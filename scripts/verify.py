@@ -95,17 +95,22 @@ def build_test_environment(root: Path) -> dict[str, str]:
 def gate_relevant_paths(root: Path) -> tuple[str, ...]:
     """Return all inputs whose changes invalidate broad tier/failed results."""
     paths: set[str] = set()
-    for directory in ("src", "configs", "scripts", "tests"):
+    for directory in ("src", "configs", "requirements", "scripts", "tests"):
         base = root / directory
         if not base.exists():
             continue
         for path in base.rglob("*"):
             if path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"}:
                 paths.add(path.relative_to(root).as_posix())
-    for relative in (".gitignore", "Makefile", "external.lock.yaml", "pyproject.toml"):
+    for relative in (".gitignore", "Makefile", "external.lock.yaml", "teachers.lock.yaml", "pyproject.toml"):
         if (root / relative).is_file():
             paths.add(relative)
     return tuple(sorted(paths))
+
+
+def changed_gate_relevant_paths(paths: tuple[str, ...], tests: tuple[str, ...]) -> tuple[str, ...]:
+    """Hash mixed changed-gate inputs without treating documentation as test input."""
+    return tuple(sorted({*tests, *(path for path in paths if not path.startswith("docs/"))}))
 
 
 def command_cacheable(
@@ -229,7 +234,7 @@ def main() -> int:
         print("changed=" + ",".join(paths))
         print("tiers=" + ",".join(selection.tiers))
         commands = [command_for(test) for test in selection.tests]
-        relevant = list(paths) + list(selection.tests)
+        relevant = list(changed_gate_relevant_paths(paths, selection.tests))
     if not commands:
         print("no impacted tests")
         return 0

@@ -24,7 +24,9 @@ class TRADESObjective(DistillationObjective):
         labels: torch.Tensor,
         teacher_logits: torch.Tensor | None = None,
         clean_student_logits: torch.Tensor | None = None,
+        adversarial_target_probabilities: torch.Tensor | None = None,
     ) -> ObjectiveTerms:
+        del teacher_logits, adversarial_target_probabilities
         if clean_student_logits is None:
             raise ValueError("TRADES requires student logits on the clean input")
         hard = F.cross_entropy(clean_student_logits, labels, reduction="none")

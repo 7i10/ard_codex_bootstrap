@@ -18,6 +18,7 @@ from verify import (  # noqa: E402
     CACHE_ENVIRONMENT_KEYS,
     VerificationError,
     build_test_environment,
+    changed_gate_relevant_paths,
     changed_paths,
     command_cacheable,
     exclude_scientific_markers,
@@ -44,6 +45,8 @@ def test_unborn_repository_changed_paths_include_untracked_files(tmp_path: Path)
 def test_impact_map_selects_marker_tiers_and_conservative_unknown_fallback() -> None:
     tests = (
         "tests/unit/test_external_management.py",
+        "tests/unit/test_models_teacher.py",
+        "tests/unit/test_tracking.py",
         "tests/unit/test_verify_gate.py",
         "tests/regression/test_trades_upstream_differential.py",
     )
@@ -54,6 +57,8 @@ def test_impact_map_selects_marker_tiers_and_conservative_unknown_fallback() -> 
     assert external_lock.tests == (
         "tests/regression/test_trades_upstream_differential.py",
         "tests/unit/test_external_management.py",
+        "tests/unit/test_models_teacher.py",
+        "tests/unit/test_tracking.py",
     )
     assert external_lock.tiers == ("T0", "T1", "T2")
     unknown = select(("src/ard/new_shared.py",), tests)
@@ -128,6 +133,7 @@ def test_m3_scientific_paths_select_both_m3_regressions(changed_path: str) -> No
 def test_train_cli_impact_selects_m4_tracking_resume_and_ddp() -> None:
     required = {
         "tests/unit/test_tracking.py",
+        "tests/integration/test_m2_method_switch.py",
         "tests/integration/test_checkpoint_resume.py",
         "tests/integration/test_tracking_evaluation.py",
         "tests/regression/test_m4_distributed.py",
@@ -360,6 +366,44 @@ def test_broad_gate_fingerprint_changes_when_production_source_changes(tmp_path:
     after = fingerprint(root=tmp_path, command=command, relevant_paths=gate_relevant_paths(tmp_path))
     assert after != before
     assert not cache.has_pass(after)
+
+
+def test_changed_gate_fingerprint_ignores_docs_but_invalidates_source(tmp_path: Path) -> None:
+    source = tmp_path / "src" / "ard" / "production.py"
+    documentation = tmp_path / "docs" / "plans" / "evidence.md"
+    test_file = tmp_path / "tests" / "unit" / "test_example.py"
+    for path in (source, documentation, test_file):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("version 1\n", encoding="utf-8")
+    relevant = changed_gate_relevant_paths(
+        ("docs/plans/evidence.md", "src/ard/production.py"),
+        ("tests/unit/test_example.py",),
+    )
+    assert relevant == ("src/ard/production.py", "tests/unit/test_example.py")
+    command = (sys.executable, "-m", "pytest", "-q", "tests/unit/test_example.py")
+    before = fingerprint(root=tmp_path, command=command, relevant_paths=relevant)
+
+    documentation.write_text("version 2\n", encoding="utf-8")
+    after_docs = fingerprint(root=tmp_path, command=command, relevant_paths=relevant)
+    assert after_docs == before
+
+    source.write_text("version 2\n", encoding="utf-8")
+    after_source = fingerprint(root=tmp_path, command=command, relevant_paths=relevant)
+    assert after_source != before
+
+
+@pytest.mark.parametrize("changed", ("teachers.lock.yaml", "requirements/constraints.txt"))
+def test_broad_gate_inputs_include_teacher_and_dependency_locks(tmp_path: Path, changed: str) -> None:
+    target = tmp_path / changed
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("version: 1\n", encoding="utf-8")
+    relevant = gate_relevant_paths(tmp_path)
+    assert changed in relevant
+    command = (sys.executable, "-m", "pytest", "-q", "-m", "t1")
+    before = fingerprint(root=tmp_path, command=command, relevant_paths=relevant)
+    target.write_text("version: 2\n", encoding="utf-8")
+    after = fingerprint(root=tmp_path, command=command, relevant_paths=gate_relevant_paths(tmp_path))
+    assert after != before
 
 
 def test_changed_t4_file_command_is_never_cacheable(tmp_path: Path) -> None:

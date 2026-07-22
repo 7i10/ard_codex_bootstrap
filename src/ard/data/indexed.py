@@ -6,7 +6,7 @@ import math
 from collections import Counter
 from collections.abc import Callable, Iterator, Sequence, Sized
 from dataclasses import dataclass
-from typing import Any, TypeAlias, cast, overload
+from typing import Any, Protocol, TypeAlias, cast, overload
 
 import torch
 from torch.utils.data import Dataset, Sampler
@@ -42,10 +42,21 @@ class SampleRef:
 IndexedItem: TypeAlias = tuple[torch.Tensor, int, int] | tuple[torch.Tensor, int, int, bool, int]
 
 
+class SourceIdTransform(Protocol):
+    """Transform whose deterministic output is keyed by immutable source ID."""
+
+    source_id_keyed: bool
+
+    def __call__(self, image: Any, *, source_id: int) -> torch.Tensor: ...
+
+
+IndexedTransform: TypeAlias = Callable[[Any], torch.Tensor] | SourceIdTransform
+
+
 class IndexedDataset(Dataset[IndexedItem]):
     """Attach the immutable source index after the wrapped transform executes."""
 
-    def __init__(self, dataset: Dataset[Any], transform: Callable[[Any], torch.Tensor] | None = None) -> None:
+    def __init__(self, dataset: Dataset[Any], transform: IndexedTransform | None = None) -> None:
         self.dataset = dataset
         self.transform = transform
         self.content_identity: dict[str, object] | None = None
@@ -72,9 +83,9 @@ class IndexedDataset(Dataset[IndexedItem]):
         image, label = item[0], item[1]
         if self.transform is not None:
             if getattr(self.transform, "source_id_keyed", False):
-                image = self.transform(image, source_id=source_index)
+                image = cast(SourceIdTransform, self.transform)(image, source_id=source_index)
             else:
-                image = self.transform(image)
+                image = cast(Callable[[Any], torch.Tensor], self.transform)(image)
         if not isinstance(image, torch.Tensor):
             raise TypeError("dataset transform must produce a torch.Tensor")
         if reference is None:

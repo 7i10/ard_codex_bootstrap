@@ -40,7 +40,16 @@ def test_one_epoch_synthetic_method_switch_smoke(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[2]
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(root / "src")
-    for name in ("pgd_at", "trades", "rslad", "rslad_entropy", "rslad_student", "rslad_joint"):
+    for name in (
+        "pgd_at",
+        "trades",
+        "rslad",
+        "rslad_entropy",
+        "rslad_student",
+        "rslad_joint",
+        "rslad_joint_downweight",
+        "rslad_hard_fallback",
+    ):
         output = tmp_path / name
         data: dict[str, object] = {
             "schema_version": 2,

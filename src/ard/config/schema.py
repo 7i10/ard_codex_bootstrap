@@ -7,7 +7,7 @@ import json
 import math
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -609,25 +609,25 @@ class ExperimentConfig(StrictModel):
         if not spec.runnable_locally:
             return
         if self.protocol.id == "synthetic_smoke_v2":
-            errors: list[str] = []
+            smoke_errors: list[str] = []
             if self.tier not in {"dev", "smoke"}:
-                errors.append("tier must be dev or smoke")
+                smoke_errors.append("tier must be dev or smoke")
             if self.dataset.name != "synthetic_cifar":
-                errors.append("dataset.name must be synthetic_cifar")
+                smoke_errors.append("dataset.name must be synthetic_cifar")
             if self.student.architecture != "fixture_cnn":
-                errors.append("student.architecture must be fixture_cnn")
-            if errors:
-                raise ValueError("synthetic_smoke_v2 contract violation: " + "; ".join(errors))
+                smoke_errors.append("student.architecture must be fixture_cnn")
+            if smoke_errors:
+                raise ValueError("synthetic_smoke_v2 contract violation: " + "; ".join(smoke_errors))
             return
         if self.protocol.id != "controlled_cifar10_r18_v1":
             return
         metadata = spec.metadata
         errors: list[str] = []
-        dataset = metadata["dataset"]
-        student = metadata["student"]
-        training = metadata["training"]
-        seeds = metadata["seeds"]
-        evaluation = metadata["evaluation"]
+        dataset = cast(Mapping[str, object], metadata["dataset"])
+        student = cast(Mapping[str, object], metadata["student"])
+        training = cast(Mapping[str, object], metadata["training"])
+        seeds = cast(Mapping[str, object], metadata["seeds"])
+        evaluation = cast(Mapping[str, object], metadata["evaluation"])
         assert all(isinstance(item, Mapping) for item in (dataset, student, training, seeds, evaluation))
         for field, expected in dataset.items():
             if getattr(self.dataset, field) != expected:

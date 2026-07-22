@@ -4,16 +4,26 @@
 
 ## 現在の到達点
 
-single-teacherの同一training loop上で、次の4 ablationを選択できます。
+同一training engine上で、次の8つのschema-v2 methodを選択できます。M4のbounded method-switchは全methodを
+one epochのsynthetic fixtureで切り替える構成であり、engineをmethodごとに複製しません。
 
 | Config method | 役割 | 固定された追加契約 |
 |---|---|---|
+| `pgd_at` | hard-label adversarial training | CE inner/outer objective |
+| `trades` | TRADES baseline | student-clean KL inner objective、explicit beta |
 | `rslad` | uniform RSLAD baseline | hard-label fallbackなし |
 | `rslad_entropy` | teacher entropy weighting | Shannon entropy、係数`5`、clip/mean preservation/fallbackなし |
-| `rslad_student` | student robust-margin risk | EMA `0.9`、epoch 0はuniform warmup |
-| `rslad_joint` | student risk × teacher overconfidence | EMA `0.9`、epoch 0はuniform warmup |
+| `rslad_student` | student-risk target softening | EMA `0.9`、epoch 0はunsoftened warmup、adversarial KD targetのみ変更 |
+| `rslad_joint` | joint-risk target softening | student risk × teacher overconfidence、epoch 0はunsoftened warmup |
+| `rslad_joint_downweight` | explicit downweight ablation | joint riskでKDをdownweight、hard fallbackなし |
+| `rslad_hard_fallback` | legacy fallback ablation | 旧joint KD/CE blendを明示的method IDで保持 |
 
-全4手法でattackはpixel-space `[0,1]`、`Linf`、`epsilon=8/255`、
+Baseline-readinessのM0–M4は承認済みです。最終bounded T0–T3 gateは18 commandsで`209 passed, 2 skipped`、
+同一の最終fingerprintの再確認は18 commandsすべて`cached pass`でした。
+Ruff/mypy/import/CLI gateもpassしました。T4/T5、live W&B、real teacher checkpoint取得・ロード、
+teacher accuracy audit、CIFAR本訓練、real full AutoAttackはdeferredです。
+
+全8手法でattackはpixel-space `[0,1]`、`Linf`、`epsilon=8/255`、
 `step_size=2/255`、10 steps、random startです。checkpoint selection attackは同じbudgetのhard-label CEです。
 attack identity/hashはbudgetだけでなく、resolved quantity、loss/target、temperature、model modeを含む
 `AttackConfig`全14 fieldから作ります。これらのいずれかを変更した実験は同一baselineとして扱いません。
@@ -184,7 +194,8 @@ after clone, `ARD_TRADES_SOURCE_EVIDENCE=1 ... test_trades_upstream_differential
 reported `4 passed`; `verify_external.py --all` passed for both repositories.
 Legacy upstream runtime/CIFAR parity, T4/T5, and full training are deferred.
 
-以下はbootstrap中に記録されたfocused test/gateの範囲です。CIFARのaccuracy結果ではありません。
+以下はbaseline-readiness M4以前のbootstrapで記録されたfocused test/gateのhistorical evidenceです。
+CIFARのaccuracy結果でも、今回のM4 final gate結果でもありません。
 
 - final M5 sourceで`make lint`が完了しました。Ruff format/checkは87 files、mypyは51 source files、
   import testは`2 passed`で、train/evaluate両CLIの`--help`も成功しました。

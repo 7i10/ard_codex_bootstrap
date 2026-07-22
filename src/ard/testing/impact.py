@@ -18,6 +18,8 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("external.lock.yaml",),
         (
             "tests/unit/test_external_management.py",
+            "tests/unit/test_models_teacher.py",
+            "tests/unit/test_tracking.py",
             "tests/regression/test_m2_upstream_oracle.py",
             "tests/regression/test_trades_upstream_differential.py",
         ),

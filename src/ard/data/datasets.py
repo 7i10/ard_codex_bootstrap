@@ -17,7 +17,7 @@ from torchvision.transforms import functional as transform_functional
 
 from ard.config.schema import DatasetConfig
 
-from .indexed import IndexedDataset, IndexedItem, SampleRef
+from .indexed import IndexedDataset, IndexedItem, IndexedTransform, SampleRef
 
 
 class EpochSourceTransform:
@@ -37,9 +37,7 @@ class EpochSourceTransform:
         # This is deliberately independent of worker order, sampler order,
         # rank, and process RNG state.  It makes a resumed epoch reproduce the
         # same train view for every immutable official source ID.
-        generator = torch.Generator().manual_seed(
-            self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
-        )
+        generator = torch.Generator().manual_seed(self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id)
         padded = transform_functional.pad(image, padding=4, fill=0)
         top = int(torch.randint(0, 9, (), generator=generator).item())
         left = int(torch.randint(0, 9, (), generator=generator).item())
@@ -242,7 +240,7 @@ def build_train_validation_views(
     split_train, split_validation = stratified_train_validation_split(
         split_view, validation_fraction=validation_fraction, seed=split_seed
     )
-    train_transform: Callable[[Any], torch.Tensor]
+    train_transform: IndexedTransform
     if config.name in {"cifar10", "cifar100"}:
         train_transform = EpochSourceTransform(augmentation_seed=augmentation_seed)
     else:

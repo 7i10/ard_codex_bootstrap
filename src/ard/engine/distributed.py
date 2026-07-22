@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import torch
 import torch.distributed as dist
@@ -111,7 +111,7 @@ def run_rank_zero_value(operation: Callable[[], T], *, phase: str) -> T:
         error_type = "UnknownError" if result is None else result.get("type", "UnknownError")
         message = "rank zero returned no outcome" if result is None else result.get("message", "")
         raise RuntimeError(f"rank-zero {phase} failed ({error_type}): {message}")
-    return result["value"]  # type: ignore[no-any-return]
+    return cast(T, result["value"])
 
 
 def reduce_sums(values: torch.Tensor) -> torch.Tensor:

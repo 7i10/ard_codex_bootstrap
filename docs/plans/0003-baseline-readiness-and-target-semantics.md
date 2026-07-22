@@ -4,7 +4,7 @@
 
 - Owner: primary agent; one owning Terra per milestone; Luna only after each API freeze; Sol scientific review at each milestone boundary
 - Branch / base SHA: `master` / `937decf2415dc5827df7f06f46316688a1f51507`
-- Current milestone: M4 pending; M0–M3 approved
+- Current milestone: complete; M0–M4 approved
 - Last updated: 2026-07-22
 
 ## Goal
@@ -81,7 +81,7 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
   - Acceptance: production defaults avoid repeated teacher clean work and per-step/per-sample synchronization while preserving loss, state, best/last, and tracking lineage
   - Rollback point: reviewed M3 delta
   - Planned commit: `perf: bound teacher diagnostics and artifact overhead`
-- [ ] M4 — Bounded integration and handoff
+- [x] M4 — Bounded integration and handoff
   - Files/modules: impact map/cache inputs, bounded configs/tests, all affected docs and execution ledger
   - Owner: one Terra for integration/impact; one final Luna docs batch
   - Tests: targeted T0–T2; synthetic at most two epochs/one train batch; conditional single-GPU and two-GPU DDP only if available; offline W&B; checkpoint/resume; saved-checkpoint PGD; constructor-only teacher smoke without weights
@@ -133,6 +133,9 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
 - 2026-07-22: M3 made PGD step-loss tracing opt-in, reuses one detached FP32 clean-teacher target across attack and outer RSLAD loss, and rejects `teacher_clean` KL attacks with teacher train mode. Diagnostics now have explicit `off|summary|panel` modes, batch CPU transfer, and ephemeral adversarial-teacher-logit reuse. Local best/last checkpoint cadence is unchanged while W&B model publication is periodic plus final.
 - 2026-07-22: M3 review found and fixed three P1 classes: terminal no-op resume could corrupt completed artifact lineage, teacher-clean reuse depended on a concrete attack config instead of the `AttackGenerator` contract, and an invalid teacher train-mode request was silently executed in eval mode. Delta review then found and fixed rank-local terminal classification and acceptance of impossible future epochs. Final scientific review approved M3 with no P0/P1/P2.
 - 2026-07-22: The host changed gate first exposed a W&B test-only race: `_tree_bytes` dereferenced an external `debug-core.log` symlink while W&B shutdown appended asynchronously. `$ard-bug-hunt` confirmed the rejected resume had not initialized W&B or mutated ARD-owned files; that resume-preflight test now uses disabled tracking while dedicated offline tests retain W&B coverage. A stale teacher-mode fixture was also corrected without weakening validation. Final `scripts/verify.py --changed --non-scientific` passed all 25 selected commands; an unchanged rerun reported all 25 as `cached pass`. Bounded `CUDA_VISIBLE_DEVICES=0,1 ... scripts/verify.py --smoke` passed all four smoke cases, including single-CUDA and two-rank CUDA DDP (`4 passed, 1 deselected`). No live W&B, checkpoint download, full training, or AutoAttack occurred.
+- 2026-07-22: M4 expanded the bounded one-engine switch from six to all eight schema-v2 methods, completed teacher/dependency lock impact and cache inputs, and retained constructor-only teacher, offline W&B, checkpoint/resume, and saved-checkpoint PGD coverage. Full lint exposed and closed 11 type errors plus four deterministic formatting deltas; final `make lint` passed Ruff on 99 files, mypy on 57 source files, two import tests, and both CLI help paths.
+- 2026-07-22: An observed cache inefficiency showed that evidence-only `docs/**` edits invalidated every mixed changed-gate command. The changed gate now excludes only docs from test fingerprints while retaining source, config, requirements, scripts, tests, and locks; a regression proves docs stability and source invalidation. Scientific review approved the full M4 diff and all deltas with no P0/P1/P2.
+- 2026-07-22: Final host `CUDA_VISIBLE_DEVICES=0,1 ... scripts/verify.py --changed --force --non-scientific` ran 18 selected commands and reported `209 passed, 2 skipped`; an unchanged rerun after the evidence-only docs update reported all 18 commands as `cached pass`. Coverage includes bounded single-CUDA and two-rank CUDA DDP. The skips are opt-in SAAD/TRADES upstream subprocess oracles; prior pinned-source differential evidence remains recorded. No live W&B, teacher weight acquisition/load, real CIFAR training, T4/T5, or full AutoAttack occurred.
 
 ## Reusable execution notes
 
@@ -143,4 +146,4 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
 
 ## Completion report
 
-Pending M0–M4 implementation, focused tests, scientific reviews, bounded smoke, documentation, and local commits. No production experiment has started.
+M0–M4 are implemented and scientifically approved. The schema-v2 engine switches all eight explicit methods, exact protocols and teacher lineage are locked, runtime/tracking overhead is bounded, and the final T0–T3 gate passed on the host with both RTX 4090 devices available. M4 is recorded by the accompanying planned local commit. The next authorized step is teacher checkpoint acquisition and a bounded accuracy audit, followed by an explicitly approved offline-sync pilot. No production experiment has started.

@@ -284,9 +284,7 @@ def test_teacher_bootstrap_is_explicit_atomic_and_never_overwrites(
     monkeypatch.setattr("bootstrap_teacher.TeacherRegistry.load", lambda _root: registry)
     monkeypatch.setattr(TeacherRegistry, "validate_external", lambda _self: None)
 
-    destination = bootstrap_teacher(
-        root=tmp_path, registry_id="chen2021_ltd_wrn34_10", source=source, update_lock=True
-    )
+    destination = bootstrap_teacher(root=tmp_path, registry_id="chen2021_ltd_wrn34_10", source=source, update_lock=True)
     assert destination.read_bytes() == source.read_bytes()
     raw = yaml.safe_load((tmp_path / "teachers.lock.yaml").read_text(encoding="utf-8"))
     entry = raw["teachers"]["chen2021_ltd_wrn34_10"]
@@ -330,9 +328,7 @@ def test_teacher_bootstrap_requires_lock_update_and_rolls_back_lock_publish_fail
     assert raw["teachers"]["chen2021_ltd_wrn34_10"]["checkpoint_status"] == "missing"
 
     monkeypatch.setattr(bootstrap_teacher_script, "_publish_lock", original_publish_lock)
-    retried = bootstrap_teacher(
-        root=tmp_path, registry_id="chen2021_ltd_wrn34_10", source=source, update_lock=True
-    )
+    retried = bootstrap_teacher(root=tmp_path, registry_id="chen2021_ltd_wrn34_10", source=source, update_lock=True)
     assert retried == destination
 
 
@@ -370,7 +366,5 @@ def test_teacher_bootstrap_preserves_destination_race_and_allows_retry_after_rem
     assert raw["teachers"]["chen2021_ltd_wrn34_10"]["checkpoint_status"] == "missing"
     destination.unlink()
     monkeypatch.setattr(bootstrap_teacher_script, "_publish_checkpoint", original_publish_checkpoint)
-    retried = bootstrap_teacher(
-        root=tmp_path, registry_id="chen2021_ltd_wrn34_10", source=source, update_lock=True
-    )
+    retried = bootstrap_teacher(root=tmp_path, registry_id="chen2021_ltd_wrn34_10", source=source, update_lock=True)
     assert retried == destination

@@ -275,8 +275,18 @@ def _parse_spec(registry_id: str, entry: Any) -> TeacherSpec:
     if not isinstance(registry_id, str) or not isinstance(entry, dict):
         raise TeacherRegistryError("teacher entries must be named mappings")
     required = {
-        "source", "upstream_model_id", "architecture", "factory", "dataset", "threat", "preprocessing",
-        "expected_parameter_count", "upstream_locator", "checkpoint_filename", "checkpoint_path", "checkpoint_sha256",
+        "source",
+        "upstream_model_id",
+        "architecture",
+        "factory",
+        "dataset",
+        "threat",
+        "preprocessing",
+        "expected_parameter_count",
+        "upstream_locator",
+        "checkpoint_filename",
+        "checkpoint_path",
+        "checkpoint_sha256",
         "checkpoint_status",
     }
     if set(entry) != required or entry["source"] != ROBUSTBENCH_REPOSITORY:
@@ -322,12 +332,18 @@ def _parse_spec(registry_id: str, entry: Any) -> TeacherSpec:
         raise TeacherRegistryError(f"teacher lock entry {registry_id!r} has invalid factory/count metadata")
     return TeacherSpec(
         registry_id=registry_id,
-        upstream_model_id=str(entry["upstream_model_id"]), architecture=str(entry["architecture"]),
+        upstream_model_id=str(entry["upstream_model_id"]),
+        architecture=str(entry["architecture"]),
         factory=FactorySpec(module=str(factory.get("module")), symbol=str(factory.get("symbol")), kwargs=kwargs),
-        dataset=str(entry["dataset"]), threat=TeacherThreat(**threat), preprocessing=parsed_preprocessing,
-        expected_parameter_count=entry["expected_parameter_count"], upstream_locator=str(entry["upstream_locator"]),
-        checkpoint_filename=str(entry["checkpoint_filename"]), checkpoint_path=checkpoint_path,
-        checkpoint_sha256=sha, checkpoint_status=status,
+        dataset=str(entry["dataset"]),
+        threat=TeacherThreat(**threat),
+        preprocessing=parsed_preprocessing,
+        expected_parameter_count=entry["expected_parameter_count"],
+        upstream_locator=str(entry["upstream_locator"]),
+        checkpoint_filename=str(entry["checkpoint_filename"]),
+        checkpoint_path=checkpoint_path,
+        checkpoint_sha256=sha,
+        checkpoint_status=status,
     )
 
 
