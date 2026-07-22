@@ -29,6 +29,6 @@ RUN="$RUN" GPUS="$GPUS" SCREEN="$SCREEN" ARGV="$ARGV" "$PYTHON" - <<'PY'
 import json,os,pathlib
 p=pathlib.Path(os.environ['RUN'])/'manifest.json'; d=json.loads(p.read_text()); ids=[int(x) for x in os.environ['GPUS'].split(',')]; d.update(status='starting',physical_gpu_indices=ids,world_size=len(ids),screen_name=os.environ['SCREEN'],command_argv=json.loads(os.environ['ARGV']),launcher='direct'); p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
 PY
-screen -DmS "$SCREEN" bash "$RUN/control/launch.sh"
+screen -DmS "$SCREEN" bash "$RUN/control/launch.sh" </dev/null >/dev/null 2>&1
 SH
 printf 'launched %s on physical GPUs %s\n' "$run_id" "$gpus"

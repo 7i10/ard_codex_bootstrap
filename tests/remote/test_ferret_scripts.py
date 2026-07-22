@@ -33,3 +33,10 @@ def test_launch_rejects_duplicate_gpu_before_ssh() -> None:
     result = subprocess.run([str(SCRIPTS / "ferret-launch"), "--run-id", "safe", "--gpus", "0,0", "--", "true"], text=True, capture_output=True)
     assert result.returncode != 0
     assert "duplicate GPU" in result.stderr
+
+
+@pytest.mark.unit
+def test_screen_launch_detaches_ssh_standard_streams() -> None:
+    launch = (SCRIPTS / "ferret-launch").read_text()
+    assert 'screen -DmS "$SCREEN"' in launch
+    assert '</dev/null >/dev/null 2>&1' in launch
