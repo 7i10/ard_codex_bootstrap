@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+: "${FERRET_HOST:=shunsukenaito@192.168.100.18}"
+: "${FERRET_REPO_ROOT:=/home/shunsukenaito/workspace-local/ard_codex_bootstrap}"
+: "${FERRET_EXPECTED_REMOTE:=https://github.com/7i10/ard_codex_bootstrap.git}"
+: "${FERRET_RUN_ROOT:=/home/shunsukenaito/workspace-local/ard-runs/ard_codex_bootstrap}"
+: "${HAMSTER_RESULT_ROOT:=/home/shunsukenaito/workspace-local/ferret-results/ard_codex_bootstrap}"
+: "${FERRET_MAX_GPUS:=3}"
+FERRET_SSH=(ssh -o BatchMode=yes -o ConnectTimeout=10 "$FERRET_HOST")
+[[ $FERRET_REPO_ROOT == /* && $FERRET_RUN_ROOT == /* && $FERRET_RUN_ROOT != / && $HAMSTER_RESULT_ROOT == /* && $HAMSTER_RESULT_ROOT != / ]] || { echo 'error: configured roots must be safe absolute paths' >&2; exit 2; }
+[[ $FERRET_MAX_GPUS =~ ^[1-9][0-9]*$ ]] || { echo 'error: FERRET_MAX_GPUS must be a positive integer' >&2; exit 2; }
+
+die() { printf 'error: %s\n' "$*" >&2; exit 2; }
+valid_run_id() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$ && "$1" != *..* ]] || die 'invalid run-id'; }
+valid_sha() { [[ "$1" =~ ^[0-9a-fA-F]{40}$ ]] || die 'SHA must be exactly 40 hex characters'; }
+run_dir() { valid_run_id "$1"; printf '%s/%s\n' "${FERRET_RUN_ROOT%/}" "$1"; }
+q() { printf '%q' "$1"; }

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source "$(dirname "$0")/ferret-common"; run_id= tail_n=200; mode=both
+while (($#)); do case "$1" in --run-id) run_id=$2; shift 2;; --tail) tail_n=$2; shift 2;; --stdout) mode=stdout; shift;; --stderr) mode=stderr; shift;; --both) mode=both; shift;; *) die "unknown argument $1";; esac; done
+valid_run_id "$run_id"; [[ $tail_n =~ ^[0-9]+$ && $tail_n -le 10000 ]] || die 'invalid tail'; run=$(run_dir "$run_id")
+"${FERRET_SSH[@]}" "RUN=$(q "$run") N=$(q "$tail_n") MODE=$(q "$mode") bash -s" <<'SH'
+[[ $MODE == stderr ]] || { echo '== stdout =='; tail -n "$N" "$RUN/logs/stdout.log" 2>/dev/null || true; }; [[ $MODE == stdout ]] || { echo '== stderr =='; tail -n "$N" "$RUN/logs/stderr.log" 2>/dev/null || true; }
+SH

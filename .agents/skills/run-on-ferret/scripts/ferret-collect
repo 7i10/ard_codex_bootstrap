@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source "$(dirname "$0")/ferret-common"; run_id=; checkpoints=false; wandb=false; all=false
+while (($#)); do case "$1" in --run-id) run_id=$2; shift 2;; --include-checkpoints) checkpoints=true; shift;; --include-wandb-offline) wandb=true; shift;; --include-all) all=true; shift;; *) die "unknown argument $1";; esac; done
+run=$(run_dir "$run_id"); dest="$HAMSTER_RESULT_ROOT/$run_id"; mkdir -p "$dest"
+filters=(--include='/manifest.json' --include='/status.json' --include='/logs/***' --include='/control/' --include='/control/exit_code' --include='/control/started_at' --include='/control/ended_at' --include='/outputs/' --include='/outputs/**/' --include='/outputs/**/summary*' --include='/outputs/**/metrics*' --include='/outputs/**/*.json' --include='/outputs/**/*.csv' --include='/outputs/**/*.md' --include='/outputs/**/*.png' --include='/outputs/**/*.pdf')
+$checkpoints && filters+=(--include='/outputs/**/*.pt' --include='/outputs/**/*.pth' --include='/outputs/**/*.ckpt')
+$wandb && filters+=(--include='/outputs/**/wandb/***' --include='/wandb/***')
+filters+=(--exclude='*')
+$all && filters=(--exclude='/repo/***')
+rsync -a --partial --safe-links "${filters[@]}" "$FERRET_HOST:$run/" "$dest/"
+printf '%s\n' "$run_id" >"$dest/.collected"; printf '%s\n' "$dest"

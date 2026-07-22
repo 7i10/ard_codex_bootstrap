@@ -11,6 +11,7 @@
 - [Teacher config fragments](../configs/teachers/): strict RobustBench teacher configs; checkpoints are registered explicitly
 - [Experiment taxonomy](EXPERIMENT_PROTOCOL.md): audit, pilot, and canonical production separation
 - [Codex workflow](CODEX_WORKFLOW.md): Sol/Terra/Lunaの役割分担
+- [Ferret execution protocol](FERRET_EXECUTION_PROTOCOL.md): fixed-SHA remote GPU runs from Hamster
 
 ## CLI entry points
 

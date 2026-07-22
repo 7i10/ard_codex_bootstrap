@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source "$(dirname "$0")/ferret-common"; run_id= execute=false
+while (($#)); do case "$1" in --run-id) run_id=$2; shift 2;; --execute) execute=true; shift;; *) die "unknown argument $1";; esac; done
+run=$(run_dir "$run_id"); marker="$HAMSTER_RESULT_ROOT/$run_id/.collected"
+if ! $execute; then printf '{"dry_run":true,"run_id":"%s","remote_path":"%s","collected":%s}\n' "$run_id" "$run" "$([[ -f $marker ]] && echo true || echo false)"; exit; fi
+[[ -f $marker ]] || die 'refusing cleanup before collection'; "${FERRET_SSH[@]}" "RUN=$(q "$run") ROOT=$(q "$FERRET_RUN_ROOT") REPO=$(q "$FERRET_REPO_ROOT") bash -s" <<'SH'
+set -Eeuo pipefail; test ! -L "$RUN"; test "$(realpath -m "$(dirname "$RUN")")" = "$(realpath -m "$ROOT")"; test -f "$RUN/control/exit_code"; name=$(cat "$RUN/control/screen_name" 2>/dev/null || true); [[ -z $name ]] || ! screen -ls 2>/dev/null | grep -Fq ".$name" || { echo running >&2; exit 3; }; git -C "$REPO" worktree remove "$RUN/repo"; find "$RUN" -depth -delete; git -C "$REPO" worktree prune
+SH

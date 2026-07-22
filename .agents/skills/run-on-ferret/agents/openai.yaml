@@ -1,0 +1,6 @@
+interface:
+  display_name: "Run on Ferret"
+  short_description: "Run fixed-SHA GPU experiments safely on Ferret"
+  default_prompt: "Use $run-on-ferret to preflight and operate a bounded fixed-SHA Ferret experiment."
+policy:
+  allow_implicit_invocation: false
