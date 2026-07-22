@@ -1,16 +1,32 @@
 #!/usr/bin/env python3
-"""Verify that the local SAAD checkout exactly matches external.lock.yaml."""
+"""Verify one or all local external checkouts against external.lock.yaml."""
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from external_common import ExternalError, license_evidence, load_lock, repository_root, validate_checkout
+from external_common import (
+    ExternalError,
+    LockedRepository,
+    license_evidence,
+    repository_root,
+    select_repositories,
+    validate_checkout,
+)
 
 
-def verify(*, root: Path) -> dict[str, object]:
-    _, locked = load_lock(root / "external.lock.yaml")
+def verify(
+    *, root: Path, repository: str | None = None, all_repositories: bool = False
+) -> dict[str, object] | tuple[dict[str, object], ...]:
+    _, repositories = select_repositories(
+        root / "external.lock.yaml", repository=repository, all_repositories=all_repositories
+    )
+    reports = tuple(_verify_one(root=root, locked=locked) for locked in repositories)
+    return reports if all_repositories else reports[0]
+
+
+def _verify_one(*, root: Path, locked: LockedRepository) -> dict[str, object]:
     checkout = root / ".external" / locked.name
     validate_checkout(checkout, locked)
     observed_path, observed_evidence = license_evidence(checkout)
@@ -31,12 +47,18 @@ def verify(*, root: Path) -> dict[str, object]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=repository_root())
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--repository", help="locked repository name (default: saad)")
+    selection.add_argument("--all", action="store_true", help="verify every locked repository by name")
     args = parser.parse_args()
     try:
-        report = verify(root=args.root.resolve())
-    except ExternalError as exc:
+        reports = verify(root=args.root.resolve(), repository=args.repository, all_repositories=args.all)
+    except (ExternalError, ValueError) as exc:
         parser.error(str(exc))
-    print(" ".join(f"{key}={value}" for key, value in report.items()))
+    if isinstance(reports, tuple):
+        print("\n".join(" ".join(f"{key}={value}" for key, value in report.items()) for report in reports))
+    else:
+        print(" ".join(f"{key}={value}" for key, value in reports.items()))
     return 0
 
 

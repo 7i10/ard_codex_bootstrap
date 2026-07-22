@@ -7,7 +7,7 @@
 - [Test strategy](TEST_STRATEGY.md): tier、変更影響、pass cache、数値tolerance、GPU排他
 - [W&B protocol](WANDB_PROTOCOL.md): tier/state、group/job type、artifact、固定sample table
 - [Experiment protocol](EXPERIMENT_PROTOCOL.md): run tier、baseline、seed、評価
-- [Upstream baselines](UPSTREAM_BASELINES.md): pinned SAAD SHA、ライセンス不在、既知差分
+- [Upstream baselines](UPSTREAM_BASELINES.md): pinned SAAD/TRADES SHA、ライセンス証拠、既知差分
 - [Codex workflow](CODEX_WORKFLOW.md): Sol/Terra/Lunaの役割分担
 
 ## CLI entry points

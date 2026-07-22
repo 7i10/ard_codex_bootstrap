@@ -41,7 +41,7 @@ repositories:
 
 - `.external`を作成
 - lockがある場合はexact commitをcheckout
-- lockがない初回だけremote HEADを取得し、commitをlock候補として出力
+- `--repository NAME`で1件、`--all`でlock内の全repoを名前順に処理（無指定は`saad`）
 - remote mismatchをエラー化
 - dirty working treeを上書きしない
 - clone失敗・checkout失敗を成功扱いしない
@@ -124,7 +124,51 @@ optimizer update, and an opt-in subprocess differential. The latter requires
 `ARD_RUN_SAAD_ORACLE=1` and a dependency-complete local clone; it skips when
 the local oracle cannot import its own optional dependencies.
 
-## 8. Verified versus deferred
+## 8. TRADES upstream baseline
+
+Official TRADES is pinned as a separate local oracle:
+
+```text
+remote: https://github.com/yaodongyu/TRADES.git
+commit: 6e8e11b7c281371c2f027ffadfbaea80361f09de
+license: root LICENSE, MIT, SHA256 4b42e38a6899d82801eb6782fe161cccb5d3d685c8bcddc2b877ac9f87161a30
+```
+
+The clean checkout and lock evidence were verified. `scripts/bootstrap_external.py`
+supports `--repository NAME` and `--all`; the default remains `saad`. The same
+named selection is available to `scripts/verify_external.py`, and cache
+fingerprints include every locked repository.
+
+Documented upstream-vs-local differences are intentional and covered by the
+fixed-batch differential test:
+
+- The official outer clean KL target is non-detached; local TRADES detaches it.
+  The scalar is equal, but clean-input gradients and the resulting SGD delta differ.
+- Official attack initialization is Gaussian noise with `0.001` scale; local
+  initialization is uniform in `[-epsilon, epsilon]`, immediately projected and clamped.
+- Official CIFAR defaults are epsilon `.031`, step `.007`, 10 steps, `beta=6`;
+  local defaults are `8/255`, `2/255`, 10 steps, `beta=6`.
+- Upstream data uses `ToTensor()` without `Normalize`; local attacks still receive
+  pixels in `[0,1]`, but `PixelModel` applies the configured normalization exactly
+  once before its architecture (identity for the synthetic fixture and an explicit
+  dataset profile for real-data configs). The upstream learning-rate, data-loader,
+  and WideResNet path is not reproduced locally.
+
+Evidence commands:
+
+```bash
+python scripts/bootstrap_external.py --repository trades
+python scripts/verify_external.py --all
+ARD_TRADES_SOURCE_EVIDENCE=1 \
+  PYTHONPATH=src python -m pytest -q tests/regression/test_trades_upstream_differential.py
+```
+
+The focused core gate was `40 passed, 1 skipped` before cloning. After the
+TRADES clone, the source-evidence differential was `4 passed`, and
+`verify_external.py --all` passed for both locked repositories. Legacy upstream
+runtime/CIFAR parity, T4/T5, and full training remain deferred.
+
+## 9. Verified versus deferred
 
 Verified during bootstrap:
 
@@ -138,6 +182,9 @@ Deferred and therefore not claimed:
 - CIFAR public-number reproduction
 - full AutoAttack comparison
 - legal permission to copy, modify, or redistribute upstream source
+
+The TRADES root MIT license is recorded above; this does not imply legacy
+upstream runtime or CIFAR-number parity.
 
 Because the license file is absent, `.external/saad` remains a local read-only
 oracle. No upstream source is vendored into production modules.

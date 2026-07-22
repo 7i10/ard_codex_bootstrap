@@ -15,12 +15,16 @@ class ImpactSelection:
 
 RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     (
+        ("external.lock.yaml",),
         (
-            "external.lock.yaml",
-            "scripts/bootstrap_external.py",
-            "scripts/verify_external.py",
-            "scripts/external_common.py",
+            "tests/unit/test_external_management.py",
+            "tests/regression/test_m2_upstream_oracle.py",
+            "tests/regression/test_trades_upstream_differential.py",
         ),
+        ("T0", "T1", "T2"),
+    ),
+    (
+        ("scripts/bootstrap_external.py", "scripts/verify_external.py", "scripts/external_common.py"),
         ("tests/unit/test_external_management.py",),
         ("T0", "T1"),
     ),
@@ -35,9 +39,10 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
             "tests/unit/test_config.py",
             "tests/regression/test_m3_student_aware.py",
             "tests/regression/test_m3_distributed.py",
+            "tests/regression/test_trades_upstream_differential.py",
             "tests/integration/test_synthetic_training.py",
         ),
-        ("T0", "T3"),
+        ("T0", "T2", "T3"),
     ),
     (
         ("src/ard/data/",),
@@ -64,6 +69,7 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
             "tests/unit/test_pgd.py",
             "tests/regression/test_m2_baselines.py",
             "tests/regression/test_m2_upstream_oracle.py",
+            "tests/regression/test_trades_upstream_differential.py",
             "tests/integration/test_m2_method_switch.py",
             "tests/integration/test_checkpoint_resume.py",
             "tests/integration/test_synthetic_training.py",
@@ -77,6 +83,7 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
             "tests/unit/test_pgd.py",
             "tests/regression/test_m2_baselines.py",
             "tests/regression/test_m2_upstream_oracle.py",
+            "tests/regression/test_trades_upstream_differential.py",
             "tests/regression/test_m3_student_aware.py",
             "tests/regression/test_m3_distributed.py",
             "tests/integration/test_m2_method_switch.py",
@@ -149,6 +156,7 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         (
             "tests/unit/test_config.py",
             "tests/regression/test_m2_baselines.py",
+            "tests/regression/test_trades_upstream_differential.py",
             "tests/integration/test_m2_method_switch.py",
             "tests/integration/test_synthetic_training.py",
         ),

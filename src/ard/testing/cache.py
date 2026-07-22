@@ -11,19 +11,69 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def external_sha(root: Path) -> str | None:
-    checkout = root / ".external" / "saad"
+def _checkout_identity(checkout: Path) -> dict[str, str | None]:
     if not checkout.exists():
-        return None
+        return {"head": None, "origin": None, "dirty": None}
     completed = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=checkout, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
     )
-    return completed.stdout.strip() if completed.returncode == 0 else None
+    head = completed.stdout.strip() if completed.returncode == 0 else None
+    if head is None:
+        return {"head": None, "origin": None, "dirty": None}
+    origin = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        cwd=checkout,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=checkout,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    return {
+        "head": head,
+        "origin": origin.stdout.strip() if origin.returncode == 0 else None,
+        "dirty": "true" if dirty.returncode == 0 and bool(dirty.stdout) else "false" if dirty.returncode == 0 else None,
+    }
+
+
+def external_identity(root: Path) -> dict[str, dict[str, str | None]]:
+    """Describe every repository declared by the lock, in deterministic name order."""
+    lock_path = root / "external.lock.yaml"
+    try:
+        raw = yaml.safe_load(lock_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, yaml.YAMLError):
+        return {}
+    repositories = raw.get("repositories") if isinstance(raw, dict) else None
+    if not isinstance(repositories, dict):
+        return {}
+    identity: dict[str, dict[str, str | None]] = {}
+    for name in sorted(repositories):
+        entry = repositories[name]
+        if not isinstance(name, str) or not isinstance(entry, dict):
+            continue
+        identity[name] = {
+            "locked_commit": entry.get("commit") if isinstance(entry.get("commit"), str) else None,
+            "locked_url": entry.get("url") if isinstance(entry.get("url"), str) else None,
+            **_checkout_identity(root / ".external" / name),
+        }
+    return identity
+
+
+def external_sha(root: Path) -> str | None:
+    """Backward-compatible access to the historical SAAD checkout SHA."""
+    return external_identity(root).get("saad", {}).get("head")
 
 
 def environment_identity() -> dict[str, object]:
@@ -91,7 +141,7 @@ def fingerprint(
         "source_config_hashes": _hash_paths(root, declared_paths, prefixes=("src/", "configs/", "pyproject.toml")),
         "other_input_hashes": files,
         "runtime": environment_identity(),
-        "external_sha": external_sha(root),
+        "external_identity": external_identity(root),
         "fixture_version": fixture_version,
         "seed": seed,
     }

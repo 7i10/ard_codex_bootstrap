@@ -16,6 +16,17 @@ from ard.testing.cache import CacheRecord, PassCache, fingerprint  # noqa: E402
 from ard.testing.gpu_lock import GPULock  # noqa: E402
 from ard.testing.impact import select  # noqa: E402
 
+CACHE_ENVIRONMENT_KEYS = (
+    "CUDA_VISIBLE_DEVICES",
+    "PYTHONHASHSEED",
+    "WANDB_MODE",
+    "PYTHONPATH",
+    "ARD_TEST_SEED",
+    "ARD_TEST_FIXTURE_VERSION",
+    "ARD_RUN_SAAD_ORACLE",
+    "ARD_TRADES_SOURCE_EVIDENCE",
+)
+
 
 class VerificationError(RuntimeError):
     """The gate cannot determine a complete, trustworthy test selection."""
@@ -231,18 +242,7 @@ def main() -> int:
             root=root,
             command=command,
             relevant_paths=relevant,
-            environment={
-                key: run_environment[key]
-                for key in (
-                    "CUDA_VISIBLE_DEVICES",
-                    "PYTHONHASHSEED",
-                    "WANDB_MODE",
-                    "PYTHONPATH",
-                    "ARD_TEST_SEED",
-                    "ARD_TEST_FIXTURE_VERSION",
-                )
-                if key in run_environment
-            },
+            environment={key: run_environment[key] for key in CACHE_ENVIRONMENT_KEYS if key in run_environment},
             fixture_version=run_environment["ARD_TEST_FIXTURE_VERSION"],
             seed=run_environment["ARD_TEST_SEED"],
         )

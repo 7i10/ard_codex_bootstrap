@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from verify import (  # noqa: E402
+    CACHE_ENVIRONMENT_KEYS,
     VerificationError,
     build_test_environment,
     changed_paths,
@@ -24,7 +25,7 @@ from verify import (  # noqa: E402
 )
 from verify import main as verify_main  # noqa: E402
 
-from ard.testing.cache import CacheRecord, PassCache, environment_identity, fingerprint  # noqa: E402
+from ard.testing.cache import CacheRecord, PassCache, environment_identity, external_identity, fingerprint  # noqa: E402
 from ard.testing.gpu_lock import GPULock  # noqa: E402
 from ard.testing.impact import select  # noqa: E402
 
@@ -41,17 +42,30 @@ def test_unborn_repository_changed_paths_include_untracked_files(tmp_path: Path)
 
 
 def test_impact_map_selects_marker_tiers_and_conservative_unknown_fallback() -> None:
-    tests = ("tests/unit/test_external_management.py", "tests/unit/test_verify_gate.py")
+    tests = (
+        "tests/unit/test_external_management.py",
+        "tests/unit/test_verify_gate.py",
+        "tests/regression/test_trades_upstream_differential.py",
+    )
     external = select(("scripts/bootstrap_external.py",), tests)
     assert external.tests == ("tests/unit/test_external_management.py",)
     assert external.tiers == ("T0", "T1")
+    external_lock = select(("external.lock.yaml",), tests)
+    assert external_lock.tests == (
+        "tests/regression/test_trades_upstream_differential.py",
+        "tests/unit/test_external_management.py",
+    )
+    assert external_lock.tiers == ("T0", "T1", "T2")
     unknown = select(("src/ard/new_shared.py",), tests)
-    assert unknown.tests == tests
+    assert unknown.tests == tuple(sorted(tests))
     assert unknown.tiers == ("T0", "T1")
     mixed = select(("Makefile", "src/ard/attacks/pgd.py"), tests)
-    assert mixed.tests == tests
+    assert mixed.tests == (
+        "tests/regression/test_trades_upstream_differential.py",
+        "tests/unit/test_verify_gate.py",
+    )
     test_helper = select(("tests/conftest.py",), tests)
-    assert test_helper.tests == tests
+    assert test_helper.tests == tuple(sorted(tests))
 
 
 def test_configs_changes_select_repository_config_resolution_test() -> None:
@@ -215,6 +229,29 @@ def test_fingerprint_covers_exact_command_test_source_config_fixture_and_seed(tm
         path.write_text(path.read_text(encoding="utf-8").replace("# changed\n", ""), encoding="utf-8")
 
 
+def test_external_identity_and_fingerprint_cover_every_locked_repository(tmp_path: Path) -> None:
+    lock = tmp_path / "external.lock.yaml"
+    lock.write_text(
+        """version: 1
+repositories:
+  trades:
+    url: https://example.invalid/TRADES.git
+    commit: "2222222222222222222222222222222222222222"
+  saad:
+    url: https://example.invalid/saad.git
+    commit: "1111111111111111111111111111111111111111"
+""",
+        encoding="utf-8",
+    )
+    command = (sys.executable, "-m", "pytest", "-q", "tests/test_runtime.py")
+    before = fingerprint(root=tmp_path, command=command, relevant_paths=())
+    identities = external_identity(tmp_path)
+    assert tuple(identities) == ("saad", "trades")
+    assert identities["trades"]["locked_commit"] == "2" * 40
+    lock.write_text(lock.read_text(encoding="utf-8").replace("2222", "3333", 1), encoding="utf-8")
+    assert before != fingerprint(root=tmp_path, command=command, relevant_paths=())
+
+
 def test_environment_identity_canonicalizes_cuda_uuid_and_fingerprint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -259,6 +296,7 @@ def test_test_environment_sets_explicit_cache_seed_and_fixture_version(tmp_path:
     assert environment["PYTHONHASHSEED"] == "0"
     assert environment["ARD_TEST_SEED"] == "0"
     assert environment["ARD_TEST_FIXTURE_VERSION"] == "1"
+    assert {"ARD_RUN_SAAD_ORACLE", "ARD_TRADES_SOURCE_EVIDENCE"} <= set(CACHE_ENVIRONMENT_KEYS)
 
 
 def test_gpu_lock_uses_one_file_per_visible_physical_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

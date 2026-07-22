@@ -7,3 +7,11 @@ repositories:
     license_file: null
     license_status: absent
     license_evidence: null
+  trades:
+    url: https://github.com/yaodongyu/TRADES.git
+    commit: 6e8e11b7c281371c2f027ffadfbaea80361f09de
+    fetched_at: '2026-07-22T06:18:25.185174+00:00'
+    license_file: LICENSE
+    license_status: verified
+    license_evidence:
+      sha256: 4b42e38a6899d82801eb6782fe161cccb5d3d685c8bcddc2b877ac9f87161a30
