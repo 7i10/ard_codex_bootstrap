@@ -36,7 +36,8 @@ def test_launch_rejects_duplicate_gpu_before_ssh() -> None:
 
 
 @pytest.mark.unit
-def test_screen_launch_detaches_ssh_standard_streams() -> None:
+def test_nohup_setsid_launch_detaches_ssh_standard_streams() -> None:
     launch = (SCRIPTS / "ferret-launch").read_text()
-    assert 'screen -DmS "$SCREEN"' in launch
-    assert '</dev/null >/dev/null 2>&1' in launch
+    assert 'nohup setsid bash "$RUN/control/launch.sh"' in launch
+    assert '</dev/null >"$RUN/control/supervisor.log" 2>&1 &' in launch
+    assert "screen -" not in launch

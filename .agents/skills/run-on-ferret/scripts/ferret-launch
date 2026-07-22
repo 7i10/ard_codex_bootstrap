@@ -5,11 +5,11 @@ run_id= gpus=
 while (($#)); do case "$1" in --run-id) run_id=$2; shift 2;; --gpus) gpus=$2; shift 2;; --launcher) [[ $2 == direct ]] || die 'only direct launcher is supported'; shift 2;; --) shift; break;; *) die "unknown argument $1";; esac; done
 valid_run_id "$run_id"; [[ $gpus =~ ^[0-9]+(,[0-9]+)*$ ]] || die 'invalid GPU list'; (($#)) || die 'command argv required after --'
 IFS=, read -ra gpu_array <<<"$gpus"; declare -A seen=(); for x in "${gpu_array[@]}"; do ((x<FERRET_MAX_GPUS)) || die 'GPU index exceeds configured maximum'; [[ -z ${seen[$x]:-} ]] || die 'duplicate GPU'; seen[$x]=1; done
-run=$(run_dir "$run_id"); screen_name="ard-${run_id:0:70}"; command_line=$(printf '%q ' "$@")
+run=$(run_dir "$run_id"); command_line=$(printf '%q ' "$@")
 payload=$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
-"${FERRET_SSH[@]}" "RUN=$(q "$run") GPUS=$(q "$gpus") SCREEN=$(q "$screen_name") ARGV=$(q "$payload") CMD=$(q "$command_line") PYTHON=$(q "$FERRET_PYTHON") bash -s" <<'SH'
+"${FERRET_SSH[@]}" "RUN=$(q "$run") GPUS=$(q "$gpus") ARGV=$(q "$payload") CMD=$(q "$command_line") PYTHON=$(q "$FERRET_PYTHON") bash -s" <<'SH'
 set -Eeuo pipefail
-test ! -L "$RUN"; test -f "$RUN/manifest.json"; exec 9>"$RUN/control/launch.lock"; flock -n 9 || { echo 'concurrent launch refused' >&2; exit 3; }; test ! -e "$RUN/control/launched"; ! screen -ls 2>/dev/null | grep -Fq ".$SCREEN"
+test ! -L "$RUN"; test -f "$RUN/manifest.json"; exec 9>"$RUN/control/launch.lock"; flock -n 9 || { echo 'concurrent launch refused' >&2; exit 3; }; test ! -e "$RUN/control/launched"
 available=$(nvidia-smi --query-gpu=index --format=csv,noheader,nounits); busy=$(nvidia-smi --query-compute-apps=gpu_uuid --format=csv,noheader 2>/dev/null || true)
 IFS=, read -ra ids <<<"$GPUS"; uuids=(); for id in "${ids[@]}"; do grep -qx "$id" <<<"$available" || { echo "GPU $id unavailable" >&2; exit 3; }; uuid=$(nvidia-smi --query-gpu=uuid --format=csv,noheader | sed -n "$((id+1))p"); grep -Fqx "$uuid" <<<"$busy" && { echo "GPU $id busy" >&2; exit 3; }; uuids+=("$uuid"); done
 cat >"$RUN/control/launch.sh" <<EOF
@@ -24,11 +24,12 @@ set +e
 CUDA_VISIBLE_DEVICES=$(printf '%q' "$GPUS") $CMD > >(tee -a $(printf '%q' "$RUN/logs/stdout.log")) 2> >(tee -a $(printf '%q' "$RUN/logs/stderr.log") >&2)
 code=\$?; set -e; printf '%s\n' "\$code" > $(printf '%q' "$RUN/control/exit_code"); date --iso-8601=seconds > $(printf '%q' "$RUN/control/ended_at"); exit "\$code"
 EOF
-chmod 700 "$RUN/control/launch.sh"; printf '%s\n' "$SCREEN" >"$RUN/control/screen_name"; : >"$RUN/control/launched"
-RUN="$RUN" GPUS="$GPUS" SCREEN="$SCREEN" ARGV="$ARGV" "$PYTHON" - <<'PY'
+chmod 700 "$RUN/control/launch.sh"; : >"$RUN/control/launched"
+RUN="$RUN" GPUS="$GPUS" ARGV="$ARGV" "$PYTHON" - <<'PY'
 import json,os,pathlib
-p=pathlib.Path(os.environ['RUN'])/'manifest.json'; d=json.loads(p.read_text()); ids=[int(x) for x in os.environ['GPUS'].split(',')]; d.update(status='starting',physical_gpu_indices=ids,world_size=len(ids),screen_name=os.environ['SCREEN'],command_argv=json.loads(os.environ['ARGV']),launcher='direct'); p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
+p=pathlib.Path(os.environ['RUN'])/'manifest.json'; d=json.loads(p.read_text()); ids=[int(x) for x in os.environ['GPUS'].split(',')]; d.update(status='starting',physical_gpu_indices=ids,world_size=len(ids),launch_backend='nohup-setsid',command_argv=json.loads(os.environ['ARGV']),launcher='direct'); p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
 PY
-screen -DmS "$SCREEN" bash "$RUN/control/launch.sh" </dev/null >/dev/null 2>&1
+nohup setsid bash "$RUN/control/launch.sh" </dev/null >"$RUN/control/supervisor.log" 2>&1 &
+printf '%s\n' "$!" >"$RUN/control/submitted_pid"
 SH
 printf 'launched %s on physical GPUs %s\n' "$run_id" "$gpus"

@@ -1,6 +1,6 @@
 ---
 name: run-on-ferret
-description: Safely prepare, launch, monitor, collect, cancel, and clean fixed-commit GPU experiments on the Ferret host. Use only when explicitly asked to operate a bounded Ferret run through SSH, screen, and rsync.
+description: Safely prepare, launch, monitor, collect, cancel, and clean fixed-commit GPU experiments on the Ferret host. Use only when explicitly asked to operate a bounded Ferret run through SSH, nohup/setsid, and rsync.
 ---
 
 # Run On Ferret

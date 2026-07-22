@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 source "$(dirname "$0")/ferret-common"; [[ ${1:-} == --run-id && -n ${2:-} ]] || die 'usage: --run-id ID'; run=$(run_dir "$2")
 "${FERRET_SSH[@]}" "RUN=$(q "$run") PYTHON=$(q "$FERRET_PYTHON") bash -s" <<'SH'
-set -Eeuo pipefail; name=$(cat "$RUN/control/screen_name"); pid=$(cat "$RUN/control/launcher_pid"); pgid=$(cat "$RUN/control/process_group"); screen -ls | grep -Fq ".$name"
+set -Eeuo pipefail; pid=$(cat "$RUN/control/launcher_pid"); pgid=$(cat "$RUN/control/process_group")
 test "$(stat -c '%Y' "/proc/$pid/stat")" = "$(cat "$RUN/control/process_start_marker")"
 test "$(ps -o user= -p "$pid" | tr -d ' ')" = "$USER"
 case "$(readlink -f "/proc/$pid/cwd")" in "$RUN/repo"|"$RUN/repo/"*) ;; *) echo 'process cwd mismatch' >&2; exit 3;; esac
@@ -12,5 +12,5 @@ RUN="$RUN" "$PYTHON" - <<'PY'
 import json,os,pathlib
 p=pathlib.Path(os.environ['RUN'])/'manifest.json'; d=json.loads(p.read_text()); d['status']='cancel_requested'; p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
 PY
-kill -TERM -- "-$pgid"; sleep 10; ! screen -ls 2>/dev/null | grep -Fq ".$name" || { echo 'still running; no KILL sent' >&2; exit 4; }
+kill -TERM -- "-$pgid"; sleep 10; ! kill -0 "$pid" 2>/dev/null || { echo 'still running; no KILL sent' >&2; exit 4; }
 SH
