@@ -3,7 +3,7 @@
 ## Status
 
 - Base: `dd7c54b`
-- Current milestone: F6 detached lifecycle validation
+- Current milestone: F7 final review and handoff
 - Owners: Sol for plan/review, Terra for scripts/tests, main thread for integration and remote operations
 - Last updated: 2026-07-23
 
@@ -27,7 +27,7 @@ Provide an explicitly invoked repo-local `$run-on-ferret` skill that lets Hamste
 - [x] F3 — detached launch, normalized status, bounded logs
 - [x] F4 — selective rsync collect, targeted cancel, dry-run cleanup
 - [x] F5 — local mocked/static tests and skill validation
-- [ ] F6 — Ferret read-only, prepare-only, detached CPU smoke, collect, cleanup dry-run
+- [x] F6 — Ferret read-only, prepare-only, detached CPU smoke, collect, cleanup dry-run
 - [ ] F7 — delta review, documentation, cohesive commit, non-force push
 
 ## Changed surfaces
@@ -58,6 +58,6 @@ Completion requires local safety tests and skill validation, verified BatchMode 
 
 - Hamster/Ferret authentication: dedicated GitHub and Ferret keys are configured; GitHub identified account `7i10`, and Ferret identified host `islab-3gpu` / user `shunsukenaito`.
 - Static/local: Bash syntax passed for all nine scripts; skill `quick_validate.py` passed; focused remote-controller tests passed `16 passed in 0.08s`; `git diff --check` passed. ShellCheck is not installed.
-- Review status: the first independent reviewer did not return a verdict and therefore does not count as approval. The main-thread checklist added exact-origin verification, safe roots, full-SHA/run-ID validation, argv quoting, launch locking, busy-GPU refusal, process identity checks before TERM, selective collection, and guarded cleanup. One independent delta review remains after F6 evidence is complete.
-- Ferret evidence: read-only preflight passed with RTX 4090 x3 and >1 TB free. Fixed-SHA prepare, CPU execution, completed status, logs, collection, and cleanup dry-run passed at `be163f7`; the smoke exposed blocking behavior in the prompt's `screen -D -m` pattern, so the backend was replaced with `nohup setsid` and requires one final lifecycle rerun.
-- Deferred: final detached CPU lifecycle, executed cleanup, CUDA/DDP smoke, production, AutoAttack, and live W&B.
+- Review status: two independent reviewer attempts did not return a verdict and therefore do not count as approval; no third retry was started. The main-thread checklist added exact-origin verification, safe roots, full-SHA/run-ID validation, argv quoting, launch locking, busy-GPU refusal, process identity checks before TERM, selective collection, and guarded cleanup. Independent review remains explicitly pending rather than blocking bounded operational validation.
+- Ferret evidence: read-only preflight passed with RTX 4090 x3 and >1 TB free. The prompt's `screen -D -m` pattern blocked until job completion and was replaced at user direction with `nohup setsid`. At fixed SHA `db216fe`, launch returned in 0.70 seconds, status transitioned `running → completed`, exit code was 0, logs contained `start`/`done`, selective collection succeeded, and cleanup dry-run confirmed collected evidence.
+- Deferred: destructive cleanup execution, CUDA/DDP smoke, production, AutoAttack, and live W&B. Two earlier collected smoke directories and the final collected run remain on Ferret until explicit cleanup.
