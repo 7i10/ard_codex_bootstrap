@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from ard.analysis import ParquetDependencyError, fixed_panel_ids, summarize_checkpoint_groups, write_sample_parquet
-from ard.cli.evaluate import _validate_evaluation_tracking_identity
-from ard.config.schema import ExperimentConfig, validate_global_batch_size
+from ard.cli.evaluate import _evaluation_tracker_config, _validate_evaluation_tracking_identity
+from ard.config.schema import ExperimentConfig, TrainingConfig, training_execution_identity, validate_global_batch_size
 from ard.engine.checkpoint import REQUIRED_KEYS
 from ard.evaluation.autoattack import run_autoattack
 from ard.evaluation.saved_checkpoint import validate_checkpoint_lineage
@@ -154,6 +154,30 @@ def test_evaluation_protocol_id_must_match_resolved_training_config() -> None:
         _validate_evaluation_tracking_identity(evaluation, training)
 
 
+def test_evaluation_tracker_config_uses_training_identity_and_evaluation_only_fields(tmp_path: Path) -> None:
+    training = _tracked_repro_config()
+    evaluation = training.model_copy(
+        update={
+            "optimizer": training.optimizer.model_copy(update={"learning_rate": 0.025}),
+            "training": training.training.model_copy(update={"num_workers": 3}),
+            "evaluation": training.evaluation.model_copy(update={"seed": 91}),
+            "output_dir": tmp_path / "caller-output",
+        }
+    )
+
+    tracker_config = _evaluation_tracker_config(evaluation, training, output_dir=tmp_path / "evaluation-output")
+
+    assert tracker_config.protocol == training.protocol
+    assert tracker_config.seeds == training.seeds
+    assert tracker_config.teacher == training.teacher
+    assert tracker_config.method == training.method
+    assert tracker_config.optimizer == training.optimizer
+    assert tracker_config.training == training.training
+    assert tracker_config.tracking == training.tracking
+    assert tracker_config.evaluation == evaluation.evaluation
+    assert tracker_config.output_dir == tmp_path / "evaluation-output"
+
+
 def test_evaluation_attack_must_be_explicit_eval_ce_and_panel_is_stable() -> None:
     data = base()
     data["evaluation"] = {"attack": {"steps": 1, "student_mode": "train"}}
@@ -186,6 +210,18 @@ def test_global_batch_identity_is_exact_for_checkpoint_world_size() -> None:
     assert validate_global_batch_size(per_rank_batch_size=4, global_batch_size=8, world_size=2) == 8
     with pytest.raises(ValueError, match="global_batch_size"):
         validate_global_batch_size(per_rank_batch_size=4, global_batch_size=4, world_size=2)
+
+
+def test_execution_identity_distinguishes_local_batchnorm_profiles_with_equal_global_batch() -> None:
+    one_gpu = training_execution_identity(
+        training=TrainingConfig(per_rank_batch_size=128, global_batch_size=128), world_size=1
+    )
+    two_gpu = training_execution_identity(
+        training=TrainingConfig(per_rank_batch_size=64, global_batch_size=128), world_size=2
+    )
+    assert one_gpu["effective_global_batch_size"] == two_gpu["effective_global_batch_size"] == 128
+    assert one_gpu["batchnorm_mode"] == two_gpu["batchnorm_mode"] == "local_per_rank"
+    assert one_gpu != two_gpu
 
 
 def test_parquet_never_falls_back_to_a_mislabeled_file(tmp_path: Path) -> None:
@@ -338,7 +374,17 @@ def _evaluation_row(
         "training_dataset_identity": {"name": "cifar10", "split": "train"},
         "student_identity": student_identity or {"architecture": "resnet18"},
         "method_identity": method_identity or {"name": "pgd_at"},
-        "training_protocol_identity": {"id": "controlled_cifar10_r18_v1", "checkpoint_world_size": 1, "epochs": 1},
+        "training_protocol_identity": {
+            "id": "controlled_cifar10_r18_v1",
+            "epochs": 1,
+            "execution": {
+                "world_size": 1,
+                "per_rank_batch_size": 4,
+                "global_batch_size": 4,
+                "effective_global_batch_size": 4,
+                "batchnorm_mode": "local_per_rank",
+            },
+        },
         "evaluation_protocol_identity": {"seed": 0, "loader_batch_size": 4},
         "threat_hash": threat_hash,
         "evaluation_seed": 0,
@@ -410,7 +456,20 @@ def test_checkpoint_aggregation_rejects_duplicate_checkpoint_for_one_train_run()
     ("field", "value"),
     (
         ("evaluation_seed", 7),
-        ("training_protocol_identity", {"epochs": 2, "scheduler": {"type": "StepLR"}}),
+        (
+            "training_protocol_identity",
+            {
+                "id": "controlled_cifar10_r18_v1",
+                "epochs": 2,
+                "execution": {
+                    "world_size": 1,
+                    "per_rank_batch_size": 4,
+                    "global_batch_size": 4,
+                    "effective_global_batch_size": 4,
+                    "batchnorm_mode": "local_per_rank",
+                },
+            },
+        ),
     ),
 )
 def test_checkpoint_aggregation_rejects_mixed_evaluation_seed_or_training_protocol(field: str, value: object) -> None:
@@ -495,7 +554,20 @@ def test_checkpoint_aggregation_requires_every_canonical_result_field() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     (
-        ("training_protocol_identity", {"checkpoint_world_size": 2, "epochs": 1}),
+        (
+            "training_protocol_identity",
+            {
+                "id": "controlled_cifar10_r18_v1",
+                "epochs": 1,
+                "execution": {
+                    "world_size": 2,
+                    "per_rank_batch_size": 2,
+                    "global_batch_size": 4,
+                    "effective_global_batch_size": 4,
+                    "batchnorm_mode": "local_per_rank",
+                },
+            },
+        ),
         ("dataset_identity", {"name": "cifar10", "split": "test", "content_fingerprint": "b" * 64}),
     ),
 )
@@ -510,5 +582,30 @@ def test_checkpoint_aggregation_rejects_mixed_world_size_or_content_fingerprint(
     for row in rows[2:]:
         row[field] = value
 
+    with pytest.raises(ValueError, match="mixed experiment identities"):
+        summarize_checkpoint_groups(rows, metric="robust")
+
+
+def test_checkpoint_aggregation_rejects_local_batchnorm_execution_profile_mixing() -> None:
+    rows = [
+        _evaluation_row(checkpoint=checkpoint, run_id="run-a", training_seed=1, teacher="teacher-a")
+        for checkpoint in ("best", "last")
+    ] + [
+        _evaluation_row(checkpoint=checkpoint, run_id="run-b", training_seed=2, teacher="teacher-b")
+        for checkpoint in ("best", "last")
+    ]
+    for row in rows[2:]:
+        protocol = row["training_protocol_identity"]
+        assert isinstance(protocol, dict)
+        row["training_protocol_identity"] = {
+            **protocol,
+            "execution": {
+                "world_size": 2,
+                "per_rank_batch_size": 2,
+                "global_batch_size": 4,
+                "effective_global_batch_size": 4,
+                "batchnorm_mode": "local_per_rank",
+            },
+        }
     with pytest.raises(ValueError, match="mixed experiment identities"):
         summarize_checkpoint_groups(rows, metric="robust")

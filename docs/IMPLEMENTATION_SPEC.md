@@ -49,6 +49,11 @@ single-teacher ARDにおけるbaseline再現、per-sample診断、sample-wise po
 └── pyproject.toml
 ```
 
+Runnable experiment taxonomy is `configs/audit` (teacher screening), `configs/pilot` (5-epoch engineering check),
+and `configs/production` (canonical 200-epoch comparisons). `configs/protocols` records public SAAD/paper settings;
+the legacy `repro` tier is compatibility-only and has no new runnable files. Execution identity is stored separately
+from tier and includes DDP world size, per-rank/global batch, and local BatchNorm mode.
+
 ## 3. 中核interface
 
 ### AttackGenerator
@@ -100,18 +105,18 @@ full SAADはupstream wrapperから開始し、必要時に別method IDでclean-r
 
 ## 6. 実装済みCLI
 
-現行entry pointとchecked-in reproduction configの使用形は次のとおりです。
+現行entry pointとchecked-in pilot/production configの使用形は次のとおりです。
 
 ```bash
 PYTHONPATH=src python -m ard.cli.train \
-  --config configs/reproduction/cifar10_r18_rslad.yaml
+  --config configs/pilot/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml
 PYTHONPATH=src python -m ard.cli.train \
-  --config configs/reproduction/cifar10_r18_rslad_joint.yaml
+  --config configs/production/cifar10_r18_rslad_joint_chen2021_ltd_wrn34_10.yaml
 PYTHONPATH=src python -m ard.cli.evaluate \
-  --config configs/reproduction/cifar10_r18_rslad.yaml \
+  --config configs/pilot/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml \
   --checkpoint-dir <training-output>
 PYTHONPATH=src python -m ard.cli.evaluate \
-  --config configs/reproduction/cifar10_r18_rslad.yaml \
+  --config configs/production/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml \
   --checkpoint-dir <training-output> \
   --allow-autoattack evaluation.autoattack=true
 python scripts/verify.py --changed

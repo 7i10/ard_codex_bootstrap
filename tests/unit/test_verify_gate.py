@@ -352,6 +352,49 @@ def test_smoke_gate_acquires_the_outer_gpu_lock_once(tmp_path: Path, monkeypatch
     assert events == ["enter", "run", "exit"]
 
 
+def test_dry_run_skips_collection_fingerprint_and_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "tests" / "smoke").mkdir(parents=True)
+    (tmp_path / "tests" / "smoke" / "test_preview.py").write_text("def test_preview(): pass\n", encoding="utf-8")
+
+    def forbidden(*_: object, **__: object) -> object:
+        raise AssertionError("dry-run must not collect, fingerprint, lock, or execute")
+
+    monkeypatch.setattr("verify.command_cacheable", forbidden)
+    monkeypatch.setattr("verify.fingerprint", forbidden)
+    monkeypatch.setattr("verify.command_selects_marker", forbidden)
+    monkeypatch.setattr("verify.GPULock", forbidden)
+    monkeypatch.setattr("verify.subprocess.run", forbidden)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "--smoke", "--dry-run", "--root", str(tmp_path)])
+
+    assert verify_main() == 0
+    assert "would run:" in capsys.readouterr().out
+
+
+def test_exact_cached_pass_skips_marker_collection_and_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "tests" / "smoke").mkdir(parents=True)
+    (tmp_path / "tests" / "smoke" / "test_cached.py").write_text("def test_cached(): pass\n", encoding="utf-8")
+    command = (sys.executable, "-m", "pytest", "-q", "tests/smoke", "-m", "smoke")
+    cache = PassCache(tmp_path / ".cache" / "test-gate" / "results.jsonl")
+    cache.append(CacheRecord("exact-hit", command, "passed"))
+
+    def forbidden(*_: object, **__: object) -> object:
+        raise AssertionError("cache hit must not collect markers, lock a GPU, or execute")
+
+    monkeypatch.setattr("verify.fingerprint", lambda **_: "exact-hit")
+    monkeypatch.setattr("verify.command_cacheable", forbidden)
+    monkeypatch.setattr("verify.command_selects_marker", forbidden)
+    monkeypatch.setattr("verify.GPULock", forbidden)
+    monkeypatch.setattr("verify.subprocess.run", forbidden)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "--smoke", "--root", str(tmp_path)])
+
+    assert verify_main() == 0
+    assert "cached pass:" in capsys.readouterr().out
+
+
 def test_latest_failure_invalidates_same_fingerprint_pass(tmp_path: Path) -> None:
     cache = PassCache(tmp_path / "results.jsonl")
     command = (sys.executable, "-m", "pytest", "-q", "tests/unit/test_verify_gate.py")

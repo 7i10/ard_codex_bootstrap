@@ -72,6 +72,31 @@ def summarize_checkpoint_groups(rows: Iterable[Mapping[str, Any]], *, metric: st
         checkpoint = str(row["checkpoint_alias"])
         if checkpoint not in {"best", "last"}:
             raise ValueError("checkpoint group must be best or last")
+        training_protocol = row["training_protocol_identity"]
+        if not isinstance(training_protocol, Mapping):
+            raise ValueError("training_protocol_identity must be a mapping")
+        execution = training_protocol.get("execution")
+        required_execution = {
+            "world_size",
+            "per_rank_batch_size",
+            "global_batch_size",
+            "effective_global_batch_size",
+            "batchnorm_mode",
+        }
+        if not isinstance(execution, Mapping) or set(execution) != required_execution:
+            raise ValueError("training_protocol_identity requires a complete execution identity")
+        if (
+            isinstance(execution["world_size"], bool)
+            or not isinstance(execution["world_size"], int)
+            or execution["world_size"] <= 0
+            or isinstance(execution["per_rank_batch_size"], bool)
+            or not isinstance(execution["per_rank_batch_size"], int)
+            or execution["per_rank_batch_size"] <= 0
+            or execution["global_batch_size"] != execution["effective_global_batch_size"]
+            or execution["global_batch_size"] != execution["world_size"] * execution["per_rank_batch_size"]
+            or execution["batchnorm_mode"] != "local_per_rank"
+        ):
+            raise ValueError("training execution identity is invalid")
         training_seeds = row["training_seeds"]
         if (
             not isinstance(training_seeds, Mapping)

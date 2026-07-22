@@ -19,3 +19,21 @@ def test_torchrun_cpu_environment_initializes_gloo_with_local_rank(monkeypatch) 
 
     assert initialized and device == torch.device("cpu")
     assert observed == {"backend": "gloo", "init_method": "env://"}
+
+
+def test_reduce_max_uses_cross_rank_max_without_mutating_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    value = torch.tensor([2.0, 11.0])
+    observed: list[object] = []
+
+    def fake_all_reduce(reduced: torch.Tensor, *, op: object) -> None:
+        observed.append(op)
+        reduced.copy_(torch.tensor([3.0, 17.0]))
+
+    monkeypatch.setattr(distributed, "distributed_ready", lambda: True)
+    monkeypatch.setattr(distributed.dist, "all_reduce", fake_all_reduce)
+
+    reduced = distributed.reduce_max(value)
+
+    assert torch.equal(value, torch.tensor([2.0, 11.0]))
+    assert torch.equal(reduced, torch.tensor([3.0, 17.0]))
+    assert observed == [distributed.dist.ReduceOp.MAX]

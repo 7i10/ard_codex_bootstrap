@@ -44,6 +44,7 @@ _CONTROLLED_METADATA = MappingProxyType(
                 "global_batch_size": 128,
                 "validation_fraction": 0.1,
                 "deterministic": True,
+                "batchnorm_mode": "local_per_rank",
             }
         ),
         "seeds": MappingProxyType({"split": 20260722, "evaluation_attack": 0}),
@@ -90,6 +91,21 @@ _CONTROLLED_METADATA = MappingProxyType(
     }
 )
 
+_PILOT_METADATA = MappingProxyType(
+    {
+        **_CONTROLLED_METADATA,
+        "training": MappingProxyType(
+            {
+                "epochs": 5,
+                "global_batch_size": 128,
+                "validation_fraction": 0.1,
+                "deterministic": True,
+                "batchnorm_mode": "local_per_rank",
+            }
+        ),
+    }
+)
+
 _PAPER_METADATA = MappingProxyType(
     {
         "dataset": "cifar10",
@@ -124,6 +140,12 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_CONTROLLED_METADATA,
+        ),
+        "controlled_cifar10_r18_pilot_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_pilot_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_PILOT_METADATA,
         ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",

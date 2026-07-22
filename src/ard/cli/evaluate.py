@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, load_config, save_resolved_config
 from ard.config.loader import resolved_config_dict
-from ard.config.schema import validate_global_batch_size
+from ard.config.schema import training_execution_identity
 from ard.data import EpochShuffleSampler, IndexedBatch, build_dataset, collate_indexed
 from ard.engine import config_digest
 from ard.evaluation import (
@@ -128,7 +128,13 @@ def _dataset_identity(dataset: Any, *, observed: dict[str, object] | None = None
 def _validate_evaluation_tracking_identity(config: ExperimentConfig, training_config: ExperimentConfig) -> None:
     if config.protocol.id != training_config.protocol.id:
         raise ValueError("evaluation protocol ID must match resolved training config")
-    if training_config.tier not in {"repro", "production"}:
+    if config.method != training_config.method:
+        raise ValueError("evaluation method identity must exactly match resolved training config")
+    if config.teacher != training_config.teacher:
+        raise ValueError("evaluation teacher identity must exactly match resolved training config")
+    if config.seeds != training_config.seeds:
+        raise ValueError("evaluation training seeds must exactly match resolved training config")
+    if training_config.tier not in {"repro", "pilot", "production"}:
         return
     if config.tier != training_config.tier:
         raise ValueError("evaluation tier may not downgrade the resolved training tier")
@@ -137,10 +143,16 @@ def _validate_evaluation_tracking_identity(config: ExperimentConfig, training_co
             raise ValueError(f"evaluation tracking {field} must match resolved training config")
 
 
+def _evaluation_tracker_config(
+    config: ExperimentConfig, training_config: ExperimentConfig, *, output_dir: Path
+) -> ExperimentConfig:
+    """Compose evaluation metadata without accepting training identity from the evaluation file."""
+    return training_config.model_copy(update={"evaluation": config.evaluation, "output_dir": output_dir})
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config = load_config(args.config, args.overrides)
-    validate_tracking_guard(config, root=Path.cwd())
     if config.evaluation.dataset is None:
         raise ValueError("evaluation requires evaluation.dataset with an official val or test split")
     if config.evaluation.autoattack and not args.allow_autoattack:
@@ -153,6 +165,7 @@ def main(argv: list[str] | None = None) -> int:
         raise FileNotFoundError(f"sibling resolved training config is missing: {training_config_path}")
     training_config = load_config(training_config_path)
     _validate_evaluation_tracking_identity(config, training_config)
+    validate_tracking_guard(training_config, root=Path.cwd())
     evaluation_dataset = config.evaluation.dataset
     training_dataset = training_config.dataset
     if (evaluation_dataset.name, evaluation_dataset.num_classes, evaluation_dataset.image_size) != (
@@ -185,22 +198,23 @@ def main(argv: list[str] | None = None) -> int:
         for payload in checkpoint_payloads
     ):
         raise ValueError("requested checkpoints do not share the same training run/config/world-size identity")
-    effective_global_batch_size = validate_global_batch_size(
-        per_rank_batch_size=training_config.training.per_rank_batch_size,
-        global_batch_size=training_config.training.global_batch_size,
+    execution_identity = training_execution_identity(
+        training=training_config.training,
         world_size=checkpoint_world_size,
     )
     output_dir = (args.output or ((args.checkpoint_dir or args.checkpoint.parent) / "evaluation")).resolve()
     if output_dir.exists() and any(output_dir.iterdir()):
         raise FileExistsError(f"refusing to overwrite existing evaluation output: {output_dir}")
+    tracker_config = _evaluation_tracker_config(config, training_config, output_dir=output_dir)
+    evaluation_hash = config_digest(resolved_config_dict(tracker_config))
     output_dir.mkdir(parents=True, exist_ok=False)
-    save_resolved_config(config, output_dir / "resolved_evaluation_config.yaml")
+    save_resolved_config(tracker_config, output_dir / "resolved_evaluation_config.yaml")
     (output_dir / "evaluation-lineage.json").write_text(
         json.dumps(
             {
                 "training_config": str(training_config_path.resolve()),
                 "training_config_hash": expected_config_hash,
-                "evaluation_config_hash": config_digest(resolved_config_dict(config)),
+                "evaluation_config_hash": evaluation_hash,
             },
             sort_keys=True,
             indent=2,
@@ -208,27 +222,27 @@ def main(argv: list[str] | None = None) -> int:
         + "\n",
         encoding="utf-8",
     )
-    evaluation_hash = config_digest(resolved_config_dict(config))
     checkpoint_set = ",".join(path.name for path in checkpoints)
     evaluation_run_id = (
         "eval-" + hashlib.sha256(f"{train_run_id}:{evaluation_hash}:{checkpoint_set}".encode()).hexdigest()[:20]
     )
     evaluation_tracker = create_tracker(
-        config=config,
+        config=tracker_config,
         output_dir=output_dir,
-        config_hash=config_digest(resolved_config_dict(config)),
+        config_hash=evaluation_hash,
         root=Path.cwd(),
         job_type="evaluation",
         run_id=evaluation_run_id,
         training_seed=training_config.seeds.model_init,
         training_seeds=training_config.seeds.model_dump(mode="json"),
         evaluation_seed=config.evaluation.seed,
+        training_execution=execution_identity,
     )
     try:
         if isinstance(evaluation_tracker, LocalTracker):
             evaluation_tracker.attach_resolved_config(output_dir / "resolved_evaluation_config.yaml")
-        device = torch.device("cuda" if config.training.device == "cuda" else "cpu")
-        if config.training.device == "auto":
+        device = torch.device("cuda" if training_config.training.device == "cuda" else "cpu")
+        if training_config.training.device == "auto":
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         dataset = build_dataset(config.evaluation.dataset)
         evaluation_dataset_identity = _dataset_identity(config.evaluation.dataset, observed=dataset.content_identity)
@@ -237,9 +251,9 @@ def main(argv: list[str] | None = None) -> int:
             DataLoader[IndexedBatch],
             DataLoader(
                 dataset,
-                batch_size=config.training.per_rank_batch_size,
+                batch_size=training_config.training.per_rank_batch_size,
                 sampler=sampler,
-                num_workers=config.training.num_workers,
+                num_workers=training_config.training.num_workers,
                 collate_fn=collate_indexed,
             ),
         )
@@ -249,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
         attack = LinfPGD(attack_config)
         evaluation_protocol_identity = {
             "seed": config.evaluation.seed,
-            "loader_batch_size": config.training.per_rank_batch_size,
+            "loader_batch_size": training_config.training.per_rank_batch_size,
             "attack": threat_model,
             "autoattack": {
                 "enabled": config.evaluation.autoattack,
@@ -327,9 +341,7 @@ def main(argv: list[str] | None = None) -> int:
                         "deterministic": training_config.training.deterministic,
                         "validation_fraction": training_config.training.validation_fraction,
                         "scheduler": training_config.scheduler.model_dump(mode="json"),
-                        "checkpoint_world_size": payload_world_size,
-                        "per_rank_batch_size": training_config.training.per_rank_batch_size,
-                        "effective_global_batch_size": effective_global_batch_size,
+                        "execution": execution_identity,
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

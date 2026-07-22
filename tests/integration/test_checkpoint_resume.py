@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sized
 from pathlib import Path
+from typing import cast
 
 import pytest
 import torch
@@ -117,7 +119,13 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
     trainer = make_trainer(tmp_path)
     trainer.sample_state = {"placeholder_version": 1}
     loader, validation_loader, _ = make_loaders()
-    history = trainer.fit(loader, validation_loader=validation_loader, epochs=2)
+    callback_metrics: list[dict[str, float]] = []
+    history = trainer.fit(
+        loader,
+        validation_loader=validation_loader,
+        epochs=2,
+        on_epoch_end=lambda metrics, _: callback_metrics.append(dict(metrics)),
+    )
     best, last = tmp_path / "best.pt", tmp_path / "last.pt"
     assert best.is_file() and last.is_file() and best != last
     payload = torch.load(last, map_location="cpu", weights_only=False)
@@ -130,9 +138,18 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
         "train_loss",
         "train_clean_accuracy",
         "train_robust_accuracy",
+        "train_valid_examples",
+        "train_seconds",
+        "train_images_per_second",
+        "train_cuda_peak_allocated_bytes",
+        "train_teacher_clean_forward_calls",
         "val_clean_accuracy",
         "val_pgd_accuracy",
     }
+    assert history[0]["train_valid_examples"] == float(len(cast(Sized, loader.dataset)))
+    assert history[0]["train_teacher_clean_forward_calls"] == 0.0
+    assert history[0]["train_cuda_peak_allocated_bytes"] == 0.0
+    assert callback_metrics == history
     assert payload["selection_metadata"]["metric"] == "val_pgd_accuracy"
     assert payload["selection_metadata"]["tie_break"] == "earliest_epoch"
 
@@ -140,21 +157,39 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
 def test_epoch_boundary_resume_matches_uninterrupted_training(tmp_path: Path) -> None:
     uninterrupted = make_trainer(tmp_path / "full")
     full_loader, full_validation_loader, _ = make_loaders()
-    uninterrupted.fit(full_loader, validation_loader=full_validation_loader, epochs=2)
+    uninterrupted_history = uninterrupted.fit(full_loader, validation_loader=full_validation_loader, epochs=2)
 
     first_leg = make_trainer(tmp_path / "resumed")
     first_loader, first_validation_loader, _ = make_loaders()
-    first_leg.fit(first_loader, validation_loader=first_validation_loader, epochs=1)
+    first_leg_history = first_leg.fit(first_loader, validation_loader=first_validation_loader, epochs=1)
     resumed = make_trainer(tmp_path / "resumed")
     resumed_loader, resumed_validation_loader, resumed_sampler = make_loaders()
     state = resumed.resume(tmp_path / "resumed" / "last.pt", sampler=resumed_sampler)
     assert state.next_epoch == 1
-    resumed.fit(resumed_loader, validation_loader=resumed_validation_loader, epochs=2, start_epoch=state.next_epoch)
+    resumed_history = resumed.fit(
+        resumed_loader, validation_loader=resumed_validation_loader, epochs=2, start_epoch=state.next_epoch
+    )
 
     for name, expected in uninterrupted.model.state_dict().items():
         assert torch.equal(expected, resumed.model.state_dict()[name]), name
     assert uninterrupted.global_step == resumed.global_step
     assert uninterrupted.best_metric == resumed.best_metric
+    deterministic_metrics = (
+        "train_loss",
+        "train_clean_accuracy",
+        "train_robust_accuracy",
+        "train_valid_examples",
+        "train_teacher_clean_forward_calls",
+        "val_clean_accuracy",
+        "val_pgd_accuracy",
+    )
+    combined_history = first_leg_history + resumed_history
+    for uninterrupted_epoch, resumed_epoch in zip(uninterrupted_history, combined_history, strict=True):
+        assert {key: uninterrupted_epoch[key] for key in deterministic_metrics} == {
+            key: resumed_epoch[key] for key in deterministic_metrics
+        }
+        assert uninterrupted_epoch["train_valid_examples"] == float(len(cast(Sized, full_loader.dataset)))
+        assert uninterrupted_epoch["train_teacher_clean_forward_calls"] == 0.0
 
 
 def _advance_optimizer_and_schedule(optimizer: SGD, scheduler: object, *, completed_epochs: int) -> None:
@@ -385,11 +420,16 @@ def test_padded_rows_are_excluded_from_training_loss_and_accuracy(tmp_path: Path
         multiplicity=torch.tensor([2, 2, 2, 2]),
     )
     metrics = trainer.train_epoch([batch])
-    assert metrics == {
+    assert {key: metrics[key] for key in ("loss", "clean_accuracy", "robust_accuracy")} == {
         "loss": pytest.approx(1.5),
         "clean_accuracy": pytest.approx(0.5),
         "robust_accuracy": pytest.approx(0.5),
     }
+    assert metrics["valid_examples"] == 2.0
+    assert metrics["teacher_clean_forward_calls"] == 0.0
+    assert metrics["cuda_peak_allocated_bytes"] == 0.0
+    assert metrics["seconds"] > 0.0
+    assert metrics["images_per_second"] == pytest.approx(2.0 / metrics["seconds"])
 
 
 def test_validation_attack_preserves_batchnorm_state_and_modes(tmp_path: Path) -> None:

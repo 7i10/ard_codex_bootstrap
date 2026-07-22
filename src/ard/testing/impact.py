@@ -15,6 +15,16 @@ class ImpactSelection:
 
 RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     (
+        (
+            "src/ard/config/teacher_audit.py",
+            "src/ard/evaluation/teacher_audit.py",
+            "src/ard/cli/audit_teacher.py",
+            "configs/audit/",
+        ),
+        ("tests/unit/test_teacher_accuracy_audit.py",),
+        ("T0", "T1", "T2"),
+    ),
+    (
         ("external.lock.yaml",),
         (
             "tests/unit/test_external_management.py",
@@ -153,6 +163,8 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("src/ard/engine/",),
         (
             "tests/unit/test_imports.py",
+            "tests/unit/test_distributed.py",
+            "tests/unit/test_pilot_observability.py",
             "tests/regression/test_m2_baselines.py",
             "tests/regression/test_m3_student_aware.py",
             "tests/regression/test_m3_distributed.py",

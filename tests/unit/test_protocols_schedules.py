@@ -95,6 +95,63 @@ def test_controlled_protocol_keeps_distinct_valid_train_and_selection_attacks() 
     assert config.method.selection_attack.loss == "ce"
 
 
+def _pilot_config() -> dict[str, object]:
+    data = _controlled_config()
+    data["protocol"] = {"id": "controlled_cifar10_r18_pilot_v1"}
+    data["tier"] = "pilot"
+    training = data["training"]
+    assert isinstance(training, dict)
+    training["epochs"] = 5
+    data["teacher"] = {
+        "source": "robustbench",
+        "registry_id": "chen2021_ltd_wrn34_10",
+        "architecture": "robustbench_wide_resnet",
+        "num_classes": 10,
+        "normalization": {"profile": "cifar10_standard"},
+        "preprocessing_owner": "teacher_adapter",
+        "checkpoint": "teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt",
+        "checkpoint_sha256": "a" * 64,
+    }
+    data["tracking"] = {
+        "mode": "offline_sync",
+        "project": "ard-single-teacher",
+        "entity": "shunsuke-n-waseda-university",
+        "group": "chen-cifar10-r18-controlled",
+    }
+    return data
+
+
+def test_controlled_pilot_protocol_is_five_epoch_and_requires_pilot_tier() -> None:
+    config = ExperimentConfig.model_validate(_pilot_config())
+    assert config.protocol.id == "controlled_cifar10_r18_pilot_v1"
+    assert config.training.epochs == 5
+    assert config.training.batchnorm_mode == "local_per_rank"
+    invalid = _pilot_config()
+    invalid["tier"] = "production"
+    with pytest.raises(ValueError, match="requires tier=pilot"):
+        ExperimentConfig.model_validate(invalid)
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    (
+        ("training.epochs", 4, "pilot_v1 contract violation"),
+        ("dataset.name", "synthetic_cifar", "forbid synthetic"),
+        ("student.architecture", "fixture_cnn", "forbid synthetic"),
+        ("tracking.mode", "disabled", "require online or offline_sync"),
+        ("tracking.entity", None, "requires tracking.project"),
+        ("tracking.group", None, "requires tracking.project"),
+    ),
+)
+def test_controlled_pilot_contract_rejects_noncanonical_or_untracked_inputs(
+    path: str, value: object, message: str
+) -> None:
+    data = _pilot_config()
+    _set_path(data, path, value)
+    with pytest.raises(ValueError, match=message):
+        ExperimentConfig.model_validate(data)
+
+
 def _set_path(data: dict[str, object], path: str, value: object) -> None:
     target = data
     parts = path.split(".")

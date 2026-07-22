@@ -8,8 +8,75 @@ from pydantic import ValidationError
 
 from ard.config import load_config, save_resolved_config
 from ard.config.schema import AttackConfig, MethodConfig, NormalizationConfig
+from ard.config.teacher_audit import load_teacher_audit_config
 
 pytestmark = pytest.mark.t0
+
+
+def _set_repository_config_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, per_rank: int = 64) -> None:
+    values = {
+        "ARD_CIFAR10_ROOT": str(tmp_path / "cifar"),
+        "ARD_OUTPUT_ROOT": str(tmp_path / "outputs"),
+        "ARD_PER_RANK_BATCH_SIZE": str(per_rank),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_DEVICE": "cpu",
+        "ARD_SEED": "1",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "single-teacher-ard",
+        "WANDB_GROUP_CHEN": "chen-comparison",
+        "WANDB_GROUP_BARTOLDSON": "bartoldson-comparison",
+        "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT": str(tmp_path / "chen.pt"),
+        "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256": "a" * 64,
+        "ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT": str(tmp_path / "bart.pt"),
+        "ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT_SHA256": "b" * 64,
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+
+
+def test_experiment_taxonomy_and_execution_profiles(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path)
+    assert not list(Path("configs/reproduction").glob("*.yaml"))
+    audit = sorted(Path("configs/audit").glob("*.yaml"))
+    pilot = sorted(Path("configs/pilot").glob("*.yaml"))
+    production = sorted(Path("configs/production").glob("*.yaml"))
+    assert len(audit) == 2 and len(pilot) == 2 and len(production) == 8
+    assert {load_teacher_audit_config(path).teacher.registry_id for path in audit} == {
+        "chen2021_ltd_wrn34_10",
+        "bartoldson2024_adversarial_wrn94_16",
+    }
+    pilot_configs = [load_config(path) for path in pilot]
+    production_configs = [load_config(path) for path in production]
+    assert {config.training.epochs for config in pilot_configs} == {5}
+    assert {config.training.epochs for config in production_configs} == {200}
+    assert {config.tier for config in pilot_configs} == {"pilot"}
+    assert {config.tier for config in production_configs} == {"production"}
+    assert all(config.training.global_batch_size == 128 for config in pilot_configs + production_configs)
+    assert all(config.training.per_rank_batch_size == 64 for config in pilot_configs + production_configs)
+    assert all(config.training.batchnorm_mode == "local_per_rank" for config in pilot_configs + production_configs)
+    assert {config.teacher.registry_id for config in production_configs} == {
+        "chen2021_ltd_wrn34_10",
+        "bartoldson2024_adversarial_wrn94_16",
+    }
+    groups_by_teacher: dict[str, set[str]] = {}
+    for config in production_configs:
+        groups_by_teacher.setdefault(config.teacher.registry_id or "", set()).add(config.tracking.group or "")
+    assert {teacher: len(groups) for teacher, groups in groups_by_teacher.items()} == {
+        "chen2021_ltd_wrn34_10": 1,
+        "bartoldson2024_adversarial_wrn94_16": 1,
+    }
+    assert next(iter(groups_by_teacher["chen2021_ltd_wrn34_10"])) != next(
+        iter(groups_by_teacher["bartoldson2024_adversarial_wrn94_16"])
+    )
+    assert all("method" not in config.tracking.group.lower() for config in production_configs)
+    assert all("seed" not in config.tracking.group.lower() for config in production_configs)
+
+
+def test_two_gpu_profile_can_be_resolved_as_one_gpu_batch_128(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
+    config = load_config(Path("configs/production/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml"))
+    assert config.training.per_rank_batch_size == 128
+    assert config.training.global_batch_size == 128
 
 
 def base_config() -> dict:
@@ -350,15 +417,18 @@ def test_top_level_configs_resolve_under_controlled_environment(
     values = {
         "ARD_SEED": "7",
         "ARD_CIFAR10_ROOT": str(tmp_path / "cifar10"),
-        "ARD_TEACHER_CHECKPOINT": str(teacher_checkpoint),
-        "ARD_TEACHER_CHECKPOINT_SHA256": "a" * 64,
+        "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT": str(teacher_checkpoint),
+        "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256": "a" * 64,
+        "ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT": str(teacher_checkpoint),
+        "ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT_SHA256": "b" * 64,
         "ARD_PER_RANK_BATCH_SIZE": "128",
         "ARD_NUM_WORKERS": "0",
         "ARD_DEVICE": "cpu",
         "ARD_OUTPUT_ROOT": str(tmp_path / "outputs"),
         "WANDB_ENTITY": "entity",
         "WANDB_PROJECT": "project",
-        "WANDB_GROUP": "group",
+        "WANDB_GROUP_CHEN": "chen-group",
+        "WANDB_GROUP_BARTOLDSON": "bartoldson-group",
     }
     for key, value in values.items():
         monkeypatch.setenv(key, value)
@@ -366,7 +436,7 @@ def test_top_level_configs_resolve_under_controlled_environment(
     paths = sorted(
         [
             *(config_dir / "experiments").glob("*.yaml"),
-            *(config_dir / "reproduction").glob("*.yaml"),
+            *(config_dir / "pilot").glob("*.yaml"),
             *(config_dir / "production").glob("*.yaml"),
         ]
     )

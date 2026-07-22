@@ -29,6 +29,9 @@ python scripts/verify.py --changed --force
 ```
 
 `--changed`はtracked/staged/untracked pathsを含み、unborn repositoryでも動作します。Config-only gates parse every checked-in YAML and resolve top-level configs under an explicit environment (`ARD_PER_RANK_BATCH_SIZE=128` may stand in for one GPU); they do not download data, require a GPU, or run full training.
+The taxonomy gate also rejects runnable `configs/reproduction`, requires exactly two audit configs, two pilot configs,
+and eight teacher-explicit production configs. It checks both one-GPU (per-rank 128) and two-GPU (per-rank 64) execution
+profiles without executing training.
 不正なbaseはfail closedです。既知pathは`src/ard/testing/impact.py`のmappingでfocused testsへ変換し、
 未知source、helper、fixture変更はavailable tests全体へ保守的にfallbackします。
 

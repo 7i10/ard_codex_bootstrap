@@ -40,6 +40,7 @@ class ProtocolConfig(StrictModel):
         "saad_paper_reproduction_v1",
         "saad_code_295121c_audit_v1",
         "controlled_cifar10_r18_v1",
+        "controlled_cifar10_r18_pilot_v1",
         "synthetic_smoke_v2",
     ]
 
@@ -431,6 +432,9 @@ class TrainingConfig(StrictModel):
     device: Literal["auto", "cpu", "cuda"] = "auto"
     deterministic: bool = True
     validation_fraction: float = Field(default=0.25, gt=0, lt=1)
+    # This is a protocol identity, not a performance option. Ordinary DDP
+    # computes BatchNorm statistics independently on each rank.
+    batchnorm_mode: Literal["local_per_rank"] = "local_per_rank"
 
     @model_validator(mode="after")
     def validate_batch_identity(self) -> TrainingConfig:
@@ -450,6 +454,22 @@ def validate_global_batch_size(*, per_rank_batch_size: int, global_batch_size: i
             f"({global_batch_size} != {per_rank_batch_size} * {world_size})"
         )
     return effective_global_batch_size
+
+
+def training_execution_identity(*, training: TrainingConfig, world_size: int) -> dict[str, int | str]:
+    """Return the immutable hardware-sensitive training identity."""
+    effective_global_batch_size = validate_global_batch_size(
+        per_rank_batch_size=training.per_rank_batch_size,
+        global_batch_size=training.global_batch_size,
+        world_size=world_size,
+    )
+    return {
+        "world_size": world_size,
+        "per_rank_batch_size": training.per_rank_batch_size,
+        "global_batch_size": training.global_batch_size,
+        "effective_global_batch_size": effective_global_batch_size,
+        "batchnorm_mode": training.batchnorm_mode,
+    }
 
 
 class TrackingConfig(StrictModel):
@@ -507,7 +527,7 @@ class EvaluationConfig(StrictModel):
 class ExperimentConfig(StrictModel):
     schema_version: Literal[2]
     protocol: ProtocolConfig
-    tier: Literal["dev", "smoke", "repro", "production"] = "dev"
+    tier: Literal["dev", "smoke", "repro", "pilot", "production"] = "dev"
     seeds: SeedsConfig
     dataset: DatasetConfig = Field(default_factory=DatasetConfig)
     student: ModelConfig = Field(default_factory=ModelConfig)
@@ -558,18 +578,20 @@ class ExperimentConfig(StrictModel):
                 raise ValueError("production requires panel diagnostics with tracking.panel_size > 0")
         if self.tier == "smoke" and self.tracking.mode not in {"disabled", "offline"}:
             raise ValueError("smoke permits only disabled or offline tracking")
-        if self.tier in {"repro", "production"} and self.tracking.mode not in {"online", "offline_sync"}:
-            raise ValueError("repro/production require online or offline_sync tracking")
-        if self.tier in {"repro", "production"} and (
+        if self.tier in {"repro", "pilot", "production"} and self.tracking.mode not in {"online", "offline_sync"}:
+            raise ValueError("repro/pilot/production require online or offline_sync tracking")
+        if self.tier == "pilot" and (not self.tracking.project or not self.tracking.entity or not self.tracking.group):
+            raise ValueError("pilot requires tracking.project, tracking.entity, and tracking.group")
+        if self.tier in {"repro", "pilot", "production"} and (
             self.dataset.name == "synthetic_cifar" or self.student.architecture == "fixture_cnn"
         ):
-            raise ValueError("repro/production forbid synthetic datasets and fixture students")
+            raise ValueError("repro/pilot/production forbid synthetic datasets and fixture students")
         if (
-            self.tier in {"repro", "production"}
+            self.tier in {"repro", "pilot", "production"}
             and self.dataset.name == "tiny_imagenet"
             and not self.dataset.content_sha256
         ):
-            raise ValueError("repro/production Tiny-ImageNet requires dataset.content_sha256")
+            raise ValueError("repro/pilot/production Tiny-ImageNet requires dataset.content_sha256")
         if self.student.num_classes != self.dataset.num_classes:
             raise ValueError("student and dataset num_classes must match")
         if self.teacher is not None and self.teacher.num_classes != self.dataset.num_classes:
@@ -588,6 +610,8 @@ class ExperimentConfig(StrictModel):
             raise ValueError("oracle_mask is scientific/dev-only and is forbidden for smoke, repro, and production")
         if self.teacher is not None and self.teacher.source == "fixture" and self.tier not in {"dev", "smoke"}:
             raise ValueError("fixture teachers are restricted to dev/smoke tiers")
+        if self.tier == "pilot" and (self.teacher is None or self.teacher.source != "robustbench"):
+            raise ValueError("pilot requires a registered RobustBench teacher")
         expected_profile = {
             "synthetic_cifar": "fixture_unit",
             "cifar10": "cifar10_standard",
@@ -608,6 +632,10 @@ class ExperimentConfig(StrictModel):
         spec = get_protocol(self.protocol.id)
         if not spec.runnable_locally:
             return
+        if self.protocol.id == "controlled_cifar10_r18_pilot_v1" and self.tier != "pilot":
+            raise ValueError("controlled_cifar10_r18_pilot_v1 requires tier=pilot")
+        if self.tier == "pilot" and self.protocol.id != "controlled_cifar10_r18_pilot_v1":
+            raise ValueError("tier=pilot requires controlled_cifar10_r18_pilot_v1")
         if self.protocol.id == "synthetic_smoke_v2":
             smoke_errors: list[str] = []
             if self.tier not in {"dev", "smoke"}:
@@ -619,7 +647,7 @@ class ExperimentConfig(StrictModel):
             if smoke_errors:
                 raise ValueError("synthetic_smoke_v2 contract violation: " + "; ".join(smoke_errors))
             return
-        if self.protocol.id != "controlled_cifar10_r18_v1":
+        if self.protocol.id not in {"controlled_cifar10_r18_v1", "controlled_cifar10_r18_pilot_v1"}:
             return
         metadata = spec.metadata
         errors: list[str] = []
@@ -680,4 +708,4 @@ class ExperimentConfig(StrictModel):
             if configured.student_mode != "eval" or configured.teacher_mode != "eval":
                 errors.append(f"{name} must preserve eval attack modes")
         if errors:
-            raise ValueError("controlled_cifar10_r18_v1 contract violation: " + "; ".join(errors))
+            raise ValueError(f"{self.protocol.id} contract violation: " + "; ".join(errors))

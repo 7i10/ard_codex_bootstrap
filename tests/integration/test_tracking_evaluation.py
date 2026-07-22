@@ -17,8 +17,11 @@ import yaml
 from ard.analysis import summarize_checkpoint_groups
 from ard.cli import evaluate as evaluate_cli
 from ard.cli import train as train_cli
+from ard.config import save_resolved_config
+from ard.config.loader import resolved_config_dict
 from ard.config.schema import ExperimentConfig
 from ard.data import build_dataset, stratified_train_validation_split
+from ard.engine import config_digest
 from ard.engine.trainer import Trainer
 from ard.tracking import QUALITATIVE_COLUMNS, LocalTracker, TrackingError
 
@@ -73,6 +76,7 @@ def _training_config(output: Path) -> dict[str, Any]:
             "mode": "offline",
             "project": "ard-test",
             "run_id": "offline-smoke",
+            "group": "fixture-comparison",
             "panel_size": 2,
         },
         "evaluation": {
@@ -282,6 +286,20 @@ def test_saved_checkpoint_evaluation_is_canonical_and_aggregates(offline_run: di
     assert all(item["training_seeds"] == offline_run["config"].seeds.model_dump(mode="json") for item in results)
     assert all(item["training_protocol_identity"]["id"] == offline_run["config"].protocol.id for item in results)
     assert all(
+        item["training_protocol_identity"]["execution"]
+        == {
+            "world_size": 1,
+            "per_rank_batch_size": offline_run["config"].training.per_rank_batch_size,
+            "global_batch_size": offline_run["config"].training.global_batch_size,
+            "effective_global_batch_size": offline_run["config"].training.global_batch_size,
+            "batchnorm_mode": "local_per_rank",
+        }
+        for item in results
+    )
+    train_manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    evaluation_manifest = json.loads((evaluation_output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert evaluation_manifest["group"] == train_manifest["group"]
+    assert all(
         {"name", "split", "classes", "image_size", "version"} <= item["dataset_identity"].keys()
         and "root" not in item["dataset_identity"]
         and "root" in item["dataset_provenance"]
@@ -460,8 +478,55 @@ def test_evaluation_rejects_temperature_squared_drift_before_output_creation(
     assert not output.exists()
 
 
+@pytest.mark.parametrize(
+    "drift",
+    (
+        "method",
+        "teacher",
+        "seed.split",
+        "seed.model_init",
+        "seed.data_order",
+        "seed.augmentation",
+        "seed.train_attack",
+        "seed.evaluation_attack",
+        "seed.qualitative_panel",
+    ),
+)
+def test_evaluation_rejects_training_identity_drift_before_output_creation(
+    offline_run: dict[str, Any], tmp_path: Path, drift: str
+) -> None:
+    training_output: Path = offline_run["output"]
+    raw = yaml.safe_load((training_output / "resolved_config.yaml").read_text(encoding="utf-8"))
+    if drift == "method":
+        raw["method"]["attack"]["steps"] += 1
+        message = "method identity"
+    elif drift == "teacher":
+        raw["teacher"] = {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 2}
+        message = "teacher identity"
+    else:
+        seed = drift.removeprefix("seed.")
+        raw["seeds"][seed] += 1
+        message = "training seeds"
+    config_path = tmp_path / f"evaluation-{drift.replace('.', '-')}.yaml"
+    config_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    output = tmp_path / f"output-{drift.replace('.', '-')}"
+
+    with pytest.raises(ValueError, match=message):
+        evaluate_cli.main(
+            [
+                "--config",
+                str(config_path),
+                "--checkpoint-dir",
+                str(training_output),
+                "--output",
+                str(output),
+            ]
+        )
+    assert not output.exists()
+
+
 @pytest.mark.parametrize("world_size", (1, 2))
-def test_evaluation_preflight_rejects_mixed_checkpoint_world_size_before_output_creation(
+def test_evaluation_uses_checkpoint_training_execution_in_single_process(
     offline_run: dict[str, Any], tmp_path: Path, world_size: int
 ) -> None:
     training_output: Path = offline_run["output"]
@@ -469,10 +534,17 @@ def test_evaluation_preflight_rejects_mixed_checkpoint_world_size_before_output_
     checkpoint_dir.mkdir()
     for name in ("best.pt", "last.pt", "resolved_config.yaml"):
         shutil.copy2(training_output / name, checkpoint_dir / name)
-    if world_size != 1:
-        payload = torch.load(checkpoint_dir / "last.pt", map_location="cpu", weights_only=False)
+    raw = yaml.safe_load((checkpoint_dir / "resolved_config.yaml").read_text(encoding="utf-8"))
+    raw["training"]["per_rank_batch_size"] = 2 // world_size
+    training_config = ExperimentConfig.model_validate(raw)
+    save_resolved_config(training_config, checkpoint_dir / "resolved_config.yaml")
+    expected_hash = config_digest(resolved_config_dict(training_config))
+    for checkpoint_name in ("best.pt", "last.pt"):
+        checkpoint_path = checkpoint_dir / checkpoint_name
+        payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         payload["world_size"] = world_size
-        torch.save(payload, checkpoint_dir / "last.pt")
+        payload["config_hash"] = expected_hash
+        torch.save(payload, checkpoint_path)
     output = tmp_path / f"evaluation-{world_size}"
     args = [
         "--config",
@@ -482,13 +554,46 @@ def test_evaluation_preflight_rejects_mixed_checkpoint_world_size_before_output_
         "--output",
         str(output),
     ]
-    if world_size == 1:
-        assert evaluate_cli.main(args) == 0
-        assert output.is_dir()
-    else:
-        with pytest.raises(ValueError, match="world-size identity"):
-            evaluate_cli.main(args)
-        assert not output.exists()
+    assert evaluate_cli.main(args) == 0
+    assert output.is_dir()
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["world_size"] == 1
+    assert manifest["training_execution_identity"] == {
+        "world_size": world_size,
+        "per_rank_batch_size": 2 // world_size,
+        "global_batch_size": 2,
+        "effective_global_batch_size": 2,
+        "batchnorm_mode": "local_per_rank",
+    }
+    assert manifest["group"].endswith(f"localbn-ws{world_size}-prb{2 // world_size}-gb2")
+
+
+def test_evaluation_rejects_inconsistent_checkpoint_execution_before_output_creation(
+    offline_run: dict[str, Any], tmp_path: Path
+) -> None:
+    training_output: Path = offline_run["output"]
+    checkpoint_dir = tmp_path / "inconsistent-execution"
+    checkpoint_dir.mkdir()
+    for name in ("best.pt", "last.pt", "resolved_config.yaml"):
+        shutil.copy2(training_output / name, checkpoint_dir / name)
+    for checkpoint_name in ("best.pt", "last.pt"):
+        checkpoint_path = checkpoint_dir / checkpoint_name
+        payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        payload["world_size"] = 2
+        torch.save(payload, checkpoint_path)
+    output = tmp_path / "inconsistent-execution-output"
+    with pytest.raises(ValueError, match="global_batch_size"):
+        evaluate_cli.main(
+            [
+                "--config",
+                str(checkpoint_dir / "resolved_config.yaml"),
+                "--checkpoint-dir",
+                str(checkpoint_dir),
+                "--output",
+                str(output),
+            ]
+        )
+    assert not output.exists()
 
 
 @pytest.mark.parametrize("entrypoint", ("train", "evaluate"))

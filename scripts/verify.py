@@ -241,8 +241,14 @@ def main() -> int:
     for command in commands:
         if args.non_scientific:
             command = exclude_scientific_markers(command)
+        printable = " ".join(command)
+        if args.dry_run:
+            # Selection previews must remain cheap: cacheability/marker
+            # collection and fingerprinting are execution concerns and can
+            # launch one pytest subprocess per selected file.
+            print("would run: " + printable)
+            continue
         run_environment = build_test_environment(root)
-        cacheable = command_cacheable(root=root, command=command, requested_tier=args.tier, environment=run_environment)
         key = fingerprint(
             root=root,
             command=command,
@@ -251,13 +257,14 @@ def main() -> int:
             fixture_version=run_environment["ARD_TEST_FIXTURE_VERSION"],
             seed=run_environment["ARD_TEST_SEED"],
         )
-        printable = " ".join(command)
-        if cacheable and not args.force and cache.has_pass(key):
+        # A pass record is written only after command_cacheable has proved the
+        # command excludes T4/T5.  Therefore an exact fingerprint hit can skip
+        # another pytest collection safely.
+        if not args.force and cache.has_pass(key):
             print("cached pass: " + printable)
             continue
-        print(("would run: " if args.dry_run else "running: ") + printable)
-        if args.dry_run:
-            continue
+        cacheable = command_cacheable(root=root, command=command, requested_tier=args.tier, environment=run_environment)
+        print("running: " + printable)
         with (
             GPULock()
             if command_selects_marker(root=root, command=command, marker="gpu", environment=run_environment)

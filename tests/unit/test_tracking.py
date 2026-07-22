@@ -24,7 +24,13 @@ from ard.tracking import (
     stable_run_id,
     validate_tracking_guard,
 )
-from ard.tracking.adapter import _rng_preserving_rank_zero_phase, _teacher_metadata, collect_git_state
+from ard.tracking.adapter import (
+    _rng_preserving_rank_zero_phase,
+    _teacher_metadata,
+    canonical_run_group,
+    canonical_run_name,
+    collect_git_state,
+)
 
 pytestmark = [pytest.mark.t1, pytest.mark.wandb]
 
@@ -145,6 +151,111 @@ def test_manifest_preserves_complete_structured_training_seed_lineage(tmp_path: 
     assert manifest["training_seeds"] == cfg.seeds.model_dump(mode="json")
     assert manifest["training_seed"] == cfg.seeds.model_init
     assert manifest["protocol_id"] == cfg.protocol.id
+
+
+def test_manifest_persists_and_resume_validates_training_execution_identity(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    base_config = config(output, mode="disabled")
+    cfg = base_config.model_copy(
+        update={"training": base_config.training.model_copy(update={"per_rank_batch_size": 1, "global_batch_size": 2})}
+    )
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path).finish()
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["training_execution_identity"] == {
+        "world_size": 2,
+        "per_rank_batch_size": 1,
+        "global_batch_size": 2,
+        "effective_global_batch_size": 2,
+        "batchnorm_mode": "local_per_rank",
+    }
+    monkeypatch.setenv("WORLD_SIZE", "1")
+    with pytest.raises(TrackingError, match="world_size"):
+        create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    with pytest.raises(TrackingError, match="training_execution_identity"):
+        create_tracker(
+            config=cfg,
+            output_dir=output,
+            config_hash="abc",
+            root=tmp_path,
+            training_execution={
+                "world_size": 1,
+                "per_rank_batch_size": 2,
+                "global_batch_size": 2,
+                "effective_global_batch_size": 2,
+                "batchnorm_mode": "local_per_rank",
+            },
+        )
+
+
+def test_pilot_and_production_use_canonical_wandb_name_identity(tmp_path: Path) -> None:
+    cfg = _with_registered_teacher(production_config(tmp_path / "output", tmp_path / "data"), "chen2021_ltd_wrn34_10")
+    name = canonical_run_name(cfg, git_sha="1234567890abcdef")
+    assert name == ("cifar10-saad_resnet18_cifar_v1-chen2021_ltd_wrn34_10-robustbench_wide_resnet-rslad-s9-1234567")
+
+
+def _with_registered_teacher(config: ExperimentConfig, registry_id: str) -> ExperimentConfig:
+    spec = TeacherRegistry.load(ROOT).spec(registry_id)
+    assert spec.checkpoint_sha256 is not None
+    teacher = TeacherConfig.model_validate(
+        {
+            "source": "robustbench",
+            "registry_id": spec.registry_id,
+            "architecture": spec.architecture,
+            "num_classes": 10,
+            "normalization": spec.preprocessing.normalization(),
+            "preprocessing_owner": spec.preprocessing.owner,
+            "checkpoint": spec.checkpoint_path,
+            "checkpoint_sha256": spec.checkpoint_sha256,
+        }
+    )
+    return config.model_copy(update={"teacher": teacher})
+
+
+def test_canonical_group_keeps_teacher_comparison_axis_and_separates_execution_profiles(tmp_path: Path) -> None:
+    unregistered = production_config(tmp_path / "output", tmp_path / "data")
+    execution_ws1 = {
+        "world_size": 1,
+        "per_rank_batch_size": 128,
+        "global_batch_size": 128,
+        "effective_global_batch_size": 128,
+        "batchnorm_mode": "local_per_rank",
+    }
+    with pytest.raises(TrackingError, match="teacher.registry_id"):
+        canonical_run_group(unregistered, training_execution=execution_ws1)
+
+    chen = _with_registered_teacher(unregistered, "chen2021_ltd_wrn34_10")
+    bartoldson = _with_registered_teacher(unregistered, "bartoldson2024_adversarial_wrn94_16")
+    base = chen.tracking.group
+    assert base == "ard-test-group"
+    ws1 = canonical_run_group(
+        chen,
+        training_execution=execution_ws1,
+    )
+    ws2 = canonical_run_group(
+        chen,
+        training_execution={
+            "world_size": 2,
+            "per_rank_batch_size": 64,
+            "global_batch_size": 128,
+            "effective_global_batch_size": 128,
+            "batchnorm_mode": "local_per_rank",
+        },
+    )
+    bartoldson_ws1 = canonical_run_group(bartoldson, training_execution=execution_ws1)
+    assert ws1 == ("ard-test-group-controlled_cifar10_r18_v1-chen2021_ltd_wrn34_10-localbn-ws1-prb128-gb128")
+    assert ws2 == ("ard-test-group-controlled_cifar10_r18_v1-chen2021_ltd_wrn34_10-localbn-ws2-prb64-gb128")
+    assert bartoldson_ws1 != ws1
+    assert chen.method.id not in ws1 and f"s{chen.seeds.model_init}" not in ws1
+    assert ws1 != ws2
+    changed_method = chen.model_copy(update={"method": chen.method.model_copy(update={"id": "rslad_entropy"})})
+    changed_seed = chen.model_copy(update={"seeds": chen.seeds.model_copy(update={"model_init": 123})})
+    assert canonical_run_group(changed_method, training_execution=execution_ws1) == ws1
+    assert canonical_run_group(changed_seed, training_execution=execution_ws1) == ws1
 
 
 @pytest.mark.parametrize(

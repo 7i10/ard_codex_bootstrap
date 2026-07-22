@@ -25,7 +25,7 @@ import torch
 import yaml
 
 from ard.config.loader import resolved_config_dict
-from ard.config.schema import ExperimentConfig, SeedsConfig
+from ard.config.schema import ExperimentConfig, SeedsConfig, training_execution_identity
 from ard.engine.checkpoint import capture_rng_state, restore_rng_state
 from ard.engine.distributed import is_rank_zero, run_rank_zero_phase
 from ard.models.teacher import sha256_file
@@ -223,6 +223,80 @@ def stable_run_id(
     return "ard-" + hashlib.sha256(f"{config_hash}:{git_sha or 'unborn'}".encode()).hexdigest()[:16]
 
 
+def canonical_run_name(config: ExperimentConfig, *, git_sha: str | None) -> str | None:
+    """Return the mandatory, human-readable identity for tracked studies.
+
+    Production and pilot names deliberately include both the robust teacher's
+    registry ID (when available) and architecture.  This is separate from the
+    opaque, stable W&B run ID used for safe resume.
+    """
+    if config.tier not in {"pilot", "production"}:
+        return config.tracking.name
+    teacher = config.teacher
+    teacher_identity = (
+        "none" if teacher is None else "-".join(part for part in (teacher.registry_id, teacher.architecture) if part)
+    )
+    return "-".join(
+        (
+            config.dataset.name,
+            config.student.architecture,
+            teacher_identity,
+            config.method.id,
+            f"s{config.seeds.model_init}",
+            (git_sha or "unborn")[:7],
+        )
+    )
+
+
+def validate_training_execution(value: Mapping[str, object]) -> dict[str, int | str]:
+    """Validate a checkpoint-derived execution identity before tracker writes."""
+    required = {
+        "world_size",
+        "per_rank_batch_size",
+        "global_batch_size",
+        "effective_global_batch_size",
+        "batchnorm_mode",
+    }
+    if set(value) != required:
+        raise TrackingError("training_execution must contain the complete five-field identity")
+    integers: dict[str, int] = {}
+    for field in ("world_size", "per_rank_batch_size", "global_batch_size", "effective_global_batch_size"):
+        candidate = value[field]
+        if isinstance(candidate, bool) or not isinstance(candidate, int) or candidate <= 0:
+            raise TrackingError(f"training_execution.{field} must be a positive integer")
+        integers[field] = candidate
+    if integers["global_batch_size"] != integers["effective_global_batch_size"] or integers["global_batch_size"] != (
+        integers["world_size"] * integers["per_rank_batch_size"]
+    ):
+        raise TrackingError("training_execution batch sizes are inconsistent")
+    batchnorm_mode = value["batchnorm_mode"]
+    if batchnorm_mode != "local_per_rank":
+        raise TrackingError("training_execution.batchnorm_mode must be local_per_rank")
+    return {**integers, "batchnorm_mode": batchnorm_mode}
+
+
+def canonical_run_group(config: ExperimentConfig, *, training_execution: Mapping[str, object]) -> str | None:
+    """Append teacher, protocol, and execution identity to the comparison base."""
+    teacher_registry_id = None if config.teacher is None else config.teacher.registry_id
+    if config.tier in {"pilot", "production"} and teacher_registry_id is None:
+        raise TrackingError("pilot/production canonical groups require teacher.registry_id")
+    base = config.tracking.group
+    if base is None:
+        return None
+    execution = validate_training_execution(training_execution)
+    batchnorm_token = (
+        "localbn"
+        if execution["batchnorm_mode"] == "local_per_rank"
+        else str(execution["batchnorm_mode"]).replace("_", "-")
+    )
+    execution_token = (
+        f"{batchnorm_token}-ws{execution['world_size']}-prb{execution['per_rank_batch_size']}"
+        f"-gb{execution['global_batch_size']}"
+    )
+    teacher_token = "" if teacher_registry_id is None else f"-{teacher_registry_id}"
+    return f"{base}-{config.protocol.id}{teacher_token}-{execution_token}"
+
+
 def _rng_preserving_rank_zero_phase(operation: Any, *, phase: str) -> None:
     """Tracking must be observational: restore every RNG stream on every rank."""
     state = capture_rng_state()
@@ -278,6 +352,7 @@ class LocalTracker:
         training_seed: int | None = None,
         training_seeds: Mapping[str, int] | None = None,
         evaluation_seed: int | None = None,
+        training_execution: Mapping[str, object] | None = None,
     ) -> None:
         self.config, self.output_dir, self.config_hash, self.root, self.run_id = (
             config,
@@ -299,6 +374,23 @@ class LocalTracker:
         )
         if training_seed is not None and training_seed != resolved_training_seeds.model_init:
             raise TrackingError("training_seed compatibility scalar must match training_seeds.model_init")
+        try:
+            process_world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        except ValueError as exc:
+            raise TrackingError("process WORLD_SIZE must be a positive integer") from exc
+        if process_world_size <= 0:
+            raise TrackingError("process WORLD_SIZE must be a positive integer")
+        if training_execution is None:
+            try:
+                resolved_training_execution = training_execution_identity(
+                    training=config.training,
+                    world_size=process_world_size,
+                )
+            except ValueError as exc:
+                raise TrackingError("process world_size does not match the configured training batch identity") from exc
+        else:
+            resolved_training_execution = validate_training_execution(training_execution)
+        effective_group = canonical_run_group(config, training_execution=resolved_training_execution)
         prior: dict[str, Any] | None = None
         if self.manifest_path.is_file():
             try:
@@ -321,6 +413,12 @@ class LocalTracker:
             for key, current in current_lineage.items():
                 if prior.get(key) != current:
                     raise TrackingError(f"resume manifest lineage drift: {key}")
+            if prior.get("world_size") != process_world_size:
+                raise TrackingError("resume manifest lineage drift: world_size")
+            if prior.get("training_execution_identity") != resolved_training_execution:
+                raise TrackingError("resume manifest lineage drift: training_execution_identity")
+            if prior.get("group") != effective_group:
+                raise TrackingError("resume manifest lineage drift: group")
             prior_environment = self.bundle_dir / "environment.json"
             if (
                 prior_environment.is_file()
@@ -331,6 +429,7 @@ class LocalTracker:
             self._terminal_resume = True
             return
         git = collect_git_state(root)
+        git_sha = git["sha"] if isinstance(git["sha"], str) else None
         self.manifest = {
             "schema_version": 1,
             "run_id": run_id,
@@ -342,11 +441,14 @@ class LocalTracker:
             "job_type": job_type,
             "config_hash": config_hash,
             "protocol_id": config.protocol.id,
+            "run_name": canonical_run_name(config, git_sha=git_sha),
+            "group": effective_group,
             "seed": resolved_training_seeds.model_init,
             "training_seed": resolved_training_seeds.model_init,
             "training_seeds": resolved_training_seeds.model_dump(mode="json"),
             "evaluation_seed": evaluation_seed,
-            "world_size": int(os.environ.get("WORLD_SIZE", "1")),
+            "world_size": process_world_size,
+            "training_execution_identity": resolved_training_execution,
             "git": {key: value for key, value in git.items() if key != "diff"},
             "external": _external_metadata(root),
             "teacher": _teacher_metadata(config, root=root),
@@ -378,10 +480,13 @@ class LocalTracker:
                 "diagnostics_mode",
                 "job_type",
                 "protocol_id",
+                "run_name",
+                "group",
                 "seed",
                 "training_seed",
                 "training_seeds",
                 "world_size",
+                "training_execution_identity",
             ):
                 if prior.get(key) != self.manifest.get(key):
                     raise TrackingError(f"resume manifest lineage drift: {key}")
@@ -424,7 +529,7 @@ class LocalTracker:
 
                 module = wandb
             except ImportError as exc:
-                if self.config.tier in {"repro", "production"}:
+                if self.config.tier in {"repro", "pilot", "production"}:
                     raise TrackingError("production tracking requires the wandb package") from exc
                 # Offline smoke/dev still owns a complete local pending bundle.
                 self.manifest["wandb_unavailable"] = True
@@ -436,8 +541,8 @@ class LocalTracker:
             "id": self.run_id,
             "resume": "must" if self._is_resume and self.manifest["wandb_initialized"] else "never",
             "mode": "offline" if self.config.tracking.mode == "offline_sync" else self.config.tracking.mode,
-            "name": self.config.tracking.name,
-            "group": self.config.tracking.group,
+            "name": self.manifest["run_name"],
+            "group": self.manifest["group"],
             "job_type": self.manifest["job_type"],
             "dir": str(self.output_dir / "wandb"),
             "config": resolved_config_dict(self.config),
@@ -446,7 +551,7 @@ class LocalTracker:
         try:
             self._wandb_run = module.init(**{key: value for key, value in kwargs.items() if value is not None})
         except Exception as exc:
-            if self.config.tier in {"repro", "production"} or self.config.tracking.mode == "online":
+            if self.config.tier in {"repro", "pilot", "production"} or self.config.tracking.mode == "online":
                 raise TrackingError("requested W&B tracker could not initialize") from exc
             # Offline/dev/smoke operation must never escape to a live run.  A
             # restricted host can also forbid W&B's local service sockets, in
@@ -735,8 +840,13 @@ def create_tracker(
     training_seed: int | None = None,
     training_seeds: Mapping[str, int] | None = None,
     evaluation_seed: int | None = None,
+    training_execution: Mapping[str, object] | None = None,
 ) -> ExperimentTracker:
     """Return a no-op on non-zero ranks; only rank zero can initialize W&B."""
+    if job_type == "evaluation" and training_execution is None:
+        raise TrackingError("evaluation tracker requires checkpoint-derived training_execution")
+    if training_execution is not None:
+        training_execution = validate_training_execution(training_execution)
     run_id = run_id or stable_run_id(
         config, config_hash=config_hash, resume_run_id=resume_run_id, git_sha=collect_git_state(root)["sha"]
     )
@@ -754,6 +864,7 @@ def create_tracker(
         training_seed=training_seed,
         training_seeds=training_seeds,
         evaluation_seed=evaluation_seed,
+        training_execution=training_execution,
     )
 
 
@@ -796,14 +907,18 @@ def coordinated_tracker_action(
 
 
 def validate_tracking_guard(config: ExperimentConfig, *, root: Path) -> None:
-    """Reject incomplete repro/production lineage before creating any output."""
-    if config.tier not in {"repro", "production"}:
+    """Reject incomplete tracked lineage before creating any output."""
+    if config.tier not in {"repro", "pilot", "production"}:
         return
     git = collect_git_state(root)
     if not git["sha"]:
-        raise TrackingError("repro/production requires a real Git HEAD for lineage")
+        raise TrackingError("repro/pilot/production requires a real Git HEAD for lineage")
     if config.tracking.mode not in {"online", "offline_sync"}:
-        raise TrackingError("repro/production requires online or offline_sync tracking")
+        raise TrackingError("repro/pilot/production requires online or offline_sync tracking")
+    if config.tier == "pilot" and (
+        not config.tracking.project or not config.tracking.entity or not config.tracking.group
+    ):
+        raise TrackingError("pilot requires W&B entity, project, and group")
     if config.tier == "production" and (
         not config.tracking.project or not config.tracking.entity or not config.tracking.group
     ):
@@ -815,7 +930,7 @@ def validate_tracking_guard(config: ExperimentConfig, *, root: Path) -> None:
         saad = raw["repositories"]["saad"]
         url, commit = saad["url"], saad["commit"]
     except (OSError, TypeError, KeyError, yaml.YAMLError) as exc:
-        raise TrackingError("repro/production requires a valid external.lock.yaml saad entry") from exc
+        raise TrackingError("repro/pilot/production requires a valid external.lock.yaml saad entry") from exc
     if (
         not isinstance(url, str)
         or not isinstance(commit, str)
@@ -846,7 +961,7 @@ def validate_tracking_guard(config: ExperimentConfig, *, root: Path) -> None:
 
 def _validate_robustbench_teacher_preflight(config: ExperimentConfig, *, root: Path) -> None:
     teacher = config.teacher
-    if config.tier not in {"repro", "production"} or teacher is None or teacher.source != "robustbench":
+    if config.tier not in {"repro", "pilot", "production"} or teacher is None or teacher.source != "robustbench":
         return
     try:
         registry = TeacherRegistry.load(root)

@@ -70,6 +70,10 @@ sampleをdatasetから削除しません。oracle maskはdev-onlyで、smoke/rep
 
 ## 4. Stable sample state and DDP
 
+The controlled protocol fixes global batch 128. A one-GPU per-rank batch of 128 and a two-GPU per-rank batch of 64
+are distinct execution identities because ordinary local BatchNorm uses per-rank statistics; they must not be pooled
+as one scientific run family. Pilot uses five epochs only; canonical production uses 200 epochs.
+
 - sample IDは元dataset indexであり、subset、augmentation、shuffle、rankで作り直さない。
 - robust marginはpre-update detached FP32 logitsから計算する。
 - EMA decayはcanonical student/joint methodで`0.9`、first observationで初期化する。

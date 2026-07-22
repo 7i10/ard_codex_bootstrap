@@ -1,0 +1,14 @@
+schema_version: 2
+protocol: {id: controlled_cifar10_r18_v1}
+tier: production
+seeds: {split: 20260722, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: train, download: false, num_classes: 10}
+student: {architecture: saad_resnet18_cifar_v1, num_classes: 10, preprocessing_owner: student_adapter, normalization: {profile: cifar10_raw_identity}}
+teacher: {source: robustbench, registry_id: chen2021_ltd_wrn34_10, architecture: robustbench_wide_resnet, num_classes: 10, preprocessing_owner: teacher_adapter, normalization: {profile: cifar10_raw_identity}, checkpoint: "${ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT}", checkpoint_sha256: "${ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256}", threat_norm: linf, threat_epsilon: 8/255}
+method: {id: rslad_joint, version: 1, target_policy: {id: teacher_target_uniform_mix, version: 1, risk_transform: identity, mixing: uniform, apply_to: adversarial_student_kd, rho_max: 0.5}, student_ema_decay: 0.9, student_policy_warmup_epochs: 1, oracle_mask: false, attack: {loss: kl, kl_target: teacher_clean, temperature: 1.0, temperature_squared: true, epsilon: 8/255, step_size: 2/255, steps: 10, random_start: true, trace_step_losses: false}, selection_attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 20, random_start: true, student_mode: eval, teacher_mode: eval, trace_step_losses: false}}
+optimizer: {id: sgd, learning_rate: 0.1, momentum: 0.9, weight_decay: 0.0005, nesterov: false}
+scheduler: {id: multistep, milestones: [100, 150], gamma: 0.1, step_at: epoch_end}
+training: {epochs: 200, per_rank_batch_size: "${ARD_PER_RANK_BATCH_SIZE}", global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: "${ARD_DEVICE}", deterministic: true, validation_fraction: 0.1, batchnorm_mode: local_per_rank}
+tracking: {mode: offline_sync, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: "${WANDB_GROUP_CHEN}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: test, download: false, num_classes: 10}, attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 20, random_start: true, trace_step_losses: false}, autoattack: false, autoattack_batch_size: 128, write_sample_stats: true, panel_size: 24}
+output_dir: "${ARD_OUTPUT_ROOT}/cifar10-r18-rslad-joint-chen2021-ltd-wrn34-10-production-s${ARD_SEED}"

@@ -1,0 +1,5 @@
+schema_version: 1
+teacher: {registry_id: chen2021_ltd_wrn34_10}
+dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: test, download: false}
+run: {max_samples: 1000, batch_size: 128, num_workers: 4, seed: 0, device: cuda, output_dir: "${ARD_OUTPUT_ROOT}/teacher-audit-chen2021_ltd_wrn34_10"}
+attack: {norm: linf, input_domain: pixel_0_1, epsilon: 8/255, step_size: 2/255, steps: 20, random_start: true, loss: ce, kl_target: null, temperature: 1.0, temperature_squared: true, student_mode: eval, teacher_mode: eval, trace_step_losses: false}

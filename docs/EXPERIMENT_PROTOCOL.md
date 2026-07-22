@@ -15,12 +15,11 @@
 - W&B offline推奨
 - 精度比較には使わない
 
-### Reproduction
+### Audit and pilot
 
-- 先行研究のconfigに合わせる
-- W&Bへ`reproduction` tag
-- upstream SHA、checkpoint hash、差分を保存
-- 公開値との差を記録
+- `configs/audit/` は教師checkpoint・normalization・PGD-20スクリーニング専用。W&Bなし、AA再現ではない。
+- `configs/pilot/` は実CIFARを5 epochだけ動かすengineering確認で、canonical paper resultではない。
+- 旧`repro` tierはresolved configの互換性だけに残し、新規のrunnable reproduction configは作らない。
 
 ### Production
 
@@ -29,6 +28,35 @@
 - best/last保存
 - 正式評価は別run
 - 論文候補の集計対象
+
+Tierと実行profile（world size/per-rank batch）は別軸である。global batch=128でも、1 GPUのper-rank 128と
+2 GPUのper-rank 64は通常のlocal BatchNorm統計が異なるため、同一比較へ混ぜない。推奨順序は1 GPU・W&Bなしの
+bounded teacher audit、必要ならmicro smoke、2 GPU・per-rank 64の5 epoch pilot、最後に同じ2 GPU profileで
+canonical 200 epoch productionである。
+
+Teacher audit batchはaccuracy定義ではなく実行メタデータであり、Chenは128、Bartoldsonは16から開始する。
+BartoldsonはVRAMに余裕がある場合だけ32へ上げ、OOM時だけ8へ下げる。
+
+Example execution profile (pilot or production):
+
+```bash
+export ARD_PER_RANK_BATCH_SIZE=64 ARD_DEVICE=cuda
+export WANDB_ENTITY=shunsuke-n-waseda-university WANDB_PROJECT=single-teacher-ard WANDB_GROUP_CHEN=chen-cifar10-r18
+CUDA_VISIBLE_DEVICES=0,1 PYTHONPATH=src python -m torch.distributed.run --standalone --nproc_per_node=2 \
+  --module ard.cli.train --config configs/pilot/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml
+```
+
+The Bartoldson pilot uses `configs/pilot/cifar10_r18_rslad_bartoldson2024_adversarial_wrn94_16.yaml` and
+`WANDB_GROUP_BARTOLDSON` instead. First run the W&B-free teacher screening on one GPU:
+
+```bash
+PYTHONPATH=src CUDA_VISIBLE_DEVICES=0 python -m ard.cli.audit_teacher \
+  --config configs/audit/chen2021_ltd_wrn34_10.yaml
+```
+
+Swap the audit config and GPU for Bartoldson. These commands are procedures only; neither audit nor pilot has been run.
+
+Evaluation is a separate saved-checkpoint process and must preserve the checkpoint's training execution identity.
 
 Tracking diagnostics are explicit: `off` emits no diagnostics/sample statistics, `summary` emits scalar metrics and
 Parquet statistics without image Tables, and `panel` emits fixed-ID media plus sample statistics. Production requires

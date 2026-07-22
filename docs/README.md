@@ -9,6 +9,7 @@
 - [Experiment protocol](EXPERIMENT_PROTOCOL.md): run tier、baseline、seed、評価
 - [Upstream baselines](UPSTREAM_BASELINES.md): pinned SAAD/TRADES SHA、ライセンス証拠、既知差分
 - [Teacher config fragments](../configs/teachers/): strict RobustBench teacher configs; checkpoints are registered explicitly
+- [Experiment taxonomy](EXPERIMENT_PROTOCOL.md): audit, pilot, and canonical production separation
 - [Codex workflow](CODEX_WORKFLOW.md): Sol/Terra/Lunaの役割分担
 
 ## CLI entry points
@@ -24,6 +25,10 @@ python scripts/verify.py --changed
 `evaluation.checkpoints`（既定は`both`）に従って`best.pt`と`last.pt`を別々に評価します。
 full AutoAttackは通常のtestやtrainからは起動せず、evaluation configで明示的に有効化した上で
 `--allow-autoattack`を付けた別processだけが実行できます。
+
+Teacher audit (W&B-free, PGD screening) should run on one GPU first. After that, use the two-GPU pilot and production
+commands documented in `EXPERIMENT_PROTOCOL.md`; set `WANDB_PROJECT=single-teacher-ard` (and teacher-specific group
+variables) for pilot/production. Smoke runs may remain disabled and do not upload to W&B; production may not disable it.
 
 実装計画は `docs/plans/`、重大なバグの記録は `docs/debugging/` にあります。CIFAR本訓練を始める前に、
 [Reproduction status](REPRODUCTION_STATUS.md) の未実行項目とproduction guardを確認してください。

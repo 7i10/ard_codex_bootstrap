@@ -19,7 +19,8 @@ cadence. The final epoch always publishes both best and last model artifacts.
 |---|---|---|
 | `dev` | disabled/offline/online as explicitly configured | local development only |
 | `smoke` | disabled or offline | synthetic/local validation; not a paper result |
-| `repro` | online or offline_sync | lineage guard required |
+| `repro` | online or offline_sync | legacy compatibility only; no new runnable configs |
+| `pilot` | online or offline_sync | short engineering check; not a paper result |
 | `production` | online or offline_sync | lineage guard plus entity/project/group required |
 
 `offline`と`offline_sync`は別状態です。
@@ -52,6 +53,7 @@ job_type: train | evaluation
 ```
 
 `group`はseedを除いた比較単位として、4 ablationと対応するsaved-checkpoint evaluationで共有します。
+教師ごとに比較baseを分け（例: `WANDB_GROUP_CHEN`, `WANDB_GROUP_BARTOLDSON`）、method/seedはbaseへ含めません。
 `job_type`はCLIが設定し、train CLIは`train`、evaluate CLIは`evaluation`です。
 analysis専用runは現bootstrapでは実装済みCLIとして主張しません。
 

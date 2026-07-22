@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
@@ -28,7 +29,7 @@ from ard.targets import TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 
 from .checkpoint import TrainingState, load_checkpoint, save_checkpoint
-from .distributed import gather_objects, get_rank, get_world_size, reduce_min, reduce_sums
+from .distributed import gather_objects, get_rank, get_world_size, reduce_max, reduce_min, reduce_sums
 
 
 @contextmanager
@@ -39,6 +40,34 @@ def _evaluation_mode(model: nn.Module) -> Iterator[None]:
         yield
     finally:
         model.train(mode)
+
+
+def _reduce_epoch_observability(
+    local_totals: torch.Tensor,
+    *,
+    local_seconds: float,
+    local_cuda_peak_allocated_bytes: int,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    """Apply the epoch SUM/MAX contract and derive globally valid throughput."""
+    if local_totals.shape != (5,):
+        raise ValueError("epoch totals must contain five scalar accumulators")
+    global_totals = reduce_sums(local_totals)
+    rank_max = reduce_max(
+        torch.tensor(
+            [local_seconds, float(local_cuda_peak_allocated_bytes)],
+            dtype=torch.float64,
+            device=local_totals.device,
+        )
+    )
+    valid_examples = float(global_totals[3].item())
+    seconds = float(rank_max[0].item())
+    return global_totals, {
+        "valid_examples": valid_examples,
+        "seconds": seconds,
+        "images_per_second": valid_examples / seconds if seconds > 0 else 0.0,
+        "cuda_peak_allocated_bytes": float(rank_max[1].item()),
+        "teacher_clean_forward_calls": float(global_totals[4].item()),
+    }
 
 
 class Trainer:
@@ -235,7 +264,14 @@ class Trainer:
 
     def train_epoch(self, loader: DataLoader[IndexedBatch]) -> dict[str, float]:
         self.model.train()
-        totals = torch.zeros(4, dtype=torch.float64, device=self.device)
+        if self.device.type == "cuda":
+            torch.cuda.synchronize(self.device)
+            torch.cuda.reset_peak_memory_stats(self.device)
+        started_at = time.perf_counter()
+        # Loss sum, clean-correct, robust-correct, valid examples, and actual
+        # detached clean-teacher target forwards.  One final SUM makes the
+        # count telemetry global without adding a hot-loop collective.
+        totals = torch.zeros(5, dtype=torch.float64, device=self.device)
         for batch in loader:
             if not isinstance(batch, IndexedBatch):
                 raise TypeError("trainer requires IndexedBatch batches")
@@ -247,6 +283,7 @@ class Trainer:
             requires_teacher_clean = getattr(self.objective, "requires_teacher_clean_logits", False)
             attack_requires_teacher_clean = bool(getattr(self.attack, "requires_teacher_clean_target", False))
             teacher_clean_logits = None
+            teacher_clean_forward_calls = 0.0
             if requires_teacher_clean or attack_requires_teacher_clean:
                 if self.teacher is None:
                     raise ValueError("selected attack or objective requires a teacher")
@@ -259,6 +296,7 @@ class Trainer:
                     torch.autocast(device_type=self.device.type, enabled=False),
                 ):
                     teacher_clean_logits = self.teacher(batch.images.float()).detach().float()
+                teacher_clean_forward_calls = 1.0
             attack_result = self.attack.generate(
                 AttackRequest(
                     inputs=batch.images,
@@ -404,17 +442,28 @@ class Trainer:
                     float(((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
                     float(((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
                     float(mask.sum()),
+                    teacher_clean_forward_calls,
                 ],
                 dtype=torch.float64,
                 device=self.device,
             )
             self.global_step += 1
-        totals = reduce_sums(totals)
-        count = max(float(totals[3].item()), 1.0)
+        if self.device.type == "cuda":
+            torch.cuda.synchronize(self.device)
+            peak_allocated_bytes = torch.cuda.max_memory_allocated(self.device)
+        else:
+            peak_allocated_bytes = 0
+        totals, observability = _reduce_epoch_observability(
+            totals,
+            local_seconds=time.perf_counter() - started_at,
+            local_cuda_peak_allocated_bytes=peak_allocated_bytes,
+        )
+        count = max(observability["valid_examples"], 1.0)
         return {
             "loss": float(totals[0].item()) / count,
             "clean_accuracy": float(totals[1].item()) / count,
             "robust_accuracy": float(totals[2].item()) / count,
+            **observability,
         }
 
     def validate_epoch(self, loader: DataLoader[IndexedBatch]) -> dict[str, float]:
@@ -508,6 +557,11 @@ class Trainer:
                 "train_loss": train_metrics["loss"],
                 "train_clean_accuracy": train_metrics["clean_accuracy"],
                 "train_robust_accuracy": train_metrics["robust_accuracy"],
+                "train_valid_examples": train_metrics.get("valid_examples", 0.0),
+                "train_seconds": train_metrics.get("seconds", 0.0),
+                "train_images_per_second": train_metrics.get("images_per_second", 0.0),
+                "train_cuda_peak_allocated_bytes": train_metrics.get("cuda_peak_allocated_bytes", 0.0),
+                "train_teacher_clean_forward_calls": train_metrics.get("teacher_clean_forward_calls", 0.0),
                 "val_clean_accuracy": validation_metrics["clean_accuracy"],
                 "val_pgd_accuracy": validation_metrics["pgd_accuracy"],
             }

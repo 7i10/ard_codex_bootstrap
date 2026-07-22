@@ -128,6 +128,14 @@ def reduce_min(value: torch.Tensor) -> torch.Tensor:
     return reduced
 
 
+def reduce_max(value: torch.Tensor) -> torch.Tensor:
+    """Return the cross-rank maximum without mutating the caller's tensor."""
+    reduced = value.detach().clone()
+    if distributed_ready():
+        dist.all_reduce(reduced, op=dist.ReduceOp.MAX)
+    return reduced
+
+
 def gather_objects(value: Any) -> list[Any]:
     if not distributed_ready():
         return [value]
