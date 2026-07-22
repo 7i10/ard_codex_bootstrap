@@ -50,3 +50,11 @@ def test_prepare_links_only_named_shared_runtime_assets() -> None:
     assert "required shared runtime asset is missing" in prepare
     assert 'ln -s "$REPO/$name" "$RUN/repo/$name"' in prepare
     assert "shared_runtime_assets" in prepare
+
+
+@pytest.mark.unit
+def test_preflight_requires_all_locked_external_checkouts_and_teacher_cache() -> None:
+    preflight = (SCRIPTS / "ferret-preflight").read_text()
+    assert "('saad','trades','robustbench')" in preflight
+    assert "all(report['external_checkouts_available'].values())" in preflight
+    assert "report['teacher_cache_available']" in preflight
