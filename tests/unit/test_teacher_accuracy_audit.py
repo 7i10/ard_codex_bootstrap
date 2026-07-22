@@ -246,6 +246,7 @@ def test_run_reports_accuracy_count_attack_identity_freeze_and_metadata(
     assert report.lineage == _fake_lineage(tmp_path, registry)
     assert report.environment["torch"] == str(torch.__version__)
     assert {"cuda", "cudnn"} <= report.environment.keys()
+    assert "cuda_visible_devices" in report.environment
     assert report.backend_flags == BackendFlags(True, False, True, False, False)
     assert report.device == {"type": "cpu"}
     assert all(not parameter.requires_grad and parameter.grad is None for parameter in constructed[0].parameters())

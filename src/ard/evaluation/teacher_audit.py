@@ -395,6 +395,7 @@ def _environment_identity() -> dict[str, object]:
         "torch": str(torch.__version__),
         "cuda": torch.version.cuda,
         "cudnn": torch.backends.cudnn.version(),
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
     }
 
 
