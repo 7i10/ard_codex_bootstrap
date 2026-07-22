@@ -8,6 +8,18 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+_TRAINING_SEED_FIELDS = frozenset(
+    {
+        "split",
+        "model_init",
+        "data_order",
+        "augmentation",
+        "train_attack",
+        "evaluation_attack",
+        "qualitative_panel",
+    }
+)
+
 
 def _canonical_identity(value: object) -> str:
     return json.dumps(value, sort_keys=True, default=str)
@@ -39,7 +51,7 @@ def summarize_checkpoint_groups(rows: Iterable[Mapping[str, Any]], *, metric: st
     run_metadata: dict[str, tuple[str, ...]] = {}
     required = {
         "train_run_id",
-        "training_seed",
+        "training_seeds",
         "evaluation_seed",
         "dataset_identity",
         "training_dataset_identity",
@@ -60,6 +72,13 @@ def summarize_checkpoint_groups(rows: Iterable[Mapping[str, Any]], *, metric: st
         checkpoint = str(row["checkpoint_alias"])
         if checkpoint not in {"best", "last"}:
             raise ValueError("checkpoint group must be best or last")
+        training_seeds = row["training_seeds"]
+        if (
+            not isinstance(training_seeds, Mapping)
+            or set(training_seeds) != _TRAINING_SEED_FIELDS
+            or any(isinstance(value, bool) or not isinstance(value, int) for value in training_seeds.values())
+        ):
+            raise ValueError("canonical evaluation training_seeds must be the complete seven-field mapping")
         groups.setdefault(checkpoint, []).append(float(row[metric]))
         if not isinstance(row["checkpoint_filename"], str) or not isinstance(row["checkpoint_sha256"], str):
             raise ValueError("canonical evaluation checkpoint identity is invalid")
@@ -85,7 +104,7 @@ def summarize_checkpoint_groups(rows: Iterable[Mapping[str, Any]], *, metric: st
         )
         train_run_id = str(row.get("train_run_id", ""))
         metadata = (
-            str(row.get("training_seed", "")),
+            _canonical_identity(training_seeds),
             _canonical_identity(row.get("teacher_identity", {})),
             _canonical_identity(row.get("student_identity", {})),
             _canonical_identity(row.get("method_identity", {})),

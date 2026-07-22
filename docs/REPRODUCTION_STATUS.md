@@ -193,3 +193,5 @@ invocationで実行したという主張ではありません。22件のcached p
 - repository全体のmonolithic full pytest suite
 
 従って、現時点ではfixture smoke以外のclean/robust accuracy、upstream parity、論文再現成功を主張しません。
+
+M0 schema v2 config migration is complete. Configured schedulers use identity to preserve existing execution semantics; exact schedule migration is deferred to M1. Student/joint target softening is adversarial-branch-only and clean KD remains unchanged.

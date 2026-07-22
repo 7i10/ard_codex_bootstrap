@@ -13,16 +13,26 @@ pytestmark = pytest.mark.t3
 
 def _method(name: str) -> dict[str, object]:
     if name == "pgd_at":
-        return {"name": name, "attack": {"loss": "ce"}}
+        return {"id": name, "version": 1, "attack": {"loss": "ce"}}
     target = "student_clean" if name == "trades" else "teacher_clean"
     method: dict[str, object] = {
-        "name": name,
+        "id": name,
+        "version": 1,
         "attack": {"loss": "kl", "kl_target": target},
     }
     if name == "trades":
         method["trades_beta"] = 2.0
     if name == "rslad_entropy":
         method.update({"entropy_gamma": 1.0})
+    if name in {"rslad_student", "rslad_joint"}:
+        method["target_policy"] = {
+            "id": "teacher_target_uniform_mix",
+            "version": 1,
+            "risk_transform": "identity",
+            "mixing": "uniform",
+            "apply_to": "adversarial_student_kd",
+            "rho_max": 0.5,
+        }
     return method
 
 
@@ -33,10 +43,23 @@ def test_one_epoch_synthetic_method_switch_smoke(tmp_path: Path) -> None:
     for name in ("pgd_at", "trades", "rslad", "rslad_entropy", "rslad_student", "rslad_joint"):
         output = tmp_path / name
         data: dict[str, object] = {
+            "schema_version": 2,
+            "protocol": {"id": "synthetic_smoke_v2"},
             "tier": "smoke",
-            "seed": 23,
+            "seeds": {
+                k: 23
+                for k in (
+                    "split",
+                    "model_init",
+                    "data_order",
+                    "augmentation",
+                    "train_attack",
+                    "evaluation_attack",
+                    "qualitative_panel",
+                )
+            },
             "dataset": {"name": "synthetic_cifar", "num_samples": 8, "num_classes": 2, "image_size": 4, "seed": 23},
-            "student": {"architecture": "fixture_cnn", "num_classes": 2},
+            "student": {"architecture": "fixture_cnn", "num_classes": 2, "preprocessing_owner": "student_adapter"},
             "method": {
                 **_method(name),
                 "attack": {
@@ -47,11 +70,18 @@ def test_one_epoch_synthetic_method_switch_smoke(tmp_path: Path) -> None:
                     "random_start": False,
                 },
             },
-            "training": {"epochs": 1, "batch_size": 4, "learning_rate": 0.02, "device": "cpu"},
+            "optimizer": {"id": "sgd", "learning_rate": 0.02, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+            "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+            "training": {"epochs": 1, "per_rank_batch_size": 4, "global_batch_size": 4, "device": "cpu"},
             "output_dir": str(output),
         }
         if name.startswith("rslad"):
-            data["teacher"] = {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 2}
+            data["teacher"] = {
+                "source": "fixture",
+                "architecture": "fixture_cnn",
+                "num_classes": 2,
+                "preprocessing_owner": "teacher_adapter",
+            }
         config = tmp_path / f"{name}.yaml"
         config.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
         completed = subprocess.run(

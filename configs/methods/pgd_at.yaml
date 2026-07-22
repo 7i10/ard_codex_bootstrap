@@ -1,4 +1,5 @@
-name: pgd_at
+version: 1
+id: pgd_at
 attack:
   loss: ce
   epsilon: 8/255

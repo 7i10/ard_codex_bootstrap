@@ -15,10 +15,27 @@ from ard.tracking import NullTracker, coordinated_create_tracker, coordinated_tr
 def config(output: Path) -> ExperimentConfig:
     return ExperimentConfig.model_validate(
         {
+            "schema_version": 2,
+            "protocol": {"id": "synthetic_smoke_v2"},
             "tier": "smoke",
+            "seeds": {
+                k: 0
+                for k in (
+                    "split",
+                    "model_init",
+                    "data_order",
+                    "augmentation",
+                    "train_attack",
+                    "evaluation_attack",
+                    "qualitative_panel",
+                )
+            },
             "dataset": {"name": "synthetic_cifar", "num_samples": 4, "num_classes": 2},
             "student": {"architecture": "fixture_cnn", "num_classes": 2},
-            "method": {"name": "pgd_at", "attack": {"steps": 1}},
+            "method": {"id": "pgd_at", "version": 1, "attack": {"steps": 1}},
+            "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+            "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+            "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 4},
             "output_dir": str(output),
         }
     )

@@ -24,6 +24,7 @@ from ard.policies import (
 )
 from ard.signals import RobustMarginSignal, shannon_entropy
 from ard.state import SampleStateStore
+from ard.targets import TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 
 from .checkpoint import TrainingState, load_checkpoint, save_checkpoint
@@ -55,10 +56,12 @@ class Trainer:
         output_dir: Path,
         config_hash: str,
         seed: int,
+        evaluation_attack_seed: int | None = None,
         tracker_run_id: str | None = None,
         teacher: nn.Module | None = None,
         policy: WeightPolicy | None = None,
         sample_store: SampleStateStore | None = None,
+        target_policy: TeacherTargetPolicy | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
         diagnostics: TrainingDiagnostics | None = None,
@@ -72,9 +75,13 @@ class Trainer:
         self.optimizer, self.scheduler, self.scaler = optimizer, scheduler, scaler
         self.attack, self.selection_attack, self.objective = attack, selection_attack, objective
         self.device, self.output_dir, self.config_hash, self.seed = device, output_dir, config_hash, seed
+        self.evaluation_attack_seed = seed if evaluation_attack_seed is None else evaluation_attack_seed
         self.tracker_run_id = tracker_run_id
         self.policy = policy
         self.sample_store = sample_store
+        self.target_policy = target_policy
+        if target_policy is not None and self.teacher is None:
+            raise ValueError("teacher target policy requires a frozen teacher")
         if policy_warmup_epochs < 0:
             raise ValueError("policy_warmup_epochs must be non-negative")
         if oracle_mask and sample_store is None:
@@ -99,7 +106,7 @@ class Trainer:
         return torch.Generator(device=self.device).manual_seed(seed)
 
     def _selection_generator(self) -> torch.Generator:
-        seed = self.seed + 1_000_003 * self.global_step + 10_007 * get_rank() + 590_017
+        seed = self.evaluation_attack_seed + 1_000_003 * self.global_step + 10_007 * get_rank() + 590_017
         return torch.Generator(device=self.device).manual_seed(seed)
 
     @staticmethod
@@ -257,7 +264,6 @@ class Trainer:
             if requires_clean_student:
                 assert clean_student_logits is not None
                 objective_inputs["clean_student_logits"] = clean_student_logits
-            terms = self.objective(**objective_inputs)
             weights = self._policy_weights(
                 batch=batch,
                 adversarial=attack_result.adversarial,
@@ -265,6 +271,18 @@ class Trainer:
                 valid_mask=valid_mask,
                 student_signals=student_signals,
             )
+            if self.target_policy is not None:
+                if teacher_clean_logits is None:
+                    raise ValueError("teacher target policy requires clean teacher logits")
+                if weights is None or weights.joint_risk is None:
+                    raise ValueError("teacher target policy requires an explicit detached risk")
+                target_output = self.target_policy(
+                    teacher_logits=teacher_clean_logits,
+                    risk=weights.joint_risk,
+                    temperature=getattr(self.objective, "temperature", 1.0),
+                )
+                objective_inputs["adversarial_target_probabilities"] = target_output.probabilities
+            terms = self.objective(**objective_inputs)
             if weights is not None:
                 terms = terms.apply_policy(weights)
             if self.diagnostics is not None:

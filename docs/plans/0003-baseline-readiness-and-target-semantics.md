@@ -4,7 +4,7 @@
 
 - Owner: primary agent; one owning Terra per milestone; Luna only after each API freeze; Sol scientific review at each milestone boundary
 - Branch / base SHA: `master` / `937decf2415dc5827df7f06f46316688a1f51507`
-- Current milestone: M0 planning complete
+- Current milestone: M1 in progress; M0 approved
 - Last updated: 2026-07-22
 
 ## Goal
@@ -53,7 +53,7 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
 
 ## Milestones
 
-- [ ] M0 — Target semantics and schema v2
+- [x] M0 — Target semantics and schema v2
   - Files/modules: `src/ard/config/`, new `src/ard/targets/`, RSLAD objective/policies/trainer composition, method configs, focused unit/regression tests, affected invariants
   - Owner: one Terra for schema-to-trainer semantics; one Luna batch for YAML/docs after API freeze
   - Tests: config v1 rejection and method identity; risk 0/1, probability sum/finite/stop-gradient; adversarial-only target change; clean branch exact invariance; warmup; explicit downweight/fallback; DDP-valid masking
@@ -121,6 +121,9 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
 
 - 2026-07-22: Read repository contracts and the external review at HEAD `937decf`; worktree was clean. Created shared dataset/teacher directories outside Git. Preflight found PyTorch 2.11, installed RobustBench/W&B/PyArrow, and no sandbox-visible CUDA.
 - 2026-07-22: Read-only mapping confirmed current fallback semantics, shared train/validation transform, torchvision student, identity scheduler, repeated teacher-forward sites, and external RobustBench commit evidence. No teacher checkpoint was found and no download was attempted.
+- 2026-07-22: M0 implemented fail-closed schema v2, structured seeds, explicit method identity, detached adversarial-only teacher-target softening, and explicit downweight/hard-fallback ablations. All checked-in configs and fixtures were migrated.
+- 2026-07-22: M0 review found and fixed five P1 classes: FP32 target renormalization/parity, malformed repository YAML and incomplete method fragments, unsupported preprocessing ownership, DDP global-batch identity, and collapsed seed lineage. A delta review then found and fixed the two-GPU smoke batch declaration. Final scientific review approved M0 with no P0/P1.
+- 2026-07-22: M0 evidence includes config gate `21 passed`, focused numerical/lineage regressions `4 passed`, impact-selected checkpoint/resume `14 passed`, and six-method synthetic switch `1 passed`. Additional focused suites reported `92 passed` and offline tracking/evaluation `2 passed`. CUDA remains unavailable and a restricted-sandbox Gloo subprocess timed out; neither was retried.
 
 ## Completion report
 

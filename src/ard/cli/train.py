@@ -20,6 +20,7 @@ from ard.analysis import write_sample_parquet
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, load_config, save_resolved_config
 from ard.config.loader import resolved_config_dict
+from ard.config.schema import validate_global_batch_size
 from ard.data import (
     EpochShuffleSampler,
     IndexedBatch,
@@ -32,8 +33,17 @@ from ard.engine.checkpoint import validate_resume_checkpoint
 from ard.engine.distributed import barrier, initialize_from_env, is_rank_zero, run_rank_zero_phase, teardown
 from ard.models import build_student, build_teacher
 from ard.objectives import DistillationObjective, PGDATObjective, RSLADObjective, TRADESObjective
-from ard.policies import EntropyOnlyPolicy, JointRiskPolicy, RSLADBaselinePolicy, StudentRiskPolicy, WeightPolicy
+from ard.policies import (
+    EntropyOnlyPolicy,
+    HardFallbackPolicy,
+    JointDownweightPolicy,
+    JointRiskPolicy,
+    RSLADBaselinePolicy,
+    StudentRiskPolicy,
+    WeightPolicy,
+)
 from ard.state import SampleStateStore
+from ard.targets import TeacherTargetPolicy, UniformSofteningTeacherTargetPolicy
 from ard.tracking import (
     ExperimentTracker,
     LocalTracker,
@@ -105,12 +115,12 @@ def _selection_metric(value: object, *, name: str) -> float:
 
 def _build_method(
     config: ExperimentConfig,
-) -> tuple[DistillationObjective, WeightPolicy | None, SampleStateStore | None]:
+) -> tuple[DistillationObjective, WeightPolicy | None, SampleStateStore | None, TeacherTargetPolicy | None]:
     """Compose the M2 outer objective and optional policy without branching a loop."""
     method = config.method
-    if method.name == "pgd_at":
-        return PGDATObjective(), None, None
-    if method.name == "trades":
+    if method.id == "pgd_at":
+        return PGDATObjective(), None, None, None
+    if method.id == "trades":
         return (
             TRADESObjective(
                 beta=method.trades_beta,
@@ -119,32 +129,46 @@ def _build_method(
             ),
             None,
             None,
+            None,
         )
-    if method.name == "rslad":
+    if method.id == "rslad":
         return (
             RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
             RSLADBaselinePolicy(),
             None,
+            None,
         )
-    if method.name == "rslad_entropy":
+    if method.id == "rslad_entropy":
         return (
             RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
             EntropyOnlyPolicy(),
             None,
+            None,
         )
-    if method.name == "rslad_student":
+    if method.id in {"rslad_student", "rslad_joint"}:
+        assert method.target_policy is not None
+        policy = StudentRiskPolicy() if method.id == "rslad_student" else JointRiskPolicy()
         return (
             RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
-            StudentRiskPolicy(),
+            policy,
             SampleStateStore(ema_decay=method.student_ema_decay),
+            UniformSofteningTeacherTargetPolicy(rho_max=method.target_policy.rho_max),
         )
-    if method.name == "rslad_joint":
+    if method.id == "rslad_joint_downweight":
         return (
             RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
-            JointRiskPolicy(),
+            JointDownweightPolicy(),
             SampleStateStore(ema_decay=method.student_ema_decay),
+            None,
         )
-    raise RuntimeError(f"unsupported validated method: {method.name}")
+    if method.id == "rslad_hard_fallback":
+        return (
+            RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
+            HardFallbackPolicy(),
+            SampleStateStore(ema_decay=method.student_ema_decay),
+            None,
+        )
+    raise RuntimeError(f"unsupported validated method: {method.id}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -159,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
     tracker: ExperimentTracker | None = None
     tracking_completed = False
     try:
+        validate_global_batch_size(
+            per_rank_batch_size=config.training.per_rank_batch_size,
+            global_batch_size=config.training.global_batch_size,
+            world_size=get_world_size(),
+        )
         config_hash = config_digest(resolved_config_dict(config))
 
         def _validate_output_guard() -> None:
@@ -197,24 +226,28 @@ def main(argv: list[str] | None = None) -> int:
 
         coordinated_tracker_action(tracker, phase="tracker attach/resume", action=_attach_resume)
 
-        _seed_everything(config.seed + get_rank())
+        _seed_everything(config.seeds.model_init + get_rank())
         if config.training.deterministic:
             torch.use_deterministic_algorithms(True)
         dataset = build_dataset(config.dataset)
         train_dataset, validation_dataset = stratified_train_validation_split(
-            dataset, validation_fraction=config.training.validation_fraction, seed=config.seed
+            dataset, validation_fraction=config.training.validation_fraction, seed=config.seeds.split
         )
         sampler = EpochShuffleSampler(
-            len(train_dataset), seed=config.seed, rank=get_rank(), world_size=get_world_size(), shuffle=True
+            len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
         )
         validation_sampler = EpochShuffleSampler(
-            len(validation_dataset), seed=config.seed, rank=get_rank(), world_size=get_world_size(), shuffle=False
+            len(validation_dataset),
+            seed=config.seeds.data_order,
+            rank=get_rank(),
+            world_size=get_world_size(),
+            shuffle=False,
         )
         loader = cast(
             DataLoader[IndexedBatch],
             DataLoader(
                 train_dataset,
-                batch_size=config.training.batch_size,
+                batch_size=config.training.per_rank_batch_size,
                 sampler=sampler,
                 num_workers=config.training.num_workers,
                 collate_fn=collate_indexed,
@@ -224,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
             DataLoader[IndexedBatch],
             DataLoader(
                 validation_dataset,
-                batch_size=config.training.batch_size,
+                batch_size=config.training.per_rank_batch_size,
                 sampler=validation_sampler,
                 num_workers=config.training.num_workers,
                 collate_fn=collate_indexed,
@@ -236,16 +269,17 @@ def main(argv: list[str] | None = None) -> int:
         teacher = None if config.teacher is None else build_teacher(config.teacher, tier=config.tier)
         optimizer = SGD(
             student.parameters(),
-            lr=config.training.learning_rate,
-            momentum=config.training.momentum,
-            weight_decay=config.training.weight_decay,
+            lr=config.optimizer.learning_rate,
+            momentum=config.optimizer.momentum,
+            weight_decay=config.optimizer.weight_decay,
+            nesterov=config.optimizer.nesterov,
         )
         scheduler = StepLR(optimizer, step_size=1, gamma=1.0)
         selection_attack_config = config.method.selection_attack
         assert selection_attack_config is not None  # resolved by MethodConfig validation
-        objective, policy, sample_store = _build_method(config)
+        objective, policy, sample_store, target_policy = _build_method(config)
         diagnostics = TrainingDiagnostics.for_ids(
-            list(train_dataset.indices), seed=config.seed, size=config.tracking.panel_size
+            list(train_dataset.indices), seed=config.seeds.qualitative_panel, size=config.tracking.panel_size
         )
         trainer = Trainer(
             model=student,
@@ -259,10 +293,12 @@ def main(argv: list[str] | None = None) -> int:
             device=device,
             output_dir=output_dir,
             config_hash=config_hash,
-            seed=config.seed,
+            seed=config.seeds.train_attack,
+            evaluation_attack_seed=config.seeds.evaluation_attack,
             tracker_run_id=active_tracker.run_id,
             teacher=teacher,
             sample_store=sample_store,
+            target_policy=target_policy,
             policy_warmup_epochs=(config.method.student_policy_warmup_epochs if sample_store is not None else 0),
             oracle_mask=config.method.oracle_mask,
             diagnostics=diagnostics,

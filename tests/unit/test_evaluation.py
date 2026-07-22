@@ -7,7 +7,7 @@ import pytest
 
 from ard.analysis import ParquetDependencyError, fixed_panel_ids, summarize_checkpoint_groups, write_sample_parquet
 from ard.cli.evaluate import _validate_evaluation_tracking_identity
-from ard.config.schema import ExperimentConfig
+from ard.config.schema import ExperimentConfig, validate_global_batch_size
 from ard.engine.checkpoint import REQUIRED_KEYS
 from ard.evaluation.autoattack import run_autoattack
 from ard.evaluation.saved_checkpoint import validate_checkpoint_lineage
@@ -17,24 +17,58 @@ pytestmark = pytest.mark.t1
 
 def base() -> dict:
     return {
+        "schema_version": 2,
+        "protocol": {"id": "synthetic_smoke_v2"},
         "tier": "smoke",
+        "seeds": {
+            k: 0
+            for k in (
+                "split",
+                "model_init",
+                "data_order",
+                "augmentation",
+                "train_attack",
+                "evaluation_attack",
+                "qualitative_panel",
+            )
+        },
         "dataset": {"name": "synthetic_cifar", "num_samples": 4, "num_classes": 2, "split": "test"},
         "student": {"architecture": "fixture_cnn", "num_classes": 2},
-        "method": {"name": "pgd_at", "attack": {"steps": 1}},
+        "method": {"id": "pgd_at", "version": 1, "attack": {"steps": 1}},
+        "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+        "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+        "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
     }
 
 
 def _tracked_repro_config() -> ExperimentConfig:
     return ExperimentConfig.model_validate(
         {
+            "schema_version": 2,
+            "protocol": {"id": "controlled_cifar10_r18_v1"},
             "tier": "repro",
+            "seeds": {
+                k: 0
+                for k in (
+                    "split",
+                    "model_init",
+                    "data_order",
+                    "augmentation",
+                    "train_attack",
+                    "evaluation_attack",
+                    "qualitative_panel",
+                )
+            },
             "dataset": {"name": "cifar10", "root": "data", "num_classes": 10},
             "student": {
                 "architecture": "resnet18_cifar",
                 "num_classes": 10,
                 "normalization": {"profile": "cifar10_standard"},
             },
-            "method": {"name": "pgd_at", "attack": {"steps": 1}},
+            "method": {"id": "pgd_at", "version": 1, "attack": {"steps": 1}},
+            "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+            "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+            "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
             "tracking": {"mode": "offline_sync", "project": "project", "entity": "entity", "group": "group"},
         }
     )
@@ -86,6 +120,12 @@ def test_evaluation_attack_must_be_explicit_eval_ce_and_panel_is_stable() -> Non
             ],
             metric="robust",
         )
+
+
+def test_global_batch_identity_is_exact_for_checkpoint_world_size() -> None:
+    assert validate_global_batch_size(per_rank_batch_size=4, global_batch_size=8, world_size=2) == 8
+    with pytest.raises(ValueError, match="global_batch_size"):
+        validate_global_batch_size(per_rank_batch_size=4, global_batch_size=4, world_size=2)
 
 
 def test_parquet_never_falls_back_to_a_mislabeled_file(tmp_path: Path) -> None:
@@ -214,7 +254,17 @@ def _evaluation_row(
     method_identity: dict[str, str] | None = None,
     threat_hash: str = "threat-a",
     robust: float = 0.5,
+    training_seeds: dict[str, int] | None = None,
 ) -> dict[str, object]:
+    resolved_training_seeds = training_seeds or {
+        "split": training_seed,
+        "model_init": training_seed,
+        "data_order": training_seed,
+        "augmentation": training_seed,
+        "train_attack": training_seed,
+        "evaluation_attack": training_seed,
+        "qualitative_panel": training_seed,
+    }
     return {
         "checkpoint_alias": checkpoint,
         "checkpoint_filename": f"{checkpoint}.pt",
@@ -222,6 +272,7 @@ def _evaluation_row(
         "run_id": run_id,
         "train_run_id": run_id,
         "training_seed": training_seed,
+        "training_seeds": resolved_training_seeds,
         "teacher_identity": {"checkpoint_sha256": teacher},
         "dataset_identity": dataset_identity or {"name": "cifar10", "split": "test"},
         "training_dataset_identity": {"name": "cifar10", "split": "train"},
@@ -332,9 +383,24 @@ def test_checkpoint_aggregation_allows_different_dataset_provenance_roots() -> N
 
 
 def test_checkpoint_aggregation_rejects_contradictory_metadata_for_one_train_run() -> None:
+    changed_seeds = {
+        "split": 2,
+        "model_init": 1,
+        "data_order": 1,
+        "augmentation": 1,
+        "train_attack": 1,
+        "evaluation_attack": 1,
+        "qualitative_panel": 1,
+    }
     rows = [
         _evaluation_row(checkpoint="best", run_id="run-a", training_seed=1, teacher="teacher-a"),
-        _evaluation_row(checkpoint="last", run_id="run-a", training_seed=2, teacher="teacher-a"),
+        _evaluation_row(
+            checkpoint="last",
+            run_id="run-a",
+            training_seed=1,
+            training_seeds=changed_seeds,
+            teacher="teacher-a",
+        ),
     ]
 
     with pytest.raises(ValueError, match="contradictory metadata"):

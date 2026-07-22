@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -30,6 +30,74 @@ def parse_rational(value: str) -> float:
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+
+class ProtocolConfig(StrictModel):
+    """Versioned experiment protocol identity; M1 owns its concrete registry."""
+
+    id: Literal[
+        "saad_paper_reproduction_v1",
+        "saad_code_295121c_audit_v1",
+        "controlled_cifar10_r18_v1",
+        "synthetic_smoke_v2",
+    ]
+
+
+class SeedsConfig(StrictModel):
+    """Independent deterministic seeds, resolved without a legacy scalar alias."""
+
+    split: int
+    model_init: int
+    data_order: int
+    augmentation: int
+    train_attack: int
+    evaluation_attack: int
+    qualitative_panel: int
+
+
+class OptimizerConfig(StrictModel):
+    """Optimizer identity frozen for the M1 protocol implementation."""
+
+    id: Literal["sgd"]
+    learning_rate: float = Field(gt=0)
+    momentum: float = Field(ge=0, lt=1)
+    weight_decay: float = Field(ge=0)
+    nesterov: bool
+
+    @model_validator(mode="after")
+    def validate_nesterov(self) -> OptimizerConfig:
+        if self.nesterov and self.momentum <= 0:
+            raise ValueError("nesterov SGD requires positive momentum")
+        return self
+
+
+class SchedulerConfig(StrictModel):
+    """Scheduler identity frozen before M1 supplies concrete schedules."""
+
+    id: Literal["identity", "multistep"]
+    milestones: tuple[int, ...]
+    gamma: float = Field(gt=0)
+    step_at: Literal["epoch_end"]
+
+    @model_validator(mode="after")
+    def validate_schedule(self) -> SchedulerConfig:
+        if self.id == "identity":
+            if self.milestones or self.gamma != 1.0:
+                raise ValueError("identity scheduler requires milestones=[] and gamma=1.0")
+        elif not self.milestones or tuple(sorted(set(self.milestones))) != self.milestones or self.milestones[0] < 0:
+            raise ValueError("multistep scheduler requires strictly increasing non-negative milestones")
+        return self
+
+
+class TargetPolicyConfig(StrictModel):
+    """Identity for adversarial-student teacher-target calibration only."""
+
+    id: Literal["teacher_target_uniform_mix"]
+    version: Literal[1]
+    risk_transform: Literal["identity"]
+    mixing: Literal["uniform"]
+    apply_to: Literal["adversarial_student_kd"]
+    rho_max: float = Field(default=0.5, ge=0, le=1)
 
 
 class NormalizationConfig(StrictModel):
@@ -177,6 +245,7 @@ class ModelConfig(StrictModel):
     architecture: Literal["resnet18_cifar", "mobilenet_v2_cifar", "fixture_cnn"] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
+    preprocessing_owner: Literal["student_adapter"] = "student_adapter"
 
 
 class TeacherConfig(StrictModel):
@@ -184,6 +253,7 @@ class TeacherConfig(StrictModel):
     architecture: Literal["resnet18_cifar", "mobilenet_v2_cifar", "fixture_cnn"] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
+    preprocessing_owner: Literal["teacher_adapter"] = "teacher_adapter"
     checkpoint: Path | None = None
     checkpoint_sha256: str | None = None
     fixture_seed: int = 1729
@@ -200,7 +270,17 @@ class TeacherConfig(StrictModel):
 
 
 class MethodConfig(StrictModel):
-    name: Literal["pgd_at", "trades", "rslad", "rslad_entropy", "rslad_student", "rslad_joint"] = "pgd_at"
+    id: Literal[
+        "pgd_at",
+        "trades",
+        "rslad",
+        "rslad_entropy",
+        "rslad_student",
+        "rslad_joint",
+        "rslad_joint_downweight",
+        "rslad_hard_fallback",
+    ]
+    version: Literal[1]
     attack: AttackConfig = Field(default_factory=AttackConfig)
     selection_attack: AttackConfig | None = None
     temperature: float = Field(default=1.0, gt=0)
@@ -209,22 +289,30 @@ class MethodConfig(StrictModel):
     entropy_gamma: float = Field(default=1.0, gt=0)
     student_ema_decay: float = Field(default=0.9, ge=0, lt=1)
     student_policy_warmup_epochs: int = Field(default=1, ge=1)
+    target_policy: TargetPolicyConfig | None = None
     oracle_mask: bool = False
+
+    @property
+    def name(self) -> str:
+        """Runtime compatibility only; resolved configuration serializes ``id``."""
+        return self.id
 
     @model_validator(mode="after")
     def resolve_selection_attack(self) -> MethodConfig:
-        expected_loss = "ce" if self.name == "pgd_at" else "kl"
+        expected_loss = "ce" if self.id == "pgd_at" else "kl"
         expected_target = {
             "trades": "student_clean",
             "rslad": "teacher_clean",
             "rslad_entropy": "teacher_clean",
             "rslad_student": "teacher_clean",
             "rslad_joint": "teacher_clean",
-        }.get(self.name)
+            "rslad_joint_downweight": "teacher_clean",
+            "rslad_hard_fallback": "teacher_clean",
+        }.get(self.id)
         if self.attack.loss != expected_loss:
-            raise ValueError(f"{self.name} requires attack.loss={expected_loss}")
+            raise ValueError(f"{self.id} requires attack.loss={expected_loss}")
         if self.attack.kl_target != expected_target:
-            raise ValueError(f"{self.name} requires attack.kl_target={expected_target!r}")
+            raise ValueError(f"{self.id} requires attack.kl_target={expected_target!r}")
         selection = self.selection_attack
         if selection is None:
             selection = self.attack.model_copy(
@@ -249,32 +337,61 @@ class MethodConfig(StrictModel):
             raise ValueError(
                 "checkpoint selection attack must match the training threat model: " + ", ".join(mismatched)
             )
-        if self.name == "rslad_entropy" and self.entropy_gamma != 1.0:
+        if self.id == "rslad_entropy" and self.entropy_gamma != 1.0:
             raise ValueError("rslad_entropy currently implements Shannon entropy only (entropy_gamma=1)")
-        if self.name in {"rslad_student", "rslad_joint"}:
+        risk_methods = {
+            "rslad_student",
+            "rslad_joint",
+            "rslad_joint_downweight",
+            "rslad_hard_fallback",
+        }
+        if self.id in risk_methods:
             if self.student_ema_decay != 0.9:
                 raise ValueError(
-                    f"{self.name} is the canonical EMA=0.9 method; use a separate method ID for other decays"
+                    f"{self.id} is the canonical EMA=0.9 method; use a separate method ID for other decays"
                 )
             if self.student_policy_warmup_epochs != 1:
                 raise ValueError(
-                    f"{self.name} is the canonical one-epoch-warmup method; use a separate method ID for variants"
+                    f"{self.id} is the canonical one-epoch-warmup method; use a separate method ID for variants"
                 )
-        if self.oracle_mask and self.name not in {"rslad_student", "rslad_joint"}:
-            raise ValueError("oracle_mask is only defined for student-aware RSLAD methods")
+        target_methods = {"rslad_student", "rslad_joint"}
+        if self.id in target_methods:
+            if self.target_policy is None:
+                raise ValueError(f"{self.id} requires an explicit target_policy")
+        elif self.target_policy is not None:
+            raise ValueError(f"target_policy is only defined for {sorted(target_methods)}")
+        if self.oracle_mask and self.id != "rslad_hard_fallback":
+            raise ValueError("oracle_mask is only defined for rslad_hard_fallback")
         return self
 
 
 class TrainingConfig(StrictModel):
     epochs: int = Field(default=1, ge=1)
-    batch_size: int = Field(default=4, ge=1)
-    learning_rate: float = Field(default=0.01, gt=0)
-    momentum: float = Field(default=0.0, ge=0, lt=1)
-    weight_decay: float = Field(default=0.0, ge=0)
+    per_rank_batch_size: int = Field(ge=1)
+    global_batch_size: int = Field(ge=1)
     num_workers: int = Field(default=0, ge=0)
     device: Literal["auto", "cpu", "cuda"] = "auto"
     deterministic: bool = True
     validation_fraction: float = Field(default=0.25, gt=0, lt=1)
+
+    @model_validator(mode="after")
+    def validate_batch_identity(self) -> TrainingConfig:
+        if self.global_batch_size < self.per_rank_batch_size:
+            raise ValueError("global_batch_size must be at least per_rank_batch_size")
+        return self
+
+
+def validate_global_batch_size(*, per_rank_batch_size: int, global_batch_size: int, world_size: int) -> int:
+    """Validate and return the effective global batch for an initialized job."""
+    if isinstance(world_size, bool) or not isinstance(world_size, int) or world_size <= 0:
+        raise ValueError("world_size must be a positive integer")
+    effective_global_batch_size = per_rank_batch_size * world_size
+    if global_batch_size != effective_global_batch_size:
+        raise ValueError(
+            "global_batch_size must equal per_rank_batch_size * world_size "
+            f"({global_batch_size} != {per_rank_batch_size} * {world_size})"
+        )
+    return effective_global_batch_size
 
 
 class TrackingConfig(StrictModel):
@@ -326,19 +443,39 @@ class EvaluationConfig(StrictModel):
 
 
 class ExperimentConfig(StrictModel):
-    schema_version: int = 1
+    schema_version: Literal[2]
+    protocol: ProtocolConfig
     tier: Literal["dev", "smoke", "repro", "production"] = "dev"
-    seed: int = 0
+    seeds: SeedsConfig
     dataset: DatasetConfig = Field(default_factory=DatasetConfig)
     student: ModelConfig = Field(default_factory=ModelConfig)
     teacher: TeacherConfig | None = None
-    method: MethodConfig = Field(default_factory=MethodConfig)
-    training: TrainingConfig = Field(default_factory=TrainingConfig)
+    method: MethodConfig
+    optimizer: OptimizerConfig
+    scheduler: SchedulerConfig
+    training: TrainingConfig
     tracking: TrackingConfig = Field(default_factory=TrackingConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     output_dir: Path = Path("outputs/dev")
     # Compatibility with M1 checkpoints/configs.  New paths use tracking.run_id.
     tracker_run_id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_pre_v2_schema(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        version = value.get("schema_version")
+        if version != 2:
+            if version is None:
+                raise ValueError("schema_version is required and must be exactly 2; v1/missing configs are unsupported")
+            raise ValueError(f"schema_version must be exactly 2; received {version!r}")
+        return value
+
+    @property
+    def seed(self) -> int:
+        """Runtime compatibility only; resolved configuration serializes ``seeds.model_init``."""
+        return self.seeds.model_init
 
     @model_validator(mode="after")
     def validate_cross_fields(self) -> ExperimentConfig:
@@ -373,8 +510,16 @@ class ExperimentConfig(StrictModel):
             raise ValueError("student and dataset num_classes must match")
         if self.teacher is not None and self.teacher.num_classes != self.dataset.num_classes:
             raise ValueError("teacher and dataset num_classes must match")
-        if self.method.name in {"rslad", "rslad_entropy", "rslad_student", "rslad_joint"} and self.teacher is None:
-            raise ValueError(f"{self.method.name} requires a frozen teacher")
+        rslad_methods = {
+            "rslad",
+            "rslad_entropy",
+            "rslad_student",
+            "rslad_joint",
+            "rslad_joint_downweight",
+            "rslad_hard_fallback",
+        }
+        if self.method.id in rslad_methods and self.teacher is None:
+            raise ValueError(f"{self.method.id} requires a frozen teacher")
         if self.method.oracle_mask and self.tier != "dev":
             raise ValueError("oracle_mask is scientific/dev-only and is forbidden for smoke, repro, and production")
         if self.teacher is not None and self.teacher.source == "fixture" and self.tier not in {"dev", "smoke"}:
@@ -387,6 +532,4 @@ class ExperimentConfig(StrictModel):
         }[self.dataset.name]
         if self.student.normalization.profile != expected_profile:
             raise ValueError(f"dataset {self.dataset.name} requires student normalization profile {expected_profile}")
-        if self.teacher is not None and self.teacher.normalization.profile != self.student.normalization.profile:
-            raise ValueError("teacher and student normalization profiles to match")
         return self

@@ -25,7 +25,7 @@ import torch
 import yaml
 
 from ard.config.loader import resolved_config_dict
-from ard.config.schema import ExperimentConfig
+from ard.config.schema import ExperimentConfig, SeedsConfig
 from ard.engine.checkpoint import capture_rng_state, restore_rng_state
 from ard.engine.distributed import is_rank_zero, run_rank_zero_phase
 from ard.models.teacher import sha256_file
@@ -262,6 +262,7 @@ class LocalTracker:
         job_type: str = "train",
         wandb_module: Any | None = None,
         training_seed: int | None = None,
+        training_seeds: Mapping[str, int] | None = None,
         evaluation_seed: int | None = None,
     ) -> None:
         self.config, self.output_dir, self.config_hash, self.root, self.run_id = (
@@ -278,6 +279,11 @@ class LocalTracker:
         self._wandb_module: Any | None = None
         self._prepared = False
         self._finalization_id = uuid.uuid4().hex
+        resolved_training_seeds = (
+            config.seeds if training_seeds is None else SeedsConfig.model_validate(dict(training_seeds))
+        )
+        if training_seed is not None and training_seed != resolved_training_seeds.model_init:
+            raise TrackingError("training_seed compatibility scalar must match training_seeds.model_init")
         git = collect_git_state(root)
         prior: dict[str, Any] | None = None
         if self.manifest_path.is_file():
@@ -298,8 +304,9 @@ class LocalTracker:
             "tracking_mode": config.tracking.mode,
             "job_type": job_type,
             "config_hash": config_hash,
-            "seed": config.seed,
-            "training_seed": config.seed if training_seed is None else training_seed,
+            "seed": resolved_training_seeds.model_init,
+            "training_seed": resolved_training_seeds.model_init,
+            "training_seeds": resolved_training_seeds.model_dump(mode="json"),
             "evaluation_seed": evaluation_seed,
             "world_size": int(os.environ.get("WORLD_SIZE", "1")),
             "git": {key: value for key, value in git.items() if key != "diff"},
@@ -327,7 +334,7 @@ class LocalTracker:
             ):
                 if key in prior:
                     self.manifest[key] = prior[key]
-            for key in ("tier", "tracking_mode", "job_type", "seed", "world_size"):
+            for key in ("tier", "tracking_mode", "job_type", "seed", "training_seed", "training_seeds", "world_size"):
                 if prior.get(key) != self.manifest.get(key):
                     raise TrackingError(f"resume manifest lineage drift: {key}")
             prior_environment = self.bundle_dir / "environment.json"
@@ -646,6 +653,7 @@ def create_tracker(
     job_type: str = "train",
     run_id: str | None = None,
     training_seed: int | None = None,
+    training_seeds: Mapping[str, int] | None = None,
     evaluation_seed: int | None = None,
 ) -> ExperimentTracker:
     """Return a no-op on non-zero ranks; only rank zero can initialize W&B."""
@@ -663,6 +671,7 @@ def create_tracker(
         job_type=job_type,
         wandb_module=wandb_module,
         training_seed=training_seed,
+        training_seeds=training_seeds,
         evaluation_seed=evaluation_seed,
     )
 

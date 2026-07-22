@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, load_config, save_resolved_config
 from ard.config.loader import resolved_config_dict
+from ard.config.schema import validate_global_batch_size
 from ard.data import EpochShuffleSampler, IndexedBatch, build_dataset, collate_indexed
 from ard.engine import config_digest
 from ard.evaluation import (
@@ -182,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
         for payload in checkpoint_payloads
     ):
         raise ValueError("requested checkpoints do not share the same training run/config/world-size identity")
+    effective_global_batch_size = validate_global_batch_size(
+        per_rank_batch_size=training_config.training.per_rank_batch_size,
+        global_batch_size=training_config.training.global_batch_size,
+        world_size=checkpoint_world_size,
+    )
     output_dir = (args.output or ((args.checkpoint_dir or args.checkpoint.parent) / "evaluation")).resolve()
     if output_dir.exists() and any(output_dir.iterdir()):
         raise FileExistsError(f"refusing to overwrite existing evaluation output: {output_dir}")
@@ -212,7 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         root=Path.cwd(),
         job_type="evaluation",
         run_id=evaluation_run_id,
-        training_seed=training_config.seed,
+        training_seed=training_config.seeds.model_init,
+        training_seeds=training_config.seeds.model_dump(mode="json"),
         evaluation_seed=config.evaluation.seed,
     )
     try:
@@ -228,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
             DataLoader[IndexedBatch],
             DataLoader(
                 dataset,
-                batch_size=config.training.batch_size,
+                batch_size=config.training.per_rank_batch_size,
                 sampler=sampler,
                 num_workers=config.training.num_workers,
                 collate_fn=collate_indexed,
@@ -240,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         attack = LinfPGD(attack_config)
         evaluation_protocol_identity = {
             "seed": config.evaluation.seed,
-            "loader_batch_size": config.training.batch_size,
+            "loader_batch_size": config.training.per_rank_batch_size,
             "attack": threat_model,
             "autoattack": {
                 "enabled": config.evaluation.autoattack,
@@ -309,20 +316,17 @@ def main(argv: list[str] | None = None) -> int:
                     },
                     "student": training_config.student.architecture,
                     "student_identity": training_config.student.model_dump(mode="json"),
-                    "method": training_config.method.name,
+                    "method": training_config.method.id,
                     "method_identity": training_config.method.model_dump(mode="json"),
                     "training_protocol_identity": {
                         "epochs": training_config.training.epochs,
-                        "batch_size": training_config.training.batch_size,
-                        "learning_rate": training_config.training.learning_rate,
-                        "momentum": training_config.training.momentum,
-                        "weight_decay": training_config.training.weight_decay,
+                        "optimizer": training_config.optimizer.model_dump(mode="json"),
                         "deterministic": training_config.training.deterministic,
                         "validation_fraction": training_config.training.validation_fraction,
-                        "scheduler": {"type": "StepLR", "step_size": 1, "gamma": 1.0},
+                        "scheduler": training_config.scheduler.model_dump(mode="json"),
                         "checkpoint_world_size": payload_world_size,
-                        "per_rank_batch_size": training_config.training.batch_size,
-                        "effective_global_batch_size": (training_config.training.batch_size * payload_world_size),
+                        "per_rank_batch_size": training_config.training.per_rank_batch_size,
+                        "effective_global_batch_size": effective_global_batch_size,
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,
@@ -330,7 +334,8 @@ def main(argv: list[str] | None = None) -> int:
                         None if training_config.teacher is None else training_config.teacher.model_dump(mode="json")
                     ),
                     "seed": config.evaluation.seed,
-                    "training_seed": training_config.seed,
+                    "training_seed": training_config.seeds.model_init,
+                    "training_seeds": training_config.seeds.model_dump(mode="json"),
                     "evaluation_seed": config.evaluation.seed,
                     "config_hash": expected_config_hash,
                     "clean_accuracy": result.clean_accuracy,

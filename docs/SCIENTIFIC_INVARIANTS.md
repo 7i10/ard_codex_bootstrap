@@ -126,3 +126,7 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   resultへ照合できるようにする。現状のtraining config由来`expected-unverified`だけではこの要件を満たさない。
 - synthetic smoke、mock W&B、injected AutoAttack adapterをCIFAR reproduction resultとして報告しない。
 - T4/T5、CIFAR本訓練、real full AutoAttackが未実行の間はaccuracy/parity成功を主張しない。
+
+## M0 schema v2 target policy
+
+Schema v2 は `teacher_target_uniform_mix@1` を student/joint の adversarial student-KD branch にのみ適用する。teacher probabilities は `softmax(z_t/T)` とし、uniform mixing は `rho_max=0.5`、clean KD target は変更しない。student/joint の main semantics では hard-label fallback は使用しない。旧挙動は明示的な `rslad_hard_fallback@1` ablation としてのみ扱う。

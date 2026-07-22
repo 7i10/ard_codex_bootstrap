@@ -81,7 +81,21 @@ def test_resume_rejects_teacher_checkpoint_byte_drift(tmp_path: Path) -> None:
     digest = __import__("hashlib").sha256(checkpoint.read_bytes()).hexdigest()
     cfg = ExperimentConfig.model_validate(
         {
+            "schema_version": 2,
+            "protocol": {"id": "synthetic_smoke_v2"},
             "tier": "smoke",
+            "seeds": {
+                k: 0
+                for k in (
+                    "split",
+                    "model_init",
+                    "data_order",
+                    "augmentation",
+                    "train_attack",
+                    "evaluation_attack",
+                    "qualitative_panel",
+                )
+            },
             "dataset": {"name": "synthetic_cifar", "num_samples": 4, "num_classes": 2},
             "student": {"architecture": "fixture_cnn", "num_classes": 2},
             "teacher": {
@@ -91,7 +105,10 @@ def test_resume_rejects_teacher_checkpoint_byte_drift(tmp_path: Path) -> None:
                 "checkpoint": str(checkpoint),
                 "checkpoint_sha256": digest,
             },
-            "method": {"name": "rslad", "attack": {"loss": "kl", "kl_target": "teacher_clean", "steps": 1}},
+            "method": {"id": "rslad", "version": 1, "attack": {"loss": "kl", "kl_target": "teacher_clean", "steps": 1}},
+            "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+            "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+            "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
             "output_dir": str(tmp_path / "run"),
         }
     )
@@ -115,6 +132,16 @@ def test_resume_rejects_environment_snapshot_drift(tmp_path: Path) -> None:
 
     with pytest.raises(TrackingError, match="lineage drift: environment"):
         create_tracker(config=config(output, mode="disabled"), output_dir=output, config_hash="abc", root=tmp_path)
+
+
+def test_manifest_preserves_complete_structured_training_seed_lineage(tmp_path: Path) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    cfg = config(output, mode="disabled")
+    create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path).finish()
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["training_seeds"] == cfg.seeds.model_dump(mode="json")
+    assert manifest["training_seed"] == cfg.seeds.model_init
 
 
 def test_resume_rejects_untracked_content_drift(tmp_path: Path) -> None:
@@ -171,11 +198,27 @@ ROOT = Path(__file__).resolve().parents[2]
 def config(output: Path, *, mode: str = "offline") -> ExperimentConfig:
     return ExperimentConfig.model_validate(
         {
+            "schema_version": 2,
+            "protocol": {"id": "synthetic_smoke_v2"},
             "tier": "smoke",
-            "seed": 9,
+            "seeds": {
+                k: 9
+                for k in (
+                    "split",
+                    "model_init",
+                    "data_order",
+                    "augmentation",
+                    "train_attack",
+                    "evaluation_attack",
+                    "qualitative_panel",
+                )
+            },
             "dataset": {"name": "synthetic_cifar", "num_samples": 4, "num_classes": 2},
             "student": {"architecture": "fixture_cnn", "num_classes": 2},
-            "method": {"name": "pgd_at", "attack": {"steps": 1}},
+            "method": {"id": "pgd_at", "version": 1, "attack": {"steps": 1}},
+            "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+            "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+            "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
             "tracking": {"mode": mode, "project": "ard-test", "run_id": "stable-run"}
             if mode != "disabled"
             else {"mode": mode},
@@ -187,15 +230,31 @@ def config(output: Path, *, mode: str = "offline") -> ExperimentConfig:
 def production_config(output: Path, dataset_root: Path) -> ExperimentConfig:
     return ExperimentConfig.model_validate(
         {
+            "schema_version": 2,
+            "protocol": {"id": "controlled_cifar10_r18_v1"},
             "tier": "production",
-            "seed": 9,
+            "seeds": {
+                k: 9
+                for k in (
+                    "split",
+                    "model_init",
+                    "data_order",
+                    "augmentation",
+                    "train_attack",
+                    "evaluation_attack",
+                    "qualitative_panel",
+                )
+            },
             "dataset": {"name": "cifar10", "root": str(dataset_root), "num_classes": 10},
             "student": {
                 "architecture": "resnet18_cifar",
                 "num_classes": 10,
                 "normalization": {"profile": "cifar10_standard"},
             },
-            "method": {"name": "pgd_at", "attack": {"steps": 1}},
+            "method": {"id": "pgd_at", "version": 1, "attack": {"steps": 1}},
+            "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+            "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+            "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
             "tracking": {
                 "mode": "offline_sync",
                 "entity": "ard-test-entity",

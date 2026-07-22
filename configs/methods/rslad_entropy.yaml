@@ -1,4 +1,5 @@
-name: rslad_entropy
+version: 1
+id: rslad_entropy
 temperature: 1.0
 temperature_squared: true
 entropy_gamma: 1.0

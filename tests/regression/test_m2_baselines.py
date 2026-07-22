@@ -15,10 +15,35 @@ from ard.engine import Trainer
 from ard.engine.distributed import reduce_min
 from ard.objectives import PGDATObjective, RSLADObjective, TRADESObjective
 from ard.objectives.base import ObjectiveTerms
+from ard.objectives.kl import probabilities_to_student_kl
 from ard.policies import EntropyOnlyPolicy, PolicyContext, RSLADBaselinePolicy
 from ard.signals import shannon_entropy
+from ard.targets import UniformSofteningTeacherTargetPolicy
 
 pytestmark = pytest.mark.t2
+
+
+def _v2_experiment(*, method: dict[str, object], num_classes: int = 3) -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "protocol": {"id": "synthetic_smoke_v2"},
+        "seeds": {
+            "split": 0,
+            "model_init": 0,
+            "data_order": 0,
+            "augmentation": 0,
+            "train_attack": 0,
+            "evaluation_attack": 0,
+            "qualitative_panel": 0,
+        },
+        "dataset": {"name": "synthetic_cifar", "num_classes": num_classes, "num_samples": 8, "image_size": 4},
+        "student": {"architecture": "fixture_cnn", "num_classes": num_classes},
+        "method": method,
+        "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.0, "weight_decay": 0.0, "nesterov": False},
+        "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+        "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
+        "output_dir": "outputs/m0-config-test",
+    }
 
 
 def _kl_target_to_student(student: torch.Tensor, target: torch.Tensor, temperature: float) -> torch.Tensor:
@@ -72,6 +97,103 @@ def test_fixed_batch_pgd_at_trades_rslad_formula_direction_temperature_and_t2() 
     rslad.apply_policy(baseline).total.mean().backward()
     assert teacher_clean.grad is None
     assert student_adv.grad is not None and student_clean.grad is not None
+
+
+def test_teacher_target_uniform_softening_is_detached_normalized_temperature_consistent_and_adv_only() -> None:
+    temperature = 2.0
+    teacher = torch.tensor([[3.0, -1.0, 0.5], [-0.4, 1.3, 0.2]], dtype=torch.float64, requires_grad=True)
+    risk = torch.tensor([0.0, 1.0], dtype=torch.float64, requires_grad=True)
+    target = UniformSofteningTeacherTargetPolicy(rho_max=0.5)(
+        teacher_logits=teacher,
+        risk=risk,
+        temperature=temperature,
+    )
+    expected_teacher = torch.softmax(teacher.detach() / temperature, dim=1)
+    expected = torch.stack((expected_teacher[0], 0.5 * expected_teacher[1] + 0.5 / 3.0))
+    assert torch.equal(target.rho, torch.tensor([0.0, 0.5], dtype=torch.float64))
+    torch.testing.assert_close(target.probabilities, expected, rtol=0, atol=1e-15)
+    assert not target.probabilities.requires_grad and not target.rho.requires_grad
+    assert torch.isfinite(target.probabilities).all()
+    torch.testing.assert_close(target.probabilities.sum(1), torch.ones(2, dtype=torch.float64), rtol=0, atol=1e-15)
+
+    labels = torch.tensor([0, 2])
+    adv_base = torch.tensor([[0.2, -0.5, 0.7], [-0.1, 0.4, 0.2]], dtype=torch.float64, requires_grad=True)
+    clean_base = torch.tensor([[0.1, 0.8, -0.2], [0.3, -0.7, 0.6]], dtype=torch.float64, requires_grad=True)
+    base = RSLADObjective(temperature=temperature)(
+        student_logits=adv_base, clean_student_logits=clean_base, teacher_logits=teacher, labels=labels
+    )
+    adv_soft = adv_base.detach().clone().requires_grad_()
+    clean_soft = clean_base.detach().clone().requires_grad_()
+    softened = RSLADObjective(temperature=temperature)(
+        student_logits=adv_soft,
+        clean_student_logits=clean_soft,
+        teacher_logits=teacher,
+        labels=labels,
+        adversarial_target_probabilities=target.probabilities,
+    )
+    # Risk zero exactly preserves the adversarial KD target; the risk-one row
+    # changes only that branch, while clean KD remains the original teacher target.
+    assert base.adversarial_kd is not None and base.clean_kd is not None
+    assert softened.adversarial_kd is not None and softened.clean_kd is not None
+    torch.testing.assert_close(softened.adversarial_kd[0], base.adversarial_kd[0], rtol=0, atol=1e-15)
+    assert not torch.equal(softened.adversarial_kd[1], base.adversarial_kd[1])
+    torch.testing.assert_close(softened.clean_kd, base.clean_kd, rtol=0, atol=0)
+    clean_base_grad = torch.autograd.grad(base.kd.sum(), clean_base, retain_graph=True)[0]
+    clean_soft_grad = torch.autograd.grad(softened.kd.sum(), clean_soft, retain_graph=True)[0]
+    torch.testing.assert_close(clean_soft_grad, clean_base_grad, rtol=0, atol=1e-15)
+    softened.kd.sum().backward()
+    assert teacher.grad is None and risk.grad is None
+    assert adv_soft.grad is not None and clean_soft.grad is not None
+
+
+def test_zero_risk_fp32_target_is_bitwise_baseline_rslad_for_128_by_10_seed_zero() -> None:
+    torch.manual_seed(0)
+    temperature = 2.0
+    teacher_logits = torch.randn(128, 10, dtype=torch.float32)
+    risk = torch.zeros(128, dtype=torch.float32)
+    target = UniformSofteningTeacherTargetPolicy(rho_max=0.5)(
+        teacher_logits=teacher_logits,
+        risk=risk,
+        temperature=temperature,
+    )
+    expected_target = torch.softmax(teacher_logits / temperature, dim=1)
+    assert torch.equal(target.probabilities, expected_target)
+
+    labels = torch.randint(0, 10, (128,))
+    baseline_adv = torch.randn(128, 10, dtype=torch.float32, requires_grad=True)
+    baseline_clean = torch.randn(128, 10, dtype=torch.float32, requires_grad=True)
+    baseline = RSLADObjective(temperature=temperature)(
+        student_logits=baseline_adv,
+        clean_student_logits=baseline_clean,
+        teacher_logits=teacher_logits,
+        labels=labels,
+    )
+    softened_adv = baseline_adv.detach().clone().requires_grad_()
+    softened_clean = baseline_clean.detach().clone().requires_grad_()
+    softened = RSLADObjective(temperature=temperature)(
+        student_logits=softened_adv,
+        clean_student_logits=softened_clean,
+        teacher_logits=teacher_logits,
+        labels=labels,
+        adversarial_target_probabilities=target.probabilities,
+    )
+    assert torch.equal(softened.adversarial_kd, baseline.adversarial_kd)
+    assert torch.equal(softened.kd, baseline.kd)
+    baseline_grad = torch.autograd.grad(baseline.kd.sum(), (baseline_adv, baseline_clean))
+    softened_grad = torch.autograd.grad(softened.kd.sum(), (softened_adv, softened_clean))
+    assert all(torch.equal(actual, expected) for actual, expected in zip(softened_grad, baseline_grad, strict=True))
+
+
+def test_probability_validation_rejects_materially_malformed_distribution() -> None:
+    student = torch.zeros(1, 3, requires_grad=True)
+    malformed = torch.tensor([[0.2, 0.2, 0.2]])
+    with pytest.raises(ValueError, match="sum to one"):
+        probabilities_to_student_kl(
+            student_logits=student,
+            target_probabilities=malformed,
+            temperature=1.0,
+            temperature_squared=False,
+        )
 
 
 def test_entropy_policy_is_shannon_unclipped_and_weights_complete_rslad_loss() -> None:
@@ -245,16 +367,13 @@ def test_rslad_trainer_freezes_teacher_and_changes_student_once(tmp_path: pytest
     ],
 )
 def test_each_m2_method_config_is_selectable(name: str, attack: dict[str, str]) -> None:
-    data: dict[str, object] = {
-        "dataset": {"name": "synthetic_cifar", "num_classes": 3, "num_samples": 8, "image_size": 4},
-        "student": {"architecture": "fixture_cnn", "num_classes": 3},
-        "method": {"name": name, "attack": {**attack, "epsilon": "1/255", "step_size": "1/255", "steps": 1}},
-        "output_dir": "outputs/m2-config-test",
-    }
+    data = _v2_experiment(
+        method={"id": name, "version": 1, "attack": {**attack, "epsilon": "1/255", "step_size": "1/255", "steps": 1}}
+    )
     if name.startswith("rslad"):
         data["teacher"] = {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 3}
     config = ExperimentConfig.model_validate(data)
-    assert config.method.name == name
+    assert config.method.id == name
     assert config.method.selection_attack is not None and config.method.selection_attack.loss == "ce"
 
 
@@ -262,19 +381,20 @@ def test_rslad_entropy_rejects_configurable_scale_even_when_five() -> None:
     with pytest.raises(ValidationError, match="entropy_scale"):
         ExperimentConfig.model_validate(
             {
-                "dataset": {"name": "synthetic_cifar", "num_classes": 3, "num_samples": 8, "image_size": 4},
-                "student": {"architecture": "fixture_cnn", "num_classes": 3},
-                "teacher": {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 3},
-                "method": {
-                    "name": "rslad_entropy",
-                    "entropy_scale": 5,
-                    "attack": {
-                        "loss": "kl",
-                        "kl_target": "teacher_clean",
-                        "epsilon": "1/255",
-                        "step_size": "1/255",
-                        "steps": 1,
+                **_v2_experiment(
+                    method={
+                        "id": "rslad_entropy",
+                        "version": 1,
+                        "entropy_scale": 5,
+                        "attack": {
+                            "loss": "kl",
+                            "kl_target": "teacher_clean",
+                            "epsilon": "1/255",
+                            "step_size": "1/255",
+                            "steps": 1,
+                        },
                     },
-                },
+                ),
+                "teacher": {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 3},
             }
         )

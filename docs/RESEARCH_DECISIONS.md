@@ -35,3 +35,7 @@ CIFAR-10/100で機構と再現性を確立し、Tiny-ImageNetをscale validation
 ## D7. テストを重複実行しない
 
 Git diffと関連入力hashで必要testを選び、成功結果をcacheします。full suiteはmilestone境界、GPU smokeは影響pathがある場合、production trainingは明示的な研究実験としてのみ実行します。
+
+### M0 target softening decision
+
+`teacher_target_uniform_mix@1` は teacher の `softmax(z_t/T)` を adversarial student-KD branch のみ uniform mix する（`risk_transform: identity`, `rho_max: 0.5`）。clean KD target は不変で、student/joint main semantics に hard-label fallback はない。旧挙動は `rslad_hard_fallback@1` ablation として明示する。

@@ -39,12 +39,26 @@ def _run(root: Path, module: str, *args: str) -> subprocess.CompletedProcess[str
 
 def _training_config(output: Path) -> dict[str, Any]:
     return {
+        "schema_version": 2,
+        "protocol": {"id": "synthetic_smoke_v2"},
         "tier": "smoke",
-        "seed": 4,
+        "seeds": {
+            k: 4
+            for k in (
+                "split",
+                "model_init",
+                "data_order",
+                "augmentation",
+                "train_attack",
+                "evaluation_attack",
+                "qualitative_panel",
+            )
+        },
         "dataset": {"name": "synthetic_cifar", "num_samples": 8, "num_classes": 2, "image_size": 4},
         "student": {"architecture": "fixture_cnn", "num_classes": 2},
         "method": {
-            "name": "pgd_at",
+            "id": "pgd_at",
+            "version": 1,
             "attack": {
                 "epsilon": "1/255",
                 "step_size": "1/255",
@@ -52,7 +66,9 @@ def _training_config(output: Path) -> dict[str, Any]:
                 "random_start": False,
             },
         },
-        "training": {"epochs": 1, "batch_size": 2, "device": "cpu"},
+        "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+        "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+        "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2, "device": "cpu"},
         "tracking": {
             "mode": "offline",
             "project": "ard-test",
@@ -208,9 +224,11 @@ def test_saved_checkpoint_evaluation_is_canonical_and_aggregates(offline_run: di
         "training_protocol_identity",
         "teacher_identity",
         "training_seed",
+        "training_seeds",
         "evaluation_seed",
     }
     assert all(required_identity_keys <= item.keys() for item in results)
+    assert all(item["training_seeds"] == offline_run["config"].seeds.model_dump(mode="json") for item in results)
     assert all(
         {"name", "split", "classes", "image_size", "version"} <= item["dataset_identity"].keys()
         and "root" not in item["dataset_identity"]

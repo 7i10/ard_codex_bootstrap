@@ -43,18 +43,49 @@ class _RiskPolicy(WeightPolicy):
         risk = risk.clamp(0.0, 1.0)
         valid = context.valid_mask.to(device=risk.device)
         risk = torch.where(valid, risk, torch.zeros_like(risk)).detach()
-        return PolicyWeights(hard_weight=risk, kd_weight=(1.0 - risk) * valid.to(risk.dtype), joint_risk=risk)
+        return self._weights_from_risk(risk=risk, valid_mask=valid)
+
+    @staticmethod
+    def _weights_from_risk(*, risk: torch.Tensor, valid_mask: torch.Tensor) -> PolicyWeights:
+        valid = valid_mask.to(dtype=risk.dtype)
+        return PolicyWeights(hard_weight=torch.zeros_like(risk), kd_weight=valid, joint_risk=risk)
 
 
 class StudentRiskPolicy(_RiskPolicy):
-    """Blend complete RSLAD KD with CE according to robust student risk."""
+    """Expose student risk while preserving uniform KD and zero hard weight."""
 
     required_signals = frozenset({"student_risk"})
     signal_name = "student_risk"
 
 
 class JointRiskPolicy(_RiskPolicy):
-    """Use student risk times teacher overconfidence as the hard-label risk."""
+    """Expose joint risk while preserving uniform KD and zero hard weight."""
 
     required_signals = frozenset({"joint_risk"})
     signal_name = "joint_risk"
+
+
+class JointDownweightPolicy(JointRiskPolicy):
+    """Explicit ablation: downweight KD by joint risk without hard CE."""
+
+    @staticmethod
+    def _weights_from_risk(*, risk: torch.Tensor, valid_mask: torch.Tensor) -> PolicyWeights:
+        valid = valid_mask.to(dtype=risk.dtype)
+        return PolicyWeights(
+            hard_weight=torch.zeros_like(risk),
+            kd_weight=(1.0 - risk) * valid,
+            joint_risk=risk,
+        )
+
+
+class HardFallbackPolicy(JointRiskPolicy):
+    """Explicit legacy joint-risk KD/CE blend retained for ablation only."""
+
+    @staticmethod
+    def _weights_from_risk(*, risk: torch.Tensor, valid_mask: torch.Tensor) -> PolicyWeights:
+        valid = valid_mask.to(dtype=risk.dtype)
+        return PolicyWeights(
+            hard_weight=risk,
+            kd_weight=(1.0 - risk) * valid,
+            joint_risk=risk,
+        )

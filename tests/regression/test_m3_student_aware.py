@@ -18,6 +18,8 @@ from ard.engine import Trainer
 from ard.engine.distributed import reduce_min
 from ard.objectives import RSLADObjective
 from ard.policies import (
+    HardFallbackPolicy,
+    JointDownweightPolicy,
     JointRiskPolicy,
     PolicyContext,
     RSLADBaselinePolicy,
@@ -27,12 +29,47 @@ from ard.policies import (
 )
 from ard.signals import RobustMarginSignal, shannon_entropy
 from ard.state import SampleStateStore
+from ard.targets import UniformSofteningTeacherTargetPolicy
 
 pytestmark = pytest.mark.t2
 
 
 def _context(valid: torch.Tensor) -> PolicyContext:
     return PolicyContext(valid_mask=valid, global_min=reduce_min)
+
+
+def _v2_experiment(*, method: dict[str, object], num_classes: int = 3, image_size: int = 4) -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "protocol": {"id": "synthetic_smoke_v2"},
+        "seeds": {
+            "split": 0,
+            "model_init": 0,
+            "data_order": 0,
+            "augmentation": 0,
+            "train_attack": 0,
+            "evaluation_attack": 0,
+            "qualitative_panel": 0,
+        },
+        "dataset": {"name": "synthetic_cifar", "num_samples": 8, "num_classes": num_classes, "image_size": image_size},
+        "student": {"architecture": "fixture_cnn", "num_classes": num_classes},
+        "teacher": {"source": "fixture", "architecture": "fixture_cnn", "num_classes": num_classes},
+        "method": method,
+        "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.0, "weight_decay": 0.0, "nesterov": False},
+        "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+        "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
+    }
+
+
+def _target_policy() -> dict[str, object]:
+    return {
+        "id": "teacher_target_uniform_mix",
+        "version": 1,
+        "risk_transform": "identity",
+        "mixing": "uniform",
+        "apply_to": "adversarial_student_kd",
+        "rho_max": 0.5,
+    }
 
 
 def test_robust_margin_formula_is_detached_fp32_and_excludes_padding() -> None:
@@ -112,15 +149,16 @@ def test_student_joint_risk_ranges_monotonicity_and_warmup_is_exact_baseline_rsl
     student_weights = StudentRiskPolicy().compute(
         {"student_risk": student}, context=_context(torch.ones(3, dtype=torch.bool)), num_classes=3
     )
-    assert torch.allclose(student_weights.hard_weight, student)
-    assert torch.allclose(student_weights.kd_weight, 1.0 - student)
+    assert torch.equal(student_weights.hard_weight, torch.zeros_like(student))
+    assert torch.equal(student_weights.kd_weight, torch.ones_like(student))
     assert torch.all((student_weights.hard_weight >= 0) & (student_weights.hard_weight <= 1))
     joint = torch.tensor([0.0, 0.25, 1.0])
     joint_weights = JointRiskPolicy().compute(
         {"joint_risk": joint}, context=_context(torch.ones(3, dtype=torch.bool)), num_classes=3
     )
     assert torch.allclose(joint_weights.joint_risk, joint)
-    assert torch.allclose(joint_weights.hard_weight + joint_weights.kd_weight, torch.ones(3))
+    assert torch.equal(joint_weights.hard_weight, torch.zeros(3))
+    assert torch.equal(joint_weights.kd_weight, torch.ones(3))
     # The Trainer, rather than sample observation count, owns warmup.  Epoch
     # zero is exact baseline RSLAD while margins are still observed elsewhere.
     trainer = object.__new__(Trainer)
@@ -158,44 +196,53 @@ def test_rslad_policy_fallback_identities() -> None:
     baseline = RSLADBaselinePolicy().compute({}, context=_context(torch.ones(2, dtype=torch.bool)), num_classes=3)
     assert torch.equal(terms.apply_policy(baseline).total, terms.kd)
     risk = torch.tensor([0.0, 1.0])
-    blended = terms.apply_policy(
+    uniform = terms.apply_policy(
         StudentRiskPolicy().compute(
             {"student_risk": risk}, context=_context(torch.ones(2, dtype=torch.bool)), num_classes=3
         )
     )
-    assert torch.equal(blended.total, torch.stack((terms.kd[0], terms.hard[1])))
-
-
-@pytest.mark.parametrize("name", ["rslad", "rslad_entropy", "rslad_student", "rslad_joint"])
-def test_four_rslad_ablations_are_config_only_switches(name: str) -> None:
-    config = ExperimentConfig.model_validate(
-        {
-            "tier": "dev",
-            "dataset": {"name": "synthetic_cifar", "num_samples": 8, "num_classes": 3, "image_size": 4},
-            "student": {"architecture": "fixture_cnn", "num_classes": 3},
-            "teacher": {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 3},
-            "method": {
-                "name": name,
-                "attack": {
-                    "loss": "kl",
-                    "kl_target": "teacher_clean",
-                    "epsilon": "1/255",
-                    "step_size": "1/255",
-                    "steps": 1,
-                },
-            },
-        }
+    assert torch.equal(uniform.total, terms.kd)
+    downweighted = terms.apply_policy(
+        JointDownweightPolicy().compute(
+            {"joint_risk": risk}, context=_context(torch.ones(2, dtype=torch.bool)), num_classes=3
+        )
     )
-    assert config.method.name == name
+    assert torch.equal(downweighted.total, torch.stack((terms.kd[0], torch.zeros_like(terms.kd[1]))))
+    fallback = terms.apply_policy(
+        HardFallbackPolicy().compute(
+            {"joint_risk": risk}, context=_context(torch.ones(2, dtype=torch.bool)), num_classes=3
+        )
+    )
+    assert torch.equal(fallback.total, torch.stack((terms.kd[0], terms.hard[1])))
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["rslad", "rslad_entropy", "rslad_student", "rslad_joint", "rslad_joint_downweight", "rslad_hard_fallback"],
+)
+def test_rslad_method_ids_are_config_only_switches(name: str) -> None:
+    method: dict[str, object] = {
+        "id": name,
+        "version": 1,
+        "attack": {
+            "loss": "kl",
+            "kl_target": "teacher_clean",
+            "epsilon": "1/255",
+            "step_size": "1/255",
+            "steps": 1,
+        },
+    }
+    if name in {"rslad_student", "rslad_joint"}:
+        method["target_policy"] = _target_policy()
+    config = ExperimentConfig.model_validate(_v2_experiment(method=method))
+    assert config.method.id == name
 
 
 def test_oracle_mask_is_dev_only_and_student_aware_only() -> None:
-    base = {
-        "dataset": {"name": "synthetic_cifar", "num_samples": 8, "num_classes": 3, "image_size": 4},
-        "student": {"architecture": "fixture_cnn", "num_classes": 3},
-        "teacher": {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 3},
-        "method": {
-            "name": "rslad_joint",
+    base = _v2_experiment(
+        method={
+            "id": "rslad_hard_fallback",
+            "version": 1,
             "oracle_mask": True,
             "attack": {
                 "loss": "kl",
@@ -204,12 +251,12 @@ def test_oracle_mask_is_dev_only_and_student_aware_only() -> None:
                 "step_size": "1/255",
                 "steps": 1,
             },
-        },
-    }
+        }
+    )
     assert ExperimentConfig.model_validate({**base, "tier": "dev"}).method.oracle_mask
     with pytest.raises(ValidationError, match="scientific/dev-only"):
         ExperimentConfig.model_validate({**base, "tier": "smoke"})
-    invalid = {**base, "method": {**base["method"], "name": "rslad", "oracle_mask": True}}
+    invalid = {**base, "method": {**base["method"], "id": "rslad", "oracle_mask": True}}
     with pytest.raises(ValidationError, match="only defined"):
         ExperimentConfig.model_validate(invalid)
 
@@ -231,21 +278,23 @@ def test_canonical_student_aware_method_rejects_unversioned_variants(
     with pytest.raises(ValidationError, match=message):
         ExperimentConfig.model_validate(
             {
-                "tier": "dev",
-                "dataset": {"name": "synthetic_cifar", "num_samples": 8, "num_classes": 2, "image_size": 2},
-                "student": {"architecture": "fixture_cnn", "num_classes": 2},
-                "teacher": {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 2},
-                "method": {
-                    "name": name,
-                    field: value,
-                    "attack": {
-                        "loss": "kl",
-                        "kl_target": "teacher_clean",
-                        "epsilon": "1/255",
-                        "step_size": "1/255",
-                        "steps": 1,
+                **_v2_experiment(
+                    num_classes=2,
+                    image_size=2,
+                    method={
+                        "id": name,
+                        "version": 1,
+                        "target_policy": _target_policy(),
+                        field: value,
+                        "attack": {
+                            "loss": "kl",
+                            "kl_target": "teacher_clean",
+                            "epsilon": "1/255",
+                            "step_size": "1/255",
+                            "steps": 1,
+                        },
                     },
-                },
+                ),
             }
         )
 
@@ -292,6 +341,7 @@ def _m3_trainer(
         objective=RSLADObjective(),
         policy=policy,
         sample_store=SampleStateStore(ema_decay=0.9),
+        target_policy=UniformSofteningTeacherTargetPolicy(rho_max=0.5),
         policy_warmup_epochs=1,
         device=torch.device("cpu"),
         output_dir=output,
@@ -328,8 +378,8 @@ def _m3_trainer(
                     num_classes=logits.shape[1],
                 )
             torch.testing.assert_close(weights.joint_risk, expected_risk, rtol=0, atol=0)
-            torch.testing.assert_close(weights.hard_weight, expected_risk, rtol=0, atol=0)
-            torch.testing.assert_close(weights.kd_weight, 1.0 - expected_risk, rtol=0, atol=0)
+            torch.testing.assert_close(weights.hard_weight, torch.zeros_like(expected_risk), rtol=0, atol=0)
+            torch.testing.assert_close(weights.kd_weight, torch.ones_like(expected_risk), rtol=0, atol=0)
         captures.append(
             (
                 trainer.current_epoch,

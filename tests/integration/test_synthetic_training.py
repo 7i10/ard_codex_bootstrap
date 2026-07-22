@@ -17,12 +17,26 @@ pytestmark = pytest.mark.t3
 
 def config_data(output: Path) -> dict:
     return {
+        "schema_version": 2,
+        "protocol": {"id": "synthetic_smoke_v2"},
         "tier": "smoke",
-        "seed": 8,
+        "seeds": {
+            k: 8
+            for k in (
+                "split",
+                "model_init",
+                "data_order",
+                "augmentation",
+                "train_attack",
+                "evaluation_attack",
+                "qualitative_panel",
+            )
+        },
         "dataset": {"name": "synthetic_cifar", "num_samples": 8, "num_classes": 3, "image_size": 4, "seed": 8},
         "student": {"architecture": "fixture_cnn", "num_classes": 3},
         "method": {
-            "name": "pgd_at",
+            "id": "pgd_at",
+            "version": 1,
             "attack": {
                 "epsilon": "1/255",
                 "step_size": "1/255",
@@ -30,10 +44,18 @@ def config_data(output: Path) -> dict:
                 "random_start": False,
             },
         },
-        "training": {"epochs": 2, "batch_size": 4, "learning_rate": 0.02, "device": "cpu"},
+        "optimizer": {"id": "sgd", "learning_rate": 0.02, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+        "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+        "training": {"epochs": 2, "per_rank_batch_size": 4, "global_batch_size": 4, "device": "cpu"},
         "output_dir": str(output),
         "tracker_run_id": "smoke-local",
     }
+
+
+def two_rank_config_data(output: Path) -> dict:
+    data = config_data(output)
+    data["training"]["global_batch_size"] = data["training"]["per_rank_batch_size"] * 2
+    return data
 
 
 def run_cli(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -81,7 +103,7 @@ def test_train_cli_dry_run_overrides_and_two_epoch_synthetic_e2e(tmp_path: Path)
     output = tmp_path / "run"
     config_path.write_text(yaml.safe_dump(config_data(output), sort_keys=False), encoding="utf-8")
     dry_output = tmp_path / "dry"
-    dry = run_cli(root, "--config", str(config_path), "--output", str(dry_output), "--dry-run", "seed=21")
+    dry = run_cli(root, "--config", str(config_path), "--output", str(dry_output), "--dry-run", "seeds.model_init=21")
     assert dry.returncode == 0, dry.stderr
     assert load_config(dry_output / "resolved_config.yaml").seed == 21
 
@@ -141,7 +163,7 @@ def test_two_process_gloo_coordinates_fresh_output_and_collision_error(tmp_path:
     root = Path(__file__).resolve().parents[2]
     output = tmp_path / "distributed-output"
     config_path = tmp_path / "distributed.yaml"
-    config_path.write_text(yaml.safe_dump(config_data(output), sort_keys=False), encoding="utf-8")
+    config_path.write_text(yaml.safe_dump(two_rank_config_data(output), sort_keys=False), encoding="utf-8")
 
     fresh = run_torchrun(root, "--config", str(config_path), "--dry-run")
     assert fresh.returncode == 0, fresh.stderr
@@ -160,7 +182,7 @@ def test_two_process_gloo_coordinates_fresh_output_and_collision_error(tmp_path:
 def test_two_process_gloo_checkpoint_success_and_rank_zero_failure_propagation(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[2]
     success_output = tmp_path / "checkpoint-success"
-    success_data = config_data(success_output)
+    success_data = two_rank_config_data(success_output)
     success_data["training"]["epochs"] = 1
     success_config = tmp_path / "checkpoint-success.yaml"
     success_config.write_text(yaml.safe_dump(success_data, sort_keys=False), encoding="utf-8")
@@ -174,7 +196,7 @@ def test_two_process_gloo_checkpoint_success_and_rank_zero_failure_propagation(t
     assert torch.load(last, map_location="cpu", weights_only=False)["world_size"] == 2
 
     failure_output = tmp_path / "checkpoint-failure"
-    failure_data = config_data(failure_output)
+    failure_data = two_rank_config_data(failure_output)
     failure_data["training"]["epochs"] = 1
     failure_config = tmp_path / "checkpoint-failure.yaml"
     failure_config.write_text(yaml.safe_dump(failure_data, sort_keys=False), encoding="utf-8")
@@ -195,7 +217,7 @@ def test_two_process_gloo_checkpoint_success_and_rank_zero_failure_propagation(t
 def test_two_process_gloo_sample_statistics_are_rank_zero_only_and_fail_coherently(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[2]
     success_output = tmp_path / "sample-stats-success"
-    success_data = config_data(success_output)
+    success_data = two_rank_config_data(success_output)
     success_data["dataset"]["num_classes"] = 2
     success_data["student"]["num_classes"] = 2
     success_data["training"]["epochs"] = 1
@@ -214,7 +236,7 @@ def test_two_process_gloo_sample_statistics_are_rank_zero_only_and_fail_coherent
     assert pq.read_table(stats).column("sample_id").to_pylist() == [0, 1, 2, 4, 5, 7]
 
     failure_output = tmp_path / "sample-stats-failure"
-    failure_data = config_data(failure_output)
+    failure_data = two_rank_config_data(failure_output)
     failure_data["dataset"]["num_classes"] = 2
     failure_data["student"]["num_classes"] = 2
     failure_data["training"]["epochs"] = 1

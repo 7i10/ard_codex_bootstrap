@@ -128,3 +128,7 @@ full AutoAttackはconfig overrideと`--allow-autoattack`の両方を付けた別
 - production用launcher
 - docs内のreproduction status
 - 未実行の重い実験一覧
+
+### M0 schema v2 migration
+
+全 experiment config は `schema_version: 2` と versioned `protocol.id`、7-field `seeds`、top-level optimizer/scheduler、per-rank/global batch identity を保持する。scheduler は M0 では `identity` とし、既存実行の意味を変えない。exact schedule は M1 で導入する。
