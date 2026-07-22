@@ -12,11 +12,10 @@ mkdir "$RUN"; trap 'git -C "$REPO" worktree remove --force "$RUN/repo" >/dev/nul
 git -C "$REPO" worktree add --detach "$RUN/repo" "$SHA"; mkdir -p "$RUN"/{outputs,logs,control}
 shared=()
 for name in .external teacher_cache; do
-  if [ -e "$REPO/$name" ]; then
-    test ! -e "$RUN/repo/$name"
-    ln -s "$REPO/$name" "$RUN/repo/$name"
-    shared+=("$name")
-  fi
+  test -e "$REPO/$name" || { echo "required shared runtime asset is missing: $REPO/$name" >&2; exit 4; }
+  test ! -e "$RUN/repo/$name"
+  ln -s "$REPO/$name" "$RUN/repo/$name"
+  shared+=("$name")
 done
 REPO="$REPO" RUN="$RUN" SHA="$SHA" RID="$RID" "$PYTHON" - <<'PY'
 import datetime,json,os,pathlib,subprocess

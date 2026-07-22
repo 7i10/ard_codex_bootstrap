@@ -47,5 +47,6 @@ def test_nohup_setsid_launch_detaches_ssh_standard_streams() -> None:
 def test_prepare_links_only_named_shared_runtime_assets() -> None:
     prepare = (SCRIPTS / "ferret-prepare").read_text()
     assert "for name in .external teacher_cache" in prepare
+    assert "required shared runtime asset is missing" in prepare
     assert 'ln -s "$REPO/$name" "$RUN/repo/$name"' in prepare
     assert "shared_runtime_assets" in prepare
