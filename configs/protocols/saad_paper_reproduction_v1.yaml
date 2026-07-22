@@ -1,0 +1,11 @@
+id: saad_paper_reproduction_v1
+runnable_locally: false
+audit_only: true
+local_cli: forbidden
+dataset: cifar10
+train_set: official_full_50k
+validation: none
+checkpoint_lifecycle: last_or_published
+optimizer: {id: sgd, weight_decay: 0.0005}
+attack: {algorithm: pgd, steps: 10, epsilon: 8/255, step_size: 2/255}
+notes: paper-settings record only; no downloads, GPU, or full training in local checks

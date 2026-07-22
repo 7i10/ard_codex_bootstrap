@@ -71,12 +71,19 @@ class IndexedDataset(Dataset[IndexedItem]):
             raise TypeError("wrapped dataset items must contain image and label")
         image, label = item[0], item[1]
         if self.transform is not None:
-            image = self.transform(image)
+            if getattr(self.transform, "source_id_keyed", False):
+                image = self.transform(image, source_id=source_index)
+            else:
+                image = self.transform(image)
         if not isinstance(image, torch.Tensor):
             raise TypeError("dataset transform must produce a torch.Tensor")
         if reference is None:
             return image, int(label), int(source_index)
         return image, int(label), int(source_index), reference.state_update_mask, reference.multiplicity
+
+    def set_epoch(self, epoch: int) -> None:
+        if self.transform is not None and hasattr(self.transform, "set_epoch"):
+            self.transform.set_epoch(epoch)
 
 
 def collate_indexed(items: list[tuple[Any, ...]]) -> IndexedBatch:

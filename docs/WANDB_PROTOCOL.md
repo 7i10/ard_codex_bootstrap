@@ -210,4 +210,4 @@ final impact-selected non-scientific gateでは、real single-GPU PGD smokeと2�
 CIFAR production/paper artifact sync、real full AutoAttack、T4/T5、dependency-complete upstream differential、
 monolithic full pytestは未実行です。
 
-Resolved schema v2 config metadata includes protocol id, all seven seed identities, and per-rank/global batch sizes. The M0 identity scheduler preserves prior execution semantics; exact schedules are an M1 concern.
+Resolved schema v2 config metadata includes protocol id, all seven seed identities, and per-rank/global batch sizes. The controlled protocol records exact MultiStepLR semantics (epoch-end boundaries 100 and 150); the old identity-scheduler deferral no longer applies. `resnet18_cifar` remains a compatibility alias, not a canonical student identity.

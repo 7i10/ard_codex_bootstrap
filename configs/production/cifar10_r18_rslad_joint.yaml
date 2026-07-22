@@ -2,7 +2,7 @@ schema_version: 2
 protocol: {id: controlled_cifar10_r18_v1}
 tier: production
 seeds:
-  split: "${ARD_SEED}"
+  split: 20260722
   model_init: "${ARD_SEED}"
   data_order: "${ARD_SEED}"
   augmentation: "${ARD_SEED}"
@@ -10,7 +10,7 @@ seeds:
   evaluation_attack: 0
   qualitative_panel: "${ARD_SEED}"
 dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: train, download: false, num_classes: 10}
-student: {architecture: resnet18_cifar, num_classes: 10, preprocessing_owner: student_adapter, normalization: {profile: cifar10_standard}}
+student: {architecture: saad_resnet18_cifar_v1, num_classes: 10, preprocessing_owner: student_adapter, normalization: {profile: cifar10_raw_identity}}
 teacher:
   source: checkpoint
   architecture: resnet18_cifar
@@ -27,27 +27,28 @@ method:
   student_policy_warmup_epochs: 1
   oracle_mask: false
   attack: {loss: kl, kl_target: teacher_clean, temperature: 1.0, temperature_squared: true, epsilon: 8/255, step_size: 2/255, steps: 10, random_start: true}
+  selection_attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 20, random_start: true, student_mode: eval, teacher_mode: eval}
 optimizer:
   id: sgd
-  learning_rate: "${ARD_LEARNING_RATE}"
-  momentum: "${ARD_MOMENTUM}"
-  weight_decay: "${ARD_WEIGHT_DECAY}"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
   nesterov: false
-scheduler: {id: identity, milestones: [], gamma: 1.0, step_at: epoch_end}
+scheduler: {id: multistep, milestones: [100, 150], gamma: 0.1, step_at: epoch_end}
 training:
-  epochs: "${ARD_TRAIN_EPOCHS}"
-  per_rank_batch_size: "${ARD_BATCH_SIZE}"
-  global_batch_size: "${ARD_BATCH_SIZE}"
+  epochs: 200
+  per_rank_batch_size: "${ARD_PER_RANK_BATCH_SIZE}"
+  global_batch_size: 128
   num_workers: "${ARD_NUM_WORKERS}"
   device: "${ARD_DEVICE}"
   deterministic: true
-  validation_fraction: "${ARD_VALIDATION_FRACTION}"
+  validation_fraction: 0.1
 tracking: {mode: offline_sync, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: "${WANDB_GROUP}", name: "cifar10-r18-rslad_joint-s${ARD_SEED}", panel_size: 24, panel_interval_epochs: 5}
 evaluation:
   checkpoints: both
   seed: 0
   dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: test, download: false, num_classes: 10}
-  attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 10, random_start: true}
+  attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 20, random_start: true}
   autoattack: false
   autoattack_batch_size: 128
   write_sample_stats: true

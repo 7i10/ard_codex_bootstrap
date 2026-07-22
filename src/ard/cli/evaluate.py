@@ -126,6 +126,8 @@ def _dataset_identity(dataset: Any, *, observed: dict[str, object] | None = None
 
 
 def _validate_evaluation_tracking_identity(config: ExperimentConfig, training_config: ExperimentConfig) -> None:
+    if config.protocol.id != training_config.protocol.id:
+        raise ValueError("evaluation protocol ID must match resolved training config")
     if training_config.tier not in {"repro", "production"}:
         return
     if config.tier != training_config.tier:
@@ -319,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
                     "method": training_config.method.id,
                     "method_identity": training_config.method.model_dump(mode="json"),
                     "training_protocol_identity": {
+                        "id": training_config.protocol.id,
                         "epochs": training_config.training.epochs,
                         "optimizer": training_config.optimizer.model_dump(mode="json"),
                         "deterministic": training_config.training.deterministic,

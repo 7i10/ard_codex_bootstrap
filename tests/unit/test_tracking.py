@@ -142,6 +142,7 @@ def test_manifest_preserves_complete_structured_training_seed_lineage(tmp_path: 
     manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["training_seeds"] == cfg.seeds.model_dump(mode="json")
     assert manifest["training_seed"] == cfg.seeds.model_init
+    assert manifest["protocol_id"] == cfg.protocol.id
 
 
 def test_resume_rejects_untracked_content_drift(tmp_path: Path) -> None:
@@ -234,27 +235,72 @@ def production_config(output: Path, dataset_root: Path) -> ExperimentConfig:
             "protocol": {"id": "controlled_cifar10_r18_v1"},
             "tier": "production",
             "seeds": {
-                k: 9
-                for k in (
-                    "split",
-                    "model_init",
-                    "data_order",
-                    "augmentation",
-                    "train_attack",
-                    "evaluation_attack",
-                    "qualitative_panel",
-                )
+                "split": 20260722,
+                "model_init": 9,
+                "data_order": 9,
+                "augmentation": 9,
+                "train_attack": 9,
+                "evaluation_attack": 0,
+                "qualitative_panel": 9,
             },
-            "dataset": {"name": "cifar10", "root": str(dataset_root), "num_classes": 10},
+            "dataset": {
+                "name": "cifar10",
+                "root": str(dataset_root),
+                "split": "train",
+                "download": False,
+                "num_classes": 10,
+                "image_size": 32,
+            },
             "student": {
+                "architecture": "saad_resnet18_cifar_v1",
+                "num_classes": 10,
+                "preprocessing_owner": "student_adapter",
+                "normalization": {"profile": "cifar10_raw_identity"},
+            },
+            "teacher": {
+                "source": "checkpoint",
                 "architecture": "resnet18_cifar",
                 "num_classes": 10,
                 "normalization": {"profile": "cifar10_standard"},
+                "checkpoint": str(dataset_root / "teacher.pt"),
+                "checkpoint_sha256": "a" * 64,
             },
-            "method": {"id": "pgd_at", "version": 1, "attack": {"steps": 1}},
-            "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
-            "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
-            "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
+            "method": {
+                "id": "rslad",
+                "version": 1,
+                "attack": {
+                    "loss": "kl",
+                    "kl_target": "teacher_clean",
+                    "temperature": 1.0,
+                    "temperature_squared": True,
+                    "epsilon": "8/255",
+                    "step_size": "2/255",
+                    "steps": 10,
+                    "random_start": True,
+                    "student_mode": "eval",
+                    "teacher_mode": "eval",
+                },
+                "selection_attack": {
+                    "loss": "ce",
+                    "temperature": 1.0,
+                    "temperature_squared": True,
+                    "epsilon": "8/255",
+                    "step_size": "2/255",
+                    "steps": 20,
+                    "random_start": True,
+                    "student_mode": "eval",
+                    "teacher_mode": "eval",
+                },
+            },
+            "optimizer": {"id": "sgd", "learning_rate": 0.1, "momentum": 0.9, "weight_decay": 5e-4, "nesterov": False},
+            "scheduler": {"id": "multistep", "milestones": [100, 150], "gamma": 0.1, "step_at": "epoch_end"},
+            "training": {
+                "epochs": 200,
+                "per_rank_batch_size": 128,
+                "global_batch_size": 128,
+                "deterministic": True,
+                "validation_fraction": 0.1,
+            },
             "tracking": {
                 "mode": "offline_sync",
                 "entity": "ard-test-entity",
@@ -262,6 +308,7 @@ def production_config(output: Path, dataset_root: Path) -> ExperimentConfig:
                 "group": "ard-test-group",
             },
             "output_dir": str(output),
+            "evaluation": {"seed": 0},
         }
     )
 

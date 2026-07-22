@@ -82,6 +82,7 @@ stable sample IDをキーに、EMA、correctness count、forgetting count、last
 - attackとobjectiveは別moduleにする。
 - sample stateの更新時点を明示する。
 - train-time quick PGDと正式evaluationを分離する。
+- controlled SAAD studentはraw-pixel identity adapterを使う（canonical architecture id: `saad_resnet18_cifar_v1`）。MultiStepLRはepoch-endにstepし、epoch 0–99/100–149/150–199でLRは0.1/0.01/0.001。controlled attacksはPGD-10 KL (teacher_clean) とselection PGD-20 CE。
 - upstream実装はruntime dependencyではなく、oracle/wrapperとする。
 
 ## 5. 初期method構成

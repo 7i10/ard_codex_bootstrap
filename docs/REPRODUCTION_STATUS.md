@@ -25,6 +25,8 @@ scaler、RNG、sampler epoch、sample state、global step、tracking run ID、be
 検証し、不完全またはdriftしたterminal lineageは拒否します。
 mid-epoch resumeとworld-size変更は再現保証の対象外です。
 
+Controlled configs freeze split seed `20260722`, 200 epochs, validation fraction 0.1, global batch 128, and `${ARD_PER_RANK_BATCH_SIZE}` (128 on one GPU, 64 on two). The SAAD student uses raw identity normalization and has 11,173,962 parameters; its lossless current-PyTorch state_dict contains 122 keys including BatchNorm counters. LR is 0.1/0.01/0.001 for epochs 0–99/100–149/150–199. Training uses PGD-10 KL/teacher-clean; selection/evaluation uses explicit PGD-20 CE. Paper/code protocols are audit-only; config checks perform no downloads, GPU, or full training. `resnet18_cifar` is a compatibility alias, not canonical.
+
 ## CIFAR template configs
 
 次の8ファイルはloader/guardに適合する実行テンプレートです。実測精度やupstream-exact scheduleを表す結果ではありません。
@@ -41,12 +43,15 @@ mid-epoch resumeとworld-size変更は再現保証の対象外です。
 | `ARD_TEACHER_CHECKPOINT_SHA256` | lowercase 64文字のcheckpoint SHA-256 |
 | `WANDB_ENTITY`, `WANDB_PROJECT`, `WANDB_GROUP` | W&B identity。比較する4手法と対応evalでgroupを共有する |
 | `ARD_SEED`, `ARD_OUTPUT_ROOT` | seedと出力root |
-| `ARD_TRAIN_EPOCHS`, `ARD_BATCH_SIZE`, `ARD_LEARNING_RATE` | 事前登録したschedule |
-| `ARD_MOMENTUM`, `ARD_WEIGHT_DECAY`, `ARD_NUM_WORKERS` | optimizer/data loader設定 |
-| `ARD_DEVICE`, `ARD_VALIDATION_FRACTION` | deviceと固定validation split率 |
+| `ARD_PER_RANK_BATCH_SIZE` | per-rank batch size（single GPU=128、2 GPU=64） |
+| `ARD_NUM_WORKERS`, `ARD_DEVICE` | data-loader worker数とdevice |
 
-scheduleは現時点でupstream-exactと認定されていないため、テンプレート内に推測値を埋めていません。
-比較runでは全4手法へ同じ値を与え、resolved configを保存してください。
+Protocol ID, optimizer, scheduler, epoch count (200), validation fraction (0.1), global batch size (128),
+and attack identities are fixed in the checked-in YAML. Overrides of these scientific fields are rejected by the schema;
+there are no `ARD_TRAIN_EPOCHS`, `ARD_BATCH_SIZE`, `ARD_LEARNING_RATE`, `ARD_MOMENTUM`, `ARD_WEIGHT_DECAY`, or
+`ARD_VALIDATION_FRACTION` exports for controlled runs.
+
+比較runでは全4手法へ同じ operator environment を与え、resolved configを保存してください。
 
 ## 実際のCLI
 
@@ -194,4 +199,4 @@ invocationで実行したという主張ではありません。22件のcached p
 
 従って、現時点ではfixture smoke以外のclean/robust accuracy、upstream parity、論文再現成功を主張しません。
 
-M0 schema v2 config migration is complete. Configured schedulers use identity to preserve existing execution semantics; exact schedule migration is deferred to M1. Student/joint target softening is adversarial-branch-only and clean KD remains unchanged.
+M0 schema v2 config migration is complete. Controlled configs now use the exact M1 MultiStepLR schedule (epoch-end milestones 100 and 150); identity is retained only for synthetic compatibility fixtures. Student/joint target softening is adversarial-branch-only and clean KD remains unchanged.

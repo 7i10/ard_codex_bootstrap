@@ -13,10 +13,48 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import datasets, transforms
+from torchvision.transforms import functional as transform_functional
 
 from ard.config.schema import DatasetConfig
 
 from .indexed import IndexedDataset, IndexedItem, SampleRef
+
+
+class EpochSourceTransform:
+    """Deterministic CIFAR augmentation keyed by seed, epoch, and source ID."""
+
+    def __init__(self, *, augmentation_seed: int) -> None:
+        self.augmentation_seed = augmentation_seed
+        self.epoch = 0
+        self.source_id_keyed = True
+
+    def set_epoch(self, epoch: int) -> None:
+        if epoch < 0:
+            raise ValueError("augmentation epoch must be non-negative")
+        self.epoch = epoch
+
+    def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
+        # This is deliberately independent of worker order, sampler order,
+        # rank, and process RNG state.  It makes a resumed epoch reproduce the
+        # same train view for every immutable official source ID.
+        generator = torch.Generator().manual_seed(
+            self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
+        )
+        padded = transform_functional.pad(image, padding=4, fill=0)
+        top = int(torch.randint(0, 9, (), generator=generator).item())
+        left = int(torch.randint(0, 9, (), generator=generator).item())
+        cropped = transform_functional.crop(padded, top=top, left=left, height=32, width=32)
+        if bool(torch.randint(0, 2, (), generator=generator).item()):
+            cropped = transform_functional.hflip(cropped)
+        return _to_tensor(cropped)
+
+
+def _to_tensor(image: Any) -> torch.Tensor:
+    if isinstance(image, torch.Tensor):
+        if not image.is_floating_point():
+            return image.to(dtype=torch.float32).div(255)
+        return image
+    return transforms.ToTensor()(image)
 
 
 class SourceIndexedSubset(Dataset[IndexedItem]):
@@ -46,12 +84,16 @@ class SourceIndexedSubset(Dataset[IndexedItem]):
             return image, label, source_id
         return image, label, source_id, reference.state_update_mask, reference.multiplicity
 
+    def set_epoch(self, epoch: int) -> None:
+        self.dataset.set_epoch(epoch)
+
 
 class SyntheticCIFAR(Dataset[tuple[torch.Tensor, int]]):
     """CIFAR-shaped deterministic fixture; each sample depends only on seed and index."""
 
     def __init__(self, *, size: int, num_classes: int, image_size: int = 32, seed: int = 0) -> None:
         self.size, self.num_classes, self.image_size, self.seed = size, num_classes, image_size, seed
+        self.targets = tuple(index % num_classes for index in range(size))
 
     def __len__(self) -> int:
         return self.size
@@ -61,7 +103,7 @@ class SyntheticCIFAR(Dataset[tuple[torch.Tensor, int]]):
             raise IndexError(index)
         generator = torch.Generator().manual_seed(self.seed + index)
         image = torch.rand((3, self.image_size, self.image_size), generator=generator, dtype=torch.float32)
-        return image, index % self.num_classes
+        return image, self.targets[index]
 
 
 class TinyImageNetDataset(Dataset[tuple[Image.Image, int]]):
@@ -102,6 +144,7 @@ class TinyImageNetDataset(Dataset[tuple[Image.Image, int]]):
         if not samples or any(not path.is_file() for path, _, _ in samples):
             raise FileNotFoundError(f"Tiny-ImageNet {split} images are missing under {root}")
         self.samples = [(path, label) for path, label, _ in samples]
+        self.targets = tuple(label for _, label in self.samples)
         self.content_identity = self._content_identity(split, classes, samples)
 
     def _content_identity(
@@ -146,21 +189,16 @@ class TinyImageNetDataset(Dataset[tuple[Image.Image, int]]):
             return image.convert("RGB"), label
 
 
-def build_dataset(config: DatasetConfig, *, transform: Callable[[Any], torch.Tensor] | None = None) -> IndexedDataset:
-    tensor_transform = transform or transforms.ToTensor()
+def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
     if config.name == "synthetic_cifar":
-        return IndexedDataset(
-            SyntheticCIFAR(
-                size=config.num_samples, num_classes=config.num_classes, image_size=config.image_size, seed=config.seed
-            ),
-            transform,
+        return SyntheticCIFAR(
+            size=config.num_samples, num_classes=config.num_classes, image_size=config.image_size, seed=config.seed
         )
     if config.root is None:
         raise ValueError(f"{config.name} requires an explicit dataset root")
     if config.name in {"cifar10", "cifar100"}:
         factory = datasets.CIFAR10 if config.name == "cifar10" else datasets.CIFAR100
-        base = factory(root=str(config.root), train=config.split == "train", download=config.download)
-        return IndexedDataset(base, tensor_transform)
+        return factory(root=str(config.root), train=config.split == "train", download=config.download)
     if config.name == "tiny_imagenet":
         base = TinyImageNetDataset(config.root, config.split)
         if len(base.class_to_index) != config.num_classes:
@@ -176,10 +214,45 @@ def build_dataset(config: DatasetConfig, *, transform: Callable[[Any], torch.Ten
                 "expected_sha256": config.content_sha256,
                 "verification": "computed-and-matched",
             }
-        indexed = IndexedDataset(base, tensor_transform)
-        indexed.content_identity = base.content_identity
-        return indexed
+        return base
     raise ValueError(f"unknown dataset: {config.name}")
+
+
+def build_dataset(config: DatasetConfig, *, transform: Callable[[Any], torch.Tensor] | None = None) -> IndexedDataset:
+    """Build one indexed view; callers needing train/validation use views below."""
+    base = build_raw_dataset(config)
+    indexed = IndexedDataset(base, transform or _to_tensor)
+    if isinstance(base, TinyImageNetDataset):
+        indexed.content_identity = base.content_identity
+    return indexed
+
+
+def build_train_validation_views(
+    config: DatasetConfig,
+    *,
+    validation_fraction: float,
+    split_seed: int,
+    augmentation_seed: int,
+) -> tuple[SourceIndexedSubset, SourceIndexedSubset]:
+    """Create independently transformed train/validation views over one raw set."""
+    if config.split != "train":
+        raise ValueError("train/validation views require the official train split")
+    raw = build_raw_dataset(config)
+    split_view = IndexedDataset(raw, _to_tensor)
+    split_train, split_validation = stratified_train_validation_split(
+        split_view, validation_fraction=validation_fraction, seed=split_seed
+    )
+    train_transform: Callable[[Any], torch.Tensor]
+    if config.name in {"cifar10", "cifar100"}:
+        train_transform = EpochSourceTransform(augmentation_seed=augmentation_seed)
+    else:
+        train_transform = _to_tensor
+    train_view = IndexedDataset(raw, train_transform)
+    validation_view = IndexedDataset(raw, _to_tensor)
+    return (
+        SourceIndexedSubset(train_view, list(split_train.indices)),
+        SourceIndexedSubset(validation_view, list(split_validation.indices)),
+    )
 
 
 def stratified_train_validation_split(
@@ -193,9 +266,14 @@ def stratified_train_validation_split(
     """
     if not 0 < validation_fraction < 1:
         raise ValueError("validation_fraction must lie strictly between zero and one")
+    raw = dataset.dataset
+    targets = getattr(raw, "targets", None)
+    if not isinstance(targets, (list, tuple)) or len(targets) != len(dataset):
+        raise TypeError("stratified validation split requires a label-only targets sequence matching dataset length")
     by_label: dict[int, list[int]] = defaultdict(list)
-    for index in range(len(dataset)):
-        _, label, source_id = dataset[index]
+    for source_id, label in enumerate(targets):
+        if isinstance(label, bool) or not isinstance(label, int):
+            raise TypeError("dataset targets must contain integer class labels")
         by_label[label].append(source_id)
     generator = torch.Generator().manual_seed(seed)
     validation_ids: list[int] = []

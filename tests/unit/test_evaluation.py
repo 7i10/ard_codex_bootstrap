@@ -47,29 +47,80 @@ def _tracked_repro_config() -> ExperimentConfig:
             "schema_version": 2,
             "protocol": {"id": "controlled_cifar10_r18_v1"},
             "tier": "repro",
-            "seeds": {
-                k: 0
-                for k in (
-                    "split",
-                    "model_init",
-                    "data_order",
-                    "augmentation",
-                    "train_attack",
-                    "evaluation_attack",
-                    "qualitative_panel",
-                )
-            },
-            "dataset": {"name": "cifar10", "root": "data", "num_classes": 10},
-            "student": {
-                "architecture": "resnet18_cifar",
-                "num_classes": 10,
-                "normalization": {"profile": "cifar10_standard"},
-            },
-            "method": {"id": "pgd_at", "version": 1, "attack": {"steps": 1}},
-            "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
-            "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
-            "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
-            "tracking": {"mode": "offline_sync", "project": "project", "entity": "entity", "group": "group"},
+                "seeds": {
+                    "split": 20260722,
+                    "model_init": 0,
+                    "data_order": 0,
+                    "augmentation": 0,
+                    "train_attack": 0,
+                    "evaluation_attack": 0,
+                    "qualitative_panel": 0,
+                },
+                "dataset": {
+                    "name": "cifar10",
+                    "root": "data",
+                    "split": "train",
+                    "download": False,
+                    "num_classes": 10,
+                    "image_size": 32,
+                },
+                "student": {
+                    "architecture": "saad_resnet18_cifar_v1",
+                    "num_classes": 10,
+                    "preprocessing_owner": "student_adapter",
+                    "normalization": {"profile": "cifar10_raw_identity"},
+                },
+                "teacher": {
+                    "source": "checkpoint",
+                    "architecture": "fixture_cnn",
+                    "num_classes": 10,
+                    "checkpoint": "teacher.pt",
+                    "checkpoint_sha256": "a" * 64,
+                },
+                "method": {
+                    "id": "rslad",
+                    "version": 1,
+                    "attack": {
+                        "loss": "kl",
+                        "kl_target": "teacher_clean",
+                        "temperature": 1.0,
+                        "temperature_squared": True,
+                        "epsilon": "8/255",
+                        "step_size": "2/255",
+                        "steps": 10,
+                        "random_start": True,
+                        "student_mode": "eval",
+                        "teacher_mode": "eval",
+                    },
+                    "selection_attack": {
+                        "loss": "ce",
+                        "temperature": 1.0,
+                        "temperature_squared": True,
+                        "epsilon": "8/255",
+                        "step_size": "2/255",
+                        "steps": 20,
+                        "random_start": True,
+                        "student_mode": "eval",
+                        "teacher_mode": "eval",
+                    },
+                },
+                "optimizer": {
+                    "id": "sgd",
+                    "learning_rate": 0.1,
+                    "momentum": 0.9,
+                    "weight_decay": 5e-4,
+                    "nesterov": False,
+                },
+                "scheduler": {"id": "multistep", "milestones": [100, 150], "gamma": 0.1, "step_at": "epoch_end"},
+                "training": {
+                    "epochs": 200,
+                    "per_rank_batch_size": 128,
+                    "global_batch_size": 128,
+                    "deterministic": True,
+                    "validation_fraction": 0.1,
+                },
+                "tracking": {"mode": "offline_sync", "project": "project", "entity": "entity", "group": "group"},
+                "evaluation": {"seed": 0},
         }
     )
 
@@ -91,6 +142,15 @@ def test_evaluation_rejects_repro_tier_and_tracking_identity_downgrade(field: st
         evaluation = training.model_copy(update={"tracking": training.tracking.model_copy(update={field: value})})
 
     with pytest.raises(ValueError, match=message):
+        _validate_evaluation_tracking_identity(evaluation, training)
+
+
+def test_evaluation_protocol_id_must_match_resolved_training_config() -> None:
+    training = _tracked_repro_config()
+    evaluation = training.model_copy(
+        update={"protocol": training.protocol.model_copy(update={"id": "saad_paper_reproduction_v1"})}
+    )
+    with pytest.raises(ValueError, match="protocol ID must match"):
         _validate_evaluation_tracking_identity(evaluation, training)
 
 
@@ -278,7 +338,7 @@ def _evaluation_row(
         "training_dataset_identity": {"name": "cifar10", "split": "train"},
         "student_identity": student_identity or {"architecture": "resnet18"},
         "method_identity": method_identity or {"name": "pgd_at"},
-        "training_protocol_identity": {"checkpoint_world_size": 1, "epochs": 1},
+        "training_protocol_identity": {"id": "controlled_cifar10_r18_v1", "checkpoint_world_size": 1, "epochs": 1},
         "evaluation_protocol_identity": {"seed": 0, "loader_batch_size": 4},
         "threat_hash": threat_hash,
         "evaluation_seed": 0,
@@ -291,7 +351,7 @@ def test_checkpoint_aggregation_allows_multiple_seed_teacher_axes() -> None:
         _evaluation_row(checkpoint=checkpoint, run_id="run-a", training_seed=1, teacher="teacher-a")
         for checkpoint in ("best", "last")
     ] + [
-        _evaluation_row(checkpoint=checkpoint, run_id="run-b", training_seed=2, teacher="teacher-b")
+        _evaluation_row(checkpoint=checkpoint, run_id="run-b", training_seed=1, teacher="teacher-a")
         for checkpoint in ("best", "last")
     ]
 
@@ -363,6 +423,23 @@ def test_checkpoint_aggregation_rejects_mixed_evaluation_seed_or_training_protoc
     ]
     for row in rows[2:]:
         row[field] = value
+
+    with pytest.raises(ValueError, match="mixed experiment identities"):
+        summarize_checkpoint_groups(rows, metric="robust")
+
+
+def test_checkpoint_aggregation_rejects_rows_differing_only_in_protocol_id() -> None:
+    rows = [
+        _evaluation_row(checkpoint=checkpoint, run_id="run-a", training_seed=1, teacher="teacher-a")
+        for checkpoint in ("best", "last")
+    ] + [
+        _evaluation_row(checkpoint=checkpoint, run_id="run-b", training_seed=2, teacher="teacher-b")
+        for checkpoint in ("best", "last")
+    ]
+    for row in rows[2:]:
+        protocol = row["training_protocol_identity"]
+        assert isinstance(protocol, dict)
+        row["training_protocol_identity"] = {**protocol, "id": "synthetic_smoke_v2"}
 
     with pytest.raises(ValueError, match="mixed experiment identities"):
         summarize_checkpoint_groups(rows, metric="robust")

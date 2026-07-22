@@ -304,6 +304,7 @@ class LocalTracker:
             "tracking_mode": config.tracking.mode,
             "job_type": job_type,
             "config_hash": config_hash,
+            "protocol_id": config.protocol.id,
             "seed": resolved_training_seeds.model_init,
             "training_seed": resolved_training_seeds.model_init,
             "training_seeds": resolved_training_seeds.model_dump(mode="json"),
@@ -334,7 +335,16 @@ class LocalTracker:
             ):
                 if key in prior:
                     self.manifest[key] = prior[key]
-            for key in ("tier", "tracking_mode", "job_type", "seed", "training_seed", "training_seeds", "world_size"):
+            for key in (
+                "tier",
+                "tracking_mode",
+                "job_type",
+                "protocol_id",
+                "seed",
+                "training_seed",
+                "training_seeds",
+                "world_size",
+            ):
                 if prior.get(key) != self.manifest.get(key):
                     raise TrackingError(f"resume manifest lineage drift: {key}")
             prior_environment = self.bundle_dir / "environment.json"

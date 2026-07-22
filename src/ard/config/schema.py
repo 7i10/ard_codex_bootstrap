@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
@@ -104,7 +105,14 @@ class NormalizationConfig(StrictModel):
     """A named, pixel-space normalization contract owned by one model adapter."""
 
     input_domain: Literal["pixel_0_1"] = "pixel_0_1"
-    profile: Literal["fixture_unit", "cifar10_standard", "cifar100_standard", "tiny_imagenet_standard", "custom"] = (
+    profile: Literal[
+        "fixture_unit",
+        "cifar10_raw_identity",
+        "cifar10_standard",
+        "cifar100_standard",
+        "tiny_imagenet_standard",
+        "custom",
+    ] = (
         "fixture_unit"
     )
     mean: tuple[float, float, float] | None = None
@@ -115,6 +123,11 @@ class NormalizationConfig(StrictModel):
     def validate_std(self) -> NormalizationConfig:
         profiles = {
             "fixture_unit": ((0.0, 0.0, 0.0), (1.0, 1.0, 1.0), "ARD fixture identity profile"),
+            "cifar10_raw_identity": (
+                (0.0, 0.0, 0.0),
+                (1.0, 1.0, 1.0),
+                "CIFAR-10 raw-pixel identity profile for clean-room SAAD student",
+            ),
             "cifar10_standard": ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616), "CIFAR-10 repository profile"),
             "cifar100_standard": (
                 (0.5071, 0.4865, 0.4409),
@@ -242,7 +255,13 @@ class DatasetConfig(StrictModel):
 
 
 class ModelConfig(StrictModel):
-    architecture: Literal["resnet18_cifar", "mobilenet_v2_cifar", "fixture_cnn"] = "fixture_cnn"
+    architecture: Literal[
+        "saad_resnet18_cifar_v1",
+        "torchvision_resnet18_cifar_norm_v1",
+        "resnet18_cifar",
+        "mobilenet_v2_cifar",
+        "fixture_cnn",
+    ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
     preprocessing_owner: Literal["student_adapter"] = "student_adapter"
@@ -250,7 +269,13 @@ class ModelConfig(StrictModel):
 
 class TeacherConfig(StrictModel):
     source: Literal["checkpoint", "fixture"] = "fixture"
-    architecture: Literal["resnet18_cifar", "mobilenet_v2_cifar", "fixture_cnn"] = "fixture_cnn"
+    architecture: Literal[
+        "saad_resnet18_cifar_v1",
+        "torchvision_resnet18_cifar_norm_v1",
+        "resnet18_cifar",
+        "mobilenet_v2_cifar",
+        "fixture_cnn",
+    ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
     preprocessing_owner: Literal["teacher_adapter"] = "teacher_adapter"
@@ -324,7 +349,11 @@ class MethodConfig(StrictModel):
         if selection.student_mode != "eval" or selection.teacher_mode != "eval":
             raise ValueError("checkpoint selection attack must keep student and teacher in eval mode")
         mismatched = []
-        for field in ("norm", "input_domain", "steps", "random_start", "temperature", "temperature_squared"):
+        # Selection uses CE, whereas training may use KL.  Temperature and
+        # KL-only fields do not define CE threat parity, and controlled
+        # selection deliberately uses a stronger 20-step attack than the
+        # 10-step training inner maximization.
+        for field in ("norm", "input_domain", "random_start"):
             if getattr(selection, field) != getattr(self.attack, field):
                 mismatched.append(field)
         assert selection.epsilon_value is not None and self.attack.epsilon_value is not None
@@ -530,6 +559,92 @@ class ExperimentConfig(StrictModel):
             "cifar100": "cifar100_standard",
             "tiny_imagenet": "tiny_imagenet_standard",
         }[self.dataset.name]
+        if self.student.architecture == "saad_resnet18_cifar_v1" and self.dataset.name == "cifar10":
+            expected_profile = "cifar10_raw_identity"
         if self.student.normalization.profile != expected_profile:
             raise ValueError(f"dataset {self.dataset.name} requires student normalization profile {expected_profile}")
+        self._validate_protocol_contract()
         return self
+
+    def _validate_protocol_contract(self) -> None:
+        """Fail closed for the runnable, versioned protocol identities."""
+        from ard.protocols import get_protocol
+
+        spec = get_protocol(self.protocol.id)
+        if not spec.runnable_locally:
+            return
+        if self.protocol.id == "synthetic_smoke_v2":
+            errors: list[str] = []
+            if self.tier not in {"dev", "smoke"}:
+                errors.append("tier must be dev or smoke")
+            if self.dataset.name != "synthetic_cifar":
+                errors.append("dataset.name must be synthetic_cifar")
+            if self.student.architecture != "fixture_cnn":
+                errors.append("student.architecture must be fixture_cnn")
+            if errors:
+                raise ValueError("synthetic_smoke_v2 contract violation: " + "; ".join(errors))
+            return
+        if self.protocol.id != "controlled_cifar10_r18_v1":
+            return
+        metadata = spec.metadata
+        errors: list[str] = []
+        dataset = metadata["dataset"]
+        student = metadata["student"]
+        training = metadata["training"]
+        seeds = metadata["seeds"]
+        evaluation = metadata["evaluation"]
+        assert all(isinstance(item, Mapping) for item in (dataset, student, training, seeds, evaluation))
+        for field, expected in dataset.items():
+            if getattr(self.dataset, field) != expected:
+                errors.append(f"dataset.{field} must be {expected!r}")
+        for field, expected in student.items():
+            actual = (
+                self.student.normalization.profile
+                if field == "normalization_profile"
+                else getattr(self.student, field)
+            )
+            if actual != expected:
+                errors.append(f"student.{field} must be {expected!r}")
+        for field, expected in training.items():
+            actual = getattr(self.training, field)
+            if isinstance(expected, float):
+                matches = math.isclose(actual, expected, rel_tol=0, abs_tol=1e-15)
+            else:
+                matches = actual == expected
+            if not matches:
+                errors.append(f"training.{field} must be {expected!r}")
+        for field, expected in seeds.items():
+            if getattr(self.seeds, field) != expected:
+                errors.append(f"seeds.{field} must be {expected!r}")
+        for field, expected in evaluation.items():
+            if getattr(self.evaluation, field) != expected:
+                errors.append(f"evaluation.{field} must be {expected!r}")
+        optimizer = metadata["optimizer"]
+        assert isinstance(optimizer, Mapping)
+        for field, expected in optimizer.items():
+            if getattr(self.optimizer, field) != expected:
+                errors.append(f"optimizer.{field} must be {expected!r}")
+        schedule = metadata["scheduler"]
+        assert isinstance(schedule, Mapping)
+        for field, expected in schedule.items():
+            if getattr(self.scheduler, field) != expected:
+                errors.append(f"scheduler.{field} must be {expected!r}")
+        attack = metadata["train_attack"]
+        selection = metadata["selection_attack"]
+        assert isinstance(attack, Mapping) and isinstance(selection, Mapping)
+        actual_selection = self.method.selection_attack
+        assert actual_selection is not None
+        configured_attacks = (
+            (self.method.attack, attack, "method.attack"),
+            (actual_selection, selection, "method.selection_attack"),
+        )
+        for configured, expected, name in configured_attacks:
+            for field, value in expected.items():
+                if getattr(configured, field) != value:
+                    errors.append(f"{name}.{field} must be {value!r}")
+            if configured.norm != "linf" or configured.input_domain != "pixel_0_1":
+                errors.append(f"{name} must be Linf in raw pixel [0,1] domain")
+            if configured.student_mode != "eval" or configured.teacher_mode != "eval":
+                errors.append(f"{name} must preserve eval attack modes")
+        if errors:
+            raise ValueError("controlled_cifar10_r18_v1 contract violation: " + "; ".join(errors))

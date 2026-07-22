@@ -1,0 +1,10 @@
+id: saad_code_295121c_audit_v1
+runnable_locally: false
+audit_only: true
+local_cli: forbidden
+optimizer: {id: sgd, weight_decay: 0.0002}
+source_attack_call: {step_size: 8/255, epsilon: 2/255}
+test_each_epoch: true
+swa: {enabled: true, start_epoch: 95}
+parallelism: DataParallel
+notes: upstream code audit record; do not download, run GPU, or claim reproduction

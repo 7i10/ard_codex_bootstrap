@@ -64,6 +64,18 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T1", "T2", "T3"),
     ),
     (
+        ("src/ard/protocols/", "src/ard/schedules/"),
+        (
+            "tests/unit/test_protocols_schedules.py",
+            "tests/unit/test_config.py",
+            "tests/unit/test_tracking.py",
+            "tests/unit/test_evaluation.py",
+            "tests/integration/test_checkpoint_resume.py",
+            "tests/integration/test_tracking_evaluation.py",
+        ),
+        ("T0", "T1", "T3"),
+    ),
+    (
         ("src/ard/attacks/",),
         (
             "tests/unit/test_pgd.py",

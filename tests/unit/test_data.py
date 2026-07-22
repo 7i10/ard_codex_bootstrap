@@ -13,6 +13,7 @@ from ard.data import (
     IndexedDataset,
     SyntheticCIFAR,
     build_dataset,
+    build_train_validation_views,
     collate_indexed,
     stratified_train_validation_split,
 )
@@ -157,3 +158,84 @@ def test_cifar_adapters_respect_explicit_root_split_and_no_download(
     dataset = build_dataset(config, transform=lambda image: image)
     assert calls == [(str(tmp_path), True, False)]
     assert dataset[1][2] == 1
+
+
+def test_cifar_train_and_validation_views_are_independent_epoch_keyed_and_keep_official_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, bool, bool]] = []
+
+    class FakeCIFAR(SyntheticCIFAR):
+        def __getitem__(self, index: int) -> tuple[torch.Tensor, int]:
+            image = torch.arange(3 * 32 * 32, dtype=torch.float32).reshape(3, 32, 32) / (3 * 32 * 32)
+            return image + index / 100_000, index % 2
+
+    def factory(*, root: str, train: bool, download: bool) -> FakeCIFAR:
+        calls.append((root, train, download))
+        return FakeCIFAR(size=12, num_classes=10, image_size=32)
+
+    monkeypatch.setattr("ard.data.datasets.datasets.CIFAR10", factory)
+    config = DatasetConfig(name="cifar10", root=tmp_path, split="train", download=False, num_classes=10)
+    train, validation = build_train_validation_views(
+        config, validation_fraction=0.25, split_seed=7, augmentation_seed=11
+    )
+    assert calls == [(str(tmp_path), True, False)]
+    assert train.dataset is not validation.dataset
+    train_ids = {train[index][2] for index in range(len(train))}
+    validation_ids = {validation[index][2] for index in range(len(validation))}
+    assert train_ids.isdisjoint(validation_ids)
+    assert train_ids | validation_ids == set(range(12))
+    sample_id = train[0][2]
+    train.set_epoch(0)
+    epoch_zero = train[0][0]
+    train.set_epoch(1)
+    epoch_one = train[0][0]
+    alternate_train, _ = build_train_validation_views(
+        config, validation_fraction=0.25, split_seed=7, augmentation_seed=12
+    )
+    alternate_train.set_epoch(0)
+    assert sample_id == train[0][2]
+    assert not torch.equal(epoch_zero, epoch_one)
+    assert not torch.equal(epoch_zero, alternate_train[0][0])
+    assert torch.equal(validation[0][0], validation[0][0])
+
+
+def test_cifar_split_reads_targets_without_loading_or_transforming_images(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class ImageCountingCIFAR(SyntheticCIFAR):
+        def __init__(self) -> None:
+            super().__init__(size=12, num_classes=10, image_size=32)
+            self.image_reads = 0
+
+        def __getitem__(self, index: int) -> tuple[torch.Tensor, int]:
+            self.image_reads += 1
+            return super().__getitem__(index)
+
+    raw = ImageCountingCIFAR()
+    monkeypatch.setattr("ard.data.datasets.datasets.CIFAR10", lambda **_: raw)
+    config = DatasetConfig(name="cifar10", root=tmp_path, split="train", download=False, num_classes=10)
+    train, validation = build_train_validation_views(
+        config, validation_fraction=0.25, split_seed=7, augmentation_seed=11
+    )
+    assert raw.image_reads == 0
+    train_ids = [train[index][2] for index in range(len(train))]
+    validation_ids = [validation[index][2] for index in range(len(validation))]
+    assert raw.image_reads == len(train) + len(validation)
+    assert set(train_ids).isdisjoint(validation_ids)
+    assert set(train_ids) | set(validation_ids) == set(range(len(raw)))
+
+
+def test_official_test_is_never_part_of_train_validation_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[bool] = []
+
+    def factory(*, root: str, train: bool, download: bool) -> SyntheticCIFAR:
+        calls.append(train)
+        return SyntheticCIFAR(size=12, num_classes=10, image_size=32)
+
+    monkeypatch.setattr("ard.data.datasets.datasets.CIFAR10", factory)
+    config = DatasetConfig(name="cifar10", root=tmp_path, split="train", download=False, num_classes=10)
+    build_train_validation_views(config, validation_fraction=0.25, split_seed=7, augmentation_seed=11)
+    assert calls == [True]

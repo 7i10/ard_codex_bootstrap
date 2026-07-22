@@ -1,0 +1,16 @@
+id: controlled_cifar10_r18_v1
+runnable_locally: true
+dataset: cifar10
+student_architecture: saad_resnet18_cifar_v1
+normalization: cifar10_raw_identity
+epochs: 200
+validation_fraction: 0.1
+global_batch_size: 128
+per_rank_batch_size: "${ARD_PER_RANK_BATCH_SIZE}"
+split_seed: 20260722
+evaluation_seed: 0
+optimizer: {id: sgd, learning_rate: 0.1, momentum: 0.9, weight_decay: 0.0005, nesterov: false}
+scheduler: {id: multistep, milestones: [100, 150], gamma: 0.1, step_at: epoch_end}
+train_attack: {algorithm: pgd, steps: 10, loss: kl, kl_target: teacher_clean, epsilon: 8/255, step_size: 2/255, random_start: true, student_mode: eval, teacher_mode: eval}
+selection_attack: {algorithm: pgd, steps: 20, loss: ce, epsilon: 8/255, step_size: 2/255, random_start: true, student_mode: eval, teacher_mode: eval}
+augmentation: {train: "RandomCrop(32,padding=4)+RandomHorizontalFlip", validation: deterministic, test: deterministic}

@@ -166,7 +166,7 @@ ARD_TRADES_SOURCE_EVIDENCE=1 \
 The focused core gate was `40 passed, 1 skipped` before cloning. After the
 TRADES clone, the source-evidence differential was `4 passed`, and
 `verify_external.py --all` passed for both locked repositories. Legacy upstream
-runtime/CIFAR parity, T4/T5, and full training remain deferred.
+runtime/CIFAR parity, T4/T5, and full training remain deferred. Protocol fragments record paper full-50k/no-validation/PGD-10 (wd 5e-4) and code audit deviations (wd 2e-4, epsilon/step inversion, test-each-epoch, SWA epoch 95, DataParallel); both are audit-only and never trigger downloads or local CLI training.
 
 ## 9. Verified versus deferred
 

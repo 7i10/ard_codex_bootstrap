@@ -410,6 +410,8 @@ class Trainer:
             sampler = loader.sampler
             if hasattr(sampler, "set_epoch"):
                 sampler.set_epoch(epoch)
+            if hasattr(loader.dataset, "set_epoch"):
+                loader.dataset.set_epoch(epoch)
             train_metrics = self.train_epoch(loader)
             self._flush_sample_store()
             if self.diagnostics is not None:

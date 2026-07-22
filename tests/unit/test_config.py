@@ -159,10 +159,7 @@ def test_cifar_rejects_nonexistent_validation_split(tmp_path: Path, monkeypatch:
     (
         ("epsilon", "4/255"),
         ("step_size", "1/255"),
-        ("steps", 2),
         ("random_start", False),
-        ("temperature", 2.0),
-        ("temperature_squared", False),
     ),
 )
 def test_selection_attack_rejects_threat_model_drift(
@@ -302,14 +299,9 @@ def test_top_level_configs_resolve_under_controlled_environment(
         "ARD_CIFAR10_ROOT": str(tmp_path / "cifar10"),
         "ARD_TEACHER_CHECKPOINT": str(teacher_checkpoint),
         "ARD_TEACHER_CHECKPOINT_SHA256": "a" * 64,
-        "ARD_LEARNING_RATE": "0.1",
-        "ARD_MOMENTUM": "0.9",
-        "ARD_WEIGHT_DECAY": "0.0005",
-        "ARD_TRAIN_EPOCHS": "1",
-        "ARD_BATCH_SIZE": "2",
+        "ARD_PER_RANK_BATCH_SIZE": "128",
         "ARD_NUM_WORKERS": "0",
         "ARD_DEVICE": "cpu",
-        "ARD_VALIDATION_FRACTION": "0.25",
         "ARD_OUTPUT_ROOT": str(tmp_path / "outputs"),
         "WANDB_ENTITY": "entity",
         "WANDB_PROJECT": "project",

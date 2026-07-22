@@ -229,6 +229,7 @@ def test_saved_checkpoint_evaluation_is_canonical_and_aggregates(offline_run: di
     }
     assert all(required_identity_keys <= item.keys() for item in results)
     assert all(item["training_seeds"] == offline_run["config"].seeds.model_dump(mode="json") for item in results)
+    assert all(item["training_protocol_identity"]["id"] == offline_run["config"].protocol.id for item in results)
     assert all(
         {"name", "split", "classes", "image_size", "version"} <= item["dataset_identity"].keys()
         and "root" not in item["dataset_identity"]
@@ -323,7 +324,11 @@ def test_failure_finalization_does_not_mask_application_error(
         output = tmp_path / "train-original-error"
         config_path = tmp_path / "train-original-error.yaml"
         config_path.write_text(yaml.safe_dump(_training_config(output)), encoding="utf-8")
-        monkeypatch.setattr(train_cli, "build_dataset", lambda _: (_ for _ in ()).throw(ValueError("train original")))
+        monkeypatch.setattr(
+            train_cli,
+            "build_train_validation_views",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("train original")),
+        )
         with pytest.raises(ValueError, match="train original"):
             train_cli.main(["--config", str(config_path)])
     else:

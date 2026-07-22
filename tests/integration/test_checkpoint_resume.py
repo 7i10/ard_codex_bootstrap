@@ -11,19 +11,21 @@ from torch.utils.data import DataLoader
 
 from ard.attacks import LinfPGD
 from ard.attacks.base import AttackResult
-from ard.config.schema import AttackConfig, ModelConfig
+from ard.config.schema import AttackConfig, ModelConfig, SchedulerConfig
 from ard.data import (
     EpochShuffleSampler,
+    EpochSourceTransform,
     IndexedBatch,
     IndexedDataset,
     SyntheticCIFAR,
     collate_indexed,
     stratified_train_validation_split,
 )
-from ard.engine.checkpoint import REQUIRED_KEYS
+from ard.engine.checkpoint import REQUIRED_KEYS, load_checkpoint, save_checkpoint
 from ard.engine.trainer import Trainer
 from ard.models import build_student
 from ard.objectives import ObjectiveTerms, PGDATObjective
+from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
 from ard.tracking import NullTracker, coordinated_tracker_action
 from ard.tracking.diagnostics import TrainingDiagnostics
@@ -153,6 +155,99 @@ def test_epoch_boundary_resume_matches_uninterrupted_training(tmp_path: Path) ->
         assert torch.equal(expected, resumed.model.state_dict()[name]), name
     assert uninterrupted.global_step == resumed.global_step
     assert uninterrupted.best_metric == resumed.best_metric
+
+
+def _advance_optimizer_and_schedule(optimizer: SGD, scheduler: object, *, completed_epochs: int) -> None:
+    for _ in range(completed_epochs):
+        for group in optimizer.param_groups:
+            for parameter in group["params"]:
+                parameter.grad = torch.ones_like(parameter)
+        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
+        scheduler.step()  # type: ignore[union-attr]
+
+
+def _state_equal(left: object, right: object) -> bool:
+    if isinstance(left, torch.Tensor) and isinstance(right, torch.Tensor):
+        return torch.equal(left, right)
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(_state_equal(left[key], right[key]) for key in left)
+    if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+        return len(left) == len(right) and all(_state_equal(a, b) for a, b in zip(left, right, strict=True))
+    return left == right
+
+
+@pytest.mark.parametrize("completed_epochs", (99, 100, 149, 150))
+def test_multistep_optimizer_scheduler_checkpoint_roundtrip_matches_uninterrupted(
+    tmp_path: Path, completed_epochs: int
+) -> None:
+    schedule = SchedulerConfig(id="multistep", milestones=(100, 150), gamma=0.1, step_at="epoch_end")
+
+    def components() -> tuple[nn.Linear, SGD, object, EpochShuffleSampler]:
+        torch.manual_seed(71)
+        model = nn.Linear(2, 2)
+        optimizer = SGD(model.parameters(), lr=0.1, momentum=0.9)
+        return model, optimizer, build_scheduler(optimizer, schedule), EpochShuffleSampler(2, seed=3)
+
+    uninterrupted_model, uninterrupted_optimizer, uninterrupted_scheduler, _ = components()
+    _advance_optimizer_and_schedule(
+        uninterrupted_optimizer, uninterrupted_scheduler, completed_epochs=completed_epochs + 1
+    )
+
+    saved_model, saved_optimizer, saved_scheduler, saved_sampler = components()
+    _advance_optimizer_and_schedule(saved_optimizer, saved_scheduler, completed_epochs=completed_epochs)
+    saved_sampler.set_epoch(completed_epochs)
+    checkpoint = tmp_path / f"boundary-{completed_epochs}.pt"
+    save_checkpoint(
+        checkpoint,
+        epoch=completed_epochs - 1,
+        model=saved_model,
+        optimizer=saved_optimizer,
+        scheduler=saved_scheduler,
+        scaler=None,
+        sampler=saved_sampler,
+        sample_state={},
+        global_step=completed_epochs,
+        best_metric=0.0,
+        selection_metadata={},
+        tracker_run_id="scheduler-roundtrip",
+        config_hash="a" * 64,
+    )
+
+    resumed_model, resumed_optimizer, resumed_scheduler, resumed_sampler = components()
+    state = load_checkpoint(
+        checkpoint,
+        model=resumed_model,
+        optimizer=resumed_optimizer,
+        scheduler=resumed_scheduler,
+        scaler=None,
+        sampler=resumed_sampler,
+        expected_config_hash="a" * 64,
+        device=torch.device("cpu"),
+    )
+    assert state.next_epoch == completed_epochs
+    assert _state_equal(resumed_optimizer.state_dict(), saved_optimizer.state_dict())
+    assert resumed_scheduler.state_dict() == saved_scheduler.state_dict()  # type: ignore[union-attr]
+    assert resumed_optimizer.param_groups[0]["lr"] == saved_optimizer.param_groups[0]["lr"]
+
+    _advance_optimizer_and_schedule(resumed_optimizer, resumed_scheduler, completed_epochs=1)
+    assert _state_equal(resumed_model.state_dict(), uninterrupted_model.state_dict())
+    assert _state_equal(resumed_optimizer.state_dict(), uninterrupted_optimizer.state_dict())
+    assert resumed_scheduler.state_dict() == uninterrupted_scheduler.state_dict()  # type: ignore[union-attr]
+    assert resumed_optimizer.param_groups[0]["lr"] == uninterrupted_optimizer.param_groups[0]["lr"]
+
+
+def test_epoch_keyed_augmentation_view_at_resumed_epoch_matches_uninterrupted() -> None:
+    raw = SyntheticCIFAR(size=8, num_classes=2, image_size=32, seed=13)
+    uninterrupted = IndexedDataset(raw, EpochSourceTransform(augmentation_seed=17))
+    resumed = IndexedDataset(raw, EpochSourceTransform(augmentation_seed=17))
+    uninterrupted.set_epoch(100)
+    resumed.set_epoch(100)
+    for source_id in range(len(raw)):
+        first, _, first_id = uninterrupted[source_id]
+        second, _, second_id = resumed[source_id]
+        assert first_id == second_id == source_id
+        assert torch.equal(first, second)
 
 
 def test_rng_consuming_recording_callback_is_scientifically_observational(tmp_path: Path) -> None:

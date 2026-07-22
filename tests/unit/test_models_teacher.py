@@ -21,6 +21,38 @@ from ard.models import (
 pytestmark = pytest.mark.t1
 
 
+def _saad_resnet18_state_shapes() -> dict[str, tuple[int, ...]]:
+    """Independent structural specification for the clean-room CIFAR ResNet-18."""
+    shapes: dict[str, tuple[int, ...]] = {"conv1.weight": (64, 3, 3, 3)}
+
+    def batch_norm(prefix: str, channels: int) -> None:
+        shapes.update(
+            {
+                f"{prefix}.weight": (channels,),
+                f"{prefix}.bias": (channels,),
+                f"{prefix}.running_mean": (channels,),
+                f"{prefix}.running_var": (channels,),
+                f"{prefix}.num_batches_tracked": (),
+            }
+        )
+
+    batch_norm("bn1", 64)
+    for layer, (in_planes, planes) in enumerate(((64, 64), (64, 128), (128, 256), (256, 512)), start=1):
+        for block in range(2):
+            prefix = f"layer{layer}.{block}"
+            block_input = in_planes if block == 0 else planes
+            shapes[f"{prefix}.conv1.weight"] = (planes, block_input, 3, 3)
+            batch_norm(f"{prefix}.bn1", planes)
+            shapes[f"{prefix}.conv2.weight"] = (planes, planes, 3, 3)
+            batch_norm(f"{prefix}.bn2", planes)
+            if block == 0 and block_input != planes:
+                shapes[f"{prefix}.shortcut.0.weight"] = (planes, block_input, 1, 1)
+                batch_norm(f"{prefix}.shortcut.1", planes)
+    shapes["linear.weight"] = (10, 512)
+    shapes["linear.bias"] = (10,)
+    return shapes
+
+
 def test_explicit_cifar_model_registry_and_normalization() -> None:
     normalization = NormalizationConfig(
         profile="custom", mean=(0.5, 0.5, 0.5), std=(0.25, 0.25, 0.25), provenance="unit-test"
@@ -33,6 +65,27 @@ def test_explicit_cifar_model_registry_and_normalization() -> None:
     assert resnet.model.conv1.kernel_size == (3, 3) and resnet.model.conv1.stride == (1, 1)
     assert isinstance(resnet.model.maxpool, nn.Identity)
     assert mobile.model.features[0][0].stride == (1, 1)
+
+
+def test_clean_room_saad_resnet18_cifar_contract_is_exact_and_has_no_external_dependency() -> None:
+    model = build_architecture("saad_resnet18_cifar_v1", 10)
+    assert model(torch.rand(2, 3, 32, 32)).shape == (2, 10)
+    assert sum(parameter.numel() for parameter in model.parameters()) == 11_173_962
+    actual_shapes = {key: tuple(value.shape) for key, value in model.state_dict().items()}
+    assert actual_shapes == _saad_resnet18_state_shapes()
+    assert len(actual_shapes) == 122
+    assert model.conv1.kernel_size == (3, 3) and model.conv1.bias is None
+    assert model.avgpool.kernel_size == 4
+    student = build_student(
+        ModelConfig(
+            architecture="saad_resnet18_cifar_v1",
+            num_classes=10,
+            normalization=NormalizationConfig(profile="cifar10_raw_identity"),
+        ),
+        tier="dev",
+    )
+    pixels = torch.rand(1, 3, 32, 32)
+    assert torch.equal(student.normalization(pixels), pixels)
 
 
 def test_adapter_preprocessing_is_exactly_once_and_profiles_are_independent() -> None:

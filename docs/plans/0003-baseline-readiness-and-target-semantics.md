@@ -4,7 +4,7 @@
 
 - Owner: primary agent; one owning Terra per milestone; Luna only after each API freeze; Sol scientific review at each milestone boundary
 - Branch / base SHA: `master` / `937decf2415dc5827df7f06f46316688a1f51507`
-- Current milestone: M1 in progress; M0 approved
+- Current milestone: M2 in progress; M0–M1 approved
 - Last updated: 2026-07-22
 
 ## Goal
@@ -60,7 +60,7 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
   - Acceptance: main student/joint methods contain no hard CE fallback; resolved config uniquely reconstructs the equation; fixed-batch gradient contract passes
   - Rollback point: reviewed schema/target/objective diff
   - Planned commit: `feat: introduce target-softening method semantics v2`
-- [ ] M1 — Protocol, data, student, and schedule readiness
+- [x] M1 — Protocol, data, student, and schedule readiness
   - Files/modules: protocol/schedule config, data views/transforms, clean-room student registry, scheduler construction/resume, protocol configs and tests
   - Owner: one Terra; Luna synchronizes standalone YAMLs only after schema is stable
   - Tests: stable IDs across stochastic/deterministic views; validation has no random augmentation; architecture shapes/count/identity; LR at 99/100/149/150 and resumed equivalence; global/per-rank batch validation
@@ -123,7 +123,10 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
 - 2026-07-22: Read-only mapping confirmed current fallback semantics, shared train/validation transform, torchvision student, identity scheduler, repeated teacher-forward sites, and external RobustBench commit evidence. No teacher checkpoint was found and no download was attempted.
 - 2026-07-22: M0 implemented fail-closed schema v2, structured seeds, explicit method identity, detached adversarial-only teacher-target softening, and explicit downweight/hard-fallback ablations. All checked-in configs and fixtures were migrated.
 - 2026-07-22: M0 review found and fixed five P1 classes: FP32 target renormalization/parity, malformed repository YAML and incomplete method fragments, unsupported preprocessing ownership, DDP global-batch identity, and collapsed seed lineage. A delta review then found and fixed the two-GPU smoke batch declaration. Final scientific review approved M0 with no P0/P1.
-- 2026-07-22: M0 evidence includes config gate `21 passed`, focused numerical/lineage regressions `4 passed`, impact-selected checkpoint/resume `14 passed`, and six-method synthetic switch `1 passed`. Additional focused suites reported `92 passed` and offline tracking/evaluation `2 passed`. CUDA remains unavailable and a restricted-sandbox Gloo subprocess timed out; neither was retried.
+- 2026-07-22: M0 evidence includes config gate `21 passed`, focused numerical/lineage regressions `4 passed`, impact-selected checkpoint/resume `14 passed`, and six-method synthetic switch `1 passed`. Additional focused suites reported `92 passed` and offline tracking/evaluation `2 passed`. CUDA was unavailable in the default sandbox and a restricted-sandbox Gloo subprocess timed out; neither was retried at M0.
+- 2026-07-22: M1 added independent controlled/paper/code-audit protocol identities, separate deterministic train/validation views, an epoch/source-keyed augmentation stream, clean-room `saad_resnet18_cifar_v1`, and the exact epoch-end scheduler factory. Direct upstream instantiation corrected the planned state count from 112 to 122 tensors on current PyTorch while retaining 11,173,962 parameters and exact `shortcut`/`linear` keys.
+- 2026-07-22: M1 review found and fixed protocol relabel bypass, missing protocol lineage in evaluation/aggregation, eager 50k-image split decoding, incomplete integrated resume/state-map tests, stale operator variables, and evaluation/training protocol-ID mismatch. Final scientific review approved M1 with no P0/P1.
+- 2026-07-22: M1 focused evidence: protocol/scheduler `5 passed`, data `12 passed`, checkpoint/resume `14 passed`, review-fix suite `158 passed`, offline tracking/evaluation `17 passed`, and impact-selected non-scientific `19 passed` with remaining commands cache-valid. Host escalation exposed two RTX 4090 GPUs; bounded smoke then passed all four selected cases, including single-CUDA and two-rank CUDA DDP (`4 passed, 1 deselected`). No live W&B, download, full training, or AutoAttack occurred.
 
 ## Completion report
 

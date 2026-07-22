@@ -13,7 +13,6 @@ import torch
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim import SGD
-from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
 from ard.analysis import write_sample_parquet
@@ -24,9 +23,8 @@ from ard.config.schema import validate_global_batch_size
 from ard.data import (
     EpochShuffleSampler,
     IndexedBatch,
-    build_dataset,
+    build_train_validation_views,
     collate_indexed,
-    stratified_train_validation_split,
 )
 from ard.engine import Trainer, config_digest, get_rank, get_world_size
 from ard.engine.checkpoint import validate_resume_checkpoint
@@ -42,6 +40,8 @@ from ard.policies import (
     StudentRiskPolicy,
     WeightPolicy,
 )
+from ard.protocols import ensure_local_trainable
+from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
 from ard.targets import TeacherTargetPolicy, UniformSofteningTeacherTargetPolicy
 from ard.tracking import (
@@ -179,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     output_dir = config.output_dir.resolve()
     if config.dataset.split != "train":
         raise ValueError("training only accepts the official train split; official test data is evaluation-only")
+    ensure_local_trainable(config.protocol.id)
     device, initialized_distributed = initialize_from_env(config.training.device)
     tracker: ExperimentTracker | None = None
     tracking_completed = False
@@ -229,9 +230,11 @@ def main(argv: list[str] | None = None) -> int:
         _seed_everything(config.seeds.model_init + get_rank())
         if config.training.deterministic:
             torch.use_deterministic_algorithms(True)
-        dataset = build_dataset(config.dataset)
-        train_dataset, validation_dataset = stratified_train_validation_split(
-            dataset, validation_fraction=config.training.validation_fraction, seed=config.seeds.split
+        train_dataset, validation_dataset = build_train_validation_views(
+            config.dataset,
+            validation_fraction=config.training.validation_fraction,
+            split_seed=config.seeds.split,
+            augmentation_seed=config.seeds.augmentation,
         )
         sampler = EpochShuffleSampler(
             len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
@@ -274,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
             weight_decay=config.optimizer.weight_decay,
             nesterov=config.optimizer.nesterov,
         )
-        scheduler = StepLR(optimizer, step_size=1, gamma=1.0)
+        scheduler = build_scheduler(optimizer, config.scheduler)
         selection_attack_config = config.method.selection_attack
         assert selection_attack_config is not None  # resolved by MethodConfig validation
         objective, policy, sample_store, target_policy = _build_method(config)

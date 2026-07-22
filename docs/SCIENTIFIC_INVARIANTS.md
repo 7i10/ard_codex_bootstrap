@@ -7,7 +7,7 @@
 
 - dataset adapterからattackへ渡す画像はfloat pixel-space `[0,1]`。
 - CIFAR normalizationはstudent/teacher model adapterが所有し、attack前後に二重適用しない。
-- CIFAR-10はnamed `cifar10_standard` profileを要求し、teacherとstudent profileを一致させる。
+- CIFAR-10 SAAD studentはnamed `cifar10_raw_identity` profile（student adapter所有）を要求する。train augmentationはsource-keyed、validation/testはdeterministicである。
 - PGD projectionはpixel-spaceで行い、`Linf` ballへprojectした後`[0,1]`へclampする。
 - rational値は文字列`8/255`, `2/255`としてresolved configへ保持し、数値値と照合する。
 
@@ -32,6 +32,9 @@ attack identityとthreat hashは`AttackConfig`の全14 field、すなわち`norm
 mappingのexact equality、hashはcanonical JSONのSHA-256であり、budgetだけの比較やfield省略を認めません。
 
 ## 2. Model mode and gradient source
+
+The canonical SAAD CIFAR student has exactly 11,173,962 parameters; a lossless current-PyTorch `state_dict` has 122 keys,
+including BatchNorm tracking counters. These counts are identity checks, not interchangeable compatibility aliases.
 
 - attack requestがstudent/teacher modeを明示し、context終了時に元modeへ戻す。
 - checkpoint-selection/evaluation attackはstudent/teacherをeval modeに保つ。
