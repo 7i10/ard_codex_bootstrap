@@ -13,3 +13,4 @@ dist/
 htmlcov/
 wandb/
 outputs/
+teacher_cache/

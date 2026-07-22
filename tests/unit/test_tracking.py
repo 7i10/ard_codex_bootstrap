@@ -4,6 +4,7 @@ import importlib.util
 import json
 import random
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType
 
@@ -12,7 +13,8 @@ import torch
 import yaml
 
 from ard.analysis import summarize
-from ard.config.schema import ExperimentConfig
+from ard.config.schema import ExperimentConfig, TeacherConfig
+from ard.models.teacher_registry import TeacherRegistry, TeacherRegistryError
 from ard.tracking import (
     QUALITATIVE_COLUMNS,
     LocalTracker,
@@ -22,7 +24,7 @@ from ard.tracking import (
     stable_run_id,
     validate_tracking_guard,
 )
-from ard.tracking.adapter import _rng_preserving_rank_zero_phase, collect_git_state
+from ard.tracking.adapter import _rng_preserving_rank_zero_phase, _teacher_metadata, collect_git_state
 
 pytestmark = [pytest.mark.t1, pytest.mark.wandb]
 
@@ -143,6 +145,96 @@ def test_manifest_preserves_complete_structured_training_seed_lineage(tmp_path: 
     assert manifest["training_seeds"] == cfg.seeds.model_dump(mode="json")
     assert manifest["training_seed"] == cfg.seeds.model_init
     assert manifest["protocol_id"] == cfg.protocol.id
+
+
+@pytest.mark.parametrize(
+    "registry_id",
+    ("chen2021_ltd_wrn34_10", "bartoldson2024_adversarial_wrn94_16"),
+)
+def test_robustbench_teacher_manifest_metadata_is_complete_without_constructor(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, registry_id: str
+) -> None:
+    base = replace(TeacherRegistry.load(ROOT), root=tmp_path)
+    original = base.spec(registry_id)
+    checkpoint = tmp_path / original.checkpoint_path
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_bytes(b"hash-registered fixture bytes")
+    digest = __import__("hashlib").sha256(checkpoint.read_bytes()).hexdigest()
+    spec = replace(original, checkpoint_status="verified", checkpoint_sha256=digest)
+    registry = replace(base, specs={spec.registry_id: spec})
+    teacher = TeacherConfig(
+        source="robustbench",
+        registry_id=spec.registry_id,
+        architecture=spec.architecture,
+        num_classes=10,
+        normalization=spec.preprocessing.normalization(),
+        preprocessing_owner=spec.preprocessing.owner,
+        checkpoint=checkpoint,
+        checkpoint_sha256=digest,
+    )
+    cfg = production_config(tmp_path / "output", tmp_path / "data").model_copy(update={"teacher": teacher})
+    monkeypatch.setattr("ard.tracking.adapter.TeacherRegistry.load", lambda _root: registry)
+    metadata = _teacher_metadata(cfg, root=tmp_path)
+    assert metadata is not None
+    assert metadata["registry_id"] == spec.registry_id
+    assert metadata["upstream_model_id"] == spec.upstream_model_id
+    assert metadata["external_commit"] == registry.repository_commit
+    assert metadata["checkpoint_actual_sha256"] == digest
+    assert metadata["preprocessing_owner"] == spec.preprocessing.owner
+    assert metadata["preprocessing_profile"] == spec.preprocessing.profile
+    assert metadata["threat_model"] == {"norm": "linf", "epsilon": "8/255", "input_domain": "pixel_0_1"}
+
+
+@pytest.mark.parametrize("failure", ("checkpoint", "external"))
+def test_robustbench_preflight_rejects_before_wandb_init(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, failure: str
+) -> None:
+    spec = TeacherRegistry.load(ROOT).spec("chen2021_ltd_wrn34_10")
+    checkpoint = tmp_path / spec.checkpoint_path
+    teacher = TeacherConfig(
+        source="robustbench",
+        registry_id=spec.registry_id,
+        architecture=spec.architecture,
+        num_classes=10,
+        normalization=spec.preprocessing.normalization(),
+        preprocessing_owner=spec.preprocessing.owner,
+        checkpoint=checkpoint,
+        checkpoint_sha256="0" * 64,
+    )
+    cfg = production_config(tmp_path / "output", tmp_path / "data").model_copy(update={"teacher": teacher})
+
+    class InvalidRegistry:
+        def validate_config(self, configured: TeacherConfig) -> object:
+            assert configured is teacher
+            return spec
+
+        def validate_local_checkpoint(self, _spec: object, _checkpoint: Path) -> None:
+            if failure == "checkpoint":
+                raise TeacherRegistryError("checkpoint mismatch")
+
+        def validate_external(self) -> None:
+            if failure == "external":
+                raise TeacherRegistryError("external checkout dirty")
+
+    class Wandb:
+        calls = 0
+
+        @classmethod
+        def init(cls, **kwargs: object) -> None:
+            del kwargs
+            cls.calls += 1
+
+    monkeypatch.setattr("ard.tracking.adapter.TeacherRegistry.load", lambda _root: InvalidRegistry())
+    with pytest.raises(TrackingError, match="RobustBench teacher preflight failed"):
+        create_tracker(
+            config=cfg,
+            output_dir=tmp_path / "output",
+            config_hash="abc",
+            root=tmp_path,
+            wandb_module=Wandb(),
+        )
+    assert Wandb.calls == 0
+    assert not (tmp_path / "output").exists()
 
 
 def test_resume_rejects_untracked_content_drift(tmp_path: Path) -> None:

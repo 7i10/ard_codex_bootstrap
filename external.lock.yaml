@@ -15,3 +15,11 @@ repositories:
     license_status: verified
     license_evidence:
       sha256: 4b42e38a6899d82801eb6782fe161cccb5d3d685c8bcddc2b877ac9f87161a30
+  robustbench:
+    url: https://github.com/RobustBench/robustbench.git
+    commit: 78fcc9e48a07a861268f295a777b975f25155964
+    fetched_at: '2026-07-22T10:03:28.531449+00:00'
+    license_file: LICENSE
+    license_status: verified
+    license_evidence:
+      sha256: b001aaaa1b5dafecda30513aad5641cc6dd564a80e88c5f9760ed8ac44347245

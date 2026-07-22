@@ -1,0 +1,10 @@
+source: robustbench
+registry_id: chen2021_ltd_wrn34_10
+architecture: robustbench_wide_resnet
+num_classes: 10
+normalization: {profile: cifar10_raw_identity}
+preprocessing_owner: teacher_adapter
+checkpoint: "${ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT}"
+checkpoint_sha256: "${ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256}"
+threat_norm: linf
+threat_epsilon: 8/255

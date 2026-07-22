@@ -4,7 +4,7 @@
 
 - Owner: primary agent; one owning Terra per milestone; Luna only after each API freeze; Sol scientific review at each milestone boundary
 - Branch / base SHA: `master` / `937decf2415dc5827df7f06f46316688a1f51507`
-- Current milestone: M2 in progress; M0–M1 approved
+- Current milestone: M3 pending; M0–M2 approved
 - Last updated: 2026-07-22
 
 ## Goal
@@ -67,7 +67,7 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
   - Acceptance: controlled/paper/code-audit protocols resolve distinctly; raw-pixel contract remains; exact epoch schedule survives checkpoint resume
   - Rollback point: reviewed M1 delta
   - Planned commit: `feat: add versioned CIFAR baseline protocols`
-- [ ] M2 — Pinned RobustBench teacher registry
+- [x] M2 — Pinned RobustBench teacher registry
   - Files/modules: `external.lock.yaml`, `.external/robustbench`, `teachers.lock.yaml`, teacher registry/adapter, bootstrap/verify scripts, teacher configs and tests
   - Owner: one Terra; main thread performs the explicit external clone/license verification; no weight acquisition
   - Tests: exact model IDs/constructor metadata/parameter counts; Chen identity preprocessing; Bartoldson embedded preprocessing without double normalization; lock/hash failure; production download rejection; frozen/eval contract
@@ -127,6 +127,9 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
 - 2026-07-22: M1 added independent controlled/paper/code-audit protocol identities, separate deterministic train/validation views, an epoch/source-keyed augmentation stream, clean-room `saad_resnet18_cifar_v1`, and the exact epoch-end scheduler factory. Direct upstream instantiation corrected the planned state count from 112 to 122 tensors on current PyTorch while retaining 11,173,962 parameters and exact `shortcut`/`linear` keys.
 - 2026-07-22: M1 review found and fixed protocol relabel bypass, missing protocol lineage in evaluation/aggregation, eager 50k-image split decoding, incomplete integrated resume/state-map tests, stale operator variables, and evaluation/training protocol-ID mismatch. Final scientific review approved M1 with no P0/P1.
 - 2026-07-22: M1 focused evidence: protocol/scheduler `5 passed`, data `12 passed`, checkpoint/resume `14 passed`, review-fix suite `158 passed`, offline tracking/evaluation `17 passed`, and impact-selected non-scientific `19 passed` with remaining commands cache-valid. Host escalation exposed two RTX 4090 GPUs; bounded smoke then passed all four selected cases, including single-CUDA and two-rank CUDA DDP (`4 passed, 1 deselected`). No live W&B, download, full training, or AutoAttack occurred.
+- 2026-07-22: M2 pinned RobustBench at `78fcc9e48a07a861268f295a777b975f25155964`, verified its clean origin/HEAD/root-license digest, and added exact metadata for Chen WRN-34-10 and Bartoldson DM WRN-94-16. Checkpoint acquisition is explicit, hash-registered, project-lock serialized, rollback-safe, and never invokes the upstream downloader. No teacher weight was acquired or instantiated.
+- 2026-07-22: M2 scientific review found and fixed four P1 classes: preloaded unpinned RobustBench module reuse, regression of metadata-bearing `model` checkpoint wrappers, generic `model_embedded` preprocessing drift, and racy/non-transactional checkpoint publication. P2 fixes moved RobustBench external/checkpoint validation before tracker initialization, made teacher fragments strict after environment expansion, and added teacher-specific impact coverage. Delta review approved M2 with no remaining P0/P1/P2.
+- 2026-07-22: M2 focused suites reported `79 passed`, config/verify slices `43 passed`, and final correction slices `37 passed`. The first changed gate hit three sandbox-only Gloo socket timeouts; the exact failed nodes passed on the host (`3 passed`). The next host gate exposed one stale schema-v1 TRADES test fixture, which was corrected without weakening schema. The final host `scripts/verify.py --changed --non-scientific` completed with `212 passed, 2 skipped`; an unchanged rerun reported all 16 commands as `cached pass`. The skips are optional upstream-oracle paths. No live W&B, checkpoint download, full training, or AutoAttack occurred.
 
 ## Completion report
 

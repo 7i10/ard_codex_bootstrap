@@ -180,7 +180,12 @@ def test_clean_room_attack_initialization_projection_clamp_and_mode_contracts() 
     assert (local_defaults.epsilon, local_defaults.step_size, local_defaults.steps) == ("8/255", "2/255", 10)
     official_defaults = (0.031, 0.007, 10, 6.0)
     assert (local_defaults.epsilon, local_defaults.step_size, local_defaults.steps) != (".031", ".007", 10)
-    assert MethodConfig().trades_beta == official_defaults[3]
+    trades_method = MethodConfig(
+        id="trades",
+        version=1,
+        attack=AttackConfig(loss="kl", kl_target="student_clean"),
+    )
+    assert trades_method.trades_beta == official_defaults[3]
 
 
 @pytest.mark.upstream

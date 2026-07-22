@@ -1,0 +1,10 @@
+source: robustbench
+registry_id: bartoldson2024_adversarial_wrn94_16
+architecture: robustbench_dm_wide_resnet
+num_classes: 10
+normalization: {profile: robustbench_cifar10_bartoldson_embedded}
+preprocessing_owner: model_embedded
+checkpoint: "${ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT}"
+checkpoint_sha256: "${ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT_SHA256}"
+threat_norm: linf
+threat_epsilon: 8/255

@@ -186,6 +186,9 @@ def test_m4_production_requires_tracking_and_unknown_lineage_bypass_is_rejected(
     data = base_config()
     data.update(
         {
+            # This test swaps the synthetic fixture for real CIFAR inputs but
+            # deliberately does not claim a runnable controlled protocol.
+            "protocol": {"id": "saad_code_295121c_audit_v1"},
             "tier": "production",
             "dataset": {"name": "cifar10", "root": str(tmp_path), "num_classes": 10},
             "student": {
@@ -217,6 +220,7 @@ def test_real_dataset_normalization_is_required_and_adapter_profiles_are_indepen
     base = base_config()
     base.update(
         {
+            "protocol": {"id": "saad_code_295121c_audit_v1"},
             "dataset": {"name": "cifar10", "root": str(tmp_path), "num_classes": 10},
             "student": {"architecture": "resnet18_cifar", "num_classes": 10},
             "output_dir": str(tmp_path / "output"),

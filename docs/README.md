@@ -8,6 +8,7 @@
 - [W&B protocol](WANDB_PROTOCOL.md): tier/state、group/job type、artifact、固定sample table
 - [Experiment protocol](EXPERIMENT_PROTOCOL.md): run tier、baseline、seed、評価
 - [Upstream baselines](UPSTREAM_BASELINES.md): pinned SAAD/TRADES SHA、ライセンス証拠、既知差分
+- [Teacher config fragments](../configs/teachers/): strict RobustBench teacher configs; checkpoints are registered explicitly
 - [Codex workflow](CODEX_WORKFLOW.md): Sol/Terra/Lunaの役割分担
 
 ## CLI entry points

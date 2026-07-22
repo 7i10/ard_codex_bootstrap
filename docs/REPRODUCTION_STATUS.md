@@ -29,6 +29,31 @@ Controlled configs freeze split seed `20260722`, 200 epochs, validation fraction
 
 ## CIFAR template configs
 
+### RobustBench teacher acquisition
+
+Strict `TeacherConfig` fragments under `configs/teachers/` cover the exact IDs
+`chen2021_ltd_wrn34_10` and `bartoldson2024_adversarial_wrn94_16`, pinned to
+RobustBench commit `78fcc9e48a07a861268f295a777b975f25155964`. No weights have
+been acquired or loaded and no real-model smoke has run. Acquisition is never
+automatic: bootstrap the external checkout, provide a local file to
+`bootstrap_teacher.py --update-lock`, export the lock-matching ID-specific
+path/SHA variables, compose/copy the fragment into an experiment config, then
+verify. Missing environment variables fail closed. Preprocessing ownership and
+the CIFAR-10 `Linf` `8/255` threat are explicit in each fragment.
+
+```bash
+python scripts/bootstrap_external.py --repository robustbench
+python scripts/bootstrap_teacher.py \
+  --registry-id chen2021_ltd_wrn34_10 \
+  --source <EXISTING_LOCAL_CHECKPOINT> --update-lock
+export ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT="$PWD/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt"
+export ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256="<SHA_FROM_TEACHERS_LOCK>"
+python scripts/verify_teacher.py --registry-id chen2021_ltd_wrn34_10
+```
+
+上記はChenの例です。Bartoldsonでは下表の対応する2変数をexportします。選んだfragmentを
+experimentの`teacher` mappingとしてcompose/copyした後にのみtrain configとして使用します。
+
 次の8ファイルはloader/guardに適合する実行テンプレートです。実測精度やupstream-exact scheduleを表す結果ではありません。
 
 - `configs/reproduction/cifar10_r18_{rslad,rslad_entropy,rslad_student,rslad_joint}.yaml`
@@ -41,10 +66,15 @@ Controlled configs freeze split seed `20260722`, 200 epochs, validation fraction
 | `ARD_CIFAR10_ROOT` | 既存CIFAR-10 root（configはdownloadしない） |
 | `ARD_TEACHER_CHECKPOINT` | frozen ResNet-18 teacher checkpoint |
 | `ARD_TEACHER_CHECKPOINT_SHA256` | lowercase 64文字のcheckpoint SHA-256 |
+| `ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT`, `ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256` | Chen fragment用のregistry cache pathとlock SHA |
+| `ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT`, `ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT_SHA256` | Bartoldson fragment用のregistry cache pathとlock SHA |
 | `WANDB_ENTITY`, `WANDB_PROJECT`, `WANDB_GROUP` | W&B identity。比較する4手法と対応evalでgroupを共有する |
 | `ARD_SEED`, `ARD_OUTPUT_ROOT` | seedと出力root |
 | `ARD_PER_RANK_BATCH_SIZE` | per-rank batch size（single GPU=128、2 GPU=64） |
 | `ARD_NUM_WORKERS`, `ARD_DEVICE` | data-loader worker数とdevice |
+
+W&B remains offline/disabled for this acquisition-only state; no online or
+offline-sync experiment is claimed.
 
 Protocol ID, optimizer, scheduler, epoch count (200), validation fraction (0.1), global batch size (128),
 and attack identities are fixed in the checked-in YAML. Overrides of these scientific fields are rejected by the schema;

@@ -29,6 +29,7 @@ from ard.config.schema import ExperimentConfig, SeedsConfig
 from ard.engine.checkpoint import capture_rng_state, restore_rng_state
 from ard.engine.distributed import is_rank_zero, run_rank_zero_phase
 from ard.models.teacher import sha256_file
+from ard.models.teacher_registry import TeacherRegistry, TeacherRegistryError
 
 
 class TrackingError(RuntimeError):
@@ -175,7 +176,7 @@ def _external_metadata(root: Path) -> dict[str, Any]:
     return {"lock_path": str(lock), "sha256": sha256_file(lock), "repositories": explicit}
 
 
-def _teacher_metadata(config: ExperimentConfig) -> dict[str, Any] | None:
+def _teacher_metadata(config: ExperimentConfig, *, root: Path) -> dict[str, Any] | None:
     teacher = config.teacher
     if teacher is None:
         return None
@@ -184,13 +185,26 @@ def _teacher_metadata(config: ExperimentConfig) -> dict[str, Any] | None:
         actual = sha256_file(teacher.checkpoint)
         if teacher.checkpoint_sha256 is not None and actual != teacher.checkpoint_sha256:
             raise TrackingError("teacher checkpoint declared SHA does not match actual bytes")
+    robustbench: dict[str, str | None] = {"upstream_model_id": None, "external_commit": None}
+    if teacher.source == "robustbench":
+        try:
+            registry = TeacherRegistry.load(root)
+            spec = registry.validate_config(teacher)
+        except TeacherRegistryError as exc:
+            raise TrackingError(f"RobustBench teacher lineage is invalid: {exc}") from exc
+        robustbench = {"upstream_model_id": spec.upstream_model_id, "external_commit": registry.repository_commit}
     return {
         "source": teacher.source,
         "architecture": teacher.architecture,
+        "registry_id": teacher.registry_id,
+        **robustbench,
         "checkpoint": None if teacher.checkpoint is None else str(teacher.checkpoint),
         "checkpoint_sha256": teacher.checkpoint_sha256,
         "checkpoint_actual_sha256": actual,
         "normalization": teacher.normalization.model_dump(mode="json"),
+        "preprocessing_owner": teacher.preprocessing_owner,
+        "preprocessing_profile": teacher.normalization.profile,
+        "threat_model": {"norm": teacher.threat_norm, "epsilon": teacher.threat_epsilon, "input_domain": "pixel_0_1"},
     }
 
 
@@ -312,7 +326,7 @@ class LocalTracker:
             "world_size": int(os.environ.get("WORLD_SIZE", "1")),
             "git": {key: value for key, value in git.items() if key != "diff"},
             "external": _external_metadata(root),
-            "teacher": _teacher_metadata(config),
+            "teacher": _teacher_metadata(config, root=root),
             "sync_state": "running" if config.tracking.mode == "offline_sync" else None,
             "wandb_initialized": False,
             "summary": {},
@@ -672,6 +686,7 @@ def create_tracker(
     )
     if not is_rank_zero():
         return NullTracker(run_id)
+    _validate_robustbench_teacher_preflight(config, root=root)
     return LocalTracker(
         config=config,
         output_dir=output_dir,
@@ -737,6 +752,7 @@ def validate_tracking_guard(config: ExperimentConfig, *, root: Path) -> None:
         not config.tracking.project or not config.tracking.entity or not config.tracking.group
     ):
         raise TrackingError("production requires W&B entity, project, and group")
+    _validate_robustbench_teacher_preflight(config, root=root)
     lock = root / "external.lock.yaml"
     try:
         raw = yaml.safe_load(lock.read_text(encoding="utf-8"))
@@ -770,3 +786,17 @@ def validate_tracking_guard(config: ExperimentConfig, *, root: Path) -> None:
             raise TrackingError("production rejects untracked repository files")
         if git["dirty"] and not git["diff"]:
             raise TrackingError("production tracked dirty state requires an exact binary diff")
+
+
+def _validate_robustbench_teacher_preflight(config: ExperimentConfig, *, root: Path) -> None:
+    teacher = config.teacher
+    if config.tier not in {"repro", "production"} or teacher is None or teacher.source != "robustbench":
+        return
+    try:
+        registry = TeacherRegistry.load(root)
+        spec = registry.validate_config(teacher)
+        assert teacher.checkpoint is not None
+        registry.validate_local_checkpoint(spec, teacher.checkpoint)
+        registry.validate_external()
+    except TeacherRegistryError as exc:
+        raise TrackingError(f"RobustBench teacher preflight failed: {exc}") from exc

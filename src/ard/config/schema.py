@@ -109,6 +109,7 @@ class NormalizationConfig(StrictModel):
         "fixture_unit",
         "cifar10_raw_identity",
         "cifar10_standard",
+        "robustbench_cifar10_bartoldson_embedded",
         "cifar100_standard",
         "tiny_imagenet_standard",
         "custom",
@@ -129,6 +130,11 @@ class NormalizationConfig(StrictModel):
                 "CIFAR-10 raw-pixel identity profile for clean-room SAAD student",
             ),
             "cifar10_standard": ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616), "CIFAR-10 repository profile"),
+            "robustbench_cifar10_bartoldson_embedded": (
+                (0.4914, 0.4822, 0.4465),
+                (0.2471, 0.2435, 0.2616),
+                "RobustBench dm_wide_resnet.CIFAR10_MEAN/CIFAR10_STD at 78fcc9e48a07a861268f295a777b975f25155964",
+            ),
             "cifar100_standard": (
                 (0.5071, 0.4865, 0.4409),
                 (0.2673, 0.2564, 0.2762),
@@ -268,25 +274,47 @@ class ModelConfig(StrictModel):
 
 
 class TeacherConfig(StrictModel):
-    source: Literal["checkpoint", "fixture"] = "fixture"
+    source: Literal["checkpoint", "fixture", "robustbench"] = "fixture"
     architecture: Literal[
         "saad_resnet18_cifar_v1",
         "torchvision_resnet18_cifar_norm_v1",
         "resnet18_cifar",
         "mobilenet_v2_cifar",
         "fixture_cnn",
+        "robustbench_wide_resnet",
+        "robustbench_dm_wide_resnet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
-    preprocessing_owner: Literal["teacher_adapter"] = "teacher_adapter"
+    preprocessing_owner: Literal["teacher_adapter", "model_embedded"] = "teacher_adapter"
     checkpoint: Path | None = None
     checkpoint_sha256: str | None = None
+    registry_id: Literal["chen2021_ltd_wrn34_10", "bartoldson2024_adversarial_wrn94_16"] | None = None
+    threat_norm: Literal["linf"] = "linf"
+    threat_epsilon: str = "8/255"
     fixture_seed: int = 1729
 
     @model_validator(mode="after")
     def validate_source(self) -> TeacherConfig:
-        if self.source == "checkpoint" and (self.checkpoint is None or self.checkpoint_sha256 is None):
-            raise ValueError("checkpoint teachers require checkpoint and checkpoint_sha256")
+        if self.source in {"checkpoint", "robustbench"} and (
+            self.checkpoint is None or self.checkpoint_sha256 is None
+        ):
+            raise ValueError(f"{self.source} teachers require checkpoint and checkpoint_sha256")
+        if self.source == "robustbench" and self.registry_id is None:
+            raise ValueError("robustbench teachers require registry_id")
+        if self.source != "robustbench" and self.registry_id is not None:
+            raise ValueError("registry_id is only valid for robustbench teachers")
+        if (
+            self.source == "robustbench"
+            and self.registry_id == "chen2021_ltd_wrn34_10"
+            and self.preprocessing_owner != "teacher_adapter"
+        ):
+            raise ValueError("Chen RobustBench teacher requires teacher_adapter preprocessing")
+        if self.preprocessing_owner == "model_embedded":
+            if self.source != "robustbench" or self.registry_id != "bartoldson2024_adversarial_wrn94_16":
+                raise ValueError("model_embedded preprocessing is restricted to the Bartoldson RobustBench teacher")
+        if self.threat_epsilon != "8/255":
+            raise ValueError("teacher threat_epsilon must remain the explicit canonical value 8/255")
         if self.checkpoint_sha256 is not None and (
             len(self.checkpoint_sha256) != 64 or any(char not in "0123456789abcdef" for char in self.checkpoint_sha256)
         ):

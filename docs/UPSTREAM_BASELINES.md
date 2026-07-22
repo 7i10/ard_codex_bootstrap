@@ -186,5 +186,37 @@ Deferred and therefore not claimed:
 The TRADES root MIT license is recorded above; this does not imply legacy
 upstream runtime or CIFAR-number parity.
 
+## 10. RobustBench teachers
+
+The approved RobustBench source is pinned to commit
+`78fcc9e48a07a861268f295a777b975f25155964`. The lock records root MIT license
+evidence and separate Apache-2.0 architecture evidence for Bartoldson; this
+does not claim identical licensing for every upstream artifact.
+
+`configs/teachers/` contains strict `TeacherConfig` fragments for
+`chen2021_ltd_wrn34_10` (WRN-34-10, 46,160,474 parameters) and
+`bartoldson2024_adversarial_wrn94_16` (DM WRN-94-16, 365,915,610 parameters).
+Both specify CIFAR-10 `Linf` `8/255` in pixel space. Chen preprocessing is
+teacher-adapter-owned raw identity; Bartoldson preprocessing is model-embedded
+mean/std. No checkpoint is auto-downloaded. Before acquisition, the required
+environment variables are absent and fragment expansion fails closed.
+
+Acquire deliberately:
+
+```bash
+python scripts/bootstrap_external.py --repository robustbench
+python scripts/bootstrap_teacher.py \
+  --registry-id chen2021_ltd_wrn34_10 \
+  --source <EXISTING_LOCAL_CHECKPOINT> --update-lock
+export ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT="$PWD/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt"
+export ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256="<SHA_FROM_TEACHERS_LOCK>"
+python scripts/verify_teacher.py --registry-id chen2021_ltd_wrn34_10
+```
+
+The example uses Chen; Bartoldson uses the corresponding ID-specific variables
+listed in `REPRODUCTION_STATUS.md`. After exporting the selected fragment's
+registry cache path and exact SHA from `teachers.lock.yaml`, compose/copy that
+fragment into an experiment config. Arbitrary path or SHA overrides are rejected.
+
 Because the license file is absent, `.external/saad` remains a local read-only
 oracle. No upstream source is vendored into production modules.

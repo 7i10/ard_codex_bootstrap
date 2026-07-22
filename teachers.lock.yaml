@@ -1,0 +1,66 @@
+version: 1
+repository:
+  name: robustbench
+  url: https://github.com/RobustBench/robustbench.git
+  commit: 78fcc9e48a07a861268f295a777b975f25155964
+  license_evidence:
+    repository_code_and_weights:
+      file: LICENSE
+      sha256: b001aaaa1b5dafecda30513aad5641cc6dd564a80e88c5f9760ed8ac44347245
+      status: verified
+      statement: RobustBench root LICENSE declares MIT for code and model weights except listed IDs; neither selected ID is listed.
+    bartoldson_architecture:
+      file: robustbench/model_zoo/architectures/dm_wide_resnet.py
+      license: Apache-2.0
+      evidence: Apache-2.0 header and setup.py classifier are separate architecture-code evidence.
+teachers:
+  chen2021_ltd_wrn34_10:
+    source: robustbench
+    upstream_model_id: Chen2021LTD_WRN34_10
+    architecture: robustbench_wide_resnet
+    factory:
+      module: robustbench.model_zoo.architectures.wide_resnet
+      symbol: WideResNet
+      kwargs: {depth: 34, widen_factor: 10, sub_block1: false}
+    dataset: cifar10
+    threat: {norm: linf, epsilon: 8/255, input_domain: pixel_0_1}
+    preprocessing:
+      owner: teacher_adapter
+      profile: cifar10_raw_identity
+      mean: [0.0, 0.0, 0.0]
+      std: [1.0, 1.0, 1.0]
+      provenance: RobustBench Chen2021LTD_WRN34_10 registry uses raw [0,1] inputs; ARD adapter owns explicit identity.
+    expected_parameter_count: 46160474
+    upstream_locator: robustbench/model_zoo/cifar10.py:Chen2021LTD_WRN34_10
+    checkpoint_filename: Chen2021LTD_WRN34_10.pt
+    checkpoint_path: teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt
+    checkpoint_sha256: null
+    checkpoint_status: missing
+  bartoldson2024_adversarial_wrn94_16:
+    source: robustbench
+    upstream_model_id: Bartoldson2024Adversarial_WRN-94-16
+    architecture: robustbench_dm_wide_resnet
+    factory:
+      module: robustbench.model_zoo.architectures.dm_wide_resnet
+      symbol: DMWideResNet
+      kwargs:
+        num_classes: 10
+        depth: 94
+        width: 16
+        activation_fn: torch.nn.SiLU
+        mean: [0.4914, 0.4822, 0.4465]
+        std: [0.2471, 0.2435, 0.2616]
+    dataset: cifar10
+    threat: {norm: linf, epsilon: 8/255, input_domain: pixel_0_1}
+    preprocessing:
+      owner: model_embedded
+      profile: robustbench_cifar10_bartoldson_embedded
+      mean: [0.4914, 0.4822, 0.4465]
+      std: [0.2471, 0.2435, 0.2616]
+      provenance: RobustBench DMWideResNet mean/std are nonpersistent model-owned preprocessing buffers.
+    expected_parameter_count: 365915610
+    upstream_locator: robustbench/model_zoo/cifar10.py:Bartoldson2024Adversarial_WRN-94-16
+    checkpoint_filename: Bartoldson2024Adversarial_WRN-94-16.pt
+    checkpoint_path: teacher_cache/robustbench/Bartoldson2024Adversarial_WRN-94-16.pt
+    checkpoint_sha256: null
+    checkpoint_status: missing
