@@ -68,3 +68,9 @@ Three GPUs are supported mechanically, including three independent single-GPU ru
 ## Verified host
 
 On 2026-07-23 BatchMode SSH authenticated through the `Ferret` alias to `islab-3gpu` as `shunsukenaito`. Read-only preflight verified three idle RTX 4090 GPUs, the exact GitHub origin, the synchronized repository, `/usr/bin/python3`, `nohup`, `setsid`, `flock`, and more than 1 TB free disk.
+
+The Ferret `adv` environment has Python 3.12.13, PyTorch 2.11.0+cu128, CUDA access to all three GPUs, torchvision, W&B 0.28.0, Pydantic, PyYAML, RobustBench, AutoAttack, and pytest. CIFAR-10 and both registered teacher checkpoints are present; their SHA-256 values match the Hamster registry. `pip check` reports no broken requirements, and train/evaluate CLI imports pass from a detached worktree.
+
+PyArrow 25.0.0 was installed to match Hamster; `pip check` remains clean. Ruff and mypy are absent but are development checks, not runtime requirements. Hamster can pull selected results with rsync; this path was verified with manifest, status, logs, and timestamps. Ferret does not need an SSH key back to Hamster because all control and collection connections originate on Hamster.
+
+Ferret-specific bounded verification passed: one single-GPU PGD test, single-GPU synthetic training, two-GPU DDP synthetic training, 47 networkless W&B unit tests, and one offline training-bundle/artifact integration test. W&B credentials are present on both hosts without exposing their values. This establishes readiness for the two-GPU pilot, not three-GPU protocol equivalence or production-result validity.

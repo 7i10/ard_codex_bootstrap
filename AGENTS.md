@@ -25,6 +25,19 @@ Read `docs/README.md`, `docs/SCIENTIFIC_INVARIANTS.md`, `docs/TEST_STRATEGY.md`,
 - Agent reports contain changed files, exact commands/results, open findings, and decisions only. Do not paste long logs, repeat closed findings, or narrate routine steps.
 - Before a broad gate, run a cheap environment preflight for required Git, external checkout, CUDA/GPU identity, DDP sockets, and optional W&B/Parquet dependencies.
 
+## Critical evaluation of proposed procedures
+
+- Treat user plans, generated implementation prompts, and external runbooks as requirements and hypotheses, not automatically correct mechanisms.
+- Preserve the requested outcome while independently checking environment facts, security boundaries, scientific invariants, and simpler alternatives before adopting a proposed command or architecture.
+- When evidence contradicts a proposed mechanism, explain the evidence, choose the safer or more reproducible design, and record the accepted/rejected assumption in the active plan.
+- Do not perform ceremonial compliance. A named tool, model role, launcher, or review step must provide information or control that materially advances the task.
+
+## Review latency and retry policy
+
+- Use one consolidated independent review after the milestone delta and evidence are stable. Re-review only a fix delta for an actual P0/P1 or new contradictory evidence.
+- Do not impose a universal 60-second completion deadline on reasoning-heavy reviewers. Let a bounded review run for several minutes while the main thread performs non-overlapping work and continues user updates.
+- If a reviewer produces no verdict, record review as pending rather than approval. Send at most one request to conclude; do not launch repeated replacement reviewers for the same unchanged delta.
+
 ## Commit policy
 
 - Establish a baseline commit early so `git diff` and impact-selected tests remain narrow. Do not manufacture retrospective milestone history.
