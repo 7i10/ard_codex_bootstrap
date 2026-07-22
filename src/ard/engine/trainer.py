@@ -100,6 +100,10 @@ class Trainer:
         }
         self.sample_state: dict[str, Any] = {} if sample_store is None else sample_store.state_dict()
         self.diagnostics = diagnostics
+        # This detached cache is strictly intra-batch diagnostic reuse.  It is
+        # cleared at every batch boundary and intentionally excluded from
+        # checkpoint state.
+        self._diagnostic_teacher_adversarial_logits: torch.Tensor | None = None
 
     def _attack_generator(self) -> torch.Generator:
         seed = self.seed + 1_000_003 * self.global_step + 10_007 * get_rank()
@@ -185,11 +189,15 @@ class Trainer:
         signals: dict[str, torch.Tensor] = {}
         required = self.policy.required_signals
         entropy: torch.Tensor | None = None
+        teacher_adversarial_logits: torch.Tensor | None = None
         if "teacher_entropy" in required or "joint_risk" in required:
             if self.teacher is None:
                 raise ValueError("selected policy requires a teacher")
-            with torch.no_grad():
-                entropy = shannon_entropy(self.teacher(adversarial))
+            with _evaluation_mode(self.teacher), torch.no_grad():
+                teacher_adversarial_logits = self.teacher(adversarial).detach().float()
+                entropy = shannon_entropy(teacher_adversarial_logits)
+            if self.diagnostics is not None:
+                self._diagnostic_teacher_adversarial_logits = teacher_adversarial_logits
         if "teacher_entropy" in required:
             assert entropy is not None
             signals["teacher_entropy"] = entropy
@@ -232,14 +240,32 @@ class Trainer:
             if not isinstance(batch, IndexedBatch):
                 raise TypeError("trainer requires IndexedBatch batches")
             batch = batch.to(self.device)
+            self._diagnostic_teacher_adversarial_logits = None
             mask = self._mask(batch)
             self.optimizer.zero_grad(set_to_none=True)
+            requires_clean_student = getattr(self.objective, "requires_clean_student_logits", False)
+            requires_teacher_clean = getattr(self.objective, "requires_teacher_clean_logits", False)
+            attack_requires_teacher_clean = bool(getattr(self.attack, "requires_teacher_clean_target", False))
+            teacher_clean_logits = None
+            if requires_teacher_clean or attack_requires_teacher_clean:
+                if self.teacher is None:
+                    raise ValueError("selected attack or objective requires a teacher")
+                # This is the one detached FP32 target for both inner and outer
+                # RSLAD-family computations.  It has no teacher parameter or
+                # input graph and remains valid while the student is updated.
+                with (
+                    _evaluation_mode(self.teacher),
+                    torch.no_grad(),
+                    torch.autocast(device_type=self.device.type, enabled=False),
+                ):
+                    teacher_clean_logits = self.teacher(batch.images.float()).detach().float()
             attack_result = self.attack.generate(
                 AttackRequest(
                     inputs=batch.images,
                     labels=batch.labels,
                     student=self.model,
                     teacher=self.teacher,
+                    target_logits=teacher_clean_logits,
                     generator=self._attack_generator(),
                 )
             )
@@ -247,16 +273,8 @@ class Trainer:
             valid_mask = mask.to(dtype=torch.bool)
             student_signals = self._student_aware_signals(batch=batch, logits=logits, valid_mask=valid_mask)
             clean_student_logits = None
-            requires_clean_student = getattr(self.objective, "requires_clean_student_logits", False)
-            requires_teacher_clean = getattr(self.objective, "requires_teacher_clean_logits", False)
             if requires_clean_student:
                 clean_student_logits = self.model(batch.images)
-            teacher_clean_logits = None
-            if requires_teacher_clean:
-                if self.teacher is None:
-                    raise ValueError("selected objective requires a teacher")
-                with torch.no_grad():
-                    teacher_clean_logits = self.teacher(batch.images)
             objective_inputs: dict[str, torch.Tensor] = {"student_logits": logits, "labels": batch.labels}
             if requires_teacher_clean:
                 assert teacher_clean_logits is not None
@@ -287,43 +305,83 @@ class Trainer:
                 terms = terms.apply_policy(weights)
             if self.diagnostics is not None:
                 with _evaluation_mode(self.model), torch.no_grad():
-                    diagnostic_clean = self.model(batch.images)
+                    diagnostic_clean = self.model(batch.images).detach()
                 teacher_prediction = teacher_entropy = None
                 if self.teacher is not None:
-                    with torch.no_grad():
-                        teacher_logits = self.teacher(attack_result.adversarial)
-                        teacher_prediction = teacher_logits.argmax(1)
-                        teacher_entropy = shannon_entropy(teacher_logits)
+                    teacher_adversarial_logits = self._diagnostic_teacher_adversarial_logits
+                    if teacher_adversarial_logits is None:
+                        with _evaluation_mode(self.teacher), torch.no_grad():
+                            teacher_adversarial_logits = self.teacher(attack_result.adversarial).detach().float()
+                    teacher_prediction = teacher_adversarial_logits.argmax(1)
+                    teacher_entropy = shannon_entropy(teacher_adversarial_logits)
                 prior_margin = None if self.sample_store is None else self.sample_store.margin_ema(batch.sample_ids)
                 sample_store = self.sample_store
-                for position, sample_id in enumerate(batch.sample_ids.tolist()):
+                # Move scalar diagnostic fields in bounded batches.  This
+                # avoids a GPU synchronization for every individual sample.
+                sample_ids = batch.sample_ids.detach().cpu().tolist()
+                valid = valid_mask.detach().cpu().tolist()
+                labels = batch.labels.detach().cpu().tolist()
+                clean_predictions = diagnostic_clean.argmax(1).detach().cpu().tolist()
+                adversarial_predictions = logits.detach().argmax(1).cpu().tolist()
+                teacher_predictions = None if teacher_prediction is None else teacher_prediction.detach().cpu().tolist()
+                teacher_entropies = None if teacher_entropy is None else teacher_entropy.detach().cpu().tolist()
+                prior_margins = None if prior_margin is None else prior_margin.detach().cpu().tolist()
+                joint_risks = (
+                    None
+                    if weights is None or weights.joint_risk is None
+                    else weights.joint_risk.detach().cpu().tolist()
+                )
+                kd_weights = None if weights is None else weights.kd_weight.detach().cpu().tolist()
+                panel_positions = (
+                    [
+                        position
+                        for position, sample_id in enumerate(sample_ids)
+                        if sample_id in self.diagnostics.panel_ids
+                    ]
+                    if self.diagnostics.mode == "panel"
+                    else []
+                )
+                panel_media: dict[int, tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = {}
+                if panel_positions:
+                    positions = torch.tensor(panel_positions, device=self.device)
+                    clean_images = batch.images.index_select(0, positions).detach().cpu()
+                    adversarial_images = attack_result.adversarial.index_select(0, positions).detach().cpu()
+                    perturbations = (adversarial_images - clean_images).detach()
+                    panel_media = {
+                        position: (clean_images[index], adversarial_images[index], perturbations[index])
+                        for index, position in enumerate(panel_positions)
+                    }
+                for position, sample_id in enumerate(sample_ids):
+                    media = panel_media.get(position)
+                    has_prior = (
+                        prior_margins is not None and sample_store is not None and sample_id in sample_store.records
+                    )
+                    prior_value = None
+                    unlearnability = None
+                    if has_prior:
+                        assert prior_margins is not None
+                        prior_value = prior_margins[position]
+                        unlearnability = (1 - prior_value) / 2
                     self.diagnostics.record(
                         sample_id=sample_id,
-                        valid=bool(valid_mask[position]),
+                        valid=valid[position],
                         epoch=self.current_epoch,
-                        clean_image=batch.images[position].detach().cpu(),
-                        adversarial_image=attack_result.adversarial[position].detach().cpu(),
-                        perturbation_visualization=(attack_result.adversarial[position] - batch.images[position])
-                        .detach()
-                        .cpu(),
-                        true_label=int(batch.labels[position]),
-                        student_clean_prediction=int(diagnostic_clean[position].argmax()),
-                        student_adv_prediction=int(logits[position].detach().argmax()),
-                        teacher_prediction=None if teacher_prediction is None else int(teacher_prediction[position]),
-                        teacher_entropy=None if teacher_entropy is None else float(teacher_entropy[position]),
-                        student_robust_margin_ema=None
-                        if prior_margin is None or sample_store is None or int(sample_id) not in sample_store.records
-                        else float(prior_margin[position]),
-                        student_unlearnability=None
-                        if prior_margin is None or sample_store is None or int(sample_id) not in sample_store.records
-                        else float((1 - prior_margin[position]) / 2),
-                        joint_risk=None
-                        if weights is None or weights.joint_risk is None
-                        else float(weights.joint_risk[position]),
-                        kd_weight=0.0 if weights is None else float(weights.kd_weight[position]),
-                        clean_correct=bool(diagnostic_clean[position].argmax() == batch.labels[position]),
-                        robust_correct=bool(logits[position].detach().argmax() == batch.labels[position]),
+                        clean_image=None if media is None else media[0],
+                        adversarial_image=None if media is None else media[1],
+                        perturbation_visualization=None if media is None else media[2],
+                        true_label=labels[position],
+                        student_clean_prediction=clean_predictions[position],
+                        student_adv_prediction=adversarial_predictions[position],
+                        teacher_prediction=None if teacher_predictions is None else teacher_predictions[position],
+                        teacher_entropy=None if teacher_entropies is None else teacher_entropies[position],
+                        student_robust_margin_ema=prior_value,
+                        student_unlearnability=unlearnability,
+                        joint_risk=None if joint_risks is None else joint_risks[position],
+                        kd_weight=0.0 if kd_weights is None else kd_weights[position],
+                        clean_correct=clean_predictions[position] == labels[position],
+                        robust_correct=adversarial_predictions[position] == labels[position],
                     )
+                self._diagnostic_teacher_adversarial_logits = None
             # DDP averages gradients across ranks.  Scale each local masked
             # sum by world_size/global-effective-count so padded ranks cannot
             # dilute the update (including the size < world_size case).

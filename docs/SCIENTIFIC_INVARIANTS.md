@@ -31,6 +31,11 @@ attack identityとthreat hashは`AttackConfig`の全14 field、すなわち`norm
 `temperature`、`temperature_squared`、`student_mode`、`teacher_mode`から作ります。comparisonはこのcomplete
 mappingのexact equality、hashはcanonical JSONのSHA-256であり、budgetだけの比較やfield省略を認めません。
 
+`trace_step_losses`はPGD per-step lossの観測/debug専用スイッチで、既定値は`false`です。これはthreat identity
+の14 fieldに含めず、既存の攻撃値を変更しません。PGD traceを無効にした通常実行ではper-step device
+synchronizationを避けます。RSLADはdetach済みFP32のteacher-clean targetをinner/outerの両方で再利用しますが、
+目的関数の式は変更しません。
+
 ## 2. Model mode and gradient source
 
 The canonical SAAD CIFAR student has exactly 11,173,962 parameters; a lossless current-PyTorch `state_dict` has 122 keys,

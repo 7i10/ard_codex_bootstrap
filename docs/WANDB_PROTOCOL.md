@@ -9,6 +9,12 @@ other ranks receive a no-op tracker. Tracking phases preserve Python/NumPy/PyTor
 
 ## 2. Tier and state contract
 
+Diagnostics are explicit: `off` writes no diagnostics or sample statistics; `summary` writes scalar metrics and
+Parquet sample statistics without image Tables; `panel` writes fixed-ID media plus sample statistics. Production runs
+require `panel`; smoke/dev configs may use `off`. `artifact_interval_epochs` controls model artifact publication
+(the checked-in cadence is 5 epochs), while local best/last checkpoints are still written at scientific checkpoint
+cadence. The final epoch always publishes both best and last model artifacts.
+
 | Tier | Allowed tracking | Completion semantics |
 |---|---|---|
 | `dev` | disabled/offline/online as explicitly configured | local development only |

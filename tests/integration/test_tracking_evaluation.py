@@ -20,7 +20,7 @@ from ard.cli import train as train_cli
 from ard.config.schema import ExperimentConfig
 from ard.data import build_dataset, stratified_train_validation_split
 from ard.engine.trainer import Trainer
-from ard.tracking import QUALITATIVE_COLUMNS, LocalTracker
+from ard.tracking import QUALITATIVE_COLUMNS, LocalTracker, TrackingError
 
 pytestmark = [pytest.mark.t3, pytest.mark.wandb]
 
@@ -134,6 +134,7 @@ def test_offline_training_bundle_and_checkpoint_publication(offline_run: dict[st
     assert manifest["sync_state"] is None
     assert manifest["external"]["repositories"]["saad"]["commit"]
     assert (output / "best.pt").is_file() and (output / "last.pt").is_file()
+    assert manifest["diagnostics_mode"] == "panel"
 
     # Publication copies the completed atomic checkpoint; it must never mutate
     # model tensors while logging an artifact.
@@ -144,6 +145,56 @@ def test_offline_training_bundle_and_checkpoint_publication(offline_run: dict[st
     copied = torch.load(published, map_location="cpu", weights_only=False)["model"]
     assert original.keys() == copied.keys()
     assert all(torch.equal(original[key], copied[key]) for key in original)
+
+
+def test_diagnostics_off_constructs_no_diagnostics_or_sample_statistics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "off"
+    raw_config = _training_config(output)
+    raw_config["tracking"].update({"mode": "disabled", "diagnostics_mode": "off"})
+    config_path = tmp_path / "off.yaml"
+    config_path.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+
+    class UnexpectedDiagnostics:
+        @classmethod
+        def for_ids(cls, *args: object, **kwargs: object) -> object:
+            del args, kwargs
+            raise AssertionError("diagnostics must not be constructed in off mode")
+
+    monkeypatch.setattr(train_cli, "TrainingDiagnostics", UnexpectedDiagnostics)
+    assert train_cli.main(["--config", str(config_path)]) == 0
+    bundle = output / "run-bundle"
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["diagnostics_mode"] == "off"
+    assert not (output / "sample-stats-train.parquet").exists()
+    assert not (bundle / "panels").exists()
+
+
+def test_summary_diagnostics_omit_media_tables_and_artifacts_are_sparse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "summary"
+    raw_config = _training_config(output)
+    raw_config["training"]["epochs"] = 3
+    raw_config["tracking"].update({"mode": "disabled", "diagnostics_mode": "summary", "artifact_interval_epochs": 2})
+    config_path = tmp_path / "summary.yaml"
+    config_path.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+
+    def forbid_table(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise AssertionError("summary diagnostics must not publish a panel table")
+
+    monkeypatch.setattr(LocalTracker, "log_table", forbid_table)
+    assert train_cli.main(["--config", str(config_path)]) == 0
+    bundle = output / "run-bundle"
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    model_entries = [entry for entry in manifest["artifacts"] if entry["type"] == "model"]
+    assert len(model_entries) == 4
+    assert [entry["aliases"] for entry in model_entries] == [["last"], ["best"], ["last"], ["best"]]
+    assert not (bundle / "panels").exists()
+    columns = set(pq.read_table(output / "sample-stats-train.parquet").column_names)
+    assert {"clean_image", "adversarial_image", "perturbation_visualization"}.isdisjoint(columns)
 
 
 def test_training_sample_stats_cover_exact_train_subset(offline_run: dict[str, Any]) -> None:
@@ -497,12 +548,83 @@ def test_resume_with_no_remaining_epochs_uses_checkpoint_last_metrics(offline_ru
     assert after_manifest["artifacts"] == artifacts_before
 
 
-def test_resume_nonimprovement_keeps_best_and_updates_last_summary(
+def _tree_bytes(root: Path) -> dict[str, bytes]:
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in sorted(root.rglob("*")) if path.is_file()}
+
+
+def _three_epoch_terminal_run(tmp_path: Path) -> tuple[Path, Path]:
+    output = tmp_path / "terminal"
+    raw_config = _training_config(output)
+    raw_config["training"]["epochs"] = 3
+    raw_config["tracking"].update({"mode": "disabled", "artifact_interval_epochs": 2})
+    config_path = tmp_path / "terminal.yaml"
+    config_path.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+    assert train_cli.main(["--config", str(config_path)]) == 0
+    return output, config_path
+
+
+def test_terminal_sparse_artifact_resume_is_byte_for_byte_read_only(tmp_path: Path) -> None:
+    output, _ = _three_epoch_terminal_run(tmp_path)
+    manifest_path = output / "run-bundle" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    model_entries = [entry for entry in manifest["artifacts"] if entry["type"] == "model"]
+    assert len(model_entries) == 4
+    before = _tree_bytes(output)
+
+    assert train_cli.main(["--config", str(output / "resolved_config.yaml"), "--resume", str(output / "last.pt")]) == 0
+
+    assert _tree_bytes(output) == before
+
+
+def test_corrupt_terminal_artifact_resume_fails_without_mutation(tmp_path: Path) -> None:
+    output, _ = _three_epoch_terminal_run(tmp_path)
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    historical_model = next(entry for entry in manifest["artifacts"] if entry["type"] == "model")
+    local = output / "run-bundle" / historical_model["local_path"] / Path(historical_model["path"]).name
+    local.write_bytes(b"corrupted immutable local artifact")
+    before = _tree_bytes(output)
+
+    with pytest.raises(TrackingError, match="local hash drift"):
+        train_cli.main(["--config", str(output / "resolved_config.yaml"), "--resume", str(output / "last.pt")])
+
+    assert _tree_bytes(output) == before
+
+
+def test_terminal_resume_rejects_nonterminal_checkpoint_without_mutation(tmp_path: Path) -> None:
+    output, _ = _three_epoch_terminal_run(tmp_path)
+    older = output / "older.pt"
+    payload = torch.load(output / "last.pt", map_location="cpu", weights_only=False)
+    payload["epoch"] = 1
+    torch.save(payload, older)
+    before = _tree_bytes(output)
+
+    with pytest.raises(TrackingError, match="completed epoch boundary"):
+        train_cli.main(["--config", str(output / "resolved_config.yaml"), "--resume", str(older)])
+
+    assert _tree_bytes(output) == before
+
+
+def test_terminal_resume_rejects_future_checkpoint_without_mutation(tmp_path: Path) -> None:
+    output, _ = _three_epoch_terminal_run(tmp_path)
+    future = output / "future.pt"
+    payload = torch.load(output / "last.pt", map_location="cpu", weights_only=False)
+    payload["epoch"] = 3
+    torch.save(payload, future)
+    before = _tree_bytes(output)
+
+    with pytest.raises(TrackingError, match="completed epoch boundary exactly"):
+        train_cli.main(["--config", str(output / "resolved_config.yaml"), "--resume", str(future)])
+
+    assert _tree_bytes(output) == before
+
+
+def test_terminal_partial_run_rejects_nonterminal_resume_without_mutation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     output = tmp_path / "resumed-summary"
     config = _training_config(output)
     config["training"]["epochs"] = 2
+    config["tracking"]["mode"] = "disabled"
     config_path = tmp_path / "resumed-summary.yaml"
     config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
     original_fit = Trainer.fit
@@ -528,15 +650,7 @@ def test_resume_nonimprovement_keeps_best_and_updates_last_summary(
     monkeypatch.setattr(Trainer, "validate_epoch", fixed_validate_epoch)
     monkeypatch.setattr(Trainer, "fit", first_leg_only)
     assert train_cli.main(["--config", str(config_path)]) == 0
-    assert train_cli.main(["--config", str(config_path), "--resume", str(output / "last.pt")]) == 0
-
-    summary = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))["summary"]
-    assert summary == {
-        "best_metric": 0.8,
-        "best_epoch": 0,
-        "best_clean_accuracy": 0.5,
-        "best_pgd_accuracy": 0.8,
-        "last_clean_accuracy": 0.4,
-        "last_pgd_accuracy": 0.7,
-        "robust_overfit_gap": pytest.approx(0.1),
-    }
+    before = _tree_bytes(output)
+    with pytest.raises(TrackingError, match="completed epoch boundary"):
+        train_cli.main(["--config", str(config_path), "--resume", str(output / "last.pt")])
+    assert _tree_bytes(output) == before

@@ -7,7 +7,7 @@ import yaml
 from pydantic import ValidationError
 
 from ard.config import load_config, save_resolved_config
-from ard.config.schema import MethodConfig, NormalizationConfig
+from ard.config.schema import AttackConfig, MethodConfig, NormalizationConfig
 
 pytestmark = pytest.mark.t0
 
@@ -68,6 +68,24 @@ def test_strict_config_env_override_and_resolved_rationals(tmp_path: Path, monke
     save_resolved_config(config, resolved)
     reloaded = load_config(resolved)
     assert reloaded == config
+
+
+def test_attack_trace_is_resolved_observability_not_threat_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    attack = AttackConfig(trace_step_losses=True)
+    assert attack.trace_step_losses
+    assert "trace_step_losses" not in attack.identity()
+    assert len(attack.identity()) == 14
+    data = base_config()
+    data["method"]["attack"]["trace_step_losses"] = True
+    path = tmp_path / "trace.yaml"
+    write_yaml(path, data)
+    monkeypatch.setenv("ARD_TEST_OUTPUT", str(tmp_path / "output"))
+    config = load_config(path)
+    resolved = tmp_path / "resolved.yaml"
+    save_resolved_config(config, resolved)
+    assert yaml.safe_load(resolved.read_text(encoding="utf-8"))["method"]["attack"]["trace_step_losses"] is True
 
 
 def test_unknown_keys_and_unresolved_environment_are_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -214,6 +232,37 @@ def test_m4_production_requires_tracking_and_unknown_lineage_bypass_is_rejected(
     data["tracking"] = {"mode": "offline_sync", "project": "ard-test"}
     write_yaml(path, data)
     assert load_config(path).tier == "repro"
+
+
+@pytest.mark.parametrize("diagnostics_mode", ("off", "summary"))
+def test_production_requires_panel_diagnostics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, diagnostics_mode: str
+) -> None:
+    data = base_config()
+    data.update(
+        {
+            "protocol": {"id": "saad_code_295121c_audit_v1"},
+            "tier": "production",
+            "dataset": {"name": "cifar10", "root": str(tmp_path), "num_classes": 10},
+            "student": {
+                "architecture": "resnet18_cifar",
+                "num_classes": 10,
+                "normalization": {"profile": "cifar10_standard"},
+            },
+            "tracking": {
+                "mode": "online",
+                "project": "ard-test",
+                "entity": "ard-test",
+                "group": "m3-test",
+                "diagnostics_mode": diagnostics_mode,
+            },
+        }
+    )
+    path = tmp_path / "production-panel.yaml"
+    write_yaml(path, data)
+    monkeypatch.setenv("ARD_TEST_OUTPUT", str(tmp_path / "output"))
+    with pytest.raises(ValidationError, match="production requires panel diagnostics"):
+        load_config(path)
 
 
 def test_real_dataset_normalization_is_required_and_adapter_profiles_are_independent(tmp_path: Path) -> None:

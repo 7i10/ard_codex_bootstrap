@@ -28,7 +28,14 @@ from ard.data import (
 )
 from ard.engine import Trainer, config_digest, get_rank, get_world_size
 from ard.engine.checkpoint import validate_resume_checkpoint
-from ard.engine.distributed import barrier, initialize_from_env, is_rank_zero, run_rank_zero_phase, teardown
+from ard.engine.distributed import (
+    barrier,
+    initialize_from_env,
+    is_rank_zero,
+    run_rank_zero_phase,
+    run_rank_zero_value,
+    teardown,
+)
 from ard.models import build_student, build_teacher
 from ard.objectives import DistillationObjective, PGDATObjective, RSLADObjective, TRADESObjective
 from ard.policies import (
@@ -47,6 +54,7 @@ from ard.targets import TeacherTargetPolicy, UniformSofteningTeacherTargetPolicy
 from ard.tracking import (
     ExperimentTracker,
     LocalTracker,
+    TrackingError,
     coordinated_create_tracker,
     coordinated_tracker_action,
     validate_tracking_guard,
@@ -105,6 +113,27 @@ def _resume_tracker_id(path: Path | None) -> str | None:
     if run_id is not None and not isinstance(run_id, str):
         raise ValueError("resume checkpoint tracker_run_id must be a string or null")
     return run_id
+
+
+def _terminal_resume_requested(*, output_dir: Path, resume: Path | None, epochs: int) -> bool:
+    """Read-only terminal-resume preflight before any run-bundle write."""
+    if resume is None:
+        return False
+    manifest_path = output_dir / "run-bundle" / "manifest.json"
+    if not manifest_path.is_file():
+        return False
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise TrackingError("existing tracking manifest is unreadable") from exc
+    if manifest.get("status") not in {"completed", "sync_pending"}:
+        return False
+    payload = torch.load(resume, map_location="cpu", weights_only=False)
+    if not isinstance(payload, dict) or not isinstance(payload.get("epoch"), int):
+        raise TrackingError("terminal resume checkpoint is invalid")
+    if payload["epoch"] + 1 != epochs:
+        raise TrackingError("terminal resume requires a checkpoint at the completed epoch boundary exactly")
+    return True
 
 
 def _selection_metric(value: object, *, name: str) -> float:
@@ -183,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     device, initialized_distributed = initialize_from_env(config.training.device)
     tracker: ExperimentTracker | None = None
     tracking_completed = False
+    terminal_resume = False
     try:
         validate_global_batch_size(
             per_rank_batch_size=config.training.per_rank_batch_size,
@@ -196,10 +226,17 @@ def main(argv: list[str] | None = None) -> int:
             _guard_output(output_dir, resume=args.resume, config_hash=config_hash)
 
         run_rank_zero_phase(_validate_output_guard, phase="output guard")
-        run_rank_zero_phase(
-            lambda: save_resolved_config(config, output_dir / "resolved_config.yaml"),
-            phase="resolved-config write",
+        terminal_resume = run_rank_zero_value(
+            lambda: _terminal_resume_requested(
+                output_dir=output_dir, resume=args.resume, epochs=config.training.epochs
+            ),
+            phase="terminal resume preflight",
         )
+        if not terminal_resume:
+            run_rank_zero_phase(
+                lambda: save_resolved_config(config, output_dir / "resolved_config.yaml"),
+                phase="resolved-config write",
+            )
         barrier()
         if args.dry_run:
             if is_rank_zero():
@@ -281,8 +318,15 @@ def main(argv: list[str] | None = None) -> int:
         selection_attack_config = config.method.selection_attack
         assert selection_attack_config is not None  # resolved by MethodConfig validation
         objective, policy, sample_store, target_policy = _build_method(config)
-        diagnostics = TrainingDiagnostics.for_ids(
-            list(train_dataset.indices), seed=config.seeds.qualitative_panel, size=config.tracking.panel_size
+        diagnostics = (
+            None
+            if config.tracking.diagnostics_mode == "off"
+            else TrainingDiagnostics.for_ids(
+                list(train_dataset.indices),
+                seed=config.seeds.qualitative_panel,
+                size=config.tracking.panel_size,
+                mode=config.tracking.diagnostics_mode,
+            )
         )
         trainer = Trainer(
             model=student,
@@ -320,11 +364,6 @@ def main(argv: list[str] | None = None) -> int:
                 phase="tracker no-op resume validation",
                 action=validate_noop_resume,
             )
-            coordinated_tracker_action(
-                active_tracker,
-                phase="tracker no-op resume finish",
-                action=lambda active: active.finish(),
-            )
             tracking_completed = True
             if is_rank_zero():
                 print(json.dumps({"output_dir": str(output_dir), "history": []}, sort_keys=True))
@@ -338,13 +377,17 @@ def main(argv: list[str] | None = None) -> int:
                 values = dict(metrics)
                 values["epoch"] = trainer.current_epoch
                 active_tracker.log_metrics(values, step=trainer.global_step)
-                active_tracker.log_artifact(
-                    output_dir / "last.pt",
-                    name=f"model-{active_tracker.run_id}-last",
-                    artifact_type="model",
-                    aliases=("last",),
+                publish_models = (
+                    trainer.current_epoch + 1 == config.training.epochs
+                    or (trainer.current_epoch + 1) % config.tracking.artifact_interval_epochs == 0
                 )
-                if improved:
+                if publish_models:
+                    active_tracker.log_artifact(
+                        output_dir / "last.pt",
+                        name=f"model-{active_tracker.run_id}-last",
+                        artifact_type="model",
+                        aliases=("last",),
+                    )
                     active_tracker.log_artifact(
                         output_dir / "best.pt",
                         name=f"model-{active_tracker.run_id}-best",
@@ -357,7 +400,7 @@ def main(argv: list[str] | None = None) -> int:
                     or trainer.current_epoch + 1 == config.training.epochs
                     or (trainer.current_epoch + 1) % config.tracking.panel_interval_epochs == 0
                 )
-                if sparse and diagnostics.panel_rows:
+                if diagnostics is not None and diagnostics.mode == "panel" and sparse and diagnostics.panel_rows:
                     rows: list[Mapping[str, object]] = [row for row in diagnostics.panel_rows]
                     active_tracker.log_table(f"panel-epoch-{trainer.current_epoch}", rows)
 
@@ -370,23 +413,26 @@ def main(argv: list[str] | None = None) -> int:
             start_epoch=start_epoch,
             on_epoch_end=_record_epoch,
         )
-        scalar_rows = [
-            {
-                key: value
-                for key, value in row.items()
-                if key not in {"clean_image", "adversarial_image", "perturbation_visualization"}
-            }
-            for _, row in sorted(diagnostics.all_rows.items())
-        ]
-        stats_path = output_dir / "sample-stats-train.parquet"
+        stats_path: Path | None = None
+        if diagnostics is not None:
+            scalar_rows = [
+                {
+                    key: value
+                    for key, value in row.items()
+                    if key not in {"clean_image", "adversarial_image", "perturbation_visualization"}
+                }
+                for _, row in sorted(diagnostics.all_rows.items())
+            ]
+            stats_path = output_dir / "sample-stats-train.parquet"
 
-        def _write_sample_statistics() -> None:
-            write_sample_parquet(scalar_rows, stats_path)
+            def _write_sample_statistics() -> None:
+                assert stats_path is not None
+                write_sample_parquet(scalar_rows, stats_path)
 
-        run_rank_zero_phase(
-            _write_sample_statistics,
-            phase="sample statistics write",
-        )
+            run_rank_zero_phase(
+                _write_sample_statistics,
+                phase="sample statistics write",
+            )
 
         def _finalize(active_tracker: ExperimentTracker) -> None:
             best_epoch = trainer.selection_metadata["selected_epoch"]
@@ -398,9 +444,10 @@ def main(argv: list[str] | None = None) -> int:
             selected_pgd = _selection_metric(selected_pgd, name="selected PGD accuracy")
             last_clean = _selection_metric(last_clean, name="last clean accuracy")
             last_pgd = _selection_metric(last_pgd, name="last PGD accuracy")
-            active_tracker.log_artifact(
-                stats_path, name=f"sample-stats-{active_tracker.run_id}", artifact_type="sample-stats"
-            )
+            if stats_path is not None:
+                active_tracker.log_artifact(
+                    stats_path, name=f"sample-stats-{active_tracker.run_id}", artifact_type="sample-stats"
+                )
             active_tracker.set_summary(
                 {
                     "best_metric": trainer.best_metric,
@@ -427,7 +474,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"output_dir": str(output_dir), "history": history}, sort_keys=True))
         return 0
     finally:
-        if tracker is not None and not tracking_completed:
+        if tracker is not None and not tracking_completed and not terminal_resume:
             # On an exception retain an explicit failed local manifest for
             # offline recovery.
             try:

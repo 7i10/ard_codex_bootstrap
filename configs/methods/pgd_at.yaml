@@ -6,3 +6,4 @@ attack:
   step_size: 2/255
   steps: 10
   random_start: true
+  trace_step_losses: false

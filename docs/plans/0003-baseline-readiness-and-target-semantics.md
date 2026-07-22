@@ -4,7 +4,7 @@
 
 - Owner: primary agent; one owning Terra per milestone; Luna only after each API freeze; Sol scientific review at each milestone boundary
 - Branch / base SHA: `master` / `937decf2415dc5827df7f06f46316688a1f51507`
-- Current milestone: M3 pending; M0–M2 approved
+- Current milestone: M4 pending; M0–M3 approved
 - Last updated: 2026-07-22
 
 ## Goal
@@ -74,7 +74,7 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
   - Acceptance: repository SHA/license and two teacher specifications are locked; missing weight fails clearly; constructor metadata can be audited offline without loading a checkpoint
   - Rollback point: reviewed M2 delta
   - Planned commit: `feat: add pinned RobustBench teacher registry`
-- [ ] M3 — Runtime efficiency and tracking cadence
+- [x] M3 — Runtime efficiency and tracking cadence
   - Files/modules: attack request/trace config, trainer teacher-logit reuse, diagnostics modes, tracker publication cadence, manifests/tests
   - Owner: one Terra; Luna only updates stable config/docs
   - Tests: exactly one teacher clean forward per batch and numerical parity; trace disabled means no PGD-step CPU scalar collection; diagnostics off constructs/runs nothing; panel/summary modes; sparse artifact cadence; checkpoint/resume unchanged
@@ -130,6 +130,16 @@ Make the repository ready for comparable CIFAR baseline pilots without starting 
 - 2026-07-22: M2 pinned RobustBench at `78fcc9e48a07a861268f295a777b975f25155964`, verified its clean origin/HEAD/root-license digest, and added exact metadata for Chen WRN-34-10 and Bartoldson DM WRN-94-16. Checkpoint acquisition is explicit, hash-registered, project-lock serialized, rollback-safe, and never invokes the upstream downloader. No teacher weight was acquired or instantiated.
 - 2026-07-22: M2 scientific review found and fixed four P1 classes: preloaded unpinned RobustBench module reuse, regression of metadata-bearing `model` checkpoint wrappers, generic `model_embedded` preprocessing drift, and racy/non-transactional checkpoint publication. P2 fixes moved RobustBench external/checkpoint validation before tracker initialization, made teacher fragments strict after environment expansion, and added teacher-specific impact coverage. Delta review approved M2 with no remaining P0/P1/P2.
 - 2026-07-22: M2 focused suites reported `79 passed`, config/verify slices `43 passed`, and final correction slices `37 passed`. The first changed gate hit three sandbox-only Gloo socket timeouts; the exact failed nodes passed on the host (`3 passed`). The next host gate exposed one stale schema-v1 TRADES test fixture, which was corrected without weakening schema. The final host `scripts/verify.py --changed --non-scientific` completed with `212 passed, 2 skipped`; an unchanged rerun reported all 16 commands as `cached pass`. The skips are optional upstream-oracle paths. No live W&B, checkpoint download, full training, or AutoAttack occurred.
+- 2026-07-22: M3 made PGD step-loss tracing opt-in, reuses one detached FP32 clean-teacher target across attack and outer RSLAD loss, and rejects `teacher_clean` KL attacks with teacher train mode. Diagnostics now have explicit `off|summary|panel` modes, batch CPU transfer, and ephemeral adversarial-teacher-logit reuse. Local best/last checkpoint cadence is unchanged while W&B model publication is periodic plus final.
+- 2026-07-22: M3 review found and fixed three P1 classes: terminal no-op resume could corrupt completed artifact lineage, teacher-clean reuse depended on a concrete attack config instead of the `AttackGenerator` contract, and an invalid teacher train-mode request was silently executed in eval mode. Delta review then found and fixed rank-local terminal classification and acceptance of impossible future epochs. Final scientific review approved M3 with no P0/P1/P2.
+- 2026-07-22: The host changed gate first exposed a W&B test-only race: `_tree_bytes` dereferenced an external `debug-core.log` symlink while W&B shutdown appended asynchronously. `$ard-bug-hunt` confirmed the rejected resume had not initialized W&B or mutated ARD-owned files; that resume-preflight test now uses disabled tracking while dedicated offline tests retain W&B coverage. A stale teacher-mode fixture was also corrected without weakening validation. Final `scripts/verify.py --changed --non-scientific` passed all 25 selected commands; an unchanged rerun reported all 25 as `cached pass`. Bounded `CUDA_VISIBLE_DEVICES=0,1 ... scripts/verify.py --smoke` passed all four smoke cases, including single-CUDA and two-rank CUDA DDP (`4 passed, 1 deselected`). No live W&B, checkpoint download, full training, or AutoAttack occurred.
+
+## Reusable execution notes
+
+- Keep the primary thread as the only plan/evidence ledger owner. One Terra owns the milestone implementation; one post-API-freeze Luna batch handles YAML/docs; one Sol review returns consolidated findings. Use delta-only follow-ups rather than restarting broad reviews.
+- Treat third-party asynchronous files and symlinks as outside byte-for-byte ARD output invariants. Resume tests should compare ARD-owned files or disable the unrelated backend; W&B lifecycle behavior stays in dedicated offline integration tests.
+- Default-sandbox Gloo failures are environmental until the exact node is rerun on the host. GPU/DDP milestone smoke uses both RTX 4090 devices under the test-gate GPU lock; it does not imply scientific T4/T5 validation.
+- A final cache demonstration is a fingerprint check, not a second test execution. Record the number of `cached pass` commands and do not repeat the same passing command after that.
 
 ## Completion report
 

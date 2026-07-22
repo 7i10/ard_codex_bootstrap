@@ -28,6 +28,11 @@ class AttackResult:
 
 
 class AttackGenerator(ABC):
+    @property
+    def requires_teacher_clean_target(self) -> bool:
+        """Whether this attack consumes a detached clean-teacher target."""
+        return False
+
     @abstractmethod
     def generate(self, request: AttackRequest) -> AttackResult:
         raise NotImplementedError

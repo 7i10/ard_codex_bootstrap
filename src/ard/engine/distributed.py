@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeVar
 
 import torch
 import torch.distributed as dist
+
+T = TypeVar("T")
 
 
 def distributed_ready() -> bool:
@@ -91,6 +93,25 @@ def run_rank_zero_phase(operation: Callable[[], None], *, phase: str) -> None:
         error_type = "UnknownError" if result is None else result.get("type", "UnknownError")
         message = "rank zero returned no outcome" if result is None else result.get("message", "")
         raise RuntimeError(f"rank-zero {phase} failed ({error_type}): {message}")
+
+
+def run_rank_zero_value(operation: Callable[[], T], *, phase: str) -> T:
+    """Run a read-only rank-zero operation and return one broadcast value."""
+    if not distributed_ready():
+        return operation()
+    outcome: list[dict[str, Any] | None] = [None]
+    if is_rank_zero():
+        try:
+            outcome[0] = {"ok": True, "value": operation()}
+        except Exception as exc:
+            outcome[0] = {"ok": False, "type": type(exc).__name__, "message": str(exc)}
+    dist.broadcast_object_list(outcome, src=0)
+    result = outcome[0]
+    if result is None or not result.get("ok", False):
+        error_type = "UnknownError" if result is None else result.get("type", "UnknownError")
+        message = "rank zero returned no outcome" if result is None else result.get("message", "")
+        raise RuntimeError(f"rank-zero {phase} failed ({error_type}): {message}")
+    return result["value"]  # type: ignore[no-any-return]
 
 
 def reduce_sums(values: torch.Tensor) -> torch.Tensor:

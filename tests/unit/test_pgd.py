@@ -15,13 +15,24 @@ def linear_model(classes: int = 3) -> nn.Module:
     return nn.Sequential(nn.Flatten(), nn.Linear(3 * 4 * 4, classes))
 
 
-def test_pgd_projection_clamp_mode_diagnostics_and_no_parameter_grads() -> None:
+def test_pgd_projection_clamp_mode_without_trace_collection_and_no_parameter_grads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     torch.manual_seed(3)
     model = linear_model()
     model.train()
     inputs = torch.rand(4, 3, 4, 4)
     labels = torch.tensor([0, 1, 2, 0])
     config = AttackConfig(epsilon="8/255", step_size="2/255", steps=3, random_start=True, student_mode="eval")
+    original_cpu = torch.Tensor.cpu
+    cpu_calls = 0
+
+    def count_cpu(self: torch.Tensor, *args: object, **kwargs: object) -> torch.Tensor:
+        nonlocal cpu_calls
+        cpu_calls += 1
+        return original_cpu(self, *args, **kwargs)
+
+    monkeypatch.setattr(torch.Tensor, "cpu", count_cpu)
     result = LinfPGD(config).generate(
         AttackRequest(inputs=inputs, labels=labels, student=model, generator=torch.Generator().manual_seed(9))
     )
@@ -30,8 +41,26 @@ def test_pgd_projection_clamp_mode_diagnostics_and_no_parameter_grads() -> None:
     assert result.adversarial.min() >= 0 and result.adversarial.max() <= 1
     assert (result.adversarial - inputs).abs().max() <= 8 / 255 + 1e-7
     assert result.max_abs_delta <= 8 / 255 + 1e-7
-    assert len(result.step_losses) == 3
+    assert result.step_losses == ()
+    # The final max-delta summary is one bounded scalar transfer.  Disabled
+    # tracing must not add one transfer for every PGD step.
+    assert cpu_calls == 1
     assert all(parameter.grad is None for parameter in model.parameters())
+
+
+def test_pgd_trace_collection_is_explicit_and_exact() -> None:
+    torch.manual_seed(3)
+    model = linear_model()
+    inputs = torch.rand(4, 3, 4, 4)
+    labels = torch.tensor([0, 1, 2, 0])
+    config = AttackConfig(
+        epsilon="8/255", step_size="2/255", steps=3, random_start=True, student_mode="eval", trace_step_losses=True
+    )
+    result = LinfPGD(config).generate(
+        AttackRequest(inputs=inputs, labels=labels, student=model, generator=torch.Generator().manual_seed(9))
+    )
+    assert len(result.step_losses) == config.steps
+    assert all(isinstance(loss, float) and torch.isfinite(torch.tensor(loss)) for loss in result.step_losses)
 
 
 def test_kl_pgd_and_frozen_teacher_input_gradient_contract() -> None:

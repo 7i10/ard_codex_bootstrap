@@ -104,6 +104,7 @@ def test_m3_scientific_paths_select_both_m3_regressions(changed_path: str) -> No
     m3_tests = {
         "tests/regression/test_m3_student_aware.py",
         "tests/regression/test_m3_distributed.py",
+        "tests/regression/test_m3_runtime_efficiency.py",
     }
     available = tuple(
         sorted(

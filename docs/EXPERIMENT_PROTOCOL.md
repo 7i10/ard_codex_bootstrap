@@ -30,6 +30,12 @@
 - 正式評価は別run
 - 論文候補の集計対象
 
+Tracking diagnostics are explicit: `off` emits no diagnostics/sample statistics, `summary` emits scalar metrics and
+Parquet statistics without image Tables, and `panel` emits fixed-ID media plus sample statistics. Production requires
+`panel`. Local best/last checkpoints remain on scientific checkpoint cadence; model artifact publication follows the
+configured interval (5 epochs in checked-in templates) and always publishes both at finalization. PGD step-loss traces
+default to off to avoid per-step device synchronization.
+
 ## 2. 初期baseline matrix
 
 | Dataset | Student | Methods | Teachers | Seeds |

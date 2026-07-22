@@ -479,7 +479,7 @@ def test_frozen_teacher_stays_eval_through_nested_batchnorm_attack_and_input_gra
             epsilon="1/255",
             step_size="1/255",
             steps=1,
-            teacher_mode="train",
+            teacher_mode="eval",
         )
     ).generate(AttackRequest(inputs=inputs, labels=labels, student=student, teacher=teacher))
     gradient = teacher_input_gradient(teacher, inputs, labels)

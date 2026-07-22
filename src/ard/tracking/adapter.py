@@ -292,13 +292,13 @@ class LocalTracker:
         self._wandb_run: Any | None = None
         self._wandb_module: Any | None = None
         self._prepared = False
+        self._terminal_resume = False
         self._finalization_id = uuid.uuid4().hex
         resolved_training_seeds = (
             config.seeds if training_seeds is None else SeedsConfig.model_validate(dict(training_seeds))
         )
         if training_seed is not None and training_seed != resolved_training_seeds.model_init:
             raise TrackingError("training_seed compatibility scalar must match training_seeds.model_init")
-        git = collect_git_state(root)
         prior: dict[str, Any] | None = None
         if self.manifest_path.is_file():
             try:
@@ -309,13 +309,36 @@ class LocalTracker:
                 raise TrackingError("resume manifest run ID or config hash does not match checkpoint lineage")
         self._is_resume = prior is not None
         self._prior_manifest = prior
-        self.manifest: dict[str, Any] = {
+        if prior is not None and prior.get("status") in {"completed", "sync_pending"}:
+            # A terminal no-op resume is validation-only.  Do not collect or
+            # rewrite mutable lineage, initialize W&B, or append an event.
+            git = collect_git_state(root)
+            current_lineage = {
+                "git": {key: value for key, value in git.items() if key != "diff"},
+                "external": _external_metadata(root),
+                "teacher": _teacher_metadata(config, root=root),
+            }
+            for key, current in current_lineage.items():
+                if prior.get(key) != current:
+                    raise TrackingError(f"resume manifest lineage drift: {key}")
+            prior_environment = self.bundle_dir / "environment.json"
+            if (
+                prior_environment.is_file()
+                and json.loads(prior_environment.read_text(encoding="utf-8")) != collect_environment()
+            ):
+                raise TrackingError("resume manifest lineage drift: environment")
+            self.manifest = prior
+            self._terminal_resume = True
+            return
+        git = collect_git_state(root)
+        self.manifest = {
             "schema_version": 1,
             "run_id": run_id,
             "status": "running",
             "created_at": datetime.now(UTC).isoformat(),
             "tier": config.tier,
             "tracking_mode": config.tracking.mode,
+            "diagnostics_mode": config.tracking.diagnostics_mode,
             "job_type": job_type,
             "config_hash": config_hash,
             "protocol_id": config.protocol.id,
@@ -352,6 +375,7 @@ class LocalTracker:
             for key in (
                 "tier",
                 "tracking_mode",
+                "diagnostics_mode",
                 "job_type",
                 "protocol_id",
                 "seed",
@@ -386,6 +410,8 @@ class LocalTracker:
 
     def attach_resolved_config(self, path: Path) -> None:
         """Copy the exact pre-training resolved config into the durable bundle."""
+        if self._terminal_resume:
+            return
         if not path.is_file():
             raise TrackingError(f"resolved config is missing: {path}")
         shutil.copy2(path, self.bundle_dir / "resolved_config.yaml")
@@ -591,24 +617,52 @@ class LocalTracker:
         if not isinstance(entries, list):
             raise TrackingError("no-op resume prior artifacts are invalid")
         aliases = {alias for entry in entries if isinstance(entry, dict) for alias in entry.get("aliases", [])}
-        if (
-            not {"best", "last"}.issubset(aliases)
-            or not any(isinstance(entry, dict) and entry.get("type") == "sample-stats" for entry in entries)
-            or not any(isinstance(entry, dict) and entry.get("type") == "run-bundle" for entry in entries)
-        ):
+        requires_sample_stats = self.config.tracking.diagnostics_mode != "off"
+        has_sample_stats = any(isinstance(entry, dict) and entry.get("type") == "sample-stats" for entry in entries)
+        has_bundle = any(isinstance(entry, dict) and entry.get("type") == "run-bundle" for entry in entries)
+        if not {"best", "last"}.issubset(aliases) or (requires_sample_stats and not has_sample_stats) or not has_bundle:
             raise TrackingError("no-op resume prior artifacts are incomplete")
-        for entry in entries:
+        latest_source_entry: dict[tuple[str, str], int] = {}
+        for index, entry in enumerate(entries):
+            if isinstance(entry, dict) and "sha256" in entry:
+                path = entry.get("path")
+                name = entry.get("name")
+                if isinstance(path, str) and isinstance(name, str):
+                    latest_source_entry[(path, name)] = index
+        for index, entry in enumerate(entries):
             if not isinstance(entry, dict):
                 raise TrackingError("no-op resume prior artifact is invalid")
             local_path = entry.get("local_path")
             if "sha256" in entry:
                 path = Path(entry["path"])
-                if not path.is_file() or sha256_file(path) != entry["sha256"]:
-                    raise TrackingError("no-op resume artifact hash drift")
                 if not isinstance(local_path, str):
                     raise TrackingError("no-op resume artifact local copy is missing")
                 local_file = self.bundle_dir / local_path / path.name
                 if not local_file.is_file() or sha256_file(local_file) != entry["sha256"]:
+                    raise TrackingError("no-op resume artifact local hash drift")
+                key = (str(path), str(entry.get("name")))
+                if latest_source_entry.get(key) == index and (
+                    not path.is_file() or sha256_file(path) != entry["sha256"]
+                ):
+                    raise TrackingError("no-op resume artifact hash drift")
+            elif "directory_digest" in entry and isinstance(local_path, str):
+                local_directory = self.bundle_dir / local_path
+                if not local_directory.is_dir():
+                    raise TrackingError("no-op resume artifact local copy is missing")
+                expected_files = entry.get("files")
+                if not isinstance(expected_files, list):
+                    raise TrackingError("no-op resume artifact local copy is invalid")
+                digest = hashlib.sha256()
+                actual_files = []
+                for candidate in sorted(local_directory.rglob("*")):
+                    relative = candidate.relative_to(local_directory)
+                    if not candidate.is_file() or relative.name == "manifest.json" or relative.parts[0] == "artifacts":
+                        continue
+                    name = relative.as_posix()
+                    file_hash = sha256_file(candidate)
+                    digest.update(name.encode() + b"\0" + file_hash.encode() + b"\n")
+                    actual_files.append({"path": name, "sha256": file_hash})
+                if actual_files != expected_files or digest.hexdigest() != entry["directory_digest"]:
                     raise TrackingError("no-op resume artifact local hash drift")
 
     # Short compatibility aliases for local callers created before the public
@@ -620,6 +674,8 @@ class LocalTracker:
         self.log_artifact(path, name=f"model-{self.run_id}-{alias}", artifact_type="model", aliases=(alias,))
 
     def prepare_finish(self, *, status: str = "completed") -> None:
+        if self._terminal_resume:
+            return
         if self._prepared and status == "completed":
             return
         if self.config.tracking.mode == "offline_sync" and status == "completed":

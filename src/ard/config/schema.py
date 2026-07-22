@@ -113,9 +113,7 @@ class NormalizationConfig(StrictModel):
         "cifar100_standard",
         "tiny_imagenet_standard",
         "custom",
-    ] = (
-        "fixture_unit"
-    )
+    ] = "fixture_unit"
     mean: tuple[float, float, float] | None = None
     std: tuple[float, float, float] | None = None
     provenance: str | None = None
@@ -183,6 +181,9 @@ class AttackConfig(StrictModel):
     temperature_squared: bool = True
     student_mode: Literal["train", "eval"] = "eval"
     teacher_mode: Literal["train", "eval"] = "eval"
+    # Trace collection is debugging-only and deliberately excluded from the
+    # complete 14-field scientific attack identity below.
+    trace_step_losses: bool = False
 
     def identity(self) -> dict[str, object]:
         """JSON-safe complete attack identity; never omit a scientific field."""
@@ -229,6 +230,8 @@ class AttackConfig(StrictModel):
             raise ValueError("kl_target is valid only for KL attacks")
         if self.loss == "kl" and self.kl_target is None:
             raise ValueError("KL attacks require an explicit kl_target")
+        if self.loss == "kl" and self.kl_target == "teacher_clean" and self.teacher_mode != "eval":
+            raise ValueError("teacher_clean KL attacks require teacher_mode=eval")
         return self
 
 
@@ -296,9 +299,7 @@ class TeacherConfig(StrictModel):
 
     @model_validator(mode="after")
     def validate_source(self) -> TeacherConfig:
-        if self.source in {"checkpoint", "robustbench"} and (
-            self.checkpoint is None or self.checkpoint_sha256 is None
-        ):
+        if self.source in {"checkpoint", "robustbench"} and (self.checkpoint is None or self.checkpoint_sha256 is None):
             raise ValueError(f"{self.source} teachers require checkpoint and checkpoint_sha256")
         if self.source == "robustbench" and self.registry_id is None:
             raise ValueError("robustbench teachers require registry_id")
@@ -461,8 +462,10 @@ class TrackingConfig(StrictModel):
     name: str | None = None
     group: str | None = None
     log_every_steps: int | None = None
+    diagnostics_mode: Literal["off", "summary", "panel"] = "panel"
     panel_size: int = Field(default=24, ge=0)
     panel_interval_epochs: int = Field(default=5, ge=1)
+    artifact_interval_epochs: int = Field(default=5, ge=1)
 
     @model_validator(mode="after")
     def validate_wandb_identity(self) -> TrackingConfig:
@@ -472,6 +475,8 @@ class TrackingConfig(StrictModel):
             raise ValueError("tracking.run_id must not be empty")
         if self.log_every_steps is not None:
             raise ValueError("bootstrap tracking is epoch-only; tracking.log_every_steps must be null")
+        if self.diagnostics_mode == "panel" and self.panel_size == 0:
+            raise ValueError("panel diagnostics require tracking.panel_size > 0")
         return self
 
 
@@ -549,6 +554,8 @@ class ExperimentConfig(StrictModel):
                 raise ValueError("production requires tracking.project and tracking.entity")
             if not self.tracking.group:
                 raise ValueError("production requires tracking.group")
+            if self.tracking.diagnostics_mode != "panel" or self.tracking.panel_size == 0:
+                raise ValueError("production requires panel diagnostics with tracking.panel_size > 0")
         if self.tier == "smoke" and self.tracking.mode not in {"disabled", "offline"}:
             raise ValueError("smoke permits only disabled or offline tracking")
         if self.tier in {"repro", "production"} and self.tracking.mode not in {"online", "offline_sync"}:
@@ -627,9 +634,7 @@ class ExperimentConfig(StrictModel):
                 errors.append(f"dataset.{field} must be {expected!r}")
         for field, expected in student.items():
             actual = (
-                self.student.normalization.profile
-                if field == "normalization_profile"
-                else getattr(self.student, field)
+                self.student.normalization.profile if field == "normalization_profile" else getattr(self.student, field)
             )
             if actual != expected:
                 errors.append(f"student.{field} must be {expected!r}")

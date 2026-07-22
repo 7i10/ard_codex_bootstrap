@@ -44,6 +44,10 @@ class LinfPGD(AttackGenerator):
             raise ValueError("LinfPGD supports only linf attacks in pixel [0,1]")
         self.config = config
 
+    @property
+    def requires_teacher_clean_target(self) -> bool:
+        return self.config.loss == "kl" and self.config.kl_target == "teacher_clean"
+
     def _target_logits(self, request: AttackRequest, clean: torch.Tensor) -> torch.Tensor | None:
         if self.config.loss == "ce":
             return None
@@ -83,7 +87,7 @@ class LinfPGD(AttackGenerator):
             delta = (clean + delta).clamp(0, 1) - clean
         initial_delta = delta.detach().clone()
         adversarial = (clean + delta).detach()
-        losses: list[float] = []
+        losses: list[float] | None = [] if self.config.trace_step_losses else None
         with _temporary_modes(
             request.student,
             request.teacher,
@@ -97,7 +101,8 @@ class LinfPGD(AttackGenerator):
                     logits = request.student(adversarial.float())
                     loss = self._loss(logits.float(), request.labels, target_logits)
                 gradient = torch.autograd.grad(loss, adversarial, only_inputs=True)[0]
-                losses.append(float(loss.detach().cpu()))
+                if losses is not None:
+                    losses.append(float(loss.detach().cpu()))
                 adversarial = adversarial.detach() + step_size * gradient.detach().sign()
                 delta = (adversarial - clean).clamp(-epsilon, epsilon)
                 adversarial = (clean + delta).clamp(0, 1).detach()
@@ -105,7 +110,7 @@ class LinfPGD(AttackGenerator):
         return AttackResult(
             adversarial=adversarial,
             initial_delta=initial_delta,
-            step_losses=tuple(losses),
+            step_losses=() if losses is None else tuple(losses),
             max_abs_delta=float(final_delta.detach().abs().amax().cpu()),
         )
 

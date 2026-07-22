@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from ard.analysis import fixed_panel_ids
 from ard.engine.distributed import gather_objects, get_rank
@@ -12,20 +12,23 @@ from ard.engine.distributed import gather_objects, get_rank
 @dataclass
 class TrainingDiagnostics:
     panel_ids: tuple[int, ...]
+    mode: Literal["summary", "panel"] = "panel"
     pending: list[dict[str, Any]] = field(default_factory=list)
     all_rows: dict[int, dict[str, Any]] = field(default_factory=dict)
     panel_rows: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
-    def for_ids(cls, ids: list[int], *, seed: int, size: int) -> TrainingDiagnostics:
-        return cls(fixed_panel_ids(ids, seed=seed, size=size))
+    def for_ids(
+        cls, ids: list[int], *, seed: int, size: int, mode: Literal["summary", "panel"] = "panel"
+    ) -> TrainingDiagnostics:
+        return cls(fixed_panel_ids(ids, seed=seed, size=size) if mode == "panel" else (), mode=mode)
 
     def record(self, **values: Any) -> None:
         if not bool(values.pop("valid")):
             return
         values["rank"] = get_rank()
         values["order"] = len(self.pending)
-        if int(values["sample_id"]) not in self.panel_ids:
+        if self.mode != "panel" or int(values["sample_id"]) not in self.panel_ids:
             for field in ("clean_image", "adversarial_image", "perturbation_visualization"):
                 values.pop(field, None)
         self.pending.append(values)
