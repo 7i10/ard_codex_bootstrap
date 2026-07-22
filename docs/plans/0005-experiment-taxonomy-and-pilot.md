@@ -83,3 +83,7 @@ Completion means the old runnable reproduction templates are gone, historical `r
 - The first P6 launch failed before tracker initialization because Ferret's allowlisted runtime symlinks appeared untracked.
   `.gitignore` now covers directory and symlink forms without weakening the production guard; focused remote-script and
   production-guard tests passed before retry.
+- P6 retry `chen-rslad-production-s0-0ca90ad` is running from fixed SHA
+  `0ca90ad3d48fe019151363b00c6da2160d64eb99` on GPUs 0/1 with W&B offline run ID
+  `ard-32a10cb8a2cab31a`. At the 2026-07-23 07:53 JST handoff it had completed epochs 0–24 with contiguous global
+  steps, finite metrics, expected teacher-forward/sample counts, and ten cadence-correct best/last artifact entries.

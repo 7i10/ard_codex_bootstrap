@@ -46,7 +46,8 @@ canonical 200-epoch configs (two teachers × four methods). The former reproduct
 removed; `repro` remains only as a legacy schema tier for old resolved bundles. Public SAAD paper/code records under
 `configs/protocols/` are audit-only and are not local reproduction claims.
 
-The Chen five-epoch pilot has been executed; 200-epoch training and full AutoAttack have not completed. Teacher audit
+The Chen five-epoch pilot has been executed; the first 200-epoch controlled RSLAD baseline is running and full
+AutoAttack has not been executed. Teacher audit
 PGD-20 and pilot PGD-20 are bounded screening measurements and must not be reported as AutoAttack or paper results.
 
 Use `ARD_PER_RANK_BATCH_SIZE=64` with `torchrun --nproc_per_node=2` for pilot and canonical production. Execution
@@ -72,6 +73,12 @@ The train run [`ard-cde030a72ddca4b9`](https://wandb.ai/shunsuke-n-waseda-univer
 and evaluation run [`eval-92f3750eb628e93d6060`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-92f3750eb628e93d6060)
 both have local manifests at `status=completed`, `sync_state=synced`, `sync_cursor=1` and durable
 `sync-complete.json` markers. Full AutoAttack was not run.
+
+The canonical Chen RSLAD seed-0 run `chen-rslad-production-s0-0ca90ad` started from fixed SHA
+`0ca90ad3d48fe019151363b00c6da2160d64eb99` on the same two-GPU execution profile. Its W&B offline-sync identity is
+`ard-32a10cb8a2cab31a`; it must remain a pending run until application completion and subsequent sync verification.
+At 2026-07-23 07:53 JST, epochs 0–24, global steps, finite metrics, and five best/last publication intervals were
+continuous. This in-progress state is not a completed reproduction result.
 
 ### RobustBench teacher acquisition
 
