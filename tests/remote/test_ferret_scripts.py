@@ -41,3 +41,11 @@ def test_nohup_setsid_launch_detaches_ssh_standard_streams() -> None:
     assert 'nohup setsid bash "$RUN/control/launch.sh"' in launch
     assert '</dev/null >"$RUN/control/supervisor.log" 2>&1 &' in launch
     assert "screen -" not in launch
+
+
+@pytest.mark.unit
+def test_prepare_links_only_named_shared_runtime_assets() -> None:
+    prepare = (SCRIPTS / "ferret-prepare").read_text()
+    assert "for name in .external teacher_cache" in prepare
+    assert 'ln -s "$REPO/$name" "$RUN/repo/$name"' in prepare
+    assert "shared_runtime_assets" in prepare

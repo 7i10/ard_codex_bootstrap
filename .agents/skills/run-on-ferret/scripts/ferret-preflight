@@ -11,6 +11,8 @@ gpu=run(['nvidia-smi','--query-gpu=index,name,uuid,memory.total,memory.used,util
 report={'host':socket.gethostname(),'user':os.environ.get('USER'),'gpu_count':len(gpu),'gpu_inventory':gpu,'nohup_available':bool(shutil.which('nohup')),'setsid_available':bool(shutil.which('setsid')),'screen_available':bool(shutil.which('screen')),'flock_available':bool(shutil.which('flock')),'git_available':bool(shutil.which('git')),'python':sys.executable,'repo_available':os.path.isdir(os.path.join(repo,'.git')),'repo_root':repo,'run_root':root}
 report['git_remote']=run(['git','-C',repo,'remote','get-url','origin']) if report['repo_available'] else None
 report['git_status']=run(['git','-C',repo,'status','--short','--branch']) if report['repo_available'] else None
+report['robustbench_checkout_available']=os.path.isdir(os.path.join(repo,'.external','robustbench'))
+report['teacher_cache_available']=os.path.isdir(os.path.join(repo,'teacher_cache','robustbench'))
 report['disk_free_bytes']=shutil.disk_usage(os.path.expanduser('~')).free
 report['screens']=run(['screen','-ls']) if report['screen_available'] else ''
 report['expected_git_remote']=os.environ['EXPECTED']; report['expected_gpu_count']=int(os.environ['MAXGPUS'])

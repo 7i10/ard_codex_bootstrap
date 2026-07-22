@@ -10,9 +10,17 @@ test -d "$REPO/.git"; test "$(git -C "$REPO" remote get-url origin)" = "$EXPECTE
 git -C "$REPO" fetch --prune origin; git -C "$REPO" cat-file -e "${SHA}^{commit}"
 mkdir "$RUN"; trap 'git -C "$REPO" worktree remove --force "$RUN/repo" >/dev/null 2>&1 || true; rmdir "$RUN" >/dev/null 2>&1 || true' ERR
 git -C "$REPO" worktree add --detach "$RUN/repo" "$SHA"; mkdir -p "$RUN"/{outputs,logs,control}
+shared=()
+for name in .external teacher_cache; do
+  if [ -e "$REPO/$name" ]; then
+    test ! -e "$RUN/repo/$name"
+    ln -s "$REPO/$name" "$RUN/repo/$name"
+    shared+=("$name")
+  fi
+done
 REPO="$REPO" RUN="$RUN" SHA="$SHA" RID="$RID" "$PYTHON" - <<'PY'
 import datetime,json,os,pathlib,subprocess
-p=pathlib.Path(os.environ['RUN'])/'manifest.json'; d={'schema_version':1,'run_id':os.environ['RID'],'host':'Ferret','requested_by_host':'Hamster','git_sha':os.environ['SHA'].lower(),'git_remote':subprocess.check_output(['git','-C',os.environ['REPO'],'remote','get-url','origin'],text=True).strip(),'prepared_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'prepared'}; p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
+repo=pathlib.Path(os.environ['REPO']); run=pathlib.Path(os.environ['RUN']); p=run/'manifest.json'; d={'schema_version':1,'run_id':os.environ['RID'],'host':'Ferret','requested_by_host':'Hamster','git_sha':os.environ['SHA'].lower(),'git_remote':subprocess.check_output(['git','-C',str(repo),'remote','get-url','origin'],text=True).strip(),'prepared_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'prepared','shared_runtime_assets':{name:str((repo/name).resolve()) for name in ('.external','teacher_cache') if (run/'repo'/name).is_symlink()}}; p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
 PY
 SH
 printf 'prepared %s at %s\n' "$run_id" "$sha"

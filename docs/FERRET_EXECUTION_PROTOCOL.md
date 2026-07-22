@@ -28,6 +28,8 @@ $FERRET_RUN_ROOT/<run-id>/
 
 Run IDs match `^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$`; `..` is rejected. A full 40-hex Git SHA is mandatory. Existing runs are never overwritten.
 
+The source clone owns one verified, Git-ignored `.external` checkout and `teacher_cache`. Prepare links only these two allowlisted runtime directories into a detached worktree and records their resolved paths in the manifest. This retains the fixed source SHA while avoiding checkpoint duplication; the runtime still validates external commit/license state and teacher SHA before model construction.
+
 ## Explicit skill workflow
 
 Invoke `$run-on-ferret` explicitly; implicit invocation is disabled. The skill maps each operation to the executable of the same name in `.agents/skills/run-on-ferret/scripts/`.
