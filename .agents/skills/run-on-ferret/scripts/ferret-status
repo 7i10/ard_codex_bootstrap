@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source "$(dirname "$0")/ferret-common"; [[ ${1:-} == --run-id && -n ${2:-} ]] || die 'usage: --run-id ID'; run=$(run_dir "$2")
-"${FERRET_SSH[@]}" "RUN=$(q "$run") python -" <<'PY'
+"${FERRET_SSH[@]}" "RUN=$(q "$run") $(q "$FERRET_PYTHON") -" <<'PY'
 import json,os,pathlib,subprocess
 r=pathlib.Path(os.environ['RUN']); d=json.loads((r/'manifest.json').read_text()); screens=subprocess.run(['screen','-ls'],text=True,capture_output=True).stdout; live='.'+d.get('screen_name','\0') in screens; ep=r/'control/exit_code'; code=int(ep.read_text()) if ep.exists() else None; cancel=d.get('status')=='cancel_requested'; status=('cancel_requested' if cancel else 'running') if live and code is None else ('cancelled' if cancel else 'completed') if code==0 else ('cancelled' if cancel else 'failed') if code is not None else ('prepared' if d.get('status')=='prepared' else 'orphaned'); out={'run_id':d['run_id'],'status':status,'screen_present':live,'exit_code':code,'manifest':d}; (r/'status.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n'); print(json.dumps(out,indent=2,sort_keys=True))
 PY

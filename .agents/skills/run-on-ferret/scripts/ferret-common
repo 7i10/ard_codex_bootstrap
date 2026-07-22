@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-: "${FERRET_HOST:=shunsukenaito@192.168.100.18}"
+: "${FERRET_HOST:=Ferret}"
+: "${FERRET_PYTHON:=/usr/bin/python3}"
 : "${FERRET_REPO_ROOT:=/home/shunsukenaito/workspace-local/ard_codex_bootstrap}"
 : "${FERRET_EXPECTED_REMOTE:=https://github.com/7i10/ard_codex_bootstrap.git}"
 : "${FERRET_RUN_ROOT:=/home/shunsukenaito/workspace-local/ard-runs/ard_codex_bootstrap}"
@@ -8,6 +9,7 @@ set -Eeuo pipefail
 : "${FERRET_MAX_GPUS:=3}"
 FERRET_SSH=(ssh -o BatchMode=yes -o ConnectTimeout=10 "$FERRET_HOST")
 [[ $FERRET_REPO_ROOT == /* && $FERRET_RUN_ROOT == /* && $FERRET_RUN_ROOT != / && $HAMSTER_RESULT_ROOT == /* && $HAMSTER_RESULT_ROOT != / ]] || { echo 'error: configured roots must be safe absolute paths' >&2; exit 2; }
+[[ $FERRET_PYTHON == /* && $FERRET_PYTHON != *[[:space:]]* ]] || { echo 'error: FERRET_PYTHON must be an absolute executable path' >&2; exit 2; }
 [[ $FERRET_MAX_GPUS =~ ^[1-9][0-9]*$ ]] || { echo 'error: FERRET_MAX_GPUS must be a positive integer' >&2; exit 2; }
 
 die() { printf 'error: %s\n' "$*" >&2; exit 2; }

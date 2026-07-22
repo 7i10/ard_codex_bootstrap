@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 source "$(dirname "$0")/ferret-common"
 repo=$(q "$FERRET_REPO_ROOT"); root=$(q "$FERRET_RUN_ROOT")
-"${FERRET_SSH[@]}" "REPO=$repo RUNROOT=$root EXPECTED=$(q "$FERRET_EXPECTED_REMOTE") MAXGPUS=$(q "$FERRET_MAX_GPUS") python -" <<'PY'
-import json, os, shutil, socket, subprocess
+"${FERRET_SSH[@]}" "REPO=$repo RUNROOT=$root EXPECTED=$(q "$FERRET_EXPECTED_REMOTE") MAXGPUS=$(q "$FERRET_MAX_GPUS") $(q "$FERRET_PYTHON") -" <<'PY'
+import json, os, shutil, socket, subprocess, sys
 def run(args):
     return subprocess.run(args, text=True, capture_output=True).stdout.strip()
 repo=os.environ['REPO']; root=os.environ['RUNROOT']
 gpu=run(['nvidia-smi','--query-gpu=index,name,uuid,memory.total,memory.used,utilization.gpu','--format=csv,noheader']).splitlines() if shutil.which('nvidia-smi') else []
-report={'host':socket.gethostname(),'user':os.environ.get('USER'),'gpu_count':len(gpu),'gpu_inventory':gpu,'screen_available':bool(shutil.which('screen')),'flock_available':bool(shutil.which('flock')),'git_available':bool(shutil.which('git')),'python':shutil.which('python'),'repo_available':os.path.isdir(os.path.join(repo,'.git')),'repo_root':repo,'run_root':root}
+report={'host':socket.gethostname(),'user':os.environ.get('USER'),'gpu_count':len(gpu),'gpu_inventory':gpu,'screen_available':bool(shutil.which('screen')),'flock_available':bool(shutil.which('flock')),'git_available':bool(shutil.which('git')),'python':sys.executable,'repo_available':os.path.isdir(os.path.join(repo,'.git')),'repo_root':repo,'run_root':root}
 report['git_remote']=run(['git','-C',repo,'remote','get-url','origin']) if report['repo_available'] else None
 report['git_status']=run(['git','-C',repo,'status','--short','--branch']) if report['repo_available'] else None
 report['disk_free_bytes']=shutil.disk_usage(os.path.expanduser('~')).free
