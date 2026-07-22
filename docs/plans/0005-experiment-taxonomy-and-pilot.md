@@ -3,9 +3,9 @@
 ## Status
 
 - Base: `f7ec48c`
-- Current milestone: P5 Ferret two-GPU pilot execution
+- Current milestone: P6 Chen RSLAD canonical baseline execution
 - Owners: Sol for decisions/review, Terra for core runtime, Luna for configs/docs after API freeze
-- Last updated: 2026-07-22
+- Last updated: 2026-07-23
 
 ## Goal and decisions
 
@@ -35,11 +35,15 @@ Separate scientific protocol, experiment lifecycle tier, and hardware execution 
 - [x] P4 — Pilot observability and handoff
   - Add global images/sec, rank-max peak VRAM, teacher-clean forward count, and execution-profile metrics only if not already derivable without hot-loop synchronization.
   - Provide one-GPU teacher-audit and two-GPU pilot/production commands. Do not execute five-epoch pilot, 200-epoch production, or full AutoAttack.
-- [ ] P5 — Ferret two-GPU Chen pilot
+- [x] P5 — Ferret two-GPU Chen pilot
   - Keep failed fixed-SHA runs as evidence; do not reuse their output directories or W&B identities.
   - Fix the confirmed DDP BatchNorm multi-forward version error without changing attack, objective, batch size, or validation behavior.
   - Require the focused two-rank Trainer regression, impact-selected gate, one consolidated scientific review, and a fresh pushed SHA.
   - Complete only after the fresh CUDA/NCCL run produces distinct best/last checkpoints and a valid offline-sync bundle.
+- [ ] P6 — Ferret canonical Chen RSLAD baseline
+  - Run the 200-epoch production config with the exact P5 two-GPU execution profile and seed 0.
+  - Keep every failed preflight run as evidence and retry only from a fresh pushed SHA and run ID.
+  - Evaluate best/last from saved checkpoints in a separate process; full AutoAttack remains deferred.
 
 ## Test selection
 
@@ -73,3 +77,9 @@ Completion means the old runnable reproduction templates are gone, historical `r
   were made fail-closed. The first fully prepared run reached the initial backward and exposed a confirmed DDP BatchNorm
   buffer version error. The scoped fix passed its two-rank Trainer regression (`1 passed`), affected runtime tests
   (`4 passed`), Ruff, mypy, and the changed-path gate; CUDA/NCCL re-execution remains the P5 completion gate.
+- P5 completed at fixed SHA `dcdca4903181fe556c2436a0555dc360a9684532`: two-GPU CUDA/NCCL training
+  finished five epochs, saved distinct best/last checkpoints, and separate PGD-20 evaluation covered both checkpoints on
+  10,000 test samples. Train and evaluation W&B runs both reached `completed/synced` with sync markers.
+- The first P6 launch failed before tracker initialization because Ferret's allowlisted runtime symlinks appeared untracked.
+  `.gitignore` now covers directory and symlink forms without weakening the production guard; focused remote-script and
+  production-guard tests passed before retry.

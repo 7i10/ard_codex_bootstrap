@@ -1,4 +1,4 @@
-.external/
+.external
 .cache/
 .mypy_cache/
 .ruff_cache/
@@ -13,4 +13,4 @@ dist/
 htmlcov/
 wandb/
 outputs/
-teacher_cache/
+teacher_cache

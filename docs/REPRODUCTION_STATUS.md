@@ -1,6 +1,6 @@
 # Reproduction status
 
-最終更新: 2026-07-22
+最終更新: 2026-07-23
 
 ## 現在の到達点
 
@@ -20,8 +20,8 @@ one epochのsynthetic fixtureで切り替える構成であり、engineをmethod
 
 Baseline-readinessのM0–M4は承認済みです。最終bounded T0–T3 gateは18 commandsで`209 passed, 2 skipped`、
 同一の最終fingerprintの再確認は18 commandsすべて`cached pass`でした。
-Ruff/mypy/import/CLI gateもpassしました。T4/T5、live W&B、real teacher checkpoint取得・ロード、
-teacher accuracy audit、CIFAR本訓練、real full AutoAttackはdeferredです。
+Ruff/mypy/import/CLI gateもpassしました。Real teacher取得・audit、Chen pilot、saved-checkpoint PGD evaluation、
+pilot W&B offline-syncは実行済みです。completed T5 production、multi-seed集計、real full AutoAttackはdeferredです。
 
 全8手法でattackはpixel-space `[0,1]`、`Linf`、`epsilon=8/255`、
 `step_size=2/255`、10 steps、random startです。checkpoint selection attackは同じbudgetのhard-label CEです。
@@ -46,13 +46,32 @@ canonical 200-epoch configs (two teachers × four methods). The former reproduct
 removed; `repro` remains only as a legacy schema tier for old resolved bundles. Public SAAD paper/code records under
 `configs/protocols/` are audit-only and are not local reproduction claims.
 
-No 5-epoch pilot, 200-epoch training, or full AutoAttack has been executed. Teacher audit PGD-20 is a bounded screening
-measurement and must not be reported as AutoAttack.
+The Chen five-epoch pilot has been executed; 200-epoch training and full AutoAttack have not completed. Teacher audit
+PGD-20 and pilot PGD-20 are bounded screening measurements and must not be reported as AutoAttack or paper results.
 
 Use `ARD_PER_RANK_BATCH_SIZE=64` with `torchrun --nproc_per_node=2` for pilot and canonical production. Execution
 identity includes world size, per-rank/global batch, and `local_per_rank` BatchNorm; a 1-GPU batch-128 run is a
 scientifically distinct profile. Evaluate saved checkpoints in a separate process and reuse the checkpoint's training
 execution identity.
+
+### Executed Chen two-GPU pilot
+
+Ferret run `chen-rslad-pilot-s0-dcdca49` used fixed Git SHA
+`dcdca4903181fe556c2436a0555dc360a9684532`, GPUs 0/1, world size 2, per-rank batch 64, global batch 128, and seed 0.
+All five epochs completed. Final validation was clean `0.5396` and PGD-20 CE `0.3162`; the peak allocated memory was
+`1,125,998,080` bytes per rank and observed training throughput was 332–364 images/s. These are five-epoch pilot
+measurements, not paper results.
+
+Best and last were separate checkpoint files with SHA-256
+`3be65af0299048d56314451cff17660383b82d55ab01c8ba2982dcfe25bf9ea3` and
+`0632e50eda8fd0d83e6b81e5fc57198f94582651c5460bf78e0c48448f135421`. A separate one-GPU process evaluated both on
+all 10,000 official CIFAR-10 test samples with the saved PGD-20 CE threat hash
+`7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`; both yielded clean `0.5366` and PGD `0.3168`.
+
+The train run [`ard-cde030a72ddca4b9`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/ard-cde030a72ddca4b9)
+and evaluation run [`eval-92f3750eb628e93d6060`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-92f3750eb628e93d6060)
+both have local manifests at `status=completed`, `sync_state=synced`, `sync_cursor=1` and durable
+`sync-complete.json` markers. Full AutoAttack was not run.
 
 ### RobustBench teacher acquisition
 
@@ -132,7 +151,7 @@ AutoAttack values and do not replace the reported references.
 Audit・pilot・productionを明確に分離します。`configs/audit/`には教師監査2件、`configs/pilot/`には5 epochの
 RSLAD動作確認2件、`configs/production/`には2教師×4 methodのcanonical 200 epoch設定8件があります。
 旧reproduction directoryのrunnable設定は削除済みで、`repro` tierは旧resolved bundleの互換性だけに残します。
-5 epoch pilot、200 epoch本訓練、full AutoAttackはいずれも未実行です。
+Chenの5 epoch pilotは実行済みです。200 epoch本訓練とfull AutoAttackは未完了です。
 
 全テンプレートは未解決値を暗黙defaultにしません。実行前に以下を環境へ設定します。
 
@@ -146,11 +165,12 @@ RSLAD動作確認2件、`configs/production/`には2教師×4 methodのcanonical
 | `ARD_PER_RANK_BATCH_SIZE` | per-rank batch size（single GPU=128、2 GPU=64） |
 | `ARD_NUM_WORKERS`, `ARD_DEVICE` | data-loader worker数とdevice |
 
-W&B remains offline/disabled for this acquisition-only state; no online or
-offline-sync experiment is claimed.
+Teacher acquisition and audits remain W&B-free. The Chen pilot train/evaluation
+offline-sync runs were uploaded and verified separately.
 
 Diagnostics policy is explicit: smoke/dev uses `diagnostics_mode: off`; pilot and production templates use fixed-ID
-`panel` diagnostics. No W&B online run, CIFAR training run, or real full AutoAttack has been executed in this bootstrap.
+`panel` diagnostics. The bounded Chen pilot and its saved-checkpoint PGD evaluation have been executed; real full
+AutoAttack remains unexecuted.
 
 Protocol ID, optimizer, scheduler, epoch count (200), validation fraction (0.1), global batch size (128),
 and attack identities are fixed in the checked-in YAML. Overrides of these scientific fields are rejected by the schema;
@@ -302,14 +322,15 @@ invocationで実行したという主張ではありません。22件のcached p
 ## 未実行・結果を主張できない範囲
 
 - T4 limited scientific verification
-- T5 production experiment
+- T5 production experimentの完走
 - 上記CIFAR-10 reproduction/production templateによる本訓練とmulti-seed集計
 - CIFAR-100/Tiny-ImageNet本訓練
 - real full AutoAttack（best/lastとも未実行）
 - dependency-completeなfull upstream SAAD reproduction/differential
-- live W&B online uploadと論文用artifact syncの運用確認
+- production/paper artifactのW&B同期（pilot train/evaluationのoffline-sync運用は確認済み）
 - repository全体のmonolithic full pytest suite
 
-従って、現時点ではfixture smoke以外のclean/robust accuracy、upstream parity、論文再現成功を主張しません。
+従って、上記pilot accuracyは実GPUでのengineering evidenceとしてのみ扱い、論文結果、full AutoAttack、upstream
+parity、または論文再現成功を主張しません。
 
 M0 schema v2 config migration is complete. Controlled configs now use the exact M1 MultiStepLR schedule (epoch-end milestones 100 and 150); identity is retained only for synthetic compatibility fixtures. Student/joint target softening is adversarial-branch-only and clean KD remains unchanged.
