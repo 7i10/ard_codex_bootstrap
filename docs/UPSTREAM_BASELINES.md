@@ -198,25 +198,51 @@ does not claim identical licensing for every upstream artifact.
 `bartoldson2024_adversarial_wrn94_16` (DM WRN-94-16, 365,915,610 parameters).
 Both specify CIFAR-10 `Linf` `8/255` in pixel space. Chen preprocessing is
 teacher-adapter-owned raw identity; Bartoldson preprocessing is model-embedded
-mean/std. No checkpoint is auto-downloaded. Before acquisition, the required
-environment variables are absent and fragment expansion fails closed.
+mean/std. The pinned RobustBench checkout has verified root MIT license evidence
+(`LICENSE`, SHA-256 `b001aaaa1b5dafecda30513aad5641cc6dd564a80e88c5f9760ed8ac44347245`);
+the Bartoldson architecture separately carries Apache-2.0 evidence. No source
+is vendored into this repository.
 
 Acquire deliberately:
 
 ```bash
-python scripts/bootstrap_external.py --repository robustbench
-python scripts/bootstrap_teacher.py \
+# Full two-teacher acquisition, registration, verification, and local-only
+# audit commands are maintained in REPRODUCTION_STATUS.md.
+PYTHONPATH=src python scripts/acquire_robustbench_teachers.py \
   --registry-id chen2021_ltd_wrn34_10 \
-  --source <EXISTING_LOCAL_CHECKPOINT> --update-lock
-export ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT="$PWD/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt"
-export ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256="<SHA_FROM_TEACHERS_LOCK>"
-python scripts/verify_teacher.py --registry-id chen2021_ltd_wrn34_10
+  --model-dir /home/shunsukenaito/workspace-local/datasets/ard/teachers/robustbench \
+  --device cuda:0 --allow-network
+PYTHONPATH=src python scripts/bootstrap_teacher.py \
+  --registry-id chen2021_ltd_wrn34_10 \
+  --source /home/shunsukenaito/workspace-local/datasets/ard/teachers/robustbench/cifar10/Linf/Chen2021LTD_WRN34_10.pt \
+  --install-locked
 ```
 
 The example uses Chen; Bartoldson uses the corresponding ID-specific variables
 listed in `REPRODUCTION_STATUS.md`. After exporting the selected fragment's
 registry cache path and exact SHA from `teachers.lock.yaml`, compose/copy that
 fragment into an experiment config. Arbitrary path or SHA overrides are rejected.
+The same `--install-locked` mode is required for both teachers on a fresh clone;
+it verifies source bytes without editing the committed lock. `--update-lock` is
+only for a maintainer establishing the first SHA of a `missing` entry. The
+acquisition CLI also checks verified lock SHA before publishing downloaded bytes.
 
-Because the license file is absent, `.external/saad` remains a local read-only
-oracle. No upstream source is vendored into production modules.
+Acquisition evidence (2026-07-22): Chen source
+`/home/shunsukenaito/workspace-local/datasets/ard/teachers/robustbench/cifar10/Linf/Chen2021LTD_WRN34_10.pt`
+is 184,803,174 bytes with SHA
+`fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983`; Bartoldson
+source at the same directory is 1,464,289,203 bytes with SHA
+`56bbad8ad748df86e67c24dba4f59a9e7d285e583251460b2ed154017a18cb0b`. The
+ignored runtime cache and `teachers.lock.yaml` match both source hashes. Fresh
+process GPU audits (`cuda:0` / `cuda:1`) passed exact FP32 logit parity, input
+gradient and freeze contracts, and one-step PGD. The user-supplied AA references
+(56.94% / 73.71%) were not reproduced. No W&B, CIFAR training, or full
+AutoAttack was run; optional Chen WRN-34-20 and Gowal WRN-28-10 acquisition is
+deferred.
+
+The pinned SAAD checkout remains a separate license boundary: no root
+`LICENSE`/`COPYING` file was found at commit
+`295121c5d2eed827b5b2d6aa42307de809bdfada`, so its license status is recorded as
+absent. `.external/saad` is retained only as a local read-only reproduction
+oracle; its source is not copied, modified, vendored, or redistributed in this
+repository.

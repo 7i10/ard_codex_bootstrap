@@ -44,23 +44,59 @@ Controlled configs freeze split seed `20260722`, 200 epochs, validation fraction
 
 Strict `TeacherConfig` fragments under `configs/teachers/` cover the exact IDs
 `chen2021_ltd_wrn34_10` and `bartoldson2024_adversarial_wrn94_16`, pinned to
-RobustBench commit `78fcc9e48a07a861268f295a777b975f25155964`. No weights have
-been acquired or loaded and no real-model smoke has run. Acquisition is never
-automatic: bootstrap the external checkout, provide a local file to
-`bootstrap_teacher.py --update-lock`, export the lock-matching ID-specific
-path/SHA variables, compose/copy the fragment into an experiment config, then
-verify. Missing environment variables fail closed. Preprocessing ownership and
-the CIFAR-10 `Linf` `8/255` threat are explicit in each fragment.
+RobustBench commit `78fcc9e48a07a861268f295a777b975f25155964`. Acquisition is
+never automatic: the pinned loader was invoked once with
+`scripts/acquire_robustbench_teachers.py --allow-network`; the committed lock
+now contains both verified checkpoint identities. On a fresh clone,
+`bootstrap_teacher.py --install-locked` materializes the ignored runtime cache
+without changing that lock. `--update-lock` is reserved for a maintainer
+establishing the first identity of a `missing` lock entry. Missing environment
+variables fail closed. Preprocessing ownership and the CIFAR-10 `Linf` `8/255`
+threat are explicit in each fragment. For a verified entry, acquisition checks
+the staged download against the locked SHA before publishing the external file.
 
 ```bash
-python scripts/bootstrap_external.py --repository robustbench
-python scripts/bootstrap_teacher.py \
+MODEL_DIR=/home/shunsukenaito/workspace-local/datasets/ard/teachers/robustbench
+PYTHONPATH=src python scripts/bootstrap_external.py --repository robustbench
+PYTHONPATH=src python scripts/acquire_robustbench_teachers.py \
+  --registry-id chen2021_ltd_wrn34_10 --model-dir "$MODEL_DIR" \
+  --device cuda:0 --allow-network
+PYTHONPATH=src python scripts/acquire_robustbench_teachers.py \
+  --registry-id bartoldson2024_adversarial_wrn94_16 --model-dir "$MODEL_DIR" \
+  --device cuda:1 --allow-network
+PYTHONPATH=src python scripts/bootstrap_teacher.py \
   --registry-id chen2021_ltd_wrn34_10 \
-  --source <EXISTING_LOCAL_CHECKPOINT> --update-lock
+  --source "$MODEL_DIR/cifar10/Linf/Chen2021LTD_WRN34_10.pt" --install-locked
+PYTHONPATH=src python scripts/bootstrap_teacher.py \
+  --registry-id bartoldson2024_adversarial_wrn94_16 \
+  --source "$MODEL_DIR/cifar10/Linf/Bartoldson2024Adversarial_WRN-94-16.pt" --install-locked
+PYTHONPATH=src python scripts/verify_teacher.py --registry-id chen2021_ltd_wrn34_10
+PYTHONPATH=src python scripts/verify_teacher.py --registry-id bartoldson2024_adversarial_wrn94_16
+PYTHONPATH=src python scripts/audit_robustbench_teacher.py \
+  --registry-id chen2021_ltd_wrn34_10 --model-dir "$MODEL_DIR" --device cuda:0
+PYTHONPATH=src python scripts/audit_robustbench_teacher.py \
+  --registry-id bartoldson2024_adversarial_wrn94_16 --model-dir "$MODEL_DIR" --device cuda:1
 export ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT="$PWD/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt"
 export ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256="<SHA_FROM_TEACHERS_LOCK>"
-python scripts/verify_teacher.py --registry-id chen2021_ltd_wrn34_10
 ```
+
+The two acquired sources and ignored runtime copies are SHA-locked as follows:
+
+| Teacher / role | Source bytes (SHA-256) | Parameters | Preprocessing |
+|---|---:|---:|---|
+| `Chen2021LTD_WRN34_10` (ERT) | `184803174`; `fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983` | 46,160,474 | adapter-owned raw identity |
+| `Bartoldson2024Adversarial_WRN-94-16` (IRT) | `1464289203`; `56bbad8ad748df86e67c24dba4f59a9e7d285e583251460b2ed154017a18cb0b` | 365,915,610 | model-embedded mean/std |
+
+Sources reside under
+`/home/shunsukenaito/workspace-local/datasets/ard/teachers/robustbench/cifar10/Linf/`;
+the matching project cache is `teacher_cache/robustbench/` and is Git-ignored.
+Fresh-process audits on physical GPUs (`cuda:0` Chen, `cuda:1` Bartoldson) passed
+exact pinned-loader/ARD FP32 logit parity (`max_abs_diff=0.0`), finite nonzero
+input gradients, frozen teacher parameters, and one-step production PGD with
+`Linf=0.007843166589736938` (epsilon `8/255`, step `2/255`). The reported
+teacher AutoAttack values (Chen `56.94%`, Bartoldson `73.71%`) are reference
+values only and were not locally reproduced. No CIFAR training, AutoAttack, or
+W&B run was performed. Chen WRN-34-20 and Gowal WRN-28-10 remain deferred.
 
 上記はChenの例です。Bartoldsonでは下表の対応する2変数をexportします。選んだfragmentを
 experimentの`teacher` mappingとしてcompose/copyした後にのみtrain configとして使用します。

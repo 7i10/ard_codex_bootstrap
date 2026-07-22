@@ -203,8 +203,9 @@ def test_robustbench_registry_is_exact_and_requires_no_model_construction() -> N
     assert bartoldson.expected_parameter_count == 365_915_610
     assert bartoldson.preprocessing.owner == "model_embedded"
     assert bartoldson.preprocessing.normalization().profile == "robustbench_cifar10_bartoldson_embedded"
-    assert chen.checkpoint_sha256 is bartoldson.checkpoint_sha256 is None
-    assert chen.checkpoint_status == bartoldson.checkpoint_status == "missing"
+    for spec in (chen, bartoldson):
+        assert spec.checkpoint_status in {"missing", "verified"}
+        assert (spec.checkpoint_status == "missing") == (spec.checkpoint_sha256 is None)
 
 
 def test_robustbench_embedded_preprocessing_is_not_double_applied() -> None:
@@ -273,8 +274,10 @@ def test_checkpoint_prefix_normalization_rejects_collisions_and_strict_load(tmp_
 
 
 def test_robustbench_missing_hash_fails_before_constructor(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    registry = replace(TeacherRegistry.load(Path(__file__).resolve().parents[2]), root=tmp_path)
-    spec = registry.spec("chen2021_ltd_wrn34_10")
+    base = replace(TeacherRegistry.load(Path(__file__).resolve().parents[2]), root=tmp_path)
+    original = base.spec("chen2021_ltd_wrn34_10")
+    spec = replace(original, checkpoint_status="missing", checkpoint_sha256=None)
+    registry = replace(base, specs={spec.registry_id: spec})
     checkpoint = tmp_path / spec.checkpoint_path
     checkpoint.parent.mkdir(parents=True)
     checkpoint.write_bytes(b"not a checkpoint")

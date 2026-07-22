@@ -83,6 +83,18 @@ def test_configs_changes_select_repository_config_resolution_test() -> None:
     assert "tests/unit/test_config.py" in selected.tests
 
 
+def test_teacher_acquisition_scripts_select_focused_acquisition_and_registry_tests() -> None:
+    available = (
+        "tests/unit/test_external_management.py",
+        "tests/unit/test_models_teacher.py",
+        "tests/unit/test_teacher_acquisition.py",
+        "tests/unit/test_tracking.py",
+    )
+    selected = select(("scripts/acquire_robustbench_teachers.py",), available)
+    assert selected.tests == available
+    assert selected.tiers == ("T0", "T1", "T2")
+
+
 def test_m1_attack_impact_selects_numerical_integration_and_gpu_smoke() -> None:
     tests = (
         "tests/unit/test_pgd.py",

@@ -26,9 +26,20 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1", "T2"),
     ),
     (
-        ("teachers.lock.yaml", "scripts/bootstrap_teacher.py", "scripts/verify_teacher.py"),
-        ("tests/unit/test_models_teacher.py", "tests/unit/test_external_management.py", "tests/unit/test_tracking.py"),
-        ("T0", "T1"),
+        (
+            "teachers.lock.yaml",
+            "scripts/bootstrap_teacher.py",
+            "scripts/verify_teacher.py",
+            "scripts/acquire_robustbench_teachers.py",
+            "scripts/audit_robustbench_teacher.py",
+        ),
+        (
+            "tests/unit/test_models_teacher.py",
+            "tests/unit/test_external_management.py",
+            "tests/unit/test_tracking.py",
+            "tests/unit/test_teacher_acquisition.py",
+        ),
+        ("T0", "T1", "T2"),
     ),
     (
         ("configs/teachers/",),

@@ -87,6 +87,17 @@ def write_multi_lock(root: Path, sources: dict[str, tuple[Path, str]]) -> None:
     )
 
 
+def write_missing_teacher_lock(root: Path) -> None:
+    """Keep bootstrap fixtures independent from the root registry transition."""
+    raw = yaml.safe_load((ROOT / "teachers.lock.yaml").read_text(encoding="utf-8"))
+    assert isinstance(raw, dict) and isinstance(raw.get("teachers"), dict)
+    for entry in raw["teachers"].values():
+        assert isinstance(entry, dict)
+        entry["checkpoint_status"] = "missing"
+        entry["checkpoint_sha256"] = None
+    (root / "teachers.lock.yaml").write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+
+
 def test_repository_lock_pins_the_approved_saad_revision() -> None:
     _, locked = load_lock(ROOT / "external.lock.yaml")
     assert locked.url == "https://github.com/HongsinLee/saad.git"
@@ -274,9 +285,7 @@ def test_unknown_or_unsafe_named_repository_fails_closed(tmp_path: Path) -> None
 def test_teacher_bootstrap_is_explicit_atomic_and_never_overwrites(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    import shutil
-
-    shutil.copyfile(ROOT / "teachers.lock.yaml", tmp_path / "teachers.lock.yaml")
+    write_missing_teacher_lock(tmp_path)
     real_load = TeacherRegistry.load
     registry = replace(real_load(ROOT), root=tmp_path)
     source = tmp_path / "supplied.pt"
@@ -302,9 +311,7 @@ def test_teacher_bootstrap_is_explicit_atomic_and_never_overwrites(
 def test_teacher_bootstrap_requires_lock_update_and_rolls_back_lock_publish_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    import shutil
-
-    shutil.copyfile(ROOT / "teachers.lock.yaml", tmp_path / "teachers.lock.yaml")
+    write_missing_teacher_lock(tmp_path)
     registry = replace(TeacherRegistry.load(ROOT), root=tmp_path)
     source = tmp_path / "supplied.pt"
     source.write_bytes(b"local-only teacher bytes")
@@ -332,6 +339,66 @@ def test_teacher_bootstrap_requires_lock_update_and_rolls_back_lock_publish_fail
     assert retried == destination
 
 
+def test_teacher_bootstrap_install_locked_restores_verified_bytes_without_changing_lock(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    write_missing_teacher_lock(tmp_path)
+    source = tmp_path / "supplied.pt"
+    source.write_bytes(b"verified local teacher bytes")
+    real_load = TeacherRegistry.load
+    missing_registry = replace(real_load(ROOT), root=tmp_path)
+    monkeypatch.setattr("bootstrap_teacher.TeacherRegistry.load", lambda _root: missing_registry)
+    monkeypatch.setattr(TeacherRegistry, "validate_external", lambda _self: None)
+    destination = bootstrap_teacher(root=tmp_path, registry_id="chen2021_ltd_wrn34_10", source=source, update_lock=True)
+    destination.unlink()
+    lock_before = (tmp_path / "teachers.lock.yaml").read_bytes()
+    verified_registry = real_load(tmp_path)
+    monkeypatch.setattr("bootstrap_teacher.TeacherRegistry.load", lambda _root: verified_registry)
+
+    restored = bootstrap_teacher(
+        root=tmp_path,
+        registry_id="chen2021_ltd_wrn34_10",
+        source=source,
+        install_locked=True,
+    )
+
+    assert restored == destination
+    assert restored.read_bytes() == source.read_bytes()
+    assert (tmp_path / "teachers.lock.yaml").read_bytes() == lock_before
+
+
+def test_teacher_bootstrap_install_locked_rejects_mismatch_without_destination_or_lock_change(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    write_missing_teacher_lock(tmp_path)
+    initial = tmp_path / "initial.pt"
+    initial.write_bytes(b"initial verified teacher bytes")
+    real_load = TeacherRegistry.load
+    missing_registry = replace(real_load(ROOT), root=tmp_path)
+    monkeypatch.setattr("bootstrap_teacher.TeacherRegistry.load", lambda _root: missing_registry)
+    monkeypatch.setattr(TeacherRegistry, "validate_external", lambda _self: None)
+    destination = bootstrap_teacher(
+        root=tmp_path, registry_id="chen2021_ltd_wrn34_10", source=initial, update_lock=True
+    )
+    destination.unlink()
+    lock_before = (tmp_path / "teachers.lock.yaml").read_bytes()
+    verified_registry = real_load(tmp_path)
+    monkeypatch.setattr("bootstrap_teacher.TeacherRegistry.load", lambda _root: verified_registry)
+    mismatched = tmp_path / "mismatched.pt"
+    mismatched.write_bytes(b"not the verified teacher bytes")
+
+    with pytest.raises(TeacherRegistryError, match="hash mismatch: expected .* got"):
+        bootstrap_teacher(
+            root=tmp_path,
+            registry_id="chen2021_ltd_wrn34_10",
+            source=mismatched,
+            install_locked=True,
+        )
+
+    assert not destination.exists()
+    assert (tmp_path / "teachers.lock.yaml").read_bytes() == lock_before
+
+
 def test_teacher_bootstrap_lock_is_project_global_across_registry_ids(tmp_path: Path) -> None:
     expected = tmp_path / ".cache" / "teacher-bootstrap.lock"
     assert bootstrap_teacher_script._project_lock_path(tmp_path) == expected
@@ -343,9 +410,7 @@ def test_teacher_bootstrap_lock_is_project_global_across_registry_ids(tmp_path: 
 def test_teacher_bootstrap_preserves_destination_race_and_allows_retry_after_removal(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    import shutil
-
-    shutil.copyfile(ROOT / "teachers.lock.yaml", tmp_path / "teachers.lock.yaml")
+    write_missing_teacher_lock(tmp_path)
     registry = replace(TeacherRegistry.load(ROOT), root=tmp_path)
     source = tmp_path / "supplied.pt"
     source.write_bytes(b"local-only teacher bytes")

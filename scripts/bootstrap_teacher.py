@@ -20,15 +20,27 @@ sys.path.insert(0, str(ROOT / "src"))
 from ard.models.teacher_registry import TeacherRegistry, TeacherRegistryError, sha256_file  # noqa: E402
 
 
-def bootstrap(*, root: Path, registry_id: str, source: Path, update_lock: bool = False) -> Path:
+def bootstrap(
+    *,
+    root: Path,
+    registry_id: str,
+    source: Path,
+    update_lock: bool = False,
+    install_locked: bool = False,
+) -> Path:
     """Atomically copy a user-provided file into its pinned local cache location.
 
-    ``--update-lock`` is required: a cache file without a project-owned SHA is
-    intentionally unusable. Existing files are never overwritten; a failed
-    lock publication removes only the inode created by this invocation.
+    Exactly one explicit mode is required. ``--update-lock`` establishes the
+    first project-owned SHA from a missing lock entry. ``--install-locked``
+    restores bytes already identified by a verified lock and never rewrites
+    the lock. Existing files are never overwritten; a failed lock publication
+    removes only the inode created by this invocation.
     """
-    if not update_lock:
-        raise TeacherRegistryError("teacher bootstrap requires --update-lock; unregistered cache files are unusable")
+    if update_lock == install_locked:
+        raise TeacherRegistryError(
+            "teacher bootstrap requires --update-lock or --install-locked, but not both; "
+            "unregistered cache files are unusable"
+        )
     with _project_lock(root):
         registry = TeacherRegistry.load(root)
         spec = registry.spec(registry_id)
@@ -50,10 +62,16 @@ def bootstrap(*, root: Path, registry_id: str, source: Path, update_lock: bool =
                 output_handle.flush()
                 os.fsync(output_handle.fileno())
             observed = sha256_file(temporary)
-            lock_temporary = _prepare_checkpoint_lock(lock_path, registry_id, observed)
+            if install_locked:
+                expected = _require_verified_checkpoint_lock(lock_path, registry_id, spec.checkpoint_sha256)
+                if observed != expected:
+                    raise TeacherRegistryError(f"teacher checkpoint hash mismatch: expected {expected}, got {observed}")
+            else:
+                lock_temporary = _prepare_checkpoint_lock(lock_path, registry_id, observed)
             _publish_checkpoint(temporary, destination)
             published = True
-            _publish_lock(lock_temporary, lock_path)
+            if lock_temporary is not None:
+                _publish_lock(lock_temporary, lock_path)
         except Exception:
             if published:
                 _remove_our_published_checkpoint(destination, temporary)
@@ -101,6 +119,34 @@ def _prepare_checkpoint_lock(lock_path: Path, registry_id: str, digest: str) -> 
     return temporary
 
 
+def _require_verified_checkpoint_lock(lock_path: Path, registry_id: str, registry_sha: str | None) -> str:
+    """Return the immutable SHA for an install-only restore.
+
+    The raw lock is checked in addition to the loaded registry so a stale or
+    inconsistent registry object cannot turn a restore into an identity
+    change. This function is deliberately read-only: install mode must retain
+    ``teachers.lock.yaml`` byte-for-byte.
+    """
+    raw = yaml.safe_load(lock_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or not isinstance(raw.get("teachers"), dict):
+        raise TeacherRegistryError("teacher lock cannot be used for install because its schema is invalid")
+    entry = raw["teachers"].get(registry_id)
+    if not isinstance(entry, dict):
+        raise TeacherRegistryError(f"teacher lock has no registry ID {registry_id!r}")
+    digest = entry.get("checkpoint_sha256")
+    if (
+        entry.get("checkpoint_status") != "verified"
+        or not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+        or registry_sha != digest
+    ):
+        raise TeacherRegistryError(
+            "teacher lock is not a consistent verified checkpoint identity; --install-locked is unavailable"
+        )
+    return digest
+
+
 def _publish_checkpoint(temporary: Path, destination: Path) -> None:
     try:
         os.link(temporary, destination)
@@ -136,10 +182,16 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--registry-id", required=True)
     parser.add_argument("--source", type=Path, required=True, help="existing local checkpoint file; no URL is accepted")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
         "--update-lock",
         action="store_true",
-        help="required: atomically publish the file and its SHA to teachers.lock.yaml",
+        help="establish a missing checkpoint SHA and atomically publish the file",
+    )
+    mode.add_argument(
+        "--install-locked",
+        action="store_true",
+        help="restore bytes matching an existing verified SHA without changing teachers.lock.yaml",
     )
     args = parser.parse_args()
     try:
@@ -148,6 +200,7 @@ def main() -> int:
             registry_id=args.registry_id,
             source=args.source.resolve(),
             update_lock=args.update_lock,
+            install_locked=args.install_locked,
         )
         print(destination)
     except TeacherRegistryError as exc:
