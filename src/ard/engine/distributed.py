@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any, TypeVar, cast
 
 import torch
 import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel
 
 T = TypeVar("T")
 
@@ -66,8 +68,40 @@ def teardown() -> None:
         dist.destroy_process_group()
 
 
+def wrap_ddp(model: torch.nn.Module, device: torch.device) -> DistributedDataParallel:
+    """Wrap a model for single-server DDP with PyTorch's normal buffer sync."""
+    device_ids = [device.index] if device.type == "cuda" else None
+    return DistributedDataParallel(model, device_ids=device_ids)
+
+
+@contextmanager
+def suspend_ddp_buffer_broadcasts(model: torch.nn.Module) -> Iterator[None]:
+    """Suppress buffer mutation during an additional pre-backward forward.
+
+    RSLAD-family objectives retain the adversarial forward graph while doing a
+    clean student forward. DDP's pre-forward BatchNorm buffer broadcast would
+    mutate a tensor saved by the retained graph. Preserve the ordinary first
+    forward and next-step synchronization while making only the additional
+    forward exception-safe.
+    """
+    if not isinstance(model, DistributedDataParallel):
+        yield
+        return
+    broadcast_buffers = model.broadcast_buffers
+    require_forward_param_sync = model.require_forward_param_sync
+    model.broadcast_buffers = False
+    try:
+        yield
+    finally:
+        model.broadcast_buffers = broadcast_buffers
+        # A no-grad DDP forward sets this false in its post-forward hook.
+        # Restore it so the next ordinary forward performs its expected
+        # parameter/buffer synchronization.
+        model.require_forward_param_sync = require_forward_param_sync
+
+
 def unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
-    return model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
+    return model.module if isinstance(model, DistributedDataParallel) else model
 
 
 def run_rank_zero_phase(operation: Callable[[], None], *, phase: str) -> None:

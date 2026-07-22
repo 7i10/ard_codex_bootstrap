@@ -29,7 +29,15 @@ from ard.targets import TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 
 from .checkpoint import TrainingState, load_checkpoint, save_checkpoint
-from .distributed import gather_objects, get_rank, get_world_size, reduce_max, reduce_min, reduce_sums
+from .distributed import (
+    gather_objects,
+    get_rank,
+    get_world_size,
+    reduce_max,
+    reduce_min,
+    reduce_sums,
+    suspend_ddp_buffer_broadcasts,
+)
 
 
 @contextmanager
@@ -312,7 +320,8 @@ class Trainer:
             student_signals = self._student_aware_signals(batch=batch, logits=logits, valid_mask=valid_mask)
             clean_student_logits = None
             if requires_clean_student:
-                clean_student_logits = self.model(batch.images)
+                with suspend_ddp_buffer_broadcasts(self.model):
+                    clean_student_logits = self.model(batch.images)
             objective_inputs: dict[str, torch.Tensor] = {"student_logits": logits, "labels": batch.labels}
             if requires_teacher_clean:
                 assert teacher_clean_logits is not None
@@ -342,7 +351,7 @@ class Trainer:
             if weights is not None:
                 terms = terms.apply_policy(weights)
             if self.diagnostics is not None:
-                with _evaluation_mode(self.model), torch.no_grad():
+                with suspend_ddp_buffer_broadcasts(self.model), _evaluation_mode(self.model), torch.no_grad():
                     diagnostic_clean = self.model(batch.images).detach()
                 teacher_prediction = teacher_entropy = None
                 if self.teacher is not None:

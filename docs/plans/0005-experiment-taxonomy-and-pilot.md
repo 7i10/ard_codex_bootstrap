@@ -3,7 +3,7 @@
 ## Status
 
 - Base: `f7ec48c`
-- Current milestone: P3 config/documentation migration and P4 observability
+- Current milestone: P5 Ferret two-GPU pilot execution
 - Owners: Sol for decisions/review, Terra for core runtime, Luna for configs/docs after API freeze
 - Last updated: 2026-07-22
 
@@ -35,6 +35,11 @@ Separate scientific protocol, experiment lifecycle tier, and hardware execution 
 - [x] P4 — Pilot observability and handoff
   - Add global images/sec, rank-max peak VRAM, teacher-clean forward count, and execution-profile metrics only if not already derivable without hot-loop synchronization.
   - Provide one-GPU teacher-audit and two-GPU pilot/production commands. Do not execute five-epoch pilot, 200-epoch production, or full AutoAttack.
+- [ ] P5 — Ferret two-GPU Chen pilot
+  - Keep failed fixed-SHA runs as evidence; do not reuse their output directories or W&B identities.
+  - Fix the confirmed DDP BatchNorm multi-forward version error without changing attack, objective, batch size, or validation behavior.
+  - Require the focused two-rank Trainer regression, impact-selected gate, one consolidated scientific review, and a fresh pushed SHA.
+  - Complete only after the fresh CUDA/NCCL run produces distinct best/last checkpoints and a valid offline-sync bundle.
 
 ## Test selection
 
@@ -64,3 +69,7 @@ Completion means the old runnable reproduction templates are gone, historical `r
 - CIFAR-10 acquisition: the official torchvision archive matched MD5 `c58f30108f718f92721af3b95e74349a`; torchvision verified 50,000 train and 10,000 test examples under `/home/shunsukenaito/workspace-local/datasets/ard/torchvision`.
 - Post-commit operation: both 1000-sample CIFAR-10 teacher audits completed in parallel on GPUs 0/1 at clean HEAD `56610ea`; results are recorded in `docs/REPRODUCTION_STATUS.md`.
 - Not run: five-epoch pilot, 200-epoch production, or full AutoAttack.
+- P5 first execution evidence: three fresh runs stopped before producing a checkpoint while runtime assets and strict lineage
+  were made fail-closed. The first fully prepared run reached the initial backward and exposed a confirmed DDP BatchNorm
+  buffer version error. The scoped fix passed its two-rank Trainer regression (`1 passed`), affected runtime tests
+  (`4 passed`), Ruff, mypy, and the changed-path gate; CUDA/NCCL re-execution remains the P5 completion gate.

@@ -11,7 +11,6 @@ from typing import cast
 
 import torch
 from torch import nn
-from torch.nn.parallel import DistributedDataParallel
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 
@@ -35,6 +34,7 @@ from ard.engine.distributed import (
     run_rank_zero_phase,
     run_rank_zero_value,
     teardown,
+    wrap_ddp,
 )
 from ard.models import build_student, build_teacher
 from ard.objectives import DistillationObjective, PGDATObjective, RSLADObjective, TRADESObjective
@@ -305,7 +305,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         student: nn.Module = build_student(config.student, tier=config.tier).to(device)
         if initialized_distributed:
-            student = DistributedDataParallel(student, device_ids=[device.index] if device.type == "cuda" else None)
+            student = wrap_ddp(student, device)
         teacher = None if config.teacher is None else build_teacher(config.teacher, tier=config.tier)
         optimizer = SGD(
             student.parameters(),
