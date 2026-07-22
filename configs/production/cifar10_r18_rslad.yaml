@@ -1,0 +1,28 @@
+tier: production
+seed: ${ARD_SEED}
+dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: train, download: false, num_classes: 10}
+student: {architecture: resnet18_cifar, num_classes: 10, normalization: {profile: cifar10_standard}}
+teacher: {source: checkpoint, architecture: resnet18_cifar, num_classes: 10,
+          normalization: {profile: cifar10_standard}, checkpoint: "${ARD_TEACHER_CHECKPOINT}",
+          checkpoint_sha256: "${ARD_TEACHER_CHECKPOINT_SHA256}"}
+method:
+  name: rslad
+  temperature: 1.0
+  temperature_squared: true
+  attack: {loss: kl, kl_target: teacher_clean, temperature: 1.0, temperature_squared: true,
+           epsilon: 8/255, step_size: 2/255, steps: 10, random_start: true}
+training: {epochs: "${ARD_TRAIN_EPOCHS}", batch_size: "${ARD_BATCH_SIZE}", learning_rate: "${ARD_LEARNING_RATE}",
+           momentum: "${ARD_MOMENTUM}", weight_decay: "${ARD_WEIGHT_DECAY}", num_workers: "${ARD_NUM_WORKERS}",
+           device: "${ARD_DEVICE}", deterministic: true, validation_fraction: "${ARD_VALIDATION_FRACTION}"}
+tracking: {mode: offline_sync, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: "${WANDB_GROUP}",
+           name: "cifar10-r18-rslad-s${ARD_SEED}", panel_size: 24, panel_interval_epochs: 5}
+evaluation:
+  checkpoints: both
+  seed: 0
+  dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: test, download: false, num_classes: 10}
+  attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 10, random_start: true}
+  autoattack: false
+  autoattack_batch_size: 128
+  write_sample_stats: true
+  panel_size: 24
+output_dir: ${ARD_OUTPUT_ROOT}/cifar10-r18-rslad-production-s${ARD_SEED}

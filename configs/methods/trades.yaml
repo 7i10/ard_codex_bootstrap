@@ -1,0 +1,13 @@
+name: trades
+temperature: 1.0
+temperature_squared: true
+trades_beta: 6.0
+attack:
+  loss: kl
+  kl_target: student_clean
+  temperature: 1.0
+  temperature_squared: true
+  epsilon: 8/255
+  step_size: 2/255
+  steps: 10
+  random_start: true

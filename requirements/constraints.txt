@@ -1,0 +1,12 @@
+# Reproducible bootstrap/test environment.  Install project extras with this
+# file as a pip constraint; CUDA wheels must come from the matching PyTorch index.
+setuptools==78.1.0
+pydantic==2.13.4
+PyYAML==6.0.3
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
+pytest==9.1.1
+ruff==0.15.22
+mypy==2.3.0
+wandb==0.28.0
+pyarrow==25.0.0

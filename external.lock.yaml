@@ -1,0 +1,9 @@
+version: 1
+repositories:
+  saad:
+    url: https://github.com/HongsinLee/saad.git
+    commit: 295121c5d2eed827b5b2d6aa42307de809bdfada
+    fetched_at: '2026-07-21T22:40:30.404478+00:00'
+    license_file: null
+    license_status: absent
+    license_evidence: null

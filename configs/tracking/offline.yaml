@@ -1,0 +1,5 @@
+tracking:
+  mode: offline
+  project: student-aware-ard
+  log_every_steps: null
+  panel_size: 24

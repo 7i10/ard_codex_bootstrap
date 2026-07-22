@@ -1,0 +1,8 @@
+evaluation:
+  checkpoints: both
+  seed: 0
+  # This is opt-in because pyarrow is an optional tracking dependency.  A
+  # successful request always writes genuine Parquet, never a disguised CSV.
+  write_sample_stats: true
+  panel_size: 24
+  autoattack: false

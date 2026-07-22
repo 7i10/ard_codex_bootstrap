@@ -1,0 +1,7 @@
+name: pgd_at
+attack:
+  loss: ce
+  epsilon: 8/255
+  step_size: 2/255
+  steps: 10
+  random_start: true

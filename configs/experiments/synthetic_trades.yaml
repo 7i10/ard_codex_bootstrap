@@ -1,0 +1,13 @@
+tier: smoke
+seed: 0
+dataset: {name: synthetic_cifar, num_samples: 16, num_classes: 10, image_size: 32, seed: 0}
+student: {architecture: fixture_cnn, num_classes: 10}
+method:
+  name: trades
+  temperature: 1.0
+  temperature_squared: true
+  trades_beta: 6.0
+  attack: {loss: kl, kl_target: student_clean, temperature: 1.0, temperature_squared: true, epsilon: 8/255, step_size: 2/255, steps: 10, random_start: true}
+training: {epochs: 1, batch_size: 4, learning_rate: 0.01, device: cpu}
+evaluation: {seed: 0}
+output_dir: outputs/smoke-trades
