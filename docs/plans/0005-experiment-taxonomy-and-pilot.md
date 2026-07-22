@@ -62,4 +62,5 @@ Completion means the old runnable reproduction templates are gone, historical `r
 - Final lint/import/CLI gate: Ruff format/check passed, mypy passed for 60 source files, import tests passed 2/2, and train/evaluate/audit CLI help resolved.
 - Test-gate overhead fix: `--dry-run` no longer collects markers or fingerprints, and exact cached passes skip repeat marker collection. The focused verify-gate suite passed 31/31.
 - CIFAR-10 acquisition: the official torchvision archive matched MD5 `c58f30108f718f92721af3b95e74349a`; torchvision verified 50,000 train and 10,000 test examples under `/home/shunsukenaito/workspace-local/datasets/ard/torchvision`.
-- Not run: real CIFAR-10 teacher accuracy audit, five-epoch pilot, 200-epoch production, or full AutoAttack.
+- Post-commit operation: both 1000-sample CIFAR-10 teacher audits completed in parallel on GPUs 0/1 at clean HEAD `56610ea`; results are recorded in `docs/REPRODUCTION_STATUS.md`.
+- Not run: five-epoch pilot, 200-epoch production, or full AutoAttack.

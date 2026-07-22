@@ -112,6 +112,23 @@ teacher AutoAttack values (Chen `56.94%`, Bartoldson `73.71%`) are reference
 values only and were not locally reproduced. No CIFAR training, AutoAttack, or
 W&B run was performed. Chen WRN-34-20 and Gowal WRN-28-10 remain deferred.
 
+### Bounded teacher accuracy audit (2026-07-23)
+
+Clean HEAD `56610ea40d6333c5a98d40f23aa24fd4cc9b11bb`で、official CIFAR-10 testからseed 0で
+stratified選択した同一1000 sampleを監査しました。attackはpixel `[0,1]`、Linf `8/255`、step `2/255`、
+PGD-20 hard-label CE、random startです。sample-ID digestは両教師とも
+`37671f8e336f31778e8f4f2343fc1904ebc981dff6d69b8652ff89e3479fe0ef`、attack digestは
+`7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`でした。
+
+| Teacher | GPU / batch | Clean | PGD-20 | Peak allocated | Result SHA-256 |
+|---|---:|---:|---:|---:|---|
+| Chen2021LTD_WRN34_10 | visible `0` / 128 | 859/1000 (85.9%) | 630/1000 (63.0%) | 3,214,566,912 B | `716921d89f120d4b238e16438c999595038c045bd3c7be6633a526a21e2fe908` |
+| Bartoldson2024Adversarial_WRN-94-16 | visible `1` / 16 | 945/1000 (94.5%) | 771/1000 (77.1%) | 4,357,223,424 B | `39f09e68af426f683d35d2430dca2d25a9b26f311ce7f5b21247da9daf30c716` |
+
+Artifacts are under `/home/shunsukenaito/workspace-local/datasets/ard/audits/56610ea/`. Both jobs ran in parallel;
+other GPU processes were present, so this run is not a throughput benchmark. These PGD values are not RobustBench
+AutoAttack values and do not replace the reported references.
+
 Audit・pilot・productionを明確に分離します。`configs/audit/`には教師監査2件、`configs/pilot/`には5 epochの
 RSLAD動作確認2件、`configs/production/`には2教師×4 methodのcanonical 200 epoch設定8件があります。
 旧reproduction directoryのrunnable設定は削除済みで、`repro` tierは旧resolved bundleの互換性だけに残します。
