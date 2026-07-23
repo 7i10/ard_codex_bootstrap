@@ -153,6 +153,10 @@ for closed findings or wait synchronously on long experiments.
   `pytest -q tests/unit/test_campaign.py tests/unit/test_campaign_management.py tests/unit/test_evaluation.py
   tests/unit/test_config.py tests/unit/test_pilot_observability.py` passed 78 tests. Consolidated scientific delta
   review reported no remaining P0/P1.
+- 2026-07-23: First real pilot attempt at `23968e7` exposed an orchestration namespace collision before training:
+  phase control pre-created the guarded job output. All three attempts exited nonzero without scientific metrics.
+  Control records moved under campaign state, a focused regression was added, and all three pilots are required again
+  from the corrective SHA. See `docs/debugging/0009-campaign-control-output-collision.md`.
 
 ## Completion report
 

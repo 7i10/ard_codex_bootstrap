@@ -493,7 +493,10 @@ class CampaignWorker:
         except WorkerError as exc:
             self.state.transition_job(job.id, JobState.BLOCKED, failure="unsafe phase argv", launch_error=str(exc))
             return False
-        phase_dir = self.output_root / job.output / "campaign-control" / phase
+        # Control records must not pre-create the scientific output directory:
+        # train owns that directory and rejects an already-existing output.
+        # Keep launch/adoption records under durable campaign state instead.
+        phase_dir = (self.state.root / "phases" / job.id / phase).resolve()
         exit_record = phase_dir / "exit.json"
         launch_record = phase_dir / "launch.json"
         lease_handshake = phase_dir / "lease-handshake.json"

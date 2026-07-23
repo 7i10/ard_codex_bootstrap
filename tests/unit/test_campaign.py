@@ -277,6 +277,41 @@ def test_exit_zero_without_terminal_artifacts_blocks_before_pgd(tmp_path: Path) 
 
 @pytest.mark.unit
 @pytest.mark.t1
+def test_train_launch_control_files_do_not_precreate_scientific_output(tmp_path: Path) -> None:
+    spec = CampaignSpec.model_validate(_raw_campaign(autoattack=False))
+    state = CampaignStateStore(tmp_path / "state")
+    scientific_output = tmp_path / "outputs" / "job-1"
+
+    def fake_launcher(argv: tuple[str, ...], **kwargs: object) -> dict[str, object]:
+        del argv
+        exit_record = Path(kwargs["exit_record"])  # type: ignore[index,arg-type]
+        assert exit_record.parent == state.root / "phases" / "job-1" / "train"
+        assert not scientific_output.exists()
+        return {
+            "wrapper": {"pid": 999999, "start_time_ticks": 1, "cwd": str(tmp_path), "argv_digest": "not-live"},
+            "phase_argv_digest": "digest",
+            "exit_record": str(exit_record),
+            "launch_record": str(kwargs["launch_record"]),
+        }
+
+    worker = CampaignWorker(
+        spec,
+        state,
+        host="hamster",
+        repository=tmp_path,
+        output_root=tmp_path,
+        inventory_provider=lambda: (_snapshot(),),
+        launcher=fake_launcher,
+        phase_success_validator=lambda _job, _phase, _output: None,
+        gpu_lock_root=tmp_path / "locks",
+    )
+    worker.arm()
+    assert worker.run_once()["job-1"] == "training"
+    assert not scientific_output.exists()
+
+
+@pytest.mark.unit
+@pytest.mark.t1
 def test_phase_tokens_and_evaluation_terminal_contract_match_real_cli_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -309,9 +344,7 @@ def test_phase_tokens_and_evaluation_terminal_contract_match_real_cli_outputs(
     )
     selection_attack = SimpleNamespace(identity_sha256=lambda: "threat-hash", epsilon_value=8 / 255)
     training_config = SimpleNamespace(method=SimpleNamespace(selection_attack=selection_attack))
-    evaluation_config = SimpleNamespace(
-        evaluation=SimpleNamespace(autoattack=False, seed=0, autoattack_batch_size=128)
-    )
+    evaluation_config = SimpleNamespace(evaluation=SimpleNamespace(autoattack=False, seed=0, autoattack_batch_size=128))
 
     def fake_load_config(path: Path) -> object:
         return evaluation_config if path.name == "resolved_evaluation_config.yaml" else training_config
