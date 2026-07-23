@@ -15,6 +15,7 @@ import math
 import os
 import sys
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,14 @@ REQUIRED_PILOTS = (
     RequiredPilot("pilot-f-bart-rslad-s0", "ferret", "bartoldson2024_adversarial_wrn94_16", "rslad"),
 )
 PROFILE_ID = "ws1_prb128_gb128_localbn_v1"
+EXPECTED_JOINT_TARGET_POLICY: dict[str, object] = {
+    "id": "teacher_target_uniform_mix",
+    "version": 1,
+    "risk_transform": "identity",
+    "mixing": "uniform",
+    "apply_to": "adversarial_student_kd",
+    "rho_max": 0.5,
+}
 
 
 def _sha256(path: Path) -> str:
@@ -110,7 +119,14 @@ def _load_metrics(path: Path) -> tuple[list[dict[str, Any]], float]:
     return rows, math.ceil(peak_bytes / 1024**2)
 
 
-def _validate_joint_signal(path: Path) -> None:
+def _validate_joint_target_policy(policy: Mapping[str, object] | None) -> None:
+    if policy is None or dict(policy) != EXPECTED_JOINT_TARGET_POLICY:
+        raise PilotAcceptanceError("joint pilot must use the canonical teacher_target_uniform_mix@1 target policy")
+
+
+def _validate_joint_signal(path: Path, *, warmup_epochs: int) -> None:
+    if warmup_epochs < 1:
+        raise PilotAcceptanceError("joint pilot must declare at least one warmup epoch")
     try:
         table = pq.read_table(path, columns=["epoch", "joint_risk", "kd_weight"])
     except Exception as exc:
@@ -118,15 +134,24 @@ def _validate_joint_signal(path: Path) -> None:
     epochs = table.column("epoch").to_pylist()
     risks = table.column("joint_risk").to_pylist()
     weights = table.column("kd_weight").to_pylist()
-    post_warmup = [
-        (float(risk), float(weight))
-        for epoch, risk, weight in zip(epochs, risks, weights, strict=True)
-        if int(epoch) >= 1 and _finite(risk) and _finite(weight)
-    ]
+    post_warmup: list[tuple[float, float]] = []
+    for epoch, risk, weight in zip(epochs, risks, weights, strict=True):
+        if not _finite(epoch):
+            raise PilotAcceptanceError("joint pilot contains a non-finite epoch")
+        if int(epoch) < warmup_epochs:
+            continue
+        if not _finite(risk) or not _finite(weight):
+            raise PilotAcceptanceError("joint pilot contains non-finite post-warmup signal values")
+        post_warmup.append((float(risk), float(weight)))
     if not post_warmup:
         raise PilotAcceptanceError("joint pilot contains no finite post-warmup signal rows")
-    if not any(0.0 < risk <= 1.0 and 0.0 <= weight < 1.0 for risk, weight in post_warmup):
-        raise PilotAcceptanceError("joint pilot policy never became active after warmup")
+    post_warmup_risks = [risk for risk, _ in post_warmup]
+    if any(risk < 0.0 or risk > 1.0 for risk in post_warmup_risks):
+        raise PilotAcceptanceError("joint pilot post-warmup risk is outside [0, 1]")
+    if max(post_warmup_risks) <= 0.0 or min(post_warmup_risks) == max(post_warmup_risks):
+        raise PilotAcceptanceError("joint pilot risk never became positive and nonconstant after warmup")
+    if any(weight != 1.0 for _, weight in post_warmup):
+        raise PilotAcceptanceError("teacher_target_uniform_mix requires uniform post-warmup KD weight 1.0")
 
 
 def _job_for(spec_path: Path, *, sha: str, required: RequiredPilot) -> JobSpec:
@@ -213,7 +238,12 @@ def _accept_one(
         "execution_profile_match": True,
     }
     if required.method == "rslad_joint":
-        _validate_joint_signal(output / "sample-stats-train.parquet")
+        target_policy = config.method.target_policy
+        _validate_joint_target_policy(None if target_policy is None else target_policy.model_dump(mode="json"))
+        _validate_joint_signal(
+            output / "sample-stats-train.parquet",
+            warmup_epochs=config.method.student_policy_warmup_epochs,
+        )
         checks["joint_post_warmup_signal_active"] = True
     return {
         "job_id": job.id,

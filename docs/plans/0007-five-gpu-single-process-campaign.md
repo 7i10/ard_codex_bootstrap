@@ -101,7 +101,7 @@ optional lower-priority AutoAttack, and terminal lineage validation without dupl
   - Reviewer: one consolidated scientific review; repeat only for unresolved P0/P1 or a changed scientific delta.
   - Acceptance: no P0/P1, clean pushed full SHA, no unchanged full-suite reruns.
   - Commit: corrective delta only if required.
-- [ ] C5 — Real pilots and acceptance
+- [x] C5 — Real pilots and acceptance
   - Runs: Hamster Chen RSLAD 1 epoch, Hamster Chen Joint 3 epochs, Ferret Bartoldson RSLAD 1 epoch.
   - Acceptance: finite train/eval metrics; best/last; full 10k clean/PGD-20; process adoption; no duplicate launch;
     W&B/local terminal lineage; measured memory gate; Joint active after warmup.
@@ -161,6 +161,10 @@ for closed findings or wait synchronously on long experiments.
   Bartoldson failed at W&B initialization because its complete canonical group exceeded the 128-character service
   limit. Long groups now use a readable prefix plus a digest of the full identity; all three pilots remain required
   from the next SHA. See `docs/debugging/0010-wandb-group-length-gate.md`.
+- 2026-07-23: All three pilots at `2d54b82` completed online W&B and official best/last 10,000-example PGD-20.
+  Hash-bound acceptance passed after correcting a gate-only stale assumption: schema-v2 Joint keeps KD weight 1 while
+  softening targets with positive post-warmup risk. Peak reserved VRAM was 2058 MiB (Chen RSLAD), 2070 MiB (Chen
+  Joint), and 3688 MiB (Bartoldson RSLAD). See `docs/debugging/0011-joint-pilot-acceptance-semantics.md`.
 
 ## Completion report
 
