@@ -275,6 +275,20 @@ def validate_training_execution(value: Mapping[str, object]) -> dict[str, int | 
     return {**integers, "batchnorm_mode": batchnorm_mode}
 
 
+_WANDB_GROUP_MAX_BYTES = 128
+_CANONICAL_GROUP_DIGEST_HEX_LENGTH = 64
+
+
+def _bounded_wandb_group(canonical_identity: str) -> str:
+    """Retain a readable W&B group identity within the service length limit."""
+    if len(canonical_identity.encode("utf-8")) <= _WANDB_GROUP_MAX_BYTES:
+        return canonical_identity
+    digest = hashlib.sha256(canonical_identity.encode("utf-8")).hexdigest()[:_CANONICAL_GROUP_DIGEST_HEX_LENGTH]
+    suffix = f"-sha256-{digest}"
+    prefix = canonical_identity.encode("utf-8")[: _WANDB_GROUP_MAX_BYTES - len(suffix)].decode("utf-8", errors="ignore")
+    return prefix + suffix
+
+
 def canonical_run_group(config: ExperimentConfig, *, training_execution: Mapping[str, object]) -> str | None:
     """Append teacher, protocol, and execution identity to the comparison base."""
     teacher_registry_id = None if config.teacher is None else config.teacher.registry_id
@@ -294,7 +308,7 @@ def canonical_run_group(config: ExperimentConfig, *, training_execution: Mapping
         f"-gb{execution['global_batch_size']}"
     )
     teacher_token = "" if teacher_registry_id is None else f"-{teacher_registry_id}"
-    return f"{base}-{config.protocol.id}{teacher_token}-{execution_token}"
+    return _bounded_wandb_group(f"{base}-{config.protocol.id}{teacher_token}-{execution_token}")
 
 
 def _rng_preserving_rank_zero_phase(operation: Any, *, phase: str) -> None:

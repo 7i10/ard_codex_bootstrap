@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import random
@@ -256,6 +257,67 @@ def test_canonical_group_keeps_teacher_comparison_axis_and_separates_execution_p
     changed_seed = chen.model_copy(update={"seeds": chen.seeds.model_copy(update={"model_init": 123})})
     assert canonical_run_group(changed_method, training_execution=execution_ws1) == ws1
     assert canonical_run_group(changed_seed, training_execution=execution_ws1) == ws1
+
+
+def test_canonical_group_compacts_long_pilot_identity_with_complete_identity_digest(tmp_path: Path) -> None:
+    execution_ws1 = {
+        "world_size": 1,
+        "per_rank_batch_size": 128,
+        "global_batch_size": 128,
+        "effective_global_batch_size": 128,
+        "batchnorm_mode": "local_per_rank",
+    }
+    bartoldson = _with_registered_teacher(
+        production_config(tmp_path / "output", tmp_path / "data"), "bartoldson2024_adversarial_wrn94_16"
+    )
+    # Exact identity rejected by W&B during the first Bartoldson pilot.
+    protocol_id = "controlled_cifar10_r18_pilot_1ep_v1"
+    group_base = "bartoldson-cifar10-r18-ws1-pilot"
+    pilot = bartoldson.model_copy(
+        update={
+            "tier": "pilot",
+            "protocol": bartoldson.protocol.model_copy(update={"id": protocol_id}),
+            "tracking": bartoldson.tracking.model_copy(update={"group": group_base}),
+        }
+    )
+    canonical_identity = f"{group_base}-{protocol_id}-bartoldson2024_adversarial_wrn94_16-localbn-ws1-prb128-gb128"
+    assert len(canonical_identity.encode("utf-8")) == 129
+    digest = hashlib.sha256(canonical_identity.encode("utf-8")).hexdigest()
+
+    compact = canonical_run_group(pilot, training_execution=execution_ws1)
+    assert compact is not None
+    assert len(compact) <= 128
+    assert len(compact.encode("utf-8")) <= 128
+    assert compact == canonical_run_group(pilot, training_execution=execution_ws1)
+    assert compact == canonical_identity[: 128 - len(f"-sha256-{digest}")] + f"-sha256-{digest}"
+
+    teacher_changed = _with_registered_teacher(pilot, "chen2021_ltd_wrn34_10")
+    protocol_changed = pilot.model_copy(
+        update={"protocol": pilot.protocol.model_copy(update={"id": protocol_id + "_changed"})}
+    )
+    assert canonical_run_group(teacher_changed, training_execution=execution_ws1) != compact
+    assert canonical_run_group(protocol_changed, training_execution=execution_ws1) != compact
+    assert (
+        canonical_run_group(
+            pilot,
+            training_execution={**execution_ws1, "world_size": 2, "per_rank_batch_size": 64},
+        )
+        != compact
+    )
+    assert (
+        canonical_run_group(
+            pilot.model_copy(update={"method": pilot.method.model_copy(update={"id": "rslad_entropy"})}),
+            training_execution=execution_ws1,
+        )
+        == compact
+    )
+    assert (
+        canonical_run_group(
+            pilot.model_copy(update={"seeds": pilot.seeds.model_copy(update={"model_init": 123})}),
+            training_execution=execution_ws1,
+        )
+        == compact
+    )
 
 
 @pytest.mark.parametrize(

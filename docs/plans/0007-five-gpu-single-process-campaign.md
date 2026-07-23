@@ -157,6 +157,10 @@ for closed findings or wait synchronously on long experiments.
   phase control pre-created the guarded job output. All three attempts exited nonzero without scientific metrics.
   Control records moved under campaign state, a focused regression was added, and all three pilots are required again
   from the corrective SHA. See `docs/debugging/0009-campaign-control-output-collision.md`.
+- 2026-07-23: At corrective SHA `712b878`, both Chen pilots initialized online W&B and entered training. Ferret
+  Bartoldson failed at W&B initialization because its complete canonical group exceeded the 128-character service
+  limit. Long groups now use a readable prefix plus a digest of the full identity; all three pilots remain required
+  from the next SHA. See `docs/debugging/0010-wandb-group-length-gate.md`.
 
 ## Completion report
 
