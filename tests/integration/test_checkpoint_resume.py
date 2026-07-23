@@ -142,6 +142,7 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
         "train_seconds",
         "train_images_per_second",
         "train_cuda_peak_allocated_bytes",
+        "train_cuda_peak_reserved_bytes",
         "train_teacher_clean_forward_calls",
         "val_clean_accuracy",
         "val_pgd_accuracy",
@@ -149,6 +150,7 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
     assert history[0]["train_valid_examples"] == float(len(cast(Sized, loader.dataset)))
     assert history[0]["train_teacher_clean_forward_calls"] == 0.0
     assert history[0]["train_cuda_peak_allocated_bytes"] == 0.0
+    assert history[0]["train_cuda_peak_reserved_bytes"] == 0.0
     assert callback_metrics == history
     assert payload["selection_metadata"]["metric"] == "val_pgd_accuracy"
     assert payload["selection_metadata"]["tie_break"] == "earliest_epoch"
@@ -428,6 +430,7 @@ def test_padded_rows_are_excluded_from_training_loss_and_accuracy(tmp_path: Path
     assert metrics["valid_examples"] == 2.0
     assert metrics["teacher_clean_forward_calls"] == 0.0
     assert metrics["cuda_peak_allocated_bytes"] == 0.0
+    assert metrics["cuda_peak_reserved_bytes"] == 0.0
     assert metrics["seconds"] > 0.0
     assert metrics["images_per_second"] == pytest.approx(2.0 / metrics["seconds"])
 

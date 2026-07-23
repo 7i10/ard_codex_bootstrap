@@ -12,6 +12,7 @@
 - [Experiment taxonomy](EXPERIMENT_PROTOCOL.md): audit, pilot, and canonical production separation
 - [Codex workflow](CODEX_WORKFLOW.md): Sol/Terra/Lunaの役割分担
 - [Ferret execution protocol](FERRET_EXECUTION_PROTOCOL.md): fixed-SHA remote GPU runs from Hamster
+- [Five-GPU campaign protocol](FIVE_GPU_CAMPAIGN_PROTOCOL.md): independent single-GPU queues on Hamster/Ferret
 
 ## CLI entry points
 

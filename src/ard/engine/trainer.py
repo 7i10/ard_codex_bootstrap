@@ -55,6 +55,7 @@ def _reduce_epoch_observability(
     *,
     local_seconds: float,
     local_cuda_peak_allocated_bytes: int,
+    local_cuda_peak_reserved_bytes: int,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     """Apply the epoch SUM/MAX contract and derive globally valid throughput."""
     if local_totals.shape != (5,):
@@ -62,7 +63,7 @@ def _reduce_epoch_observability(
     global_totals = reduce_sums(local_totals)
     rank_max = reduce_max(
         torch.tensor(
-            [local_seconds, float(local_cuda_peak_allocated_bytes)],
+            [local_seconds, float(local_cuda_peak_allocated_bytes), float(local_cuda_peak_reserved_bytes)],
             dtype=torch.float64,
             device=local_totals.device,
         )
@@ -74,6 +75,7 @@ def _reduce_epoch_observability(
         "seconds": seconds,
         "images_per_second": valid_examples / seconds if seconds > 0 else 0.0,
         "cuda_peak_allocated_bytes": float(rank_max[1].item()),
+        "cuda_peak_reserved_bytes": float(rank_max[2].item()),
         "teacher_clean_forward_calls": float(global_totals[4].item()),
     }
 
@@ -460,12 +462,15 @@ class Trainer:
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
             peak_allocated_bytes = torch.cuda.max_memory_allocated(self.device)
+            peak_reserved_bytes = torch.cuda.max_memory_reserved(self.device)
         else:
             peak_allocated_bytes = 0
+            peak_reserved_bytes = 0
         totals, observability = _reduce_epoch_observability(
             totals,
             local_seconds=time.perf_counter() - started_at,
             local_cuda_peak_allocated_bytes=peak_allocated_bytes,
+            local_cuda_peak_reserved_bytes=peak_reserved_bytes,
         )
         count = max(observability["valid_examples"], 1.0)
         return {
@@ -570,6 +575,7 @@ class Trainer:
                 "train_seconds": train_metrics.get("seconds", 0.0),
                 "train_images_per_second": train_metrics.get("images_per_second", 0.0),
                 "train_cuda_peak_allocated_bytes": train_metrics.get("cuda_peak_allocated_bytes", 0.0),
+                "train_cuda_peak_reserved_bytes": train_metrics.get("cuda_peak_reserved_bytes", 0.0),
                 "train_teacher_clean_forward_calls": train_metrics.get("teacher_clean_forward_calls", 0.0),
                 "val_clean_accuracy": validation_metrics["clean_accuracy"],
                 "val_pgd_accuracy": validation_metrics["pgd_accuracy"],

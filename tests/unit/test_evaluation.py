@@ -265,6 +265,7 @@ def test_autoattack_adapter_maps_linf_and_restores_eval_mode(tmp_path: Path) -> 
     )
     assert (
         received["norm"] == "Linf"
+        and result["attack_version"] == "standard"
         and result["version"] == "injected"
         and result["batch_size"] == 128
         and instances[0].seed == 4

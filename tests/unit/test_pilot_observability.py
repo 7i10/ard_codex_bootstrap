@@ -94,6 +94,7 @@ def test_cpu_epoch_observability_counts_only_actual_valid_work(tmp_path: Path, m
     assert metrics["seconds"] == 2.0
     assert metrics["images_per_second"] == 1.5
     assert metrics["cuda_peak_allocated_bytes"] == 0.0
+    assert metrics["cuda_peak_reserved_bytes"] == 0.0
 
 
 def test_two_rank_observability_reduction_contract(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -104,13 +105,14 @@ def test_two_rank_observability_reduction_contract(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(
         trainer_module,
         "reduce_max",
-        lambda values: torch.maximum(values, torch.tensor([4.0, 80.0], dtype=torch.float64)),
+        lambda values: torch.maximum(values, torch.tensor([4.0, 80.0, 150.0], dtype=torch.float64)),
     )
 
     global_totals, metrics = _reduce_epoch_observability(
         local_totals,
         local_seconds=2.0,
         local_cuda_peak_allocated_bytes=100,
+        local_cuda_peak_reserved_bytes=160,
     )
 
     assert torch.equal(global_totals, local_totals + remote_totals)
@@ -119,6 +121,7 @@ def test_two_rank_observability_reduction_contract(monkeypatch: pytest.MonkeyPat
         "seconds": 4.0,
         "images_per_second": 2.0,
         "cuda_peak_allocated_bytes": 100.0,
+        "cuda_peak_reserved_bytes": 160.0,
         "teacher_clean_forward_calls": 6.0,
     }
 

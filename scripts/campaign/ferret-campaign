@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/campaign-common"
+
+action=${1:-}
+shift || true
+case "$action" in
+  prepare|start|status|stop) campaign_manage "$action" "$@" ;;
+  *) echo "usage: ferret-campaign {prepare|start|status|stop} <arguments>" >&2; exit 2 ;;
+esac

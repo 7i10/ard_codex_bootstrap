@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/campaign-common"
+[[ $# -eq 2 ]] || { echo "usage: campaign-validate <campaign.yaml> <full-sha>" >&2; exit 2; }
+PYTHONPATH=src "$ARD_CAMPAIGN_PYTHON" -m ard.campaign.cli validate --campaign "$1" --sha "$2"

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CAMPAIGN_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+: "${ARD_CAMPAIGN_PYTHON:=/home/shunsukenaito/.conda/envs/adv/bin/python}"
+: "${ARD_CAMPAIGN_SOURCE_REPO:=/home/shunsukenaito/workspace-local/ard_codex_bootstrap}"
+: "${ARD_CAMPAIGN_RUN_ROOT:=/home/shunsukenaito/workspace-local/ard-campaign-runs/ard_codex_bootstrap}"
+
+campaign_manage() {
+  "$ARD_CAMPAIGN_PYTHON" "$CAMPAIGN_SCRIPT_DIR/manage.py" "$@"
+}

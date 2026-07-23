@@ -15,6 +15,16 @@ class ImpactSelection:
 
 RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     (
+        ("src/ard/campaign/", "scripts/campaign/", "configs/campaigns/", "configs/execution/"),
+        (
+            "tests/unit/test_campaign.py",
+            "tests/unit/test_campaign_management.py",
+            "tests/unit/test_config.py",
+            "tests/unit/test_protocols_schedules.py",
+        ),
+        ("T0", "T1"),
+    ),
+    (
         (
             "src/ard/config/teacher_audit.py",
             "src/ard/evaluation/teacher_audit.py",

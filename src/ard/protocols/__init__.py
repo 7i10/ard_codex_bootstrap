@@ -106,6 +106,24 @@ _PILOT_METADATA = MappingProxyType(
     }
 )
 
+
+def _pilot_metadata(epochs: int) -> Mapping[str, object]:
+    return MappingProxyType(
+        {
+            **_CONTROLLED_METADATA,
+            "training": MappingProxyType(
+                {
+                    "epochs": epochs,
+                    "global_batch_size": 128,
+                    "validation_fraction": 0.1,
+                    "deterministic": True,
+                    "batchnorm_mode": "local_per_rank",
+                }
+            ),
+        }
+    )
+
+
 _PAPER_METADATA = MappingProxyType(
     {
         "dataset": "cifar10",
@@ -146,6 +164,18 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_PILOT_METADATA,
+        ),
+        "controlled_cifar10_r18_pilot_1ep_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_pilot_1ep_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_pilot_metadata(1),
+        ),
+        "controlled_cifar10_r18_pilot_3ep_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_pilot_3ep_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_pilot_metadata(3),
         ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",

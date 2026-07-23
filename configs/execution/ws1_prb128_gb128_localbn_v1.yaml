@@ -1,0 +1,6 @@
+id: ws1_prb128_gb128_localbn_v1
+world_size: 1
+per_rank_batch_size: 128
+global_batch_size: 128
+batchnorm_mode: local_per_rank
+launcher: direct_single_process

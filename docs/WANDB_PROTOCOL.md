@@ -23,9 +23,9 @@ cadence. The final epoch always publishes both best and last model artifacts.
 | `pilot` | online or offline_sync | short engineering check; not a paper result |
 | `production` | online or offline_sync | lineage guard plus entity/project/group required |
 
-Checked-in production configs use `online` for live scalar visibility; pilot configs retain
-`offline_sync` for fault-isolated engineering checks. An already-running offline-sync job is
-never changed in place.
+Checked-in production and current single-GPU campaign pilot configs use `online` for live scalar visibility. This
+pilot exception was explicitly approved before campaign launch; ordinary smoke remains disabled/offline, and an
+already-running offline-sync job is never changed in place.
 
 `offline`と`offline_sync`は別状態です。
 

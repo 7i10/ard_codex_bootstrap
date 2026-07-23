@@ -65,6 +65,7 @@ def run_autoattack(
         "seed": seed,
         "norm": "Linf",
         "epsilon": epsilon,
+        "attack_version": "standard",
         "version": version,
         "batch_size": batch_size,
     }

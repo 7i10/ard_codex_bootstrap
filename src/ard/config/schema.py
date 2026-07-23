@@ -41,6 +41,8 @@ class ProtocolConfig(StrictModel):
         "saad_code_295121c_audit_v1",
         "controlled_cifar10_r18_v1",
         "controlled_cifar10_r18_pilot_v1",
+        "controlled_cifar10_r18_pilot_1ep_v1",
+        "controlled_cifar10_r18_pilot_3ep_v1",
         "synthetic_smoke_v2",
     ]
 
@@ -632,10 +634,15 @@ class ExperimentConfig(StrictModel):
         spec = get_protocol(self.protocol.id)
         if not spec.runnable_locally:
             return
-        if self.protocol.id == "controlled_cifar10_r18_pilot_v1" and self.tier != "pilot":
-            raise ValueError("controlled_cifar10_r18_pilot_v1 requires tier=pilot")
-        if self.tier == "pilot" and self.protocol.id != "controlled_cifar10_r18_pilot_v1":
-            raise ValueError("tier=pilot requires controlled_cifar10_r18_pilot_v1")
+        pilot_protocols = {
+            "controlled_cifar10_r18_pilot_v1",
+            "controlled_cifar10_r18_pilot_1ep_v1",
+            "controlled_cifar10_r18_pilot_3ep_v1",
+        }
+        if self.protocol.id in pilot_protocols and self.tier != "pilot":
+            raise ValueError(f"{self.protocol.id} requires tier=pilot")
+        if self.tier == "pilot" and self.protocol.id not in pilot_protocols:
+            raise ValueError("tier=pilot requires a controlled CIFAR-10 pilot protocol")
         if self.protocol.id == "synthetic_smoke_v2":
             smoke_errors: list[str] = []
             if self.tier not in {"dev", "smoke"}:
@@ -647,7 +654,7 @@ class ExperimentConfig(StrictModel):
             if smoke_errors:
                 raise ValueError("synthetic_smoke_v2 contract violation: " + "; ".join(smoke_errors))
             return
-        if self.protocol.id not in {"controlled_cifar10_r18_v1", "controlled_cifar10_r18_pilot_v1"}:
+        if self.protocol.id not in {"controlled_cifar10_r18_v1", *pilot_protocols}:
             return
         metadata = spec.metadata
         errors: list[str] = []

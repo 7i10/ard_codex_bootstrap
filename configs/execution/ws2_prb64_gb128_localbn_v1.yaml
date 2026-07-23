@@ -1,0 +1,6 @@
+id: ws2_prb64_gb128_localbn_v1
+world_size: 2
+per_rank_batch_size: 64
+global_batch_size: 128
+batchnorm_mode: local_per_rank
+launcher: torchrun_local_rank_batchnorm

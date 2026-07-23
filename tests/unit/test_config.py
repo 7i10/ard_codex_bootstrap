@@ -6,6 +6,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from ard.campaign.schema import load_campaign
 from ard.config import load_config, save_resolved_config
 from ard.config.schema import AttackConfig, MethodConfig, NormalizationConfig
 from ard.config.teacher_audit import load_teacher_audit_config
@@ -17,6 +18,8 @@ def _set_repository_config_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, 
     values = {
         "ARD_CIFAR10_ROOT": str(tmp_path / "cifar"),
         "ARD_OUTPUT_ROOT": str(tmp_path / "outputs"),
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
         "ARD_PER_RANK_BATCH_SIZE": str(per_rank),
         "ARD_NUM_WORKERS": "0",
         "ARD_DEVICE": "cpu",
@@ -70,6 +73,83 @@ def test_experiment_taxonomy_and_execution_profiles(tmp_path: Path, monkeypatch:
     )
     assert all("method" not in config.tracking.group.lower() for config in production_configs)
     assert all("seed" not in config.tracking.group.lower() for config in production_configs)
+
+
+def test_single_gpu_campaign_configs_are_explicit_and_resolve(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path)
+    pilots = [load_config(path) for path in sorted(Path("configs/pilot/single_gpu").glob("*.yaml"))]
+    production = [load_config(path) for path in sorted(Path("configs/production/single_gpu").glob("*.yaml"))]
+    assert len(pilots) == 3
+    assert sorted(config.training.epochs for config in pilots) == [1, 1, 3]
+    assert len(production) == 8
+    assert {config.method.id for config in production} == {
+        "rslad",
+        "rslad_entropy",
+        "rslad_student",
+        "rslad_joint",
+    }
+    assert {config.teacher.registry_id for config in production if config.teacher is not None} == {
+        "chen2021_ltd_wrn34_10",
+        "bartoldson2024_adversarial_wrn94_16",
+    }
+    for config in [*pilots, *production]:
+        assert config.training.per_rank_batch_size == 128
+        assert config.training.global_batch_size == 128
+        assert config.training.batchnorm_mode == "local_per_rank"
+        assert config.tracking.mode == "online"
+        assert config.tracking.run_id == "config-test-run"
+        assert config.output_dir == tmp_path / "job-output"
+
+
+def test_single_gpu_campaign_crosswalk_and_scientific_protocol_are_exact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path)
+    production = load_campaign(Path("configs/campaigns/five_gpu_single_process_v1.yaml"))
+    canonical_by_cell = {}
+    for path in sorted(Path("configs/production").glob("*.yaml")):
+        config = load_config(path)
+        assert config.teacher is not None
+        canonical_by_cell[(config.teacher.registry_id, config.method.id)] = config
+    assert len(canonical_by_cell) == 8
+
+    for job in production.jobs:
+        monkeypatch.setenv("WANDB_ENTITY", job.wandb.entity)
+        monkeypatch.setenv("WANDB_PROJECT", job.wandb.project)
+        monkeypatch.setenv("WANDB_GROUP_CHEN", job.wandb.group)
+        monkeypatch.setenv("WANDB_GROUP_BARTOLDSON", job.wandb.group)
+        monkeypatch.setenv("ARD_RUN_ID", job.wandb.run_id)
+        config = load_config(Path(job.config))
+        assert config.teacher is not None
+        assert (config.teacher.registry_id, config.method.id) == (job.teacher, job.method)
+        assert config.tracking.group == job.wandb.group
+        assert config.tracking.project == job.wandb.project
+        assert config.tracking.entity == job.wandb.entity
+        canonical = canonical_by_cell[(job.teacher, job.method)]
+        assert config.dataset == canonical.dataset
+        assert config.student == canonical.student
+        assert config.teacher == canonical.teacher
+        assert config.method == canonical.method
+        assert config.optimizer == canonical.optimizer
+        assert config.scheduler == canonical.scheduler
+        assert config.seeds == canonical.seeds
+        assert config.training.epochs == canonical.training.epochs == 200
+        assert config.training.global_batch_size == canonical.training.global_batch_size == 128
+        assert config.training.per_rank_batch_size == 128
+        assert canonical.training.per_rank_batch_size == 64
+        assert config.method.attack.identity() == canonical.method.attack.identity()
+        assert config.method.selection_attack is not None
+        assert canonical.method.selection_attack is not None
+        assert config.method.selection_attack.identity() == canonical.method.selection_attack.identity()
+        assert job.phases.train == (
+            "{PYTHON}",
+            "-m",
+            "ard.cli.train",
+            "--config",
+            "{CONFIG_PATH}",
+            "--output",
+            "{JOB_OUTPUT_DIR}",
+        )
 
 
 def test_two_gpu_profile_can_be_resolved_as_one_gpu_batch_128(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -425,6 +505,8 @@ def test_top_level_configs_resolve_under_controlled_environment(
         "ARD_NUM_WORKERS": "0",
         "ARD_DEVICE": "cpu",
         "ARD_OUTPUT_ROOT": str(tmp_path / "outputs"),
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
         "WANDB_ENTITY": "entity",
         "WANDB_PROJECT": "project",
         "WANDB_GROUP_CHEN": "chen-group",

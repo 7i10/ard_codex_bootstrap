@@ -1,0 +1,61 @@
+campaign_id: c10-r18-ws1-pilots-v1
+git_sha: null
+execution_profile:
+  id: ws1_prb128_gb128_localbn_v1
+  world_size: 1
+  per_rank_batch_size: 128
+  global_batch_size: 128
+  batchnorm_mode: local_per_rank
+external_process_policy: allow_with_memory_gate
+hosts:
+  hamster: {gpus: [0, 1]}
+  ferret: {gpus: [0, 1, 2]}
+reservations:
+  - {host: ferret, gpu: 0, run_id: chen-rslad-production-s0-0ca90ad, execution_profile: ws2_prb64_gb128_localbn, active: true}
+  - {host: ferret, gpu: 1, run_id: chen-rslad-production-s0-0ca90ad, execution_profile: ws2_prb64_gb128_localbn, active: true}
+jobs:
+  - id: pilot-h-chen-rslad-s0
+    host: hamster
+    gpu: 0
+    teacher: chen2021_ltd_wrn34_10
+    method: rslad
+    seed: 0
+    config: configs/pilot/single_gpu/cifar10_r18_rslad_chen_1ep.yaml
+    output: pilot/hamster-chen-rslad-s0
+    wandb: {entity: shunsuke-n-waseda-university, project: single-teacher-ard, group: chen-cifar10-r18-ws1-pilot, run_id: pilot-h-chen-rslad-s0}
+    phases:
+      train: ["{PYTHON}", -m, ard.cli.train, --config, "{CONFIG_PATH}", --output, "{JOB_OUTPUT_DIR}"]
+      pgd_evaluate: ["{PYTHON}", -m, ard.cli.evaluate, --config, "{CONFIG_PATH}", --checkpoint-dir, "{JOB_OUTPUT_DIR}", --output, "{JOB_OUTPUT_DIR}/evaluation-pgd"]
+    priority: 1
+    core: true
+    pilot_peak_reserved_mib: 6000
+  - id: pilot-h-chen-joint-s0
+    host: hamster
+    gpu: 1
+    teacher: chen2021_ltd_wrn34_10
+    method: rslad_joint
+    seed: 0
+    config: configs/pilot/single_gpu/cifar10_r18_rslad_joint_chen_3ep.yaml
+    output: pilot/hamster-chen-joint-s0
+    wandb: {entity: shunsuke-n-waseda-university, project: single-teacher-ard, group: chen-cifar10-r18-ws1-pilot, run_id: pilot-h-chen-joint-s0}
+    phases:
+      train: ["{PYTHON}", -m, ard.cli.train, --config, "{CONFIG_PATH}", --output, "{JOB_OUTPUT_DIR}"]
+      pgd_evaluate: ["{PYTHON}", -m, ard.cli.evaluate, --config, "{CONFIG_PATH}", --checkpoint-dir, "{JOB_OUTPUT_DIR}", --output, "{JOB_OUTPUT_DIR}/evaluation-pgd"]
+    priority: 1
+    core: true
+    pilot_peak_reserved_mib: 6000
+  - id: pilot-f-bart-rslad-s0
+    host: ferret
+    gpu: 2
+    teacher: bartoldson2024_adversarial_wrn94_16
+    method: rslad
+    seed: 0
+    config: configs/pilot/single_gpu/cifar10_r18_rslad_bartoldson_1ep.yaml
+    output: pilot/ferret-bartoldson-rslad-s0
+    wandb: {entity: shunsuke-n-waseda-university, project: single-teacher-ard, group: bartoldson-cifar10-r18-ws1-pilot, run_id: pilot-f-bart-rslad-s0}
+    phases:
+      train: ["{PYTHON}", -m, ard.cli.train, --config, "{CONFIG_PATH}", --output, "{JOB_OUTPUT_DIR}"]
+      pgd_evaluate: ["{PYTHON}", -m, ard.cli.evaluate, --config, "{CONFIG_PATH}", --checkpoint-dir, "{JOB_OUTPUT_DIR}", --output, "{JOB_OUTPUT_DIR}/evaluation-pgd"]
+    priority: 1
+    core: true
+    pilot_peak_reserved_mib: 10000
