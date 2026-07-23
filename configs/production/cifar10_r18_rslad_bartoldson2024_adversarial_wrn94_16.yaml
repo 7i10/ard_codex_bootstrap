@@ -9,6 +9,6 @@ method: {id: rslad, version: 1, attack: {loss: kl, kl_target: teacher_clean, tem
 optimizer: {id: sgd, learning_rate: 0.1, momentum: 0.9, weight_decay: 0.0005, nesterov: false}
 scheduler: {id: multistep, milestones: [100, 150], gamma: 0.1, step_at: epoch_end}
 training: {epochs: 200, per_rank_batch_size: "${ARD_PER_RANK_BATCH_SIZE}", global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: "${ARD_DEVICE}", deterministic: true, validation_fraction: 0.1, batchnorm_mode: local_per_rank}
-tracking: {mode: offline_sync, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: "${WANDB_GROUP_BARTOLDSON}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: "${WANDB_GROUP_BARTOLDSON}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
 evaluation: {checkpoints: both, seed: 0, dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: test, download: false, num_classes: 10}, attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 20, random_start: true, trace_step_losses: false}, autoattack: false, autoattack_batch_size: 128, write_sample_stats: true, panel_size: 24}
 output_dir: "${ARD_OUTPUT_ROOT}/cifar10-r18-rslad-bartoldson2024-adversarial-wrn94-16-production-s${ARD_SEED}"

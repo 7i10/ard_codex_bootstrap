@@ -23,6 +23,10 @@ cadence. The final epoch always publishes both best and last model artifacts.
 | `pilot` | online or offline_sync | short engineering check; not a paper result |
 | `production` | online or offline_sync | lineage guard plus entity/project/group required |
 
+Checked-in production configs use `online` for live scalar visibility; pilot configs retain
+`offline_sync` for fault-isolated engineering checks. An already-running offline-sync job is
+never changed in place.
+
 `offline`と`offline_sync`は別状態です。
 
 - `offline`: local/offline smoke用。完了時は`status=completed`, `sync_state=null`。
