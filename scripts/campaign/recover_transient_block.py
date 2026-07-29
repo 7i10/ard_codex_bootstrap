@@ -132,8 +132,14 @@ def validate(args: argparse.Namespace) -> tuple[Any, CampaignStateStore, list[An
     _fixed_sha(repository, spec.git_sha)
     state = CampaignStateStore(args.state_root.resolve())
     state.assert_campaign_identity(spec)
-    if state.campaign().get("state") != "awaiting_scientific_review":
-        raise RecoveryError("recovery requires campaign state awaiting_scientific_review")
+    campaign_state = state.campaign().get("state")
+    allowed_campaign_states = (
+        {"awaiting_scientific_review"}
+        if args.failure_kind == "gpu_inventory"
+        else {"armed", "awaiting_scientific_review"}
+    )
+    if campaign_state not in allowed_campaign_states:
+        raise RecoveryError(f"recovery refuses campaign state: {campaign_state!r}")
 
     selected = []
     by_id = {job.id: job for job in spec.jobs}
@@ -143,7 +149,12 @@ def validate(args: argparse.Namespace) -> tuple[Any, CampaignStateStore, list[An
             raise RecoveryError(f"explicit recovery job is absent from campaign: {job_id}")
         if job.host != args.host:
             raise RecoveryError(f"recovery job belongs to a different host: {job_id}")
+        record = state.job(job.id)
+        phase = record.get("phase")
+        phase_name = phase.get("name") if isinstance(phase, dict) else None
         output = _contained(args.output_root, args.output_root / job.output, "job output")
+        if args.failure_kind == "missing_runtime_environment" and phase_name == "autoattack":
+            output /= "evaluation-autoattack"
         if output.exists():
             raise RecoveryError(f"scientific output already exists; refusing recovery: {output}")
         _release_marker_is_exact(job, spec)
@@ -213,7 +224,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 state.recover_transient_gpu_blocks(job_ids)
             else:
                 state.recover_missing_runtime_environment_failures(job_ids)
-            campaign = state.rearm_after_transient_gpu_recovery()
+            if state.campaign().get("state") == "awaiting_scientific_review":
+                campaign = state.rearm_after_transient_gpu_recovery()
+            else:
+                campaign = state.campaign()
             result.update({"applied": True, "campaign_state": campaign["state"]})
         print(json.dumps(result, sort_keys=True))
         return 0

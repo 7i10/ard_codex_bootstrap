@@ -418,8 +418,11 @@ class CampaignStateStore:
             recovered: dict[str, dict[str, Any]] = {}
             now = utc_now()
             for job_id, job in records.items():
-                phase_dir = self.root / "phases" / job_id / "train"
-                archive = self.root / "recovery-archive" / job_id / "train-missing-runtime-environment"
+                phase_name = str(job["phase"]["name"])
+                phase_dir = self.root / "phases" / job_id / phase_name
+                archive = (
+                    self.root / "recovery-archive" / job_id / f"{phase_name}-missing-runtime-environment"
+                )
                 archive.parent.mkdir(parents=True, exist_ok=True)
                 if archive.exists():
                     raise StateError(f"runtime-environment recovery archive already exists: {job_id}")
@@ -428,7 +431,7 @@ class CampaignStateStore:
                 history.append(
                     {
                         "state": job["state"],
-                        "failure": job["failure"],
+                        "failure": job.get("failure"),
                         "phase_exit": job["phase_exit"],
                         "phase_archive": str(archive),
                         "recovered_at": now,
@@ -446,9 +449,11 @@ class CampaignStateStore:
                     "admission",
                     "shared_gpu_at_launch",
                     "live_phase_digest_evidenced",
+                    "autoattack_status",
                 ):
                     job.pop(key, None)
-                job["state"] = JobState.PREFLIGHT.value
+                target = JobState.PREFLIGHT if phase_name == "train" else JobState.PGD_COMPLETED
+                job["state"] = target.value
                 job["updated_at"] = now
                 job["revision"] = int(job.get("revision", 0)) + 1
                 _atomic_json(self.jobs_path / f"{job_id}.json", job)
@@ -456,8 +461,12 @@ class CampaignStateStore:
                     {
                         "kind": "missing_runtime_environment_failure_recovered",
                         "job_id": job_id,
-                        "from": JobState.FAILED.value,
-                        "to": JobState.PREFLIGHT.value,
+                        "from": (
+                            JobState.FAILED.value
+                            if phase_name == "train"
+                            else JobState.PGD_COMPLETED_AUTOATTACK_FAILED.value
+                        ),
+                        "to": target.value,
                         "revision": job["revision"],
                         "phase_archive": str(archive),
                     }
@@ -475,15 +484,24 @@ class CampaignStateStore:
             job = _read_json(self.jobs_path / f"{job_id}.json")
             phase = job.get("phase")
             phase_exit = job.get("phase_exit")
-            phase_dir = self.root / "phases" / job_id / "train"
+            phase_name = phase.get("name") if isinstance(phase, dict) else None
+            if phase_name not in {"train", "autoattack"}:
+                raise StateError(f"job is not an exact pre-output runtime-environment failure: {job_id}")
+            expected_state = (
+                JobState.FAILED.value
+                if phase_name == "train"
+                else JobState.PGD_COMPLETED_AUTOATTACK_FAILED.value
+            )
+            expected_failure = phase_name == "train"
+            phase_dir = self.root / "phases" / job_id / phase_name
             expected_exit = phase_dir / "exit.json"
             expected_launch = phase_dir / "launch.json"
             stderr = phase_dir / "stderr.log"
             if (
-                job.get("state") != JobState.FAILED.value
-                or job.get("failure") != "phase returned nonzero"
+                job.get("state") != expected_state
+                or (expected_failure and job.get("failure") != "phase returned nonzero")
+                or (not expected_failure and job.get("autoattack_status") != "failed")
                 or not isinstance(phase, dict)
-                or phase.get("name") != "train"
                 or phase.get("exit_record") != str(expected_exit)
                 or phase.get("launch_record") != str(expected_launch)
                 or not isinstance(phase_exit, dict)
@@ -497,7 +515,9 @@ class CampaignStateStore:
             stderr_lines = stderr.read_text(encoding="utf-8").rstrip().splitlines()
             if not stderr_lines or stderr_lines[-1] != MISSING_RUNTIME_ENVIRONMENT_ERROR:
                 raise StateError(f"job has a different runtime failure: {job_id}")
-            archive = self.root / "recovery-archive" / job_id / "train-missing-runtime-environment"
+            archive = (
+                self.root / "recovery-archive" / job_id / f"{phase_name}-missing-runtime-environment"
+            )
             if archive.exists():
                 raise StateError(f"runtime-environment recovery archive already exists: {job_id}")
             records[job_id] = job

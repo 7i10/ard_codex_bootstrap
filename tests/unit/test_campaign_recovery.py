@@ -280,3 +280,53 @@ def test_watchdog_controller_environment_contains_fixed_runtime_inputs(tmp_path:
     assert environment["ARD_CIFAR10_ROOT"]
     assert environment["ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT"].startswith(str(scientific))
     assert environment["ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT"].startswith(str(scientific))
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+def test_missing_runtime_environment_autoattack_returns_to_pgd_completed(tmp_path: Path) -> None:
+    store = CampaignStateStore(tmp_path / "state")
+    store.initialize(CampaignSpec.model_validate(_raw_campaign()))
+    phase_dir = store.root / "phases" / "job-1" / "autoattack"
+    phase_dir.mkdir(parents=True)
+    launch = phase_dir / "launch.json"
+    exit_record = phase_dir / "exit.json"
+    launch.write_text("{}\n", encoding="utf-8")
+    exit_record.write_text("{}\n", encoding="utf-8")
+    (phase_dir / "stderr.log").write_text(
+        "traceback\nValueError: missing environment variables: ARD_CIFAR10_ROOT\n",
+        encoding="utf-8",
+    )
+    for target in (
+        JobState.PREFLIGHT,
+        JobState.LAUNCHING,
+        JobState.TRAINING,
+        JobState.TRAINING_COMPLETED,
+        JobState.LAUNCHING,
+        JobState.PGD_EVALUATION,
+        JobState.PGD_COMPLETED,
+        JobState.LAUNCHING,
+    ):
+        store.transition_job("job-1", target)
+    store.transition_job(
+        "job-1",
+        JobState.AUTOATTACK,
+        phase={
+            "name": "autoattack",
+            "exit_record": str(exit_record),
+            "launch_record": str(launch),
+        },
+    )
+    store.transition_job(
+        "job-1",
+        JobState.PGD_COMPLETED_AUTOATTACK_FAILED,
+        phase_exit={"exit_code": 1, "error": None},
+        autoattack_status="failed",
+    )
+
+    recovered = store.recover_missing_runtime_environment_failures(["job-1"])["job-1"]
+
+    archive = store.root / "recovery-archive" / "job-1" / "autoattack-missing-runtime-environment"
+    assert recovered["state"] == "pgd_completed"
+    assert archive.is_dir() and not phase_dir.exists()
+    assert "autoattack_status" not in recovered
