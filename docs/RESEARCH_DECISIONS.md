@@ -18,7 +18,9 @@ RSLADはteacher-forward中心の軽量なsingle-teacher基盤として、signal/
 
 ## D3. 学習不可能サンプルを削除しない
 
-robust learnabilityは学生、学習時点、脅威モデルに依存します。サンプル自体を永久除外せず、高リスク時にteacher KDを弱め、hard-label adversarial objectiveへfallbackします。
+robust learnabilityは学生、学習時点、脅威モデルに依存します。サンプル自体を永久除外しません。
+schema-v2のstudent/joint主経路では、高リスク時にadversarial branchのteacher targetを一様分布へsoftenし、
+hard-label fallbackは使いません。旧fallbackは明示的な`rslad_hard_fallback@1` ablationとしてだけ保持します。
 
 ## D4. 最初の学生信号はrobust-margin EMA
 

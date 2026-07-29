@@ -61,10 +61,12 @@ including BatchNorm tracking counters. These counts are identity checks, not int
 - `rslad_entropy`: frozen teacherのShannon entropyを使い、weightは
   `5 * (H_i - global_min_valid_batch(H))`。係数5はmethod constant。clip、mean preservation、
   hard-label fallbackはない。
-- `rslad_student`: student riskは`(1 - margin_ema) / 2`、KD weightは`1-risk`、hard weightは`risk`。
-- `rslad_joint`: teacher riskは`1-H/log(C)`、joint riskはstudent riskとの積。KD/hard blendは
-  `1-risk`/`risk`。
-- student/jointのepoch 0はexact baseline RSLAD（uniform KD、hard=0）としてstateだけを収集する。
+- `rslad_student`: student riskは`(1 - margin_ema) / 2`。schema-v2主経路のKD weightは1、hard weightは0で、
+  adversarial KD targetだけを`rho=0.5*risk`で一様分布へsoftenする。
+- `rslad_joint`: teacher riskは`1-H/log(C)`、joint riskはstudent riskとの積。schema-v2主経路では同じ
+  target softeningへjoint riskを使い、KD/hard loss weightは1/0のままにする。
+- student/jointのepoch 0はexact baseline RSLAD（target softeningなし、uniform KD、hard=0）としてstateだけを
+  収集する。
 
 sampleをdatasetから削除しません。oracle maskはdev-onlyで、smoke/repro/productionでは禁止です。
 
