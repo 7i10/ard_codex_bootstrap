@@ -142,6 +142,7 @@ def test_recovery_cli_refuses_missing_marker_existing_output_and_live_controller
         host="hamster",
         job=["job-1"],
         controller_record=None,
+        failure_kind="gpu_inventory",
         apply=False,
     )
     monkeypatch.setattr(recovery, "_fixed_sha", lambda *_args: None)
@@ -222,3 +223,60 @@ def test_watchdog_starts_no_duplicate_controller_after_one_successful_start(
     assert len(starts) == 1
     assert starts[0]["scientific_repository"] == repository
     assert starts[0]["control_sha"] == "c" * 40
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+def test_missing_runtime_environment_failure_is_archived_before_exact_requeue(tmp_path: Path) -> None:
+    store = CampaignStateStore(tmp_path / "state")
+    store.initialize(CampaignSpec.model_validate(_raw_campaign()))
+    phase_dir = store.root / "phases" / "job-1" / "train"
+    phase_dir.mkdir(parents=True)
+    launch = phase_dir / "launch.json"
+    exit_record = phase_dir / "exit.json"
+    launch.write_text("{}\n", encoding="utf-8")
+    exit_record.write_text("{}\n", encoding="utf-8")
+    (phase_dir / "stderr.log").write_text(
+        "traceback\nValueError: missing environment variables: ARD_CIFAR10_ROOT\n",
+        encoding="utf-8",
+    )
+    store.transition_job("job-1", JobState.PREFLIGHT)
+    store.transition_job("job-1", JobState.LAUNCHING)
+    store.transition_job(
+        "job-1",
+        JobState.TRAINING,
+        phase={
+            "name": "train",
+            "exit_record": str(exit_record),
+            "launch_record": str(launch),
+        },
+    )
+    store.transition_job(
+        "job-1",
+        JobState.FAILED,
+        failure="phase returned nonzero",
+        phase_exit={"exit_code": 1, "error": None},
+    )
+
+    recovered = store.recover_missing_runtime_environment_failures(["job-1"])["job-1"]
+
+    archive = store.root / "recovery-archive" / "job-1" / "train-missing-runtime-environment"
+    assert recovered["state"] == "preflight"
+    assert archive.is_dir() and not phase_dir.exists()
+    assert recovered["recovery_history"][-1]["phase_archive"] == str(archive)
+    assert "phase" not in recovered and "phase_exit" not in recovered
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+def test_watchdog_controller_environment_contains_fixed_runtime_inputs(tmp_path: Path) -> None:
+    watchdog = _script("watch_controller.py")
+    scientific = tmp_path / "scientific"
+    control = tmp_path / "control"
+
+    environment = watchdog._controller_environment(scientific, control)
+
+    assert environment["PYTHONPATH"] == str(control / "src")
+    assert environment["ARD_CIFAR10_ROOT"]
+    assert environment["ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT"].startswith(str(scientific))
+    assert environment["ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT"].startswith(str(scientific))

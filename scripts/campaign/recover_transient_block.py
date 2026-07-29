@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recover only an unlaunched exact nvidia-smi admission block.
+"""Recover one of the explicitly supported pre-science control failures.
 
 The command is intentionally dry-run by default.  It is a control-plane tool:
 it neither edits campaign YAML nor touches a scientific output directory.
@@ -165,7 +165,11 @@ def validate(args: argparse.Namespace) -> tuple[Any, CampaignStateStore, list[An
     missing = [job.id for job in selected if job.gpu not in present]
     if missing:
         raise RecoveryError(f"assigned GPU is absent from current inventory: {', '.join(missing)}")
-    state.validate_transient_gpu_blocks([job.id for job in selected])
+    job_ids = [job.id for job in selected]
+    if args.failure_kind == "gpu_inventory":
+        state.validate_transient_gpu_blocks(job_ids)
+    else:
+        state.validate_missing_runtime_environment_failures(job_ids)
     return spec, state, selected
 
 
@@ -179,6 +183,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", choices=("hamster", "ferret"), required=True)
     parser.add_argument("--job", action="append", required=True)
     parser.add_argument("--controller-record", type=Path)
+    parser.add_argument(
+        "--failure-kind",
+        choices=("gpu_inventory", "missing_runtime_environment"),
+        default="gpu_inventory",
+    )
     parser.add_argument("--apply", action="store_true")
     return parser
 
@@ -193,11 +202,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             "git_sha": spec.git_sha,
             "host": args.host,
             "jobs": [job.id for job in selected],
-            "inventory_error": NVIDIA_SMI_ADMISSION_ERROR,
+            "failure_kind": args.failure_kind,
             "applied": False,
         }
+        if args.failure_kind == "gpu_inventory":
+            result["inventory_error"] = NVIDIA_SMI_ADMISSION_ERROR
         if args.apply:
-            state.recover_transient_gpu_blocks([job.id for job in selected])
+            job_ids = [job.id for job in selected]
+            if args.failure_kind == "gpu_inventory":
+                state.recover_transient_gpu_blocks(job_ids)
+            else:
+                state.recover_missing_runtime_environment_failures(job_ids)
             campaign = state.rearm_after_transient_gpu_recovery()
             result.update({"applied": True, "campaign_state": campaign["state"]})
         print(json.dumps(result, sort_keys=True))

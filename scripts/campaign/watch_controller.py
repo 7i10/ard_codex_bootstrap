@@ -22,6 +22,10 @@ class WatchError(RuntimeError):
     pass
 
 
+_CHEN_SHA256 = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+_BARTOLDSON_SHA256 = "56bbad8ad748df86e67c24dba4f59a9e7d285e583251460b2ed154017a18cb0b"
+
+
 def _read_object(path: Path, label: str) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -163,6 +167,33 @@ def _gpu_lock_root(args: argparse.Namespace, record_path: Path) -> Path:
     ).resolve()
 
 
+def _controller_environment(scientific_repository: Path, control_repository: Path) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "PYTHONPATH": str(control_repository / "src"),
+            "ARD_CIFAR10_ROOT": os.environ.get(
+                "ARD_CIFAR10_ROOT",
+                "/home/shunsukenaito/workspace-local/datasets/ard/torchvision",
+            ),
+            "ARD_NUM_WORKERS": os.environ.get("ARD_NUM_WORKERS", "4"),
+            "ARD_CAMPAIGN_ALLOW_EXTERNAL_GPU_PROCESSES": "1",
+            "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT": str(
+                scientific_repository / "teacher_cache" / "robustbench" / "Chen2021LTD_WRN34_10.pt"
+            ),
+            "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256": _CHEN_SHA256,
+            "ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT": str(
+                scientific_repository
+                / "teacher_cache"
+                / "robustbench"
+                / "Bartoldson2024Adversarial_WRN-94-16.pt"
+            ),
+            "ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT_SHA256": _BARTOLDSON_SHA256,
+        }
+    )
+    return environment
+
+
 def _launch_controller(
     args: argparse.Namespace,
     *,
@@ -199,8 +230,7 @@ def _launch_controller(
         "--interval-seconds",
         str(args.interval_seconds),
     ]
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = str(control_repository / "src")
+    environment = _controller_environment(scientific_repository, control_repository)
     stdout = (run_dir / "control" / "controller.stdout.log").open("ab")
     stderr = (run_dir / "control" / "controller.stderr.log").open("ab")
     try:

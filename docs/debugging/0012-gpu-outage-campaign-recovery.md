@@ -15,6 +15,9 @@ After both hosts recovered from an NVIDIA driver outage, three independent contr
 3. The protected Ferret finalizer could not find the same-environment `wandb` console script. After that was
    corrected, evaluation rejected a teacher-identity mismatch because the finalizer loaded a separate config whose
    checkpoint path used a different absolute-path alias than the training run.
+4. The first control-overlay launch omitted `ARD_CIFAR10_ROOT` from the controller environment. Three Ferret train
+   wrappers exited during config expansion, before output creation, W&B initialization, model construction, or a GPU
+   step. Their exact phase records are archived before the same job IDs are requeued.
 
 No completed scientific phase was rerun, and no attack, checkpoint, batch size, or evaluation threshold was changed.
 
@@ -28,6 +31,8 @@ No completed scientific phase was rerun, and no attack, checkpoint, batch size, 
 - The watchdog is a host-local singleton. It runs a committed control-plane revision while keeping the scientific
   repository/config/phase commands fixed at
   `2d54b8230b8d14d13c1ea7472ccba53491b4d38d`; both revisions are recorded in `controller.json`.
+- The watchdog supplies the dataset root, worker count, and exact teacher checkpoint paths/hashes itself; successful
+  launch does not depend on the invoking shell exporting those runtime inputs.
 - The protected finalizer prepends the active Python environment to `PATH` and evaluates with the training run's
   persisted `resolved_config.yaml`. Exact teacher identity validation remains enabled.
 

@@ -100,6 +100,7 @@ class StateError(CampaignError):
 # nvidia-smi admission failure in ``campaign.gpu``.  Recovery may not turn a
 # generic controller or launch failure into a new training attempt.
 NVIDIA_SMI_ADMISSION_ERROR = "GPUInspectionError('nvidia-smi inventory failed; refusing GPU admission')"
+MISSING_RUNTIME_ENVIRONMENT_ERROR = "ValueError: missing environment variables: ARD_CIFAR10_ROOT"
 
 
 class FileLock:
@@ -400,6 +401,107 @@ class CampaignStateStore:
                 }
             )
             return campaign
+
+    def validate_missing_runtime_environment_failures(
+        self, job_ids: tuple[str, ...] | list[str]
+    ) -> dict[str, dict[str, Any]]:
+        with self.host_lock:
+            return self._validate_missing_runtime_environment_failures_locked(tuple(job_ids))
+
+    def recover_missing_runtime_environment_failures(
+        self, job_ids: tuple[str, ...] | list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Archive and requeue exact config-before-output controller failures."""
+        requested = tuple(job_ids)
+        with self.host_lock:
+            records = self._validate_missing_runtime_environment_failures_locked(requested)
+            recovered: dict[str, dict[str, Any]] = {}
+            now = utc_now()
+            for job_id, job in records.items():
+                phase_dir = self.root / "phases" / job_id / "train"
+                archive = self.root / "recovery-archive" / job_id / "train-missing-runtime-environment"
+                archive.parent.mkdir(parents=True, exist_ok=True)
+                if archive.exists():
+                    raise StateError(f"runtime-environment recovery archive already exists: {job_id}")
+                os.replace(phase_dir, archive)
+                history = list(job.get("recovery_history", []))
+                history.append(
+                    {
+                        "state": job["state"],
+                        "failure": job["failure"],
+                        "phase_exit": job["phase_exit"],
+                        "phase_archive": str(archive),
+                        "recovered_at": now,
+                    }
+                )
+                job["recovery_history"] = history
+                for key in (
+                    "failure",
+                    "phase",
+                    "phase_exit",
+                    "launch_intent",
+                    "pending_successor_phase",
+                    "gpu_snapshot",
+                    "gpu_uuid",
+                    "admission",
+                    "shared_gpu_at_launch",
+                    "live_phase_digest_evidenced",
+                ):
+                    job.pop(key, None)
+                job["state"] = JobState.PREFLIGHT.value
+                job["updated_at"] = now
+                job["revision"] = int(job.get("revision", 0)) + 1
+                _atomic_json(self.jobs_path / f"{job_id}.json", job)
+                self._append_event_locked(
+                    {
+                        "kind": "missing_runtime_environment_failure_recovered",
+                        "job_id": job_id,
+                        "from": JobState.FAILED.value,
+                        "to": JobState.PREFLIGHT.value,
+                        "revision": job["revision"],
+                        "phase_archive": str(archive),
+                    }
+                )
+                recovered[job_id] = job
+            return recovered
+
+    def _validate_missing_runtime_environment_failures_locked(
+        self, requested: tuple[str, ...]
+    ) -> dict[str, dict[str, Any]]:
+        if not requested or len(set(requested)) != len(requested):
+            raise StateError("recovery requires one or more unique explicit job IDs")
+        records: dict[str, dict[str, Any]] = {}
+        for job_id in requested:
+            job = _read_json(self.jobs_path / f"{job_id}.json")
+            phase = job.get("phase")
+            phase_exit = job.get("phase_exit")
+            phase_dir = self.root / "phases" / job_id / "train"
+            expected_exit = phase_dir / "exit.json"
+            expected_launch = phase_dir / "launch.json"
+            stderr = phase_dir / "stderr.log"
+            if (
+                job.get("state") != JobState.FAILED.value
+                or job.get("failure") != "phase returned nonzero"
+                or not isinstance(phase, dict)
+                or phase.get("name") != "train"
+                or phase.get("exit_record") != str(expected_exit)
+                or phase.get("launch_record") != str(expected_launch)
+                or not isinstance(phase_exit, dict)
+                or phase_exit.get("exit_code") != 1
+                or phase_exit.get("error") is not None
+                or not expected_exit.is_file()
+                or not expected_launch.is_file()
+                or not stderr.is_file()
+            ):
+                raise StateError(f"job is not an exact pre-output runtime-environment failure: {job_id}")
+            stderr_lines = stderr.read_text(encoding="utf-8").rstrip().splitlines()
+            if not stderr_lines or stderr_lines[-1] != MISSING_RUNTIME_ENVIRONMENT_ERROR:
+                raise StateError(f"job has a different runtime failure: {job_id}")
+            archive = self.root / "recovery-archive" / job_id / "train-missing-runtime-environment"
+            if archive.exists():
+                raise StateError(f"runtime-environment recovery archive already exists: {job_id}")
+            records[job_id] = job
+        return records
 
     def _append_event_locked(self, event: dict[str, Any]) -> None:
         self.events_path.parent.mkdir(parents=True, exist_ok=True)
