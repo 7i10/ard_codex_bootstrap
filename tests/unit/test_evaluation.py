@@ -154,6 +154,38 @@ def test_evaluation_protocol_id_must_match_resolved_training_config() -> None:
         _validate_evaluation_tracking_identity(evaluation, training)
 
 
+def test_evaluation_allows_relocated_teacher_checkpoint_with_same_sha() -> None:
+    training = _tracked_repro_config()
+    assert training.teacher is not None
+    evaluation = training.model_copy(
+        update={
+            "teacher": training.teacher.model_copy(
+                update={"checkpoint": Path("/different-host/teacher-checkpoint.pt")}
+            )
+        }
+    )
+
+    _validate_evaluation_tracking_identity(evaluation, training)
+
+
+def test_evaluation_rejects_relocated_teacher_checkpoint_with_different_sha() -> None:
+    training = _tracked_repro_config()
+    assert training.teacher is not None
+    evaluation = training.model_copy(
+        update={
+            "teacher": training.teacher.model_copy(
+                update={
+                    "checkpoint": Path("/different-host/teacher-checkpoint.pt"),
+                    "checkpoint_sha256": "b" * 64,
+                }
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="teacher identity"):
+        _validate_evaluation_tracking_identity(evaluation, training)
+
+
 def test_evaluation_tracker_config_uses_training_identity_and_evaluation_only_fields(tmp_path: Path) -> None:
     training = _tracked_repro_config()
     evaluation = training.model_copy(

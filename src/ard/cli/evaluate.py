@@ -130,7 +130,16 @@ def _validate_evaluation_tracking_identity(config: ExperimentConfig, training_co
         raise ValueError("evaluation protocol ID must match resolved training config")
     if config.method != training_config.method:
         raise ValueError("evaluation method identity must exactly match resolved training config")
-    if config.teacher != training_config.teacher:
+    evaluation_teacher = None if config.teacher is None else config.teacher.model_dump(mode="json")
+    training_teacher = None if training_config.teacher is None else training_config.teacher.model_dump(mode="json")
+    # A checkpoint's absolute location is execution metadata, not scientific
+    # teacher identity. Cross-host evaluation may relocate the same verified
+    # bytes; every other teacher field, including checkpoint_sha256,
+    # normalization and threat model, must remain exact.
+    for teacher in (evaluation_teacher, training_teacher):
+        if teacher is not None:
+            teacher.pop("checkpoint", None)
+    if evaluation_teacher != training_teacher:
         raise ValueError("evaluation teacher identity must exactly match resolved training config")
     if config.seeds != training_config.seeds:
         raise ValueError("evaluation training seeds must exactly match resolved training config")
