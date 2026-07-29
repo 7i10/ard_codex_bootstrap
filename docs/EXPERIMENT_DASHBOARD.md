@@ -23,14 +23,17 @@ teacher overconfidenceとstudentの時変robust learnabilityを分離して観�
 教師AA値はRobustBenchの公開参考値であり、このリポジトリでfull AutoAttack再現した値ではありません。
 ローカルではcheckpoint SHA、normalization、forward、1000例のbounded PGD監査までを実施済みです。
 
-### 手法の実際の意味
+### 手法の区分と実際の意味
 
-| 手法 | 追加する信号・処理 |
-|---|---|
-| `rslad` | uniformなRSLAD KD baseline |
-| `rslad_entropy` | `5 * (H_i - min_batch H)`。clip、平均保存、hard-label fallbackなし |
-| `rslad_student` | adversarial student probability marginのEMAからriskを計算 |
-| `rslad_joint` | student risk × `1 - H/log(C)` |
+`★ Proposed`はこの研究基盤の提案手法または、その効果を分離するための提案ablationです。
+RSLAD baselineおよびSAAD由来のentropy-onlyとは表・集計で分けます。
+
+| 区分 | 手法 | 追加する信号・処理 |
+|---|---|---|
+| Baseline | `rslad` | uniformなRSLAD KD baseline |
+| SAAD-derived ablation | `rslad_entropy` | `5 * (H_i - min_batch H)`。clip、平均保存、hard-label fallbackなし |
+| ★ Proposed ablation | `rslad_student` | adversarial student probability marginのEMAからriskを計算 |
+| ★ Proposed main | `rslad_joint` | student risk × `1 - H/log(C)` |
 
 Studentは、各sampleのadversarial predictionについて
 `margin = p_student(y|x_adv) - max_{c != y} p_student(c|x_adv)`を測り、decay 0.9のEMAを保持します。
@@ -76,16 +79,17 @@ RSLAD/entropy/jointはPGDとAutoAttackまでが予定phaseです。
 |---|---|---|---|
 | 完了 | Hamster 0 | Chen / RSLAD | 200 epoch、PGD、AA完了 |
 | 完了 | Hamster 0 | Bartoldson / Student | 200 epoch、PGD完了。AAは計画対象外 |
-| 評価待ち | Hamster 1 | Bartoldson / Entropy | 200 epoch、PGD完了。AAは同GPUのtrain後に実行 |
+| 再配置準備 | Ferret 2 | Bartoldson / Entropy | 200 epoch、PGD完了。AAだけをHamsterから移送して実行する |
 | 実行中 | Hamster 1 | Chen / Entropy | epoch 116、val clean/PGD 84.52% / 56.54% |
 | 実行中 | Ferret 0 | Bartoldson / RSLAD | epoch 25、val clean/PGD 72.90% / 40.90% |
-| 未着手・queue済み | Ferret 0 | Chen / Student | Bartoldson RSLADの後に開始 |
-| 実行中 | Ferret 1 | Bartoldson / Joint | epoch 25、val clean/PGD 72.58% / 41.60% |
-| 完了 | Ferret 2 | Chen / Joint | 200 epoch、PGD、AA完了 |
+| 再配置準備 | Hamster 0 | Chen / ★ Student | Ferretのtrain queueから外し、空いているHamsterで開始する |
+| 実行中 | Ferret 1 | Bartoldson / ★ Joint | epoch 25、val clean/PGD 72.58% / 41.60% |
+| 完了 | Ferret 2 | Chen / ★ Joint | 200 epoch、PGD、AA完了 |
 
-Hamster GPU 0が現在idleでも、実行中にjobを別GPUへ移すと静的割当・lineageが変わるため、Hamster
-GPU 1のqueueを移動しません。W&Bは数epoch遅れて見える場合があり、phase状態と最新epochはhost-local
-manifest/metricsを正とします。
+2026-07-29の運用判断として、Ferretへ3本のtrainを集中させません。空いているHamster GPU 0を
+Chen/Student trainへ使い、比較的短いBartoldson/Entropy AutoAttackをFerret GPU 2へ移します。
+移送は未開始phaseだけを対象とし、checkpoint SHA、source SHA、実行GPU UUID、元job IDを記録します。
+W&Bは数epoch遅れて見える場合があり、phase状態と最新epochはhost-local manifest/metricsを正とします。
 
 ### 現在未着手の研究
 
@@ -103,9 +107,9 @@ manifest/metricsを正とします。
 | Teacher / method | Best clean | Best PGD | Best AA | Last clean | Last PGD | Last AA |
 |---|---:|---:|---:|---:|---:|---:|
 | Chen / RSLAD | 83.18 | 55.65 | 51.90 | 83.22 | 55.44 | 51.78 |
-| Chen / Joint | 83.08 | 55.46 | 51.65 | 83.07 | 55.17 | 51.54 |
+| Chen / ★ Joint | 83.08 | 55.46 | 51.65 | 83.07 | 55.17 | 51.54 |
 | Bartoldson / Entropy | 85.24 | 50.09 | 未評価 | 85.11 | 48.72 | 未評価 |
-| Bartoldson / Student | 84.71 | 50.53 | 計画外 | 85.00 | 45.98 | 計画外 |
+| Bartoldson / ★ Student | 84.71 | 50.53 | 計画外 | 85.00 | 45.98 | 計画外 |
 
 別profileの参考値:
 
@@ -155,12 +159,15 @@ SAAD Table 1では、teacher AAがChen 56.94%からBartoldson 73.71%へ上がる
 
 ### 現時点で言えること
 
-- Chenでは、seed 0のJointはRSLADに対してbest PGDで`-0.19 pp`、best AAで`-0.25 pp`です。改善とは
+- Chenでは、seed 0の★ JointはRSLADに対してbest PGDで`-0.19 pp`、best AAで`-0.25 pp`です。改善とは
   判定できません。ただしERTではteacher riskが小さくJointがRSLADに近づく設計なので、近い結果自体は
   機構上の想定と整合します。
-- Bartoldsonの完了済み2手法では、Studentのbest PGDはEntropyより`+0.44 pp`ですが、best-to-last
+- Bartoldsonの完了済み2手法では、★ Studentのbest PGDはEntropyより`+0.44 pp`ですが、best-to-last
   PGD低下はStudent `4.55 pp`、Entropy `1.37 pp`です。SAAD論文のBartoldson/RSLAD `5.44 pp`、
   full SAAD `0.93 pp`という方向性に対し、Entropyのoverfitting抑制は暫定的に想定どおりです。
+- **提案手法が成功したという証拠はまだありません。** 完了済みの直接比較ではChen/★ JointがRSLADを
+  わずかに下回りました。Bartoldson/★ Studentは対応するRSLADが未完了、Chen/★ Studentは未開始、
+  Bartoldson/★ Jointはtraining中なので、提案全体の失敗ともまだ判定できません。
 - Bartoldson / RSLADとJoint、およびChen / EntropyとStudentが揃っていないため、教師差と手法差を
   分離した結論はまだ出せません。
 - すべてseed 0なので、現在値は探索的結果です。複数seedとfull SAAD/direct baselineなしに論文の主要結論
