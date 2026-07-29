@@ -93,6 +93,10 @@ W&Bは数epoch遅れて見える場合があり、phase状態と最新epochはho
 Chen/StudentはW&B run `prod-chen-student-s0-2d54b82`としてonline tracking中です。Bartoldson/Entropy
 evaluationはW&B run `eval-6dcf1b78a77d3258b2e0`として開始しました。
 
+重複起動を防ぐため、ユーザー承認後にHamster/Ferretのwatchdogとcontrollerだけを一時停止しました。
+既存のChen/Entropy、Bartoldson/RSLAD、Bartoldson/★ Joint、および再配置した2 phaseはdetached
+scientific childとして継続しています。再配置結果をcanonical stateへimportするまでschedulerを再開しません。
+
 ### 現在未着手の研究
 
 - core seed-0ではChen / Studentのみが未開始です。
