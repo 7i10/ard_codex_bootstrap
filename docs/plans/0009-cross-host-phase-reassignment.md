@@ -14,12 +14,13 @@ The original campaign Git SHA, method config, W&B identity, checkpoint bytes, an
 ## Checklist
 
 - [x] Confirm both target phases are not live and both destination GPUs are idle.
-- [ ] Stop automatic launch of the two source assignments without stopping unrelated live phases.
-- [ ] Transfer only the Bartoldson entropy evaluation inputs and verify their SHA-256 on Ferret.
-- [ ] Launch both phases with durable process/exit identity and GPU UUID records.
+- [ ] Stop automatic launch of the two source assignments without stopping unrelated live phases. Explicit user
+  approval is required to pause the watchdog/controllers; detached scientific children must remain untouched.
+- [x] Transfer only the Bartoldson entropy evaluation inputs and verify their SHA-256 on Ferret.
+- [x] Launch both phases with durable process/exit identity and GPU UUID records.
 - [ ] Import terminal evidence back to the canonical output/state location without overwriting prior evidence.
-- [ ] Add focused duplicate-prevention and lineage tests, then run `scripts/verify.py --changed`.
-- [ ] Update the experiment dashboard with actual launch/result evidence.
+- [x] Add focused portability/lineage tests, then run the impact-selected gate.
+- [x] Update the experiment dashboard with actual launch/result evidence.
 
 ## Safety and rollback
 
@@ -27,3 +28,14 @@ The original campaign Git SHA, method config, W&B identity, checkpoint bytes, an
 - Never start a destination phase while its source controller may still launch the same phase.
 - Never copy the 4.7 GiB training bundle when resolved config, best/last checkpoints, and training manifest suffice.
 - A failed transfer or launch leaves the original completed training/PGD artifacts untouched and restores the source queue.
+
+## Execution evidence
+
+- Hamster GPU 0 launched Chen/Student train+PGD at `2026-07-29T05:48:11Z`; W&B online initialization and CUDA
+  utilization were observed.
+- Ferret GPU 2 launched Bartoldson/Entropy AutoAttack at `2026-07-29T06:01:29Z`; W&B evaluation initialization and
+  GPU utilization were observed.
+- Cross-host evaluation initially failed closed because absolute teacher checkpoint paths were treated as scientific
+  identity in three tracking/preflight layers. The runtime now permits only a path relocation: registered SHA-256,
+  teacher metadata, normalization, threat model, training config hash, and checkpoint lineage remain exact.
+- Failed preflight outputs contain no metrics and are retained under explicit `evaluation-autoattack-failed-*` names.

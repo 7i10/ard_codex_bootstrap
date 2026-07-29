@@ -1,6 +1,6 @@
 # 実験ダッシュボード
 
-最終スナップショット: **2026-07-29 14:18 JST**
+最終スナップショット: **2026-07-29 15:02 JST**
 
 このページは、人間が現在の研究目的、条件、進捗、結果、W&B上のrunの役割を一か所で確認するための
 台帳です。実行中の値は変化するため、論文用の確定表ではありません。
@@ -79,10 +79,10 @@ RSLAD/entropy/jointはPGDとAutoAttackまでが予定phaseです。
 |---|---|---|---|
 | 完了 | Hamster 0 | Chen / RSLAD | 200 epoch、PGD、AA完了 |
 | 完了 | Hamster 0 | Bartoldson / Student | 200 epoch、PGD完了。AAは計画対象外 |
-| 再配置準備 | Ferret 2 | Bartoldson / Entropy | 200 epoch、PGD完了。AAだけをHamsterから移送して実行する |
+| 実行中 | Ferret 2 | Bartoldson / Entropy | best/lastをSHA検証して移送し、AAを実行中 |
 | 実行中 | Hamster 1 | Chen / Entropy | epoch 116、val clean/PGD 84.52% / 56.54% |
 | 実行中 | Ferret 0 | Bartoldson / RSLAD | epoch 25、val clean/PGD 72.90% / 40.90% |
-| 再配置準備 | Hamster 0 | Chen / ★ Student | Ferretのtrain queueから外し、空いているHamsterで開始する |
+| 実行中 | Hamster 0 | Chen / ★ Student | 200-epoch trainを開始。完了後に同じGPUでPGDを実行 |
 | 実行中 | Ferret 1 | Bartoldson / ★ Joint | epoch 25、val clean/PGD 72.58% / 41.60% |
 | 完了 | Ferret 2 | Chen / ★ Joint | 200 epoch、PGD、AA完了 |
 
@@ -90,6 +90,8 @@ RSLAD/entropy/jointはPGDとAutoAttackまでが予定phaseです。
 Chen/Student trainへ使い、比較的短いBartoldson/Entropy AutoAttackをFerret GPU 2へ移します。
 移送は未開始phaseだけを対象とし、checkpoint SHA、source SHA、実行GPU UUID、元job IDを記録します。
 W&Bは数epoch遅れて見える場合があり、phase状態と最新epochはhost-local manifest/metricsを正とします。
+Chen/StudentはW&B run `prod-chen-student-s0-2d54b82`としてonline tracking中です。Bartoldson/Entropy
+evaluationはW&B run `eval-6dcf1b78a77d3258b2e0`として開始しました。
 
 ### 現在未着手の研究
 
