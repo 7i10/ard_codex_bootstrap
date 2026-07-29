@@ -105,11 +105,12 @@ def _input_hashes(output: Path, phases: list[str]) -> dict[str, str]:
 
 def _environment(args: argparse.Namespace) -> dict[str, str]:
     repository = args.repository.resolve()
+    runtime_source = (args.runtime_source or (repository / "src")).resolve()
     environment = os.environ.copy()
     environment.update(
         {
             "CUDA_VISIBLE_DEVICES": str(args.gpu),
-            "PYTHONPATH": str(repository / "src"),
+            "PYTHONPATH": str(runtime_source),
             "ARD_CIFAR10_ROOT": args.dataset_root,
             "ARD_NUM_WORKERS": str(args.num_workers),
             "ARD_JOB_OUTPUT_DIR": str(args.output.resolve()),
@@ -136,11 +137,17 @@ def _environment(args: argparse.Namespace) -> dict[str, str]:
 def _execute_spec(path: Path) -> int:
     spec = json.loads(path.read_text(encoding="utf-8"))
     repository = Path(spec["repository"])
+    runtime_repository = Path(spec["runtime_source"]).parent
     lease = Path(spec["lease_path"])
     events = path.with_name("sequence-events.jsonl")
     try:
         if _git(repository, "rev-parse", "HEAD") != spec["git_sha"] or _git(repository, "status", "--porcelain"):
             raise ReassignmentError("scientific repository identity changed after launch")
+        if (
+            _git(runtime_repository, "rev-parse", "HEAD") != spec["runtime_git_sha"]
+            or _git(runtime_repository, "status", "--porcelain")
+        ):
+            raise ReassignmentError("runtime source identity changed after launch")
         for raw_path, expected in spec["input_sha256"].items():
             artifact = Path(raw_path)
             if not artifact.is_file() or _sha256(artifact) != expected:
@@ -177,8 +184,20 @@ def launch(args: argparse.Namespace) -> dict[str, Any]:
         raise ReassignmentError("config is absent from the scientific repository")
     input_hashes = _input_hashes(args.output.resolve(), args.phases)
     commands = _commands(args)
+    runtime_source = (args.runtime_source or (repository / "src")).resolve()
+    if not runtime_source.is_dir():
+        raise ReassignmentError("runtime source directory is absent")
+    runtime_repository = runtime_source.parent
+    runtime_git_sha = _git(runtime_repository, "rev-parse", "HEAD")
+    if _git(runtime_repository, "status", "--porcelain"):
+        raise ReassignmentError("runtime source repository must be clean")
     if args.dry_run:
-        return {"status": "dry-run", "commands": commands, "input_sha256": input_hashes}
+        return {
+            "status": "dry-run",
+            "commands": commands,
+            "input_sha256": input_hashes,
+            "runtime_git_sha": runtime_git_sha,
+        }
 
     snapshots = inventory()
     snapshot = next((item for item in snapshots if item.index == args.gpu), None)
@@ -209,6 +228,8 @@ def launch(args: argparse.Namespace) -> dict[str, Any]:
             "destination_gpu_uuid": snapshot.uuid,
             "repository": str(repository),
             "git_sha": args.git_sha,
+            "runtime_source": str(runtime_source),
+            "runtime_git_sha": runtime_git_sha,
             "output": str(args.output.resolve()),
             "commands": commands,
             "input_sha256": input_hashes,
@@ -251,6 +272,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute-spec", type=Path)
     parser.add_argument("--repository", type=Path)
+    parser.add_argument("--runtime-source", type=Path)
     parser.add_argument("--git-sha")
     parser.add_argument("--config")
     parser.add_argument("--output", type=Path)
