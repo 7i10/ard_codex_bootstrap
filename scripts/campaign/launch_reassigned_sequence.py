@@ -89,8 +89,12 @@ def _input_hashes(output: Path, phases: list[str]) -> dict[str, str]:
         if output.exists():
             raise ReassignmentError("train destination output already exists")
         return {}
-    if phases != ["autoattack"]:
-        raise ReassignmentError("only train+pgd or autoattack sequences are allowed")
+    if phases not in (["pgd", "autoattack"], ["autoattack"]):
+        raise ReassignmentError("only train+pgd, pgd+autoattack, or autoattack sequences are allowed")
+    phase_outputs = [output / f"evaluation-{phase}" for phase in phases]
+    existing = [str(path) for path in phase_outputs if path.exists()]
+    if existing:
+        raise ReassignmentError("evaluation destination output already exists: " + ", ".join(existing))
     required = (
         output / "resolved_config.yaml",
         output / "best.pt",
