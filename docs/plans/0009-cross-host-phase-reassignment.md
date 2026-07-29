@@ -35,6 +35,12 @@ The original campaign Git SHA, method config, W&B identity, checkpoint bytes, an
   utilization were observed.
 - Ferret GPU 2 launched Bartoldson/Entropy AutoAttack at `2026-07-29T06:01:29Z`; W&B evaluation initialization and
   GPU utilization were observed.
+- Chen/Student train+PGD completed with exit code 0 at `2026-07-29T10:12:55Z`. Official test best/last clean was
+  83.35/83.59%, and PGD-20 was 55.44/55.21%. AutoAttack was not a registered phase for this ablation.
+- Bartoldson/Entropy AutoAttack completed with exit code 0 at `2026-07-29T07:42:09Z`. Official test best/last
+  AutoAttack was 47.37/46.16%; the corresponding PGD-20 values remained 50.09/48.72%.
+- At `2026-07-29T23:24+09:00`, Hamster GPUs 0/1 and Ferret GPU 2 were idle. The canonical state import remains
+  intentionally pending, so this idle capacity is not treated as permission to resume the paused schedulers.
 - The user approved pausing both source schedulers. Hamster controller PGID `47653` and Ferret controller PGID
   `13019` stopped after their watchdog screen sessions; GPU utilization and detached scientific wrappers remained
   live. Each host has an atomic `control/reassignment-controller-pause.json` record.

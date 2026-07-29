@@ -1,6 +1,6 @@
 # 実験ダッシュボード
 
-最終スナップショット: **2026-07-29 15:02 JST**
+最終スナップショット: **2026-07-29 23:24 JST**
 
 このページは、人間が現在の研究目的、条件、進捗、結果、W&B上のrunの役割を一か所で確認するための
 台帳です。実行中の値は変化するため、論文用の確定表ではありません。
@@ -79,27 +79,30 @@ RSLAD/entropy/jointはPGDとAutoAttackまでが予定phaseです。
 |---|---|---|---|
 | 完了 | Hamster 0 | Chen / RSLAD | 200 epoch、PGD、AA完了 |
 | 完了 | Hamster 0 | Bartoldson / Student | 200 epoch、PGD完了。AAは計画対象外 |
-| 実行中 | Ferret 2 | Bartoldson / Entropy | best/lastをSHA検証して移送し、AAを実行中 |
-| 実行中 | Hamster 1 | Chen / Entropy | epoch 116、val clean/PGD 84.52% / 56.54% |
-| 実行中 | Ferret 0 | Bartoldson / RSLAD | epoch 25、val clean/PGD 72.90% / 40.90% |
-| 実行中 | Hamster 0 | Chen / ★ Student | 200-epoch trainを開始。完了後に同じGPUでPGDを実行 |
-| 実行中 | Ferret 1 | Bartoldson / ★ Joint | epoch 25、val clean/PGD 72.58% / 41.60% |
+| 完了 | Ferret 2 | Bartoldson / Entropy | 200 epoch、PGD、AA完了 |
+| 評価待ち | Hamster 1 | Chen / Entropy | 200 epoch完了。official PGD/AAは未実行 |
+| 実行中 | Ferret 0 | Bartoldson / RSLAD | epoch 142、val clean/PGD 84.32% / 45.92% |
+| 完了 | Hamster 0 | Chen / ★ Student | 200 epoch、PGD完了。AAは計画対象外 |
+| 実行中 | Ferret 1 | Bartoldson / ★ Joint | epoch 141、val clean/PGD 85.00% / 47.66% |
 | 完了 | Ferret 2 | Chen / ★ Joint | 200 epoch、PGD、AA完了 |
 
-2026-07-29の運用判断として、Ferretへ3本のtrainを集中させません。空いているHamster GPU 0を
-Chen/Student trainへ使い、比較的短いBartoldson/Entropy AutoAttackをFerret GPU 2へ移します。
-移送は未開始phaseだけを対象とし、checkpoint SHA、source SHA、実行GPU UUID、元job IDを記録します。
+2026-07-29の運用判断として、Ferretへ3本のtrainを集中させず、Hamster GPU 0へChen/Student
+train+PGD、Ferret GPU 2へBartoldson/Entropy AutoAttackを再配置しました。両sequenceはexit code 0で
+完了しています。移送は未開始phaseだけを対象とし、checkpoint SHA、source SHA、実行GPU UUID、
+元job IDを記録しました。
 W&Bは数epoch遅れて見える場合があり、phase状態と最新epochはhost-local manifest/metricsを正とします。
-Chen/StudentはW&B run `prod-chen-student-s0-2d54b82`としてonline tracking中です。Bartoldson/Entropy
-evaluationはW&B run `eval-6dcf1b78a77d3258b2e0`として開始しました。
+Chen/StudentはW&B run `prod-chen-student-s0-2d54b82`として完了しました。Bartoldson/Entropy
+evaluationはW&B run `eval-6dcf1b78a77d3258b2e0`として完了しました。
 
 重複起動を防ぐため、ユーザー承認後にHamster/Ferretのwatchdogとcontrollerだけを一時停止しました。
-既存のChen/Entropy、Bartoldson/RSLAD、Bartoldson/★ Joint、および再配置した2 phaseはdetached
-scientific childとして継続しています。再配置結果をcanonical stateへimportするまでschedulerを再開しません。
+現在はBartoldson/RSLADとBartoldson/★ Jointのdetached scientific childだけが実行中です。
+Hamster GPU 0/1とFerret GPU 2は空いています。再配置結果をcanonical stateへimportするまでschedulerを
+再開しないため、Chen/Entropyのofficial evaluationは自動開始されません。
 
 ### 現在未着手の研究
 
-- core seed-0ではChen / Studentのみが未開始です。
+- core seed-0の全8 trainは開始済みで、6本がtrain完了、2本が実行中です。
+- Chen/Entropyのofficial PGD/AAと、実行中2本の完了後evaluationが残っています。
 - seed 1/2、複数seed統計、teacher感度のmean/std/worst/bestは未着手です。
 - controlled protocolでのPGD-AT、TRADES、full SAAD直接比較は未着手です。
 - CIFAR-100、MobileNetV2、Tiny-ImageNet本訓練は未着手です。
@@ -113,8 +116,9 @@ scientific childとして継続しています。再配置結果をcanonical sta
 | Teacher / method | Best clean | Best PGD | Best AA | Last clean | Last PGD | Last AA |
 |---|---:|---:|---:|---:|---:|---:|
 | Chen / RSLAD | 83.18 | 55.65 | 51.90 | 83.22 | 55.44 | 51.78 |
+| Chen / ★ Student | 83.35 | 55.44 | 計画外 | 83.59 | 55.21 | 計画外 |
 | Chen / ★ Joint | 83.08 | 55.46 | 51.65 | 83.07 | 55.17 | 51.54 |
-| Bartoldson / Entropy | 85.24 | 50.09 | 未評価 | 85.11 | 48.72 | 未評価 |
+| Bartoldson / Entropy | 85.24 | 50.09 | 47.37 | 85.11 | 48.72 | 46.16 |
 | Bartoldson / ★ Student | 84.71 | 50.53 | 計画外 | 85.00 | 45.98 | 計画外 |
 
 別profileの参考値:
@@ -165,15 +169,17 @@ SAAD Table 1では、teacher AAがChen 56.94%からBartoldson 73.71%へ上がる
 
 ### 現時点で言えること
 
-- Chenでは、seed 0の★ JointはRSLADに対してbest PGDで`-0.19 pp`、best AAで`-0.25 pp`です。改善とは
-  判定できません。ただしERTではteacher riskが小さくJointがRSLADに近づく設計なので、近い結果自体は
-  機構上の想定と整合します。
+- Chenでは、seed 0の★ JointはRSLADに対してbest PGDで`-0.19 pp`、best AAで`-0.25 pp`、★ Studentは
+  best PGDで`-0.21 pp`です。完了した提案2手法はいずれもbaselineを改善していません。ただしERTでは
+  teacher riskが小さくJointがRSLADに近づく設計なので、近い結果自体は機構上の想定と整合します。
 - Bartoldsonの完了済み2手法では、★ Studentのbest PGDはEntropyより`+0.44 pp`ですが、best-to-last
-  PGD低下はStudent `4.55 pp`、Entropy `1.37 pp`です。SAAD論文のBartoldson/RSLAD `5.44 pp`、
-  full SAAD `0.93 pp`という方向性に対し、Entropyのoverfitting抑制は暫定的に想定どおりです。
-- **提案手法が成功したという証拠はまだありません。** 完了済みの直接比較ではChen/★ JointがRSLADを
-  わずかに下回りました。Bartoldson/★ Studentは対応するRSLADが未完了、Chen/★ Studentは未開始、
-  Bartoldson/★ Jointはtraining中なので、提案全体の失敗ともまだ判定できません。
+  PGD低下はStudent `4.55 pp`、Entropy `1.37 pp`、EntropyのAA低下は`1.21 pp`です。SAAD論文の
+  Bartoldson/RSLAD `5.44 pp`、full SAAD `0.93 pp`という方向性に対し、Entropyのoverfitting抑制は
+  暫定的に想定どおりです。ただしEntropyのbest AA 47.37%はfull SAAD報告値50.34%より`-2.97 pp`で、
+  同一手法ではありません。
+- **提案手法が成功したという証拠はまだありません。** Chenでは★ Student/JointがともにRSLADを
+  わずかに下回りました。Bartoldson/★ Studentと★ Jointは対応するRSLADの確定結果が未完了なので、
+  提案全体の失敗ともまだ判定できません。
 - Bartoldson / RSLADとJoint、およびChen / EntropyとStudentが揃っていないため、教師差と手法差を
   分離した結論はまだ出せません。
 - すべてseed 0なので、現在値は探索的結果です。複数seedとfull SAAD/direct baselineなしに論文の主要結論
@@ -212,24 +218,26 @@ Host別root:
 epoch/step metrics、best/last summaries、model/run-bundle/sample-stat/Table artifactsと、saved-checkpoint
 evaluationが別runとして保存されます。evaluation runはtrain runの重複ではなく、評価分離の証拠です。
 
-## 6. W&B 26 runの整理
+## 6. W&B runの整理
 
-APIで確認した時点では、**14 train + 12 evaluation = 26 run**、状態は**23 finished + 3 running**でした。
+前回APIで確認した時点では、**14 train + 12 evaluation = 26 run**、状態は
+**23 finished + 3 running**でした。この監査後にChen/Student train+PGDとBartoldson/Entropy AAが
+W&Bへ追加されたため、26件は現在数ではありません。次のAPI監査まで削除判断には使いません。
 crashed状態はなく、26件すべてが少なくとも1つのartifactを持っています。
 
-### A. 論文候補cohortの重要run — 13件
+### A. 論文候補cohortの重要run
 
-この13件は削除対象にしません。正式な結果はevaluation run、再現性とcheckpoint lineageは対応するtrain
+このcohortは削除対象にしません。正式な結果はevaluation run、再現性とcheckpoint lineageは対応するtrain
 runが担うため、両方が必要です。
 
 | セル | Train | PGD evaluation | AutoAttack evaluation |
 |---|---|---|---|
 | Chen / RSLAD | [`prod-chen-rslad-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-rslad-s0-2d54b82) | [`eval-7008…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-7008ebd671ee70b41990) | [`eval-7ebd…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-7ebd06a00e4f8f2d996d) |
 | Chen / Entropy | [`prod-chen-entropy-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-entropy-s0-2d54b82) | 未作成 | 未作成 |
-| Chen / Student | 未作成 | 未作成 | 計画外 |
+| Chen / Student | [`prod-chen-student-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-student-s0-2d54b82) | [`eval-141e…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-141ef2fedeb6cd23c4fe) | 計画外 |
 | Chen / Joint | [`prod-chen-joint-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-joint-s0-2d54b82) | [`eval-1eefd…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-1eefd911db6c022c20f6) | [`eval-eafdd…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-eafdd255adb7eb585582) |
 | Bartoldson / RSLAD | [`prod-bart-rslad-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-rslad-s0-2d54b82) | 未作成 | 未作成 |
-| Bartoldson / Entropy | [`prod-bart-entropy-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-entropy-s0-2d54b82) | [`eval-8ff4…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-8ff463c11843dfdd9b24) | 未作成 |
+| Bartoldson / Entropy | [`prod-bart-entropy-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-entropy-s0-2d54b82) | [`eval-8ff4…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-8ff463c11843dfdd9b24) | [`eval-6dcf…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-6dcf1b78a77d3258b2e0) |
 | Bartoldson / Student | [`prod-bart-student-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-student-s0-2d54b82) | [`eval-3839…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-3839fd906dfc2aa5b318) | 計画外 |
 | Bartoldson / Joint | [`prod-bart-joint-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-joint-s0-2d54b82) | 未作成 | 未作成 |
 
