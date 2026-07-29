@@ -61,6 +61,13 @@ evaluation attack, sample count, world size, BatchNorm profile, seed, Git SHA, a
   - Acceptance: dashboard matches the captured evidence and the worktree is clean after the cohesive commit.
   - Rollback: revert the documentation commit.
   - Commit: `Document experiment status and W&B run roles`.
+- [x] D3 — Add paper-reference targets and classify reproduction fidelity.
+  - Files: `docs/EXPERIMENT_DASHBOARD.md`, this plan.
+  - Tests: primary-paper table/source cross-check and docs-only changed-path gate.
+  - Acceptance: original RSLAD, SAAD RSLAD analysis, full SAAD, and entropy-only references are not conflated;
+    Student/Joint are explicitly identified as new ablations without published target values.
+  - Rollback: revert the reference-only documentation delta.
+  - Commit: `Compare current results with published baselines`.
 
 ## Agent and review budget
 
@@ -93,6 +100,12 @@ review on a read-only reporting delta.
   best/last PGD and available AutoAttack results were copied from evaluation result files.
 - 2026-07-29: `git diff --check` passed. `/home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py --changed`
   selected T0 and reported `no impacted tests`; no GPU or scientific test was run for the docs-only delta.
+- 2026-07-29: Reopened the dashboard for a primary-source comparison after the user correctly noted that current
+  controlled reproduction results need their paper targets and method provenance. GPU reassignment remains a separate
+  operational decision because the current runner fixes host/GPU in its immutable campaign identity.
+- 2026-07-29: D3 added the original RSLAD best result, SAAD Chen/Bartoldson RSLAD records, full-SAAD Bartoldson
+  result, and the Gowal entropy-weighting compatibility result. The dashboard now labels the active campaign as a
+  controlled SAAD-analysis reproduction plus new Student/Joint ablations, not an exact RSLAD or full-SAAD reproduction.
 
 ## Completion report
 

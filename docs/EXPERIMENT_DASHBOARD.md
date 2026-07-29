@@ -32,6 +32,15 @@ teacher overconfidenceとstudentの時変robust learnabilityを分離して観�
 | `rslad_student` | adversarial student probability marginのEMAからriskを計算 |
 | `rslad_joint` | student risk × `1 - H/log(C)` |
 
+Studentは、各sampleのadversarial predictionについて
+`margin = p_student(y|x_adv) - max_{c != y} p_student(c|x_adv)`を測り、decay 0.9のEMAを保持します。
+`student_risk = (1-margin_ema)/2`なので、正解classが他classより十分優勢ならriskは低く、誤分類または
+境界付近なら高くなります。
+
+Jointはこのstudent riskへ、teacherのoverconfidence
+`teacher_risk = 1 - H(teacher(x_adv))/log(C)`を掛けます。したがって、**studentがそのsampleを頑健に
+学びにくく、かつteacherが低entropyで過信している場合だけ**riskが大きくなります。
+
 schema-v2のstudent/joint主経路は、riskに応じてadversarial KDのteacher targetを一様分布へ最大0.5だけ
 softenします。KD weightは1、hard-label weightは0のままで、sampleを削除しません。旧KD/CE fallbackは
 別の明示的ablationであり、今回の8セルには含まれません。
@@ -104,12 +113,54 @@ manifest/metricsを正とします。
 |---|---|---:|---:|
 | world size 2、per-rank 64、local BN | Chen / RSLAD | 83.51 / 55.88 | 83.42 / 55.61 |
 
+### これは何の再現実験か
+
+現在の8セルは、**RSLAD原論文の完全再現ではなく、SAAD論文のteacher分析を基準にしたcontrolled
+reproduction + 新規ablation**です。
+
+共通しているのはCIFAR-10、ResNet-18、200 epochs、batch 128、SGD、LR milestones 100/150、PGD-10
+training、epsilon `8/255`、step `2/255`、およびSAAD論文でERT/IRT分析に使われたChen/Bartoldson
+checkpointです。一方、次が異なります。
+
+- [RSLAD原論文](https://arxiv.org/abs/2108.07969)の主結果はTRADESで訓練した別のWRN-34-10教師と
+  300 epochsを使用します。
+- 現在はseed 0のみですが、SAADの主要表は3 seed平均です。
+- 現在は固定validation splitでbestを選択し、world-size 1 / local BNを実行identityとして固定しています。
+- `rslad_entropy`はSAAD entropy weightingをRSLADへ載せた軽量ablationで、AdaAD+IGDM inner、
+  teacher input gradient、SWAを含む**full SAADではありません**。
+- Student/Jointはこの研究基盤の新規ablationで、RSLAD/SAAD論文に同名の公開目標値はありません。
+
+### 論文・公開記録との比較
+
+| Source / setting | Clean | PGD | AA | 現在値との関係 |
+|---|---:|---:|---:|---|
+| RSLAD原論文: WRN-34-10教師、RSLAD best、300 epochs | 83.38 | 55.94 | 51.49 | Chen/RSLAD現在値は`-0.20 / -0.29 / +0.41 pp`だが、教師とepochが異なる |
+| SAAD Table 1/10: Chen34-10教師、RSLAD | — | — | 52.21 | Chen/RSLAD現在AA 51.90は`-0.31 pp` |
+| SAAD Table 4: Bart94教師、RSLAD、3-seed mean | 84.28±0.11 | 47.17±0.33 | 44.42±0.34 | 現在のBart/RSLADが比較対象。まだtraining中 |
+| SAAD Table 4: Bart94教師、full SAAD、3-seed mean | 84.27±0.18 | 53.39±0.23 | 50.34±0.08 | 現在のEntropy-onlyと同一手法ではない |
+| SAAD Table 16: Gowal28教師、RSLAD + SAAD weighting | 81.74 | 50.54 | 48.53 | Entropy weighting単体の機構参照。教師が異なる |
+
+RSLAD原論文のPGD欄は`PGD_TRADES`であり、現在のofficial CE PGD-20とは攻撃lossが同一ではありません。
+この行は実装のsanity referenceであって、厳密な数値差判定には使いません。
+
+Sources:
+
+- [RSLAD paper, CIFAR-10 best/last tables](https://arxiv.org/pdf/2108.07969)
+- [SAAD paper, ERT/IRT analysis, three-seed results, and weighting ablation](https://arxiv.org/html/2512.10275)
+
+SAAD Table 1では、teacher AAがChen 56.94%からBartoldson 73.71%へ上がる一方、RSLAD student AAは
+52.21%から44.07%へ低下し、Bartoldsonのrobust-overfitting gapは5.44 ppと報告されています。これが
+現在の2-teacher比較で再確認したい主要現象です。full SAADではBartoldson/ResNet-18のAAが
+50.34±0.08%まで改善したと報告されています。
+
 ### 現時点で言えること
 
 - Chenでは、seed 0のJointはRSLADに対してbest PGDで`-0.19 pp`、best AAで`-0.25 pp`です。改善とは
-  判定できません。
+  判定できません。ただしERTではteacher riskが小さくJointがRSLADに近づく設計なので、近い結果自体は
+  機構上の想定と整合します。
 - Bartoldsonの完了済み2手法では、Studentのbest PGDはEntropyより`+0.44 pp`ですが、best-to-last
-  PGD低下はStudent `4.55 pp`、Entropy `1.37 pp`です。
+  PGD低下はStudent `4.55 pp`、Entropy `1.37 pp`です。SAAD論文のBartoldson/RSLAD `5.44 pp`、
+  full SAAD `0.93 pp`という方向性に対し、Entropyのoverfitting抑制は暫定的に想定どおりです。
 - Bartoldson / RSLADとJoint、およびChen / EntropyとStudentが揃っていないため、教師差と手法差を
   分離した結論はまだ出せません。
 - すべてseed 0なので、現在値は探索的結果です。複数seedとfull SAAD/direct baselineなしに論文の主要結論
