@@ -844,6 +844,7 @@ class LocalTracker:
 def create_tracker(
     *,
     config: ExperimentConfig,
+    preflight_config: ExperimentConfig | None = None,
     output_dir: Path,
     config_hash: str,
     root: Path,
@@ -866,7 +867,7 @@ def create_tracker(
     )
     if not is_rank_zero():
         return NullTracker(run_id)
-    _validate_robustbench_teacher_preflight(config, root=root)
+    _validate_robustbench_teacher_preflight(preflight_config or config, root=root)
     return LocalTracker(
         config=config,
         output_dir=output_dir,

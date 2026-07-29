@@ -730,6 +730,26 @@ def test_nonzero_rank_receives_null_tracker(tmp_path: Path, monkeypatch: pytest.
     assert tracker.run_id == "stable-run"
 
 
+def test_tracker_uses_explicit_local_preflight_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    canonical = config(tmp_path / "run", mode="disabled")
+    local = canonical.model_copy(update={"output_dir": tmp_path / "local-path"})
+    observed: list[ExperimentConfig] = []
+    monkeypatch.setattr(
+        "ard.tracking.adapter._validate_robustbench_teacher_preflight",
+        lambda candidate, *, root: observed.append(candidate),
+    )
+
+    create_tracker(
+        config=canonical,
+        preflight_config=local,
+        output_dir=tmp_path / "run",
+        config_hash="abc",
+        root=Path.cwd(),
+    ).finish()
+
+    assert observed == [local]
+
+
 def test_tracking_phase_is_rng_observational() -> None:
     import numpy as np
     import torch

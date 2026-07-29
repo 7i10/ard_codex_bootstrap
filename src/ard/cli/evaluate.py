@@ -248,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     evaluation_tracker = create_tracker(
         config=tracker_config,
+        preflight_config=preflight_config,
         output_dir=output_dir,
         config_hash=evaluation_hash,
         root=Path.cwd(),
