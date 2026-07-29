@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 
 from ard.analysis import ParquetDependencyError, fixed_panel_ids, summarize_checkpoint_groups, write_sample_parquet
-from ard.cli.evaluate import _evaluation_tracker_config, _validate_evaluation_tracking_identity
+from ard.cli.evaluate import (
+    _evaluation_preflight_config,
+    _evaluation_tracker_config,
+    _validate_evaluation_tracking_identity,
+)
 from ard.config.schema import ExperimentConfig, TrainingConfig, training_execution_identity, validate_global_batch_size
 from ard.engine.checkpoint import REQUIRED_KEYS
 from ard.evaluation.autoattack import run_autoattack
@@ -184,6 +188,25 @@ def test_evaluation_rejects_relocated_teacher_checkpoint_with_different_sha() ->
 
     with pytest.raises(ValueError, match="teacher identity"):
         _validate_evaluation_tracking_identity(evaluation, training)
+
+
+def test_evaluation_preflight_uses_relocated_path_but_preserves_training_lineage() -> None:
+    training = _tracked_repro_config()
+    assert training.teacher is not None
+    evaluation = training.model_copy(
+        update={
+            "teacher": training.teacher.model_copy(
+                update={"checkpoint": Path("/different-host/teacher-checkpoint.pt")}
+            )
+        }
+    )
+
+    preflight = _evaluation_preflight_config(evaluation, training)
+
+    assert preflight.teacher == evaluation.teacher
+    assert preflight.method == training.method
+    assert preflight.seeds == training.seeds
+    assert preflight.tracking == training.tracking
 
 
 def test_evaluation_tracker_config_uses_training_identity_and_evaluation_only_fields(tmp_path: Path) -> None:

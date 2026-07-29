@@ -159,6 +159,13 @@ def _evaluation_tracker_config(
     return training_config.model_copy(update={"evaluation": config.evaluation, "output_dir": output_dir})
 
 
+def _evaluation_preflight_config(
+    config: ExperimentConfig, training_config: ExperimentConfig
+) -> ExperimentConfig:
+    """Use portable local paths without changing canonical training lineage."""
+    return training_config.model_copy(update={"teacher": config.teacher})
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config = load_config(args.config, args.overrides)
@@ -174,7 +181,11 @@ def main(argv: list[str] | None = None) -> int:
         raise FileNotFoundError(f"sibling resolved training config is missing: {training_config_path}")
     training_config = load_config(training_config_path)
     _validate_evaluation_tracking_identity(config, training_config)
-    validate_tracking_guard(training_config, root=Path.cwd())
+    # The training config remains the canonical lineage/config-hash source.
+    # Only use the evaluation host's already-verified checkpoint location for
+    # the local RobustBench preflight.
+    preflight_config = _evaluation_preflight_config(config, training_config)
+    validate_tracking_guard(preflight_config, root=Path.cwd())
     evaluation_dataset = config.evaluation.dataset
     training_dataset = training_config.dataset
     if (evaluation_dataset.name, evaluation_dataset.num_classes, evaluation_dataset.image_size) != (
