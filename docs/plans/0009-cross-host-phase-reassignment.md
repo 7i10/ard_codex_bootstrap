@@ -21,6 +21,9 @@ The original campaign Git SHA, method config, W&B identity, checkpoint bytes, an
 - [ ] Import terminal evidence back to the canonical output/state location without overwriting prior evidence.
 - [x] Add focused portability/lineage tests, then run the impact-selected gate.
 - [x] Update the experiment dashboard with actual launch/result evidence.
+- [x] Use newly idle GPUs for Chen/Entropy PGD+AA and post-hoc Chen/Bartoldson Student AA.
+- [x] Arm exact-successor watchers for the two live Ferret trains without resuming the duplicate-prone full controller.
+- [ ] Collect the five newly running/waiting evaluation sequences and update the final result table.
 
 ## Safety and rollback
 
@@ -41,6 +44,12 @@ The original campaign Git SHA, method config, W&B identity, checkpoint bytes, an
   AutoAttack was 47.37/46.16%; the corresponding PGD-20 values remained 50.09/48.72%.
 - At `2026-07-29T23:24+09:00`, Hamster GPUs 0/1 and Ferret GPU 2 were idle. The canonical state import remains
   intentionally pending, so this idle capacity is not treated as permission to resume the paused schedulers.
+- At `2026-07-29T23:33+09:00`, Hamster GPU 0 launched Chen/Entropy PGD+AA and GPU 1 launched the post-hoc
+  Chen/Student AA. Chen/Entropy PGD finished with exit code 0 before its AA began.
+- Bartoldson/Student checkpoint inputs were copied to Ferret with all four SHA-256 values matching, then its
+  post-hoc AA launched on Ferret GPU 2 at `2026-07-29T23:34+09:00`.
+- Ferret RSLAD and Joint train-successor watchers were armed from runtime commit `0bffb7a`. They validate exact
+  train exit/completion/Git/GPU/lease identity and can only launch the registered PGD+AA sequence on the same GPU.
 - The user approved pausing both source schedulers. Hamster controller PGID `47653` and Ferret controller PGID
   `13019` stopped after their watchdog screen sessions; GPU utilization and detached scientific wrappers remained
   live. Each host has an atomic `control/reassignment-controller-pause.json` record.

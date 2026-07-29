@@ -1,6 +1,6 @@
 # 実験ダッシュボード
 
-最終スナップショット: **2026-07-29 23:24 JST**
+最終スナップショット: **2026-07-29 23:43 JST**
 
 このページは、人間が現在の研究目的、条件、進捗、結果、W&B上のrunの役割を一か所で確認するための
 台帳です。実行中の値は変化するため、論文用の確定表ではありません。
@@ -72,18 +72,20 @@ softenします。KD weightは1、hard-label weightは0のままで、sampleを�
 
 ## 3. 現在の進捗
 
-「完了」は、そのセルに事前登録された全phaseが終わったことを表します。student-onlyはPGDまで、
-RSLAD/entropy/jointはPGDとAutoAttackまでが予定phaseです。
+「完了」は、そのセルに現在登録された全phaseが終わったことを表します。当初student-onlyはPGDまで、
+RSLAD/entropy/jointはPGDとAutoAttackまでが予定phaseでした。空きGPUを利用するユーザー判断により、
+2026-07-29 23:33 JSTからStudent 2セルにも同一standard AutoAttackを事後追加しています。訓練条件や
+checkpoint selectionは変えていません。
 
 | 状態 | Host/GPU | Teacher / method | 現在の証拠 |
 |---|---|---|---|
 | 完了 | Hamster 0 | Chen / RSLAD | 200 epoch、PGD、AA完了 |
-| 完了 | Hamster 0 | Bartoldson / Student | 200 epoch、PGD完了。AAは計画対象外 |
+| AA実行中 | Ferret 2 | Bartoldson / ★ Student | 200 epoch、PGD完了。事後追加AAを実行中 |
 | 完了 | Ferret 2 | Bartoldson / Entropy | 200 epoch、PGD、AA完了 |
-| 評価待ち | Hamster 1 | Chen / Entropy | 200 epoch完了。official PGD/AAは未実行 |
-| 実行中 | Ferret 0 | Bartoldson / RSLAD | epoch 142、val clean/PGD 84.32% / 45.92% |
-| 完了 | Hamster 0 | Chen / ★ Student | 200 epoch、PGD完了。AAは計画対象外 |
-| 実行中 | Ferret 1 | Bartoldson / ★ Joint | epoch 141、val clean/PGD 85.00% / 47.66% |
+| AA実行中 | Hamster 0 | Chen / Entropy | PGD完了。best clean/PGD 82.87% / 55.12% |
+| 実行中 | Ferret 0 | Bartoldson / RSLAD | epoch 146、val clean/PGD 84.42% / 46.04% |
+| AA実行中 | Hamster 1 | Chen / ★ Student | 200 epoch、PGD完了。事後追加AAを実行中 |
+| 実行中 | Ferret 1 | Bartoldson / ★ Joint | epoch 145、val clean/PGD 85.38% / 46.90% |
 | 完了 | Ferret 2 | Chen / ★ Joint | 200 epoch、PGD、AA完了 |
 
 2026-07-29の運用判断として、Ferretへ3本のtrainを集中させず、Hamster GPU 0へChen/Student
@@ -95,14 +97,15 @@ Chen/StudentはW&B run `prod-chen-student-s0-2d54b82`として完了しました
 evaluationはW&B run `eval-6dcf1b78a77d3258b2e0`として完了しました。
 
 重複起動を防ぐため、ユーザー承認後にHamster/Ferretのwatchdogとcontrollerだけを一時停止しました。
-現在はBartoldson/RSLADとBartoldson/★ Jointのdetached scientific childだけが実行中です。
-Hamster GPU 0/1とFerret GPU 2は空いています。再配置結果をcanonical stateへimportするまでschedulerを
-再開しないため、Chen/Entropyのofficial evaluationは自動開始されません。
+現在は2 trainと3 AutoAttackがdetached scientific childとして実行中です。Ferretの2 trainには、
+exit code 0、completion marker、Git SHA、GPU UUID、GPU lease ownershipを検証してから同じGPUで
+PGD→AAだけを起動する限定watcherを設定しました。全campaign controllerは再開していないため、
+完了済みChen/Studentを重複訓練しません。
 
 ### 現在未着手の研究
 
 - core seed-0の全8 trainは開始済みで、6本がtrain完了、2本が実行中です。
-- Chen/Entropyのofficial PGD/AAと、実行中2本の完了後evaluationが残っています。
+- Chen/Entropy PGDは完了しました。3本のAAが実行中で、Ferretの2 train後評価は自動待機中です。
 - seed 1/2、複数seed統計、teacher感度のmean/std/worst/bestは未着手です。
 - controlled protocolでのPGD-AT、TRADES、full SAAD直接比較は未着手です。
 - CIFAR-100、MobileNetV2、Tiny-ImageNet本訓練は未着手です。
@@ -116,10 +119,11 @@ Hamster GPU 0/1とFerret GPU 2は空いています。再配置結果をcanonica
 | Teacher / method | Best clean | Best PGD | Best AA | Last clean | Last PGD | Last AA |
 |---|---:|---:|---:|---:|---:|---:|
 | Chen / RSLAD | 83.18 | 55.65 | 51.90 | 83.22 | 55.44 | 51.78 |
-| Chen / ★ Student | 83.35 | 55.44 | 計画外 | 83.59 | 55.21 | 計画外 |
+| Chen / Entropy | 82.87 | 55.12 | 実行中 | 83.03 | 55.06 | 実行中 |
+| Chen / ★ Student | 83.35 | 55.44 | 実行中 | 83.59 | 55.21 | 実行中 |
 | Chen / ★ Joint | 83.08 | 55.46 | 51.65 | 83.07 | 55.17 | 51.54 |
 | Bartoldson / Entropy | 85.24 | 50.09 | 47.37 | 85.11 | 48.72 | 46.16 |
-| Bartoldson / ★ Student | 84.71 | 50.53 | 計画外 | 85.00 | 45.98 | 計画外 |
+| Bartoldson / ★ Student | 84.71 | 50.53 | 実行中 | 85.00 | 45.98 | 実行中 |
 
 別profileの参考値:
 
@@ -233,12 +237,12 @@ runが担うため、両方が必要です。
 | セル | Train | PGD evaluation | AutoAttack evaluation |
 |---|---|---|---|
 | Chen / RSLAD | [`prod-chen-rslad-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-rslad-s0-2d54b82) | [`eval-7008…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-7008ebd671ee70b41990) | [`eval-7ebd…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-7ebd06a00e4f8f2d996d) |
-| Chen / Entropy | [`prod-chen-entropy-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-entropy-s0-2d54b82) | 未作成 | 未作成 |
-| Chen / Student | [`prod-chen-student-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-student-s0-2d54b82) | [`eval-141e…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-141ef2fedeb6cd23c4fe) | 計画外 |
+| Chen / Entropy | [`prod-chen-entropy-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-entropy-s0-2d54b82) | [`eval-7b10…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-7b10222b14d776f001ca) | [`eval-d35b…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-d35bce64e04dbdbdd56e) |
+| Chen / Student | [`prod-chen-student-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-student-s0-2d54b82) | [`eval-141e…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-141ef2fedeb6cd23c4fe) | [`eval-ae9e…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-ae9e62a7694d143f3fb9) |
 | Chen / Joint | [`prod-chen-joint-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-chen-joint-s0-2d54b82) | [`eval-1eefd…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-1eefd911db6c022c20f6) | [`eval-eafdd…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-eafdd255adb7eb585582) |
 | Bartoldson / RSLAD | [`prod-bart-rslad-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-rslad-s0-2d54b82) | 未作成 | 未作成 |
 | Bartoldson / Entropy | [`prod-bart-entropy-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-entropy-s0-2d54b82) | [`eval-8ff4…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-8ff463c11843dfdd9b24) | [`eval-6dcf…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-6dcf1b78a77d3258b2e0) |
-| Bartoldson / Student | [`prod-bart-student-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-student-s0-2d54b82) | [`eval-3839…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-3839fd906dfc2aa5b318) | 計画外 |
+| Bartoldson / Student | [`prod-bart-student-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-student-s0-2d54b82) | [`eval-3839…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-3839fd906dfc2aa5b318) | [`eval-180f…`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/eval-180f437c57a483fdf8e7) |
 | Bartoldson / Joint | [`prod-bart-joint-s0-2d54b82`](https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/prod-bart-joint-s0-2d54b82) | 未作成 | 未作成 |
 
 ### B. 重要だが別profileのreference — 2件
