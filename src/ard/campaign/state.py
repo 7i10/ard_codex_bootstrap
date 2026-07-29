@@ -62,10 +62,28 @@ _TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     ),
     JobState.TRAINING: frozenset({JobState.TRAINING_COMPLETED, JobState.FAILED, JobState.BLOCKED}),
     JobState.TRAINING_COMPLETED: frozenset(
-        {JobState.LAUNCHING, JobState.PGD_EVALUATION, JobState.FAILED, JobState.BLOCKED}
+        {
+            JobState.WAITING_DEPENDENCY,
+            JobState.WAITING_GPU,
+            JobState.WAITING_FOR_MEMORY,
+            JobState.LAUNCHING,
+            JobState.PGD_EVALUATION,
+            JobState.FAILED,
+            JobState.BLOCKED,
+        }
     ),
     JobState.PGD_EVALUATION: frozenset({JobState.PGD_COMPLETED, JobState.FAILED, JobState.BLOCKED}),
-    JobState.PGD_COMPLETED: frozenset({JobState.LAUNCHING, JobState.AUTOATTACK, JobState.COMPLETED, JobState.BLOCKED}),
+    JobState.PGD_COMPLETED: frozenset(
+        {
+            JobState.WAITING_DEPENDENCY,
+            JobState.WAITING_GPU,
+            JobState.WAITING_FOR_MEMORY,
+            JobState.LAUNCHING,
+            JobState.AUTOATTACK,
+            JobState.COMPLETED,
+            JobState.BLOCKED,
+        }
+    ),
     JobState.AUTOATTACK: frozenset({JobState.COMPLETED, JobState.PGD_COMPLETED_AUTOATTACK_FAILED, JobState.BLOCKED}),
     JobState.COMPLETED: frozenset(),
     JobState.PGD_COMPLETED_AUTOATTACK_FAILED: frozenset(),
@@ -76,6 +94,12 @@ _TRANSITIONS: dict[JobState, frozenset[JobState]] = {
 
 class StateError(CampaignError):
     pass
+
+
+# This is deliberately the exact ``repr`` produced by the conservative
+# nvidia-smi admission failure in ``campaign.gpu``.  Recovery may not turn a
+# generic controller or launch failure into a new training attempt.
+NVIDIA_SMI_ADMISSION_ERROR = "GPUInspectionError('nvidia-smi inventory failed; refusing GPU admission')"
 
 
 class FileLock:
@@ -284,6 +308,98 @@ class CampaignStateStore:
             job["revision"] = int(job.get("revision", 0)) + 1
             _atomic_json(path, job)
             self._append_event_locked({"kind": "evidence", "job_id": job_id, "evidence_kind": kind})
+
+    def recover_transient_gpu_blocks(self, job_ids: tuple[str, ...] | list[str]) -> dict[str, dict[str, Any]]:
+        """Atomically requeue explicitly named, never-launched inventory blocks.
+
+        This is intentionally narrower than a general terminal-state reset:
+        only the exact nvidia-smi admission error may be recovered, and a job
+        that has any phase/launch evidence is never eligible.  All records are
+        validated while holding the host lock before writing any job file.
+        """
+        requested = tuple(job_ids)
+        with self.host_lock:
+            records = self._validate_transient_gpu_blocks_locked(requested)
+
+            recovered: dict[str, dict[str, Any]] = {}
+            now = utc_now()
+            for job_id, job in records.items():
+                prior = {
+                    "state": job["state"],
+                    "failure": job["failure"],
+                    "inventory_error": job["inventory_error"],
+                    "revision": job.get("revision", 0),
+                    "recovered_at": now,
+                }
+                history = list(job.get("recovery_history", []))
+                history.append(prior)
+                job["recovery_history"] = history
+                # Keep the failed admission available in immutable history,
+                # but do not let it masquerade as the reason for a later
+                # state transition.
+                job.pop("failure", None)
+                job.pop("inventory_error", None)
+                job["state"] = JobState.PREFLIGHT.value
+                job["updated_at"] = now
+                job["revision"] = int(job.get("revision", 0)) + 1
+                _atomic_json(self.jobs_path / f"{job_id}.json", job)
+                self._append_event_locked(
+                    {
+                        "kind": "transient_gpu_block_recovered",
+                        "job_id": job_id,
+                        "from": JobState.BLOCKED.value,
+                        "to": JobState.PREFLIGHT.value,
+                        "revision": job["revision"],
+                    }
+                )
+                recovered[job_id] = job
+            return recovered
+
+    def validate_transient_gpu_blocks(self, job_ids: tuple[str, ...] | list[str]) -> dict[str, dict[str, Any]]:
+        """Validate a recovery dry run under the same lock as its mutation."""
+        with self.host_lock:
+            return self._validate_transient_gpu_blocks_locked(tuple(job_ids))
+
+    def _validate_transient_gpu_blocks_locked(self, requested: tuple[str, ...]) -> dict[str, dict[str, Any]]:
+        if not requested or len(set(requested)) != len(requested):
+            raise StateError("recovery requires one or more unique explicit job IDs")
+        records: dict[str, dict[str, Any]] = {}
+        for job_id in requested:
+            path = self.jobs_path / f"{job_id}.json"
+            if not path.is_file():
+                raise StateError(f"recovery job is absent: {job_id}")
+            job = _read_json(path)
+            if job.get("state") != JobState.BLOCKED.value:
+                raise StateError(f"recovery job is not blocked: {job_id}")
+            if job.get("failure") != "GPU inventory unavailable":
+                raise StateError(f"recovery job has a non-transient failure: {job_id}")
+            if job.get("inventory_error") != NVIDIA_SMI_ADMISSION_ERROR:
+                raise StateError(f"recovery job has an unexpected inventory error: {job_id}")
+            # A blocked preflight has no launch intent.  Any of these fields
+            # proves recovery could duplicate a phase or obscure output
+            # lineage.
+            if any(key in job for key in ("phase", "launch_intent", "launch_record", "exit_record", "gpu_uuid")):
+                raise StateError(f"recovery job has phase or launch evidence: {job_id}")
+            records[job_id] = job
+        return records
+
+    def rearm_after_transient_gpu_recovery(self) -> dict[str, Any]:
+        """Arm only from the explicit human scientific-review boundary."""
+        with self.host_lock:
+            campaign = _read_json(self.campaign_path)
+            if campaign.get("state") != "awaiting_scientific_review":
+                raise StateError("transient recovery may re-arm only from awaiting_scientific_review")
+            campaign["state"] = "armed"
+            campaign["updated_at"] = utc_now()
+            _atomic_json(self.campaign_path, campaign)
+            self._append_event_locked(
+                {
+                    "kind": "campaign_rearmed_after_transient_gpu_recovery",
+                    "from": "awaiting_scientific_review",
+                    "to": "armed",
+                }
+            )
+            return campaign
 
     def _append_event_locked(self, event: dict[str, Any]) -> None:
         self.events_path.parent.mkdir(parents=True, exist_ok=True)

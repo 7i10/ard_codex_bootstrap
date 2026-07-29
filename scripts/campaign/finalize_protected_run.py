@@ -57,6 +57,30 @@ def _validate_evaluation(output: Path) -> None:
             raise FinalizationError("evaluation metrics are incomplete or non-finite")
 
 
+def _with_active_python_on_path(environment: dict[str, str]) -> dict[str, str]:
+    """Make same-environment console scripts (notably ``wandb``) discoverable."""
+    updated = dict(environment)
+    python_bin = str(Path(sys.executable).resolve().parent)
+    current = updated.get("PATH", "")
+    updated["PATH"] = os.pathsep.join(part for part in (python_bin, current) if part)
+    return updated
+
+
+def _evaluation_command(train_output: Path, evaluation_output: Path) -> list[str]:
+    """Evaluate with the exact config persisted by the protected training run."""
+    return [
+        sys.executable,
+        "-m",
+        "ard.cli.evaluate",
+        "--config",
+        str(train_output / "resolved_config.yaml"),
+        "--checkpoint-dir",
+        str(train_output),
+        "--output",
+        str(evaluation_output),
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-dir", type=Path, required=True)
@@ -73,7 +97,7 @@ def main() -> int:
         time.sleep(args.interval_seconds)
     if int(exit_code.read_text(encoding="utf-8").strip()) != 0:
         raise FinalizationError("protected training run did not exit successfully")
-    environment = os.environ.copy()
+    environment = _with_active_python_on_path(os.environ.copy())
     environment.update(
         {
             "PYTHONPATH": str(old_repo / "src"),
@@ -99,17 +123,7 @@ def main() -> int:
     if subprocess.run(sync, cwd=old_repo, env=environment).returncode != 0 or not _synced_terminal(train_output):
         raise FinalizationError("protected training W&B sync failed")
     if not evaluation_output.exists():
-        command = [
-            sys.executable,
-            "-m",
-            "ard.cli.evaluate",
-            "--config",
-            "configs/production/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml",
-            "--checkpoint-dir",
-            str(train_output),
-            "--output",
-            str(evaluation_output),
-        ]
+        command = _evaluation_command(train_output, evaluation_output)
         if subprocess.run(command, cwd=old_repo, env=environment).returncode != 0:
             raise FinalizationError("protected saved-checkpoint evaluation failed")
     if subprocess.run(sync, cwd=old_repo, env=environment).returncode != 0:

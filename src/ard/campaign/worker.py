@@ -21,6 +21,7 @@ class WorkerError(CampaignError):
 
 _ACTIVE = frozenset({JobState.TRAINING, JobState.PGD_EVALUATION, JobState.AUTOATTACK})
 _PHASE_STATE = {"train": JobState.TRAINING, "pgd": JobState.PGD_EVALUATION, "autoattack": JobState.AUTOATTACK}
+_WAITING_STATES = frozenset({JobState.WAITING_DEPENDENCY, JobState.WAITING_GPU, JobState.WAITING_FOR_MEMORY})
 PhaseSuccessValidator = Callable[[JobSpec, str, Path], str | None]
 
 
@@ -396,45 +397,64 @@ class CampaignWorker:
             if current == JobState.PGD_COMPLETED and job.phases.autoattack is None:
                 self.state.transition_job(job.id, JobState.COMPLETED, autoattack_status="not_requested")
                 continue
-            phase = self._next_phase(job, current)
+            try:
+                phase = self._next_phase(job, current, record)
+            except WorkerError as exc:
+                self.state.transition_job(
+                    job.id,
+                    JobState.BLOCKED,
+                    failure="invalid pending successor phase",
+                    pending_successor_error=str(exc),
+                )
+                continue
             if phase is None:
                 continue
             if current in {
                 JobState.PENDING,
-                JobState.WAITING_DEPENDENCY,
-                JobState.WAITING_GPU,
-                JobState.WAITING_FOR_MEMORY,
+                *_WAITING_STATES,
             }:
                 self.state.transition_job(job.id, JobState.PREFLIGHT)
             if not self._dependencies_complete(job):
-                self.state.transition_job(job.id, JobState.WAITING_DEPENDENCY)
+                self.state.transition_job(job.id, JobState.WAITING_DEPENDENCY, pending_successor_phase=phase)
                 continue
             if self._preflight_and_launch(job, phase):
                 return
 
     def _queue_key(self, job: JobSpec) -> tuple[int, int, str]:
-        state = JobState(self.state.job(job.id)["state"])
-        phase = self._next_phase(job, state)
+        record = self.state.job(job.id)
+        state = JobState(record["state"])
+        try:
+            phase = self._next_phase(job, state, record)
+        except WorkerError:
+            # Surface invalid durable state before any valid launch.  The
+            # launch loop records the fail-closed blocked transition.
+            return (-1, job.priority, job.id)
         # Once a GPU's training finishes, its mandatory saved-checkpoint PGD
         # must run before that same slot accepts another training job.  Other
         # free GPUs can still begin their initial train phases; AA stays last.
         rank = {"pgd": 0, "train": 1, "autoattack": 2}.get(phase or "autoattack", 3)
         return (rank, job.priority, job.id)
 
-    def _next_phase(self, job: JobSpec, state: JobState) -> str | None:
-        if state in {
-            JobState.PENDING,
-            JobState.PREFLIGHT,
-            JobState.WAITING_DEPENDENCY,
-            JobState.WAITING_GPU,
-            JobState.WAITING_FOR_MEMORY,
-        }:
+    def _next_phase(self, job: JobSpec, state: JobState, record: dict[str, Any]) -> str | None:
+        if state in _WAITING_STATES or state == JobState.PREFLIGHT:
+            if "pending_successor_phase" in record:
+                return self._validated_pending_successor_phase(job, record["pending_successor_phase"])
+            return "train"
+        if state == JobState.PENDING:
             return "train"
         if state == JobState.TRAINING_COMPLETED:
             return "pgd"
         if state == JobState.PGD_COMPLETED and job.phases.autoattack is not None:
             return "autoattack"
         return None
+
+    @staticmethod
+    def _validated_pending_successor_phase(job: JobSpec, phase: object) -> str:
+        if not isinstance(phase, str) or phase not in _PHASE_STATE:
+            raise WorkerError("pending successor phase is absent or unknown")
+        if phase == "autoattack" and job.phases.autoattack is None:
+            raise WorkerError("pending successor phase autoattack is not configured")
+        return phase
 
     def _dependencies_complete(self, job: JobSpec) -> bool:
         for dependency in job.depends_on:
@@ -473,15 +493,23 @@ class CampaignWorker:
                 target,
                 gpu_snapshot=snapshot.json(),
                 admission=self._admission_json(admission),
+                pending_successor_phase=phase,
             )
             return False
         lock = self._gpu_lease_lock(snapshot.uuid)
         if not lock.acquire(blocking=False):
-            self.state.transition_job(job.id, JobState.WAITING_GPU, failure=None, gpu_lock="held")
+            self.state.transition_job(
+                job.id, JobState.WAITING_GPU, failure=None, gpu_lock="held", pending_successor_phase=phase
+            )
             return False
         try:
             if self._gpu_claimed_by_other_job(job) or self._gpu_lease_path(snapshot.uuid).exists():
-                self.state.transition_job(job.id, JobState.WAITING_GPU, gpu_lock="host-global lease held")
+                self.state.transition_job(
+                    job.id,
+                    JobState.WAITING_GPU,
+                    gpu_lock="host-global lease held",
+                    pending_successor_phase=phase,
+                )
                 return False
             return self._launch(job, phase, snapshot, admission)
         finally:
@@ -519,6 +547,7 @@ class CampaignWorker:
             admission=self._admission_json(admission),
             gpu_uuid=snapshot.uuid,
             launch_intent=intent,
+            pending_successor_phase=None,
         )
         self._write_gpu_lease(snapshot.uuid, job, phase, intent)
         try:

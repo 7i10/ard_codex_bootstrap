@@ -716,3 +716,194 @@ def test_pgd_precedes_next_train_on_the_same_gpu(tmp_path: Path) -> None:
         state.transition_job("job-1", target)
     assert worker.run_once()["job-1"] == "pgd_evaluation"
     assert launched == ["pgd-1"]
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+@pytest.mark.parametrize(
+    ("predecessor", "successor", "wait_state"),
+    [
+        (JobState.TRAINING_COMPLETED, "pgd", JobState.WAITING_GPU),
+        (JobState.TRAINING_COMPLETED, "pgd", JobState.WAITING_FOR_MEMORY),
+        (JobState.PGD_COMPLETED, "autoattack", JobState.WAITING_GPU),
+        (JobState.PGD_COMPLETED, "autoattack", JobState.WAITING_FOR_MEMORY),
+    ],
+)
+def test_completed_phase_waits_then_launches_its_exact_successor(
+    tmp_path: Path, predecessor: JobState, successor: str, wait_state: JobState
+) -> None:
+    raw = _raw_campaign(autoattack=True)
+    release_marker = tmp_path / "protected-release.json"
+    if wait_state == JobState.WAITING_GPU:
+        raw["reservations"] = [
+            {
+                "host": "hamster",
+                "gpu": 0,
+                "run_id": "protected",
+                "execution_profile": "ws2",
+                "protected_git_sha": "b" * 40,
+                "release_marker": str(release_marker),
+            }
+        ]
+    spec = CampaignSpec.model_validate(raw)
+    launched: list[str] = []
+
+    def launcher(argv: tuple[str, ...], **kwargs: object) -> dict[str, object]:
+        del argv
+        launched.append(Path(kwargs["exit_record"]).parent.name)  # type: ignore[index,arg-type]
+        return {
+            "wrapper": {"pid": 999999, "start_time_ticks": 1, "cwd": str(tmp_path), "argv_digest": "not-live"},
+            "phase_argv_digest": "digest",
+            "run_id": "job-1",
+            "git_sha": "a" * 40,
+            "exit_record": str(kwargs["exit_record"]),
+            "launch_record": str(kwargs["launch_record"]),
+        }
+
+    snapshots = (_snapshot(),)
+    state = CampaignStateStore(tmp_path / "state")
+    worker = CampaignWorker(
+        spec,
+        state,
+        host="hamster",
+        repository=tmp_path,
+        output_root=tmp_path,
+        inventory_provider=lambda: snapshots,
+        launcher=launcher,
+        gpu_lock_root=tmp_path / "locks",
+    )
+    worker.arm()
+    for target in (JobState.PREFLIGHT, JobState.LAUNCHING, JobState.TRAINING, JobState.TRAINING_COMPLETED):
+        state.transition_job("job-1", target)
+    if predecessor == JobState.PGD_COMPLETED:
+        for target in (JobState.LAUNCHING, JobState.PGD_EVALUATION, JobState.PGD_COMPLETED):
+            state.transition_job("job-1", target)
+
+    if wait_state == JobState.WAITING_FOR_MEMORY:
+        snapshots = (
+            GPUSnapshot(
+                index=0,
+                uuid="GPU-abc123",
+                memory_free_mib=124,
+                memory_used_mib=876,
+                memory_total_mib=1000,
+                utilization_percent=0,
+                temperature_c=30,
+                processes=(),
+            ),
+        )
+    assert worker.run_once()["job-1"] == wait_state.value
+    assert state.job("job-1")["pending_successor_phase"] == successor
+
+    if wait_state == JobState.WAITING_GPU:
+        release_marker.write_text(
+            json.dumps(
+                {
+                    "status": "completed",
+                    "run_id": "protected",
+                    "training_git_sha": "b" * 40,
+                    "execution_profile": "ws2",
+                    "training_sync": "completed",
+                    "saved_checkpoint_pgd": "completed",
+                }
+            ),
+            encoding="utf-8",
+        )
+    else:
+        snapshots = (_snapshot(),)
+    expected_state = {"pgd": JobState.PGD_EVALUATION, "autoattack": JobState.AUTOATTACK}[successor]
+    assert worker.run_once()["job-1"] == expected_state.value
+    assert launched == [successor]
+    assert state.job("job-1")["pending_successor_phase"] is None
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+@pytest.mark.parametrize(
+    ("marker", "error"),
+    [("unknown", "absent or unknown"), ("autoattack", "not configured")],
+)
+def test_invalid_pending_successor_phase_blocks_without_retraining(tmp_path: Path, marker: str, error: str) -> None:
+    spec = CampaignSpec.model_validate(_raw_campaign(autoattack=False))
+    state = CampaignStateStore(tmp_path / "state")
+    worker = CampaignWorker(
+        spec,
+        state,
+        host="hamster",
+        repository=tmp_path,
+        output_root=tmp_path,
+        inventory_provider=lambda: (_snapshot(),),
+        launcher=lambda *_args, **_kwargs: pytest.fail("invalid successor marker must never launch train"),
+    )
+    worker.arm()
+    state.transition_job("job-1", JobState.PREFLIGHT)
+    state.transition_job("job-1", JobState.WAITING_GPU, pending_successor_phase=marker)
+
+    assert worker.run_once()["job-1"] == "blocked"
+    blocked = state.job("job-1")
+    assert blocked["failure"] == "invalid pending successor phase"
+    assert error in blocked["pending_successor_error"]
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+def test_legacy_wait_record_without_successor_marker_remains_train_only(tmp_path: Path) -> None:
+    spec = CampaignSpec.model_validate(_raw_campaign(autoattack=False))
+    state = CampaignStateStore(tmp_path / "state")
+    launched: list[str] = []
+
+    def launcher(argv: tuple[str, ...], **kwargs: object) -> dict[str, object]:
+        del argv
+        launched.append(Path(kwargs["exit_record"]).parent.name)  # type: ignore[index,arg-type]
+        return {
+            "wrapper": {"pid": 999999, "start_time_ticks": 1, "cwd": str(tmp_path), "argv_digest": "not-live"},
+            "phase_argv_digest": "digest",
+            "run_id": "job-1",
+            "git_sha": "a" * 40,
+            "exit_record": str(kwargs["exit_record"]),
+            "launch_record": str(kwargs["launch_record"]),
+        }
+
+    worker = CampaignWorker(
+        spec,
+        state,
+        host="hamster",
+        repository=tmp_path,
+        output_root=tmp_path,
+        inventory_provider=lambda: (_snapshot(),),
+        launcher=launcher,
+        gpu_lock_root=tmp_path / "locks",
+    )
+    worker.arm()
+    state.transition_job("job-1", JobState.PREFLIGHT)
+    state.transition_job("job-1", JobState.WAITING_GPU)
+
+    assert worker.run_once()["job-1"] == "training"
+    assert launched == ["train"]
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+def test_waiting_successor_phase_keeps_pgd_queue_priority(tmp_path: Path) -> None:
+    raw = _raw_campaign(autoattack=False)
+    first = raw["jobs"][0]  # type: ignore[index]
+    first["priority"] = 999
+    second = dict(first)
+    second.update({"id": "job-2", "output": "outputs/job-2", "priority": 1})
+    second["wandb"] = {"entity": "entity", "project": "project", "group": "group", "run_id": "wandb-job-2"}
+    raw["jobs"] = [first, second]  # type: ignore[index]
+    spec = CampaignSpec.model_validate(raw)
+    state = CampaignStateStore(tmp_path / "state")
+    worker = CampaignWorker(
+        spec,
+        state,
+        host="hamster",
+        repository=tmp_path,
+        output_root=tmp_path,
+        inventory_provider=lambda: (_snapshot(),),
+    )
+    for target in (JobState.PREFLIGHT, JobState.LAUNCHING, JobState.TRAINING, JobState.TRAINING_COMPLETED):
+        state.transition_job("job-1", target)
+    state.transition_job("job-1", JobState.WAITING_GPU, pending_successor_phase="pgd")
+
+    assert [job.id for job in sorted(worker._host_jobs(), key=worker._queue_key)] == ["job-1", "job-2"]  # noqa: SLF001

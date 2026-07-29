@@ -4,8 +4,8 @@
 
 - Owner: main thread integration; Sol planning/review; Terra core implementation; Luna config/docs synchronization
 - Branch / base SHA: `master` / `9a45747`
-- Current milestone: C4 focused verification and consolidated review
-- Last updated: 2026-07-23
+- Current milestone: C6 seed-0 production recovery and handoff
+- Last updated: 2026-07-29
 
 ## Goal
 
@@ -112,6 +112,15 @@ optional lower-priority AutoAttack, and terminal lineage validation without dupl
   - Acceptance before Codex stops: workers detached on both hosts; correct SHA/profile/GPU; first epoch finite;
     durable state advances; W&B identity visible. Workers continue autonomously for about five days.
   - Completion: after core PGD/selected AA, state becomes `awaiting_scientific_review`, not an automatic seed sweep.
+- [ ] C7 — Driver-outage recovery
+  - Preserve all successful phase records and recover only never-launched jobs with the exact observed
+    `nvidia-smi` admission failure.
+  - Keep the scientific worktree at `2d54b8230b8d14d13c1ea7472ccba53491b4d38d`; record a separate clean
+    control-plane revision for watchdog/reconciliation fixes.
+  - Require the protected Ferret run's W&B sync, exact best/last PGD, and release marker before rearming its three
+    blocked jobs.
+  - Acceptance: no duplicate training; pending PGD/AutoAttack survives GPU waits; watchdog is singleton and
+    persistent; Hamster/Ferret GPU inventory is healthy; all new control regressions pass.
 
 ## Agent and review budget
 
@@ -165,6 +174,20 @@ for closed findings or wait synchronously on long experiments.
   Hash-bound acceptance passed after correcting a gate-only stale assumption: schema-v2 Joint keeps KD weight 1 while
   softening targets with positive post-warmup risk. Peak reserved VRAM was 2058 MiB (Chen RSLAD), 2070 MiB (Chen
   Joint), and 3688 MiB (Bartoldson RSLAD). See `docs/debugging/0011-joint-pilot-acceptance-semantics.md`.
+- 2026-07-23: Seed-0 production was armed on both hosts from the accepted evidence. Hamster's Chen RSLAD and
+  Bartoldson entropy cells produced finite first epochs and continued through at least epochs 5 and 1 respectively;
+  Ferret's Chen Joint cell launched while GPUs 0/1 remained under the pre-registered protected-run reservation.
+  A restricted PID namespace made host controller PIDs appear absent even while metric files continued advancing;
+  no restart was performed from that ambiguous observation. C6 remains open until the Ferret first-epoch scalar is
+  read from a host-visible shell and the detached handoff is fully corroborated.
+- 2026-07-29: Both hosts recovered healthy driver 595.84 inventories (Hamster 2 × RTX 4090, Ferret 3 × RTX 4090).
+  Completed training/evaluation phases were reconciled without rerun. Hamster launched the previously queued Chen
+  entropy cell; Ferret retained three never-launched exact inventory failures behind the protected-run release gate.
+- 2026-07-29: Recovery exposed a successor-state bug: a busy GPU after PGD caused
+  `pgd_completed -> waiting_gpu` to terminate the controller, while an edge-only repair could have retried `train`.
+  The fix persists and validates the exact pending successor phase. The protected finalizer was also corrected to
+  locate same-environment W&B and to evaluate from the training run's persisted resolved config. See
+  `docs/debugging/0012-gpu-outage-campaign-recovery.md`.
 
 ## Completion report
 
