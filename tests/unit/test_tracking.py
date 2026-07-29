@@ -733,10 +733,15 @@ def test_nonzero_rank_receives_null_tracker(tmp_path: Path, monkeypatch: pytest.
 def test_tracker_uses_explicit_local_preflight_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     canonical = config(tmp_path / "run", mode="disabled")
     local = canonical.model_copy(update={"output_dir": tmp_path / "local-path"})
-    observed: list[ExperimentConfig] = []
+    observed_preflight: list[ExperimentConfig] = []
+    observed_lineage: list[ExperimentConfig] = []
     monkeypatch.setattr(
         "ard.tracking.adapter._validate_robustbench_teacher_preflight",
-        lambda candidate, *, root: observed.append(candidate),
+        lambda candidate, *, root: observed_preflight.append(candidate),
+    )
+    monkeypatch.setattr(
+        "ard.tracking.adapter._teacher_metadata",
+        lambda candidate, *, root: observed_lineage.append(candidate),
     )
 
     create_tracker(
@@ -747,7 +752,8 @@ def test_tracker_uses_explicit_local_preflight_config(tmp_path: Path, monkeypatc
         root=Path.cwd(),
     ).finish()
 
-    assert observed == [local]
+    assert observed_preflight == [local]
+    assert observed_lineage == [local]
 
 
 def test_tracking_phase_is_rng_observational() -> None:

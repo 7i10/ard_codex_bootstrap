@@ -367,6 +367,7 @@ class LocalTracker:
         training_seeds: Mapping[str, int] | None = None,
         evaluation_seed: int | None = None,
         training_execution: Mapping[str, object] | None = None,
+        teacher_lineage_config: ExperimentConfig | None = None,
     ) -> None:
         self.config, self.output_dir, self.config_hash, self.root, self.run_id = (
             config,
@@ -383,6 +384,7 @@ class LocalTracker:
         self._prepared = False
         self._terminal_resume = False
         self._finalization_id = uuid.uuid4().hex
+        self._teacher_lineage_config = teacher_lineage_config or config
         resolved_training_seeds = (
             config.seeds if training_seeds is None else SeedsConfig.model_validate(dict(training_seeds))
         )
@@ -422,7 +424,7 @@ class LocalTracker:
             current_lineage = {
                 "git": {key: value for key, value in git.items() if key != "diff"},
                 "external": _external_metadata(root),
-                "teacher": _teacher_metadata(config, root=root),
+                "teacher": _teacher_metadata(self._teacher_lineage_config, root=root),
             }
             for key, current in current_lineage.items():
                 if prior.get(key) != current:
@@ -465,7 +467,7 @@ class LocalTracker:
             "training_execution_identity": resolved_training_execution,
             "git": {key: value for key, value in git.items() if key != "diff"},
             "external": _external_metadata(root),
-            "teacher": _teacher_metadata(config, root=root),
+            "teacher": _teacher_metadata(self._teacher_lineage_config, root=root),
             "sync_state": "running" if config.tracking.mode == "offline_sync" else None,
             "wandb_initialized": False,
             "summary": {},
@@ -880,6 +882,7 @@ def create_tracker(
         training_seeds=training_seeds,
         evaluation_seed=evaluation_seed,
         training_execution=training_execution,
+        teacher_lineage_config=preflight_config,
     )
 
 
