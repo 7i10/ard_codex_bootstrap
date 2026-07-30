@@ -18,6 +18,7 @@ from ard.analysis.signal_audit import (
     associate_wandb_versions,
     audit_report,
     binary_metrics,
+    bootstrap_binary_metric_intervals,
     bootstrap_metric_delta,
     deterministic_hash_split,
     final_state_association,
@@ -28,11 +29,13 @@ from ard.analysis.signal_audit import (
     logical_dataset_identity,
     namespaced_samples,
     prospective_prediction,
+    replay_protocol,
     select_prospective_checkpoints,
     validate_sample_partitions,
     validate_teacher_risk_replay,
     write_audit_report,
 )
+from ard.analysis.teacher_risk_replay import replay_source_hashes
 from ard.cli.signal_audit import main as signal_audit_main
 from ard.engine.checkpoint import REQUIRED_KEYS, config_digest
 
@@ -180,6 +183,13 @@ def test_inventory_extracts_epoch_state_and_content_addressed_identity(tmp_path:
     assert inventory[0].scientific_git_sha == "a" * 40
 
 
+def test_inventory_accepts_forward_compatible_complete_checkpoint(tmp_path: Path) -> None:
+    payload = _checkpoint(run_id="run-0", config_hash="b" * 64, epoch=5, records=_records())
+    payload["future_checkpoint_extension"] = {"format": 2}
+    manifest = _manifest_with_checkpoint(tmp_path, payload=payload)
+    assert inventory_run_bundle(manifest)[0].epoch == 5
+
+
 def test_inventory_refuses_checkpoint_manifest_identity_mismatch(tmp_path: Path) -> None:
     manifest = _manifest_with_checkpoint(
         tmp_path, payload=_checkpoint(run_id="other-run", config_hash="b" * 64, epoch=5, records=_records())
@@ -227,6 +237,11 @@ def test_hash_split_and_clustered_bootstrap_are_deterministic() -> None:
     first = bootstrap_metric_delta(repeated, baseline=baseline, candidate=candidate, seed=7, replicates=25)
     assert first == bootstrap_metric_delta(repeated, baseline=baseline, candidate=candidate, seed=7, replicates=25)
     assert first["clustered_by_sample_id"] is True
+    intervals = bootstrap_binary_metric_intervals(repeated, scores=candidate, seed=7, replicates=25)
+    assert intervals == bootstrap_binary_metric_intervals(repeated, scores=candidate, seed=7, replicates=25)
+    assert intervals["clustered_by_sample_id"] is True
+    assert set(intervals["metrics"]) == {"auroc", "auprc", "log_loss", "prevalence"}
+    assert all(bounds["lower"] <= bounds["upper"] for bounds in intervals["metrics"].values())
 
 
 def test_cluster_bootstrap_keeps_each_repeated_sample_whole_and_stratifies_only_class() -> None:
@@ -331,6 +346,122 @@ def test_teacher_replay_requires_complete_provenance_envelope() -> None:
             teacher_checkpoint_sha256="d" * 64,
             dataset_fingerprint="dataset",
             threat_or_attack_identity={"attack": "pgd"},
+        )
+
+
+def test_teacher_replay_requires_matching_portable_dataset_identity_when_formal() -> None:
+    historical = CheckpointInventory(
+        "run-0", "model", ("last",), 0, "unused.pt", "a" * 64, 1, True, 1, "b" * 64, "c" * 40, "v1"
+    )
+    rows = [{"namespace": "train", "sample_id": 0, "class_id": 0, "teacher_risk": 0.5}]
+    envelope = {
+        "run_id": "run-0",
+        "historical_epoch": 1,
+        "historical_checkpoint_sha256": "a" * 64,
+        "teacher_checkpoint_sha256": "d" * 64,
+        "dataset_fingerprint": "dataset",
+        "attack_identity": {"name": "pgd"},
+        "dataset_identity": {"name": "cifar10", "content_fingerprint": "portable", "version": "v1"},
+        "rows": rows,
+        "replay_output_sha256": hashlib.sha256(
+            json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
+    }
+    assert validate_teacher_risk_replay(
+        envelope,
+        historical=historical,
+        teacher_checkpoint_sha256="d" * 64,
+        dataset_fingerprint="dataset",
+        threat_or_attack_identity={"name": "pgd"},
+        dataset_identity=envelope["dataset_identity"],
+    ) == tuple(rows)
+    with pytest.raises(SignalAuditError, match="portable dataset identity"):
+        validate_teacher_risk_replay(
+            envelope,
+            historical=historical,
+            teacher_checkpoint_sha256="d" * 64,
+            dataset_fingerprint="dataset",
+            threat_or_attack_identity={"name": "pgd"},
+            dataset_identity={"name": "cifar10", "content_fingerprint": "different", "version": "v1"},
+        )
+
+
+def test_formal_teacher_replay_requires_clean_protocol_source_and_bound_provenance() -> None:
+    historical = CheckpointInventory(
+        "run-0", "model", ("last",), 0, "unused.pt", "a" * 64, 1, True, 1, "b" * 64, "c" * 40, "v1"
+    )
+    rows = [{"namespace": "train", "sample_id": 0, "class_id": 0, "teacher_risk": 0.5}]
+    source_files = replay_source_hashes()
+    protocol = replay_protocol(batch_size=128, attack_seed_base=19, device_type="cuda")
+    checkpoint_training = {
+        "world_size": 1,
+        "execution_identity": {
+            "world_size": 1,
+            "per_rank_batch_size": 128,
+            "global_batch_size": 128,
+            "effective_global_batch_size": 128,
+            "batchnorm_mode": "local_per_rank",
+        },
+    }
+    envelope = {
+        "run_id": "run-0",
+        "historical_epoch": 1,
+        "historical_checkpoint_sha256": "a" * 64,
+        "teacher_checkpoint_sha256": "d" * 64,
+        "dataset_fingerprint": "dataset",
+        "attack_identity": {"epsilon_value": 8 / 255},
+        "dataset_identity": {"name": "cifar10", "content_fingerprint": "portable", "version": "v1"},
+        "replay_protocol": protocol,
+        "replay_source_files": source_files,
+        "replay_source_sha256": hashlib.sha256(
+            json.dumps(source_files, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
+        "git": {"sha": "f" * 40, "dirty": False},
+        "max_abs_delta": 8 / 255,
+        "checkpoint_training": checkpoint_training,
+        "rows": rows,
+        "replay_output_sha256": hashlib.sha256(
+            json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
+    }
+    kwargs = {
+        "historical": historical,
+        "teacher_checkpoint_sha256": "d" * 64,
+        "dataset_fingerprint": "dataset",
+        "threat_or_attack_identity": {"epsilon_value": 8 / 255},
+        "dataset_identity": envelope["dataset_identity"],
+        "expected_replay_protocol": protocol,
+        "expected_git_sha": "f" * 40,
+        "expected_checkpoint_training": checkpoint_training,
+    }
+    assert validate_teacher_risk_replay(envelope, **kwargs) == tuple(rows)
+    with pytest.raises(SignalAuditError, match="clean Git"):
+        validate_teacher_risk_replay({**envelope, "git": {"sha": "f" * 40, "dirty": True}}, **kwargs)
+    with pytest.raises(SignalAuditError, match="Git SHA does not match"):
+        validate_teacher_risk_replay(envelope, **{**kwargs, "expected_git_sha": "e" * 40})
+    with pytest.raises(SignalAuditError, match="Linf bound"):
+        validate_teacher_risk_replay({**envelope, "max_abs_delta": 8 / 255 + 1e-6}, **kwargs)
+    with pytest.raises(SignalAuditError, match="source combined SHA"):
+        validate_teacher_risk_replay({**envelope, "replay_source_sha256": "3" * 64}, **kwargs)
+    forged_sources = {"analysis_module": "1" * 64, "cli_module": "2" * 64}
+    with pytest.raises(SignalAuditError, match="source hashes do not match"):
+        validate_teacher_risk_replay(
+            {
+                **envelope,
+                "replay_source_files": forged_sources,
+                "replay_source_sha256": hashlib.sha256(
+                    json.dumps(forged_sources, sort_keys=True, separators=(",", ":")).encode()
+                ).hexdigest(),
+            },
+            **kwargs,
+        )
+    with pytest.raises(SignalAuditError, match="protocol"):
+        validate_teacher_risk_replay(
+            {
+                **envelope,
+                "replay_protocol": replay_protocol(batch_size=64, attack_seed_base=19, device_type="cuda"),
+            },
+            **kwargs,
         )
 
 
@@ -564,6 +695,8 @@ def test_valid_replay_envelope_fits_prospective_models_and_writes_byte_stable_re
     assert len(report["analysis_source_sha256"]) == 64
     assert set(report["analysis_source_files"]) == {"analysis_module", "cli_module"}
     assert all(len(digest) == 64 for digest in report["analysis_source_files"].values())
+    model_metrics = report["prospective_prediction"]["outcomes"]["final_robust_error"]["models"]["teacher_only"]
+    assert set(model_metrics["bootstrap_95"]["metrics"]) == {"auroc", "auprc", "log_loss", "prevalence"}
     first, second = tmp_path / "first.json", tmp_path / "second.json"
     write_audit_report(first, report)
     write_audit_report(second, report)
@@ -607,8 +740,13 @@ def test_cli_accepts_real_parquet_with_manifest_list_and_keeps_formal_decision_i
     resolved = {
         "teacher": {"checkpoint_sha256": "c" * 64, "registry_id": "teacher-0"},
         "method": {"id": "rslad_joint", "attack": {"name": "synthetic"}},
-        "seeds": {"model_init": 7, "split": 3},
-        "training": {"validation_fraction": 0.25},
+        "seeds": {"model_init": 7, "split": 3, "train_attack": 11},
+        "training": {
+            "validation_fraction": 0.25,
+            "per_rank_batch_size": 2,
+            "global_batch_size": 2,
+            "batchnorm_mode": "local_per_rank",
+        },
         "dataset": {"name": "synthetic", "split": "train", "root": "/host-a/data", "download": False},
     }
     resolved_hash = config_digest(resolved)
@@ -683,6 +821,8 @@ def test_cli_accepts_real_parquet_with_manifest_list_and_keeps_formal_decision_i
                 "wandb_inventory": "wandb-inventory.json",
                 "dataset_fingerprint": logical_dataset_fingerprint(resolved, train_expected_count=2),
                 "threat_identity": {"name": "synthetic"},
+                "replay_batch_size": 2,
+                "replay_device_type": "cuda",
             }
         ),
         encoding="utf-8",

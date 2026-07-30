@@ -34,3 +34,5 @@ stored_risk_kind: student
 split_seed: 0
 bootstrap_seed: 0
 bootstrap_replicates: 1000
+replay_batch_size: 128
+replay_device_type: cuda

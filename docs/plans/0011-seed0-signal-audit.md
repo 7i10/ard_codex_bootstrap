@@ -39,8 +39,8 @@ sample ID. AUPRC is always reported with positive prevalence.
 - [x] Implement fail-closed artifact inventory and dataset-namespace checks.
 - [x] Implement final-state association and prospective prediction as separate
   analysis outputs.
-- [ ] Run the frozen seed-zero audit without new training. (Student complete;
-  Joint and historical teacher-risk replay pending.)
+- [ ] Run the frozen seed-zero audit without new training. (All four
+  artifact-only reports complete; historical teacher-risk replay pending.)
 - [ ] Perform one consolidated scientific review and update the experiment
   dashboard with results and limitations.
 
@@ -62,11 +62,12 @@ student-state dynamics, but the preregistered teacher-only versus augmented
 prospective comparison remains `insufficient_data` until a deterministic
 saved-checkpoint replay produces historical teacher risk.
 
-Selected epoch-99/199 Student checkpoint bytes match W&B `last:v19/v39`.
-The Chen and Bartoldson Student reports ran successfully on 2026-07-30 and
-remain `insufficient_data` by construction. Their final-state associations
-show student-risk AUROC 0.961/0.957 and teacher-risk AUROC 0.156/0.192 for
-same-run final robust error. These numbers are exploratory and do not satisfy
+Selected epoch-99/199 Student/Joint checkpoint bytes match W&B
+`last:v19/v39`. All four reports ran successfully on 2026-07-30 and remain
+`insufficient_data` by construction. Student final-state associations show
+student-risk AUROC 0.961/0.957 and teacher-risk AUROC 0.156/0.192 for
+Chen/Bartoldson same-run final robust error; Joint shows 0.956/0.949 and
+0.150/0.194 respectively. These numbers are exploratory and do not satisfy
 the prospective Signal Go/No-Go contract.
 
 ## Data contracts

@@ -5,22 +5,28 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import torch
 import yaml
 
 from ard.analysis.signal_audit import (
+    CheckpointInventory,
     SignalAuditError,
     associate_wandb_versions,
     audit_report,
     inventory_run_bundle,
     load_final_sample_stats,
     logical_dataset_fingerprint,
+    logical_dataset_identity,
+    replay_protocol,
     select_prospective_checkpoints,
     write_audit_report,
 )
+from ard.config.schema import TrainingConfig, training_execution_identity
 from ard.engine.checkpoint import config_digest
 
 
@@ -39,6 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path, help="Resolved JSON/YAML audit configuration.")
     parser.add_argument("--output", required=True, type=Path, help="Canonical JSON report path.")
+    parser.add_argument(
+        "--teacher-risk-replay",
+        type=Path,
+        help="Override the configured replay provenance JSON without modifying the analysis config.",
+    )
     return parser
 
 
@@ -53,8 +64,35 @@ def _run_manifest(manifests: list[Path], *, run_id: str) -> tuple[Path, dict[str
     return matches[0]
 
 
+def _source_tree_clean_git_sha() -> str:
+    root = Path(__file__).resolve().parents[3]
+    try:
+        sha = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "-C", str(root), "status", "--porcelain"], check=True, capture_output=True, text=True
+            ).stdout.strip()
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SignalAuditError("formal replay validation requires a readable source-tree Git identity") from exc
+    if dirty:
+        raise SignalAuditError("formal replay validation requires a clean source-tree Git worktree")
+    if len(sha) != 40 or any(character not in "0123456789abcdef" for character in sha):
+        raise SignalAuditError("source-tree Git SHA must be an exact lowercase commit SHA")
+    return sha
+
+
 def _lineage_for_formal_replay(
-    *, config: Mapping[str, Any], manifests: list[Path], final_sha256: str, run_id: str, config_hash: str
+    *,
+    config: Mapping[str, Any],
+    manifests: list[Path],
+    final_sha256: str,
+    run_id: str,
+    config_hash: str,
+    historical: CheckpointInventory,
+    require_clean_replay_git: bool,
 ) -> dict[str, Any]:
     manifest_path, manifest = _run_manifest(manifests, run_id=run_id)
     artifacts = manifest.get("artifacts")
@@ -100,10 +138,52 @@ def _lineage_for_formal_replay(
         attack, sort_keys=True, separators=(",", ":")
     ):
         raise SignalAuditError("analysis threat/attack identity does not match the resolved training method attack")
+    replay_batch_size = config.get("replay_batch_size")
+    if isinstance(replay_batch_size, bool) or not isinstance(replay_batch_size, int) or replay_batch_size < 1:
+        raise SignalAuditError("analysis replay_batch_size must be a positive integer")
+    replay_device_type = config.get("replay_device_type")
+    if replay_device_type != "cuda":
+        raise SignalAuditError("analysis replay_device_type must be exactly cuda")
+    checkpoint_payload = torch.load(historical.path, map_location="cpu", weights_only=False)
+    if not isinstance(checkpoint_payload, Mapping):
+        raise SignalAuditError("selected replay checkpoint is unreadable")
+    global_step, train_attack_seed = checkpoint_payload.get("global_step"), seeds.get("train_attack")
+    if (
+        isinstance(global_step, bool)
+        or not isinstance(global_step, int)
+        or global_step < 0
+        or isinstance(train_attack_seed, bool)
+        or not isinstance(train_attack_seed, int)
+    ):
+        raise SignalAuditError("selected replay checkpoint/global train attack seed are invalid")
+    checkpoint_world_size = checkpoint_payload.get("world_size")
+    if (
+        isinstance(checkpoint_world_size, bool)
+        or not isinstance(checkpoint_world_size, int)
+        or checkpoint_world_size < 1
+    ):
+        raise SignalAuditError("selected replay checkpoint world_size is invalid")
+    training_mapping = resolved.get("training")
+    if not isinstance(training_mapping, Mapping):
+        raise SignalAuditError("resolved training config is missing execution identity")
+    try:
+        execution_identity = training_execution_identity(
+            training=TrainingConfig.model_validate(training_mapping), world_size=checkpoint_world_size
+        )
+    except ValueError as exc:
+        raise SignalAuditError("selected replay checkpoint/config training execution identity is invalid") from exc
     return {
         "teacher_checkpoint_sha256": _hex(teacher_sha, "teacher checkpoint SHA"),
         "dataset_fingerprint": derived_dataset_fingerprint,
+        "dataset_identity": logical_dataset_identity(resolved, train_expected_count=train_expected_count)["dataset"],
         "threat_or_attack_identity": attack,
+        "replay_protocol": replay_protocol(
+            batch_size=replay_batch_size,
+            attack_seed_base=train_attack_seed + 1_000_003 * global_step,
+            device_type=replay_device_type,
+        ),
+        "replay_git_sha": _source_tree_clean_git_sha() if require_clean_replay_git else None,
+        "checkpoint_training": {"world_size": checkpoint_world_size, "execution_identity": execution_identity},
     }
 
 
@@ -170,16 +250,23 @@ def main(argv: list[str] | None = None) -> int:
         inventories = tuple(bindings.get((item.run_id, item.publication_order), item) for item in inventories)
         wandb_hashes[str(wandb_path)] = wandb_hash
     manifest_hashes = {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in manifests}
+    replay_requested = args.teacher_risk_replay is not None or "teacher_risk_replay" in config
     lineage = _lineage_for_formal_replay(
         config=config,
         manifests=manifests,
         final_sha256=final_hash,
         run_id=prospective_run_id,
         config_hash=historical.config_hash,
+        historical=historical,
+        require_clean_replay_git=replay_requested,
     )
     replay: dict[str, Any] | None = None
     replay_hashes: dict[str, str] = {}
-    if "teacher_risk_replay" in config:
+    if args.teacher_risk_replay is not None:
+        replay_path = args.teacher_risk_replay.resolve()
+        replay, replay_hash = _load(replay_path)
+        replay_hashes[str(replay_path)] = replay_hash
+    elif "teacher_risk_replay" in config:
         replay_path = configured_path(config["teacher_risk_replay"], name="teacher_risk_replay")
         replay, replay_hash = _load(replay_path)
         replay_hashes[str(replay_path)] = replay_hash

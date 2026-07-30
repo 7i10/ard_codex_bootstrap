@@ -83,8 +83,14 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
-        ("src/ard/analysis/signal_audit.py", "src/ard/analysis/__init__.py", "src/ard/cli/signal_audit.py"),
-        ("tests/unit/test_signal_audit.py",),
+        (
+            "src/ard/analysis/signal_audit.py",
+            "src/ard/analysis/teacher_risk_replay.py",
+            "src/ard/analysis/__init__.py",
+            "src/ard/cli/signal_audit.py",
+            "src/ard/cli/replay_teacher_risk.py",
+        ),
+        ("tests/unit/test_signal_audit.py", "tests/unit/test_teacher_risk_replay.py"),
         ("T0", "T1"),
     ),
     (

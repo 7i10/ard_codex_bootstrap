@@ -27,6 +27,28 @@ class SignalAuditError(ValueError):
     """Raised when audit lineage, schema, or temporal evidence is incomplete."""
 
 
+REPLAY_SEED_FORMULA = "train_attack+1000003*checkpoint_global_step+1000003*batch_index"
+
+
+def replay_protocol(*, batch_size: int, attack_seed_base: int, device_type: str) -> dict[str, Any]:
+    """Canonical scientific protocol for random-start historical replay."""
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
+        raise SignalAuditError("replay protocol batch_size must be a positive integer")
+    if isinstance(attack_seed_base, bool) or not isinstance(attack_seed_base, int):
+        raise SignalAuditError("replay protocol attack_seed_base must be an integer")
+    if device_type not in {"cpu", "cuda"}:
+        raise SignalAuditError("replay protocol device_type must be cpu or cuda")
+    return {
+        "batch_size": batch_size,
+        "seed_formula": REPLAY_SEED_FORMULA,
+        "attack_seed_base": attack_seed_base,
+        "generator_per_batch": True,
+        "precision": "fp32",
+        "device_type": device_type,
+        "backend": f"torch-{device_type}",
+    }
+
+
 def canonical_json(value: object) -> bytes:
     """Return the sole JSON representation used for hashes and artifacts."""
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
@@ -96,6 +118,12 @@ def _analysis_source_hashes() -> dict[str, str]:
         "analysis_module": sha256_file(analysis_path),
         "cli_module": sha256_file(cli_path),
     }
+
+
+def _expected_replay_source_hashes() -> dict[str, str]:
+    analysis_path = Path(__file__).resolve().parent / "teacher_risk_replay.py"
+    cli_path = Path(__file__).resolve().parents[1] / "cli" / "replay_teacher_risk.py"
+    return {"analysis_module": sha256_file(analysis_path), "cli_module": sha256_file(cli_path)}
 
 
 def _sha256_mapping(value: object) -> str:
@@ -220,7 +248,7 @@ def inventory_run_bundle(manifest_path: Path) -> tuple[CheckpointInventory, ...]
                     "model artifact checkpoint schema does not match the complete checkpoint contract"
                 )
             inspected[cache_key] = payload
-        if set(payload) != REQUIRED_KEYS:
+        if REQUIRED_KEYS.difference(payload):
             raise SignalAuditError("model artifact checkpoint schema does not match the complete checkpoint contract")
         if payload.get("tracker_run_id") != run_id or payload.get("config_hash") != config_hash:
             raise SignalAuditError("checkpoint identity does not match manifest run/config identity")
@@ -284,6 +312,10 @@ def validate_teacher_risk_replay(
     teacher_checkpoint_sha256: str,
     dataset_fingerprint: str,
     threat_or_attack_identity: Mapping[str, Any],
+    dataset_identity: Mapping[str, Any] | None = None,
+    expected_replay_protocol: Mapping[str, Any] | None = None,
+    expected_git_sha: str | None = None,
+    expected_checkpoint_training: Mapping[str, Any] | None = None,
 ) -> tuple[Mapping[str, Any], ...]:
     """Validate the immutable provenance envelope for historical teacher replay."""
     required = {
@@ -295,6 +327,16 @@ def validate_teacher_risk_replay(
         "replay_output_sha256",
         "rows",
     }
+    if expected_replay_protocol is not None:
+        required |= {
+            "dataset_identity",
+            "replay_protocol",
+            "replay_source_files",
+            "replay_source_sha256",
+            "git",
+            "max_abs_delta",
+            "checkpoint_training",
+        }
     if not isinstance(envelope, Mapping) or not required.issubset(envelope):
         raise SignalAuditError("teacher-risk replay requires a complete provenance envelope")
     identities = [key for key in ("threat_identity", "attack_identity") if key in envelope]
@@ -314,6 +356,44 @@ def validate_teacher_risk_replay(
         raise SignalAuditError("teacher-risk replay teacher checkpoint SHA does not match lineage")
     if envelope["dataset_fingerprint"] != dataset_fingerprint:
         raise SignalAuditError("teacher-risk replay dataset fingerprint does not match analysis lineage")
+    if dataset_identity is not None:
+        replay_dataset_identity = envelope.get("dataset_identity")
+        if not isinstance(replay_dataset_identity, Mapping) or canonical_json(
+            replay_dataset_identity
+        ) != canonical_json(dataset_identity):
+            raise SignalAuditError("teacher-risk replay portable dataset identity does not match analysis lineage")
+    if expected_replay_protocol is not None and canonical_json(envelope.get("replay_protocol")) != canonical_json(
+        expected_replay_protocol
+    ):
+        raise SignalAuditError("teacher-risk replay protocol does not match analysis lineage")
+    if expected_replay_protocol is not None:
+        source_files = envelope.get("replay_source_files")
+        if not isinstance(source_files, Mapping) or set(source_files) != {"analysis_module", "cli_module"}:
+            raise SignalAuditError("teacher-risk replay source files must declare analysis and CLI SHA-256 hashes")
+        for name, digest in source_files.items():
+            _hex_digest(digest, name=f"replay source hash {name}")
+        if canonical_json(source_files) != canonical_json(_expected_replay_source_hashes()):
+            raise SignalAuditError("teacher-risk replay source hashes do not match the local replay implementation")
+        if _hex_digest(envelope.get("replay_source_sha256"), name="replay source combined SHA") != _sha256_mapping(
+            source_files
+        ):
+            raise SignalAuditError("teacher-risk replay source combined SHA does not match source-file hashes")
+        git = envelope.get("git")
+        if not isinstance(git, Mapping) or set(git) != {"sha", "dirty"}:
+            raise SignalAuditError("teacher-risk replay Git provenance is incomplete")
+        _git_sha(git.get("sha"), name="replay Git SHA")
+        if git.get("dirty") is not False:
+            raise SignalAuditError("teacher-risk replay requires clean Git provenance")
+        if expected_git_sha is not None and git["sha"] != _git_sha(expected_git_sha, name="expected replay Git SHA"):
+            raise SignalAuditError("teacher-risk replay Git SHA does not match the local clean analysis lineage")
+        if expected_checkpoint_training is not None and canonical_json(
+            envelope.get("checkpoint_training")
+        ) != canonical_json(expected_checkpoint_training):
+            raise SignalAuditError("teacher-risk replay checkpoint training execution does not match analysis lineage")
+        epsilon = _finite(threat_or_attack_identity.get("epsilon_value"), name="replay attack epsilon_value")
+        max_abs_delta = _finite(envelope.get("max_abs_delta"), name="replay max_abs_delta")
+        if max_abs_delta < 0.0 or max_abs_delta > epsilon + 1e-7:
+            raise SignalAuditError("teacher-risk replay max_abs_delta exceeds the configured Linf bound")
     if canonical_json(envelope[identities[0]]) != canonical_json(threat_or_attack_identity):
         raise SignalAuditError("teacher-risk replay threat/attack identity does not match analysis lineage")
     rows = envelope["rows"]
@@ -634,6 +714,34 @@ def bootstrap_metric_delta(
     }
 
 
+def bootstrap_binary_metric_intervals(
+    rows: Sequence[Mapping[str, Any]], *, scores: Sequence[float], seed: int, replicates: int
+) -> dict[str, Any]:
+    """Class-stratified, stable-sample-cluster bootstrap 95% intervals."""
+    if replicates < 1 or len(rows) != len(scores):
+        raise SignalAuditError("bootstrap metric rows/scores must align and use positive replicates")
+    samples: dict[str, list[float]] = {"auroc": [], "auprc": [], "log_loss": [], "prevalence": []}
+    for replicate in range(replicates):
+        selected = _bootstrap_indices(rows, seed=seed, replicate=replicate, cluster=True)
+        targets = [int(rows[index]["outcome"]) for index in selected]
+        try:
+            metrics = binary_metrics(targets, [scores[index] for index in selected])
+        except SignalAuditError:
+            continue
+        for name, values in samples.items():
+            values.append(metrics[name])
+    if not samples["auroc"]:
+        raise SignalAuditError("bootstrap produced no class-complete replicate")
+    bounds: dict[str, Any] = {}
+    for name, values in samples.items():
+        values.sort()
+        bounds[name] = {
+            "lower": values[max(0, math.floor(0.025 * (len(values) - 1)))],
+            "upper": values[min(len(values) - 1, math.ceil(0.975 * (len(values) - 1)))],
+        }
+    return {"clustered_by_sample_id": True, "replicates": len(samples["auroc"]), "metrics": bounds}
+
+
 def _state_records(inventory: CheckpointInventory) -> Mapping[str, Mapping[str, Any]]:
     payload = torch.load(Path(inventory.path), map_location="cpu", weights_only=False)
     state = payload["sample_state"]
@@ -931,9 +1039,17 @@ def prospective_prediction(
         for name, builder in feature_sets.items():
             fit = _fit_logistic([builder(row) for row in train_prepared], [row["outcome"] for row in train_prepared])
             scores[name] = _predict_logistic(fit, [builder(row) for row in test_prepared])
-        destination["models"] = {
-            name: binary_metrics([row["outcome"] for row in test_prepared], values) for name, values in scores.items()
-        }
+        destination["models"] = {}
+        for name, values in scores.items():
+            destination["models"][name] = {
+                **binary_metrics([row["outcome"] for row in test_prepared], values),
+                "bootstrap_95": bootstrap_binary_metric_intervals(
+                    test_prepared,
+                    scores=values,
+                    seed=bootstrap_seed,
+                    replicates=bootstrap_replicates,
+                ),
+            }
         interval = bootstrap_metric_delta(
             test_prepared,
             baseline=scores["teacher_only"],
@@ -1096,6 +1212,16 @@ def audit_report(
             teacher_checkpoint_sha256=teacher_sha,
             dataset_fingerprint=dataset_fingerprint,
             threat_or_attack_identity=identity,
+            dataset_identity=lineage.get("dataset_identity")
+            if isinstance(lineage.get("dataset_identity"), Mapping)
+            else None,
+            expected_replay_protocol=lineage.get("replay_protocol")
+            if isinstance(lineage.get("replay_protocol"), Mapping)
+            else None,
+            expected_git_sha=lineage.get("replay_git_sha") if isinstance(lineage.get("replay_git_sha"), str) else None,
+            expected_checkpoint_training=lineage.get("checkpoint_training")
+            if isinstance(lineage.get("checkpoint_training"), Mapping)
+            else None,
         )
         prospective_index = namespaced_samples(prospective_rows, namespace="train", expected_count=train_count)
         for key, final_row, replay_row in join_samples(final_index, prospective_index):
