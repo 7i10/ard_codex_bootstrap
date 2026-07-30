@@ -13,7 +13,7 @@ from ard.cli.evaluate import (
 )
 from ard.config.schema import ExperimentConfig, TrainingConfig, training_execution_identity, validate_global_batch_size
 from ard.engine.checkpoint import REQUIRED_KEYS
-from ard.evaluation.autoattack import run_autoattack
+from ard.evaluation.autoattack import AutoAttackProvenanceError, autoattack_provenance, run_autoattack
 from ard.evaluation.saved_checkpoint import validate_checkpoint_lineage
 
 pytestmark = pytest.mark.t1
@@ -163,9 +163,7 @@ def test_evaluation_allows_relocated_teacher_checkpoint_with_same_sha() -> None:
     assert training.teacher is not None
     evaluation = training.model_copy(
         update={
-            "teacher": training.teacher.model_copy(
-                update={"checkpoint": Path("/different-host/teacher-checkpoint.pt")}
-            )
+            "teacher": training.teacher.model_copy(update={"checkpoint": Path("/different-host/teacher-checkpoint.pt")})
         }
     )
 
@@ -195,9 +193,7 @@ def test_evaluation_preflight_uses_relocated_path_but_preserves_training_lineage
     assert training.teacher is not None
     evaluation = training.model_copy(
         update={
-            "teacher": training.teacher.model_copy(
-                update={"checkpoint": Path("/different-host/teacher-checkpoint.pt")}
-            )
+            "teacher": training.teacher.model_copy(update={"checkpoint": Path("/different-host/teacher-checkpoint.pt")})
         }
     )
 
@@ -323,9 +319,60 @@ def test_autoattack_adapter_maps_linf_and_restores_eval_mode(tmp_path: Path) -> 
         and result["attack_version"] == "standard"
         and result["version"] == "injected"
         and result["batch_size"] == 128
+        and result["provenance"]["mode"] == "injected-test-adapter"
         and instances[0].seed == 4
         and model.training
     )
+
+
+def test_autoattack_provenance_is_relative_source_hashed_and_pinned(tmp_path: Path) -> None:
+    package = tmp_path / "site-packages" / "autoattack"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("x = 1\n", encoding="utf-8")
+    (package / "implementation.py").write_text("x = 2\n", encoding="utf-8")
+    direct_url = tmp_path / "site-packages" / "direct_url.json"
+    direct_url.write_text(
+        '{"url":"https://github.com/fra31/auto-attack.git",'
+        '"vcs_info":{"vcs":"git","commit_id":"a39220048b3c9f2cca9a4d3a54604793c68eca7e"}}',
+        encoding="utf-8",
+    )
+    license_path = tmp_path / "site-packages" / "autoattack-0.1.dist-info" / "licenses" / "LICENSE"
+    license_path.parent.mkdir(parents=True)
+    license_path.write_text("MIT License\n", encoding="utf-8")
+
+    class Distribution:
+        metadata = {"Name": "autoattack"}
+        version = "0.1"
+        files = (Path("autoattack-0.1.dist-info/licenses/LICENSE"),)
+
+        def locate_file(self, item: object) -> Path:
+            return tmp_path / "site-packages" / Path(str(item))
+
+    module = type("Module", (), {"__file__": str(package / "__init__.py")})
+    import hashlib
+
+    expected = hashlib.sha256()
+    for path in sorted(package.rglob("*.py")):
+        expected.update(path.relative_to(package).as_posix().encode("utf-8"))
+        expected.update(b"\0")
+        expected.update(path.read_bytes())
+        expected.update(b"\0")
+    provenance = autoattack_provenance(
+        module,
+        distribution=Distribution(),  # type: ignore[arg-type]
+        expected_source_sha256=expected.hexdigest(),
+    )
+    assert provenance["vcs_commit"] == "a39220048b3c9f2cca9a4d3a54604793c68eca7e"
+    assert provenance["source_paths"] == ["__init__.py", "implementation.py"]
+    assert provenance["licenses"] == [
+        {
+            "path": "autoattack-0.1.dist-info/licenses/LICENSE",
+            "sha256": hashlib.sha256(b"MIT License\n").hexdigest(),
+        }
+    ]
+    direct_url.write_text('{"vcs_info":{"vcs":"git","commit_id":"bad"}}', encoding="utf-8")
+    with pytest.raises(AutoAttackProvenanceError, match="commit"):
+        autoattack_provenance(module, distribution=Distribution(), expected_source_sha256=expected.hexdigest())  # type: ignore[arg-type]
 
 
 def test_autoattack_adapter_restores_mode_when_injected_adapter_raises(tmp_path: Path) -> None:

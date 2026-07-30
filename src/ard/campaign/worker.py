@@ -93,6 +93,7 @@ def _validate_evaluation_results(path: Path, *, training_output: Path, phase: st
     from ard.config import load_config
     from ard.config.loader import resolved_config_dict
     from ard.engine import config_digest
+    from ard.evaluation.autoattack import EXPECTED_AUTOATTACK_COMMIT, EXPECTED_AUTOATTACK_SOURCE_SHA256
 
     results = _nonempty_json(path)
     if not isinstance(results, list) or len(results) != 2 or not all(isinstance(item, dict) for item in results):
@@ -160,6 +161,13 @@ def _validate_evaluation_results(path: Path, *, training_output: Path, phase: st
             or not autoattack["version"]
         ):
             return "AutoAttack result metrics or threat values are invalid"
+        provenance = autoattack.get("provenance")
+        if not isinstance(provenance, dict) or provenance.get("mode") != "installed":
+            return "AutoAttack result lacks installed-source provenance"
+        if provenance.get("expected_commit") != EXPECTED_AUTOATTACK_COMMIT:
+            return "AutoAttack result commit provenance is not the pinned source"
+        if provenance.get("source_sha256") != EXPECTED_AUTOATTACK_SOURCE_SHA256:
+            return "AutoAttack result source provenance is invalid"
         artifact = path.parent / f"autoattack-{item['checkpoint_alias']}.json"
         if _nonempty_json(artifact) != autoattack:
             return "AutoAttack result file is absent or differs from evaluation-results.json"
@@ -249,6 +257,8 @@ class CampaignWorker:
     def run_once(self) -> dict[str, str]:
         """Perform a short reconciliation pass and return state by job id."""
         self.state.assert_campaign_identity(self.spec)
+        if self.state.has_prepared_reassignment_transaction():
+            raise WorkerError("prepared terminal reassignment transaction requires recovery before controller use")
         phase_finished = self._reconcile_active()
         campaign = self.state.campaign()
         if campaign["state"] != "armed":

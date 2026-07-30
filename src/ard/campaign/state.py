@@ -310,6 +310,304 @@ class CampaignStateStore:
             _atomic_json(path, job)
             self._append_event_locked({"kind": "evidence", "job_id": job_id, "evidence_kind": kind})
 
+    def import_terminal_reassignment(
+        self, evidence: object, *, spec: CampaignSpec, dry_run: bool = True
+    ) -> dict[str, Any]:
+        """Compatibility wrapper for one document."""
+        return self.import_terminal_reassignments([evidence], spec=spec, dry_run=dry_run)
+
+    def import_terminal_reassignments(
+        self, evidences: list[object] | tuple[object, ...], *, spec: CampaignSpec, dry_run: bool = True
+    ) -> dict[str, Any]:
+        """Validate and import one host's terminal documents as one transaction."""
+        from .reassignment import canonical_json_sha256, parse_terminal_evidence
+
+        if not evidences:
+            raise StateError("terminal reassignment import requires one or more evidence documents")
+        with self.host_lock:
+            self.assert_campaign_identity(spec)
+            campaign = _read_json(self.campaign_path)
+            entries = [parse_terminal_evidence(item, spec=spec, campaign=campaign) for item in evidences]
+            job_ids = [str(entry["job_id"]) for entry in entries]
+            if len(set(job_ids)) != len(job_ids):
+                raise StateError("terminal reassignment batch contains duplicate jobs")
+            if len({str(entry["source_host"]) for entry in entries}) != 1:
+                raise StateError("terminal reassignment batch spans multiple owning hosts")
+
+            from .launcher import phase_is_live, read_exit_record
+
+            def quiescent_phase(job: dict[str, Any], job_id: str) -> bool:
+                phase = job.get("phase")
+                if phase is None:
+                    return True
+                if not isinstance(phase, dict) or phase_is_live(phase):
+                    return False
+                lease_path = phase.get("gpu_lease_path")
+                if isinstance(lease_path, str) and Path(lease_path).exists():
+                    return False
+                if lease_path is not None and not isinstance(lease_path, str):
+                    return False
+                exit_path = phase.get("exit_record")
+                if not isinstance(exit_path, str):
+                    return False
+                try:
+                    exit_record = read_exit_record(Path(exit_path))
+                except Exception:
+                    return False
+                return (
+                    isinstance(exit_record, dict)
+                    and exit_record.get("exit_code") == 0
+                    and exit_record.get("run_id") == job_id
+                    and exit_record.get("git_sha") == spec.git_sha
+                    and exit_record.get("phase_argv_digest") == phase.get("phase_argv_digest")
+                )
+
+            def validate_imported(job: dict[str, Any], entry: dict[str, Any]) -> None:
+                job_id = str(entry["job_id"])
+                terminal = {"version": 1, **entry}
+                if (
+                    job.get("terminal_reassignment") != terminal
+                    or job.get("state") != JobState.COMPLETED.value
+                    or job.get("autoattack_status") != entry["autoattack_status"]
+                    or job.get("revision") != int(entry["expected_revision"]) + 1
+                ):
+                    raise StateError(f"terminal reassignment prior import was modified: {job_id}")
+                history = job.get("reassignment_history")
+                if not isinstance(history, list) or not history or not isinstance(history[-1], dict):
+                    raise StateError(f"terminal reassignment history is missing: {job_id}")
+                archived = history[-1]
+                archive_path_raw = archived.get("archive_path")
+                if (
+                    archived.get("evidence_sha256") != entry["evidence_sha256"]
+                    or not isinstance(archive_path_raw, str)
+                ):
+                    raise StateError(f"terminal reassignment history was modified: {job_id}")
+                archive_path = Path(archive_path_raw)
+                archive = _read_json(archive_path)
+                prior_record = archive.get("prior_record")
+                if (
+                    archive.get("evidence_sha256") != entry["evidence_sha256"]
+                    or not isinstance(prior_record, dict)
+                    or archive.get("prior_record_sha256") != canonical_json_sha256(prior_record)
+                    or archived.get("prior_record_sha256") != archive.get("prior_record_sha256")
+                ):
+                    raise StateError(f"terminal reassignment archive was modified: {job_id}")
+
+            evidence_ids = sorted(str(entry["evidence_sha256"]) for entry in entries)
+            transaction_id = canonical_json_sha256(
+                {
+                    "campaign_identity_sha256": campaign["identity_sha256"],
+                    "evidence_sha256": evidence_ids,
+                }
+            )
+            transaction_path = self.root / "reassignment-transactions" / f"{transaction_id}.json"
+            existing_transaction = _read_json(transaction_path) if transaction_path.exists() else None
+
+            if existing_transaction is not None:
+                if (
+                    existing_transaction.get("version") != 1
+                    or existing_transaction.get("transaction_id") != transaction_id
+                    or existing_transaction.get("evidence_sha256") != evidence_ids
+                    or existing_transaction.get("status") not in {"prepared", "completed"}
+                ):
+                    raise StateError("terminal reassignment transaction journal is invalid")
+                items = existing_transaction.get("items")
+                if not isinstance(items, list) or len(items) != len(entries):
+                    raise StateError("terminal reassignment transaction items are invalid")
+                by_job = {str(item.get("job_id")): item for item in items if isinstance(item, dict)}
+                if set(by_job) != set(job_ids):
+                    raise StateError("terminal reassignment transaction job identity drift")
+                for entry in entries:
+                    item = by_job[str(entry["job_id"])]
+                    current = self.job(str(entry["job_id"]))
+                    prior_record = item.get("prior_record")
+                    target_record = item.get("target_record")
+                    if current not in (prior_record, target_record):
+                        raise StateError("terminal reassignment prepared transaction state drift")
+                if existing_transaction["status"] == "completed":
+                    for entry in entries:
+                        job_id = str(entry["job_id"])
+                        item = by_job[job_id]
+                        if self.job(job_id) != item.get("target_record"):
+                            raise StateError("completed terminal reassignment transaction was rolled back")
+                        archive_path = Path(str(item["archive_path"]))
+                        if not archive_path.is_file() or _read_json(archive_path) != item.get("archive"):
+                            raise StateError("completed terminal reassignment transaction archive drift")
+                        validate_imported(self.job(job_id), entry)
+                    return {
+                        "status": "dry-run" if dry_run else "imported",
+                        **({"would_import": []} if dry_run else {"imported": []}),
+                        "already_imported": job_ids,
+                        "transaction_id": transaction_id,
+                    }
+                if dry_run:
+                    return {
+                        "status": "dry-run",
+                        "would_import": [
+                            job_id
+                            for job_id, item in by_job.items()
+                            if self.job(job_id) == item.get("prior_record")
+                        ],
+                        "already_imported": [],
+                        "transaction_id": transaction_id,
+                    }
+                for job_id, item in by_job.items():
+                    archive_path = Path(str(item["archive_path"]))
+                    archive = item["archive"]
+                    if archive_path.exists() and _read_json(archive_path) != archive:
+                        raise StateError(f"terminal reassignment archive would be clobbered: {job_id}")
+                    if not archive_path.exists():
+                        _atomic_json(archive_path, archive)
+                    if self.job(job_id) == item["prior_record"]:
+                        _atomic_json(self.jobs_path / f"{job_id}.json", item["target_record"])
+                existing_transaction["status"] = "completed"
+                existing_transaction["completed_at"] = utc_now()
+                _atomic_json(transaction_path, existing_transaction)
+                for entry in entries:
+                    validate_imported(self.job(str(entry["job_id"])), entry)
+                return {
+                    "status": "imported",
+                    "imported": job_ids,
+                    "already_imported": [],
+                    "transaction_id": transaction_id,
+                }
+
+            jobs = {job_id: self.job(job_id) for job_id in job_ids}
+            imported = [
+                job_id
+                for job_id, _entry in zip(job_ids, entries, strict=True)
+                if jobs[job_id].get("terminal_reassignment")
+            ]
+            if imported:
+                if set(imported) != set(job_ids):
+                    raise StateError("terminal reassignment batch mixes imported and unimported jobs")
+                for entry in entries:
+                    validate_imported(jobs[str(entry["job_id"])], entry)
+                return {
+                    "status": "dry-run" if dry_run else "imported",
+                    **({"would_import": []} if dry_run else {"imported": []}),
+                    "already_imported": job_ids,
+                    "transaction_id": transaction_id,
+                }
+
+            active = {
+                JobState.LAUNCHING.value,
+                JobState.TRAINING.value,
+                JobState.PGD_EVALUATION.value,
+                JobState.AUTOATTACK.value,
+            }
+            waiting = {
+                JobState.PENDING.value,
+                JobState.WAITING_DEPENDENCY.value,
+                JobState.WAITING_GPU.value,
+                JobState.WAITING_FOR_MEMORY.value,
+            }
+            for entry in entries:
+                job_id = str(entry["job_id"])
+                job = jobs[job_id]
+                if job.get("state") not in active | waiting | {
+                    JobState.PREFLIGHT.value,
+                    JobState.TRAINING_COMPLETED.value,
+                    JobState.PGD_COMPLETED.value,
+                }:
+                    raise StateError(f"terminal reassignment state is not importable: {job_id}")
+                if not quiescent_phase(job, job_id) or job.get("launch_intent") is not None:
+                    raise StateError(f"terminal reassignment refuses a live or unresolved job: {job_id}")
+                if job.get("state") != entry["expected_state"] or job.get("revision") != entry["expected_revision"]:
+                    raise StateError(f"terminal reassignment compare-and-swap failed: {job_id}")
+
+            if dry_run:
+                return {
+                    "status": "dry-run",
+                    "would_import": job_ids,
+                    "already_imported": [],
+                    "transaction_id": transaction_id,
+                }
+
+            now = utc_now()
+            items: list[dict[str, Any]] = []
+            for entry in entries:
+                job_id = str(entry["job_id"])
+                prior_record = jobs[job_id]
+                archive_path = self.root / "reassignment-archive" / job_id / f"{entry['evidence_sha256']}.json"
+                archive = {
+                    "version": 1,
+                    "evidence_sha256": entry["evidence_sha256"],
+                    "prior_record_sha256": canonical_json_sha256(prior_record),
+                    "prior_record": prior_record,
+                }
+                if archive_path.exists() and _read_json(archive_path) != archive:
+                    raise StateError(f"terminal reassignment archive would be clobbered: {job_id}")
+                target_record = dict(prior_record)
+                history = list(target_record.get("reassignment_history", []))
+                history.append(
+                    {
+                        "at": now,
+                        "evidence_sha256": entry["evidence_sha256"],
+                        "archive_path": str(archive_path),
+                        "prior_record_sha256": archive["prior_record_sha256"],
+                    }
+                )
+                target_record.update(
+                    {
+                        "reassignment_history": history,
+                        "terminal_reassignment": {"version": 1, **entry},
+                        "state": JobState.COMPLETED.value,
+                        "autoattack_status": entry["autoattack_status"],
+                        "updated_at": now,
+                        "revision": int(prior_record["revision"]) + 1,
+                    }
+                )
+                items.append(
+                    {
+                        "job_id": job_id,
+                        "archive_path": str(archive_path),
+                        "archive": archive,
+                        "prior_record": prior_record,
+                        "target_record": target_record,
+                    }
+                )
+            transaction = {
+                "version": 1,
+                "transaction_id": transaction_id,
+                "campaign_identity_sha256": campaign["identity_sha256"],
+                "evidence_sha256": evidence_ids,
+                "status": "prepared",
+                "prepared_at": now,
+                "items": items,
+            }
+            _atomic_json(transaction_path, transaction)
+            for item in items:
+                _atomic_json(Path(item["archive_path"]), item["archive"])
+                _atomic_json(self.jobs_path / f"{item['job_id']}.json", item["target_record"])
+            transaction["status"] = "completed"
+            transaction["completed_at"] = utc_now()
+            _atomic_json(transaction_path, transaction)
+            for entry in entries:
+                current = self.job(str(entry["job_id"]))
+                validate_imported(current, entry)
+                self._append_event_locked(
+                    {
+                        "kind": "terminal_reassignment_imported",
+                        "job_id": entry["job_id"],
+                        "revision": current["revision"],
+                        "evidence_sha256": entry["evidence_sha256"],
+                        "transaction_id": transaction_id,
+                    }
+                )
+            return {
+                "status": "imported",
+                "imported": job_ids,
+                "already_imported": [],
+                "transaction_id": transaction_id,
+            }
+
+    def has_prepared_reassignment_transaction(self) -> bool:
+        root = self.root / "reassignment-transactions"
+        if not root.exists():
+            return False
+        return any(_read_json(path).get("status") == "prepared" for path in sorted(root.glob("*.json")))
+
     def recover_transient_gpu_blocks(self, job_ids: tuple[str, ...] | list[str]) -> dict[str, dict[str, Any]]:
         """Atomically requeue explicitly named, never-launched inventory blocks.
 
@@ -420,9 +718,7 @@ class CampaignStateStore:
             for job_id, job in records.items():
                 phase_name = str(job["phase"]["name"])
                 phase_dir = self.root / "phases" / job_id / phase_name
-                archive = (
-                    self.root / "recovery-archive" / job_id / f"{phase_name}-missing-runtime-environment"
-                )
+                archive = self.root / "recovery-archive" / job_id / f"{phase_name}-missing-runtime-environment"
                 archive.parent.mkdir(parents=True, exist_ok=True)
                 if archive.exists():
                     raise StateError(f"runtime-environment recovery archive already exists: {job_id}")
@@ -488,9 +784,7 @@ class CampaignStateStore:
             if phase_name not in {"train", "autoattack"}:
                 raise StateError(f"job is not an exact pre-output runtime-environment failure: {job_id}")
             expected_state = (
-                JobState.FAILED.value
-                if phase_name == "train"
-                else JobState.PGD_COMPLETED_AUTOATTACK_FAILED.value
+                JobState.FAILED.value if phase_name == "train" else JobState.PGD_COMPLETED_AUTOATTACK_FAILED.value
             )
             expected_failure = phase_name == "train"
             phase_dir = self.root / "phases" / job_id / phase_name
@@ -515,9 +809,7 @@ class CampaignStateStore:
             stderr_lines = stderr.read_text(encoding="utf-8").rstrip().splitlines()
             if not stderr_lines or stderr_lines[-1] != MISSING_RUNTIME_ENVIRONMENT_ERROR:
                 raise StateError(f"job has a different runtime failure: {job_id}")
-            archive = (
-                self.root / "recovery-archive" / job_id / f"{phase_name}-missing-runtime-environment"
-            )
+            archive = self.root / "recovery-archive" / job_id / f"{phase_name}-missing-runtime-environment"
             if archive.exists():
                 raise StateError(f"runtime-environment recovery archive already exists: {job_id}")
             records[job_id] = job

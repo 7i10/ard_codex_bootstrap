@@ -18,6 +18,7 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("src/ard/campaign/", "scripts/campaign/", "configs/campaigns/", "configs/execution/"),
         (
             "tests/unit/test_campaign.py",
+            "tests/unit/test_campaign_reassignment.py",
             "tests/unit/test_campaign_management.py",
             "tests/unit/test_config.py",
             "tests/unit/test_protocols_schedules.py",

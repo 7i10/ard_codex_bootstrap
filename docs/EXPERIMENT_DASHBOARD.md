@@ -189,9 +189,12 @@ SAAD Table 1では、teacher AAがChen 56.94%からBartoldson 73.71%へ上がる
   risk分布、target-softening量、teacher/student signalの相関をanalysisとして監査する価値があります。
 - すべてseed 0なので、現在値は探索的結果です。複数seedとfull SAAD/direct baselineなしに論文の主要結論
   とはしません。
-- AutoAttack manifestのlibrary versionは現在`unknown`です。checkpoint、attack version、epsilon、seed、
-  実行環境は保存されていますが、論文用追加runまでにAutoAttack source/package revisionを明示固定する
-  必要があります。
+- 完了済みAutoAttack manifestのlibrary versionは`unknown`のまま改変しません。両hostで事後確認した
+  installは同一commit/source digestでしたが、これは歴史的processが読み込んだbytesの同時証明ではありません。
+  8 resultのimmutable digestと制約は
+  [`0002-autoattack-provenance-amendment.json`](experiments/0002-autoattack-provenance-amendment.json)
+  に追補しました。今後のrunは固定commit/source digest不一致でfail closedし、論文用確定評価ではsaved
+  best/lastをその契約下で再評価します。
 
 ## 5. 出力
 

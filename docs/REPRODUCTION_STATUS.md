@@ -158,7 +158,8 @@ AutoAttack values and do not replace the reported references.
 Audit・pilot・productionを明確に分離します。`configs/audit/`には教師監査2件、`configs/pilot/`には5 epochの
 RSLAD動作確認2件、`configs/production/`には2教師×4 methodのcanonical 200 epoch設定8件があります。
 旧reproduction directoryのrunnable設定は削除済みで、`repro` tierは旧resolved bundleの互換性だけに残します。
-Chenの5 epoch pilotは実行済みです。200 epoch本訓練とfull AutoAttackは未完了です。
+Chenの5 epoch pilotに続き、single-GPU controlled protocolのseed 0について2教師×4手法の200 epoch訓練、
+official PGD-20、best/last AutoAttackが完了しました。これはmulti-seed再現やfull SAAD再現の完了を意味しません。
 
 全テンプレートは未解決値を暗黙defaultにしません。実行前に以下を環境へ設定します。
 
@@ -176,8 +177,11 @@ Teacher acquisition and audits remain W&B-free. The Chen pilot train/evaluation
 offline-sync runs were uploaded and verified separately.
 
 Diagnostics policy is explicit: smoke/dev uses `diagnostics_mode: off`; pilot and production templates use fixed-ID
-`panel` diagnostics. The bounded Chen pilot and its saved-checkpoint PGD evaluation have been executed; real full
-AutoAttack remains unexecuted.
+`panel` diagnostics. The bounded Chen pilot and its saved-checkpoint PGD evaluation were followed by the seed-zero
+controlled campaign. Full AutoAttack was executed separately from saved best/last checkpoints for all eight cells.
+Those legacy results record package version `unknown`; immutable result digests and a post-hoc two-host installation
+attestation are recorded in
+[`0002-autoattack-provenance-amendment.json`](experiments/0002-autoattack-provenance-amendment.json).
 
 Protocol ID, optimizer, scheduler, epoch count (200), validation fraction (0.1), global batch size (128),
 and attack identities are fixed in the checked-in YAML. Overrides of these scientific fields are rejected by the schema;
@@ -222,7 +226,7 @@ PYTHONPATH=src python -m ard.cli.evaluate \
   --allow-autoattack evaluation.autoattack=true
 ```
 
-このfull AutoAttack commandは未実行です。通常のPGD evaluationと同じ結果として扱いません。
+このcommand形はseed-zero campaignでsaved best/lastへ実行済みです。通常のPGD evaluationと同じ結果として扱いません。
 実行時はtraining seedとは独立した`evaluation.seed`（default `0`）をPGDのrandom start/panel selectionと
 AutoAttackの両方へ設定し、`evaluation.autoattack_batch_size`以下のbounded chunkで処理します。
 seed、batch size、versionはcheckpoint別resultへ保存されます。checked-inの全evaluation-bearing configも
@@ -329,12 +333,12 @@ invocationで実行したという主張ではありません。22件のcached p
 ## 未実行・結果を主張できない範囲
 
 - T4 limited scientific verification
-- T5 production experimentの完走
-- 上記CIFAR-10 reproduction/production templateによる本訓練とmulti-seed集計
+- seed 1以降のT5 production experimentとmulti-seed集計
+- full SAADおよび公開論文設定そのものの再現
 - CIFAR-100/Tiny-ImageNet本訓練
-- real full AutoAttack（best/lastとも未実行）
+- 固定AutoAttack provenance契約下でのbest/last再評価
 - dependency-completeなfull upstream SAAD reproduction/differential
-- production/paper artifactのW&B同期（pilot train/evaluationのoffline-sync運用は確認済み）
+- seed-zero campaignより先のproduction/paper artifact同期
 - repository全体のmonolithic full pytest suite
 
 従って、上記pilot accuracyは実GPUでのengineering evidenceとしてのみ扱い、論文結果、full AutoAttack、upstream

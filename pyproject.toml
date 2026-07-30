@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=9.0", "ruff>=0.15", "mypy>=2.3"]
 tracking = ["wandb>=0.16", "pyarrow>=14"]
+evaluation = ["autoattack @ git+https://github.com/fra31/auto-attack.git@a39220048b3c9f2cca9a4d3a54604793c68eca7e"]
 
 [tool.ruff]
 target-version = "py311"

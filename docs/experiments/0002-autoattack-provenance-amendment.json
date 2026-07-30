@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "kind": "posthoc_autoattack_host_attestation",
+  "observed_at": "2026-07-30T09:36:09+09:00",
+  "campaign_scientific_git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+  "scope": {
+    "claim": "Both execution hosts had byte-identical pinned AutoAttack installations when inspected after all listed evaluations completed.",
+    "limitation": "This post-hoc observation does not by itself prove the package bytes loaded by each historical evaluation process. Existing evaluation results and W&B artifacts remain immutable and retain version=unknown.",
+    "paper_grade_followup": "Future evaluations fail closed on the pinned commit and source digest. Rerun saved best/last checkpoints under that contract before treating source provenance as contemporaneous execution evidence."
+  },
+  "observed_installation": {
+    "distribution": {
+      "name": "autoattack",
+      "version": "0.1"
+    },
+    "source_url": "https://github.com/fra31/auto-attack",
+    "vcs_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+    "python_source_digest_contract": "sha256(sorted(relative_posix_path || NUL || file_bytes || NUL) for package-local *.py)",
+    "python_source_file_count": 13,
+    "python_source_sha256": "e74d6dab0e34faf840f1bdfe0f77e9ddcc5f753a7426cbaa54b11bf17f896487",
+    "license_evidence": {
+      "installed_file_sha256": "ff88cd04d9c3d141115d733ef17ed1b368d0ca10e0b58e15891c2385d1877b5d",
+      "installed_text_identifier": "MIT License",
+      "distribution_classifier": "License :: OSI Approved :: Apache Software License",
+      "status": "metadata_conflict_unresolved"
+    },
+    "hosts": [
+      {
+        "host": "hamster",
+        "python": "3.11"
+      },
+      {
+        "host": "ferret",
+        "python": "3.12"
+      }
+    ]
+  },
+  "immutable_results": [
+    {
+      "cell": "chen-rslad-s0",
+      "execution_host": "hamster",
+      "wandb_evaluation_run_id": "eval-7ebd06a00e4f8f2d996d",
+      "evaluation_results_sha256": "92b48f7842201e85051d5a61e6febd4b7acce62a0fbc3855b053b7896360ead7"
+    },
+    {
+      "cell": "chen-entropy-s0",
+      "execution_host": "hamster",
+      "wandb_evaluation_run_id": "eval-d35bce64e04dbdbdd56e",
+      "evaluation_results_sha256": "5c0224c9bab73ec57f1c779cf2a9f0fb76fd1fa49564d40fc05b2cf55b4fcf79"
+    },
+    {
+      "cell": "chen-student-s0",
+      "execution_host": "hamster",
+      "wandb_evaluation_run_id": "eval-ae9e62a7694d143f3fb9",
+      "evaluation_results_sha256": "fa8e5b87b1f6acf21cc52b4b0709eafefba89d1e0f172cecfc42793d22f6b44e"
+    },
+    {
+      "cell": "chen-joint-s0",
+      "execution_host": "ferret",
+      "wandb_evaluation_run_id": "eval-eafdd255adb7eb585582",
+      "evaluation_results_sha256": "a5868f1f5ff0d4f97115b9769a02ce2829adf3662e0c927a9effcfa2b6d1ef0f"
+    },
+    {
+      "cell": "bartoldson-rslad-s0",
+      "execution_host": "ferret",
+      "wandb_evaluation_run_id": "eval-ff1c4b50655af6d7997a",
+      "evaluation_results_sha256": "a0d2d4b1009c053426b30fe035081c9afa3d520886aac04c9bae3c7c2ef5eebe"
+    },
+    {
+      "cell": "bartoldson-entropy-s0",
+      "execution_host": "ferret",
+      "wandb_evaluation_run_id": "eval-6dcf1b78a77d3258b2e0",
+      "evaluation_results_sha256": "7311fe69b4206281f0f0d438d1b1ec51a0ea95e05a940dcf32b6b9c43a7b4eab"
+    },
+    {
+      "cell": "bartoldson-student-s0",
+      "execution_host": "ferret",
+      "wandb_evaluation_run_id": "eval-180f437c57a483fdf8e7",
+      "evaluation_results_sha256": "7b1e328727bf980f1ce3148b57534ad6b8da51bd63a093fd376e6856ba687eac"
+    },
+    {
+      "cell": "bartoldson-joint-s0",
+      "execution_host": "ferret",
+      "wandb_evaluation_run_id": "eval-f9f84e63660ac6825d93",
+      "evaluation_results_sha256": "56f996236280322668512d02985db6ff15f0d8079c61aa35b89aacdc32c42094"
+    }
+  ]
+}
