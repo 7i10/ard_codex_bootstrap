@@ -222,6 +222,25 @@ Go/No-Go判定には使いません。
 seed-0訓練runに条件付けられており、訓練seed間の不確実性ではありません。詳細とreport hashは
 [Seed-0 signal audit](SIGNAL_AUDIT.md)に固定しています。
 
+### ★ Frozen-oracle介入（実行中）
+
+signalの良否とtarget-softening介入の良否を分離するupper-bound実験です。Bartoldson/RSLAD seed 0の
+W&B周期checkpoint `last:v19`（epoch 99）と`last:v39`（epoch 199）をraw train splitで同じKL PGD-10へ
+再投入し、最終robust error 3,566 sampleをoracle maskとして固定しました。official testはmask作成に
+使っていません。同数・同一class分布のrandom maskを3つ作り、全4 runでselected sampleだけ
+`rho=0.5`のuniform target softeningを適用します。
+
+| 状態 | Ferret GPU | W&B train ID | Mask |
+|---|---:|---|---|
+| 実行中 | 0 | `bart-oracle-soft-s0-05cd0c6` | ★ offline oracle |
+| 実行中 | 1 | `bart-rand1-soft-s0-05cd0c6` | class-matched random 1 |
+| 実行中 | 2 | `bart-rand2-soft-s0-05cd0c6` | class-matched random 2 |
+| queue済み | 0（oracle後） | `bart-rand3-soft-s0-05cd0c6` | class-matched random 3 |
+
+実行SHAは`05cd0c66367e399dde266bd898c3ddc4097ca95c`です。4 train完了後、saved best/lastへ同一PGDと
+AutoAttackを別processで実行し、事前固定した`oracle best AA >= random平均 +0.5 pp`、全random超過、
+clean低下`<=0.5 pp`でGo/No-Goを判定します。oracleはdeployableな提案法ではありません。
+
 ## 5. 出力
 
 ### ローカル
@@ -254,9 +273,9 @@ evaluationが別runとして保存されます。evaluation runはtrain runの�
 
 ## 6. W&B runの整理
 
-2026-07-30 09:03 JSTのAPI監査では、**15 train + 22 evaluation = 37 run**で、全37件が
-`finished`です。直前の5 evaluation stderrでもW&B online sync完了と各30 artifact fileの送信を
-確認しました。
+2026-07-30 09:03 JSTのAPI監査では、既存の**15 train + 22 evaluation = 37 run**が全件
+`finished`でした。その後、frozen-oracle train 3件をonlineで開始し、random control 3はqueue済みです。
+直前の5 evaluation stderrではW&B online sync完了と各30 artifact fileの送信を確認しました。
 
 ### A. 論文候補cohortの重要run
 

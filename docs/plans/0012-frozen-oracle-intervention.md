@@ -54,7 +54,9 @@ changing the student signal or launching more Student/Joint seeds.
   defaults; see `docs/debugging/0014-frozen-oracle-historical-config-digest.md`.
 - [x] Exercise the real frozen-risk Trainer branch across deterministic
   checkpoint/resume, padding masks, and frozen-teacher gradient contracts.
-- [ ] Generate one oracle and three class-matched control manifests read-only.
+- [x] Generate one oracle and three class-matched control manifests read-only.
+- [x] Launch oracle/control-1/control-2 on Ferret GPUs 0/1/2 and queue
+  control-3 behind oracle on GPU 0.
 - [ ] Run Bartoldson oracle/control training and saved-checkpoint PGD/AA.
 - [x] Apply one consolidated scientific review to the stable implementation
   delta. Three P1 findings were fixed; delta review found no remaining P0/P1.
@@ -107,3 +109,15 @@ Implementation gate before commit:
 - Focused mypy uses `--follow-imports=skip` because the repository-wide gate
   currently reports pre-existing errors in signal-audit/AutoAttack modules;
   those unrelated errors are not attributed to this delta.
+
+Operational evidence:
+
+- Source W&B `last:v19`/`last:v39`: epoch 99/199 checkpoint SHA-256
+  `9071a7af…23f5` / `d373ebf8…102a`, raw config SHA-256 `b105b3da…222a`.
+- Replay/mask builder: clean Git `05cd0c66367e399dde266bd898c3ddc4097ca95c`;
+  45,000 train IDs, 3,566 selected, identical per-class counts in all masks.
+- Mask SHA-256: oracle `6d85afd7…c614`, controls
+  `013ba310…ead2`, `2658f67f…8b54`, `e5795e87…8e7d`.
+- Active W&B train IDs: `bart-oracle-soft-s0-05cd0c6`,
+  `bart-rand1-soft-s0-05cd0c6`, `bart-rand2-soft-s0-05cd0c6`.
+  `bart-rand3-soft-s0-05cd0c6` is prepared and predecessor-gated.
