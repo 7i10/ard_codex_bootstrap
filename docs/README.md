@@ -1,6 +1,7 @@
 # Documentation index
 
 - [Experiment dashboard](EXPERIMENT_DASHBOARD.md): 人間向けの目的、条件、現在状態、正式結果、W&B run分類
+- [Seed-0 signal audit](SIGNAL_AUDIT.md): Student/Joint signalの探索的関連、周期checkpoint、正式判定の境界
 - [Reproduction status](REPRODUCTION_STATUS.md): 実装済み機能、実行済み検証、未実行の重い実験、実際のCLI手順
 - [Research decisions](RESEARCH_DECISIONS.md): 今回の研究・実装で固定した方針
 - [Implementation specification](IMPLEMENTATION_SPEC.md): リポジトリ構造と責務

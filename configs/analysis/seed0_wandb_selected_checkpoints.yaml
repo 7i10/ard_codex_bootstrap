@@ -1,0 +1,49 @@
+artifacts:
+  - run_id: prod-chen-student-s0-2d54b82
+    artifact_name: model-prod-chen-student-s0-2d54b82-last
+    version: v19
+    file_name: last.pt
+    file_md5: oQlKC9MgcMPihQR7rcHkJA==
+    size: 92739291
+  - run_id: prod-chen-student-s0-2d54b82
+    artifact_name: model-prod-chen-student-s0-2d54b82-last
+    version: v39
+    file_name: last.pt
+    file_md5: lmKCRT8b2P3N2W/z9BNaAA==
+    size: 92829275
+  - run_id: prod-bart-student-s0-2d54b82
+    artifact_name: model-prod-bart-student-s0-2d54b82-last
+    version: v19
+    file_name: last.pt
+    file_md5: r+BvaM0DmzBI5nwy0pYAkA==
+    size: 92739291
+  - run_id: prod-bart-student-s0-2d54b82
+    artifact_name: model-prod-bart-student-s0-2d54b82-last
+    version: v39
+    file_name: last.pt
+    file_md5: 0OfXQW8FIkHTf0aMxwKVOw==
+    size: 92829275
+  - run_id: prod-chen-joint-s0-2d54b82
+    artifact_name: model-prod-chen-joint-s0-2d54b82-last
+    version: v19
+    file_name: last.pt
+    file_md5: K8O5NRHYUZvdTqa3mmPQTw==
+    size: 92739291
+  - run_id: prod-chen-joint-s0-2d54b82
+    artifact_name: model-prod-chen-joint-s0-2d54b82-last
+    version: v39
+    file_name: last.pt
+    file_md5: k+IJFC2vt43hm4i8JHWORA==
+    size: 92829275
+  - run_id: prod-bart-joint-s0-2d54b82
+    artifact_name: model-prod-bart-joint-s0-2d54b82-last
+    version: v19
+    file_name: last.pt
+    file_md5: 0cvyXhfTNhhC+oZ66g9mlQ==
+    size: 92739291
+  - run_id: prod-bart-joint-s0-2d54b82
+    artifact_name: model-prod-bart-joint-s0-2d54b82-last
+    version: v39
+    file_name: last.pt
+    file_md5: jGoxVs+VtQ4/q4aUvLp7MA==
+    size: 92829275

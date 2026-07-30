@@ -1,0 +1,36 @@
+schema_version: 1
+analysis: signal_audit
+teacher:
+  registry_id: bartoldson2024_adversarial_wrn94_16
+method_id: rslad_student
+training_seed: 0
+dataset_fingerprint: 75cdeaf61e0f98beb77055b4b237a688109ac6d546a7e680067e563b650d1a2e
+attack_identity:
+  norm: linf
+  input_domain: pixel_0_1
+  epsilon: 8/255
+  epsilon_value: 0.03137254901960784
+  step_size: 2/255
+  step_size_value: 0.00784313725490196
+  steps: 10
+  random_start: true
+  loss: kl
+  kl_target: teacher_clean
+  temperature: 1.0
+  temperature_squared: true
+  student_mode: eval
+  teacher_mode: eval
+  trace_step_losses: false
+# Owning host: Hamster. The CLI resolves absolute paths literally.
+manifests:
+  - /home/shunsukenaito/workspace-local/ard-campaign-runs/ard_codex_bootstrap/c10-r18-ws1-b128-core-s0-v1-2d54b82/outputs/production/bartoldson-student-s0/run-bundle/manifest.json
+final_parquet: /home/shunsukenaito/workspace-local/ard-campaign-runs/ard_codex_bootstrap/c10-r18-ws1-b128-core-s0-v1-2d54b82/outputs/production/bartoldson-student-s0/sample-stats-train.parquet
+prospective_run_id: prod-bart-student-s0-2d54b82
+historical_epoch: 99
+wandb_inventory: seed0_wandb_selected_checkpoints.yaml
+train_expected_count: 45000
+num_classes: 10
+stored_risk_kind: student
+split_seed: 0
+bootstrap_seed: 0
+bootstrap_replicates: 1000

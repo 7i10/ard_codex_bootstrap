@@ -83,6 +83,13 @@ def test_configs_changes_select_repository_config_resolution_test() -> None:
     assert "tests/unit/test_config.py" in selected.tests
 
 
+def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
+    available = ("tests/unit/test_signal_audit.py", "tests/unit/test_evaluation.py")
+    selected = select(("src/ard/analysis/signal_audit.py", "src/ard/cli/signal_audit.py"), available)
+    assert selected.tests == ("tests/unit/test_signal_audit.py",)
+    assert selected.tiers == ("T0", "T1")
+
+
 def test_teacher_acquisition_scripts_select_focused_acquisition_and_registry_tests() -> None:
     available = (
         "tests/unit/test_external_management.py",

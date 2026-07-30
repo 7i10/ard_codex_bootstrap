@@ -83,6 +83,11 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
+        ("src/ard/analysis/signal_audit.py", "src/ard/analysis/__init__.py", "src/ard/cli/signal_audit.py"),
+        ("tests/unit/test_signal_audit.py",),
+        ("T0", "T1"),
+    ),
+    (
         ("src/ard/config/",),
         (
             "tests/unit/test_config.py",
@@ -217,7 +222,12 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T1", "T3"),
     ),
     (
-        ("src/ard/evaluation/", "src/ard/analysis/", "src/ard/cli/evaluate.py"),
+        (
+            "src/ard/evaluation/",
+            "src/ard/analysis/aggregate.py",
+            "src/ard/analysis/sample_stats.py",
+            "src/ard/cli/evaluate.py",
+        ),
         ("tests/unit/test_evaluation.py", "tests/integration/test_tracking_evaluation.py"),
         ("T1", "T3"),
     ),
