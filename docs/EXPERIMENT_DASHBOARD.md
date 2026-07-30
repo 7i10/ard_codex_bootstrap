@@ -1,6 +1,6 @@
 # 実験ダッシュボード
 
-最終スナップショット: **2026-07-30 09:03 JST**
+最終スナップショット: **2026-07-30 10:47 JST**
 
 このページは、人間が現在の研究目的、条件、進捗、結果、W&B上のrunの役割を一か所で確認するための
 台帳です。実行中の値は変化するため、論文用の確定表ではありません。
@@ -100,7 +100,10 @@ evaluationはW&B run `eval-6dcf1b78a77d3258b2e0`として完了しました。
 Ferretの2 trainは、限定watcherがexit code 0、completion marker、Git SHA、GPU UUID、GPU lease
 ownershipを検証してから同じGPUでPGD→AAだけを起動し、全phaseがexit code 0で完了しました。
 Hamster/Ferretの全5 GPUは現在idleです。全campaign controllerは再開していないため、完了済みjobの
-重複trainはありません。canonical campaign stateへの再配置結果importだけが運用上のcleanupとして残ります。
+重複trainはありません。再配置した5 jobは、immutable result/checkpoint/sequence digestを含むportable
+evidenceからowning hostへatomic batch import済みです。再importは両hostでstrict no-opとなり、canonical
+campaign stateは両方とも`awaiting_scientific_review`へ到達しました。証跡は
+[`docs/experiments/reconciliation/`](experiments/reconciliation/)にあります。
 
 ### 次段階の未着手研究
 
@@ -272,8 +275,9 @@ checkpoint/evaluation遷移、Joint warmupの受入証拠なので保持しま�
   `pilot-h-chen-rslad-s0-712b878`、`eval-6f99576e8fa285a61f12`
 
 `712b878`のtrain metricsは最終受理pilotと一致し、科学解析上は重複です。ただし全5件にartifactがあり、
-過去のgroup-length修正とpilot受入経緯を追跡できます。**active campaign中は削除せず**、W&Bの通常viewから
-除外するのが安全です。campaign完了後に容量または画面の簡潔さを優先する場合、local manifestを保存した上で
+過去のgroup-length修正とpilot受入経緯を追跡できます。campaignはscientific-review境界へ到達しましたが、
+今回もrun削除は行っていません。通常viewから除外するのが安全です。容量または画面の簡潔さを優先する場合、
+local manifestを保存した上で
 まず`712b878`の3件を削除候補にできます。旧world-size 2 pilotの2件は固有の履歴なので、その次の候補です。
 
 ### 推奨するW&B view

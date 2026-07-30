@@ -1,6 +1,6 @@
 # AutoAttack provenance and terminal campaign reconciliation
 
-Status: in progress
+Status: completed
 
 ## Outcome
 
@@ -51,15 +51,15 @@ lineage is frozen.
 - [x] Add focused campaign reconciliation tests and CLI dry-run coverage.
 - [x] Generate and validate the additive AutoAttack provenance amendment and
   real Hamster reconciliation dry runs.
-- [ ] Generate and validate remaining reconciliation records from
+- [x] Generate and validate remaining reconciliation records from
   completed Hamster and Ferret artifacts.
-- [ ] Import only the affected jobs into their canonical host state stores.
-- [ ] Verify one controller pass per host launches nothing and reaches the
+- [x] Import only the affected jobs into their canonical host state stores.
+- [x] Verify a launch-free terminal finalization on each host reaches the
   scientific-review boundary.
 - [x] Run `scripts/verify.py --changed`, record cached passes, and perform one
   consolidated scientific review of the stable delta.
 - [x] Update experiment/dashboard and reproducibility documentation.
-- [ ] Commit the cohesive change and push after verification.
+- [x] Commit the cohesive change and push after verification.
 
 ## Changed areas
 
@@ -143,5 +143,14 @@ evaluation result is changed.
   unit commands.
 - Real read-only collection validated Chen/Entropy primary evidence and
   Chen/Student primary plus auxiliary AutoAttack evidence against immutable
-  Hamster files. State import and controller execution remain pending.
-- T4/T5, production training, and AutoAttack were not run.
+  Hamster files. Three Ferret records passed the same collection contract.
+- Hamster atomic transaction `b2bb6bba…` imported two jobs; Ferret transaction
+  `6c1a6291…` imported three. Exact re-import returned `imported: []` and the
+  complete expected `already_imported` set on both hosts.
+- An ordinary armed `run-once` was intentionally not used because it is
+  launch-capable. A reviewed terminal-only finalizer validates campaign
+  identity, absence of prepared transactions, and all core terminal states
+  under one host lock. Both stores reached `awaiting_scientific_review`
+  without invoking GPU inventory or a launcher.
+- No T4/T5, production training, or AutoAttack was rerun during this
+  reconciliation change.

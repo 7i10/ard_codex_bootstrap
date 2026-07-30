@@ -1,6 +1,6 @@
 # Reproduction status
 
-最終更新: 2026-07-23
+最終更新: 2026-07-30
 
 ## 現在の到達点
 
@@ -21,7 +21,8 @@ one epochのsynthetic fixtureで切り替える構成であり、engineをmethod
 Baseline-readinessのM0–M4は承認済みです。最終bounded T0–T3 gateは18 commandsで`209 passed, 2 skipped`、
 同一の最終fingerprintの再確認は18 commandsすべて`cached pass`でした。
 Ruff/mypy/import/CLI gateもpassしました。Real teacher取得・audit、Chen pilot、saved-checkpoint PGD evaluation、
-pilot W&B offline-syncは実行済みです。completed T5 production、multi-seed集計、real full AutoAttackはdeferredです。
+pilot W&B offline-syncに加え、single-GPU seed-0 production 8 train、official PGD-20、saved best/lastへの
+standard AutoAttackを実行済みです。multi-seed集計、full SAAD、追加baselineはdeferredです。
 
 全8手法でattackはpixel-space `[0,1]`、`Linf`、`epsilon=8/255`、
 `step_size=2/255`、10 steps、random startです。checkpoint selection attackは同じbudgetのhard-label CEです。
@@ -46,13 +47,19 @@ canonical 200-epoch configs (two teachers × four methods). The former reproduct
 removed; `repro` remains only as a legacy schema tier for old resolved bundles. Public SAAD paper/code records under
 `configs/protocols/` are audit-only and are not local reproduction claims.
 
-The Chen five-epoch pilot has been executed; the first 200-epoch controlled RSLAD baseline is running and full
-AutoAttack has not been executed. Teacher audit
-PGD-20 and pilot PGD-20 are bounded screening measurements and must not be reported as AutoAttack or paper results.
+The Chen five-epoch pilot and the single-GPU seed-zero controlled cohort have
+been executed. The cohort contains two teachers by four methods, with all
+eight 200-epoch trains, official PGD-20 evaluations, and saved best/last
+AutoAttack evaluations complete. Teacher-audit PGD-20 and pilot PGD-20 remain
+bounded screening measurements and must not be reported as AutoAttack or paper
+results.
 
-Use `ARD_PER_RANK_BATCH_SIZE=64` with `torchrun --nproc_per_node=2` for pilot and canonical production. Execution
-identity includes world size, per-rank/global batch, and `local_per_rank` BatchNorm; a 1-GPU batch-128 run is a
-scientifically distinct profile. Evaluate saved checkpoints in a separate process and reuse the checkpoint's training
+The canonical seed-zero cohort used one GPU per run with
+`ARD_PER_RANK_BATCH_SIZE=128`. The historical two-GPU profile uses
+`ARD_PER_RANK_BATCH_SIZE=64` with `torchrun --nproc_per_node=2`. Execution
+identity includes world size, per-rank/global batch, and `local_per_rank`
+BatchNorm, so these profiles remain scientifically distinct. Evaluate saved
+checkpoints in a separate process and reuse the checkpoint's training
 execution identity.
 
 ### Executed Chen two-GPU pilot
@@ -74,11 +81,12 @@ and evaluation run [`eval-92f3750eb628e93d6060`](https://wandb.ai/shunsuke-n-was
 both have local manifests at `status=completed`, `sync_state=synced`, `sync_cursor=1` and durable
 `sync-complete.json` markers. Full AutoAttack was not run.
 
-The canonical Chen RSLAD seed-0 run `chen-rslad-production-s0-0ca90ad` started from fixed SHA
-`0ca90ad3d48fe019151363b00c6da2160d64eb99` on the same two-GPU execution profile. Its W&B offline-sync identity is
-`ard-32a10cb8a2cab31a`; it must remain a pending run until application completion and subsequent sync verification.
-At 2026-07-23 07:53 JST, epochs 0–24, global steps, finite metrics, and five best/last publication intervals were
-continuous. This in-progress state is not a completed reproduction result.
+The separate Chen RSLAD seed-0 run `chen-rslad-production-s0-0ca90ad` used fixed
+SHA `0ca90ad3d48fe019151363b00c6da2160d64eb99` and the two-GPU execution
+profile. It later completed and is retained as a distinct reference rather
+than mixed into the canonical single-GPU cohort. Its official best/last
+clean/PGD values are `83.51/55.88%` and `83.42/55.61%`; full AutoAttack was not
+run for this reference.
 
 ### RobustBench teacher acquisition
 
@@ -182,6 +190,10 @@ controlled campaign. Full AutoAttack was executed separately from saved best/las
 Those legacy results record package version `unknown`; immutable result digests and a post-hoc two-host installation
 attestation are recorded in
 [`0002-autoattack-provenance-amendment.json`](experiments/0002-autoattack-provenance-amendment.json).
+Five cross-host terminal records are stored under
+[`docs/experiments/reconciliation/`](experiments/reconciliation/). They were
+imported atomically into the owning host stores, exact re-import was a no-op,
+and both canonical stores are now at `awaiting_scientific_review`.
 
 Protocol ID, optimizer, scheduler, epoch count (200), validation fraction (0.1), global batch size (128),
 and attack identities are fixed in the checked-in YAML. Overrides of these scientific fields are rejected by the schema;

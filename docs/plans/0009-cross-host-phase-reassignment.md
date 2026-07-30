@@ -1,6 +1,6 @@
 # Cross-host phase reassignment
 
-Status: in progress
+Status: completed
 
 ## Goal
 
@@ -18,7 +18,7 @@ The original campaign Git SHA, method config, W&B identity, checkpoint bytes, an
   the pause; both watchdogs/controllers stopped and detached scientific children remained live.
 - [x] Transfer only the Bartoldson entropy evaluation inputs and verify their SHA-256 on Ferret.
 - [x] Launch both phases with durable process/exit identity and GPU UUID records.
-- [ ] Import terminal evidence back to the canonical output/state location without overwriting prior evidence.
+- [x] Import terminal evidence back to the canonical output/state location without overwriting prior evidence.
 - [x] Add focused portability/lineage tests, then run the impact-selected gate.
 - [x] Update the experiment dashboard with actual launch/result evidence.
 - [x] Use newly idle GPUs for Chen/Entropy PGD+AA and post-hoc Chen/Bartoldson Student AA.
@@ -62,3 +62,14 @@ The original campaign Git SHA, method config, W&B identity, checkpoint bytes, an
   identity in three tracking/preflight layers. The runtime now permits only a path relocation: registered SHA-256,
   teacher metadata, normalization, threat model, training config hash, and checkpoint lineage remain exact.
 - Failed preflight outputs contain no metrics and are retained under explicit `evaluation-autoattack-failed-*` names.
+- On 2026-07-30, five portable evidence records were validated and imported in
+  two atomic owning-host batches. Hamster transaction
+  `b2bb6bbaf4c83d3a6d58dd34d7313b2bcec0e4425765fe46acd83884fe685c99`
+  imported Chen/Entropy and Bartoldson/Entropy. Ferret transaction
+  `6c1a629104c741dd6e646ac5e73ca719e6721e2233fa9426224b38012d39acda`
+  imported Bartoldson/RSLAD, Bartoldson/Joint, and Chen/Student; the latter
+  retains post-hoc AutoAttack as auxiliary evidence.
+- Exact batch re-import returned no newly imported jobs on both hosts.
+  Launch-free terminal finalization then moved both canonical stores to
+  `awaiting_scientific_review`; no controller, training, or evaluation process
+  was restarted.
