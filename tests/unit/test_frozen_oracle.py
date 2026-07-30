@@ -95,6 +95,16 @@ def _source_config(tmp_path: Path) -> ExperimentConfig:
     )
 
 
+def _historical_source_hash(config: ExperimentConfig) -> str:
+    """Emulate the historical resolved YAML before new schema defaults existed."""
+    raw = resolved_config_dict(config)
+    raw_method = raw["method"]
+    assert isinstance(raw_method, dict)
+    raw_method.pop("frozen_oracle_manifest", None)
+    raw_method.pop("frozen_oracle_manifest_sha256", None)
+    return config_digest(raw)
+
+
 def _checkpoint(*, config_hash: str, epoch: int, records: dict[str, dict[str, object]]) -> dict[str, object]:
     return {
         "format_version": 1,
@@ -122,7 +132,7 @@ def _inputs(tmp_path: Path) -> tuple[ExperimentConfig, Path, Path, Path, dict[in
     labels = {0: 0, 1: 0, 2: 1, 3: 1, 4: 1, 5: 2}
     historical = {str(sample_id): {"previous_robust_correct": sample_id not in {2, 5}} for sample_id in labels}
     final = {str(sample_id): {"previous_robust_correct": sample_id not in {1, 2, 5}} for sample_id in labels}
-    config_hash = config_digest(resolved_config_dict(config))
+    config_hash = _historical_source_hash(config)
     historical_path, final_path = tmp_path / "epoch99.pt", tmp_path / "epoch199.pt"
     torch.save(_checkpoint(config_hash=config_hash, epoch=99, records=historical), historical_path)
     torch.save(_checkpoint(config_hash=config_hash, epoch=199, records=final), final_path)
@@ -196,7 +206,7 @@ def _manifests(
     tmp_path: Path,
 ) -> tuple[dict[str, dict[str, object]], dict[int, int]]:
     config, source_manifest, historical, final, labels = _inputs(tmp_path)
-    config_hash = config_digest(resolved_config_dict(config))
+    config_hash = _historical_source_hash(config)
     historical_correct = {sample_id: sample_id not in {2, 5} for sample_id in labels}
     final_correct = {sample_id: sample_id not in {1, 2, 5} for sample_id in labels}
     inventory = validate_wandb_checkpoint_inventory(
@@ -211,6 +221,7 @@ def _manifests(
         build_frozen_oracle_manifests(
             source_config=config,
             source_manifest=source_manifest,
+            source_config_hash=config_hash,
             historical_replay=_replay(
                 checkpoint=historical, epoch=99, config_hash=config_hash, correctness=historical_correct
             ),
@@ -364,13 +375,14 @@ def test_schema_requires_hash_target_and_guarded_tier() -> None:
 
 def test_builder_rejects_dirty_or_unaddressable_git_identity(tmp_path: Path) -> None:
     config, source_manifest, historical, final, labels = _inputs(tmp_path)
-    config_hash = config_digest(resolved_config_dict(config))
+    config_hash = _historical_source_hash(config)
     historical_correct = {sample_id: sample_id not in {2, 5} for sample_id in labels}
     final_correct = {sample_id: sample_id not in {1, 2, 5} for sample_id in labels}
     with pytest.raises(FrozenOracleError, match="must be clean"):
         build_frozen_oracle_manifests(
             source_config=config,
             source_manifest=source_manifest,
+            source_config_hash=config_hash,
             historical_replay=_replay(
                 checkpoint=historical, epoch=99, config_hash=config_hash, correctness=historical_correct
             ),
@@ -390,7 +402,7 @@ def test_builder_rejects_dirty_or_unaddressable_git_identity(tmp_path: Path) -> 
 
 def test_builder_rejects_replay_protocol_or_linf_drift(tmp_path: Path) -> None:
     config, source_manifest, historical, final, labels = _inputs(tmp_path)
-    config_hash = config_digest(resolved_config_dict(config))
+    config_hash = _historical_source_hash(config)
     historical_correct = {sample_id: sample_id not in {2, 5} for sample_id in labels}
     final_correct = {sample_id: sample_id not in {1, 2, 5} for sample_id in labels}
     historical_replay = _replay(
@@ -411,6 +423,7 @@ def test_builder_rejects_replay_protocol_or_linf_drift(tmp_path: Path) -> None:
         build_frozen_oracle_manifests(
             source_config=config,
             source_manifest=source_manifest,
+            source_config_hash=config_hash,
             historical_replay=historical_replay,
             final_replay=drifted_protocol,
             labels=labels,
@@ -423,6 +436,7 @@ def test_builder_rejects_replay_protocol_or_linf_drift(tmp_path: Path) -> None:
         build_frozen_oracle_manifests(
             source_config=config,
             source_manifest=source_manifest,
+            source_config_hash=config_hash,
             historical_replay=historical_replay,
             final_replay=exceeded_bound,
             labels=labels,
@@ -433,7 +447,7 @@ def test_builder_rejects_replay_protocol_or_linf_drift(tmp_path: Path) -> None:
 
 def test_wandb_checkpoint_inventory_rejects_version_or_byte_drift(tmp_path: Path) -> None:
     config, _, historical, final, _ = _inputs(tmp_path)
-    config_hash = config_digest(resolved_config_dict(config))
+    config_hash = _historical_source_hash(config)
     inventory = _inventory(historical=historical, final=final, config_hash=config_hash)
     validated = validate_wandb_checkpoint_inventory(
         inventory,
@@ -482,3 +496,34 @@ def test_manifest_hash_changes_method_config_and_resume_identity(tmp_path: Path)
         return config_digest(resolved_config_dict(config))
 
     assert digest("1" * 64) != digest("2" * 64)
+
+
+def test_historical_raw_resolved_mapping_hash_survives_new_schema_defaults(tmp_path: Path) -> None:
+    config, source_manifest, historical, final, labels = _inputs(tmp_path)
+    raw_hash = _historical_source_hash(config)
+    current_schema_hash = config_digest(resolved_config_dict(config))
+    assert raw_hash != current_schema_hash
+    assert torch.load(historical, map_location="cpu", weights_only=False)["config_hash"] == raw_hash
+    historical_correct = {sample_id: sample_id not in {2, 5} for sample_id in labels}
+    final_correct = {sample_id: sample_id not in {1, 2, 5} for sample_id in labels}
+    inventory = validate_wandb_checkpoint_inventory(
+        _inventory(historical=historical, final=final, config_hash=raw_hash),
+        historical_checkpoint=historical,
+        final_checkpoint=final,
+        source_config_hash=raw_hash,
+        source_run_id="source-run",
+        source_scientific_git_sha="a" * 40,
+    )
+    manifests = build_frozen_oracle_manifests(
+        source_config=config,
+        source_manifest=source_manifest,
+        source_config_hash=raw_hash,
+        historical_replay=_replay(
+            checkpoint=historical, epoch=99, config_hash=raw_hash, correctness=historical_correct
+        ),
+        final_replay=_replay(checkpoint=final, epoch=199, config_hash=raw_hash, correctness=final_correct),
+        labels=labels,
+        builder_git={"sha": "b" * 40, "dirty": False},
+        wandb_checkpoint_inventory=inventory,
+    )
+    assert manifests["oracle"]["source"]["config_sha256"] == raw_hash

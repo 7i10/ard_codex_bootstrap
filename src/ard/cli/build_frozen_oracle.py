@@ -19,6 +19,7 @@ from ard.analysis.frozen_oracle import (
     write_frozen_oracle_manifests,
 )
 from ard.config import load_config
+from ard.engine import config_digest
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,6 +43,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    try:
+        raw_source_config = yaml.safe_load(args.source_config.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise FrozenOracleError("source resolved config YAML is unreadable") from exc
+    if not isinstance(raw_source_config, dict):
+        raise FrozenOracleError("source resolved config YAML must be a mapping")
+    # This is deliberately the historical serialized mapping, before the
+    # current Pydantic schema can inject newly introduced default fields.
+    source_config_hash = config_digest(raw_source_config)
     source = load_config(args.source_config)
     device = torch.device(args.device)
     if device.type != "cuda" or not torch.cuda.is_available():
@@ -50,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     labels = train_labels(source)
     historical_replay = replay_robust_correctness(
         source_config=source,
+        source_config_hash=source_config_hash,
         checkpoint=args.historical_checkpoint,
         device=device,
         batch_size=args.batch_size,
@@ -57,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     final_replay = replay_robust_correctness(
         source_config=source,
+        source_config_hash=source_config_hash,
         checkpoint=args.final_checkpoint,
         device=device,
         batch_size=args.batch_size,
@@ -78,13 +90,14 @@ def main(argv: list[str] | None = None) -> int:
         inventory_payload,
         historical_checkpoint=args.historical_checkpoint,
         final_checkpoint=args.final_checkpoint,
-        source_config_hash=historical_replay["config_sha256"],
+        source_config_hash=source_config_hash,
         source_run_id=historical_replay["tracker_run_id"],
         source_scientific_git_sha=source_scientific_git_sha,
     )
     manifests = build_frozen_oracle_manifests(
         source_config=source,
         source_manifest=args.source_run_manifest,
+        source_config_hash=source_config_hash,
         historical_replay=historical_replay,
         final_replay=final_replay,
         labels=labels,

@@ -50,6 +50,8 @@ changing the student signal or launching more Student/Joint seeds.
 - [x] Add formula, stable-ID, hash/lineage, resume, and random-control tests.
 - [x] Bind W&B `last:v19/v39` artifact digests and checkpoint byte identities
   to the generated mask.
+- [x] Preserve the historical raw resolved-YAML digest across later schema
+  defaults; see `docs/debugging/0014-frozen-oracle-historical-config-digest.md`.
 - [x] Exercise the real frozen-risk Trainer branch across deterministic
   checkpoint/resume, padding masks, and frozen-teacher gradient contracts.
 - [ ] Generate one oracle and three class-matched control manifests read-only.

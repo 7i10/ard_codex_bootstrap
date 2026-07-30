@@ -22,7 +22,6 @@ from torch.utils.data import DataLoader
 
 from ard.attacks import AttackRequest, LinfPGD
 from ard.config import ExperimentConfig
-from ard.config.loader import resolved_config_dict
 from ard.config.schema import AttackConfig
 from ard.data import (
     EpochShuffleSampler,
@@ -31,7 +30,6 @@ from ard.data import (
     collate_indexed,
     stratified_train_validation_split,
 )
-from ard.engine.checkpoint import config_digest
 from ard.evaluation.saved_checkpoint import load_saved_student_checkpoint, validate_checkpoint_lineage
 from ard.models import build_student, build_teacher
 
@@ -193,6 +191,7 @@ def builder_git_identity() -> dict[str, Any]:
 def replay_robust_correctness(
     *,
     source_config: ExperimentConfig,
+    source_config_hash: str,
     checkpoint: Path,
     device: torch.device,
     batch_size: int,
@@ -213,9 +212,9 @@ def replay_robust_correctness(
     expected_attack = AttackConfig(loss="kl", kl_target="teacher_clean")
     if attack_config.identity() != expected_attack.identity():
         raise FrozenOracleError("frozen-oracle replay requires the complete controlled KL PGD-10 attack identity")
-    expected_hash = config_digest(resolved_config_dict(source_config))
+    _hex(source_config_hash, name="source raw resolved-config SHA")
     try:
-        payload = validate_checkpoint_lineage(checkpoint, expected_config_hash=expected_hash)
+        payload = validate_checkpoint_lineage(checkpoint, expected_config_hash=source_config_hash)
     except (OSError, ValueError) as exc:
         raise FrozenOracleError("source replay checkpoint does not satisfy strict lineage") from exc
     if not isinstance(payload, Mapping):  # defensive after strict helper
@@ -372,6 +371,7 @@ def build_frozen_oracle_manifests(
     *,
     source_config: ExperimentConfig,
     source_manifest: Path,
+    source_config_hash: str,
     historical_replay: Mapping[str, Any],
     final_replay: Mapping[str, Any],
     labels: Mapping[int, int],
@@ -395,11 +395,10 @@ def build_frozen_oracle_manifests(
     if builder_git.get("dirty") is not False:
         raise FrozenOracleError("frozen-oracle builder Git identity must be clean")
     builder_sha = _hex(builder_git.get("sha"), name="frozen-oracle builder Git SHA", length=40)
-    source_resolved = resolved_config_dict(source_config)
-    source_hash = config_digest(source_resolved)
+    _hex(source_config_hash, name="source raw resolved-config SHA")
 
     def validate_replay(replay: Mapping[str, Any], *, epoch: int, name: str) -> tuple[dict[int, bool], dict[str, Any]]:
-        if replay.get("epoch") != epoch or replay.get("config_sha256") != source_hash:
+        if replay.get("epoch") != epoch or replay.get("config_sha256") != source_config_hash:
             raise FrozenOracleError(f"{name} replay does not bind the expected source checkpoint/config")
         if replay.get("tracker_run_id") is None or not isinstance(replay.get("tracker_run_id"), str):
             raise FrozenOracleError(f"{name} replay lacks source run lineage")
@@ -434,7 +433,9 @@ def build_frozen_oracle_manifests(
     if historical_protocol != final_protocol:
         raise FrozenOracleError("historical/final replay protocols must be exactly identical")
     lineage = _source_manifest(
-        source_manifest, source_config_hash=source_hash, source_teacher_sha256=source_config.teacher.checkpoint_sha256
+        source_manifest,
+        source_config_hash=source_config_hash,
+        source_teacher_sha256=source_config.teacher.checkpoint_sha256,
     )
     if lineage["run_id"] != historical_replay["tracker_run_id"]:
         raise FrozenOracleError("source manifest run ID does not match source replays")
@@ -471,7 +472,7 @@ def build_frozen_oracle_manifests(
         },
         "source": {
             **lineage,
-            "config_sha256": source_hash,
+            "config_sha256": source_config_hash,
             "teacher_checkpoint_sha256": source_config.teacher.checkpoint_sha256,
             "attack_identity": source_config.method.attack.identity(),
             "replay_source_files": replay_source_hashes(),
