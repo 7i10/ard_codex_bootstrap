@@ -1,0 +1,79 @@
+{
+  "campaign_id": "c10-r18-ws1-b128-core-s0-v1",
+  "campaign_identity_sha256": "e4d28add29965840a1f9b6e40abf00498ff07fde0439d77f1cf376898332f593",
+  "evidence_sha256": "84337c37011d66211e56ea037434c0499b059bc78b82938275c263da8e9bf192",
+  "execution_gpu": 0,
+  "execution_gpu_uuid": "GPU-d6b53af2-a086-be46-30db-10976ef3b989",
+  "execution_host": "ferret",
+  "job": {
+    "evidence_digests": {
+      "best_checkpoint": "64d53b83ce92195c53d68dd5cd487c4150bfca415380b95530e7a020228f339d",
+      "evaluation_results": "a0d2d4b1009c053426b30fe035081c9afa3d520886aac04c9bae3c7c2ef5eebe",
+      "last_checkpoint": "d373ebf845565ba6196c70eeda7e51776cdcf726410cb00abdb3739ed494102a"
+    },
+    "expected_revision": 12169,
+    "expected_state": "training",
+    "job_id": "prod-f0-bart-rslad-s0",
+    "outer_exit": {
+      "error": null,
+      "exit_code": 0,
+      "finished_at": "2026-07-29T20:30:23.389824+00:00",
+      "git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+      "phase_argv_digest": "ff983b0afe1f4f69c4cd5c8d025a563a033c17498494164456e7fdc4e6145178",
+      "run_id": "reassigned-prod-f0-bart-rslad-s0-successor-eval",
+      "version": 1,
+      "wrapper_pid": 118038
+    },
+    "phase_events": [
+      {
+        "at": "2026-07-29T18:50:09.252624+00:00",
+        "event": "started",
+        "phase": "pgd"
+      },
+      {
+        "at": "2026-07-29T18:51:35.587264+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "pgd"
+      },
+      {
+        "at": "2026-07-29T18:51:35.587455+00:00",
+        "event": "started",
+        "phase": "autoattack"
+      },
+      {
+        "at": "2026-07-29T20:30:23.322386+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "autoattack"
+      }
+    ],
+    "posthoc_autoattack_attestation": {
+      "amendment": {
+        "path": "docs/experiments/0002-autoattack-provenance-amendment.json",
+        "sha256": "ef4ae85acc05c50c68bcd891be9acdb43d9a391830c37f3bf590f030779dc014"
+      },
+      "evaluation_results_sha256": "a0d2d4b1009c053426b30fe035081c9afa3d520886aac04c9bae3c7c2ef5eebe",
+      "posthoc_attested": true
+    },
+    "prior_phase_digests": {
+      "train": "33e747d2a3adae0b1b2941f56c9aa8df4b11362e3c1c594793eae32f5f317b68"
+    },
+    "required_phases": [
+      "train",
+      "pgd",
+      "autoattack"
+    ],
+    "sequence_digests": {
+      "outer_exit": "844b83b984187e59eaa99e19f69d4eba52ebc0bf1eeae654dd1edc8a9b5fba59",
+      "phase_events": "7f816497ddc651c8302b91ade0331f5d326b7868ca4b4163ff105218166d85cb",
+      "sequence_completion": "c834f58b134b8534f2ee02ff91ffc7fbcc275076727d919cc1f60b1ab0a716da",
+      "sequence_spec": "2e9854ccd6b8d9df2ad17e9dfef663a03ce9bbc0c4bdbf277d4a1437820f53ea"
+    },
+    "sequence_source_job_id": "prod-f0-bart-rslad-s0-successor-eval"
+  },
+  "runtime_git_sha": "0bffb7aa041ba17c7fc45c5e5a033859623697a0",
+  "scientific_git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+  "source_host": "ferret",
+  "version": 1
+}

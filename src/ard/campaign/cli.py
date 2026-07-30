@@ -33,7 +33,7 @@ def _parser() -> argparse.ArgumentParser:
     validate.add_argument("--campaign", type=Path, required=True)
     validate.add_argument("--sha")
 
-    for name in ("init", "arm", "run-once", "run-loop"):
+    for name in ("init", "arm", "run-once", "run-loop", "finalize-terminal"):
         command = commands.add_parser(name)
         command.add_argument("--campaign", type=Path, required=True)
         command.add_argument("--sha")
@@ -43,6 +43,8 @@ def _parser() -> argparse.ArgumentParser:
     arm.add_argument("--repository", type=Path, required=True)
     arm.add_argument("--output-root", type=Path, required=True)
     arm.add_argument("--gpu-lock-root", type=Path, required=True)
+    finalize = commands.choices["finalize-terminal"]
+    finalize.add_argument("--host", choices=("hamster", "ferret"), required=True)
     run_once = commands.choices["run-once"]
     run_once.add_argument("--host", choices=("hamster", "ferret"), required=True)
     run_once.add_argument("--repository", type=Path, required=True)
@@ -77,6 +79,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         state.initialize(spec)
         if args.command == "init":
             print(json.dumps(state.campaign(), sort_keys=True))
+            return 0
+        if args.command == "finalize-terminal":
+            print(json.dumps(CampaignWorker.finalize_terminal(spec, state, host=args.host), sort_keys=True))
             return 0
         worker = CampaignWorker(
             spec,

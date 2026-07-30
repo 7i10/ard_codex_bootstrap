@@ -1,0 +1,117 @@
+{
+  "campaign_id": "c10-r18-ws1-b128-core-s0-v1",
+  "campaign_identity_sha256": "e4d28add29965840a1f9b6e40abf00498ff07fde0439d77f1cf376898332f593",
+  "evidence_sha256": "2c6e7f283ba779f18ec0f6116fd854debcb6d86d8c2b695985f685ededa39c3e",
+  "execution_gpu": 0,
+  "execution_gpu_uuid": "GPU-7ce112db-1ab9-ff86-9810-5bb92e222c2a",
+  "execution_host": "hamster",
+  "job": {
+    "auxiliary_autoattack": {
+      "evidence_digests": {
+        "best_checkpoint": "1579f0997fee2df48f2f9b59a117e5f3252ac054d73fc895ee58d8c7e8ace3ff",
+        "evaluation_results": "fa8e5b87b1f6acf21cc52b4b0709eafefba89d1e0f172cecfc42793d22f6b44e",
+        "last_checkpoint": "3fa08cb17099a4014c663a86577c50b0192bd1e91a74a895fbf65bcdc1a36111"
+      },
+      "execution_gpu": 1,
+      "execution_gpu_uuid": "GPU-9bb01a06-72d2-cc68-eeca-9c2c9daf37ce",
+      "execution_host": "hamster",
+      "outer_exit": {
+        "error": null,
+        "exit_code": 0,
+        "finished_at": "2026-07-29T15:45:05.520499+00:00",
+        "git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+        "phase_argv_digest": "971d7443fc4a8a6f26b35cccf6582e667dc0d951793d9b42d968ef9d135e18b2",
+        "run_id": "reassigned-prod-f0-chen-student-s0-extra-autoattack",
+        "version": 1,
+        "wrapper_pid": 529775
+      },
+      "phase_events": [
+        {
+          "at": "2026-07-29T14:33:43.212131+00:00",
+          "event": "started",
+          "phase": "autoattack"
+        },
+        {
+          "at": "2026-07-29T15:45:05.479525+00:00",
+          "event": "finished",
+          "exit_code": 0,
+          "phase": "autoattack"
+        }
+      ],
+      "posthoc_autoattack_attestation": {
+        "amendment": {
+          "path": "docs/experiments/0002-autoattack-provenance-amendment.json",
+          "sha256": "ef4ae85acc05c50c68bcd891be9acdb43d9a391830c37f3bf590f030779dc014"
+        },
+        "evaluation_results_sha256": "fa8e5b87b1f6acf21cc52b4b0709eafefba89d1e0f172cecfc42793d22f6b44e",
+        "posthoc_attested": true
+      },
+      "runtime_git_sha": "9e94d3622521d8dab04e695dc198f8e49e9ebbf5",
+      "sequence_digests": {
+        "outer_exit": "16f0540924edb85dcb2241b857f3321f68209dcaca7f5de166910ee7ac49febc",
+        "phase_events": "b89aa5bf3b65a1b3d4658a931cd517129bb6ceb693672df17d0f3e9d1930b95f",
+        "sequence_completion": "8a40afc2586165f1246544d562a211f82f128c1d80a2b822f8afb15b324bdcb5",
+        "sequence_spec": "674786b3bba4b01da9d416fbc3b6c07e83d56737b1336c08f1894d2f211c8cb0"
+      },
+      "sequence_source_job_id": "prod-f0-chen-student-s0-extra-autoattack"
+    },
+    "evidence_digests": {
+      "best_checkpoint": "1579f0997fee2df48f2f9b59a117e5f3252ac054d73fc895ee58d8c7e8ace3ff",
+      "evaluation_results": "4f54419800f51e4d82a7a1e6c6cb60e2e82468778aff89fb30587d16d45aecf2",
+      "last_checkpoint": "3fa08cb17099a4014c663a86577c50b0192bd1e91a74a895fbf65bcdc1a36111"
+    },
+    "expected_revision": 13234,
+    "expected_state": "waiting_gpu",
+    "job_id": "prod-f0-chen-student-s0",
+    "outer_exit": {
+      "error": null,
+      "exit_code": 0,
+      "finished_at": "2026-07-29T10:12:55.645305+00:00",
+      "git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+      "phase_argv_digest": "141f6a55ea045b9fd2aab31d819ade873044beb3947ba1a4001c6919f661a291",
+      "run_id": "reassigned-prod-f0-chen-student-s0",
+      "version": 1,
+      "wrapper_pid": 144415
+    },
+    "phase_events": [
+      {
+        "at": "2026-07-29T05:48:11.821852+00:00",
+        "event": "started",
+        "phase": "train"
+      },
+      {
+        "at": "2026-07-29T10:12:14.576366+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "train"
+      },
+      {
+        "at": "2026-07-29T10:12:14.576551+00:00",
+        "event": "started",
+        "phase": "pgd"
+      },
+      {
+        "at": "2026-07-29T10:12:55.605880+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "pgd"
+      }
+    ],
+    "prior_phase_digests": {},
+    "required_phases": [
+      "train",
+      "pgd"
+    ],
+    "sequence_digests": {
+      "outer_exit": "f6e6d90d6fa1da780455134b1eea28d4fdf0fce73f3b0077a3de0420b650866d",
+      "phase_events": "4654352946e01165ddf3b58e0d3b1dabc99150f4e896fbffdd0f3d24cb10ab2d",
+      "sequence_completion": "d1f8741c07207c203c45373468bdbb8ec11565239b9b937089877853ed333142",
+      "sequence_spec": "08740ce453d67ce51861c1c7b90bbd5fc3361af492e1ec5524ac747df011a3d2"
+    },
+    "sequence_source_job_id": "prod-f0-chen-student-s0"
+  },
+  "runtime_git_sha": null,
+  "scientific_git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+  "source_host": "ferret",
+  "version": 1
+}

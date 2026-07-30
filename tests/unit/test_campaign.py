@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,8 +20,13 @@ from ard.campaign.schema import (
     effective_wandb_run_id,
     require_aggregation_compatible,
 )
-from ard.campaign.state import CampaignStateStore, JobState, StateError
-from ard.campaign.worker import CampaignWorker, _validate_evaluation_results, default_phase_success_validator
+from ard.campaign.state import CampaignStateStore, JobState, StateError, _atomic_json
+from ard.campaign.worker import (
+    CampaignWorker,
+    WorkerError,
+    _validate_evaluation_results,
+    default_phase_success_validator,
+)
 
 
 def _raw_campaign(*, autoattack: bool = True) -> dict[str, object]:
@@ -139,6 +145,70 @@ def test_state_is_atomic_and_transitions_are_finite(tmp_path: Path) -> None:
     changed["jobs"][0]["phases"]["train"] = ["python", "-c", "changed"]  # type: ignore[index]
     with pytest.raises(StateError, match="identity"):
         store.initialize(CampaignSpec.model_validate(changed))
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+def test_finalize_terminal_never_uses_launch_or_inventory_and_requires_all_core_terminal(tmp_path: Path) -> None:
+    spec = CampaignSpec.model_validate(_raw_campaign(autoattack=False))
+    state = CampaignStateStore(tmp_path / "state")
+    state.initialize(spec)
+    state.set_campaign_state("armed")
+    with pytest.raises(WorkerError, match="all host core jobs"):
+        CampaignWorker.finalize_terminal(spec, state, host="hamster")
+    assert state.campaign()["state"] == "armed"
+
+    for target in (
+        JobState.PREFLIGHT,
+        JobState.LAUNCHING,
+        JobState.TRAINING,
+        JobState.TRAINING_COMPLETED,
+        JobState.PGD_EVALUATION,
+        JobState.PGD_COMPLETED,
+        JobState.COMPLETED,
+    ):
+        state.transition_job("job-1", target)
+    assert CampaignWorker.finalize_terminal(spec, state, host="hamster") == {"job-1": "completed"}
+    assert state.campaign()["state"] == "awaiting_scientific_review"
+
+
+@pytest.mark.unit
+@pytest.mark.t1
+def test_finalize_terminal_rechecks_prepared_transaction_under_host_lock(tmp_path: Path) -> None:
+    spec = CampaignSpec.model_validate(_raw_campaign(autoattack=False))
+    state = CampaignStateStore(tmp_path / "state")
+    state.initialize(spec)
+    state.set_campaign_state("armed")
+    for target in (
+        JobState.PREFLIGHT,
+        JobState.LAUNCHING,
+        JobState.TRAINING,
+        JobState.TRAINING_COMPLETED,
+        JobState.PGD_EVALUATION,
+        JobState.PGD_COMPLETED,
+        JobState.COMPLETED,
+    ):
+        state.transition_job("job-1", target)
+    started = threading.Event()
+    failures: list[BaseException] = []
+
+    def finalize() -> None:
+        started.set()
+        try:
+            CampaignWorker.finalize_terminal(spec, state, host="hamster")
+        except BaseException as exc:  # thread assertion propagation
+            failures.append(exc)
+
+    with state.host_lock:
+        thread = threading.Thread(target=finalize)
+        thread.start()
+        assert started.wait(timeout=1)
+        _atomic_json(state.root / "reassignment-transactions" / "prepared.json", {"status": "prepared"})
+    thread.join(timeout=1)
+    assert not thread.is_alive()
+    assert len(failures) == 1 and isinstance(failures[0], WorkerError)
+    assert "prepared terminal reassignment" in str(failures[0])
+    assert state.campaign()["state"] == "armed"
 
 
 @pytest.mark.unit

@@ -1,0 +1,79 @@
+{
+  "campaign_id": "c10-r18-ws1-b128-core-s0-v1",
+  "campaign_identity_sha256": "e4d28add29965840a1f9b6e40abf00498ff07fde0439d77f1cf376898332f593",
+  "evidence_sha256": "13a9a0f97baa5442fecf009e828bb4574fa33a35d7967178ce32b6cc3c072696",
+  "execution_gpu": 1,
+  "execution_gpu_uuid": "GPU-cf338b20-ad89-5bfd-bc79-74610aebc333",
+  "execution_host": "ferret",
+  "job": {
+    "evidence_digests": {
+      "best_checkpoint": "91132f959ec96472572273b9d184f179476af99128cefd610de2958d6082fc86",
+      "evaluation_results": "56f996236280322668512d02985db6ff15f0d8079c61aa35b89aacdc32c42094",
+      "last_checkpoint": "28123e2fcb002127d546bd28071ebf1d8b5798051457f5b7f70b94d51c578cb5"
+    },
+    "expected_revision": 12169,
+    "expected_state": "training",
+    "job_id": "prod-f1-bart-joint-s0",
+    "outer_exit": {
+      "error": null,
+      "exit_code": 0,
+      "finished_at": "2026-07-29T20:44:18.617140+00:00",
+      "git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+      "phase_argv_digest": "a85f8deb8d5ac1a28ea8472ad8587d0606b3b2d2548d5341c9a4ea18090bee00",
+      "run_id": "reassigned-prod-f1-bart-joint-s0-successor-eval",
+      "version": 1,
+      "wrapper_pid": 120442
+    },
+    "phase_events": [
+      {
+        "at": "2026-07-29T18:59:04.294363+00:00",
+        "event": "started",
+        "phase": "pgd"
+      },
+      {
+        "at": "2026-07-29T19:00:44.655185+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "pgd"
+      },
+      {
+        "at": "2026-07-29T19:00:44.655374+00:00",
+        "event": "started",
+        "phase": "autoattack"
+      },
+      {
+        "at": "2026-07-29T20:44:18.551212+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "autoattack"
+      }
+    ],
+    "posthoc_autoattack_attestation": {
+      "amendment": {
+        "path": "docs/experiments/0002-autoattack-provenance-amendment.json",
+        "sha256": "ef4ae85acc05c50c68bcd891be9acdb43d9a391830c37f3bf590f030779dc014"
+      },
+      "evaluation_results_sha256": "56f996236280322668512d02985db6ff15f0d8079c61aa35b89aacdc32c42094",
+      "posthoc_attested": true
+    },
+    "prior_phase_digests": {
+      "train": "8ec34dfa123942f47d5e9c9001e6ccf6b3b1c2153c44a230b63e074475728ba2"
+    },
+    "required_phases": [
+      "train",
+      "pgd",
+      "autoattack"
+    ],
+    "sequence_digests": {
+      "outer_exit": "6d9d3d4999ec0fb6323a24f8c999c88b3386436e2b3f6deab194b13bd82447d7",
+      "phase_events": "57965e335e33765e3762424730187df48fb69f2987e8d61aece0047a1f044bd9",
+      "sequence_completion": "7a46017e98d2566caa0ed0139f37a0f8c8d9621082497b2a4770d091efb1835b",
+      "sequence_spec": "eb5e820db7f96fe8adb5b29400c27c1c755bd4b32de76e6b8880f69859f294e1"
+    },
+    "sequence_source_job_id": "prod-f1-bart-joint-s0-successor-eval"
+  },
+  "runtime_git_sha": "0bffb7aa041ba17c7fc45c5e5a033859623697a0",
+  "scientific_git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+  "source_host": "ferret",
+  "version": 1
+}

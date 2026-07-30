@@ -1,0 +1,69 @@
+{
+  "campaign_id": "c10-r18-ws1-b128-core-s0-v1",
+  "campaign_identity_sha256": "e4d28add29965840a1f9b6e40abf00498ff07fde0439d77f1cf376898332f593",
+  "evidence_sha256": "0a7530c8de8d0f0eeb5b65b1a99cdd4f149b383eabf66f95bad901a202a96399",
+  "execution_gpu": 2,
+  "execution_gpu_uuid": "GPU-13e501b2-0ba0-3dd7-9859-e84d4a1d2af7",
+  "execution_host": "ferret",
+  "job": {
+    "evidence_digests": {
+      "best_checkpoint": "ef30e2a1515cb3987f76d588b7a5404ddb19964f4b5e95f94310fe3e8875e403",
+      "evaluation_results": "7311fe69b4206281f0f0d438d1b1ec51a0ea95e05a940dcf32b6b9c43a7b4eab",
+      "last_checkpoint": "faa1199ca84b6d3bd485912399b4ffb2320d5babd186d9f6f5145effc86cd19e"
+    },
+    "expected_revision": 1134,
+    "expected_state": "waiting_gpu",
+    "job_id": "prod-h1-bart-entropy-s0",
+    "outer_exit": {
+      "error": null,
+      "exit_code": 0,
+      "finished_at": "2026-07-29T07:42:09.396711+00:00",
+      "git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+      "phase_argv_digest": "3c3ac517b73b486552c89ac4884daa26bd96f465934924955936bcf7fe575647",
+      "run_id": "reassigned-prod-h1-bart-entropy-s0",
+      "version": 1,
+      "wrapper_pid": 26276
+    },
+    "phase_events": [
+      {
+        "at": "2026-07-29T06:01:30.325385+00:00",
+        "event": "started",
+        "phase": "autoattack"
+      },
+      {
+        "at": "2026-07-29T07:42:09.330685+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "autoattack"
+      }
+    ],
+    "posthoc_autoattack_attestation": {
+      "amendment": {
+        "path": "docs/experiments/0002-autoattack-provenance-amendment.json",
+        "sha256": "ef4ae85acc05c50c68bcd891be9acdb43d9a391830c37f3bf590f030779dc014"
+      },
+      "evaluation_results_sha256": "7311fe69b4206281f0f0d438d1b1ec51a0ea95e05a940dcf32b6b9c43a7b4eab",
+      "posthoc_attested": true
+    },
+    "prior_phase_digests": {
+      "pgd": "4b176c9cb23cb1f20fd15cf89ebb018beccb0aeb3e2532e45c08b0495f3353d0",
+      "train": "23dde08bc2b3c990fe604a42b93128f95d5e17ef88a2ae63686a2280f655adcb"
+    },
+    "required_phases": [
+      "train",
+      "pgd",
+      "autoattack"
+    ],
+    "sequence_digests": {
+      "outer_exit": "4582bb32ad360ed680e0c4e7c5dcdfcac6e85b723e42c96f5dca37281f59ba34",
+      "phase_events": "3d67126be9eae84419c8a16765d882e3d74dd4dffea1c577c8ca92d9a654d1c4",
+      "sequence_completion": "561ba04997a893cc36be120881d2203f65f950a672ffb332a7edf6b9bf51e92e",
+      "sequence_spec": "01fe5bea7d1eb7898d0f697bbb6afe259b970162be3167f006e4361cc08485f1"
+    },
+    "sequence_source_job_id": "prod-h1-bart-entropy-s0"
+  },
+  "runtime_git_sha": "d1a6d3d2458236095fc76cbd99fc2f49a2f63660",
+  "scientific_git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+  "source_host": "hamster",
+  "version": 1
+}

@@ -12,7 +12,7 @@ from typing import Any
 from .gpu import GPUAdmission, GPUSnapshot, admit, inventory
 from .launcher import LaunchError, argv_digest, launch_phase, phase_is_live, read_exit_record, read_launch_record
 from .schema import CampaignError, CampaignSpec, JobSpec, campaign_identity_sha256, effective_wandb_run_id
-from .state import TERMINAL_JOB_STATES, CampaignStateStore, FileLock, JobState, _atomic_json, _read_json
+from .state import TERMINAL_JOB_STATES, CampaignStateStore, FileLock, JobState, StateError, _atomic_json, _read_json
 
 
 class WorkerError(CampaignError):
@@ -253,6 +253,18 @@ class CampaignWorker:
 
     def arm(self) -> None:
         self.state.set_campaign_state("armed")
+
+    @staticmethod
+    def finalize_terminal(spec: CampaignSpec, state: CampaignStateStore, *, host: str) -> dict[str, str]:
+        """Move an already-terminal host queue to scientific review without launching.
+
+        This intentionally avoids constructing a worker instance, GPU inventory,
+        repository paths, and every reconciliation/launch path.
+        """
+        try:
+            return state.finalize_host_terminal(spec, host=host)
+        except StateError as exc:
+            raise WorkerError(str(exc)) from exc
 
     def run_once(self) -> dict[str, str]:
         """Perform a short reconciliation pass and return state by job id."""

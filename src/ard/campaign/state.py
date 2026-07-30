@@ -608,6 +608,34 @@ class CampaignStateStore:
             return False
         return any(_read_json(path).get("status") == "prepared" for path in sorted(root.glob("*.json")))
 
+    def finalize_host_terminal(self, spec: CampaignSpec, *, host: str) -> dict[str, str]:
+        """Atomically close one host's all-terminal core queue for review."""
+        if host not in spec.hosts:
+            raise StateError("host is not present in campaign")
+        with self.host_lock:
+            campaign = _read_json(self.campaign_path)
+            if (
+                campaign.get("identity") != campaign_identity(spec)
+                or campaign.get("identity_sha256") != campaign_identity_sha256(spec)
+            ):
+                raise StateError("campaign identity or execution profile drift is forbidden")
+            if self.has_prepared_reassignment_transaction():
+                raise StateError("prepared terminal reassignment transaction requires recovery before finalization")
+            core = tuple(job for job in spec.jobs if job.host == host and job.core)
+            states = {job.id: self.job(job.id).get("state") for job in core}
+            valid_terminal = {item.value for item in TERMINAL_JOB_STATES}
+            if not core or any(value not in valid_terminal for value in states.values()):
+                raise StateError("all host core jobs must be terminal before finalization")
+            if campaign.get("state") != "armed":
+                raise StateError("terminal finalization requires an armed campaign")
+            campaign["state"] = "awaiting_scientific_review"
+            campaign["updated_at"] = utc_now()
+            _atomic_json(self.campaign_path, campaign)
+            self._append_event_locked(
+                {"kind": "campaign_terminal_finalized", "host": host, "jobs": sorted(states)}
+            )
+            return {job_id: str(value) for job_id, value in states.items()}
+
     def recover_transient_gpu_blocks(self, job_ids: tuple[str, ...] | list[str]) -> dict[str, dict[str, Any]]:
         """Atomically requeue explicitly named, never-launched inventory blocks.
 

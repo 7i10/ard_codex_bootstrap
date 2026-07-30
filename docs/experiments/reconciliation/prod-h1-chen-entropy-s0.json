@@ -1,0 +1,79 @@
+{
+  "campaign_id": "c10-r18-ws1-b128-core-s0-v1",
+  "campaign_identity_sha256": "e4d28add29965840a1f9b6e40abf00498ff07fde0439d77f1cf376898332f593",
+  "evidence_sha256": "3a078605b79242d4a3f7f4a44fd264799ddd71e915c26357e841a6338a0a039d",
+  "execution_gpu": 0,
+  "execution_gpu_uuid": "GPU-7ce112db-1ab9-ff86-9810-5bb92e222c2a",
+  "execution_host": "hamster",
+  "job": {
+    "evidence_digests": {
+      "best_checkpoint": "953feea59536f528b7c0dcc1abf84aef0bb61183d45bdc263b5006667927e0b1",
+      "evaluation_results": "5c0224c9bab73ec57f1c779cf2a9f0fb76fd1fa49564d40fc05b2cf55b4fcf79",
+      "last_checkpoint": "057d2f2c6cab530d8a4499887557a7512ed9eda4ac7998036403ff0d29aa513a"
+    },
+    "expected_revision": 3301,
+    "expected_state": "training",
+    "job_id": "prod-h1-chen-entropy-s0",
+    "outer_exit": {
+      "error": null,
+      "exit_code": 0,
+      "finished_at": "2026-07-29T15:42:35.498771+00:00",
+      "git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+      "phase_argv_digest": "350078d7ddd51d37ded680102bee3b463d202592a015ea81325991ad82a961f9",
+      "run_id": "reassigned-prod-h1-chen-entropy-s0-extra-eval",
+      "version": 1,
+      "wrapper_pid": 529205
+    },
+    "phase_events": [
+      {
+        "at": "2026-07-29T14:33:11.052892+00:00",
+        "event": "started",
+        "phase": "pgd"
+      },
+      {
+        "at": "2026-07-29T14:33:52.658145+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "pgd"
+      },
+      {
+        "at": "2026-07-29T14:33:52.658225+00:00",
+        "event": "started",
+        "phase": "autoattack"
+      },
+      {
+        "at": "2026-07-29T15:42:35.455998+00:00",
+        "event": "finished",
+        "exit_code": 0,
+        "phase": "autoattack"
+      }
+    ],
+    "posthoc_autoattack_attestation": {
+      "amendment": {
+        "path": "docs/experiments/0002-autoattack-provenance-amendment.json",
+        "sha256": "ef4ae85acc05c50c68bcd891be9acdb43d9a391830c37f3bf590f030779dc014"
+      },
+      "evaluation_results_sha256": "5c0224c9bab73ec57f1c779cf2a9f0fb76fd1fa49564d40fc05b2cf55b4fcf79",
+      "posthoc_attested": true
+    },
+    "prior_phase_digests": {
+      "train": "d5993c7f2b7c3a4702a32a3652dc439e2eaf86ecbb46b9e7093aa1c90b48ed4f"
+    },
+    "required_phases": [
+      "train",
+      "pgd",
+      "autoattack"
+    ],
+    "sequence_digests": {
+      "outer_exit": "89e6ab16205127bed6665895efc1c354f6175098b0bceb6bb7f1a3c27777e341",
+      "phase_events": "2afa2e88724f478e223c4ffcf13735448f9f924ea3177ba06188ecedd31927d3",
+      "sequence_completion": "14f78fcf5144a58aa043f5ff96647346974b148705614bde21213c8a04f596ba",
+      "sequence_spec": "177d2af4a5fbb91a9a62d949185f98c9d2a15bcdb29031a5c36b7220090a5e1a"
+    },
+    "sequence_source_job_id": "prod-h1-chen-entropy-s0-extra-eval"
+  },
+  "runtime_git_sha": "9e94d3622521d8dab04e695dc198f8e49e9ebbf5",
+  "scientific_git_sha": "2d54b8230b8d14d13c1ea7472ccba53491b4d38d",
+  "source_host": "hamster",
+  "version": 1
+}
