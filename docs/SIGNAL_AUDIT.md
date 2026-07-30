@@ -1,9 +1,9 @@
 # Seed-0 signal audit
 
 This is a read-only diagnostic over the four Student/Joint seed-0 runs.
-All four artifact-only reports have been executed. It is exploratory and is
-not yet a formal Signal decision. The
-historical checkpoint is epoch 99 (the checkpoint after epoch 100); each
+All four artifact inventories, deterministic historical replays, and formal
+prospective reports completed on 2026-07-30. The historical checkpoint is
+epoch 99 (the checkpoint after epoch 100); each
 config fixes 45,000 train samples, 10 classes, split/bootstrap seeds, and
 1,000 bootstrap replicates.  Student configs use `stored_risk_kind: student`;
 Joint configs use `joint`.
@@ -18,13 +18,36 @@ split is excluded.
 
 The selected Student/Joint checkpoints were verified against W&B `last:v19`
 (epoch 99) and `last:v39` (epoch 199), including local-byte MD5 and size.
-All four reports correctly return `insufficient_data` for the formal prospective
-decision because no historical teacher-risk replay has yet been supplied.
-The current exploratory result is nevertheless diagnostic: final student risk
-is strongly associated with same-run final robust error (AUROC 0.961 for Chen,
-0.957 for Bartoldson), while low-entropy teacher risk is inversely associated
-(0.156 and 0.192).  These are post-training sample-level associations from
-seed 0, not evidence of future-failure prediction or method improvement.
+Epoch-99 teacher risk was reconstructed from saved checkpoints using the exact
+raw-train split and KL PGD-10 training attack. All four reports satisfy the
+preregistered **Signal Go** allocation rule:
+
+| Teacher / method | Forgetting prevalence | Teacher AUROC | Augmented AUROC | Delta | Bootstrap 95% CI |
+|---|---:|---:|---:|---:|---:|
+| Chen / Student | 0.539 | 0.853 | 0.898 | +0.045 | [0.040, 0.051] |
+| Chen / Joint | 0.547 | 0.859 | 0.896 | +0.037 | [0.031, 0.043] |
+| Bartoldson / Student | 0.684 | 0.586 | 0.923 | +0.337 | [0.325, 0.349] |
+| Bartoldson / Joint | 0.694 | 0.602 | 0.937 | +0.335 | [0.323, 0.347] |
+
+| Teacher / method | Teacher / augmented AUPRC | Teacher / augmented log-loss |
+|---|---:|---:|
+| Chen / Student | 0.830 / 0.841 | 0.471 / 0.382 |
+| Chen / Joint | 0.849 / 0.839 | 0.462 / 0.385 |
+| Bartoldson / Student | 0.772 / 0.946 | 0.607 / 0.309 |
+| Bartoldson / Joint | 0.795 / 0.955 | 0.594 / 0.280 |
+
+Held-out log-loss improves in every row. Chen Joint AUPRC decreases slightly
+despite higher AUROC and lower log-loss, so the Signal Go result should not be
+read as uniform improvement under every ranking metric. Overall this supports retaining the
+student signal, especially for Bartoldson; it does **not** establish that the
+current target-softening intervention improves accuracy. Confidence intervals
+are conditional on seed-0 training runs, not uncertainty across training seeds.
+
+The final-state association remains exploratory. Final student risk is strongly
+associated with same-run final robust error (AUROC 0.961/0.957 for
+Chen/Bartoldson Student), while final low-entropy teacher risk is inversely
+associated (0.156/0.192). These post-treatment associations are not used for
+the Signal Go decision.
 
 Historical replay is a separate, read-only CUDA command. It is fixed to the
 epoch-99 checkpoint, batch size 128, the exact training KL PGD-10 attack,
@@ -60,5 +83,15 @@ Use the analogous `seed0_{bartoldson,chen}_{student,joint}.yaml` file.  A
 successful report contains `checkpoint_inventory`,
 `final_state_association`, `artifact_only_temporal_diagnostics`, and
 `prospective_prediction`, plus `config_hash` and input hashes.  The
-prospective section must retain an `insufficient_data` decision until
-historical teacher risk is replayed.
+prospective section is eligible for a decision only when the validated
+historical replay envelope is supplied. Without it, the CLI deliberately
+returns `insufficient_data`.
+
+## Result identities
+
+The ignored local formal reports are bound by SHA-256:
+
+- Chen Student: `8c657354d94a8353953499ed89449257ca4c4fb2a051a1d3b654c4775914d61a`
+- Chen Joint: `121112b38f1be8564efa807df2648516caadef975dea6f5d749c1032afef7b20`
+- Bartoldson Student: `cb7d31e924b9ea20b102971b47f1064fd1a298c80f7e9a31ee338d50a2f142ab`
+- Bartoldson Joint: `d6b6e4334bd97e9d5c78360702d87d168ba0939534808937ff27b47157866bb7`

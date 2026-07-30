@@ -1,6 +1,6 @@
 # Seed-zero signal audit
 
-Status: in progress
+Status: complete
 
 ## Goal
 
@@ -39,9 +39,8 @@ sample ID. AUPRC is always reported with positive prevalence.
 - [x] Implement fail-closed artifact inventory and dataset-namespace checks.
 - [x] Implement final-state association and prospective prediction as separate
   analysis outputs.
-- [ ] Run the frozen seed-zero audit without new training. (All four
-  artifact-only reports complete; historical teacher-risk replay pending.)
-- [ ] Perform one consolidated scientific review and update the experiment
+- [x] Run the frozen seed-zero audit without new training.
+- [x] Perform one consolidated scientific review and update the experiment
   dashboard with results and limitations.
 
 W&B API evidence collected on 2026-07-30 shows 40 `last` versions for every
@@ -56,19 +55,24 @@ The owning-host run bundles each contain 40 content-addressed `last` and 40
 `2d54b8230b8d14d13c1ea7472ccba53491b4d38d`.  Direct loads of all eight
 terminal checkpoints found epoch 199 and matching run/config identities.
 Student and Joint each contain 45,000 state records; RSLAD and Entropy contain
-no `SampleStateStore`, as expected.  Historical teacher risk is not stored in
-the checkpoint state.  Therefore artifact-only temporal analysis can measure
-student-state dynamics, but the preregistered teacher-only versus augmented
-prospective comparison remains `insufficient_data` until a deterministic
-saved-checkpoint replay produces historical teacher risk.
+no `SampleStateStore`, as expected. Historical teacher risk is not stored in
+checkpoint state, so artifact-only temporal analysis is insufficient. The
+completed deterministic saved-checkpoint replay supplies that missing
+historical teacher risk without modifying any training or W&B artifact.
 
 Selected epoch-99/199 Student/Joint checkpoint bytes match W&B
-`last:v19/v39`. All four reports ran successfully on 2026-07-30 and remain
-`insufficient_data` by construction. Student final-state associations show
-student-risk AUROC 0.961/0.957 and teacher-risk AUROC 0.156/0.192 for
-Chen/Bartoldson same-run final robust error; Joint shows 0.956/0.949 and
-0.150/0.194 respectively. These numbers are exploratory and do not satisfy
-the prospective Signal Go/No-Go contract.
+`last:v19/v39`. All four deterministic epoch-99 teacher-risk replays and
+formal reports completed on 2026-07-30. The held-out subsequent-forgetting
+AUROC deltas over teacher-only are Chen Student `+0.045`, Chen Joint `+0.037`,
+Bartoldson Student `+0.337`, and Bartoldson Joint `+0.335`; every bootstrap
+lower bound exceeds zero and every augmented log-loss improves. All four
+therefore meet the preregistered Signal Go allocation rule. This retains the
+signal for intervention research but does not validate current target
+softening.
+
+One consolidated scientific review found no remaining P0/P1 after the
+fail-closed lineage, replay, attack, split, and bootstrap contracts were
+verified. The review was not repeated after docs-only synchronization.
 
 ## Data contracts
 

@@ -1,6 +1,6 @@
 # 実験ダッシュボード
 
-最終スナップショット: **2026-07-30 10:47 JST**
+最終スナップショット: **2026-07-30**
 
 このページは、人間が現在の研究目的、条件、進捗、結果、W&B上のrunの役割を一か所で確認するための
 台帳です。実行中の値は変化するため、論文用の確定表ではありません。
@@ -187,9 +187,10 @@ SAAD Table 1では、teacher AAがChen 56.94%からBartoldson 73.71%へ上がる
 - best-to-last AA低下はBartoldson RSLAD `3.99 pp`、Entropy `1.21 pp`、★ Student `3.82 pp`、
   ★ Joint `4.42 pp`です。Entropy weightingはrobust overfittingを最も抑えましたが、best AAの改善は
   `+0.26 pp`に留まり、full SAAD報告値50.34%には`-2.97 pp`です。
-- **現行のstudent-aware提案が明確に成功した証拠はありません。** Student単独は両教師でbest AAを下げ、
-  JointはChenで下げ、Bartoldsonでごく小さく上げただけです。次に複数seedを全8セルへ広げる前に、
-  risk分布、target-softening量、teacher/student signalの相関をanalysisとして監査する価値があります。
+- **現行のstudent-aware介入が明確に成功した証拠はありません。** Student単独は両教師でbest AAを下げ、
+  JointはChenで下げ、Bartoldsonでごく小さく上げただけです。一方、後述のprospective auditではstudent
+  signal自体に追加予測情報が確認されました。したがってsignalを捨てず、sample selectionと介入方法を分離して
+  検証します。
 - すべてseed 0なので、現在値は探索的結果です。複数seedとfull SAAD/direct baselineなしに論文の主要結論
   とはしません。
 - 完了済みAutoAttack manifestのlibrary versionは`unknown`のまま改変しません。両hostで事後確認した
@@ -198,6 +199,28 @@ SAAD Table 1では、teacher AAがChen 56.94%からBartoldson 73.71%へ上がる
   [`0002-autoattack-provenance-amendment.json`](experiments/0002-autoattack-provenance-amendment.json)
   に追補しました。今後のrunは固定commit/source digest不一致でfail closedし、論文用確定評価ではsaved
   best/lastをその契約下で再評価します。
+
+### Seed-0 prospective signal audit
+
+W&Bの全8 train runについてmodel artifact version historyをread-onlyで列挙しました。各runに
+`last:v0`から`last:v39`があり、Student/Jointの`last:v19`（epoch 99）と`last:v39`（epoch 199）には
+45,000 sampleの`SampleStateStore`が保存されています。epoch-99 teacher riskは、保存checkpointから
+raw train splitとexact KL PGD-10 attackを使って決定論的に再計算しました。
+
+主outcomeはepoch 99より後のforgettingです。epoch 199 riskと同時点のerrorは別の探索的関連として扱い、
+Go/No-Go判定には使いません。
+
+| Teacher / ★ method | Teacher-only AUROC | Student-augmented AUROC | Delta | 95% CI | 判定 |
+|---|---:|---:|---:|---:|---|
+| Chen / ★ Student | 0.853 | 0.898 | +0.045 | [0.040, 0.051] | Signal Go |
+| Chen / ★ Joint | 0.859 | 0.896 | +0.037 | [0.031, 0.043] | Signal Go |
+| Bartoldson / ★ Student | 0.586 | 0.923 | +0.337 | [0.325, 0.349] | Signal Go |
+| Bartoldson / ★ Joint | 0.602 | 0.937 | +0.335 | [0.323, 0.347] | Signal Go |
+
+全4セルでheld-out log-lossも改善しました。これはstudent signal、特にBartoldsonでの追加情報を支持しますが、
+現行target-softeningの有効性を示すものではありません。CIはclass-stratifiedなsample-level bootstrapで、
+seed-0訓練runに条件付けられており、訓練seed間の不確実性ではありません。詳細とreport hashは
+[Seed-0 signal audit](SIGNAL_AUDIT.md)に固定しています。
 
 ## 5. 出力
 
