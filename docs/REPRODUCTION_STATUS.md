@@ -4,7 +4,7 @@
 
 ## 現在の到達点
 
-同一training engine上で、次の8つのschema-v2 methodを選択できます。M4のbounded method-switchは全methodを
+同一training engine上で、次の9つのschema-v2 methodを選択できます。通常のM4 bounded method-switchは8 methodを
 one epochのsynthetic fixtureで切り替える構成であり、engineをmethodごとに複製しません。
 
 | Config method | 役割 | 固定された追加契約 |
@@ -17,6 +17,7 @@ one epochのsynthetic fixtureで切り替える構成であり、engineをmethod
 | `rslad_joint` | joint-risk target softening | student risk × teacher overconfidence、epoch 0はunsoftened warmup |
 | `rslad_joint_downweight` | explicit downweight ablation | joint riskでKDをdownweight、hard fallbackなし |
 | `rslad_hard_fallback` | legacy fallback ablation | 旧joint KD/CE blendを明示的method IDで保持 |
+| `rslad_frozen_oracle_softening` | scientific upper-bound | train-only frozen mask、selected `rho=0.5`、3 class-matched random controls |
 
 Baseline-readinessのM0–M4は承認済みです。最終bounded T0–T3 gateは18 commandsで`209 passed, 2 skipped`、
 同一の最終fingerprintの再確認は18 commandsすべて`cached pass`でした。

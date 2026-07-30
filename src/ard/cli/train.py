@@ -15,6 +15,7 @@ from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 from ard.analysis import write_sample_parquet
+from ard.analysis.frozen_oracle import FrozenRiskLookup, load_frozen_risk_lookup
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, load_config, save_resolved_config
 from ard.config.loader import resolved_config_dict
@@ -174,13 +175,18 @@ def _build_method(
             None,
             None,
         )
-    if method.id in {"rslad_student", "rslad_joint"}:
+    if method.id in {"rslad_student", "rslad_joint", "rslad_frozen_oracle_softening"}:
         assert method.target_policy is not None
         policy = StudentRiskPolicy() if method.id == "rslad_student" else JointRiskPolicy()
+        sample_store = (
+            None
+            if method.id == "rslad_frozen_oracle_softening"
+            else SampleStateStore(ema_decay=method.student_ema_decay)
+        )
         return (
             RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
             policy,
-            SampleStateStore(ema_decay=method.student_ema_decay),
+            sample_store,
             UniformSofteningTeacherTargetPolicy(rho_max=method.target_policy.rho_max),
         )
     if method.id == "rslad_joint_downweight":
@@ -273,6 +279,41 @@ def main(argv: list[str] | None = None) -> int:
             split_seed=config.seeds.split,
             augmentation_seed=config.seeds.augmentation,
         )
+        frozen_risk_lookup: FrozenRiskLookup | None = None
+        if config.method.id == "rslad_frozen_oracle_softening":
+            assert config.method.frozen_oracle_manifest is not None
+            assert config.method.frozen_oracle_manifest_sha256 is not None
+            assert config.teacher is not None
+            assert config.teacher.checkpoint_sha256 is not None
+            raw_targets = getattr(train_dataset.dataset.dataset, "targets", None)
+            if not isinstance(raw_targets, (list, tuple)):
+                raise ValueError("frozen oracle training requires immutable source training labels")
+            train_labels = {int(sample_id): int(raw_targets[sample_id]) for sample_id in train_dataset.indices}
+            frozen_risk_lookup = load_frozen_risk_lookup(
+                config.method.frozen_oracle_manifest,
+                expected_sha256=config.method.frozen_oracle_manifest_sha256,
+                expected_dataset_name=config.dataset.name,
+                expected_num_classes=config.dataset.num_classes,
+                expected_train_labels=train_labels,
+                expected_attack_identity=config.method.attack.identity(),
+                expected_teacher_checkpoint_sha256=config.teacher.checkpoint_sha256,
+            )
+            if args.resume is None:
+                frozen_input_path = config.method.frozen_oracle_manifest
+
+                def _record_frozen_oracle_input(active_tracker: ExperimentTracker) -> None:
+                    active_tracker.log_artifact(
+                        frozen_input_path,
+                        name=f"frozen-oracle-input-{active_tracker.run_id}",
+                        artifact_type="analysis-input",
+                        aliases=("input",),
+                    )
+
+                coordinated_tracker_action(
+                    active_tracker,
+                    phase="frozen oracle input artifact",
+                    action=_record_frozen_oracle_input,
+                )
         sampler = EpochShuffleSampler(
             len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
         )
@@ -348,6 +389,7 @@ def main(argv: list[str] | None = None) -> int:
             target_policy=target_policy,
             policy_warmup_epochs=(config.method.student_policy_warmup_epochs if sample_store is not None else 0),
             oracle_mask=config.method.oracle_mask,
+            frozen_risk_lookup=frozen_risk_lookup,
             diagnostics=diagnostics,
         )
         start_epoch = 0

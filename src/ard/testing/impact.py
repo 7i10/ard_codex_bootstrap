@@ -90,8 +90,16 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
             "src/ard/cli/signal_audit.py",
             "src/ard/cli/replay_teacher_risk.py",
         ),
-        ("tests/unit/test_signal_audit.py", "tests/unit/test_teacher_risk_replay.py"),
+        (
+            "tests/unit/test_signal_audit.py",
+            "tests/unit/test_teacher_risk_replay.py",
+        ),
         ("T0", "T1"),
+    ),
+    (
+        ("src/ard/analysis/frozen_oracle.py", "src/ard/cli/build_frozen_oracle.py"),
+        ("tests/unit/test_frozen_oracle.py",),
+        ("T0", "T1", "T2"),
     ),
     (
         ("src/ard/config/",),
@@ -102,6 +110,7 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
             "tests/regression/test_m3_runtime_efficiency.py",
             "tests/regression/test_trades_upstream_differential.py",
             "tests/integration/test_synthetic_training.py",
+            "tests/unit/test_frozen_oracle.py",
         ),
         ("T0", "T2", "T3"),
     ),

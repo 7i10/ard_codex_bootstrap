@@ -28,6 +28,9 @@ def _set_repository_config_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, 
         "WANDB_PROJECT": "single-teacher-ard",
         "WANDB_GROUP_CHEN": "chen-comparison",
         "WANDB_GROUP_BARTOLDSON": "bartoldson-comparison",
+        "WANDB_GROUP_BARTOLDSON_ORACLE": "bartoldson-oracle-comparison",
+        "ARD_FROZEN_ORACLE_MANIFEST": str(tmp_path / "frozen-oracle.json"),
+        "ARD_FROZEN_ORACLE_MANIFEST_SHA256": "c" * 64,
         "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT": str(tmp_path / "chen.pt"),
         "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256": "a" * 64,
         "ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT": str(tmp_path / "bart.pt"),
@@ -511,6 +514,9 @@ def test_top_level_configs_resolve_under_controlled_environment(
         "WANDB_PROJECT": "project",
         "WANDB_GROUP_CHEN": "chen-group",
         "WANDB_GROUP_BARTOLDSON": "bartoldson-group",
+        "WANDB_GROUP_BARTOLDSON_ORACLE": "bartoldson-oracle-group",
+        "ARD_FROZEN_ORACLE_MANIFEST": str(tmp_path / "frozen-oracle.json"),
+        "ARD_FROZEN_ORACLE_MANIFEST_SHA256": "c" * 64,
     }
     for key, value in values.items():
         monkeypatch.setenv(key, value)
@@ -520,9 +526,13 @@ def test_top_level_configs_resolve_under_controlled_environment(
             *(config_dir / "experiments").glob("*.yaml"),
             *(config_dir / "pilot").glob("*.yaml"),
             *(config_dir / "production").glob("*.yaml"),
+            *(config_dir / "scientific").glob("*.yaml"),
         ]
     )
     assert paths
     for path in paths:
         config = load_config(path)
         assert config.output_dir
+        if path.parent.name == "scientific":
+            assert config.tier == "production"
+            assert config.method.id == "rslad_frozen_oracle_softening"

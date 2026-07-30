@@ -65,10 +65,14 @@ including BatchNorm tracking counters. These counts are identity checks, not int
   adversarial KD targetだけを`rho=0.5*risk`で一様分布へsoftenする。
 - `rslad_joint`: teacher riskは`1-H/log(C)`、joint riskはstudent riskとの積。schema-v2主経路では同じ
   target softeningへjoint riskを使い、KD/hard loss weightは1/0のままにする。
+- `rslad_frozen_oracle_softening`: train-onlyのfrozen binary riskを外部manifestのSHA-256で固定し、selected
+  sampleだけ`rho=0.5`で同じtarget softeningを行う。これはfuture baseline failureを使うupper-bound実験であり、
+  deployable methodではない。実runはproduction lineage guardを通す。
 - student/jointのepoch 0はexact baseline RSLAD（target softeningなし、uniform KD、hard=0）としてstateだけを
   収集する。
 
-sampleをdatasetから削除しません。oracle maskはdev-onlyで、smoke/repro/productionでは禁止です。
+sampleをdatasetから削除しません。旧online `oracle_mask` flagはdev-onlyです。frozen oracleは別method ID、
+train namespace、source W&B version/bytes、builder Git SHAを固定した場合だけguarded production runを許可します。
 
 ## 4. Stable sample state and DDP
 

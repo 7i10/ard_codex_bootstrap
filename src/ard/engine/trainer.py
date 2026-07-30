@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 from torch import nn
@@ -38,6 +38,9 @@ from .distributed import (
     reduce_sums,
     suspend_ddp_buffer_broadcasts,
 )
+
+if TYPE_CHECKING:
+    from ard.analysis.frozen_oracle import FrozenRiskLookup
 
 
 @contextmanager
@@ -103,6 +106,7 @@ class Trainer:
         target_policy: TeacherTargetPolicy | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
+        frozen_risk_lookup: FrozenRiskLookup | None = None,
         diagnostics: TrainingDiagnostics | None = None,
     ) -> None:
         self.model = model.to(device)
@@ -125,7 +129,10 @@ class Trainer:
             raise ValueError("policy_warmup_epochs must be non-negative")
         if oracle_mask and sample_store is None:
             raise ValueError("oracle_mask requires student-aware sample state")
+        if frozen_risk_lookup is not None and target_policy is None:
+            raise ValueError("frozen oracle risk requires an explicit teacher target policy")
         self.policy_warmup_epochs, self.oracle_mask = policy_warmup_epochs, oracle_mask
+        self.frozen_risk_lookup = frozen_risk_lookup
         self.current_epoch = 0
         self._robust_margin_signal = RobustMarginSignal()
         self.global_step = 0
@@ -216,6 +223,15 @@ class Trainer:
         valid_mask: torch.Tensor,
         student_signals: dict[str, torch.Tensor],
     ) -> PolicyWeights | None:
+        frozen_risk_lookup = getattr(self, "frozen_risk_lookup", None)
+        if frozen_risk_lookup is not None:
+            valid = valid_mask.to(device=logits.device, dtype=logits.dtype)
+            risk = frozen_risk_lookup.values(batch.sample_ids, device=logits.device, dtype=logits.dtype) * valid
+            return PolicyWeights(
+                hard_weight=torch.zeros_like(risk),
+                kd_weight=valid,
+                joint_risk=risk,
+            )
         if self.policy is None:
             return None
         # Epoch zero is exactly baseline RSLAD while detached margin

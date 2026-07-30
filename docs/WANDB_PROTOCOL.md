@@ -160,6 +160,7 @@ train run:
 - `model-<run-id>-last`（alias `last`, file SHA-256）
 - `sample-stats-<run-id>`（Parquet, file SHA-256）
 - `run-bundle-<run-id>`（全file hashから作るdirectory digest）
+- frozen-oracle runだけ`frozen-oracle-input-<run-id>`（exact mask JSON、alias `input`、file SHA-256）
 
 train run bundleにはresolved config、manifest、environment、metrics JSONL、Git diff、external lock、
 `completion.json`、`error-marker.txt`、panel JSONL/PNG、artifact copiesが含まれます。

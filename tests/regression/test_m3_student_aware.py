@@ -11,6 +11,7 @@ from torch.optim import SGD
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
+from ard.analysis.frozen_oracle import FrozenRiskLookup
 from ard.attacks.base import AttackResult
 from ard.config.schema import ExperimentConfig
 from ard.data import EpochShuffleSampler, IndexedBatch, IndexedDataset, SyntheticCIFAR, collate_indexed
@@ -419,3 +420,74 @@ def test_student_aware_two_epoch_resume_matches_uninterrupted_exactly(tmp_path: 
     assert full.sample_store.state_dict() == resumed.sample_store.state_dict()
     assert full.global_step == resumed.global_step == 4
     assert full.scheduler.state_dict() == resumed.scheduler.state_dict()
+
+
+def _frozen_oracle_trainer(output: Path) -> Trainer:
+    torch.manual_seed(821)
+    student = nn.Sequential(nn.Flatten(), nn.Linear(3 * 2 * 2, 2))
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(822)
+        teacher = nn.Sequential(nn.Flatten(), nn.Linear(3 * 2 * 2, 2))
+    optimizer = SGD(student.parameters(), lr=0.03, momentum=0.9)
+    return Trainer(
+        model=student,
+        teacher=teacher,
+        optimizer=optimizer,
+        scheduler=StepLR(optimizer, step_size=1, gamma=0.8),
+        scaler=None,
+        attack=_IdentityAttack(),
+        selection_attack=_IdentityAttack(),
+        objective=RSLADObjective(),
+        policy=JointRiskPolicy(),
+        target_policy=UniformSofteningTeacherTargetPolicy(rho_max=0.5),
+        frozen_risk_lookup=FrozenRiskLookup(
+            risks={0: 0, 1: 1, 2: 0, 3: 1},
+            manifest_sha256="f" * 64,
+            source={"kind": "unit-fixture"},
+        ),
+        device=torch.device("cpu"),
+        output_dir=output,
+        config_hash="frozen-oracle-mask-sha-bound",
+        seed=73,
+    )
+
+
+@pytest.mark.t3
+def test_frozen_oracle_two_epoch_resume_teacher_gradient_and_padding_contract(tmp_path: Path) -> None:
+    full = _frozen_oracle_trainer(tmp_path / "frozen" / "full")
+    full_loader, full_validation, _ = _m3_loaders(seed=73)
+    full.fit(full_loader, validation_loader=full_validation, epochs=2)
+
+    first_leg = _frozen_oracle_trainer(tmp_path / "frozen" / "resumed")
+    first_loader, first_validation, _ = _m3_loaders(seed=73)
+    first_leg.fit(first_loader, validation_loader=first_validation, epochs=1)
+    resumed = _frozen_oracle_trainer(tmp_path / "frozen" / "resumed")
+    resumed_loader, resumed_validation, sampler = _m3_loaders(seed=73)
+    state = resumed.resume(tmp_path / "frozen" / "resumed" / "last.pt", sampler=sampler)
+    assert state.next_epoch == 1
+    resumed.fit(resumed_loader, validation_loader=resumed_validation, epochs=2, start_epoch=state.next_epoch)
+
+    for name, expected in full.model.state_dict().items():
+        assert torch.equal(expected, resumed.model.state_dict()[name]), name
+    assert full.global_step == resumed.global_step == 4
+    assert full.scheduler.state_dict() == resumed.scheduler.state_dict()
+    assert full.sample_store is None and resumed.sample_store is None
+    assert all(parameter.grad is None for parameter in full.teacher.parameters())
+    assert all(parameter.grad is None for parameter in resumed.teacher.parameters())
+
+    batch = IndexedBatch(
+        images=torch.zeros(3, 3, 2, 2),
+        labels=torch.tensor([0, 1, 0]),
+        sample_ids=torch.tensor([0, 1, 3]),
+        state_update_mask=torch.tensor([True, True, False]),
+    )
+    weights = resumed._policy_weights(
+        batch=batch,
+        adversarial=batch.images,
+        logits=torch.zeros(3, 2),
+        valid_mask=batch.state_update_mask,
+        student_signals={},
+    )
+    assert weights is not None
+    assert torch.equal(weights.joint_risk, torch.tensor([0.0, 1.0, 0.0]))
+    assert torch.equal(weights.kd_weight, torch.tensor([1.0, 1.0, 0.0]))

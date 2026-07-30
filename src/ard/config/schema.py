@@ -336,6 +336,7 @@ class MethodConfig(StrictModel):
         "rslad_joint",
         "rslad_joint_downweight",
         "rslad_hard_fallback",
+        "rslad_frozen_oracle_softening",
     ]
     version: Literal[1]
     attack: AttackConfig = Field(default_factory=AttackConfig)
@@ -348,6 +349,8 @@ class MethodConfig(StrictModel):
     student_policy_warmup_epochs: int = Field(default=1, ge=1)
     target_policy: TargetPolicyConfig | None = None
     oracle_mask: bool = False
+    frozen_oracle_manifest: Path | None = None
+    frozen_oracle_manifest_sha256: str | None = None
 
     @property
     def name(self) -> str:
@@ -365,6 +368,7 @@ class MethodConfig(StrictModel):
             "rslad_joint": "teacher_clean",
             "rslad_joint_downweight": "teacher_clean",
             "rslad_hard_fallback": "teacher_clean",
+            "rslad_frozen_oracle_softening": "teacher_clean",
         }.get(self.id)
         if self.attack.loss != expected_loss:
             raise ValueError(f"{self.id} requires attack.loss={expected_loss}")
@@ -415,7 +419,7 @@ class MethodConfig(StrictModel):
                 raise ValueError(
                     f"{self.id} is the canonical one-epoch-warmup method; use a separate method ID for variants"
                 )
-        target_methods = {"rslad_student", "rslad_joint"}
+        target_methods = {"rslad_student", "rslad_joint", "rslad_frozen_oracle_softening"}
         if self.id in target_methods:
             if self.target_policy is None:
                 raise ValueError(f"{self.id} requires an explicit target_policy")
@@ -423,6 +427,22 @@ class MethodConfig(StrictModel):
             raise ValueError(f"target_policy is only defined for {sorted(target_methods)}")
         if self.oracle_mask and self.id != "rslad_hard_fallback":
             raise ValueError("oracle_mask is only defined for rslad_hard_fallback")
+        frozen_fields = (self.frozen_oracle_manifest, self.frozen_oracle_manifest_sha256)
+        if self.id == "rslad_frozen_oracle_softening":
+            if any(value is None for value in frozen_fields):
+                raise ValueError("rslad_frozen_oracle_softening requires frozen_oracle_manifest and exact SHA-256")
+            assert self.target_policy is not None
+            if self.target_policy.rho_max != 0.5:
+                raise ValueError("rslad_frozen_oracle_softening fixes target_policy.rho_max=0.5")
+            if self.oracle_mask:
+                raise ValueError("rslad_frozen_oracle_softening uses only its frozen external manifest")
+        elif any(value is not None for value in frozen_fields):
+            raise ValueError("frozen_oracle_manifest fields are only defined for rslad_frozen_oracle_softening")
+        if self.frozen_oracle_manifest_sha256 is not None and (
+            len(self.frozen_oracle_manifest_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in self.frozen_oracle_manifest_sha256)
+        ):
+            raise ValueError("frozen_oracle_manifest_sha256 must be a lowercase 64-character digest")
         return self
 
 
@@ -605,11 +625,14 @@ class ExperimentConfig(StrictModel):
             "rslad_joint",
             "rslad_joint_downweight",
             "rslad_hard_fallback",
+            "rslad_frozen_oracle_softening",
         }
         if self.method.id in rslad_methods and self.teacher is None:
             raise ValueError(f"{self.method.id} requires a frozen teacher")
         if self.method.oracle_mask and self.tier != "dev":
             raise ValueError("oracle_mask is scientific/dev-only and is forbidden for smoke, repro, and production")
+        if self.method.id == "rslad_frozen_oracle_softening" and self.tier not in {"dev", "production"}:
+            raise ValueError("rslad_frozen_oracle_softening permits only dev tests or guarded production runs")
         if self.teacher is not None and self.teacher.source == "fixture" and self.tier not in {"dev", "smoke"}:
             raise ValueError("fixture teachers are restricted to dev/smoke tiers")
         if self.tier == "pilot" and (self.teacher is None or self.teacher.source != "robustbench"):

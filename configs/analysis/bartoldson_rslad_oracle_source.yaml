@@ -1,0 +1,22 @@
+schema_version: 1
+run_id: prod-bart-rslad-s0-2d54b82
+artifact_name: model-prod-bart-rslad-s0-2d54b82-last
+config_sha256: b105b3dacec6bf68c722e95b01616c5800cc1febb743e5d54719aa095cbc222a
+scientific_git_sha: 2d54b8230b8d14d13c1ea7472ccba53491b4d38d
+checkpoints:
+  historical:
+    epoch: 99
+    version: v19
+    artifact_digest: b4880f477be1cb4643f0f25c8caeb4d1
+    file_name: last.pt
+    file_md5: rBvO4zeLkEfnDmzrNRctJQ==
+    size: 89508955
+    checkpoint_sha256: 9071a7af575ae675f8bf964c984aeff3ecf2e26eb56f418081bb50ee400423f5
+  final:
+    epoch: 199
+    version: v39
+    artifact_digest: bf12af15ba13631df50a55af0095c4fe
+    file_name: last.pt
+    file_md5: 6IJkebAEUs2KNc5J9nnkQQ==
+    size: 89508955
+    checkpoint_sha256: d373ebf845565ba6196c70eeda7e51776cdcf726410cb00abdb3739ed494102a
