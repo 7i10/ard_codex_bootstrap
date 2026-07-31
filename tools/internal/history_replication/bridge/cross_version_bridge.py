@@ -223,6 +223,12 @@ def _seed_all(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
+def _activate_cuda_device(device: torch.device) -> None:
+    """Select the logical device before querying/resetting allocator state."""
+    torch.cuda.set_device(device)
+    torch.cuda.reset_peak_memory_stats(device)
+
+
 def _cuda_environment(device: torch.device) -> dict[str, object]:
     index = torch.cuda.current_device() if device.index is None else device.index
     properties = torch.cuda.get_device_properties(index)
@@ -306,7 +312,7 @@ def emit(output: Path, *, expected_git_sha: str, device: str = "cuda:0") -> Path
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
         _seed_all(4)
-        torch.cuda.reset_peak_memory_stats(resolved_device)
+        _activate_cuda_device(resolved_device)
         torch.manual_seed(123)
         student = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
         torch.manual_seed(456)

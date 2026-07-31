@@ -12,6 +12,7 @@ from tools.internal.history_replication.bridge.cross_version_bridge import (
     _SOURCE_HASH_KEYS,
     EMISSION_SCHEMA_VERSION,
     ObservationBridgeError,
+    _activate_cuda_device,
     compare,
     observation_kwargs_for,
 )
@@ -46,6 +47,15 @@ def test_observation_api_detection_is_explicit_and_fail_closed() -> None:
         observation_kwargs_for(_AmbiguousTrainer)
     with pytest.raises(ObservationBridgeError, match="exactly one"):
         observation_kwargs_for(_MissingTrainer)
+
+
+def test_cuda_device_is_selected_before_allocator_reset(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, torch.device]] = []
+    monkeypatch.setattr(torch.cuda, "set_device", lambda device: calls.append(("set", device)))
+    monkeypatch.setattr(torch.cuda, "reset_peak_memory_stats", lambda device: calls.append(("reset", device)))
+    device = torch.device("cuda:0")
+    _activate_cuda_device(device)
+    assert calls == [("set", device), ("reset", device)]
 
 
 def _record() -> dict[str, object]:
