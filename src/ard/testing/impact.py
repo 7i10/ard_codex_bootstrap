@@ -84,6 +84,14 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/rslad_signal_replay.py",
+            "src/ard/cli/rslad_signal_replay.py",
+        ),
+        ("tests/unit/test_rslad_signal_replay.py",),
+        ("T0", "T1"),
+    ),
+    (
+        (
             "src/ard/analysis/signal_audit.py",
             "src/ard/analysis/teacher_risk_replay.py",
             "src/ard/analysis/__init__.py",

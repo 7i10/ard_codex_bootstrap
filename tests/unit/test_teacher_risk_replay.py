@@ -3,16 +3,20 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import torch
 from torch import nn
 
-from ard.analysis.teacher_risk_replay import replay_rows, replay_source_hashes
+from ard.analysis import teacher_risk_replay
+from ard.analysis.signal_audit import CheckpointInventory
+from ard.analysis.teacher_risk_replay import load_historical_student, replay_rows, replay_source_hashes
 from ard.attacks import LinfPGD
 from ard.cli.replay_teacher_risk import main as replay_teacher_risk_main
 from ard.config.schema import AttackConfig
 from ard.data import IndexedBatch
+from ard.engine.checkpoint import REQUIRED_KEYS
 
 pytestmark = pytest.mark.t2
 
@@ -85,6 +89,42 @@ def test_replay_source_provenance_hashes_both_entry_points() -> None:
     hashes = replay_source_hashes()
     assert set(hashes) == {"analysis_module", "cli_module"}
     assert all(len(value) == 64 for value in hashes.values())
+
+
+def test_historical_loader_accepts_explicit_saved_raw_config_hash_without_changing_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "checkpoint.pt"
+    path.write_bytes(b"fixture")
+    checkpoint = CheckpointInventory(
+        "run", "model", ("last",), 0, str(path), "a" * 64, 4, False, 0, "raw" * 21 + "r", "b" * 40
+    )
+    captured: dict[str, object] = {}
+
+    def validate(_path: Path, *, expected_config_hash: str) -> dict[str, object]:
+        captured["hash"] = expected_config_hash
+        return {**{key: None for key in REQUIRED_KEYS}, "tracker_run_id": "run", "epoch": 4}
+
+    monkeypatch.setattr(teacher_risk_replay, "sha256_file", lambda _: "a" * 64)
+    monkeypatch.setattr(teacher_risk_replay, "resolved_config_dict", lambda _: {"current": "defaults"})
+    monkeypatch.setattr(teacher_risk_replay, "config_digest", lambda _: "reserialized-defaults")
+    monkeypatch.setattr(
+        teacher_risk_replay,
+        "validate_checkpoint_lineage",
+        validate,
+    )
+    monkeypatch.setattr(teacher_risk_replay, "build_student", lambda *_args, **_kwargs: nn.Identity())
+    monkeypatch.setattr(teacher_risk_replay, "load_saved_student_checkpoint", lambda *_args: None)
+
+    model, _ = load_historical_student(
+        checkpoint,
+        config=SimpleNamespace(student=object(), tier="smoke"),
+        device=torch.device("cpu"),
+        expected_config_hash=checkpoint.config_hash,
+    )
+
+    assert isinstance(model, nn.Identity)
+    assert captured["hash"] == checkpoint.config_hash
 
 
 def test_replay_cli_rejects_batch_size_drift_before_reading_artifacts(tmp_path: Path) -> None:

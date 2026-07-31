@@ -109,14 +109,19 @@ def build_replay_loader(config: ExperimentConfig, *, batch_size: int) -> DataLoa
 
 
 def load_historical_student(
-    checkpoint: CheckpointInventory, *, config: ExperimentConfig, device: torch.device
+    checkpoint: CheckpointInventory,
+    *,
+    config: ExperimentConfig,
+    device: torch.device,
+    expected_config_hash: str | None = None,
 ) -> tuple[nn.Module, Mapping[str, Any]]:
     """Strictly load the exact periodic checkpoint selected by the audit."""
     path = Path(checkpoint.path)
     if sha256_file(path) != checkpoint.sha256:
         raise TeacherRiskReplayError("selected replay checkpoint SHA no longer matches its immutable inventory")
     resolved = resolved_config_dict(config)
-    expected_hash = config_digest(resolved)
+    current_hash = config_digest(resolved)
+    expected_hash = current_hash if expected_config_hash is None else expected_config_hash
     try:
         payload = validate_checkpoint_lineage(path, expected_config_hash=expected_hash)
     except (OSError, ValueError) as exc:

@@ -85,6 +85,7 @@ def test_configs_changes_select_repository_config_resolution_test() -> None:
 
 def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     available = (
+        "tests/unit/test_rslad_signal_replay.py",
         "tests/unit/test_signal_audit.py",
         "tests/unit/test_teacher_risk_replay.py",
         "tests/unit/test_evaluation.py",
@@ -95,6 +96,10 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     )
     assert selected.tests == ("tests/unit/test_signal_audit.py", "tests/unit/test_teacher_risk_replay.py")
     assert selected.tiers == ("T0", "T1")
+
+    new_replay = select(("src/ard/analysis/rslad_signal_replay.py",), available)
+    assert new_replay.tests == ("tests/unit/test_rslad_signal_replay.py",)
+    assert new_replay.tiers == ("T0", "T1")
 
 
 def test_teacher_acquisition_scripts_select_focused_acquisition_and_registry_tests() -> None:
