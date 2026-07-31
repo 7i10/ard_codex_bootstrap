@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import copy
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
+import torch
 import yaml
 from pydantic import ValidationError
 
 from ard.campaign.schema import load_campaign
-from ard.cli.train import _validate_research_design
+from ard.cli import train as train_cli
+from ard.cli.train import _claim_research_allocation, _validate_research_design, _validate_research_gate_evidence
 from ard.config import load_config, save_resolved_config
 from ard.config.schema import AttackConfig, ExperimentConfig, MethodConfig, NormalizationConfig
 from ard.config.teacher_audit import load_teacher_audit_config
@@ -115,6 +119,8 @@ def test_production_logging_only_requires_and_hash_binds_frozen_research_design(
     design_path = config.research_design.manifest
     assert config.research_design.id == "logging_only_history_confirmatory_v1"
     assert hashlib.sha256(design_path.read_bytes()).hexdigest() == config.research_design.sha256
+    assert config.tracking.run_id == "bart-rslad-logging-only-s1-confirm-v1"
+    assert config.output_dir == Path("outputs/scientific/bart-rslad-logging-only-s1-confirm-v1")
     _validate_research_design(config)
 
     without_design = config.model_dump(mode="python")
@@ -124,8 +130,12 @@ def test_production_logging_only_requires_and_hash_binds_frozen_research_design(
 
     bad_design = config.research_design.model_copy(update={"sha256": "0" * 64})
     bad_config = config.model_copy(update={"research_design": bad_design})
-    with pytest.raises(ValueError, match="manifest SHA-256"):
+    with pytest.raises(ValueError, match="preregistration SHA-256"):
         _validate_research_design(bad_config)
+
+    relocated_design = config.research_design.model_copy(update={"manifest": tmp_path / "design.yaml"})
+    with pytest.raises(ValueError, match="immutable preregistration"):
+        _validate_research_design(config.model_copy(update={"research_design": relocated_design}))
 
     seed_two = config.seeds.model_copy(
         update={"model_init": 2, "data_order": 2, "augmentation": 2, "train_attack": 2, "qualitative_panel": 2}
@@ -136,6 +146,102 @@ def test_production_logging_only_requires_and_hash_binds_frozen_research_design(
     chen = load_config(Path("configs/scientific/cifar10_r18_rslad_logging_only_chen.yaml"))
     with pytest.raises(ValueError, match="first replication allocation"):
         _validate_research_design(chen)
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "message"),
+    [
+        (("status",), "pending", "not eligible"),
+        (("common_trajectory", "bartoldson", "history_gate"), "no_go", "History evidence"),
+        (("frozen_mask", "all_arms_terminal"), False, "four-arm"),
+        (("frozen_mask", "decision"), "go", "decision does not match"),
+        (("optimization_parity", "status"), "failed", "optimization parity"),
+        (("allocation", "seed"), 2, "allocation drifted"),
+        (
+            ("common_trajectory", "bartoldson", "report_sha256"),
+            "invalid",
+            "History evidence",
+        ),
+        (
+            ("frozen_mask", "arms", "random_1", "autoattack_results_sha256"),
+            "0" * 64,
+            "artifact identities",
+        ),
+        (("optimization_parity", "command"), "pytest", "optimization parity"),
+    ],
+)
+def test_logging_only_gate_rejects_hash_bound_semantic_tampering(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: tuple[str, ...],
+    value: object,
+    message: str,
+) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
+    payload = yaml.safe_load(
+        Path("configs/analysis/logging_only_history_confirmatory_v1_gate_attestation.yaml").read_text(encoding="utf-8")
+    )
+    tampered = copy.deepcopy(payload)
+    target = tampered
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    with pytest.raises(ValueError, match=message):
+        _validate_research_gate_evidence(attestation=tampered)
+
+
+def test_logging_only_research_allocation_is_atomic_and_resume_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
+    config = load_config(Path("configs/scientific/cifar10_r18_rslad_logging_only_bartoldson.yaml"))
+    output_dir = tmp_path / "allocation"
+    claimed_config = config.model_copy(update={"output_dir": output_dir})
+    _claim_research_allocation(claimed_config, output_dir=output_dir, resume=None, config_hash="f" * 64)
+    claim = json.loads((output_dir / ".research-allocation-claim.json").read_text(encoding="utf-8"))
+    assert claim["tracking_run_id"] == "bart-rslad-logging-only-s1-confirm-v1"
+    with pytest.raises(FileExistsError, match="already claimed"):
+        _claim_research_allocation(claimed_config, output_dir=output_dir, resume=None, config_hash="f" * 64)
+    _claim_research_allocation(
+        claimed_config,
+        output_dir=output_dir,
+        resume=output_dir / "last.pt",
+        config_hash="f" * 64,
+    )
+    mismatched = claimed_config.model_copy(
+        update={"tracking": claimed_config.tracking.model_copy(update={"run_id": "other"})}
+    )
+    with pytest.raises(ValueError, match="does not match"):
+        _claim_research_allocation(
+            mismatched,
+            output_dir=output_dir,
+            resume=output_dir / "last.pt",
+            config_hash="f" * 64,
+        )
+
+
+def test_logging_only_dry_run_does_not_claim_or_create_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
+    output_dir = tmp_path / "dry-run-output"
+    monkeypatch.setattr(train_cli, "initialize_from_env", lambda _: (torch.device("cpu"), False))
+    monkeypatch.setattr(train_cli, "validate_tracking_guard", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(train_cli, "_validate_research_design", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(train_cli, "run_rank_zero_phase", lambda action, **_kwargs: action())
+    monkeypatch.setattr(train_cli, "barrier", lambda: None)
+    monkeypatch.setattr(train_cli, "is_rank_zero", lambda: False)
+    assert (
+        train_cli.main(
+            [
+                "--config",
+                "configs/scientific/cifar10_r18_rslad_logging_only_bartoldson.yaml",
+                "--output",
+                str(output_dir),
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    assert not output_dir.exists()
 
 
 def test_single_gpu_campaign_crosswalk_and_scientific_protocol_are_exact(

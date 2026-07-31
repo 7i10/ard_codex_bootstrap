@@ -4,7 +4,7 @@
 
 - Owner: main thread; Terra owns the two bounded scientific code deltas
 - Branch / base SHA: `master` / `7a278df`
-- Current milestone: M1 final-SHA CUDA parity and artifact replay
+- Current milestone: M4 conditional Bartoldson replication launch
 - Last updated: 2026-07-31
 
 ## Goal
@@ -25,9 +25,11 @@ if every pre-registered gate passes.
 
 ## Existing state
 
-- Frozen-mask oracle/control-1/control-2 training is complete; control-3 is
-  training on Ferret. Saved-checkpoint evaluations are terminal for controls
-  1/2, and the oracle evaluation is running.
+- All four frozen-mask train runs and saved-checkpoint PGD/AutoAttack
+  evaluations are terminal. The outcome-informed arm is `+0.44 pp` above the
+  three-random best-AA mean but below the registered `+0.5 pp` threshold and
+  does not exceed random 2, so the independent intervention decision is
+  `inconclusive`.
 - The frozen mask contains 3,566 Bartoldson/RSLAD train IDs: 404 robustly
   correct at epoch 99 and wrong at epoch 199, plus 3,162 wrong at both
   endpoints. It is therefore an outcome-informed failure mask, not an
@@ -69,12 +71,12 @@ if every pre-registered gate passes.
 
 ## Milestones
 
-- [ ] M0: reconcile frozen-mask jobs, artifacts, and mask strata.
+- [x] M0: reconcile frozen-mask jobs, artifacts, and mask strata.
   - Acceptance: all four train/evaluation terminals, exact arm hashes and
     best/last clean/PGD/AA table, and unchanged pre-registered decision.
   - Commit boundary: combined with M1--M3 because no source code depends on job
     waiting.
-- [ ] M1: complete and run common-trajectory replay.
+- [x] M1: complete and run common-trajectory replay.
   - Files: `src/ard/analysis/rslad_signal_replay.py`, focused tests, two
     immutable execution configs.
   - Tests: focused CPU unit tests, then one checkpoint/one bounded-batch CUDA
@@ -88,10 +90,13 @@ if every pre-registered gate passes.
     margin EMA/mean/variance/slope, teacher correctness/confidence and
     clean-to-adversarial response are checkpointed and resume exactly; padded
     IDs are excluded.
-- [ ] M3: freeze the confirmatory specification and launch preflight.
+- [x] M3: freeze the confirmatory specification and launch preflight.
   - Acceptance: immutable design bytes and SHA bind predictor/features,
     anchor/outcome, split/bootstrap seeds, thresholds, and seed roles; exact
     RSLAD/logging-only CUDA parity passes at the final code revision.
+  - Terminal replay/frozen-mask artifact hashes and decisions are bound into
+    the design; semantic tampering fails closed. Final-code Hamster CUDA parity
+    passed (`1 passed`).
 - [ ] M4: conditionally start one Bartoldson logging-only seed-1 run.
   - Acceptance: fixed Git/config/teacher/design hashes, unique output/W&B ID,
     correct GPU, process and first progress, finite metrics, observation-only
@@ -161,8 +166,48 @@ actual P0/P1 fix delta.
   trajectory-completeness, and launch-allocation findings; no P0/P1 remains
   in the implementation delta.
 - 2026-07-31: non-isolated Hamster preflight confirmed two RTX 4090 devices
-  and PyTorch `cuda_available=True`; final-SHA CUDA parity is still pending the
-  tracked-clean commit.
+  and PyTorch `cuda_available=True`. Final-SHA CUDA parity passed on GPU 0
+  (`1 passed`), and a real Chen checkpoint/teacher one-batch replay smoke
+  produced 128 unique finite rows with teacher parameter gradients all
+  `None`.
+- 2026-07-31: implementation and frozen design were committed and pushed as
+  `d3c59b19788f915d82047b5f2722e9070b664517`. The final-SHA Chen replay is
+  terminal with 45,000 stable train IDs and History gate `Go`: history-only
+  exceeded the best current-state baseline by AUROC `0.06220` (paired 95% CI
+  `[0.05470, 0.07001]`) while improving log-loss by `0.07418`.
+- 2026-07-31: Oracle AutoAttack is terminal: best/last AA is
+  `47.36/43.28`. Because control-2 best AA is `47.37`, the pre-registered
+  Oracle Go condition requiring the oracle to exceed every random arm is
+  already impossible; the final No-Go/inconclusive classification still waits
+  for control-3 evaluation.
+- 2026-07-31: a detached final-SHA Bartoldson replay was started on Ferret GPU
+  2 as PID `556761` after a real one-batch smoke produced 128 unique finite
+  rows and no teacher parameter gradients. Ferret GPU 0 remains assigned to
+  control-3; GPU 1 is free.
+- 2026-07-31: the final-SHA Bartoldson replay completed with 45,000 stable
+  train IDs and History gate `Go`. History-only exceeded the best current-state
+  baseline (instantaneous margin) by AUROC `0.05250` with paired 95% CI
+  `[0.04549, 0.06027]` and improved log-loss by `0.05837`. Report SHA-256 is
+  `d44ee166f8866b77067ebd07757d394a060242c9cf1cdc5d4513f127897981f8`;
+  lineage SHA-256 is
+  `9b6ea091dc9ed4ff81bb579bf05d6650ac8e6d4ab6104981c446f29069e4a64e`.
+- 2026-07-31: random control 3 completed; best/last clean/PGD/AA is
+  `83.33/50.51/47.04` and `84.44/45.45/42.46`. The four-arm decision is
+  `inconclusive`: mask minus random-mean best AA is `+0.44 pp`, below the
+  `+0.5 pp` Go threshold, and random 2 remains slightly higher.
+- 2026-07-31: terminal evidence and the single permitted allocation were
+  hash-bound into the launch design. Semantic-tamper tests passed (`8 passed`)
+  and the final-code CUDA optimization parity passed on Hamster (`1 passed`).
+- 2026-08-01: consolidated review found three P1 launch gaps: mutable
+  preregistration, self-attested terminal evidence, and duplicate fresh
+  allocation. The fix restores and independently hashes the original
+  preregistration (`d653d9ef...`), binds a separate structured gate
+  attestation (`6207cce0...`), fixes the W&B/output identity, and atomically
+  consumes the sole fresh allocation while preserving exact resume. Focused
+  gate tests passed (`12 passed`), final Hamster CUDA parity passed
+  (`1 passed`), and the non-scientific changed gate completed with no failure.
+  Fix-delta scientific review reports no remaining P0/P1/P2 and approves the
+  conditional launch.
 
 ## Completion report
 

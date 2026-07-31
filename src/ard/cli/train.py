@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import os
 import random
 from collections.abc import Mapping
 from pathlib import Path
@@ -64,6 +66,67 @@ from ard.tracking import (
 )
 from ard.tracking.diagnostics import TrainingDiagnostics
 
+_RESEARCH_DESIGN_RELATIVE_PATH = Path("configs/analysis/logging_only_history_confirmatory_v1.yaml")
+_RESEARCH_GATE_ATTESTATION_RELATIVE_PATH = Path(
+    "configs/analysis/logging_only_history_confirmatory_v1_gate_attestation.yaml"
+)
+_RESEARCH_DESIGN_SHA256 = "d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12"
+_RESEARCH_GATE_ATTESTATION_SHA256 = "6207cce0fe70b2ef41fa3607e10b4eae47df5da6fd351fe2b68c2077b4c01cc5"
+_RESEARCH_ALLOCATION = {
+    "decision": "start_first_replication_only",
+    "teacher": "bartoldson2024_adversarial_wrn94_16",
+    "method": "rslad_logging_only",
+    "training_protocol": "controlled_cifar10_r18_v1",
+    "seed": 1,
+    "epochs": 200,
+    "world_size": 1,
+    "per_rank_batch_size": 128,
+    "global_batch_size": 128,
+    "tracking": {
+        "entity": "shunsuke-n-waseda-university",
+        "project": "single-teacher-ard",
+        "group": "bartoldson-cifar10-r18-ws1",
+        "run_id": "bart-rslad-logging-only-s1-confirm-v1",
+    },
+    "output_dir": "outputs/scientific/bart-rslad-logging-only-s1-confirm-v1",
+}
+_FROZEN_MASK_ARTIFACTS = {
+    "outcome_informed": {
+        "run_id": "bart-oracle-soft-s0-05cd0c6",
+        "roles": {
+            "train_manifest_sha256": "c101cb59a233e3d4272aac929c62788a0c31c4efb05fde92c3838e0810fb4eac",
+            "pgd_results_sha256": "b0f74de111f283cc1213bea60eb0cf03f1f2a96923dfd07d5f02763fd5f2788d",
+            "autoattack_results_sha256": "e76fef5503fa8d3b7d531988e87582b7ab80210fbe9e124418c7c06274f5e87f",
+        },
+    },
+    "random_1": {
+        "run_id": "bart-rand1-soft-s0-05cd0c6",
+        "roles": {
+            "train_manifest_sha256": "0374ff5d22cb02604758a367bdd22819a51699ac6f72987dba69ffbc689e6f39",
+            "pgd_results_sha256": "489ea0e2e1665cfe7232fb777d0e85818e3a14d4d23308266a16fead5bdc0652",
+            "autoattack_results_sha256": "6b5e922d7c253143d35fb58ed457a89168ff32ddb78949d8f79db3626bcb2d69",
+        },
+    },
+    "random_2": {
+        "run_id": "bart-rand2-soft-s0-05cd0c6",
+        "roles": {
+            "train_manifest_sha256": "afd8bb6334ae6353ff5c89f89e8ae278124b2f147b1524cb0bac673c76b1077c",
+            "pgd_results_sha256": "43516cd5acef8c5b59f28159abdb58167f44d5cfe785b8f49c59dbf933d9a0b6",
+            "autoattack_results_sha256": "ac12e918485917902c2664d81c2672a322a2bcebe1ea7081fd970322bcfc4ce0",
+        },
+    },
+    "random_3": {
+        "run_id": "bart-rand3-soft-s0-05cd0c6",
+        "roles": {
+            "train_manifest_sha256": "1bd0bd0a773a3f4e3e3951f22485197070289336ebaed055176b8c4f5fd7ad27",
+            "pgd_best_results_sha256": "a37b5302447100139e78b9b543042ac836c9e77a5831f8bb1e9b905c71310c16",
+            "pgd_last_results_sha256": "363084e38745f816030755cdecf1b8d72d78705a04325a6b9bde51581a89240b",
+            "autoattack_best_results_sha256": "89c4004c23accb766ec7e66a9711468762e8932b9c9600a9fc500cf847106056",
+            "autoattack_last_results_sha256": "b6ba77e32f54651239e7026aae169aa15b128023c71103072e3be820657daf52",
+        },
+    },
+}
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train an ARD student model.")
@@ -106,18 +169,22 @@ def _guard_output(output_dir: Path, *, resume: Path | None, config_hash: str) ->
 
 
 def _validate_research_design(config: ExperimentConfig, *, world_size: int = 1) -> None:
-    """Fail before tracker initialization unless the frozen design bytes match."""
+    """Fail before tracker initialization unless immutable design and evidence match."""
     design = config.research_design
     if design is None:
         return
-    path = design.manifest.resolve()
-    if not path.is_file():
-        raise FileNotFoundError(f"research design manifest is missing: {path}")
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    if digest != design.sha256:
-        raise ValueError("research design manifest SHA-256 does not match resolved config")
+    root = Path(__file__).resolve().parents[3]
+    design_path = design.manifest.resolve()
+    expected_design_path = (root / _RESEARCH_DESIGN_RELATIVE_PATH).resolve()
+    if design_path != expected_design_path:
+        raise ValueError("research design must use the immutable preregistration manifest")
+    if not design_path.is_file():
+        raise FileNotFoundError(f"research design manifest is missing: {design_path}")
+    digest = hashlib.sha256(design_path.read_bytes()).hexdigest()
+    if digest != _RESEARCH_DESIGN_SHA256 or design.sha256 != _RESEARCH_DESIGN_SHA256:
+        raise ValueError("research design preregistration SHA-256 does not match the immutable bytes")
     try:
-        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+        payload = yaml.safe_load(design_path.read_text(encoding="utf-8"))
         scope = payload["scope"]
         seed_roles = payload["seed_roles"]
         launch = payload["launch_sequence"]["first_and_only_automatic_run"]
@@ -157,6 +224,220 @@ def _validate_research_design(config: ExperimentConfig, *, world_size: int = 1) 
     }
     if actual != expected or any(getattr(config.seeds, field) != expected_seed for field in seed_fields):
         raise ValueError("resolved run does not match the frozen first replication allocation")
+    tracking = {
+        "entity": config.tracking.entity,
+        "project": config.tracking.project,
+        "group": config.tracking.group,
+        "run_id": config.tracking.run_id,
+    }
+    if (
+        tracking != _RESEARCH_ALLOCATION["tracking"]
+        or config.output_dir.as_posix() != _RESEARCH_ALLOCATION["output_dir"]
+    ):
+        raise ValueError("resolved run does not match the canonical logging-only tracking/output identity")
+    attestation_path = (root / _RESEARCH_GATE_ATTESTATION_RELATIVE_PATH).resolve()
+    if not attestation_path.is_file():
+        raise FileNotFoundError(f"research gate attestation is missing: {attestation_path}")
+    if hashlib.sha256(attestation_path.read_bytes()).hexdigest() != _RESEARCH_GATE_ATTESTATION_SHA256:
+        raise ValueError("research gate attestation SHA-256 does not match the immutable evidence bytes")
+    try:
+        attestation = yaml.safe_load(attestation_path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, yaml.YAMLError) as exc:
+        raise ValueError("research gate attestation is unreadable") from exc
+    if not isinstance(attestation, Mapping):
+        raise ValueError("research gate attestation must be a mapping")
+    _validate_research_gate_evidence(
+        attestation=attestation,
+    )
+
+
+def _validate_research_gate_evidence(
+    *,
+    attestation: Mapping[object, object],
+) -> None:
+    """Fail closed unless terminal seed-0 evidence permits the frozen allocation."""
+
+    common_trajectory = attestation.get("common_trajectory")
+    frozen_mask = attestation.get("frozen_mask")
+    parity = attestation.get("optimization_parity")
+    allocation = attestation.get("allocation")
+    if not all(isinstance(value, Mapping) for value in (common_trajectory, frozen_mask, parity, allocation)):
+        raise ValueError("research gate attestation lacks structured evidence")
+    common_trajectory = cast(Mapping[object, object], common_trajectory)
+    frozen_mask = cast(Mapping[object, object], frozen_mask)
+    parity = cast(Mapping[object, object], parity)
+    allocation = cast(Mapping[object, object], allocation)
+    if (
+        attestation.get("schema_version") != 1
+        or attestation.get("attestation_id") != "logging_only_history_confirmatory_v1_gate_attestation"
+        or attestation.get("status") != "eligible_for_first_replication"
+        or attestation.get("preregistered_design_sha256") != _RESEARCH_DESIGN_SHA256
+    ):
+        raise ValueError("research design gate is not eligible for the first replication")
+    if (
+        common_trajectory.get("checkpoint_scientific_git_sha") != "2d54b8230b8d14d13c1ea7472ccba53491b4d38d"
+        or common_trajectory.get("analysis_git_sha") != "d3c59b19788f915d82047b5f2722e9070b664517"
+        or common_trajectory.get("analysis_source_sha256")
+        != "2a5956e42bb65395d195c1db73b90660b2e0af65414612f2da013332eff2bec2"
+    ):
+        raise ValueError("research design gate lacks exact common-trajectory Git identities")
+
+    expected_common = {
+        "chen": {
+            "run_id": "prod-chen-rslad-s0-2d54b82",
+            "report_sha256": "cb5305182bb942b9f9d44036c67700c9d8fff54116ad3f7111be0a73f65016fa",
+            "lineage_sha256": "f485f72341b276351098e97514e4becc46b278a005694be2672811c5aaf5a808",
+        },
+        "bartoldson": {
+            "run_id": "prod-bart-rslad-s0-2d54b82",
+            "report_sha256": "d44ee166f8866b77067ebd07757d394a060242c9cf1cdc5d4513f127897981f8",
+            "lineage_sha256": "9b6ea091dc9ed4ff81bb579bf05d6650ac8e6d4ab6104981c446f29069e4a64e",
+        },
+    }
+    for teacher in ("chen", "bartoldson"):
+        evidence = common_trajectory.get(teacher)
+        if not isinstance(evidence, Mapping):
+            raise ValueError(f"research design gate lacks {teacher} common-trajectory evidence")
+        interval = evidence.get("delta_auroc_ci_95")
+        delta_auroc = evidence.get("delta_auroc_vs_best_current")
+        delta_log_loss = evidence.get("delta_log_loss")
+        if (
+            evidence.get("run_id") != expected_common[teacher]["run_id"]
+            or evidence.get("train_count") != 45_000
+            or evidence.get("history_gate") != "go"
+            or evidence.get("report_sha256") != expected_common[teacher]["report_sha256"]
+            or evidence.get("lineage_sha256") != expected_common[teacher]["lineage_sha256"]
+            or not isinstance(interval, list)
+            or len(interval) != 2
+            or not all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in interval)
+            or not all(math.isfinite(float(value)) for value in interval)
+            or float(interval[0]) <= 0.0
+            or isinstance(delta_auroc, bool)
+            or not isinstance(delta_auroc, (int, float))
+            or not math.isfinite(float(delta_auroc))
+            or float(delta_auroc) < 0.02
+            or isinstance(delta_log_loss, bool)
+            or not isinstance(delta_log_loss, (int, float))
+            or not math.isfinite(float(delta_log_loss))
+            or float(delta_log_loss) >= 0.0
+        ):
+            raise ValueError(f"research design gate rejects incomplete or failed {teacher} History evidence")
+
+    arms = frozen_mask.get("arms")
+    if (
+        frozen_mask.get("all_arms_terminal") is not True
+        or frozen_mask.get("scientific_git_sha") != "05cd0c66367e399dde266bd898c3ddc4097ca95c"
+        or not isinstance(arms, Mapping)
+        or set(arms) != set(_FROZEN_MASK_ARTIFACTS)
+    ):
+        raise ValueError("research design gate lacks terminal four-arm frozen-mask evidence")
+    best_metrics: dict[str, tuple[float, float]] = {}
+    for arm_name, arm in arms.items():
+        if not isinstance(arm_name, str) or not isinstance(arm, Mapping):
+            raise ValueError("research design frozen-mask arm evidence must use mappings")
+        best = arm.get("best")
+        if not isinstance(best, Mapping):
+            raise ValueError("research design frozen-mask arm lacks best metrics")
+        clean, aa = best.get("clean"), best.get("aa")
+        if any(
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value))
+            for value in (clean, aa)
+        ):
+            raise ValueError("research design frozen-mask arm metrics must be finite")
+        assert isinstance(clean, (int, float)) and not isinstance(clean, bool)
+        assert isinstance(aa, (int, float)) and not isinstance(aa, bool)
+        best_metrics[arm_name] = (float(clean), float(aa))
+        expected_arm = _FROZEN_MASK_ARTIFACTS[arm_name]
+        digest_roles = {key: value for key, value in arm.items() if isinstance(key, str) and key.endswith("sha256")}
+        if arm.get("run_id") != expected_arm["run_id"] or digest_roles != expected_arm["roles"]:
+            raise ValueError("research design frozen-mask artifact identities or roles do not match")
+
+    mask_clean, mask_aa = best_metrics["outcome_informed"]
+    random_values = [best_metrics[f"random_{index}"] for index in (1, 2, 3)]
+    random_clean = sum(value[0] for value in random_values) / 3.0
+    random_aa = sum(value[1] for value in random_values) / 3.0
+    go = (
+        mask_aa >= random_aa + 0.005
+        and all(mask_aa > value[1] for value in random_values)
+        and random_clean - mask_clean <= 0.005
+    )
+    observed_decision = "go" if go else ("no_go" if mask_aa <= random_aa else "inconclusive")
+    if frozen_mask.get("decision") != observed_decision:
+        raise ValueError("research design frozen-mask decision does not match terminal metrics")
+
+    if allocation != _RESEARCH_ALLOCATION:
+        raise ValueError("research design gate allocation drifted from the frozen launch sequence")
+    expected_parity = {
+        "status": "passed",
+        "scientific_git_sha": "d3c59b19788f915d82047b5f2722e9070b664517",
+        "command": (
+            "PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m pytest -q "
+            "tests/integration/test_checkpoint_resume.py::"
+            "test_rslad_logging_only_cuda_parity_with_random_start_pgd"
+        ),
+        "nodeid": (
+            "tests/integration/test_checkpoint_resume.py::test_rslad_logging_only_cuda_parity_with_random_start_pgd"
+        ),
+        "result": {"passed": 1, "failed": 0, "skipped": 0},
+        "source_digests": {
+            "test_checkpoint_resume_py_sha256": "cf4e1e3ac0b7222b8c437c3572f388ad2dcee9629bcc79bb957236252e86b24d",
+            "trainer_py_sha256": "8b3044a6faf8ffecfae999f7ed064fd5d1b6799be30bfafe9903e5883a0792e0",
+            "pgd_py_sha256": "7775955573b1c95bea81b6ee043a9cfa9f9a0d4961f61a0cd23e81fa3e5925c2",
+            "rslad_py_sha256": "646d95f8da74c4fc920cacf4ea353ec7104059305d4f2c154973643c9920d3da",
+            "sample_store_py_sha256": "dc529e9f736bdd6f722e2cff0d6481cb13302a4cd0087e83ca9d31d0921ffe02",
+        },
+    }
+    if parity != expected_parity:
+        raise ValueError("research design gate lacks exact RSLAD/logging-only optimization parity")
+
+
+def _research_claim_identity(config: ExperimentConfig, *, config_hash: str) -> dict[str, object]:
+    """Identity written once for the single allowed fresh confirmatory allocation."""
+    return {
+        "research_design_sha256": _RESEARCH_DESIGN_SHA256,
+        "gate_attestation_sha256": _RESEARCH_GATE_ATTESTATION_SHA256,
+        "config_hash": config_hash,
+        "tracking_run_id": config.tracking.run_id,
+        "output_dir": config.output_dir.as_posix(),
+    }
+
+
+def _claim_research_allocation(
+    config: ExperimentConfig,
+    *,
+    output_dir: Path,
+    resume: Path | None,
+    config_hash: str,
+) -> None:
+    """Atomically reserve a fresh allocation; resume must prove the same claim."""
+    if output_dir.resolve() != config.output_dir.resolve():
+        raise ValueError("research allocation claim must use the canonical output directory")
+    expected = _research_claim_identity(config, config_hash=config_hash)
+    claim_path = output_dir / ".research-allocation-claim.json"
+    if resume is None:
+        try:
+            output_dir.mkdir(parents=True, exist_ok=False)
+        except FileExistsError as exc:
+            raise FileExistsError("research allocation was already claimed; use its exact --resume checkpoint") from exc
+        descriptor = os.open(claim_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                json.dump(expected, handle, sort_keys=True, separators=(",", ":"))
+                handle.write("\n")
+        except BaseException:
+            # Keep the empty allocation directory as a consumed fresh claim if
+            # the process dies after mkdir; this path must never start a second
+            # fresh run with the same W&B identity.
+            raise
+        return
+    if not claim_path.is_file():
+        raise ValueError("research resume requires the original allocation claim")
+    try:
+        observed = json.loads(claim_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("research allocation claim is unreadable") from exc
+    if observed != expected:
+        raise ValueError("research resume allocation claim does not match run/config identity")
 
 
 def _resume_tracker_id(path: Path | None) -> str | None:
@@ -302,16 +583,32 @@ def main(argv: list[str] | None = None) -> int:
             ),
             phase="terminal resume preflight",
         )
+        if args.dry_run:
+            if not terminal_resume and config.research_design is None:
+                run_rank_zero_phase(
+                    lambda: save_resolved_config(config, output_dir / "resolved_config.yaml"),
+                    phase="resolved-config write",
+                )
+                barrier()
+            if is_rank_zero():
+                print(json.dumps(resolved_config_dict(config), sort_keys=True))
+            return 0
+        if config.research_design is not None:
+            run_rank_zero_phase(
+                lambda: _claim_research_allocation(
+                    config,
+                    output_dir=output_dir,
+                    resume=args.resume,
+                    config_hash=config_hash,
+                ),
+                phase="research allocation claim",
+            )
         if not terminal_resume:
             run_rank_zero_phase(
                 lambda: save_resolved_config(config, output_dir / "resolved_config.yaml"),
                 phase="resolved-config write",
             )
         barrier()
-        if args.dry_run:
-            if is_rank_zero():
-                print(json.dumps(resolved_config_dict(config), sort_keys=True))
-            return 0
 
         # The run ID is deterministic on fresh starts and taken from the
         # checkpoint on resume.  All ranks independently derive the same ID;
@@ -335,11 +632,20 @@ def main(argv: list[str] | None = None) -> int:
         coordinated_tracker_action(tracker, phase="tracker attach/resume", action=_attach_resume)
         if config.research_design is not None and args.resume is None:
             design_path = config.research_design.manifest.resolve()
+            gate_attestation_path = (
+                Path(__file__).resolve().parents[3] / _RESEARCH_GATE_ATTESTATION_RELATIVE_PATH
+            ).resolve()
 
             def _record_research_design(active_tracker: ExperimentTracker) -> None:
                 active_tracker.log_artifact(
                     design_path,
                     name=f"research-design-{active_tracker.run_id}",
+                    artifact_type="analysis-input",
+                    aliases=("input",),
+                )
+                active_tracker.log_artifact(
+                    gate_attestation_path,
+                    name=f"research-gate-attestation-{active_tracker.run_id}",
                     artifact_type="analysis-input",
                     aliases=("input",),
                 )

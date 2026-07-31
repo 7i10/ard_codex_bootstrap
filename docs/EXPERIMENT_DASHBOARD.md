@@ -1,6 +1,6 @@
 # 実験ダッシュボード
 
-最終スナップショット: **2026-07-30**
+最終スナップショット: **2026-08-01 00:50 JST**
 
 このページは、人間が現在の研究目的、条件、進捗、結果、W&B上のrunの役割を一か所で確認するための
 台帳です。実行中の値は変化するため、論文用の確定表ではありません。
@@ -99,8 +99,8 @@ evaluationはW&B run `eval-6dcf1b78a77d3258b2e0`として完了しました。
 重複起動を防ぐため、ユーザー承認後にHamster/Ferretのwatchdogとcontrollerだけを一時停止しました。
 Ferretの2 trainは、限定watcherがexit code 0、completion marker、Git SHA、GPU UUID、GPU lease
 ownershipを検証してから同じGPUでPGD→AAだけを起動し、全phaseがexit code 0で完了しました。
-Hamster/Ferretの全5 GPUは現在idleです。全campaign controllerは再開していないため、完了済みjobの
-重複trainはありません。再配置した5 jobは、immutable result/checkpoint/sequence digestを含むportable
+seed-0 core campaignとfollow-up解析の全phaseはterminalであり、完了済みjobの重複trainはありません。
+Hamster/FerretのGPUは現在idleです。再配置した5 jobは、immutable result/checkpoint/sequence digestを含むportable
 evidenceからowning hostへatomic batch import済みです。再importは両hostでstrict no-opとなり、canonical
 campaign stateは両方とも`awaiting_scientific_review`へ到達しました。証跡は
 [`docs/experiments/reconciliation/`](experiments/reconciliation/)にあります。
@@ -225,24 +225,39 @@ Go/No-Go判定には使いません。
 seed-0訓練runに条件付けられており、訓練seed間の不確実性ではありません。詳細とreport hashは
 [Seed-0 signal audit](SIGNAL_AUDIT.md)に固定しています。
 
-### ★ Frozen-oracle介入（実行中）
+### ★ Frozen outcome-informed mask介入（完了、inconclusive）
 
 signalの良否とtarget-softening介入の良否を分離するupper-bound実験です。Bartoldson/RSLAD seed 0の
 W&B周期checkpoint `last:v19`（epoch 99）と`last:v39`（epoch 199）をraw train splitで同じKL PGD-10へ
 再投入し、最終robust error 3,566 sampleをoracle maskとして固定しました。official testはmask作成に
 使っていません。同数・同一class分布のrandom maskを3つ作り、全4 runでselected sampleだけ
-`rho=0.5`のuniform target softeningを適用します。
+`rho=0.5`のuniform target softeningを適用します。このmaskはpersistent failureを多く含むため、治療効果の
+oracleではなく、**outcome-informed failure mask**と呼びます。
 
 | 状態 | Ferret GPU | W&B train ID | Mask |
 |---|---:|---|---|
-| 実行中 | 0 | `bart-oracle-soft-s0-05cd0c6` | ★ offline oracle |
-| 実行中 | 1 | `bart-rand1-soft-s0-05cd0c6` | class-matched random 1 |
-| 実行中 | 2 | `bart-rand2-soft-s0-05cd0c6` | class-matched random 2 |
-| queue済み | 0（oracle後） | `bart-rand3-soft-s0-05cd0c6` | class-matched random 3 |
+| 完了 | — | `bart-oracle-soft-s0-05cd0c6` | outcome-informed failure mask |
+| 完了 | — | `bart-rand1-soft-s0-05cd0c6` | class-matched random 1 |
+| 完了 | — | `bart-rand2-soft-s0-05cd0c6` | class-matched random 2 |
+| 完了 | — | `bart-rand3-soft-s0-05cd0c6` | class-matched random 3 |
 
-実行SHAは`05cd0c66367e399dde266bd898c3ddc4097ca95c`です。4 train完了後、saved best/lastへ同一PGDと
-AutoAttackを別processで実行し、事前固定した`oracle best AA >= random平均 +0.5 pp`、全random超過、
-clean低下`<=0.5 pp`でGo/No-Goを判定します。oracleはdeployableな提案法ではありません。
+実行SHAは`05cd0c66367e399dde266bd898c3ddc4097ca95c`です。best clean/PGD/AAはmask arm
+`83.66/50.77/47.36`、random 1 `84.61/49.82/46.35`、random 2
+`83.56/50.83/47.37`、random 3 `83.33/50.51/47.04`でした。random平均AAは`46.92`、mask差は
+`+0.44 pp`、clean低下は`0.17 pp`です。maskはrandom平均を上回るためNo-Goではありませんが、
+事前固定した`+0.5 pp`と全random超過を満たさないため判定は`inconclusive`です。このarmはdeployableな
+提案法ではなく、History replicationの独立した介入結果です。
+
+### Common-trajectory history gate（完了、History Go）
+
+介入を一切変えないcanonical RSLADの周期checkpointを同一attackで再推論し、epoch 99のcurrent state、
+student history、teacher entropyから後続checkpoint-panel forgettingを予測します。final-SHA
+`d3c59b1`のChen replayは45,000 IDでterminalとなり、history-onlyは最良current-state baselineよりAUROC
+`+0.06220`（paired 95% CI `[+0.05470,+0.07001]`）、log-loss `-0.07418`でHistory Goでした。
+Bartoldson replayも45,000 IDでterminalとなりました。history-onlyは最良current-state baseline
+（instantaneous margin）よりAUROC `+0.05250`（paired 95% CI
+`[+0.04549,+0.06027]`）、log-loss `-0.05837`でHistory Goです。両report hashとfrozen-mask 4-arm
+terminal結果はhash-bound launch designへ固定済みです。
 
 ## 5. 出力
 
@@ -277,8 +292,9 @@ evaluationが別runとして保存されます。evaluation runはtrain runの�
 ## 6. W&B runの整理
 
 2026-07-30 09:03 JSTのAPI監査では、既存の**15 train + 22 evaluation = 37 run**が全件
-`finished`でした。その後、frozen-oracle train 3件をonlineで開始し、random control 3はqueue済みです。
-直前の5 evaluation stderrではW&B online sync完了と各30 artifact fileの送信を確認しました。
+`finished`でした。その後、frozen-mask train 4件をonlineで開始し、全armのtrain、PGD、AutoAttackが
+terminalになりました。ここでの37件はその追加run前の
+スナップショットであり、現在の総数ではありません。削除判断前にはW&B APIで再集計します。
 
 ### A. 論文候補cohortの重要run
 

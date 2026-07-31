@@ -1,0 +1,95 @@
+schema_version: 1
+attestation_id: logging_only_history_confirmatory_v1_gate_attestation
+preregistered_design_sha256: d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12
+status: eligible_for_first_replication
+completed_at: '2026-08-01T00:30:08+09:00'
+common_trajectory:
+  checkpoint_scientific_git_sha: 2d54b8230b8d14d13c1ea7472ccba53491b4d38d
+  analysis_git_sha: d3c59b19788f915d82047b5f2722e9070b664517
+  analysis_source_sha256: 2a5956e42bb65395d195c1db73b90660b2e0af65414612f2da013332eff2bec2
+  chen:
+    run_id: prod-chen-rslad-s0-2d54b82
+    train_count: 45000
+    history_gate: go
+    delta_auroc_vs_best_current: 0.06219797247349235
+    delta_auroc_ci_95: [0.054698000778697575, 0.07001093416525894]
+    delta_log_loss: -0.07418413287143666
+    report_sha256: cb5305182bb942b9f9d44036c67700c9d8fff54116ad3f7111be0a73f65016fa
+    lineage_sha256: f485f72341b276351098e97514e4becc46b278a005694be2672811c5aaf5a808
+  bartoldson:
+    run_id: prod-bart-rslad-s0-2d54b82
+    train_count: 45000
+    history_gate: go
+    delta_auroc_vs_best_current: 0.05250110740764946
+    delta_auroc_ci_95: [0.04549100110065829, 0.060266308796615764]
+    delta_log_loss: -0.05837456864666013
+    report_sha256: d44ee166f8866b77067ebd07757d394a060242c9cf1cdc5d4513f127897981f8
+    lineage_sha256: 9b6ea091dc9ed4ff81bb579bf05d6650ac8e6d4ab6104981c446f29069e4a64e
+frozen_mask:
+  scientific_git_sha: 05cd0c66367e399dde266bd898c3ddc4097ca95c
+  all_arms_terminal: true
+  decision: inconclusive
+  criteria:
+    go_delta_aa_pp: 0.5
+    go_exceeds_every_random: true
+    go_max_clean_drop_pp: 0.5
+    no_go_at_or_below_random_mean: true
+  arms:
+    outcome_informed:
+      run_id: bart-oracle-soft-s0-05cd0c6
+      best: {clean: 0.8366, pgd: 0.5077, aa: 0.47360000014305115}
+      last: {clean: 0.8457, pgd: 0.4603, aa: 0.4327999949455261}
+      train_manifest_sha256: c101cb59a233e3d4272aac929c62788a0c31c4efb05fde92c3838e0810fb4eac
+      pgd_results_sha256: b0f74de111f283cc1213bea60eb0cf03f1f2a96923dfd07d5f02763fd5f2788d
+      autoattack_results_sha256: e76fef5503fa8d3b7d531988e87582b7ab80210fbe9e124418c7c06274f5e87f
+    random_1:
+      run_id: bart-rand1-soft-s0-05cd0c6
+      best: {clean: 0.8461, pgd: 0.4982, aa: 0.4634999930858612}
+      last: {clean: 0.844, pgd: 0.4522, aa: 0.42419999837875366}
+      train_manifest_sha256: 0374ff5d22cb02604758a367bdd22819a51699ac6f72987dba69ffbc689e6f39
+      pgd_results_sha256: 489ea0e2e1665cfe7232fb777d0e85818e3a14d4d23308266a16fead5bdc0652
+      autoattack_results_sha256: 6b5e922d7c253143d35fb58ed457a89168ff32ddb78949d8f79db3626bcb2d69
+    random_2:
+      run_id: bart-rand2-soft-s0-05cd0c6
+      best: {clean: 0.8356, pgd: 0.5083, aa: 0.47369998693466187}
+      last: {clean: 0.8433, pgd: 0.4557, aa: 0.42739999294281006}
+      train_manifest_sha256: afd8bb6334ae6353ff5c89f89e8ae278124b2f147b1524cb0bac673c76b1077c
+      pgd_results_sha256: 43516cd5acef8c5b59f28159abdb58167f44d5cfe785b8f49c59dbf933d9a0b6
+      autoattack_results_sha256: ac12e918485917902c2664d81c2672a322a2bcebe1ea7081fd970322bcfc4ce0
+    random_3:
+      run_id: bart-rand3-soft-s0-05cd0c6
+      best: {clean: 0.8333, pgd: 0.5051, aa: 0.47039997577667236}
+      last: {clean: 0.8444, pgd: 0.4545, aa: 0.4245999753475189}
+      train_manifest_sha256: 1bd0bd0a773a3f4e3e3951f22485197070289336ebaed055176b8c4f5fd7ad27
+      pgd_best_results_sha256: a37b5302447100139e78b9b543042ac836c9e77a5831f8bb1e9b905c71310c16
+      pgd_last_results_sha256: 363084e38745f816030755cdecf1b8d72d78705a04325a6b9bde51581a89240b
+      autoattack_best_results_sha256: 89c4004c23accb766ec7e66a9711468762e8932b9c9600a9fc500cf847106056
+      autoattack_last_results_sha256: b6ba77e32f54651239e7026aae169aa15b128023c71103072e3be820657daf52
+optimization_parity:
+  status: passed
+  scientific_git_sha: d3c59b19788f915d82047b5f2722e9070b664517
+  command: PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m pytest -q tests/integration/test_checkpoint_resume.py::test_rslad_logging_only_cuda_parity_with_random_start_pgd
+  nodeid: tests/integration/test_checkpoint_resume.py::test_rslad_logging_only_cuda_parity_with_random_start_pgd
+  result: {passed: 1, failed: 0, skipped: 0}
+  source_digests:
+    test_checkpoint_resume_py_sha256: cf4e1e3ac0b7222b8c437c3572f388ad2dcee9629bcc79bb957236252e86b24d
+    trainer_py_sha256: 8b3044a6faf8ffecfae999f7ed064fd5d1b6799be30bfafe9903e5883a0792e0
+    pgd_py_sha256: 7775955573b1c95bea81b6ee043a9cfa9f9a0d4961f61a0cd23e81fa3e5925c2
+    rslad_py_sha256: 646d95f8da74c4fc920cacf4ea353ec7104059305d4f2c154973643c9920d3da
+    sample_store_py_sha256: dc529e9f736bdd6f722e2cff0d6481cb13302a4cd0087e83ca9d31d0921ffe02
+allocation:
+  decision: start_first_replication_only
+  teacher: bartoldson2024_adversarial_wrn94_16
+  method: rslad_logging_only
+  training_protocol: controlled_cifar10_r18_v1
+  seed: 1
+  epochs: 200
+  world_size: 1
+  per_rank_batch_size: 128
+  global_batch_size: 128
+  tracking:
+    entity: shunsuke-n-waseda-university
+    project: single-teacher-ard
+    group: bartoldson-cifar10-r18-ws1
+    run_id: bart-rslad-logging-only-s1-confirm-v1
+  output_dir: outputs/scientific/bart-rslad-logging-only-s1-confirm-v1

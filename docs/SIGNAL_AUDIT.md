@@ -100,6 +100,61 @@ Chen/Bartoldson Student), while final low-entropy teacher risk is inversely
 associated (0.156/0.192). These post-treatment associations are not used for
 the Signal Go decision.
 
+## Canonical RSLAD common-trajectory result
+
+The intervention-specific Student/Joint reports above cannot cleanly compare
+signals because their losses already depend on those signals.  We therefore
+replayed the 40 periodic checkpoints from each canonical RSLAD seed-0 run with
+the same raw 45,000-sample train partition and independent fixed KL PGD-10
+feature/outcome seed domains.  Epoch 99 is the anchor; only checkpoint-panel
+transitions after that anchor define the primary forgetting outcome.
+
+The table gives held-out metrics for the frozen models.  Higher AUROC/AUPRC
+and lower log-loss are better.
+
+| Teacher | Model | AUROC | AUPRC | Log-loss |
+|---|---|---:|---:|---:|
+| Chen | Teacher entropy | 0.8003 | 0.5753 | 0.4928 |
+| Chen | Current correctness | 0.7191 | 0.4752 | 0.5399 |
+| Chen | Instantaneous margin | 0.7598 | 0.5217 | 0.5331 |
+| Chen | Current main effects | 0.7598 | 0.5217 | 0.5273 |
+| Chen | Student history | 0.8220 | 0.5533 | 0.4531 |
+| Chen | Current + history | 0.8216 | 0.5509 | 0.4534 |
+| Chen | History + teacher | 0.8295 | 0.5619 | 0.4450 |
+| Chen | History + teacher interactions | 0.8298 | 0.5626 | 0.4480 |
+| Bartoldson | Teacher entropy | 0.5961 | 0.5356 | 0.6641 |
+| Bartoldson | Current correctness | 0.6889 | 0.5584 | 0.6104 |
+| Bartoldson | Instantaneous margin | 0.7391 | 0.5893 | 0.5821 |
+| Bartoldson | Current main effects | 0.7391 | 0.5893 | 0.5824 |
+| Bartoldson | Student history | 0.7916 | 0.6368 | 0.5237 |
+| Bartoldson | Current + history | 0.7917 | 0.6338 | 0.5234 |
+| Bartoldson | History + teacher | 0.7990 | 0.6354 | 0.5171 |
+| Bartoldson | History + teacher interactions | 0.7992 | 0.6373 | 0.5156 |
+
+Both teachers pass the preregistered History gate.  Against the best
+current-state baseline, history-only improves Chen AUROC by `0.06220`
+(paired 95% CI `[0.05470, 0.07001]`) and Bartoldson AUROC by `0.05250`
+(`[0.04549, 0.06027]`); held-out log-loss improves by `0.07418` and
+`0.05837`, respectively.  Adding teacher entropy to history provides only
+`+0.00752` and `+0.00739` AUROC.  The multiplicative teacher interactions add
+`+0.00029` for Chen and `+0.00019` for Bartoldson; they worsen Chen log-loss
+but slightly improve Bartoldson log-loss.  Thus the prospective evidence
+supports student history as the main signal and teacher information as a
+secondary gate, not as the dominant multiplicative risk term.
+
+These are sample-conditional seed-0 checkpoint-panel results, not uncertainty
+across training seeds and not evidence that any intervention improves
+robustness.  Result identities are:
+
+- Chen report:
+  `cb5305182bb942b9f9d44036c67700c9d8fff54116ad3f7111be0a73f65016fa`;
+  lineage:
+  `f485f72341b276351098e97514e4becc46b278a005694be2672811c5aaf5a808`.
+- Bartoldson report:
+  `d44ee166f8866b77067ebd07757d394a060242c9cf1cdc5d4513f127897981f8`;
+  lineage:
+  `9b6ea091dc9ed4ff81bb579bf05d6650ac8e6d4ab6104981c446f29069e4a64e`.
+
 Historical replay is a separate, read-only CUDA command. It is fixed to the
 epoch-99 checkpoint, batch size 128, the exact training KL PGD-10 attack,
 raw unaugmented train samples, and a clean reviewed Git/source identity:
