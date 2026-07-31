@@ -92,6 +92,14 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/logging_only_state.py",
+            "src/ard/cli/logging_only_state.py",
+        ),
+        ("tests/unit/test_logging_only_state.py",),
+        ("T0", "T1"),
+    ),
+    (
+        (
             "src/ard/analysis/signal_audit.py",
             "src/ard/analysis/teacher_risk_replay.py",
             "src/ard/analysis/__init__.py",

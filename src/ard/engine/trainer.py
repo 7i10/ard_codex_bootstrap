@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
@@ -9,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
@@ -56,6 +58,37 @@ def _evaluation_mode(model: nn.Module) -> Iterator[None]:
         yield
     finally:
         model.train(mode)
+
+
+def _jensen_shannon_response(clean_logits: torch.Tensor, adversarial_logits: torch.Tensor) -> torch.Tensor:
+    """Return stable per-sample JS divergence for detached FP32 teacher logits."""
+    if clean_logits.ndim != 2 or clean_logits.shape != adversarial_logits.shape:
+        raise ValueError("teacher JS response requires aligned [batch, class] logits")
+    clean_log_probabilities = F.log_softmax(clean_logits.detach().float(), dim=1)
+    adversarial_log_probabilities = F.log_softmax(adversarial_logits.detach().float(), dim=1)
+    mixture_log_probabilities = torch.logaddexp(clean_log_probabilities, adversarial_log_probabilities) - math.log(2.0)
+    response = 0.5 * (
+        F.kl_div(
+            mixture_log_probabilities,
+            clean_log_probabilities,
+            reduction="none",
+            log_target=True,
+        ).sum(dim=1)
+        + F.kl_div(
+            mixture_log_probabilities,
+            adversarial_log_probabilities,
+            reduction="none",
+            log_target=True,
+        ).sum(dim=1)
+    )
+    response = response.detach().float()
+    if not bool(torch.isfinite(response).all()):
+        raise FloatingPointError("teacher JS response is non-finite")
+    # JS is non-negative analytically, but the two FP32 KL terms can cancel to
+    # a small negative value for nearly identical distributions.
+    if bool((response < -1e-6).any()):
+        raise FloatingPointError("teacher JS response is below the FP32 rounding floor")
+    return response.clamp_min(0.0)
 
 
 def _reduce_epoch_observability(
@@ -205,6 +238,8 @@ class Trainer:
         valid_mask: torch.Tensor,
         teacher_clean: TeacherConfidenceBatch | None = None,
         teacher_adversarial: TeacherConfidenceBatch | None = None,
+        teacher_clean_to_adversarial_margin_response: torch.Tensor | None = None,
+        teacher_clean_to_adversarial_js_response: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         if self.sample_store is None:
             return {}
@@ -220,10 +255,13 @@ class Trainer:
             robust_correct=robust_correct,
             valid_mask=margin.valid_mask,
             update=self.global_step,
+            epoch=self.current_epoch,
             rank=get_rank(),
             labels=batch.labels if self.observe_teacher_signals else None,
             teacher_clean=teacher_clean,
             teacher_adversarial=teacher_adversarial,
+            teacher_clean_to_adversarial_margin_response=teacher_clean_to_adversarial_margin_response,
+            teacher_clean_to_adversarial_js_response=teacher_clean_to_adversarial_js_response,
         )
         student_risk = student_risk_from_margin(self.sample_store.margin_ema(batch.sample_ids))
         return {"student_risk": student_risk}
@@ -350,6 +388,7 @@ class Trainer:
             logits = self.model(attack_result.adversarial)
             valid_mask = mask.to(dtype=torch.bool)
             observed_teacher_clean = observed_teacher_adversarial = None
+            teacher_clean_to_adversarial_margin_response = teacher_clean_to_adversarial_js_response = None
             if self.observe_teacher_signals:
                 assert self.teacher is not None and teacher_clean_logits is not None
                 with (
@@ -369,12 +408,32 @@ class Trainer:
                     batch.labels,
                     valid_mask,
                 )
+                # These are detached FP32 observation-only primitives.  They
+                # intentionally reuse the existing teacher forwards and never
+                # participate in the attack, objective, policy, or optimizer.
+                teacher_clean_to_adversarial_js_response = _jensen_shannon_response(
+                    teacher_clean_logits,
+                    teacher_adversarial_logits,
+                )
+                teacher_clean_to_adversarial_margin_response = (
+                    (
+                        (
+                            observed_teacher_adversarial.true_probability
+                            - observed_teacher_adversarial.max_wrong_probability
+                        )
+                        - (observed_teacher_clean.true_probability - observed_teacher_clean.max_wrong_probability)
+                    )
+                    .detach()
+                    .float()
+                )
             student_signals = self._student_aware_signals(
                 batch=batch,
                 logits=logits,
                 valid_mask=valid_mask,
                 teacher_clean=observed_teacher_clean,
                 teacher_adversarial=observed_teacher_adversarial,
+                teacher_clean_to_adversarial_margin_response=teacher_clean_to_adversarial_margin_response,
+                teacher_clean_to_adversarial_js_response=teacher_clean_to_adversarial_js_response,
             )
             clean_student_logits = None
             if requires_clean_student:

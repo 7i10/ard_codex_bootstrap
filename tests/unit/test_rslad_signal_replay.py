@@ -112,16 +112,42 @@ def test_exact_periodic_epoch_schedule_rejects_missing_extra_and_duplicate_epoch
 
 
 def test_feature_ema_and_checkpoint_panel_outcome_use_stable_id_joins() -> None:
-    features = build_feature_panel(_replay_rows(FEATURE_EPOCHS), expected_count=2)
+    feature_rows = _replay_rows(FEATURE_EPOCHS)
+    for row in feature_rows:
+        if row["sample_id"] == 0 and row["epoch"] == 99:
+            row["robust_correct"] = False
+    features = build_feature_panel(feature_rows, expected_count=2)
     outcomes = build_outcome_panel(_replay_rows(OUTCOME_EPOCHS), expected_count=2)
 
     first = next(row for row in features if row["sample_id"] == 0)
     expected = 0.2 + 0.001 * FEATURE_EPOCHS[0]
-    for epoch in FEATURE_EPOCHS[1:]:
+    for epoch in FEATURE_EPOCHS[1:-1]:
         expected = PANEL_EMA_BETA * expected + (1.0 - PANEL_EMA_BETA) * (0.2 + 0.001 * epoch)
-    assert first["student_margin_panel_ema"] == pytest.approx(expected, abs=1e-12)
+    panel_expected = expected
+    panel_expected = PANEL_EMA_BETA * panel_expected + (1.0 - PANEL_EMA_BETA) * (0.2 + 0.001 * FEATURE_EPOCHS[-1])
+    assert first["student_margin_panel_ema"] == pytest.approx(panel_expected, abs=1e-12)
+    assert first["student_margin_historical_ema"] == pytest.approx(expected, abs=1e-12)
+    assert first["student_margin_instantaneous_epoch99"] == pytest.approx(0.299, abs=1e-12)
+    assert first["student_robust_correct_epoch99"] == 0
+    assert first["student_robust_correct_frequency"] == 1.0
     assert next(row for row in outcomes if row["sample_id"] == 0)["checkpoint_panel_forgetting"] == 1
     assert next(row for row in outcomes if row["sample_id"] == 1)["checkpoint_panel_forgetting"] == 0
+    first_outcome = next(row for row in outcomes if row["sample_id"] == 0)
+    assert first_outcome["persistent_wrong"] == 0
+    assert first_outcome["post_anchor_robust_correct_frequency"] == pytest.approx(
+        (len(OUTCOME_EPOCHS) - 3) / (len(OUTCOME_EPOCHS) - 1)
+    )
+    persistent_rows = _replay_rows(OUTCOME_EPOCHS)
+    for row in persistent_rows:
+        if row["sample_id"] == 0:
+            row["robust_correct"] = False
+            if row["epoch"] == OUTCOME_EPOCHS[0]:
+                row["robust_correct"] = True
+    persistent_outcome = next(
+        row for row in build_outcome_panel(persistent_rows, expected_count=2) if row["sample_id"] == 0
+    )
+    assert persistent_outcome["persistent_wrong"] == 1
+    assert persistent_outcome["post_anchor_robust_correct_frequency"] == 0.0
 
     bad = [{**row} for row in outcomes]
     bad[0]["class_id"] = 9
@@ -342,10 +368,10 @@ def test_common_trajectory_replay_passes_saved_checkpoint_hash_to_strict_loader(
     assert len(result.rows) == 2
 
 
-def test_univariate_models_report_paired_student_minus_entropy_metric_signs() -> None:
+def test_predictive_audit_compares_fixed_models_on_one_split_and_applies_history_go() -> None:
     rows = []
-    for sample_id in range(200):
-        outcome = int(sample_id % 4 in {0, 1})
+    for sample_id in range(400):
+        outcome = int((sample_id // 2) % 2 == 0)
         rows.append(
             {
                 "namespace": "train",
@@ -353,8 +379,14 @@ def test_univariate_models_report_paired_student_minus_entropy_metric_signs() ->
                 "class_id": sample_id % 2,
                 "teacher_entropy_normalized": 0.5,
                 "student_margin_panel_risk": 0.9 if outcome else 0.1,
-                "student_margin_risk_epoch99": 0.9 if outcome else 0.1,
+                "student_margin_risk_epoch99": 0.5,
+                "student_robust_correct_epoch99": 1,
+                "student_robust_correct_frequency": 0.9 if outcome else 0.1,
                 "checkpoint_panel_forgetting": outcome,
+                "checkpoint_panel_transition_count": 2 * outcome,
+                "final_robust_error": outcome,
+                "persistent_wrong": outcome,
+                "post_anchor_robust_correct_frequency": 0.1 if outcome else 0.9,
             }
         )
     report = predictive_audit(rows, split_seed=13, bootstrap_seed=17, bootstrap_replicates=40)
@@ -367,6 +399,83 @@ def test_univariate_models_report_paired_student_minus_entropy_metric_signs() ->
     assert bounds["log_loss"]["upper"] < 0.0
     assert report["proxy_decision"]["gating_metrics"] == ["auroc", "log_loss"]
     assert report["proxy_decision"]["secondary_metrics"] == ["auprc"]
+    assert set(report["models"]) >= {
+        "entropy",
+        "student",
+        "teacher_entropy",
+        "current_correctness",
+        "instantaneous_margin",
+        "history_only",
+        "current_only",
+        "current_plus_history",
+        "history_plus_teacher",
+        "history_teacher_interaction",
+    }
+    assert report["split_identity"]["train_sample_ids"] == report["train_sample_ids"]
+    assert report["split_identity"]["held_out_sample_ids"] == report["held_out_sample_ids"]
+    history = report["history_minus_best_current_state"]
+    assert history["baseline"] in {"current_correctness", "instantaneous_margin", "current_only"}
+    assert history["point_estimates"]["auroc"] >= 0.02
+    assert history["bootstrap_95"]["metrics"]["auroc"]["lower"] > 0.0
+    assert history["point_estimates"]["log_loss"] < 0.0
+    assert report["history_go_no_go"]["status"] == "go"
+    assert report["history_go_no_go"]["baseline"] == history["baseline"]
+    for metrics in report["models"].values():
+        assert 0.0 <= metrics["auroc"] <= 1.0
+        assert 0.0 <= metrics["auprc"] <= 1.0
+        assert 0.0 <= metrics["prevalence"] <= 1.0
+        assert metrics["log_loss"] >= 0.0
+    first_pass = predictive_audit(rows, split_seed=13, bootstrap_seed=17, bootstrap_replicates=40)
+    assert report == first_pass
+    for metrics in report["models"].values():
+        calibration = metrics["calibration"]
+        assert 0.0 <= calibration["brier_score"] <= 1.0
+        assert 0.0 <= calibration["expected_calibration_error"] <= 1.0
+        assert calibration["bin_count"] == 10
+        assert calibration["bin_definition"] == "equal_width_[lower,upper)_except_final_[0.9,1.0]"
+        assert len(calibration["bins"]) == calibration["bin_count"]
+        assert sum(bin_["count"] for bin_ in calibration["bins"]) == len(report["held_out_sample_ids"])
+    secondary = report["secondary_outcomes"]
+    assert secondary["available"] is True
+    assert secondary["sample_count"] == len(report["held_out_sample_ids"])
+    assert 0.0 <= secondary["checkpoint_panel_transition_count"]["positive_prevalence"] <= 1.0
+    assert 0.0 <= secondary["final_robust_error"]["prevalence"] <= 1.0
+    assert 0.0 <= secondary["persistent_wrong"]["prevalence"] <= 1.0
+    assert 0.0 <= secondary["post_anchor_robust_correct_frequency"]["mean"] <= 1.0
+
+
+def test_predictive_audit_reports_no_go_when_history_has_no_incremental_value() -> None:
+    rows = [
+        {
+            "namespace": "train",
+            "sample_id": sample_id,
+            "class_id": sample_id % 2,
+            "teacher_entropy_normalized": 0.5,
+            "student_margin_panel_risk": 0.5,
+            "student_margin_risk_epoch99": 0.5,
+            "student_robust_correct_epoch99": 1,
+            "student_robust_correct_frequency": 0.5,
+            "checkpoint_panel_forgetting": int((sample_id // 2) % 2 == 0),
+        }
+        for sample_id in range(120)
+    ]
+    report = predictive_audit(rows, split_seed=19, bootstrap_seed=23, bootstrap_replicates=20)
+    history = report["history_minus_best_current_state"]
+    assert history["point_estimates"]["auroc"] == 0.0
+    assert history["point_estimates"]["log_loss"] == pytest.approx(0.0, abs=1e-12)
+    assert history["bootstrap_95"]["metrics"]["auroc"]["upper"] == 0.0
+    assert report["history_go_no_go"]["status"] == "no_go"
+
+
+def test_history_gate_uses_frozen_no_go_boundary() -> None:
+    def report(upper: float) -> dict[str, object]:
+        return {
+            "point_estimates": {"auroc": 0.015, "log_loss": -0.01},
+            "bootstrap_95": {"metrics": {"auroc": {"lower": -0.01, "upper": upper}}},
+        }
+
+    assert rslad_signal_replay._history_gate_decision(report(0.005)) == "no_go"
+    assert rslad_signal_replay._history_gate_decision(report(0.01)) == "inconclusive"
 
 
 def test_canonical_json_output_is_byte_deterministic_and_parquet_is_real(tmp_path: Path) -> None:

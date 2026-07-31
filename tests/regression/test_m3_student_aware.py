@@ -17,6 +17,7 @@ from ard.config.schema import ExperimentConfig
 from ard.data import EpochShuffleSampler, IndexedBatch, IndexedDataset, SyntheticCIFAR, collate_indexed
 from ard.engine import Trainer
 from ard.engine.distributed import reduce_min
+from ard.engine.trainer import _jensen_shannon_response
 from ard.objectives import RSLADObjective
 from ard.policies import (
     HardFallbackPolicy,
@@ -37,6 +38,45 @@ pytestmark = pytest.mark.t2
 
 def _context(valid: torch.Tensor) -> PolicyContext:
     return PolicyContext(valid_mask=valid, global_min=reduce_min)
+
+
+def test_teacher_js_response_is_finite_for_disjoint_underflowed_probabilities() -> None:
+    clean = torch.tensor([[1000.0, 0.0, -1000.0], [3.0, 2.0, 1.0]], requires_grad=True)
+    adversarial = torch.tensor([[0.0, 1000.0, -1000.0], [3.0, 2.0, 1.0]], requires_grad=True)
+    response = _jensen_shannon_response(clean, adversarial)
+    assert response.dtype == torch.float32
+    assert not response.requires_grad
+    assert torch.isfinite(response).all()
+    assert response[0].item() == pytest.approx(torch.log(torch.tensor(2.0)).item(), abs=1e-6)
+    assert response[1].item() == pytest.approx(0.0, abs=1e-7)
+    assert clean.grad is None and adversarial.grad is None
+
+
+def test_teacher_js_response_rounding_is_clamped_before_sample_state_validation() -> None:
+    torch.manual_seed(814)
+    clean = torch.randn(128, 10) * 8.0
+    adversarial = clean + 1e-3 * torch.randn_like(clean)
+    response = _jensen_shannon_response(clean, adversarial)
+    assert torch.isfinite(response).all()
+    assert bool((response >= 0.0).all())
+
+    labels = torch.arange(128) % 10
+    valid = torch.ones(128, dtype=torch.bool)
+    store = SampleStateStore()
+    store.record_pending(
+        sample_ids=torch.arange(128),
+        margins=torch.zeros(128),
+        robust_correct=torch.ones(128, dtype=torch.bool),
+        valid_mask=valid,
+        update=0,
+        epoch=0,
+        labels=labels,
+        teacher_clean=teacher_confidence_primitives(clean, labels, valid),
+        teacher_adversarial=teacher_confidence_primitives(adversarial, labels, valid),
+        teacher_clean_to_adversarial_margin_response=torch.zeros(128),
+        teacher_clean_to_adversarial_js_response=response,
+    )
+    assert len(store.pending) == 128
 
 
 def _v2_experiment(*, method: dict[str, object], num_classes: int = 3, image_size: int = 4) -> dict[str, object]:
@@ -119,6 +159,10 @@ def test_store_ema_correctness_forgetting_padding_and_exact_roundtrip() -> None:
     assert record.seen == 1 and record.robust_correct_count == 1
     assert record.robust_correct_frequency == pytest.approx(1.0)
     assert record.forgetting_count == 0 and record.last_update == 3
+    assert record.first_robustly_learned_epoch == 0
+    assert record.current_correct_streak == 1 and record.longest_correct_streak == 1
+    assert record.margin_mean == pytest.approx(0.4)
+    assert record.margin_variance == pytest.approx(0.0)
 
     store.record_pending(
         sample_ids=torch.tensor([9]),
@@ -133,6 +177,10 @@ def test_store_ema_correctness_forgetting_padding_and_exact_roundtrip() -> None:
     assert record.seen == 2 and record.robust_correct_count == 1
     assert record.robust_correct_frequency == pytest.approx(0.5)
     assert record.previous_robust_correct is False and record.forgetting_count == 1 and record.last_update == 4
+    assert record.current_correct_streak == 0 and record.longest_correct_streak == 1
+    assert record.margin_mean == pytest.approx(-0.1)
+    assert record.margin_variance == pytest.approx(0.25)
+    assert record.margin_slope == pytest.approx(-1.0)
 
     snapshot = store.state_dict()
     restored = SampleStateStore(ema_decay=0.9)
@@ -174,6 +222,38 @@ def test_store_retains_teacher_clean_and_adversarial_primitives_and_migrates_v1(
     assert record.teacher_adversarial_true_probability is not None
     assert record.teacher_adversarial_max_wrong_probability > record.teacher_adversarial_true_probability
 
+    store.record_pending(
+        sample_ids=torch.tensor([11]),
+        margins=torch.tensor([0.75]),
+        robust_correct=torch.tensor([True]),
+        valid_mask=torch.tensor([True]),
+        update=9,
+        epoch=3,
+        labels=torch.tensor([0]),
+        teacher_clean=clean.__class__(
+            entropy=clean.entropy[:1],
+            true_probability=clean.true_probability[:1],
+            max_wrong_probability=clean.max_wrong_probability[:1],
+            prediction=clean.prediction[:1],
+            correct=clean.correct[:1],
+        ),
+        teacher_adversarial=adversarial.__class__(
+            entropy=adversarial.entropy[:1],
+            true_probability=adversarial.true_probability[:1],
+            max_wrong_probability=adversarial.max_wrong_probability[:1],
+            prediction=adversarial.prediction[:1],
+            correct=adversarial.correct[:1],
+        ),
+        teacher_clean_to_adversarial_margin_response=torch.tensor([-0.4]),
+        teacher_clean_to_adversarial_js_response=torch.tensor([0.12]),
+    )
+    store.merge_pending([store.pending_state()])
+    record = store.records[11]
+    assert record.first_robustly_learned_epoch == 0
+    assert record.current_correct_streak == 2 and record.longest_correct_streak == 2
+    assert record.teacher_clean_to_adversarial_margin_response == pytest.approx(-0.4)
+    assert record.teacher_clean_to_adversarial_js_response == pytest.approx(0.12)
+
     v1 = copy.deepcopy(store.state_dict())
     v1["format_version"] = 1
     new_fields = set(SampleRecord.__dataclass_fields__) - {
@@ -189,8 +269,37 @@ def test_store_retains_teacher_clean_and_adversarial_primitives_and_migrates_v1(
             raw_record.pop(field)
     migrated = SampleStateStore(ema_decay=0.9)
     migrated.load_state_dict(v1)
-    assert migrated.state_dict()["format_version"] == 2
+    assert migrated.state_dict()["format_version"] == 3
     assert migrated.records[11].teacher_clean_entropy is None
+    assert migrated.records[11].margin_mean == pytest.approx(migrated.records[11].margin_ema)
+    assert migrated.records[11].history_statistics_complete is False
+
+    v2 = copy.deepcopy(store.state_dict())
+    v2["format_version"] = 2
+    for raw_record in v2["records"].values():
+        for field in (
+            "first_robustly_learned_epoch",
+            "current_correct_streak",
+            "longest_correct_streak",
+            "margin_mean",
+            "margin_m2",
+            "margin_time_sum",
+            "margin_time_squared_sum",
+            "margin_time_margin_sum",
+            "teacher_clean_to_adversarial_margin_response",
+            "teacher_clean_to_adversarial_js_response",
+        ):
+            raw_record.pop(field)
+        raw_record["history_statistics_complete"] = True
+    migrated.load_state_dict(v2)
+    assert migrated.state_dict()["format_version"] == 3
+    assert migrated.records[11].history_statistics_complete is False
+
+    malformed_v3 = copy.deepcopy(store.state_dict())
+    for raw_record in malformed_v3["records"].values():
+        raw_record.pop("history_statistics_complete")
+    with pytest.raises(ValueError, match="lacks history completeness"):
+        migrated.load_state_dict(malformed_v3)
 
 
 def test_pending_rank_merge_is_stable_and_duplicate_safe() -> None:

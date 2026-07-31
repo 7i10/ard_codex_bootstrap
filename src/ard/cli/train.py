@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 from collections.abc import Mapping
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import cast
 
 import torch
+import yaml
 from torch import nn
 from torch.optim import SGD
 from torch.utils.data import DataLoader
@@ -101,6 +103,60 @@ def _guard_output(output_dir: Path, *, resume: Path | None, config_hash: str) ->
     if resume.parent != output_dir:
         raise ValueError("resume checkpoint must live in the selected output directory")
     validate_resume_checkpoint(resume, expected_config_hash=config_hash)
+
+
+def _validate_research_design(config: ExperimentConfig, *, world_size: int = 1) -> None:
+    """Fail before tracker initialization unless the frozen design bytes match."""
+    design = config.research_design
+    if design is None:
+        return
+    path = design.manifest.resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"research design manifest is missing: {path}")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != design.sha256:
+        raise ValueError("research design manifest SHA-256 does not match resolved config")
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+        scope = payload["scope"]
+        seed_roles = payload["seed_roles"]
+        launch = payload["launch_sequence"]["first_and_only_automatic_run"]
+    except (OSError, TypeError, KeyError, yaml.YAMLError) as exc:
+        raise ValueError("research design manifest lacks its frozen launch contract") from exc
+    if not all(isinstance(value, Mapping) for value in (payload, scope, seed_roles, launch)):
+        raise ValueError("research design launch contract must use mappings")
+    if (
+        payload.get("design_id") != design.id
+        or payload.get("status") != "frozen_before_seed_1"
+        or seed_roles.get(1) != "sequential_replication_gate"
+    ):
+        raise ValueError("research design is not frozen for the seed-1 replication gate")
+    if config.teacher is None:
+        raise ValueError("research design launch requires a registered teacher")
+    expected_seed = launch.get("seed")
+    seed_fields = ("model_init", "data_order", "augmentation", "train_attack", "qualitative_panel")
+    actual = {
+        "teacher": config.teacher.registry_id,
+        "method": config.method.id,
+        "training_protocol": config.protocol.id,
+        "seed": config.seeds.model_init,
+        "epochs": config.training.epochs,
+        "world_size": world_size,
+        "per_rank_batch_size": config.training.per_rank_batch_size,
+        "global_batch_size": config.training.global_batch_size,
+    }
+    expected = {
+        "teacher": launch.get("teacher"),
+        "method": scope.get("method"),
+        "training_protocol": scope.get("training_protocol"),
+        "seed": expected_seed,
+        "epochs": launch.get("epochs"),
+        "world_size": launch.get("world_size"),
+        "per_rank_batch_size": launch.get("per_rank_batch_size"),
+        "global_batch_size": launch.get("global_batch_size"),
+    }
+    if actual != expected or any(getattr(config.seeds, field) != expected_seed for field in seed_fields):
+        raise ValueError("resolved run does not match the frozen first replication allocation")
 
 
 def _resume_tracker_id(path: Path | None) -> str | None:
@@ -236,6 +292,7 @@ def main(argv: list[str] | None = None) -> int:
 
         def _validate_output_guard() -> None:
             validate_tracking_guard(config, root=Path.cwd())
+            _validate_research_design(config, world_size=get_world_size())
             _guard_output(output_dir, resume=args.resume, config_hash=config_hash)
 
         run_rank_zero_phase(_validate_output_guard, phase="output guard")
@@ -276,6 +333,22 @@ def main(argv: list[str] | None = None) -> int:
                 active_tracker.resume(checkpoint_run_id=resumed_run_id, checkpoint_config_hash=config_hash)
 
         coordinated_tracker_action(tracker, phase="tracker attach/resume", action=_attach_resume)
+        if config.research_design is not None and args.resume is None:
+            design_path = config.research_design.manifest.resolve()
+
+            def _record_research_design(active_tracker: ExperimentTracker) -> None:
+                active_tracker.log_artifact(
+                    design_path,
+                    name=f"research-design-{active_tracker.run_id}",
+                    artifact_type="analysis-input",
+                    aliases=("input",),
+                )
+
+            coordinated_tracker_action(
+                active_tracker,
+                phase="research design artifact",
+                action=_record_research_design,
+            )
 
         _seed_everything(config.seeds.model_init + get_rank())
         if config.training.deterministic:
@@ -495,6 +568,16 @@ def main(argv: list[str] | None = None) -> int:
                                 "student_seen": record.seen,
                                 "student_robust_correct_frequency": record.robust_correct_frequency,
                                 "student_forgetting_count": record.forgetting_count,
+                                "student_first_robustly_learned_epoch": record.first_robustly_learned_epoch,
+                                "student_current_correct_streak": record.current_correct_streak,
+                                "student_longest_correct_streak": record.longest_correct_streak,
+                                "student_margin_mean": record.margin_mean,
+                                "student_margin_variance": record.margin_variance,
+                                "student_margin_slope": record.margin_slope,
+                                "student_margin_time_sum": record.margin_time_sum,
+                                "student_margin_time_squared_sum": record.margin_time_squared_sum,
+                                "student_margin_time_margin_sum": record.margin_time_margin_sum,
+                                "student_history_statistics_complete": record.history_statistics_complete,
                                 "teacher_clean_entropy": record.teacher_clean_entropy,
                                 "teacher_clean_true_probability": record.teacher_clean_true_probability,
                                 "teacher_clean_max_wrong_probability": record.teacher_clean_max_wrong_probability,
@@ -507,6 +590,12 @@ def main(argv: list[str] | None = None) -> int:
                                 ),
                                 "teacher_adversarial_prediction": record.teacher_adversarial_prediction,
                                 "teacher_adversarial_correct": record.teacher_adversarial_correct,
+                                "teacher_clean_to_adversarial_margin_response": (
+                                    record.teacher_clean_to_adversarial_margin_response
+                                ),
+                                "teacher_clean_to_adversarial_js_response": (
+                                    record.teacher_clean_to_adversarial_js_response
+                                ),
                             }
                         )
             stats_path = output_dir / "sample-stats-train.parquet"

@@ -101,6 +101,13 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert new_replay.tests == ("tests/unit/test_rslad_signal_replay.py",)
     assert new_replay.tiers == ("T0", "T1")
 
+    logging_state = select(
+        ("src/ard/analysis/logging_only_state.py", "src/ard/cli/logging_only_state.py"),
+        (*available, "tests/unit/test_logging_only_state.py"),
+    )
+    assert logging_state.tests == ("tests/unit/test_logging_only_state.py",)
+    assert logging_state.tiers == ("T0", "T1")
+
 
 def test_teacher_acquisition_scripts_select_focused_acquisition_and_registry_tests() -> None:
     available = (

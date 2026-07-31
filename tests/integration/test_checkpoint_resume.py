@@ -135,7 +135,7 @@ def test_rslad_logging_only_is_exact_for_optimization_rng_and_checkpoint_state(t
     for key in REQUIRED_KEYS - {"sample_state"}:
         assert equal(first[key], second[key]), key
     assert first["sample_state"] == {}
-    assert second["sample_state"]["format_version"] == 2
+    assert second["sample_state"]["format_version"] == 3
     assert len(second["sample_state"]["records"]) == len(cast(Sized, loader_b.dataset))
     for record in second["sample_state"]["records"].values():
         assert record["seen"] == 2
@@ -143,6 +143,11 @@ def test_rslad_logging_only_is_exact_for_optimization_rng_and_checkpoint_state(t
         assert record["teacher_adversarial_entropy"] is not None
         assert record["teacher_clean_true_probability"] is not None
         assert record["teacher_adversarial_max_wrong_probability"] is not None
+        assert record["teacher_clean_to_adversarial_margin_response"] is not None
+        assert record["teacher_clean_to_adversarial_js_response"] is not None
+        assert record["margin_mean"] is not None
+        assert record["margin_m2"] is not None
+        assert record["longest_correct_streak"] >= record["current_correct_streak"]
     assert all(parameter.grad is None for parameter in observed.teacher.parameters())
 
 
@@ -230,7 +235,7 @@ def test_rslad_logging_only_cuda_parity_with_random_start_pgd(tmp_path: Path) ->
     second = torch.load(tmp_path / "logging-only-cuda" / "last.pt", map_location="cpu", weights_only=False)
     for key in REQUIRED_KEYS - {"sample_state"}:
         assert equal(first[key], second[key]), key
-    assert second["sample_state"]["format_version"] == 2
+    assert second["sample_state"]["format_version"] == 3
     assert all(parameter.grad is None for parameter in observed.teacher.parameters())
 
 

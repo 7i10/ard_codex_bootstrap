@@ -1,0 +1,97 @@
+schema_version: 1
+design_id: logging_only_history_confirmatory_v1
+status: frozen_before_seed_1
+scope:
+  dataset: cifar10
+  train_partition_count: 45000
+  student: saad_resnet18_cifar_v1
+  teachers:
+    discovery: [chen2021_ltd_wrn34_10, bartoldson2024_adversarial_wrn94_16]
+    first_replication: bartoldson2024_adversarial_wrn94_16
+  method: rslad_logging_only
+  training_protocol: controlled_cifar10_r18_v1
+seed_roles:
+  0: discovery_and_design
+  1: sequential_replication_gate
+  2: conditional_independent_confirmation
+  rule: seed roles cannot be changed after seed 1 is inspected
+trajectory:
+  anchor_epoch: 99
+  final_epoch: 199
+  observations: pre_optimizer_update_detached_fp32
+  primary_outcome: future_online_forgetting
+  primary_outcome_definition: final_forgetting_count > anchor_forgetting_count
+  secondary_outcomes:
+    - subsequent_forgetting_increment
+    - final_robust_error
+    - final_robust_correct_frequency
+predictor:
+  implementation: ard.analysis.signal_audit._fit_logistic
+  preprocessing: train_fold_mean_and_population_std
+  held_out_fraction: 0.2
+  split:
+    method: true_class_stratified_deterministic_hash
+    seed: 2026073101
+  models:
+    teacher_entropy:
+      - anchor_teacher_adversarial_entropy_normalized_by_log_num_classes
+    current_correctness:
+      - anchor_previous_robust_correct
+    instantaneous_margin:
+      - anchor_last_margin_risk
+    current_only:
+      - anchor_previous_robust_correct
+      - anchor_last_margin_risk
+    history_only:
+      - anchor_robust_correct_frequency
+      - anchor_margin_ema_risk
+    current_plus_history:
+      - anchor_previous_robust_correct
+      - anchor_last_margin_risk
+      - anchor_robust_correct_frequency
+      - anchor_margin_ema_risk
+    history_plus_teacher:
+      - anchor_robust_correct_frequency
+      - anchor_margin_ema_risk
+      - anchor_teacher_adversarial_entropy_normalized_by_log_num_classes
+    history_teacher_interaction:
+      - anchor_robust_correct_frequency
+      - anchor_margin_ema_risk
+      - anchor_teacher_adversarial_entropy_normalized_by_log_num_classes
+      - anchor_robust_correct_frequency_x_teacher_entropy
+      - anchor_margin_ema_risk_x_teacher_entropy
+  primary_history_model: history_only
+  current_state_baselines: [current_correctness, instantaneous_margin, current_only]
+  teacher_information_is_secondary: true
+metrics:
+  primary: [auroc, log_loss]
+  secondary: [auprc, positive_prevalence, brier_score, fixed_10_bin_ece]
+  bootstrap:
+    method: paired_true_class_stratified_sample_bootstrap
+    seed: 2026073102
+    replicates: 1000
+    confidence: 0.95
+  uncertainty_scope: sample_conditional_not_training_seed_uncertainty
+history_gate:
+  go:
+    delta_auroc_vs_best_current_state_at_least: 0.02
+    paired_auroc_lower_bound_greater_than: 0.0
+    held_out_log_loss_must_improve: true
+  no_go:
+    paired_auroc_upper_bound_below: 0.01
+    or_held_out_log_loss_does_not_improve: true
+  inconclusive_action: do_not_start_another_replication_run
+launch_sequence:
+  first_and_only_automatic_run:
+    teacher: bartoldson2024_adversarial_wrn94_16
+    seed: 1
+    epochs: 200
+    world_size: 1
+    per_rank_batch_size: 128
+    global_batch_size: 128
+  prohibited_without_new_human_decision:
+    - chen_seed_1
+    - any_seed_2
+    - v2_intervention
+    - mobilenet
+    - automatic_full_autoattack

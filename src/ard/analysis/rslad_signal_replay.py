@@ -581,28 +581,43 @@ def _panel_by_epoch(
 
 
 def build_feature_panel(rows: Sequence[Mapping[str, Any]], *, expected_count: int) -> tuple[dict[str, Any], ...]:
-    """Build the epoch-99 entropy and panel-EMA margin features."""
+    """Build frozen epoch-99 current-state and preceding-history features."""
     panels = _panel_by_epoch(rows, expected_epochs=FEATURE_EPOCHS, expected_count=expected_count)
     output: list[dict[str, Any]] = []
+    historical_epochs = FEATURE_EPOCHS[:-1]
     for key in sorted(panels[FEATURE_EPOCHS[0]]):
         ema: float | None = None
+        historical_ema: float | None = None
         class_id: int | None = None
         entropy: float | None = None
+        robust_correct_count = 0
         for epoch in FEATURE_EPOCHS:
             row = panels[epoch][key]
             margin = float(row["student_probability_margin"])
             risk = float(row["student_margin_risk"])
             value = float(row["teacher_entropy_normalized"])
+            robust_correct = row.get("robust_correct")
             if not all(math.isfinite(item) for item in (margin, risk, value)) or not -1.0 <= margin <= 1.0:
                 raise RSLADSignalReplayError("feature signal values must be finite and valid probability margins")
             if not 0.0 <= risk <= 1.0 or not 0.0 <= value <= 1.0:
                 raise RSLADSignalReplayError("feature risks and normalized entropy must be in [0, 1]")
+            if not isinstance(robust_correct, bool):
+                raise RSLADSignalReplayError("feature robust_correct must be boolean")
             if not math.isclose(risk, (1.0 - margin) / 2.0, rel_tol=0.0, abs_tol=1e-7):
                 raise RSLADSignalReplayError("student margin risk does not match its probability-margin definition")
             ema = margin if ema is None else PANEL_EMA_BETA * ema + (1.0 - PANEL_EMA_BETA) * margin
+            if epoch in historical_epochs:
+                historical_ema = (
+                    margin
+                    if historical_ema is None
+                    else PANEL_EMA_BETA * historical_ema + (1.0 - PANEL_EMA_BETA) * margin
+                )
+                robust_correct_count += int(robust_correct)
             class_id = int(row["class_id"])
             entropy = value
-        assert ema is not None and class_id is not None and entropy is not None
+        assert ema is not None and historical_ema is not None and class_id is not None and entropy is not None
+        epoch99 = panels[FEATURE_EPOCHS[-1]][key]
+        correctness_frequency = robust_correct_count / len(historical_epochs)
         output.append(
             {
                 "namespace": key.namespace,
@@ -610,10 +625,17 @@ def build_feature_panel(rows: Sequence[Mapping[str, Any]], *, expected_count: in
                 "class_id": class_id,
                 "feature_epoch": FEATURE_EPOCHS[-1],
                 "teacher_entropy_normalized": entropy,
+                "student_robust_correct_epoch99": int(epoch99["robust_correct"]),
+                "student_robust_correct_frequency": correctness_frequency,
+                # These explicit names are the frozen Phase-B feature contract.
+                # The panel names remain as stable aliases for existing outputs.
+                "student_margin_historical_ema": historical_ema,
+                "student_margin_historical_risk": (1.0 - historical_ema) / 2.0,
+                "student_margin_instantaneous_epoch99": float(epoch99["student_probability_margin"]),
                 "student_margin_panel_ema": ema,
                 "student_margin_panel_risk": (1.0 - ema) / 2.0,
-                "student_margin_epoch99": float(panels[FEATURE_EPOCHS[-1]][key]["student_probability_margin"]),
-                "student_margin_risk_epoch99": float(panels[FEATURE_EPOCHS[-1]][key]["student_margin_risk"]),
+                "student_margin_epoch99": float(epoch99["student_probability_margin"]),
+                "student_margin_risk_epoch99": float(epoch99["student_margin_risk"]),
             }
         )
     return tuple(output)
@@ -627,6 +649,7 @@ def build_outcome_panel(rows: Sequence[Mapping[str, Any]], *, expected_count: in
         previous: bool | None = None
         forgot = False
         transition_count = 0
+        prospective_correctness: list[bool] = []
         class_id: int | None = None
         for epoch in OUTCOME_EPOCHS:
             row = panels[epoch][key]
@@ -637,8 +660,10 @@ def build_outcome_panel(rows: Sequence[Mapping[str, Any]], *, expected_count: in
                 forgot = True
                 transition_count += 1
             previous = correct
+            if epoch > OUTCOME_EPOCHS[0]:
+                prospective_correctness.append(correct)
             class_id = int(row["class_id"])
-        assert previous is not None and class_id is not None
+        assert previous is not None and class_id is not None and prospective_correctness
         output.append(
             {
                 "namespace": key.namespace,
@@ -649,6 +674,8 @@ def build_outcome_panel(rows: Sequence[Mapping[str, Any]], *, expected_count: in
                 "checkpoint_panel_forgetting": int(forgot),
                 "checkpoint_panel_transition_count": transition_count,
                 "final_robust_error": int(not previous),
+                "persistent_wrong": int(not any(prospective_correctness)),
+                "post_anchor_robust_correct_frequency": sum(prospective_correctness) / len(prospective_correctness),
             }
         )
     return tuple(output)
@@ -671,24 +698,24 @@ def join_feature_outcome_panels(
 def _paired_metric_intervals(
     rows: Sequence[Mapping[str, Any]],
     *,
-    entropy_scores: Sequence[float],
-    student_scores: Sequence[float],
+    baseline_scores: Sequence[float],
+    candidate_scores: Sequence[float],
     seed: int,
     replicates: int,
 ) -> dict[str, Any]:
-    if replicates < 1 or len(rows) != len(entropy_scores) or len(rows) != len(student_scores):
+    if replicates < 1 or len(rows) != len(baseline_scores) or len(rows) != len(candidate_scores):
         raise RSLADSignalReplayError("paired bootstrap requires aligned scores and positive replicates")
     values: dict[str, list[float]] = {"auroc": [], "auprc": [], "log_loss": []}
     for replicate in range(replicates):
         selected = _bootstrap_indices(rows, seed=seed, replicate=replicate, cluster=True)
         targets = [int(rows[index]["outcome"]) for index in selected]
         try:
-            entropy = binary_metrics(targets, [entropy_scores[index] for index in selected])
-            student = binary_metrics(targets, [student_scores[index] for index in selected])
+            baseline = binary_metrics(targets, [baseline_scores[index] for index in selected])
+            candidate = binary_metrics(targets, [candidate_scores[index] for index in selected])
         except SignalAuditError:
             continue
         for metric in values:
-            values[metric].append(student[metric] - entropy[metric])
+            values[metric].append(candidate[metric] - baseline[metric])
     if not values["auroc"]:
         raise RSLADSignalReplayError("paired bootstrap produced no class-complete held-out replicate")
     intervals: dict[str, Any] = {}
@@ -701,28 +728,175 @@ def _paired_metric_intervals(
     return {"replicates": len(values["auroc"]), "class_stratified": True, "metrics": intervals}
 
 
+CALIBRATION_BIN_COUNT = 10
+CALIBRATION_BIN_DEFINITION = "equal_width_[lower,upper)_except_final_[0.9,1.0]"
+
+
+def _calibration_summary(targets: Sequence[int], scores: Sequence[float]) -> dict[str, Any]:
+    """Return deterministic fixed-bin calibration diagnostics for one held-out model."""
+    if len(targets) != len(scores) or not targets:
+        raise RSLADSignalReplayError("calibration requires aligned non-empty targets and scores")
+    bins: list[dict[str, Any]] = []
+    ece = 0.0
+    brier = sum((float(score) - int(target)) ** 2 for target, score in zip(targets, scores, strict=True)) / len(targets)
+    for index in range(CALIBRATION_BIN_COUNT):
+        lower = index / CALIBRATION_BIN_COUNT
+        upper = (index + 1) / CALIBRATION_BIN_COUNT
+        selected = [
+            item
+            for item, score in enumerate(scores)
+            if (lower <= score <= upper if index == CALIBRATION_BIN_COUNT - 1 else lower <= score < upper)
+        ]
+        count = len(selected)
+        mean_prediction = sum(float(scores[item]) for item in selected) / count if count else None
+        observed_prevalence = sum(int(targets[item]) for item in selected) / count if count else None
+        absolute_gap = (
+            abs(mean_prediction - observed_prevalence)
+            if mean_prediction is not None and observed_prevalence is not None
+            else 0.0
+        )
+        contribution = count / len(targets) * absolute_gap
+        ece += contribution
+        bins.append(
+            {
+                "lower": lower,
+                "upper": upper,
+                "count": count,
+                "mean_prediction": mean_prediction,
+                "observed_prevalence": observed_prevalence,
+                "absolute_gap": absolute_gap,
+                "ece_contribution": contribution,
+            }
+        )
+    return {
+        "brier_score": brier,
+        "expected_calibration_error": ece,
+        "bin_count": CALIBRATION_BIN_COUNT,
+        "bin_definition": CALIBRATION_BIN_DEFINITION,
+        "bins": bins,
+    }
+
+
+def _secondary_outcome_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Summarize Phase-B secondary outcomes on the primary held-out sample IDs."""
+    required = {
+        "checkpoint_panel_transition_count",
+        "final_robust_error",
+        "persistent_wrong",
+        "post_anchor_robust_correct_frequency",
+    }
+    if not all(required.issubset(row) for row in rows):
+        return {"available": False, "reason": "secondary_outcome_primitives_absent"}
+    transition_counts: list[int] = []
+    final_errors: list[int] = []
+    persistent_wrongs: list[int] = []
+    correctness_frequencies: list[float] = []
+    for row in rows:
+        transition_count = row["checkpoint_panel_transition_count"]
+        final_error = row["final_robust_error"]
+        persistent_wrong = row["persistent_wrong"]
+        correctness_frequency = row["post_anchor_robust_correct_frequency"]
+        if isinstance(transition_count, bool) or not isinstance(transition_count, int) or transition_count < 0:
+            raise RSLADSignalReplayError("checkpoint-panel transition count must be a non-negative integer")
+        if final_error not in {0, 1, False, True} or persistent_wrong not in {0, 1, False, True}:
+            raise RSLADSignalReplayError("secondary binary outcomes must be binary")
+        if (
+            isinstance(correctness_frequency, bool)
+            or not isinstance(correctness_frequency, (int, float))
+            or not math.isfinite(float(correctness_frequency))
+            or not 0.0 <= float(correctness_frequency) <= 1.0
+        ):
+            raise RSLADSignalReplayError("post-anchor robust correctness frequency must be finite in [0, 1]")
+        transition_counts.append(transition_count)
+        final_errors.append(int(final_error))
+        persistent_wrongs.append(int(persistent_wrong))
+        correctness_frequencies.append(float(correctness_frequency))
+    return {
+        "available": True,
+        "sample_count": len(rows),
+        "checkpoint_panel_transition_count": {
+            "mean": sum(transition_counts) / len(transition_counts),
+            "min": min(transition_counts),
+            "max": max(transition_counts),
+            "positive_prevalence": sum(value > 0 for value in transition_counts) / len(transition_counts),
+        },
+        "final_robust_error": {"prevalence": sum(final_errors) / len(final_errors)},
+        "persistent_wrong": {"prevalence": sum(persistent_wrongs) / len(persistent_wrongs)},
+        "post_anchor_robust_correct_frequency": {
+            "mean": sum(correctness_frequencies) / len(correctness_frequencies),
+            "min": min(correctness_frequencies),
+            "max": max(correctness_frequencies),
+        },
+    }
+
+
+def _history_gate_decision(delta_report: Mapping[str, Any]) -> str:
+    """Apply the frozen allocation rule without silently shifting boundaries."""
+    try:
+        point = delta_report["point_estimates"]
+        bounds = delta_report["bootstrap_95"]["metrics"]
+        delta_auroc = float(point["auroc"])
+        delta_log_loss = float(point["log_loss"])
+        lower_auroc = float(bounds["auroc"]["lower"])
+        upper_auroc = float(bounds["auroc"]["upper"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RSLADSignalReplayError("history gate report is incomplete") from exc
+    if delta_auroc >= 0.02 and lower_auroc > 0.0 and delta_log_loss < 0.0:
+        return "go"
+    if upper_auroc < 0.01 or delta_log_loss >= 0.0:
+        return "no_go"
+    return "inconclusive"
+
+
 def predictive_audit(
     rows: Sequence[Mapping[str, Any]], *, split_seed: int, bootstrap_seed: int, bootstrap_replicates: int
 ) -> dict[str, Any]:
-    """Fit identical univariate logistic models on a fixed held-out split."""
+    """Compare frozen Phase-B predictors on one held-out class-stratified split."""
     prepared: list[dict[str, Any]] = []
     for row in rows:
         entropy = float(row["teacher_entropy_normalized"])
         risk = float(row["student_margin_panel_risk"])
+        historical_risk = float(row.get("student_margin_historical_risk", risk))
         instantaneous_risk = float(row["student_margin_risk_epoch99"])
+        current_correctness = row.get("student_robust_correct_epoch99")
+        if current_correctness is None:
+            # Direct callers of the pre-Phase-B public audit retain their
+            # entropy/student report compatibility.  Feature panels always
+            # provide the measured epoch-99 robust-correctness primitive.
+            current_correctness = int(instantaneous_risk < 0.5)
+        correctness_frequency = row.get("student_robust_correct_frequency", 0.5)
         outcome = row.get("checkpoint_panel_forgetting")
         if (
             not math.isfinite(entropy)
             or not math.isfinite(risk)
+            or not math.isfinite(historical_risk)
             or not math.isfinite(instantaneous_risk)
             or not 0.0 <= entropy <= 1.0
             or not 0.0 <= risk <= 1.0
+            or not 0.0 <= historical_risk <= 1.0
             or not 0.0 <= instantaneous_risk <= 1.0
         ):
             raise RSLADSignalReplayError("predictive features must be finite [0, 1] values")
+        if current_correctness not in {0, 1, False, True}:
+            raise RSLADSignalReplayError("epoch-99 robust correctness must be binary")
+        if not isinstance(correctness_frequency, (int, float)) or isinstance(correctness_frequency, bool):
+            raise RSLADSignalReplayError("historical correctness frequency must be a finite [0, 1] value")
+        correctness_frequency = float(correctness_frequency)
+        if not math.isfinite(correctness_frequency) or not 0.0 <= correctness_frequency <= 1.0:
+            raise RSLADSignalReplayError("historical correctness frequency must be a finite [0, 1] value")
         if outcome not in {0, 1, False, True}:
             raise RSLADSignalReplayError("checkpoint-panel forgetting outcome must be binary")
-        prepared.append({**row, "outcome": int(outcome)})
+        prepared.append(
+            {
+                **row,
+                "outcome": int(outcome),
+                "teacher_entropy": entropy,
+                "current_correctness": int(current_correctness),
+                "instantaneous_margin_risk": instantaneous_risk,
+                "historical_margin_risk": historical_risk,
+                "historical_correctness_frequency": correctness_frequency,
+            }
+        )
     train_ids, held_out_ids = deterministic_hash_split(prepared, seed=split_seed, held_out_fraction=0.2)
     train_set, held_out_set = set(train_ids), set(held_out_ids)
     train = [row for row in prepared if int(row["sample_id"]) in train_set]
@@ -731,43 +905,116 @@ def predictive_audit(
         raise RSLADSignalReplayError("fixed class-stratified split produced an empty partition")
     train_targets = [row["outcome"] for row in train]
 
-    def scores_for(feature: str) -> list[float]:
-        fit = _fit_logistic([[float(row[feature])] for row in train], train_targets)
-        return _predict_logistic(fit, [[float(row[feature])] for row in held_out])
+    feature_sets: dict[str, tuple[str, ...]] = {
+        "teacher_entropy": ("teacher_entropy",),
+        "current_correctness": ("current_correctness",),
+        "instantaneous_margin": ("instantaneous_margin_risk",),
+        "history_only": ("historical_correctness_frequency", "historical_margin_risk"),
+        "current_only": ("current_correctness", "instantaneous_margin_risk"),
+        "current_plus_history": (
+            "current_correctness",
+            "instantaneous_margin_risk",
+            "historical_correctness_frequency",
+            "historical_margin_risk",
+        ),
+        "history_plus_teacher": (
+            "historical_correctness_frequency",
+            "historical_margin_risk",
+            "teacher_entropy",
+        ),
+        "history_teacher_interaction": (
+            "historical_correctness_frequency",
+            "historical_margin_risk",
+            "teacher_entropy",
+            "historical_correctness_x_teacher_entropy",
+            "historical_margin_risk_x_teacher_entropy",
+        ),
+    }
+    for item in prepared:
+        item["historical_correctness_x_teacher_entropy"] = (
+            item["historical_correctness_frequency"] * item["teacher_entropy"]
+        )
+        item["historical_margin_risk_x_teacher_entropy"] = item["historical_margin_risk"] * item["teacher_entropy"]
 
-    entropy_scores = scores_for("teacher_entropy_normalized")
-    student_scores = scores_for("student_margin_panel_risk")
-    entropy_metrics = binary_metrics([row["outcome"] for row in held_out], entropy_scores)
-    student_metrics = binary_metrics([row["outcome"] for row in held_out], student_scores)
-    paired = _paired_metric_intervals(
-        held_out,
-        entropy_scores=entropy_scores,
-        student_scores=student_scores,
-        seed=bootstrap_seed,
-        replicates=bootstrap_replicates,
+    scores: dict[str, list[float]] = {}
+    for name, features in feature_sets.items():
+        fit = _fit_logistic([[float(row[feature]) for feature in features] for row in train], train_targets)
+        scores[name] = _predict_logistic(fit, [[float(row[feature]) for feature in features] for row in held_out])
+    targets = [row["outcome"] for row in held_out]
+    models: dict[str, dict[str, Any]] = {
+        name: {**binary_metrics(targets, values), "calibration": _calibration_summary(targets, values)}
+        for name, values in scores.items()
+    }
+
+    def delta_report(*, baseline: str, candidate: str) -> dict[str, Any]:
+        paired = _paired_metric_intervals(
+            held_out,
+            baseline_scores=scores[baseline],
+            candidate_scores=scores[candidate],
+            seed=bootstrap_seed,
+            replicates=bootstrap_replicates,
+        )
+        return {
+            "baseline": baseline,
+            "candidate": candidate,
+            "point_estimates": {
+                metric: float(models[candidate][metric]) - float(models[baseline][metric])
+                for metric in ("auroc", "auprc", "log_loss")
+            },
+            "bootstrap_95": paired,
+        }
+
+    current_baselines = ("current_correctness", "instantaneous_margin", "current_only")
+    best_current_baseline = max(
+        current_baselines,
+        key=lambda name: (float(models[name]["auroc"]), -float(models[name]["log_loss"]), name),
     )
-    bounds = paired["metrics"]
-    if bounds["auroc"]["lower"] > 0.0 and bounds["log_loss"]["upper"] < 0.0:
-        decision = "student_better_proxy"
-    elif bounds["auroc"]["upper"] < 0.0 and bounds["log_loss"]["lower"] > 0.0:
-        decision = "entropy_better_proxy"
-    else:
-        decision = "inconclusive_proxy"
-    instantaneous_scores = scores_for("student_margin_risk_epoch99")
+    history_minus_best_current = delta_report(baseline=best_current_baseline, candidate="history_only")
+    history_decision = _history_gate_decision(history_minus_best_current)
+    history_minus_entropy = delta_report(baseline="teacher_entropy", candidate="history_only")
     return {
         "outcome": "checkpoint_panel_forgetting",
         "held_out_fraction": 0.2,
         "train_sample_ids": train_ids,
         "held_out_sample_ids": held_out_ids,
-        "models": {"entropy": entropy_metrics, "student": student_metrics},
-        "student_minus_entropy": {
-            "point_estimates": {
-                metric: student_metrics[metric] - entropy_metrics[metric] for metric in ("auroc", "auprc", "log_loss")
+        "split_identity": {
+            "method": "true_class_stratified_deterministic_hash",
+            "seed": split_seed,
+            "train_sample_ids": train_ids,
+            "held_out_sample_ids": held_out_ids,
+        },
+        "model_features": {name: list(features) for name, features in feature_sets.items()},
+        "secondary_outcomes": _secondary_outcome_summary(held_out),
+        "models": {
+            **models,
+            # Legacy aliases retain the original entropy/student report shape.
+            "entropy": models["teacher_entropy"],
+            "student": models["history_only"],
+        },
+        "student_minus_entropy": history_minus_entropy,
+        "history_minus_instantaneous_margin": delta_report(baseline="instantaneous_margin", candidate="history_only"),
+        "history_minus_current_correctness": delta_report(baseline="current_correctness", candidate="history_only"),
+        "current_plus_history_minus_current_only": delta_report(
+            baseline="current_only", candidate="current_plus_history"
+        ),
+        "history_minus_best_current_state": history_minus_best_current,
+        "history_plus_teacher_minus_history": delta_report(baseline="history_only", candidate="history_plus_teacher"),
+        "history_teacher_interaction_minus_history_teacher": delta_report(
+            baseline="history_plus_teacher", candidate="history_teacher_interaction"
+        ),
+        "history_go_no_go": {
+            "status": history_decision,
+            "criteria": {
+                "minimum_delta_auroc": 0.02,
+                "paired_auroc_lower_ci_gt": 0.0,
+                "log_loss_improves": True,
             },
-            "bootstrap_95": paired,
+            "baseline": best_current_baseline,
         },
         "proxy_decision": {
-            "status": decision,
+            "status": {"go": "student_better_proxy", "no_go": "entropy_better_proxy"}.get(
+                history_decision, "inconclusive_proxy"
+            ),
             "gating_metrics": ["auroc", "log_loss"],
             "secondary_metrics": ["auprc"],
             "scope": (
@@ -776,7 +1023,7 @@ def predictive_audit(
         },
         "sensitivity": {
             "student_feature": "epoch99_instantaneous_margin_risk",
-            "metrics": binary_metrics([row["outcome"] for row in held_out], instantaneous_scores),
+            "metrics": models["instantaneous_margin"],
         },
     }
 

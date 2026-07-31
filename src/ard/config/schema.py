@@ -524,6 +524,20 @@ class TrackingConfig(StrictModel):
         return self
 
 
+class ResearchDesignConfig(StrictModel):
+    """Hash-bound analysis design fixed before a confirmatory run starts."""
+
+    id: Literal["logging_only_history_confirmatory_v1"]
+    manifest: Path
+    sha256: str
+
+    @model_validator(mode="after")
+    def validate_sha256(self) -> ResearchDesignConfig:
+        if len(self.sha256) != 64 or any(character not in "0123456789abcdef" for character in self.sha256):
+            raise ValueError("research_design.sha256 must be a lowercase 64-character digest")
+        return self
+
+
 class EvaluationConfig(StrictModel):
     """Saved-checkpoint evaluation contract; no training-time signal is exposed."""
 
@@ -561,6 +575,7 @@ class ExperimentConfig(StrictModel):
     scheduler: SchedulerConfig
     training: TrainingConfig
     tracking: TrackingConfig = Field(default_factory=TrackingConfig)
+    research_design: ResearchDesignConfig | None = None
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     output_dir: Path = Path("outputs/dev")
     # Compatibility with M1 checkpoints/configs.  New paths use tracking.run_id.
@@ -636,6 +651,10 @@ class ExperimentConfig(StrictModel):
             raise ValueError("oracle_mask is scientific/dev-only and is forbidden for smoke, repro, and production")
         if self.method.id == "rslad_frozen_oracle_softening" and self.tier not in {"dev", "production"}:
             raise ValueError("rslad_frozen_oracle_softening permits only dev tests or guarded production runs")
+        if self.method.id == "rslad_logging_only" and self.tier == "production" and self.research_design is None:
+            raise ValueError("production rslad_logging_only requires a hash-bound research_design")
+        if self.research_design is not None and self.method.id != "rslad_logging_only":
+            raise ValueError("research_design is currently defined only for rslad_logging_only")
         if self.teacher is not None and self.teacher.source == "fixture" and self.tier not in {"dev", "smoke"}:
             raise ValueError("fixture teachers are restricted to dev/smoke tiers")
         if self.tier == "pilot" and self.teacher is not None and self.teacher.source != "robustbench":

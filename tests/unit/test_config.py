@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -7,8 +8,9 @@ import yaml
 from pydantic import ValidationError
 
 from ard.campaign.schema import load_campaign
+from ard.cli.train import _validate_research_design
 from ard.config import load_config, save_resolved_config
-from ard.config.schema import AttackConfig, MethodConfig, NormalizationConfig
+from ard.config.schema import AttackConfig, ExperimentConfig, MethodConfig, NormalizationConfig
 from ard.config.teacher_audit import load_teacher_audit_config
 
 pytestmark = pytest.mark.t0
@@ -102,6 +104,38 @@ def test_single_gpu_campaign_configs_are_explicit_and_resolve(tmp_path: Path, mo
         assert config.tracking.mode == "online"
         assert config.tracking.run_id == "config-test-run"
         assert config.output_dir == tmp_path / "job-output"
+
+
+def test_production_logging_only_requires_and_hash_binds_frozen_research_design(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
+    config = load_config(Path("configs/scientific/cifar10_r18_rslad_logging_only_bartoldson.yaml"))
+    assert config.research_design is not None
+    design_path = config.research_design.manifest
+    assert config.research_design.id == "logging_only_history_confirmatory_v1"
+    assert hashlib.sha256(design_path.read_bytes()).hexdigest() == config.research_design.sha256
+    _validate_research_design(config)
+
+    without_design = config.model_dump(mode="python")
+    without_design["research_design"] = None
+    with pytest.raises(ValidationError, match="hash-bound research_design"):
+        ExperimentConfig.model_validate(without_design)
+
+    bad_design = config.research_design.model_copy(update={"sha256": "0" * 64})
+    bad_config = config.model_copy(update={"research_design": bad_design})
+    with pytest.raises(ValueError, match="manifest SHA-256"):
+        _validate_research_design(bad_config)
+
+    seed_two = config.seeds.model_copy(
+        update={"model_init": 2, "data_order": 2, "augmentation": 2, "train_attack": 2, "qualitative_panel": 2}
+    )
+    with pytest.raises(ValueError, match="first replication allocation"):
+        _validate_research_design(config.model_copy(update={"seeds": seed_two}))
+
+    chen = load_config(Path("configs/scientific/cifar10_r18_rslad_logging_only_chen.yaml"))
+    with pytest.raises(ValueError, match="first replication allocation"):
+        _validate_research_design(chen)
 
 
 def test_single_gpu_campaign_crosswalk_and_scientific_protocol_are_exact(
