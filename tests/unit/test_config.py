@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-import copy
-import hashlib
-import json
 from pathlib import Path
 
 import pytest
-import torch
 import yaml
 from pydantic import ValidationError
 
-from ard.campaign.schema import load_campaign
-from ard.cli import train as train_cli
-from ard.cli.train import _claim_research_allocation, _validate_research_design, _validate_research_gate_evidence
 from ard.config import load_config, save_resolved_config
 from ard.config.schema import AttackConfig, ExperimentConfig, MethodConfig, NormalizationConfig
 from ard.config.teacher_audit import load_teacher_audit_config
@@ -44,6 +37,39 @@ def _set_repository_config_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, 
     }
     for key, value in values.items():
         monkeypatch.setenv(key, value)
+
+
+def test_observation_profiles_are_strict_and_teacher_response_requires_teacher() -> None:
+    base = {
+        "schema_version": 2,
+        "protocol": {"id": "synthetic_smoke_v2"},
+        "tier": "smoke",
+        "seeds": {
+            name: 0
+            for name in (
+                "split",
+                "model_init",
+                "data_order",
+                "augmentation",
+                "train_attack",
+                "evaluation_attack",
+                "qualitative_panel",
+            )
+        },
+        "dataset": {"name": "synthetic_cifar", "num_samples": 4, "num_classes": 2},
+        "student": {"architecture": "fixture_cnn", "num_classes": 2},
+        "method": {"id": "pgd_at", "version": 1, "attack": {"steps": 1}},
+        "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+        "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+        "training": {"epochs": 1, "per_rank_batch_size": 2, "global_batch_size": 2},
+    }
+    assert ExperimentConfig.model_validate(
+        {**base, "observation": {"profile": "student_history"}}
+    ).observation.records_student_history
+    with pytest.raises(ValidationError, match="teacher_response requires a frozen teacher"):
+        ExperimentConfig.model_validate({**base, "observation": {"profile": "teacher_response"}})
+    with pytest.raises(ValidationError, match="observation.profile"):
+        ExperimentConfig.model_validate({**base, "observation": {"profile": "risk"}})
 
 
 def test_experiment_taxonomy_and_execution_profiles(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,6 +108,8 @@ def test_experiment_taxonomy_and_execution_profiles(tmp_path: Path, monkeypatch:
     )
     assert all("method" not in config.tracking.group.lower() for config in production_configs)
     assert all("seed" not in config.tracking.group.lower() for config in production_configs)
+    rslad_family = [config for config in production_configs if config.method.id.startswith("rslad")]
+    assert rslad_family and all(config.observation.profile == "teacher_response" for config in rslad_family)
 
 
 def test_single_gpu_campaign_configs_are_explicit_and_resolve(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -108,191 +136,6 @@ def test_single_gpu_campaign_configs_are_explicit_and_resolve(tmp_path: Path, mo
         assert config.tracking.mode == "online"
         assert config.tracking.run_id == "config-test-run"
         assert config.output_dir == tmp_path / "job-output"
-
-
-def test_production_logging_only_requires_and_hash_binds_frozen_research_design(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
-    config = load_config(Path("configs/scientific/cifar10_r18_rslad_logging_only_bartoldson.yaml"))
-    assert config.research_design is not None
-    design_path = config.research_design.manifest
-    assert config.research_design.id == "logging_only_history_confirmatory_v1"
-    assert hashlib.sha256(design_path.read_bytes()).hexdigest() == config.research_design.sha256
-    assert config.tracking.run_id == "bart-rslad-logging-only-s1-confirm-v1"
-    assert config.output_dir == Path("outputs/scientific/bart-rslad-logging-only-s1-confirm-v1")
-    _validate_research_design(config)
-
-    without_design = config.model_dump(mode="python")
-    without_design["research_design"] = None
-    with pytest.raises(ValidationError, match="hash-bound research_design"):
-        ExperimentConfig.model_validate(without_design)
-
-    bad_design = config.research_design.model_copy(update={"sha256": "0" * 64})
-    bad_config = config.model_copy(update={"research_design": bad_design})
-    with pytest.raises(ValueError, match="preregistration SHA-256"):
-        _validate_research_design(bad_config)
-
-    relocated_design = config.research_design.model_copy(update={"manifest": tmp_path / "design.yaml"})
-    with pytest.raises(ValueError, match="immutable preregistration"):
-        _validate_research_design(config.model_copy(update={"research_design": relocated_design}))
-
-    seed_two = config.seeds.model_copy(
-        update={"model_init": 2, "data_order": 2, "augmentation": 2, "train_attack": 2, "qualitative_panel": 2}
-    )
-    with pytest.raises(ValueError, match="first replication allocation"):
-        _validate_research_design(config.model_copy(update={"seeds": seed_two}))
-
-    chen = load_config(Path("configs/scientific/cifar10_r18_rslad_logging_only_chen.yaml"))
-    with pytest.raises(ValueError, match="first replication allocation"):
-        _validate_research_design(chen)
-
-
-@pytest.mark.parametrize(
-    ("path", "value", "message"),
-    [
-        (("status",), "pending", "not eligible"),
-        (("common_trajectory", "bartoldson", "history_gate"), "no_go", "History evidence"),
-        (("frozen_mask", "all_arms_terminal"), False, "four-arm"),
-        (("frozen_mask", "decision"), "go", "decision does not match"),
-        (("optimization_parity", "status"), "failed", "optimization parity"),
-        (("allocation", "seed"), 2, "allocation drifted"),
-        (
-            ("common_trajectory", "bartoldson", "report_sha256"),
-            "invalid",
-            "History evidence",
-        ),
-        (
-            ("frozen_mask", "arms", "random_1", "autoattack_results_sha256"),
-            "0" * 64,
-            "artifact identities",
-        ),
-        (("optimization_parity", "command"), "pytest", "optimization parity"),
-    ],
-)
-def test_logging_only_gate_rejects_hash_bound_semantic_tampering(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    path: tuple[str, ...],
-    value: object,
-    message: str,
-) -> None:
-    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
-    payload = yaml.safe_load(
-        Path("configs/analysis/logging_only_history_confirmatory_v1_gate_attestation.yaml").read_text(encoding="utf-8")
-    )
-    tampered = copy.deepcopy(payload)
-    target = tampered
-    for key in path[:-1]:
-        target = target[key]
-    target[path[-1]] = value
-    with pytest.raises(ValueError, match=message):
-        _validate_research_gate_evidence(attestation=tampered)
-
-
-def test_logging_only_research_allocation_is_atomic_and_resume_bound(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
-    config = load_config(Path("configs/scientific/cifar10_r18_rslad_logging_only_bartoldson.yaml"))
-    output_dir = tmp_path / "allocation"
-    claimed_config = config.model_copy(update={"output_dir": output_dir})
-    _claim_research_allocation(claimed_config, output_dir=output_dir, resume=None, config_hash="f" * 64)
-    claim = json.loads((output_dir / ".research-allocation-claim.json").read_text(encoding="utf-8"))
-    assert claim["tracking_run_id"] == "bart-rslad-logging-only-s1-confirm-v1"
-    with pytest.raises(FileExistsError, match="already claimed"):
-        _claim_research_allocation(claimed_config, output_dir=output_dir, resume=None, config_hash="f" * 64)
-    _claim_research_allocation(
-        claimed_config,
-        output_dir=output_dir,
-        resume=output_dir / "last.pt",
-        config_hash="f" * 64,
-    )
-    mismatched = claimed_config.model_copy(
-        update={"tracking": claimed_config.tracking.model_copy(update={"run_id": "other"})}
-    )
-    with pytest.raises(ValueError, match="does not match"):
-        _claim_research_allocation(
-            mismatched,
-            output_dir=output_dir,
-            resume=output_dir / "last.pt",
-            config_hash="f" * 64,
-        )
-
-
-def test_logging_only_dry_run_does_not_claim_or_create_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
-    output_dir = tmp_path / "dry-run-output"
-    monkeypatch.setattr(train_cli, "initialize_from_env", lambda _: (torch.device("cpu"), False))
-    monkeypatch.setattr(train_cli, "validate_tracking_guard", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(train_cli, "_validate_research_design", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(train_cli, "run_rank_zero_phase", lambda action, **_kwargs: action())
-    monkeypatch.setattr(train_cli, "barrier", lambda: None)
-    monkeypatch.setattr(train_cli, "is_rank_zero", lambda: False)
-    assert (
-        train_cli.main(
-            [
-                "--config",
-                "configs/scientific/cifar10_r18_rslad_logging_only_bartoldson.yaml",
-                "--output",
-                str(output_dir),
-                "--dry-run",
-            ]
-        )
-        == 0
-    )
-    assert not output_dir.exists()
-
-
-def test_single_gpu_campaign_crosswalk_and_scientific_protocol_are_exact(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _set_repository_config_env(monkeypatch, tmp_path)
-    production = load_campaign(Path("configs/campaigns/five_gpu_single_process_v1.yaml"))
-    canonical_by_cell = {}
-    for path in sorted(Path("configs/production").glob("*.yaml")):
-        config = load_config(path)
-        assert config.teacher is not None
-        canonical_by_cell[(config.teacher.registry_id, config.method.id)] = config
-    assert len(canonical_by_cell) == 8
-
-    for job in production.jobs:
-        monkeypatch.setenv("WANDB_ENTITY", job.wandb.entity)
-        monkeypatch.setenv("WANDB_PROJECT", job.wandb.project)
-        monkeypatch.setenv("WANDB_GROUP_CHEN", job.wandb.group)
-        monkeypatch.setenv("WANDB_GROUP_BARTOLDSON", job.wandb.group)
-        monkeypatch.setenv("ARD_RUN_ID", job.wandb.run_id)
-        config = load_config(Path(job.config))
-        assert config.teacher is not None
-        assert (config.teacher.registry_id, config.method.id) == (job.teacher, job.method)
-        assert config.tracking.group == job.wandb.group
-        assert config.tracking.project == job.wandb.project
-        assert config.tracking.entity == job.wandb.entity
-        canonical = canonical_by_cell[(job.teacher, job.method)]
-        assert config.dataset == canonical.dataset
-        assert config.student == canonical.student
-        assert config.teacher == canonical.teacher
-        assert config.method == canonical.method
-        assert config.optimizer == canonical.optimizer
-        assert config.scheduler == canonical.scheduler
-        assert config.seeds == canonical.seeds
-        assert config.training.epochs == canonical.training.epochs == 200
-        assert config.training.global_batch_size == canonical.training.global_batch_size == 128
-        assert config.training.per_rank_batch_size == 128
-        assert canonical.training.per_rank_batch_size == 64
-        assert config.method.attack.identity() == canonical.method.attack.identity()
-        assert config.method.selection_attack is not None
-        assert canonical.method.selection_attack is not None
-        assert config.method.selection_attack.identity() == canonical.method.selection_attack.identity()
-        assert job.phases.train == (
-            "{PYTHON}",
-            "-m",
-            "ard.cli.train",
-            "--config",
-            "{CONFIG_PATH}",
-            "--output",
-            "{JOB_OUTPUT_DIR}",
-        )
 
 
 def test_two_gpu_profile_can_be_resolved_as_one_gpu_batch_128(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -678,6 +521,6 @@ def test_top_level_configs_resolve_under_controlled_environment(
             assert config.method.id in {
                 "pgd_at",
                 "trades",
-                "rslad_logging_only",
+                "rslad",
                 "rslad_frozen_oracle_softening",
             }

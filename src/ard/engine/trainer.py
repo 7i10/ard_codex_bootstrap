@@ -99,8 +99,8 @@ def _reduce_epoch_observability(
     local_cuda_peak_reserved_bytes: int,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     """Apply the epoch SUM/MAX contract and derive globally valid throughput."""
-    if local_totals.shape != (5,):
-        raise ValueError("epoch totals must contain five scalar accumulators")
+    if local_totals.shape != (6,):
+        raise ValueError("epoch totals must contain six scalar accumulators")
     global_totals = reduce_sums(local_totals)
     rank_max = reduce_max(
         torch.tensor(
@@ -118,6 +118,7 @@ def _reduce_epoch_observability(
         "cuda_peak_allocated_bytes": float(rank_max[1].item()),
         "cuda_peak_reserved_bytes": float(rank_max[2].item()),
         "teacher_clean_forward_calls": float(global_totals[4].item()),
+        "teacher_adversarial_forward_calls": float(global_totals[5].item()),
     }
 
 
@@ -146,7 +147,7 @@ class Trainer:
         oracle_mask: bool = False,
         frozen_risk_lookup: FrozenRiskLookup | None = None,
         diagnostics: TrainingDiagnostics | None = None,
-        observe_teacher_signals: bool = False,
+        observation_profile: str = "off",
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -161,9 +162,15 @@ class Trainer:
         self.tracker_run_id = tracker_run_id
         self.policy = policy
         self.sample_store = sample_store
-        self.observe_teacher_signals = bool(observe_teacher_signals)
-        if self.observe_teacher_signals and (self.teacher is None or self.sample_store is None):
-            raise ValueError("teacher signal observation requires a frozen teacher and sample state")
+        if observation_profile not in {"off", "student_history", "teacher_response"}:
+            raise ValueError("observation_profile must be off, student_history, or teacher_response")
+        self.observation_profile = observation_profile
+        self._records_student_history = observation_profile in {"student_history", "teacher_response"}
+        self._records_teacher_response = observation_profile == "teacher_response"
+        if self._records_student_history and self.sample_store is None:
+            raise ValueError("student-history observation requires sample state")
+        if self._records_teacher_response and self.teacher is None:
+            raise ValueError("teacher-response observation requires a frozen teacher")
         self.target_policy = target_policy
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
@@ -191,7 +198,8 @@ class Trainer:
         # This detached cache is strictly intra-batch diagnostic reuse.  It is
         # cleared at every batch boundary and intentionally excluded from
         # checkpoint state.
-        self._diagnostic_teacher_adversarial_logits: torch.Tensor | None = None
+        self._teacher_adversarial_logits: torch.Tensor | None = None
+        self._teacher_adversarial_forward_calls = 0.0
 
     def _attack_generator(self) -> torch.Generator:
         seed = self.seed + 1_000_003 * self.global_step + 10_007 * get_rank()
@@ -230,6 +238,25 @@ class Trainer:
         self.sample_store.merge_pending(pending_by_rank)
         self.sample_state = self.sample_store.state_dict()
 
+    def _teacher_adversarial_response(self, adversarial: torch.Tensor) -> torch.Tensor:
+        """Return the one detached FP32 teacher-adv forward for this batch.
+
+        Observation, entropy/joint policies, and qualitative diagnostics share
+        this cache.  It has no graph and is cleared at the batch boundary.
+        """
+        if self._teacher_adversarial_logits is not None:
+            return self._teacher_adversarial_logits
+        if self.teacher is None:
+            raise ValueError("teacher adversarial response requires a frozen teacher")
+        with (
+            _evaluation_mode(self.teacher),
+            torch.no_grad(),
+            torch.autocast(device_type=self.device.type, enabled=False),
+        ):
+            self._teacher_adversarial_logits = self.teacher(adversarial.float()).detach().float()
+        self._teacher_adversarial_forward_calls += 1.0
+        return self._teacher_adversarial_logits
+
     def _student_aware_signals(
         self,
         *,
@@ -257,7 +284,7 @@ class Trainer:
             update=self.global_step,
             epoch=self.current_epoch,
             rank=get_rank(),
-            labels=batch.labels if self.observe_teacher_signals else None,
+            labels=batch.labels if self._records_teacher_response else None,
             teacher_clean=teacher_clean,
             teacher_adversarial=teacher_adversarial,
             teacher_clean_to_adversarial_margin_response=teacher_clean_to_adversarial_margin_response,
@@ -296,15 +323,10 @@ class Trainer:
         signals: dict[str, torch.Tensor] = {}
         required = self.policy.required_signals
         entropy: torch.Tensor | None = None
-        teacher_adversarial_logits: torch.Tensor | None = None
         if "teacher_entropy" in required or "joint_risk" in required:
             if self.teacher is None:
                 raise ValueError("selected policy requires a teacher")
-            with _evaluation_mode(self.teacher), torch.no_grad():
-                teacher_adversarial_logits = self.teacher(adversarial).detach().float()
-                entropy = shannon_entropy(teacher_adversarial_logits)
-            if self.diagnostics is not None:
-                self._diagnostic_teacher_adversarial_logits = teacher_adversarial_logits
+            entropy = shannon_entropy(self._teacher_adversarial_response(adversarial))
         if "teacher_entropy" in required:
             assert entropy is not None
             signals["teacher_entropy"] = entropy
@@ -347,14 +369,15 @@ class Trainer:
             torch.cuda.reset_peak_memory_stats(self.device)
         started_at = time.perf_counter()
         # Loss sum, clean-correct, robust-correct, valid examples, and actual
-        # detached clean-teacher target forwards.  One final SUM makes the
+        # detached clean/adv teacher forwards.  One final SUM makes the
         # count telemetry global without adding a hot-loop collective.
-        totals = torch.zeros(5, dtype=torch.float64, device=self.device)
+        totals = torch.zeros(6, dtype=torch.float64, device=self.device)
         for batch in loader:
             if not isinstance(batch, IndexedBatch):
                 raise TypeError("trainer requires IndexedBatch batches")
             batch = batch.to(self.device)
-            self._diagnostic_teacher_adversarial_logits = None
+            self._teacher_adversarial_logits = None
+            self._teacher_adversarial_forward_calls = 0.0
             mask = self._mask(batch)
             self.optimizer.zero_grad(set_to_none=True)
             requires_clean_student = getattr(self.objective, "requires_clean_student_logits", False)
@@ -362,7 +385,7 @@ class Trainer:
             attack_requires_teacher_clean = bool(getattr(self.attack, "requires_teacher_clean_target", False))
             teacher_clean_logits = None
             teacher_clean_forward_calls = 0.0
-            if requires_teacher_clean or attack_requires_teacher_clean:
+            if requires_teacher_clean or attack_requires_teacher_clean or self._records_teacher_response:
                 if self.teacher is None:
                     raise ValueError("selected attack or objective requires a teacher")
                 # This is the one detached FP32 target for both inner and outer
@@ -389,15 +412,9 @@ class Trainer:
             valid_mask = mask.to(dtype=torch.bool)
             observed_teacher_clean = observed_teacher_adversarial = None
             teacher_clean_to_adversarial_margin_response = teacher_clean_to_adversarial_js_response = None
-            if self.observe_teacher_signals:
+            if self._records_teacher_response:
                 assert self.teacher is not None and teacher_clean_logits is not None
-                with (
-                    _evaluation_mode(self.teacher),
-                    torch.no_grad(),
-                    torch.autocast(device_type=self.device.type, enabled=False),
-                ):
-                    teacher_adversarial_logits = self.teacher(attack_result.adversarial.float()).detach().float()
-                self._diagnostic_teacher_adversarial_logits = teacher_adversarial_logits
+                teacher_adversarial_logits = self._teacher_adversarial_response(attack_result.adversarial)
                 observed_teacher_clean = teacher_confidence_primitives(
                     teacher_clean_logits,
                     batch.labels,
@@ -472,10 +489,7 @@ class Trainer:
                     diagnostic_clean = self.model(batch.images).detach()
                 teacher_prediction = teacher_entropy = None
                 if self.teacher is not None:
-                    teacher_adversarial_logits = self._diagnostic_teacher_adversarial_logits
-                    if teacher_adversarial_logits is None:
-                        with _evaluation_mode(self.teacher), torch.no_grad():
-                            teacher_adversarial_logits = self.teacher(attack_result.adversarial).detach().float()
+                    teacher_adversarial_logits = self._teacher_adversarial_response(attack_result.adversarial)
                     teacher_prediction = teacher_adversarial_logits.argmax(1)
                     teacher_entropy = shannon_entropy(teacher_adversarial_logits)
                 prior_margin = None if self.sample_store is None else self.sample_store.margin_ema(batch.sample_ids)
@@ -545,7 +559,7 @@ class Trainer:
                         clean_correct=clean_predictions[position] == labels[position],
                         robust_correct=adversarial_predictions[position] == labels[position],
                     )
-                self._diagnostic_teacher_adversarial_logits = None
+                self._teacher_adversarial_logits = None
             # DDP averages gradients across ranks.  Scale each local masked
             # sum by world_size/global-effective-count so padded ranks cannot
             # dilute the update (including the size < world_size case).
@@ -569,6 +583,7 @@ class Trainer:
                     float(((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
                     float(mask.sum()),
                     teacher_clean_forward_calls,
+                    self._teacher_adversarial_forward_calls,
                 ],
                 dtype=torch.float64,
                 device=self.device,
@@ -692,6 +707,7 @@ class Trainer:
                 "train_cuda_peak_allocated_bytes": train_metrics.get("cuda_peak_allocated_bytes", 0.0),
                 "train_cuda_peak_reserved_bytes": train_metrics.get("cuda_peak_reserved_bytes", 0.0),
                 "train_teacher_clean_forward_calls": train_metrics.get("teacher_clean_forward_calls", 0.0),
+                "train_teacher_adversarial_forward_calls": train_metrics.get("teacher_adversarial_forward_calls", 0.0),
                 "val_clean_accuracy": validation_metrics["clean_accuracy"],
                 "val_pgd_accuracy": validation_metrics["pgd_accuracy"],
             }

@@ -11,8 +11,9 @@ from ard.cli.evaluate import (
     _evaluation_tracker_config,
     _validate_evaluation_tracking_identity,
 )
+from ard.config.loader import load_resolved_config_for_evaluation
 from ard.config.schema import ExperimentConfig, TrainingConfig, training_execution_identity, validate_global_batch_size
-from ard.engine.checkpoint import REQUIRED_KEYS
+from ard.engine.checkpoint import REQUIRED_KEYS, config_digest
 from ard.evaluation.autoattack import AutoAttackProvenanceError, autoattack_provenance, run_autoattack
 from ard.evaluation.saved_checkpoint import validate_checkpoint_lineage
 
@@ -430,6 +431,42 @@ def test_checkpoint_lineage_requires_complete_epoch_boundary_payload(tmp_path: P
     torch.save(_lineage_payload(boundary="mid"), boundary_path)
     with pytest.raises(ValueError, match="epoch-boundary"):
         validate_checkpoint_lineage(boundary_path, expected_config_hash="config-hash")
+
+
+def test_evaluation_migrates_legacy_resolved_config_without_changing_checkpoint_hash(tmp_path: Path) -> None:
+    import torch
+    import yaml
+
+    raw = base()
+    raw["teacher"] = {"source": "fixture", "architecture": "fixture_cnn", "num_classes": 2}
+    raw["method"] = {
+        "id": "rslad_logging_only",
+        "version": 1,
+        "attack": {"loss": "kl", "kl_target": "teacher_clean", "steps": 1},
+    }
+    raw["research_design"] = {
+        "id": "logging_only_history_confirmatory_v1",
+        "manifest": "historical-design.yaml",
+        "sha256": "a" * 64,
+    }
+    resolved = tmp_path / "resolved_config.yaml"
+    resolved.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+
+    loaded = load_resolved_config_for_evaluation(resolved)
+
+    expected_hash = config_digest(raw)
+    assert loaded.raw_config_hash == expected_hash
+    assert loaded.config.method.id == "rslad"
+    assert loaded.config.observation.profile == "teacher_response"
+    assert loaded.migration["source_method_id"] == "rslad_logging_only"
+    checkpoint = tmp_path / "last.pt"
+    payload = _lineage_payload()
+    payload["config_hash"] = expected_hash
+    torch.save(payload, checkpoint)
+    assert (
+        validate_checkpoint_lineage(checkpoint, expected_config_hash=loaded.raw_config_hash)["config_hash"]
+        == expected_hash
+    )
 
 
 @pytest.mark.parametrize("world_size", (0, -1, True, "1"))

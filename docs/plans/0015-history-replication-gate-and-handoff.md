@@ -152,8 +152,9 @@ actual P0/P1 fix delta.
   frozen analyzer. The analyzer requires 100/200 observations per ID, terminal
   run-bundle lineage, exact checkpoint artifact hashes, and a tracked-clean
   implementation identity.
-- 2026-07-31: the confirmatory design is frozen at
-  `configs/analysis/logging_only_history_confirmatory_v1.yaml` and the training
+- 2026-07-31: the confirmatory design was frozen at the then-current
+  `configs/analysis/logging_only_history_confirmatory_v1.yaml` (now archived under
+  `tools/internal/history_replication/provenance/`) and the training
   preflight permits only Bartoldson seed 1, 200 epochs, world size 1, batch
   128. Launch remains blocked until the History Go result itself is available
   and hash-bound.

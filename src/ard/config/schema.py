@@ -331,7 +331,6 @@ class MethodConfig(StrictModel):
         "pgd_at",
         "trades",
         "rslad",
-        "rslad_logging_only",
         "rslad_entropy",
         "rslad_student",
         "rslad_joint",
@@ -364,7 +363,6 @@ class MethodConfig(StrictModel):
         expected_target = {
             "trades": "student_clean",
             "rslad": "teacher_clean",
-            "rslad_logging_only": "teacher_clean",
             "rslad_entropy": "teacher_clean",
             "rslad_student": "teacher_clean",
             "rslad_joint": "teacher_clean",
@@ -524,18 +522,23 @@ class TrackingConfig(StrictModel):
         return self
 
 
-class ResearchDesignConfig(StrictModel):
-    """Hash-bound analysis design fixed before a confirmatory run starts."""
+class ObservationConfig(StrictModel):
+    """Detached, method-independent training observations.
 
-    id: Literal["logging_only_history_confirmatory_v1"]
-    manifest: Path
-    sha256: str
+    Profiles are deliberately an explicit cost/lineage axis.  They store raw
+    primitives only; a proposed risk, threshold, or loss intervention must be
+    configured separately through an existing policy/method.
+    """
 
-    @model_validator(mode="after")
-    def validate_sha256(self) -> ResearchDesignConfig:
-        if len(self.sha256) != 64 or any(character not in "0123456789abcdef" for character in self.sha256):
-            raise ValueError("research_design.sha256 must be a lowercase 64-character digest")
-        return self
+    profile: Literal["off", "student_history", "teacher_response"] = "off"
+
+    @property
+    def records_student_history(self) -> bool:
+        return self.profile in {"student_history", "teacher_response"}
+
+    @property
+    def records_teacher_response(self) -> bool:
+        return self.profile == "teacher_response"
 
 
 class EvaluationConfig(StrictModel):
@@ -575,7 +578,7 @@ class ExperimentConfig(StrictModel):
     scheduler: SchedulerConfig
     training: TrainingConfig
     tracking: TrackingConfig = Field(default_factory=TrackingConfig)
-    research_design: ResearchDesignConfig | None = None
+    observation: ObservationConfig = Field(default_factory=ObservationConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     output_dir: Path = Path("outputs/dev")
     # Compatibility with M1 checkpoints/configs.  New paths use tracking.run_id.
@@ -637,7 +640,6 @@ class ExperimentConfig(StrictModel):
             raise ValueError("teacher and dataset num_classes must match")
         rslad_methods = {
             "rslad",
-            "rslad_logging_only",
             "rslad_entropy",
             "rslad_student",
             "rslad_joint",
@@ -651,10 +653,8 @@ class ExperimentConfig(StrictModel):
             raise ValueError("oracle_mask is scientific/dev-only and is forbidden for smoke, repro, and production")
         if self.method.id == "rslad_frozen_oracle_softening" and self.tier not in {"dev", "production"}:
             raise ValueError("rslad_frozen_oracle_softening permits only dev tests or guarded production runs")
-        if self.method.id == "rslad_logging_only" and self.tier == "production" and self.research_design is None:
-            raise ValueError("production rslad_logging_only requires a hash-bound research_design")
-        if self.research_design is not None and self.method.id != "rslad_logging_only":
-            raise ValueError("research_design is currently defined only for rslad_logging_only")
+        if self.observation.records_teacher_response and self.teacher is None:
+            raise ValueError("observation.profile=teacher_response requires a frozen teacher")
         if self.teacher is not None and self.teacher.source == "fixture" and self.tier not in {"dev", "smoke"}:
             raise ValueError("fixture teachers are restricted to dev/smoke tiers")
         if self.tier == "pilot" and self.teacher is not None and self.teacher.source != "robustbench":

@@ -398,7 +398,6 @@ def test_rslad_policy_fallback_identities() -> None:
     "name",
     [
         "rslad",
-        "rslad_logging_only",
         "rslad_entropy",
         "rslad_student",
         "rslad_joint",

@@ -1,9 +1,9 @@
 # 実験ダッシュボード
 
-最終スナップショット: **2026-08-01 00:50 JST**
+科学結果スナップショット: **2026-08-01 00:50 JST**
 
-このページは、人間が現在の研究目的、条件、進捗、結果、W&B上のrunの役割を一か所で確認するための
-台帳です。実行中の値は変化するため、論文用の確定表ではありません。
+このページは、人間が研究目的、条件、確定済み進捗、結果、W&B上のrunの役割を一か所で確認するための
+台帳です。live process状態は本文へ手入力せず、run bundleとW&Bから導出します。
 
 ## 1. 実験概要と目的
 
@@ -72,6 +72,17 @@ softenします。KD weightは1、hard-label weightは0のままで、sampleを�
 
 ## 3. 現在の進捗
 
+live local statusは次で生成します。epoch metricsと同時にmanifestが更新されるため、通常の確認に
+`nvidia-smi`、PID polling、watchdogは不要です。別hostのrunはW&B projectをlive sourceとします。
+
+```bash
+PYTHONPATH=src python -m ard.cli.status \
+  --root <Hamster-or-collected-output-root> \
+  --format markdown
+```
+
+以下はseed-0 cohort完了時の科学スナップショットであり、現在のGPU占有を表しません。
+
 「完了」は、そのセルに現在登録された全phaseが終わったことを表します。当初student-onlyはPGDまで、
 RSLAD/entropy/jointはPGDとAutoAttackまでが予定phaseでした。空きGPUを利用するユーザー判断により、
 2026-07-29 23:33 JSTからStudent 2セルにも同一standard AutoAttackを事後追加しています。訓練条件や
@@ -100,7 +111,7 @@ evaluationはW&B run `eval-6dcf1b78a77d3258b2e0`として完了しました。
 Ferretの2 trainは、限定watcherがexit code 0、completion marker、Git SHA、GPU UUID、GPU lease
 ownershipを検証してから同じGPUでPGD→AAだけを起動し、全phaseがexit code 0で完了しました。
 seed-0 core campaignとfollow-up解析の全phaseはterminalであり、完了済みjobの重複trainはありません。
-Hamster/FerretのGPUは現在idleです。再配置した5 jobは、immutable result/checkpoint/sequence digestを含むportable
+このterminal reconciliation時点で対象GPUはidleでした。再配置した5 jobは、immutable result/checkpoint/sequence digestを含むportable
 evidenceからowning hostへatomic batch import済みです。再importは両hostでstrict no-opとなり、canonical
 campaign stateは両方とも`awaiting_scientific_review`へ到達しました。証跡は
 [`docs/experiments/reconciliation/`](experiments/reconciliation/)にあります。
@@ -356,7 +367,7 @@ display nameへ`pgd`または`autoattack`を含めます。seed-0 campaign途中
 
 ## 7. 更新ルール
 
-- statusはhost-local job JSONと最新`metrics.jsonl`から更新する。
+- live statusは`run-bundle/manifest.json`の`latest_progress`またはW&Bから生成し、本文へ転記しない。
 - 正式結果は`evaluation-results.json`に10,000例が揃った時だけ記載する。
 - W&B countと分類はAPIで再確認し、train/evaluationを重複扱いしない。
 - seed追加や別execution profileは同じ表へ無条件に混ぜない。

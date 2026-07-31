@@ -1,10 +1,10 @@
 # Reproduction status
 
-最終更新: 2026-07-30
+最終更新: 2026-08-01
 
 ## 現在の到達点
 
-同一training engine上で、次の10個のschema-v2 methodを選択できます。通常のM4 bounded method-switchは9 methodを
+同一training engine上で、次の9個のschema-v2 methodを選択できます。通常のM4 bounded method-switchは9 methodを
 one epochのsynthetic fixtureで切り替える構成であり、engineをmethodごとに複製しません。
 
 | Config method | 役割 | 固定された追加契約 |
@@ -12,7 +12,6 @@ one epochのsynthetic fixtureで切り替える構成であり、engineをmethod
 | `pgd_at` | hard-label adversarial training | CE inner/outer objective |
 | `trades` | TRADES baseline | student-clean KL inner objective、explicit beta |
 | `rslad` | uniform RSLAD baseline | hard-label fallbackなし |
-| `rslad_logging_only` | non-intervened signal baseline | RSLADとloss/update同一、primitive student/teacher stateだけを保存 |
 | `rslad_entropy` | teacher entropy weighting | Shannon entropy、係数`5`、clip/mean preservation/fallbackなし |
 | `rslad_student` | student-risk target softening | EMA `0.9`、epoch 0はunsoftened warmup、adversarial KD targetのみ変更 |
 | `rslad_joint` | joint-risk target softening | student risk × teacher overconfidence、epoch 0はunsoftened warmup |
@@ -41,11 +40,18 @@ mid-epoch resumeとworld-size変更は再現保証の対象外です。
 
 Controlled configs freeze split seed `20260722`, 200 epochs, validation fraction 0.1, global batch 128, and `${ARD_PER_RANK_BATCH_SIZE}` (128 on one GPU, 64 on two). The SAAD student uses raw identity normalization and has 11,173,962 parameters; its lossless current-PyTorch state_dict contains 122 keys including BatchNorm counters. LR is 0.1/0.01/0.001 for epochs 0–99/100–149/150–199. The method-specific training inner is CE/labels for PGD-AT, KL/student-clean for TRADES, and KL/teacher-clean for RSLAD-family methods; selection/evaluation remains explicit PGD-20 CE. Paper/code protocols are audit-only; config checks perform no downloads, GPU, or full training. `resnet18_cifar` is a compatibility alias, not canonical.
 
-Method-independent preparation adds runnable but unexecuted templates under
-`configs/scientific/` for PGD-AT, TRADES, and Chen/Bartoldson
-`rslad_logging_only`. The baseline templates resolved successfully under the
-one-epoch pilot protocol, and 16-sample CUDA smokes completed for PGD-AT and
-TRADES. No real-data baseline or logging-only long run has started.
+Method-independent preparation provides runnable templates under
+`configs/scientific/` for PGD-AT, TRADES, and Chen/Bartoldson observed RSLAD.
+Non-intervened observation is no longer a separate method: it is ordinary
+`rslad` plus `observation.profile=teacher_response`. All canonical production
+RSLAD-family configs now declare that profile before launch, so student history
+and teacher-response primitives are available without a second training run.
+The original Bartoldson seed-1 run remains bound to Git SHA `0fdfaeb` for exact
+resume; its live state is read from its run bundle or W&B rather than asserted here.
+Saved checkpoints from the older schema-v2 runtime remain evaluable: evaluation
+hashes the untouched sibling resolved YAML before applying an evaluation-only
+migration and records both source and runtime method identities. This does not
+permit training resume under a different runtime SHA.
 
 ## CIFAR template configs and execution status
 

@@ -58,10 +58,9 @@ including BatchNorm tracking counters. These counts are identity checks, not int
 4 ablationの追加契約:
 
 - `rslad`: valid sampleのKD weightはuniform、hard-label fallbackは0。
-- `rslad_logging_only`: attack、objective、KD/hard weight、optimizer updateは
-  `rslad`と同一。pre-updateのdetached FP32 student marginと、frozen
-  teacherのclean/student-adversarial confidence primitivesだけをstable
-  sample stateへ記録し、loss、target、sample selectionへ入力しない。
+- non-intervened observation baselineは別methodではなく`rslad`と
+  `observation.profile=teacher_response`の組合せで表す。attack、objective、KD/hard weight、optimizer updateは
+  `rslad`そのものであり、pre-update detached FP32 primitivesをloss、target、sample selectionへ入力しない。
 - `rslad_entropy`: frozen teacherのShannon entropyを使い、weightは
   `5 * (H_i - global_min_valid_batch(H))`。係数5はmethod constant。clip、mean preservation、
   hard-label fallbackはない。
@@ -86,10 +85,16 @@ as one scientific run family. Pilot uses five epochs only; canonical production 
 
 - sample IDは元dataset indexであり、subset、augmentation、shuffle、rankで作り直さない。
 - robust marginはpre-update detached FP32 logitsから計算する。
-- logging-only stateはrisk式を固定せず、margin/current EMA、correctness
+- observation stateはmethod/lossから独立し、risk式を固定せず、margin/current EMA、correctness
   frequency、forgetting、teacher entropy、true-class probability、
   max-wrong-class probability、prediction/correctnessをclean/adv別に保持する。
   wrong-confidence、threshold、gate、interventionはofflineで別々に定義する。
+- observation profileは`off`、`student_history`、`teacher_response`を明示する。
+  `teacher_response`はstudent historyを含み、teacher clean/adversarial primitivesとclean-to-adversarial
+  responseを保存する。teacher adversarial forwardはpolicy/diagnosticsとbatch内で共有する。
+- observation tensorはpre-update detached FP32であり、attack、loss、policy、gradient、optimizer、scheduler、
+  RNGへ流さない。future methodの候補riskは保存済みprimitiveからofflineで構成し、観測のために同じrunを
+  再実行しない。
 - EMA decayはcanonical student/joint methodで`0.9`、first observationで初期化する。
 - robust correctness count、observation count、forgetting count、last updateをstable IDごとに保持する。
 - rankごとのsparse observationはepoch boundaryで決定論的にmergeし、padding duplicateはstateを更新しない。
@@ -125,6 +130,10 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
 
 - training中のvalidation PGDは正式なtest evaluationではない。
 - evaluate CLIは保存済みstudent checkpointと兄弟のresolved training config hashを照合する。
+- 旧schema-v2 resolved configは、保存されたraw YAML mappingのhashをcheckpointへ先に照合してからevaluation-only
+  runtime viewへ明示migrationする。migrationは旧`rslad_logging_only`をloss-identicalな`rslad`と
+  `teacher_response`へ写し、source/runtime methodと適用変換をevaluation lineageに残す。normal train loaderと
+  exact resumeを緩和しない。
 - evaluation processはteacher、training objective/policy、optimizer、sample stateをtest-time defenseに使わない。
 - clean accuracy、PGD accuracy、AutoAttack accuracyを分離する。
 - `evaluation.seed`はtraining seedと独立し、defaultは`0`。PGD random start/panel selectionとAutoAttackの両方へ使う。

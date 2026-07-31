@@ -474,6 +474,36 @@ def test_directory_digest_keeps_files_when_ancestor_is_named_artifacts(tmp_path:
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_log_metrics_atomically_refreshes_bounded_manifest_progress(tmp_path: Path) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    tracker = create_tracker(
+        config=config(output, mode="disabled"), output_dir=output, config_hash="abc", root=tmp_path
+    )
+    assert isinstance(tracker, LocalTracker)
+    tracker.log_metrics({"epoch": 3, "train_loss": 0.25, "vector": [1, 2, 3]}, step=17)
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["latest_progress"]["epoch"] == 3
+    assert manifest["latest_progress"]["global_step"] == 17
+    assert manifest["latest_progress"]["metrics"] == {"epoch": 3, "global_step": 17, "train_loss": 0.25}
+    assert isinstance(manifest["latest_progress"]["timestamp"], str)
+
+
+def test_running_resume_preserves_latest_progress_snapshot(tmp_path: Path) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    cfg = config(output, mode="disabled")
+    tracker = create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
+    assert isinstance(tracker, LocalTracker)
+    tracker.log_metrics({"epoch": 7, "train_loss": 0.125}, step=42)
+    resumed = create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
+    assert isinstance(resumed, LocalTracker)
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "running"
+    assert manifest["latest_progress"]["epoch"] == 7
+    assert manifest["latest_progress"]["global_step"] == 42
+
+
 def config(output: Path, *, mode: str = "offline") -> ExperimentConfig:
     return ExperimentConfig.model_validate(
         {

@@ -27,7 +27,7 @@ from ard.engine.checkpoint import REQUIRED_KEYS, load_checkpoint, save_checkpoin
 from ard.engine.trainer import Trainer
 from ard.models import build_student
 from ard.objectives import ObjectiveTerms, PGDATObjective, RSLADObjective
-from ard.policies import RSLADBaselinePolicy
+from ard.policies import EntropyOnlyPolicy, RSLADBaselinePolicy
 from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
 from ard.tracking import NullTracker, coordinated_tracker_action
@@ -71,7 +71,7 @@ def test_training_diagnostics_are_observational_for_full_checkpoint_state(tmp_pa
             assert equal(first[key], second[key]), key
 
 
-def test_rslad_logging_only_is_exact_for_optimization_rng_and_checkpoint_state(tmp_path: Path) -> None:
+def test_teacher_response_observation_is_exact_for_optimization_rng_and_checkpoint_state(tmp_path: Path) -> None:
     import random
 
     import numpy as np
@@ -98,7 +98,7 @@ def test_rslad_logging_only_is_exact_for_optimization_rng_and_checkpoint_state(t
             objective=RSLADObjective(),
             policy=RSLADBaselinePolicy(),
             sample_store=SampleStateStore(ema_decay=0.9) if observed else None,
-            observe_teacher_signals=observed,
+            observation_profile="teacher_response" if observed else "off",
             diagnostics=TrainingDiagnostics.for_ids(list(range(8)), seed=4, size=0, mode="summary"),
             device=torch.device("cpu"),
             output_dir=output,
@@ -151,8 +151,54 @@ def test_rslad_logging_only_is_exact_for_optimization_rng_and_checkpoint_state(t
     assert all(parameter.grad is None for parameter in observed.teacher.parameters())
 
 
+def test_teacher_response_reuses_one_adversarial_forward_for_entropy_policy(tmp_path: Path) -> None:
+    class IdentityAttack:
+        def generate(self, request: object) -> AttackResult:
+            inputs = request.inputs  # type: ignore[attr-defined]
+            return AttackResult(inputs, torch.zeros_like(inputs), (), 0.0)
+
+    class CountingTeacher(nn.Module):
+        def __init__(self, module: nn.Module) -> None:
+            super().__init__()
+            self.module = module
+            self.calls = 0
+
+        def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+            self.calls += 1
+            return self.module(inputs)
+
+    torch.manual_seed(123)
+    student = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
+    torch.manual_seed(456)
+    teacher = CountingTeacher(build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke"))
+    optimizer = SGD(student.parameters(), lr=0.03, momentum=0.9)
+    trainer = Trainer(
+        model=student,
+        teacher=teacher,
+        optimizer=optimizer,
+        scheduler=None,
+        scaler=None,
+        attack=IdentityAttack(),  # type: ignore[arg-type]
+        selection_attack=IdentityAttack(),  # type: ignore[arg-type]
+        objective=RSLADObjective(),
+        policy=EntropyOnlyPolicy(),
+        sample_store=SampleStateStore(ema_decay=0.9),
+        observation_profile="teacher_response",
+        device=torch.device("cpu"),
+        output_dir=tmp_path,
+        config_hash="teacher-forward-reuse",
+        seed=4,
+    )
+    loader, _, _ = make_loaders()
+    trainer.train_epoch(loader)
+    # RSLAD needs one clean teacher target; teacher_response supplies exactly
+    # one adversarial response, reused by entropy policy rather than recomputed.
+    assert teacher.calls == 2 * len(loader)
+    assert all(parameter.grad is None for parameter in teacher.parameters())
+
+
 @pytest.mark.gpu
-def test_rslad_logging_only_cuda_parity_with_random_start_pgd(tmp_path: Path) -> None:
+def test_teacher_response_cuda_parity_with_random_start_pgd(tmp_path: Path) -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")
     import random
@@ -197,7 +243,7 @@ def test_rslad_logging_only_cuda_parity_with_random_start_pgd(tmp_path: Path) ->
             objective=RSLADObjective(),
             policy=RSLADBaselinePolicy(),
             sample_store=SampleStateStore(ema_decay=0.9) if observed else None,
-            observe_teacher_signals=observed,
+            observation_profile="teacher_response" if observed else "off",
             diagnostics=TrainingDiagnostics.for_ids(list(range(8)), seed=4, size=0, mode="summary"),
             device=device,
             output_dir=output,
@@ -313,11 +359,13 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
         "train_cuda_peak_allocated_bytes",
         "train_cuda_peak_reserved_bytes",
         "train_teacher_clean_forward_calls",
+        "train_teacher_adversarial_forward_calls",
         "val_clean_accuracy",
         "val_pgd_accuracy",
     }
     assert history[0]["train_valid_examples"] == float(len(cast(Sized, loader.dataset)))
     assert history[0]["train_teacher_clean_forward_calls"] == 0.0
+    assert history[0]["train_teacher_adversarial_forward_calls"] == 0.0
     assert history[0]["train_cuda_peak_allocated_bytes"] == 0.0
     assert history[0]["train_cuda_peak_reserved_bytes"] == 0.0
     assert callback_metrics == history
@@ -351,6 +399,7 @@ def test_epoch_boundary_resume_matches_uninterrupted_training(tmp_path: Path) ->
         "train_robust_accuracy",
         "train_valid_examples",
         "train_teacher_clean_forward_calls",
+        "train_teacher_adversarial_forward_calls",
         "val_clean_accuracy",
         "val_pgd_accuracy",
     )
@@ -361,6 +410,7 @@ def test_epoch_boundary_resume_matches_uninterrupted_training(tmp_path: Path) ->
         }
         assert uninterrupted_epoch["train_valid_examples"] == float(len(cast(Sized, full_loader.dataset)))
         assert uninterrupted_epoch["train_teacher_clean_forward_calls"] == 0.0
+        assert uninterrupted_epoch["train_teacher_adversarial_forward_calls"] == 0.0
 
 
 def _advance_optimizer_and_schedule(optimizer: SGD, scheduler: object, *, completed_epochs: int) -> None:

@@ -38,6 +38,17 @@ CIFAR-10/100で機構と再現性を確立し、Tiny-ImageNetをscale validation
 
 Git diffと関連入力hashで必要testを選び、成功結果をcacheします。full suiteはmilestone境界、GPU smokeは影響pathがある場合、production trainingは明示的な研究実験としてのみ実行します。
 
+## D8. 観測を介入から分離し、最初のrunで保存する
+
+将来failureを説明・予測するprimitiveは、method固有のrisk式へ早期に畳み込みません。canonical研究runでは
+目的に応じて`student_history`または`teacher_response`を事前に選び、margin history、correctness transition、
+teacher clean/adversarial confidenceとresponseをdetached stateとして保存します。これによりv1の積risk、
+wrong-confidence gate、student-only routing、将来のprescriptive utility比較を同じtrajectoryから検証できます。
+
+一方で観測は無料ではありません。teacher responseは追加forwardの有無と再利用を計測し、dev/smokeへ一律に
+有効化しません。保存するのはraw primitiveであり、outcomeを見た後のthresholdやoracle maskをtraining inputへ
+逆流させません。
+
 ### M0 target softening decision
 
 `teacher_target_uniform_mix@1` は teacher の `softmax(z_t/T)` を adversarial student-KD branch のみ uniform mix する（`risk_transform: identity`, `rho_max: 0.5`）。clean KD target は不変で、student/joint main semantics に hard-label fallback はない。旧挙動は `rslad_hard_fallback@1` ablation として明示する。

@@ -1,7 +1,7 @@
 PYTHON ?= /home/shunsukenaito/.conda/envs/adv/bin/python
 export PYTHONPATH := $(CURDIR)/src
 
-.PHONY: lint test-changed smoke verify-milestone
+.PHONY: lint test-changed smoke verify-milestone status
 
 lint:
 	$(PYTHON) -m ruff format --check src scripts tests
@@ -10,6 +10,7 @@ lint:
 	$(PYTHON) -m pytest -q tests/unit/test_imports.py
 	$(PYTHON) -m ard.cli.train --help
 	$(PYTHON) -m ard.cli.evaluate --help
+	$(PYTHON) -m ard.cli.status --help
 
 test-changed:
 	$(PYTHON) scripts/verify.py --changed
@@ -19,3 +20,6 @@ smoke:
 
 verify-milestone:
 	$(PYTHON) scripts/verify.py --changed --force --non-scientific
+
+status:
+	$(PYTHON) -m ard.cli.status --root outputs --format markdown

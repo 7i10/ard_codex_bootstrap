@@ -15,6 +15,10 @@ require `panel`; smoke/dev configs may use `off`. `artifact_interval_epochs` con
 (the checked-in cadence is 5 epochs), while local best/last checkpoints are still written at scientific checkpoint
 cadence. The final epoch always publishes both best and last model artifacts.
 
+Observation is a separate axis from W&B diagnostics. `observation.profile` controls persistent detached per-sample
+history/teacher primitives, while `tracking.diagnostics_mode` controls scalar/media publication. The resolved profile
+is part of the exact config and therefore the run lineage.
+
 | Tier | Allowed tracking | Completion semantics |
 |---|---|---|
 | `dev` | disabled/offline/online as explicitly configured | local development only |
@@ -200,6 +204,10 @@ tracker lifecycleはfailureにもtransactionalです。local manifest作成後�
 `completion.json`を残さず`error-marker.txt`をapplication failureへ更新し、未公開run-bundle entryを除去して、
 manifest/artifactsを除いたexact file digestを`failure_snapshot`へ保存します。W&B runは成功時`exit_code=0`、
 失敗時`exit_code=1`で閉じます。
+
+`log_metrics`は既存のepoch単位W&B logと同時に、local manifestの`latest_progress`をatomic updateします。
+これはepoch、global step、更新時刻とbounded scalar snapshotだけを持ちます。live cross-host表示はW&B、local
+集約は`ard.cli.status`を使い、GPU pollingやcampaign watchdogをtraining correctnessの条件にしません。
 
 全epoch完了後のterminal no-op resumeは、prior terminal statusとcompletion marker、best/last・sample-stats・
 run-bundle artifactの存在、file artifactのsource/local content hashを検証してから終了します。summary、artifact

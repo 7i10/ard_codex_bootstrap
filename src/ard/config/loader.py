@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Mapping
+from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +16,23 @@ import yaml
 from .schema import ExperimentConfig
 
 ENV_PATTERN = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
+
+
+@dataclass(frozen=True)
+class EvaluationResolvedConfig:
+    """Validated evaluation view plus immutable raw training lineage."""
+
+    config: ExperimentConfig
+    raw_config_hash: str
+    migration: dict[str, object]
+
+
+def _mapping_digest(value: Mapping[str, Any]) -> str:
+    """Match the checkpoint config digest without normalizing legacy fields."""
+    import hashlib
+
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _expand_environment(value: Any) -> Any:
@@ -53,6 +73,52 @@ def load_config(path: Path, overrides: list[str] | tuple[str, ...] = ()) -> Expe
     for override in overrides:
         _apply_override(expanded, override)
     return ExperimentConfig.model_validate(expanded)
+
+
+def load_resolved_config_for_evaluation(path: Path) -> EvaluationResolvedConfig:
+    """Load historical resolved training lineage without reopening train support.
+
+    Checkpoint identity is calculated from the untouched saved YAML mapping.
+    Only the in-memory evaluation view is migrated: the former one-off
+    logging-only method becomes ordinary RSLAD with explicit observations,
+    obsolete gate metadata is discarded, and newer optional observation state
+    defaults to ``off``.  Normal config loading remains strict.
+    """
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("resolved training config must be a YAML mapping")
+    raw_mapping = deepcopy(raw)
+    raw_hash = _mapping_digest(raw_mapping)
+    migrated = deepcopy(raw_mapping)
+    method = migrated.get("method")
+    if not isinstance(method, dict) or not isinstance(method.get("id"), str):
+        raise ValueError("resolved training config has no method ID")
+    source_method_id = method["id"]
+    applied: list[str] = []
+    if "research_design" in migrated:
+        migrated.pop("research_design")
+        applied.append("research_design_removed")
+    if source_method_id == "rslad_logging_only":
+        method["id"] = "rslad"
+        observation = migrated.get("observation")
+        if observation is not None and observation != {"profile": "teacher_response"}:
+            raise ValueError("legacy rslad_logging_only resolved config has incompatible observation metadata")
+        migrated["observation"] = {"profile": "teacher_response"}
+        applied.append("rslad_logging_only_to_rslad_teacher_response")
+    elif "observation" not in migrated:
+        migrated["observation"] = {"profile": "off"}
+        applied.append("observation_defaulted_off")
+    config = ExperimentConfig.model_validate(migrated)
+    return EvaluationResolvedConfig(
+        config=config,
+        raw_config_hash=raw_hash,
+        migration={
+            "source_method_id": source_method_id,
+            "runtime_method_id": config.method.id,
+            "applied": applied,
+            "raw_mapping_hash": raw_hash,
+        },
+    )
 
 
 def resolved_config_dict(config: ExperimentConfig) -> dict[str, Any]:

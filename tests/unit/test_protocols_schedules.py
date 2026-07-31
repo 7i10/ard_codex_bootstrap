@@ -100,7 +100,7 @@ def test_controlled_protocol_keeps_distinct_valid_train_and_selection_attacks() 
     [
         ("pgd_at", "ce", None),
         ("trades", "kl", "student_clean"),
-        ("rslad_logging_only", "kl", "teacher_clean"),
+        ("rslad", "kl", "teacher_clean"),
     ],
 )
 def test_controlled_protocol_selects_method_specific_training_attack(

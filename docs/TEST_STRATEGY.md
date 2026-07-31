@@ -168,6 +168,11 @@ freeze済みです。最終host gate `scripts/verify.py --changed --force --non-
 bootstrap中のsynthetic checkpoint/resume、diagnostics有無のfull-checkpoint exact parity、real two-rank Gloo
 diagnostics dedupのfocused証拠`1 passed in 4.40s`も保持します。
 
+観測profileを変更した場合は、観測offとのmodel/optimizer/scheduler/RNG parity、detached finite state、resume、
+stable ID/DDP paddingに加え、teacher adversarial forwardがobservation/policy/diagnostics間でbatchあたり一度だけ
+共有されることをfocused regressionで確認します。status表示はfixture manifestだけでrunning/stale/failed/
+sync-pending/completedを検証し、network、PID、CUDAを要求しません。
+
 実CLIのbounded smokeでは`configs/experiments/synthetic_pgd_at.yaml`をPGD 1 step、1 epoch、16 samplesでtrainし、
 exit 0とbest/last、sample Parquet、run bundleを確認しました。別evaluate processはbest/lastを8 synthetic samplesで
 評価し、両方でclean/PGD accuracyが`0.125`、best/last Parquet、panels、evaluation bundleが生成されました。

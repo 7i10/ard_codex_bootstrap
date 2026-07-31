@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import platform
 import shutil
@@ -79,6 +80,24 @@ def _write_json(path: Path, value: Mapping[str, Any]) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, sort_keys=True, indent=2, default=_json_default) + "\n", encoding="utf-8")
     os.replace(temporary, path)
+
+
+def _bounded_progress_metrics(
+    values: Mapping[str, Any], *, limit: int = 32
+) -> dict[str, int | float | str | bool | None]:
+    """Keep a small, JSON-safe progress snapshot inside the local manifest."""
+    bounded: dict[str, int | float | str | bool | None] = {}
+    for key in sorted(values):
+        if len(bounded) >= limit or not isinstance(key, str):
+            break
+        value = values[key]
+        if isinstance(value, bool) or value is None or isinstance(value, str):
+            bounded[key] = value
+        elif isinstance(value, int):
+            bounded[key] = value
+        elif isinstance(value, float) and math.isfinite(value):
+            bounded[key] = value
+    return bounded
 
 
 def _run_git(args: list[str]) -> str | None:
@@ -488,6 +507,7 @@ class LocalTracker:
                 "git",
                 "external",
                 "teacher",
+                "latest_progress",
             ):
                 if key in prior:
                     self.manifest[key] = prior[key]
@@ -597,6 +617,13 @@ class LocalTracker:
             record.setdefault("global_step", step)
         with self.metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, sort_keys=True, default=_json_default) + "\n")
+        self.manifest["latest_progress"] = {
+            "epoch": record.get("epoch"),
+            "global_step": record.get("global_step"),
+            "timestamp": datetime.now(UTC).isoformat(),
+            "metrics": _bounded_progress_metrics(record),
+        }
+        _write_json(self.manifest_path, self.manifest)
         if self._wandb_run is not None:
             self._wandb_run.log(record, step=step)
 

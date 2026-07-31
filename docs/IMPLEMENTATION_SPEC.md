@@ -22,6 +22,7 @@ single-teacher ARDにおけるbaseline再現、per-sample診断、sample-wise po
 │   ├── plans/
 │   └── debugging/
 ├── scripts/
+├── tools/internal/             # 非公開の過去campaign/recovery運用アーカイブ
 ├── src/ard/
 │   ├── cli/
 │   ├── config/
@@ -76,6 +77,13 @@ signal dictionaryからKD weight、必要ならtemperature/fallback maskを生�
 
 stable sample IDをキーに、EMA、correctness count、forgetting count、last update等を保持します。CPU residentを基本とし、batch単位で必要部分だけGPUへ移します。DDPの所有・集約方針を明示します。
 
+### Observation profile
+
+観測はmethod IDやloss policyと分離します。`off`、`student_history`、`teacher_response`から明示的に選び、
+detached raw primitiveだけを`SampleStateStore`へ保存します。`teacher_response`はteacher adversarial forwardの
+費用を伴うためresolved configとmanifestへ残し、entropy policyやdiagnosticsと同じlogitsを再利用します。
+risk式、threshold、gateは観測層へ入れず、analysisまたはpolicyで定義します。
+
 ### ExperimentTracker
 
 `log_metrics`、`log_table`、`log_artifact`、`set_summary`、`finish`等の小さなinterfaceを提供します。W&B固有objectがengineへ漏れないようにします。
@@ -97,12 +105,15 @@ stable sample IDをキーに、EMA、correctness count、forgetting count、last
 | `pgd_at` | student PGD | hard-label CE | none | uniform |
 | `trades` | TRADES inner | TRADES | none | uniform |
 | `rslad` | RSLAD-compatible | hard + robust KD | none | uniform |
-| `rslad_logging_only` | same as RSLAD | exact RSLAD | primitive student/teacher state | uniform; observation-only |
 | `rslad_entropy` | same as RSLAD | same | teacher entropy | entropy weight |
 | `rslad_student` | same as RSLAD | same | robust-margin EMA | student weight |
 | `rslad_joint` | same as RSLAD | same | entropy + margin EMA | joint-risk gate |
 
 full SAADはupstream wrapperから開始し、必要時に別method IDでclean-room portします。
+
+介入なしの観測baselineは、新しいmethodを作らず`rslad`と
+`observation.profile=teacher_response`を組み合わせます。これにより同じ観測profileをEntropy/Student/Jointや
+将来手法にも適用でき、観測不足を理由とする再訓練を避けます。
 
 ## 6. 実装済みCLI
 

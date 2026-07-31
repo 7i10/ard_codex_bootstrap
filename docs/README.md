@@ -1,6 +1,6 @@
 # Documentation index
 
-- [Experiment dashboard](EXPERIMENT_DASHBOARD.md): 人間向けの目的、条件、現在状態、正式結果、W&B run分類
+- [Experiment dashboard](EXPERIMENT_DASHBOARD.md): 人間向けの目的、条件、確定結果、W&B run分類
 - [Seed-0 signal audit](SIGNAL_AUDIT.md): Student/Joint signalの探索的関連、周期checkpoint、正式判定の境界
 - [Reproduction status](REPRODUCTION_STATUS.md): 実装済み機能、実行済み検証、未実行の重い実験、実際のCLI手順
 - [Research decisions](RESEARCH_DECISIONS.md): 今回の研究・実装で固定した方針
@@ -14,7 +14,7 @@
 - [Experiment taxonomy](EXPERIMENT_PROTOCOL.md): audit, pilot, and canonical production separation
 - [Codex workflow](CODEX_WORKFLOW.md): Sol/Terra/Lunaの役割分担
 - [Ferret execution protocol](FERRET_EXECUTION_PROTOCOL.md): fixed-SHA remote GPU runs from Hamster
-- [Five-GPU campaign protocol](FIVE_GPU_CAMPAIGN_PROTOCOL.md): independent single-GPU queues on Hamster/Ferret
+- [Legacy campaign archive](../tools/internal/legacy_campaign/README.md): 完了済みHamster/Ferret運用コードの非公開・非runtimeアーカイブ
 
 ## CLI entry points
 
@@ -22,6 +22,7 @@
 PYTHONPATH=src python -m ard.cli.train --config <experiment.yaml>
 PYTHONPATH=src python -m ard.cli.train --config <experiment.yaml> --resume <output>/last.pt
 PYTHONPATH=src python -m ard.cli.evaluate --config <experiment.yaml> --checkpoint-dir <output>
+PYTHONPATH=src python -m ard.cli.status --root <output-root> --format markdown
 python scripts/verify.py --changed
 ```
 
@@ -29,6 +30,9 @@ python scripts/verify.py --changed
 `evaluation.checkpoints`（既定は`both`）に従って`best.pt`と`last.pt`を別々に評価します。
 full AutoAttackは通常のtestやtrainからは起動せず、evaluation configで明示的に有効化した上で
 `--allow-autoattack`を付けた別processだけが実行できます。
+
+実行中のepoch、step、更新時刻、terminal stateは`run-bundle/manifest.json`からstatus CLIが導出します。
+跨hostのlive viewはW&Bを使い、Git管理されたdashboard本文をprocess監視のために手編集しません。
 
 Teacher audit (W&B-free, PGD screening) should run on one GPU first. After that, use the two-GPU pilot and production
 commands documented in `EXPERIMENT_PROTOCOL.md`; set `WANDB_PROJECT=single-teacher-ard` (and teacher-specific group

@@ -91,6 +91,7 @@ def test_cpu_epoch_observability_counts_only_actual_valid_work(tmp_path: Path, m
     assert teacher.calls == 2
     assert metrics["valid_examples"] == 3.0
     assert metrics["teacher_clean_forward_calls"] == 2.0
+    assert metrics["teacher_adversarial_forward_calls"] == 0.0
     assert metrics["seconds"] == 2.0
     assert metrics["images_per_second"] == 1.5
     assert metrics["cuda_peak_allocated_bytes"] == 0.0
@@ -98,8 +99,8 @@ def test_cpu_epoch_observability_counts_only_actual_valid_work(tmp_path: Path, m
 
 
 def test_two_rank_observability_reduction_contract(monkeypatch: pytest.MonkeyPatch) -> None:
-    local_totals = torch.tensor([10.0, 2.0, 1.0, 3.0, 2.0], dtype=torch.float64)
-    remote_totals = torch.tensor([20.0, 4.0, 3.0, 5.0, 4.0], dtype=torch.float64)
+    local_totals = torch.tensor([10.0, 2.0, 1.0, 3.0, 2.0, 1.0], dtype=torch.float64)
+    remote_totals = torch.tensor([20.0, 4.0, 3.0, 5.0, 4.0, 7.0], dtype=torch.float64)
 
     monkeypatch.setattr(trainer_module, "reduce_sums", lambda values: values + remote_totals)
     monkeypatch.setattr(
@@ -123,6 +124,7 @@ def test_two_rank_observability_reduction_contract(monkeypatch: pytest.MonkeyPat
         "cuda_peak_allocated_bytes": 100.0,
         "cuda_peak_reserved_bytes": 160.0,
         "teacher_clean_forward_calls": 6.0,
+        "teacher_adversarial_forward_calls": 8.0,
     }
 
 

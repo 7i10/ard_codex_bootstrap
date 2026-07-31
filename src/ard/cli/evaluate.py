@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, load_config, save_resolved_config
-from ard.config.loader import resolved_config_dict
+from ard.config.loader import load_resolved_config_for_evaluation, resolved_config_dict
 from ard.config.schema import training_execution_identity
 from ard.data import EpochShuffleSampler, IndexedBatch, build_dataset, collate_indexed
 from ard.engine import config_digest
@@ -159,9 +159,7 @@ def _evaluation_tracker_config(
     return training_config.model_copy(update={"evaluation": config.evaluation, "output_dir": output_dir})
 
 
-def _evaluation_preflight_config(
-    config: ExperimentConfig, training_config: ExperimentConfig
-) -> ExperimentConfig:
+def _evaluation_preflight_config(config: ExperimentConfig, training_config: ExperimentConfig) -> ExperimentConfig:
     """Use portable local paths without changing canonical training lineage."""
     return training_config.model_copy(update={"teacher": config.teacher})
 
@@ -179,7 +177,8 @@ def main(argv: list[str] | None = None) -> int:
     training_config_path = args.train_config or (checkpoints[0].parent / "resolved_config.yaml")
     if not training_config_path.is_file():
         raise FileNotFoundError(f"sibling resolved training config is missing: {training_config_path}")
-    training_config = load_config(training_config_path)
+    resolved_training = load_resolved_config_for_evaluation(training_config_path)
+    training_config = resolved_training.config
     _validate_evaluation_tracking_identity(config, training_config)
     # The training config remains the canonical lineage/config-hash source.
     # Only use the evaluation host's already-verified checkpoint location for
@@ -201,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     evaluation_attack = config.evaluation.attack or training_selection_attack
     if _attack_identity(evaluation_attack) != _attack_identity(training_selection_attack):
         raise ValueError("evaluation attack must exactly match the resolved training selection attack")
-    expected_config_hash = config_digest(resolved_config_dict(training_config))
+    expected_config_hash = resolved_training.raw_config_hash
     checkpoint_payloads = [
         validate_checkpoint_lineage(checkpoint, expected_config_hash=expected_config_hash) for checkpoint in checkpoints
     ]
@@ -234,6 +233,8 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "training_config": str(training_config_path.resolve()),
                 "training_config_hash": expected_config_hash,
+                "training_runtime_config_hash": config_digest(resolved_config_dict(training_config)),
+                "training_config_migration": resolved_training.migration,
                 "evaluation_config_hash": evaluation_hash,
             },
             sort_keys=True,
@@ -353,8 +354,10 @@ def main(argv: list[str] | None = None) -> int:
                     },
                     "student": training_config.student.architecture,
                     "student_identity": training_config.student.model_dump(mode="json"),
-                    "method": training_config.method.id,
+                    "method": resolved_training.migration["source_method_id"],
+                    "runtime_method": training_config.method.id,
                     "method_identity": training_config.method.model_dump(mode="json"),
+                    "training_config_migration": resolved_training.migration,
                     "training_protocol_identity": {
                         "id": training_config.protocol.id,
                         "epochs": training_config.training.epochs,

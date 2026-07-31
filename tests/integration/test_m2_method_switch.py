@@ -44,7 +44,6 @@ def test_one_epoch_synthetic_method_switch_smoke(tmp_path: Path) -> None:
         "pgd_at",
         "trades",
         "rslad",
-        "rslad_logging_only",
         "rslad_entropy",
         "rslad_student",
         "rslad_joint",
