@@ -70,6 +70,14 @@ therefore meet the preregistered Signal Go allocation rule. This retains the
 signal for intervention research but does not validate current target
 softening.
 
+The complete four-model table was subsequently extracted from those unchanged
+formal JSON reports into `docs/SIGNAL_AUDIT.md`. Student-only contains almost
+all held-out ranking information; adding teacher entropy after student history
+changes AUROC by `-0.0021` to `+0.0010`. Adding the multiplicative interaction
+changes AUROC by `+0.0009` to `+0.0035` and improves log-loss in all four
+reports. These adjacent point deltas do not have dedicated paired bootstrap
+intervals in the existing reports and remain descriptive.
+
 One consolidated scientific review found no remaining P0/P1 after the
 fail-closed lineage, replay, attack, split, and bootstrap contracts were
 verified. The review was not repeated after docs-only synchronization.

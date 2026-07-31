@@ -43,6 +43,57 @@ student signal, especially for Bartoldson; it does **not** establish that the
 current target-softening intervention improves accuracy. Confidence intervals
 are conditional on seed-0 training runs, not uncertainty across training seeds.
 
+### Complete held-out model comparison
+
+The tables below extract all four preregistered logistic models from the same
+formal JSON reports and the same held-out prospective
+`subsequent_forgetting_increment` outcome. Here, `c_i` is historical teacher
+low-entropy risk, `u_i` is historical student robust-margin risk, and
+`u_i c_i` is their product. Higher AUROC/AUPRC and lower log-loss are better.
+
+| Teacher / run | Teacher-only `c_i` | Student-only `u_i` | Main effects `u_i,c_i` | Main + product `u_i,c_i,u_i c_i` |
+|---|---:|---:|---:|---:|
+| **AUROC** |||||
+| Chen / Student | 0.8529 | 0.8989 | 0.8968 | 0.8982 |
+| Chen / Joint | 0.8593 | 0.8952 | 0.8955 | 0.8964 |
+| Bartoldson / Student | 0.5857 | 0.9184 | 0.9194 | 0.9230 |
+| Bartoldson / Joint | 0.6023 | 0.9338 | 0.9340 | 0.9373 |
+| **AUPRC** |||||
+| Chen / Student | 0.8296 | 0.8461 | 0.8384 | 0.8414 |
+| Chen / Joint | 0.8490 | 0.8401 | 0.8398 | 0.8395 |
+| Bartoldson / Student | 0.7719 | 0.9363 | 0.9387 | 0.9460 |
+| Bartoldson / Joint | 0.7950 | 0.9469 | 0.9475 | 0.9552 |
+| **Log-loss** |||||
+| Chen / Student | 0.4710 | 0.3895 | 0.3853 | 0.3822 |
+| Chen / Joint | 0.4623 | 0.3981 | 0.3882 | 0.3853 |
+| Bartoldson / Student | 0.6071 | 0.3137 | 0.3134 | 0.3086 |
+| Bartoldson / Joint | 0.5936 | 0.2857 | 0.2860 | 0.2796 |
+
+The three requested incremental comparisons are:
+
+1. **Teacher versus student (`c_i` vs `u_i`).** Student-only AUROC is higher
+   in all four reports: `+0.0461`, `+0.0359`, `+0.3326`, and `+0.3315`.
+   Student-only log-loss also improves in every report. Chen Joint is the
+   exception for AUPRC (`0.8401` vs teacher `0.8490`), so the student signal
+   does not dominate the teacher under every ranking metric.
+2. **Adding teacher to student (`u_i` vs `u_i,c_i`).** AUROC changes are
+   `-0.0021`, `+0.0004`, `+0.0010`, and `+0.0002`. Teacher entropy therefore
+   adds little ranking information after student history in these seed-0
+   reports. It improves Chen log-loss, is nearly neutral for Bartoldson
+   Student, and slightly worsens Bartoldson Joint (`+0.0003`).
+3. **Adding the product (`u_i,c_i` vs `u_i,c_i,u_i c_i`).** AUROC changes are
+   `+0.0014`, `+0.0009`, `+0.0035`, and `+0.0033`; log-loss improves in all
+   four reports by `0.0030`, `0.0030`, `0.0048`, and `0.0064`. The product
+   provides a small incremental calibration/ranking gain, strongest for
+   Bartoldson, but is not the main source of predictive power.
+
+These are held-out point estimates. The existing reports contain paired
+bootstrap inference for teacher-only versus main-plus-product, not for every
+adjacent comparison above. Therefore the small main-effect/product increments
+are descriptive and should not yet be called statistically established.
+Predictive interaction also does not prove that multiplying the risks is the
+correct causal intervention or target-softening rule.
+
 The final-state association remains exploratory. Final student risk is strongly
 associated with same-run final robust error (AUROC 0.961/0.957 for
 Chen/Bartoldson Student), while final low-entropy teacher risk is inversely
