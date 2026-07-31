@@ -1,0 +1,125 @@
+schema_version: 1
+design_id: history_confirmatory_block_v2
+status: frozen_before_seed_1_or_2_outcomes
+frozen_on: 2026-08-01
+
+scientific_contract:
+  inherited_design: tools/internal/history_replication/provenance/logging_only_history_confirmatory_v1.yaml
+  inherited_design_sha256: d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12
+  predictor_features_outcomes_splits_metrics_and_thresholds: unchanged
+  runtime_contract_parent_git_sha: ad6d26e1c15d90eeb8c1d8b10cfa081a433364b9
+  dataset: cifar10
+  train_partition_count: 45000
+  student: saad_resnet18_cifar_v1
+  protocol: controlled_cifar10_r18_v1
+  method: rslad
+  observation_profile: teacher_response
+  epochs: 200
+  world_size: 1
+  per_rank_batch_size: 128
+  global_batch_size: 128
+  anchor_epoch: 99
+  final_epoch: 199
+
+optimization_parity:
+  observations: pre_optimizer_update_detached_fp32
+  may_affect_loss_gradient_optimizer_scheduler_or_rng: false
+  cuda_test: tests/integration/test_checkpoint_resume.py::test_teacher_response_cuda_parity_with_random_start_pgd
+  required_result: pass
+  legacy_bridge:
+    run_id: bart-rslad-logging-only-s1-confirm-v1
+    teacher: bartoldson2024_adversarial_wrn94_16
+    seed: 1
+    git_sha: 0fdfaeb5809e3b08a0825e2e5caf0bebfa215047
+    source_method: rslad_logging_only
+    runtime_equivalent_method: rslad
+    runtime_equivalent_observation_profile: teacher_response
+    admissible_only_if: old_and_new_runtime_parity_evidence_passes
+
+confirmatory_runs:
+  - id: L1
+    teacher: bartoldson2024_adversarial_wrn94_16
+    seed: 1
+    role: confirmatory
+    allocation: hamster_gpu_1_existing
+  - id: L2
+    teacher: chen2021_ltd_wrn34_10
+    seed: 1
+    role: confirmatory
+    allocation: hamster_gpu_0
+  - id: L3
+    teacher: bartoldson2024_adversarial_wrn94_16
+    seed: 2
+    role: confirmatory
+    allocation: ferret_gpu_0
+  - id: L4
+    teacher: chen2021_ltd_wrn34_10
+    seed: 2
+    role: confirmatory
+    allocation: ferret_gpu_1
+
+analysis_lock:
+  inspect_run_outcomes_before_all_four_trajectories_are_terminal: prohibited
+  feature_engineering_after_seed_outcomes: prohibited
+  thresholds_after_seed_outcomes: prohibited
+  sample_level_bootstrap_scope: conditional_within_trajectory
+  seed_level_uncertainty_claim: prohibited_with_two_confirmatory_seeds
+  required_table:
+    - teacher_only
+    - student_only
+    - main_effects
+    - main_effects_plus_product
+
+decision_rules:
+  per_trajectory_history_go:
+    delta_auroc_vs_best_current_state_at_least: 0.02
+    paired_auroc_lower_bound_greater_than: 0.0
+    held_out_log_loss_must_improve: true
+  bartoldson_history_selector_admissible_for_screen:
+    required_runs: [L1, L3]
+    rule: both_runs_must_meet_per_trajectory_history_go
+  cross_teacher_history_claim:
+    required_runs: [L1, L2, L3, L4]
+    rule: all_runs_must_have_positive_delta_auroc_and_improved_log_loss
+  conflicting_bartoldson_result:
+    action: do_not_launch_history_selected_intervention
+  both_bartoldson_history_no_go:
+    fallback_selector: consistently_best_frozen_current_state_baseline
+    admissible_only_if: same_current_state_baseline_wins_on_L1_and_L3
+  no_consistent_bartoldson_selector:
+    action: do_not_launch_intervention_screen
+
+later_intervention_screen:
+  status: prepared_but_not_launchable_before_confirmatory_decision
+  teacher: bartoldson2024_adversarial_wrn94_16
+  branch_epoch: 99
+  source: exact_L3_epoch_99_checkpoint
+  selector_training_source:
+    trajectory: seed_0_bartoldson_common_trajectory
+    report_sha256: d44ee166f8866b77067ebd07757d394a060242c9cf1cdc5d4513f127897981f8
+    lineage_sha256: 9b6ea091dc9ed4ff81bb579bf05d6650ac8e6d4ab6104981c446f29069e4a64e
+    coefficients_and_preprocessing_must_be_hash_bound_before_confirmatory_outcome_read: true
+    fitting_on_seed_1_or_2_future_outcomes: prohibited
+  intervention_strength:
+    uniform_target_softening_rho: 0.5
+    adversarial_kd_multiplier: 0.5
+  arms:
+    C: {selector: none, intervention: ordinary_rslad}
+    HS: {selector: student_history, intervention: uniform_target_softening}
+    RS: {selector: class_matched_random, intervention: uniform_target_softening}
+    HD: {selector: student_history, intervention: adversarial_kd_downweight}
+    RD: {selector: class_matched_random, intervention: adversarial_kd_downweight}
+  fixed_across_arms:
+    - selected_sample_count
+    - selected_class_histogram
+    - parent_checkpoint_sha256
+    - parent_model_optimizer_scheduler_scaler_and_sample_state
+    - data_order_rng_state
+    - augmentation_rng_state
+    - train_attack_rng_state
+    - intervention_budget
+    - continuation_epochs
+  prohibited:
+    - test_or_autoattack_outcomes_in_selector_construction
+    - changing_intervention_strength_after_arm_results
+    - treating_prediction_as_training_utility
