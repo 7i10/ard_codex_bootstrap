@@ -58,6 +58,10 @@ including BatchNorm tracking counters. These counts are identity checks, not int
 4 ablationの追加契約:
 
 - `rslad`: valid sampleのKD weightはuniform、hard-label fallbackは0。
+- `rslad_logging_only`: attack、objective、KD/hard weight、optimizer updateは
+  `rslad`と同一。pre-updateのdetached FP32 student marginと、frozen
+  teacherのclean/student-adversarial confidence primitivesだけをstable
+  sample stateへ記録し、loss、target、sample selectionへ入力しない。
 - `rslad_entropy`: frozen teacherのShannon entropyを使い、weightは
   `5 * (H_i - global_min_valid_batch(H))`。係数5はmethod constant。clip、mean preservation、
   hard-label fallbackはない。
@@ -82,6 +86,10 @@ as one scientific run family. Pilot uses five epochs only; canonical production 
 
 - sample IDは元dataset indexであり、subset、augmentation、shuffle、rankで作り直さない。
 - robust marginはpre-update detached FP32 logitsから計算する。
+- logging-only stateはrisk式を固定せず、margin/current EMA、correctness
+  frequency、forgetting、teacher entropy、true-class probability、
+  max-wrong-class probability、prediction/correctnessをclean/adv別に保持する。
+  wrong-confidence、threshold、gate、interventionはofflineで別々に定義する。
 - EMA decayはcanonical student/joint methodで`0.9`、first observationで初期化する。
 - robust correctness count、observation count、forgetting count、last updateをstable IDごとに保持する。
 - rankごとのsparse observationはepoch boundaryで決定論的にmergeし、padding duplicateはstateを更新しない。

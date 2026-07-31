@@ -72,6 +72,58 @@ _CONTROLLED_METADATA = MappingProxyType(
                 "teacher_mode": "eval",
             }
         ),
+        "train_attacks": MappingProxyType(
+            {
+                "pgd_at": MappingProxyType(
+                    {
+                        "loss": "ce",
+                        "kl_target": None,
+                        "temperature": 1.0,
+                        "temperature_squared": True,
+                        "steps": 10,
+                        "epsilon": "8/255",
+                        "step_size": "2/255",
+                        "random_start": True,
+                        "norm": "linf",
+                        "input_domain": "pixel_0_1",
+                        "student_mode": "eval",
+                        "teacher_mode": "eval",
+                    }
+                ),
+                "trades": MappingProxyType(
+                    {
+                        "loss": "kl",
+                        "kl_target": "student_clean",
+                        "temperature": 1.0,
+                        "temperature_squared": True,
+                        "steps": 10,
+                        "epsilon": "8/255",
+                        "step_size": "2/255",
+                        "random_start": True,
+                        "norm": "linf",
+                        "input_domain": "pixel_0_1",
+                        "student_mode": "eval",
+                        "teacher_mode": "eval",
+                    }
+                ),
+                "rslad": MappingProxyType(
+                    {
+                        "loss": "kl",
+                        "kl_target": "teacher_clean",
+                        "temperature": 1.0,
+                        "temperature_squared": True,
+                        "steps": 10,
+                        "epsilon": "8/255",
+                        "step_size": "2/255",
+                        "random_start": True,
+                        "norm": "linf",
+                        "input_domain": "pixel_0_1",
+                        "student_mode": "eval",
+                        "teacher_mode": "eval",
+                    }
+                ),
+            }
+        ),
         "selection_attack": MappingProxyType(
             {
                 "loss": "ce",

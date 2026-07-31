@@ -26,7 +26,8 @@ from ard.data import (
 from ard.engine.checkpoint import REQUIRED_KEYS, load_checkpoint, save_checkpoint
 from ard.engine.trainer import Trainer
 from ard.models import build_student
-from ard.objectives import ObjectiveTerms, PGDATObjective
+from ard.objectives import ObjectiveTerms, PGDATObjective, RSLADObjective
+from ard.policies import RSLADBaselinePolicy
 from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
 from ard.tracking import NullTracker, coordinated_tracker_action
@@ -68,6 +69,169 @@ def test_training_diagnostics_are_observational_for_full_checkpoint_state(tmp_pa
         assert REQUIRED_KEYS.issubset(first) and REQUIRED_KEYS.issubset(second)
         for key in REQUIRED_KEYS:
             assert equal(first[key], second[key]), key
+
+
+def test_rslad_logging_only_is_exact_for_optimization_rng_and_checkpoint_state(tmp_path: Path) -> None:
+    import random
+
+    import numpy as np
+
+    class IdentityAttack:
+        def generate(self, request: object) -> AttackResult:
+            inputs = request.inputs  # type: ignore[attr-defined]
+            return AttackResult(inputs, torch.zeros_like(inputs), (), 0.0)
+
+    def make(output: Path, *, observed: bool) -> Trainer:
+        torch.manual_seed(123)
+        student = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
+        torch.manual_seed(456)
+        teacher = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
+        optimizer = SGD(student.parameters(), lr=0.03, momentum=0.9)
+        return Trainer(
+            model=student,
+            teacher=teacher,
+            optimizer=optimizer,
+            scheduler=StepLR(optimizer, step_size=1, gamma=0.8),
+            scaler=None,
+            attack=IdentityAttack(),  # type: ignore[arg-type]
+            selection_attack=IdentityAttack(),  # type: ignore[arg-type]
+            objective=RSLADObjective(),
+            policy=RSLADBaselinePolicy(),
+            sample_store=SampleStateStore(ema_decay=0.9) if observed else None,
+            observe_teacher_signals=observed,
+            diagnostics=TrainingDiagnostics.for_ids(list(range(8)), seed=4, size=0, mode="summary"),
+            device=torch.device("cpu"),
+            output_dir=output,
+            config_hash="logging-only-parity",
+            seed=4,
+            tracker_run_id="logging-only-parity",
+        )
+
+    def equal(left: object, right: object) -> bool:
+        if isinstance(left, torch.Tensor) and isinstance(right, torch.Tensor):
+            return torch.equal(left, right)
+        if isinstance(left, np.ndarray) and isinstance(right, np.ndarray):
+            return np.array_equal(left, right)
+        if isinstance(left, dict) and isinstance(right, dict):
+            return left.keys() == right.keys() and all(equal(left[key], right[key]) for key in left)
+        if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+            return len(left) == len(right) and all(equal(a, b) for a, b in zip(left, right))
+        return left == right
+
+    plain = make(tmp_path / "plain-rslad", observed=False)
+    observed = make(tmp_path / "logging-only", observed=True)
+    loader_a, validation_a, _ = make_loaders()
+    loader_b, validation_b, _ = make_loaders()
+    torch.manual_seed(991)
+    np.random.seed(991)
+    random.seed(991)
+    plain.fit(loader_a, validation_loader=validation_a, epochs=2)
+    torch.manual_seed(991)
+    np.random.seed(991)
+    random.seed(991)
+    observed.fit(loader_b, validation_loader=validation_b, epochs=2)
+    first = torch.load(tmp_path / "plain-rslad" / "last.pt", map_location="cpu", weights_only=False)
+    second = torch.load(tmp_path / "logging-only" / "last.pt", map_location="cpu", weights_only=False)
+    for key in REQUIRED_KEYS - {"sample_state"}:
+        assert equal(first[key], second[key]), key
+    assert first["sample_state"] == {}
+    assert second["sample_state"]["format_version"] == 2
+    assert len(second["sample_state"]["records"]) == len(cast(Sized, loader_b.dataset))
+    for record in second["sample_state"]["records"].values():
+        assert record["seen"] == 2
+        assert record["teacher_clean_entropy"] is not None
+        assert record["teacher_adversarial_entropy"] is not None
+        assert record["teacher_clean_true_probability"] is not None
+        assert record["teacher_adversarial_max_wrong_probability"] is not None
+    assert all(parameter.grad is None for parameter in observed.teacher.parameters())
+
+
+@pytest.mark.gpu
+def test_rslad_logging_only_cuda_parity_with_random_start_pgd(tmp_path: Path) -> None:
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA unavailable")
+    import random
+
+    import numpy as np
+
+    device = torch.device("cuda:0")
+
+    def make(output: Path, *, observed: bool) -> Trainer:
+        torch.manual_seed(123)
+        student = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
+        torch.manual_seed(456)
+        teacher = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
+        optimizer = SGD(student.parameters(), lr=0.03, momentum=0.9)
+        return Trainer(
+            model=student,
+            teacher=teacher,
+            optimizer=optimizer,
+            scheduler=StepLR(optimizer, step_size=1, gamma=0.8),
+            scaler=None,
+            attack=LinfPGD(
+                AttackConfig(
+                    loss="kl",
+                    kl_target="teacher_clean",
+                    epsilon="1/255",
+                    step_size="1/255",
+                    steps=1,
+                    random_start=True,
+                )
+            ),
+            selection_attack=LinfPGD(
+                AttackConfig(
+                    loss="ce",
+                    epsilon="1/255",
+                    step_size="1/255",
+                    steps=1,
+                    random_start=True,
+                    student_mode="eval",
+                    teacher_mode="eval",
+                )
+            ),
+            objective=RSLADObjective(),
+            policy=RSLADBaselinePolicy(),
+            sample_store=SampleStateStore(ema_decay=0.9) if observed else None,
+            observe_teacher_signals=observed,
+            diagnostics=TrainingDiagnostics.for_ids(list(range(8)), seed=4, size=0, mode="summary"),
+            device=device,
+            output_dir=output,
+            config_hash="logging-only-cuda-parity",
+            seed=4,
+            evaluation_attack_seed=9,
+            tracker_run_id="logging-only-cuda-parity",
+        )
+
+    def equal(left: object, right: object) -> bool:
+        if isinstance(left, torch.Tensor) and isinstance(right, torch.Tensor):
+            return torch.equal(left, right)
+        if isinstance(left, np.ndarray) and isinstance(right, np.ndarray):
+            return np.array_equal(left, right)
+        if isinstance(left, dict) and isinstance(right, dict):
+            return left.keys() == right.keys() and all(equal(left[key], right[key]) for key in left)
+        if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+            return len(left) == len(right) and all(equal(a, b) for a, b in zip(left, right))
+        return left == right
+
+    plain = make(tmp_path / "plain-rslad-cuda", observed=False)
+    observed = make(tmp_path / "logging-only-cuda", observed=True)
+    loader_a, validation_a, _ = make_loaders()
+    loader_b, validation_b, _ = make_loaders()
+    for trainer, loader, validation in (
+        (plain, loader_a, validation_a),
+        (observed, loader_b, validation_b),
+    ):
+        torch.manual_seed(991)
+        torch.cuda.manual_seed_all(991)
+        np.random.seed(991)
+        random.seed(991)
+        trainer.fit(loader, validation_loader=validation, epochs=1)
+    first = torch.load(tmp_path / "plain-rslad-cuda" / "last.pt", map_location="cpu", weights_only=False)
+    second = torch.load(tmp_path / "logging-only-cuda" / "last.pt", map_location="cpu", weights_only=False)
+    for key in REQUIRED_KEYS - {"sample_state"}:
+        assert equal(first[key], second[key]), key
+    assert second["sample_state"]["format_version"] == 2
+    assert all(parameter.grad is None for parameter in observed.teacher.parameters())
 
 
 pytestmark = pytest.mark.t3

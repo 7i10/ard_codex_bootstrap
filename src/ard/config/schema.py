@@ -331,6 +331,7 @@ class MethodConfig(StrictModel):
         "pgd_at",
         "trades",
         "rslad",
+        "rslad_logging_only",
         "rslad_entropy",
         "rslad_student",
         "rslad_joint",
@@ -363,6 +364,7 @@ class MethodConfig(StrictModel):
         expected_target = {
             "trades": "student_clean",
             "rslad": "teacher_clean",
+            "rslad_logging_only": "teacher_clean",
             "rslad_entropy": "teacher_clean",
             "rslad_student": "teacher_clean",
             "rslad_joint": "teacher_clean",
@@ -620,6 +622,7 @@ class ExperimentConfig(StrictModel):
             raise ValueError("teacher and dataset num_classes must match")
         rslad_methods = {
             "rslad",
+            "rslad_logging_only",
             "rslad_entropy",
             "rslad_student",
             "rslad_joint",
@@ -635,8 +638,8 @@ class ExperimentConfig(StrictModel):
             raise ValueError("rslad_frozen_oracle_softening permits only dev tests or guarded production runs")
         if self.teacher is not None and self.teacher.source == "fixture" and self.tier not in {"dev", "smoke"}:
             raise ValueError("fixture teachers are restricted to dev/smoke tiers")
-        if self.tier == "pilot" and (self.teacher is None or self.teacher.source != "robustbench"):
-            raise ValueError("pilot requires a registered RobustBench teacher")
+        if self.tier == "pilot" and self.teacher is not None and self.teacher.source != "robustbench":
+            raise ValueError("pilot teacher must be a registered RobustBench teacher")
         expected_profile = {
             "synthetic_cifar": "fixture_unit",
             "cifar10": "cifar10_standard",
@@ -720,7 +723,10 @@ class ExperimentConfig(StrictModel):
         for field, expected in schedule.items():
             if getattr(self.scheduler, field) != expected:
                 errors.append(f"scheduler.{field} must be {expected!r}")
-        attack = metadata["train_attack"]
+        attack_family = self.method.id if self.method.id in {"pgd_at", "trades"} else "rslad"
+        train_attacks = metadata["train_attacks"]
+        assert isinstance(train_attacks, Mapping)
+        attack = train_attacks[attack_family]
         selection = metadata["selection_attack"]
         assert isinstance(attack, Mapping) and isinstance(selection, Mapping)
         actual_selection = self.method.selection_attack

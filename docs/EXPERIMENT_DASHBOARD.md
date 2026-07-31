@@ -110,6 +110,9 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 - core seed-0の8 train、8 PGD、8 AutoAttackはすべて完了しました。Student 2セルのAAは事後追加評価です。
 - seed 1/2、複数seed統計、teacher感度のmean/std/worst/bestは未着手です。
 - controlled protocolでのPGD-AT、TRADES、full SAAD直接比較は未着手です。
+- PGD-AT/TRADESのcanonical configとCUDA synthetic smoke、および
+  Chen/Bartoldson logging-only RSLAD config/parity gateは準備済みです。
+  いずれも200 epoch実験は未開始です。
 - CIFAR-100、MobileNetV2、Tiny-ImageNet本訓練は未着手です。
 - これらを現在のseed-0結果から自動的に開始する設定にはしていません。
 

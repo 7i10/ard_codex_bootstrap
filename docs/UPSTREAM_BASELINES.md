@@ -110,6 +110,13 @@ Known upstream observations, not copied behavior:
   distinct best checkpoint. This repository does not use that behavior; full
   SAAD is only available through `scripts/run_saad_upstream.py` as a verified
   clone subprocess (`--dry-run` by default for inspection).
+- 2026-07-31 preflight verified the exact checkout, but the current `adv`
+  environment cannot import upstream `saad.py`: the checkout-local
+  `autoattack` shadows the installed package while pinned RobustBench imports
+  `autoattack.state`, which that checkout-local revision does not provide.
+  No training started. Full SAAD requires a separately pinned compatible
+  dependency environment or a documented patch; silently changing which
+  AutoAttack implementation is imported is forbidden.
 - This repository does not copy an upstream optimizer/scheduler/training
   schedule into the CIFAR templates. Those values are required explicitly as
   environment-expanded inputs until a dependency-complete T4 reproduction

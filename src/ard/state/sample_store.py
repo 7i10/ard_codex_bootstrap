@@ -8,6 +8,8 @@ from typing import Any
 
 import torch
 
+from ard.signals.teacher_confidence import TeacherConfidenceBatch
+
 
 @dataclass(frozen=True)
 class SampleObservation:
@@ -17,6 +19,17 @@ class SampleObservation:
     update: int
     rank: int = 0
     order: int = 0
+    true_label: int | None = None
+    teacher_clean_entropy: float | None = None
+    teacher_clean_true_probability: float | None = None
+    teacher_clean_max_wrong_probability: float | None = None
+    teacher_clean_prediction: int | None = None
+    teacher_clean_correct: bool | None = None
+    teacher_adversarial_entropy: float | None = None
+    teacher_adversarial_true_probability: float | None = None
+    teacher_adversarial_max_wrong_probability: float | None = None
+    teacher_adversarial_prediction: int | None = None
+    teacher_adversarial_correct: bool | None = None
 
 
 @dataclass
@@ -27,6 +40,18 @@ class SampleRecord:
     previous_robust_correct: bool | None
     forgetting_count: int
     last_update: int
+    last_margin: float | None = None
+    true_label: int | None = None
+    teacher_clean_entropy: float | None = None
+    teacher_clean_true_probability: float | None = None
+    teacher_clean_max_wrong_probability: float | None = None
+    teacher_clean_prediction: int | None = None
+    teacher_clean_correct: bool | None = None
+    teacher_adversarial_entropy: float | None = None
+    teacher_adversarial_true_probability: float | None = None
+    teacher_adversarial_max_wrong_probability: float | None = None
+    teacher_adversarial_prediction: int | None = None
+    teacher_adversarial_correct: bool | None = None
 
     @property
     def robust_correct_frequency(self) -> float:
@@ -40,7 +65,7 @@ class SampleStateStore:
     only queued locally; ``merge_pending`` is the sole mutation path for records.
     """
 
-    FORMAT_VERSION = 1
+    FORMAT_VERSION = 2
 
     def __init__(self, *, ema_decay: float = 0.9) -> None:
         if not 0.0 <= ema_decay < 1.0:
@@ -59,6 +84,9 @@ class SampleStateStore:
         valid_mask: torch.Tensor,
         update: int,
         rank: int = 0,
+        labels: torch.Tensor | None = None,
+        teacher_clean: TeacherConfidenceBatch | None = None,
+        teacher_adversarial: TeacherConfidenceBatch | None = None,
     ) -> None:
         """Queue valid detached observations; padded rows never enter state."""
         if any(value.ndim != 1 for value in (sample_ids, margins, robust_correct, valid_mask)):
@@ -71,12 +99,60 @@ class SampleStateStore:
         values = margins.detach().to(device="cpu", dtype=torch.float32)
         correct = robust_correct.detach().to(device="cpu", dtype=torch.bool)
         mask = valid_mask.detach().to(device="cpu", dtype=torch.bool)
+        label_values = None if labels is None else labels.detach().to(device="cpu", dtype=torch.long)
+        if label_values is not None and label_values.shape != ids.shape:
+            raise ValueError("sample observation labels must match sample IDs")
+        if (teacher_clean is None) != (teacher_adversarial is None):
+            raise ValueError("teacher clean and adversarial observations must be provided together")
+        if teacher_clean is not None and label_values is None:
+            raise ValueError("teacher observations require true labels")
+
+        def _teacher_values(
+            values: TeacherConfidenceBatch | None,
+        ) -> tuple[list[float], list[float], list[float], list[int], list[bool]] | None:
+            if values is None:
+                return None
+            tensors = (
+                values.entropy,
+                values.true_probability,
+                values.max_wrong_probability,
+                values.prediction,
+                values.correct,
+            )
+            if any(tensor.ndim != 1 or tensor.shape != ids.shape for tensor in tensors):
+                raise ValueError("teacher observation vectors must match sample IDs")
+            scalars = torch.stack(
+                (
+                    values.entropy.detach().float(),
+                    values.true_probability.detach().float(),
+                    values.max_wrong_probability.detach().float(),
+                ),
+                dim=1,
+            ).to(device="cpu")
+            if bool((~torch.isfinite(scalars[mask])).any()):
+                raise FloatingPointError("cannot store non-finite teacher observations")
+            if bool(((scalars[mask, 1:] < 0.0) | (scalars[mask, 1:] > 1.0)).any()):
+                raise FloatingPointError("cannot store teacher probabilities outside [0,1]")
+            return (
+                scalars[:, 0].tolist(),
+                scalars[:, 1].tolist(),
+                scalars[:, 2].tolist(),
+                values.prediction.detach().to(device="cpu", dtype=torch.long).tolist(),
+                values.correct.detach().to(device="cpu", dtype=torch.bool).tolist(),
+            )
+
+        clean_values = _teacher_values(teacher_clean)
+        adversarial_values = _teacher_values(teacher_adversarial)
         if bool((~torch.isfinite(values) & mask).any()):
             raise FloatingPointError("cannot store a non-finite robust margin")
-        for sample_id, margin, is_correct, valid in zip(
-            ids.tolist(), values.tolist(), correct.tolist(), mask.tolist(), strict=True
+        for position, (sample_id, margin, is_correct, valid) in enumerate(
+            zip(ids.tolist(), values.tolist(), correct.tolist(), mask.tolist(), strict=True)
         ):
             if valid:
+                clean = None if clean_values is None else tuple(values[position] for values in clean_values)
+                adversarial = (
+                    None if adversarial_values is None else tuple(values[position] for values in adversarial_values)
+                )
                 self.pending.append(
                     SampleObservation(
                         sample_id=int(sample_id),
@@ -85,6 +161,19 @@ class SampleStateStore:
                         update=int(update),
                         rank=int(rank),
                         order=self._next_order,
+                        true_label=None if label_values is None else int(label_values[position]),
+                        teacher_clean_entropy=None if clean is None else float(clean[0]),
+                        teacher_clean_true_probability=None if clean is None else float(clean[1]),
+                        teacher_clean_max_wrong_probability=None if clean is None else float(clean[2]),
+                        teacher_clean_prediction=None if clean is None else int(clean[3]),
+                        teacher_clean_correct=None if clean is None else bool(clean[4]),
+                        teacher_adversarial_entropy=None if adversarial is None else float(adversarial[0]),
+                        teacher_adversarial_true_probability=(None if adversarial is None else float(adversarial[1])),
+                        teacher_adversarial_max_wrong_probability=(
+                            None if adversarial is None else float(adversarial[2])
+                        ),
+                        teacher_adversarial_prediction=None if adversarial is None else int(adversarial[3]),
+                        teacher_adversarial_correct=None if adversarial is None else bool(adversarial[4]),
                     )
                 )
                 self._next_order += 1
@@ -122,8 +211,26 @@ class SampleStateStore:
                     previous_robust_correct=observation.robust_correct,
                     forgetting_count=0,
                     last_update=observation.update,
+                    last_margin=observation.margin,
+                    true_label=observation.true_label,
+                    teacher_clean_entropy=observation.teacher_clean_entropy,
+                    teacher_clean_true_probability=observation.teacher_clean_true_probability,
+                    teacher_clean_max_wrong_probability=observation.teacher_clean_max_wrong_probability,
+                    teacher_clean_prediction=observation.teacher_clean_prediction,
+                    teacher_clean_correct=observation.teacher_clean_correct,
+                    teacher_adversarial_entropy=observation.teacher_adversarial_entropy,
+                    teacher_adversarial_true_probability=observation.teacher_adversarial_true_probability,
+                    teacher_adversarial_max_wrong_probability=observation.teacher_adversarial_max_wrong_probability,
+                    teacher_adversarial_prediction=observation.teacher_adversarial_prediction,
+                    teacher_adversarial_correct=observation.teacher_adversarial_correct,
                 )
                 continue
+            if (
+                record.true_label is not None
+                and observation.true_label is not None
+                and record.true_label != observation.true_label
+            ):
+                raise ValueError("stable sample ID changed true label")
             record.margin_ema = self.ema_decay * record.margin_ema + (1.0 - self.ema_decay) * observation.margin
             record.seen += 1
             record.robust_correct_count += int(observation.robust_correct)
@@ -131,6 +238,23 @@ class SampleStateStore:
                 record.forgetting_count += 1
             record.previous_robust_correct = observation.robust_correct
             record.last_update = observation.update
+            record.last_margin = observation.margin
+            for field in (
+                "true_label",
+                "teacher_clean_entropy",
+                "teacher_clean_true_probability",
+                "teacher_clean_max_wrong_probability",
+                "teacher_clean_prediction",
+                "teacher_clean_correct",
+                "teacher_adversarial_entropy",
+                "teacher_adversarial_true_probability",
+                "teacher_adversarial_max_wrong_probability",
+                "teacher_adversarial_prediction",
+                "teacher_adversarial_correct",
+            ):
+                value = getattr(observation, field)
+                if value is not None:
+                    setattr(record, field, value)
         self.pending.clear()
         self._next_order = 0
 
@@ -153,7 +277,7 @@ class SampleStateStore:
     def load_state_dict(self, state: Mapping[str, Any]) -> None:
         if set(state) != {"format_version", "ema_decay", "records", "pending", "next_order"}:
             raise ValueError("sample state has unexpected or missing keys")
-        if state["format_version"] != self.FORMAT_VERSION:
+        if state["format_version"] not in {1, self.FORMAT_VERSION}:
             raise ValueError("unsupported sample state format")
         if float(state["ema_decay"]) != self.ema_decay:
             raise ValueError("sample state ema_decay does not match configuration")

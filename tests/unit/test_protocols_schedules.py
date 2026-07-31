@@ -95,6 +95,30 @@ def test_controlled_protocol_keeps_distinct_valid_train_and_selection_attacks() 
     assert config.method.selection_attack.loss == "ce"
 
 
+@pytest.mark.parametrize(
+    ("method_id", "loss", "target"),
+    [
+        ("pgd_at", "ce", None),
+        ("trades", "kl", "student_clean"),
+        ("rslad_logging_only", "kl", "teacher_clean"),
+    ],
+)
+def test_controlled_protocol_selects_method_specific_training_attack(
+    method_id: str,
+    loss: str,
+    target: str | None,
+) -> None:
+    raw = _controlled_config()
+    method = raw["method"]
+    assert isinstance(method, dict)
+    method.update({"id": method_id, "attack": {**method["attack"], "loss": loss, "kl_target": target}})
+    if method_id in {"pgd_at", "trades"}:
+        raw.pop("teacher")
+    config = ExperimentConfig.model_validate(raw)
+    assert config.method.attack.loss == loss
+    assert config.method.attack.kl_target == target
+
+
 def _pilot_config() -> dict[str, object]:
     data = _controlled_config()
     data["protocol"] = {"id": "controlled_cifar10_r18_pilot_v1"}

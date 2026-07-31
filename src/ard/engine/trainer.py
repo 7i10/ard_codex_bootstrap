@@ -23,7 +23,12 @@ from ard.policies import (
     student_risk_from_margin,
     teacher_risk_from_entropy,
 )
-from ard.signals import RobustMarginSignal, shannon_entropy
+from ard.signals import (
+    RobustMarginSignal,
+    TeacherConfidenceBatch,
+    shannon_entropy,
+    teacher_confidence_primitives,
+)
 from ard.state import SampleStateStore
 from ard.targets import TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
@@ -108,6 +113,7 @@ class Trainer:
         oracle_mask: bool = False,
         frozen_risk_lookup: FrozenRiskLookup | None = None,
         diagnostics: TrainingDiagnostics | None = None,
+        observe_teacher_signals: bool = False,
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -122,6 +128,9 @@ class Trainer:
         self.tracker_run_id = tracker_run_id
         self.policy = policy
         self.sample_store = sample_store
+        self.observe_teacher_signals = bool(observe_teacher_signals)
+        if self.observe_teacher_signals and (self.teacher is None or self.sample_store is None):
+            raise ValueError("teacher signal observation requires a frozen teacher and sample state")
         self.target_policy = target_policy
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
@@ -194,6 +203,8 @@ class Trainer:
         batch: IndexedBatch,
         logits: torch.Tensor,
         valid_mask: torch.Tensor,
+        teacher_clean: TeacherConfidenceBatch | None = None,
+        teacher_adversarial: TeacherConfidenceBatch | None = None,
     ) -> dict[str, torch.Tensor]:
         if self.sample_store is None:
             return {}
@@ -210,6 +221,9 @@ class Trainer:
             valid_mask=margin.valid_mask,
             update=self.global_step,
             rank=get_rank(),
+            labels=batch.labels if self.observe_teacher_signals else None,
+            teacher_clean=teacher_clean,
+            teacher_adversarial=teacher_adversarial,
         )
         student_risk = student_risk_from_margin(self.sample_store.margin_ema(batch.sample_ids))
         return {"student_risk": student_risk}
@@ -335,7 +349,33 @@ class Trainer:
             )
             logits = self.model(attack_result.adversarial)
             valid_mask = mask.to(dtype=torch.bool)
-            student_signals = self._student_aware_signals(batch=batch, logits=logits, valid_mask=valid_mask)
+            observed_teacher_clean = observed_teacher_adversarial = None
+            if self.observe_teacher_signals:
+                assert self.teacher is not None and teacher_clean_logits is not None
+                with (
+                    _evaluation_mode(self.teacher),
+                    torch.no_grad(),
+                    torch.autocast(device_type=self.device.type, enabled=False),
+                ):
+                    teacher_adversarial_logits = self.teacher(attack_result.adversarial.float()).detach().float()
+                self._diagnostic_teacher_adversarial_logits = teacher_adversarial_logits
+                observed_teacher_clean = teacher_confidence_primitives(
+                    teacher_clean_logits,
+                    batch.labels,
+                    valid_mask,
+                )
+                observed_teacher_adversarial = teacher_confidence_primitives(
+                    teacher_adversarial_logits,
+                    batch.labels,
+                    valid_mask,
+                )
+            student_signals = self._student_aware_signals(
+                batch=batch,
+                logits=logits,
+                valid_mask=valid_mask,
+                teacher_clean=observed_teacher_clean,
+                teacher_adversarial=observed_teacher_adversarial,
+            )
             clean_student_logits = None
             if requires_clean_student:
                 with suspend_ddp_buffer_broadcasts(self.model):

@@ -14,7 +14,7 @@ import torch
 import yaml
 
 from ard.analysis import summarize
-from ard.config.schema import ExperimentConfig, TeacherConfig
+from ard.config.schema import ExperimentConfig, MethodConfig, TeacherConfig
 from ard.models.teacher_registry import TeacherRegistry, TeacherRegistryError
 from ard.tracking import (
     QUALITATIVE_COLUMNS,
@@ -228,6 +228,19 @@ def test_canonical_group_keeps_teacher_comparison_axis_and_separates_execution_p
     }
     with pytest.raises(TrackingError, match="teacher.registry_id"):
         canonical_run_group(unregistered, training_execution=execution_ws1)
+    teacherless_pgd = unregistered.model_copy(
+        update={
+            "teacher": None,
+            "method": MethodConfig(
+                id="pgd_at",
+                version=1,
+                attack={"loss": "ce", "kl_target": None, "steps": 10},
+            ),
+        }
+    )
+    assert canonical_run_group(teacherless_pgd, training_execution=execution_ws1) == (
+        "ard-test-group-controlled_cifar10_r18_v1-localbn-ws1-prb128-gb128"
+    )
 
     chen = _with_registered_teacher(unregistered, "chen2021_ltd_wrn34_10")
     bartoldson = _with_registered_teacher(unregistered, "bartoldson2024_adversarial_wrn94_16")

@@ -168,6 +168,13 @@ def _build_method(
             None,
             None,
         )
+    if method.id == "rslad_logging_only":
+        return (
+            RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
+            RSLADBaselinePolicy(),
+            SampleStateStore(ema_decay=method.student_ema_decay),
+            None,
+        )
     if method.id == "rslad_entropy":
         return (
             RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
@@ -387,10 +394,21 @@ def main(argv: list[str] | None = None) -> int:
             teacher=teacher,
             sample_store=sample_store,
             target_policy=target_policy,
-            policy_warmup_epochs=(config.method.student_policy_warmup_epochs if sample_store is not None else 0),
+            policy_warmup_epochs=(
+                config.method.student_policy_warmup_epochs
+                if config.method.id
+                in {
+                    "rslad_student",
+                    "rslad_joint",
+                    "rslad_joint_downweight",
+                    "rslad_hard_fallback",
+                }
+                else 0
+            ),
             oracle_mask=config.method.oracle_mask,
             frozen_risk_lookup=frozen_risk_lookup,
             diagnostics=diagnostics,
+            observe_teacher_signals=config.method.id == "rslad_logging_only",
         )
         start_epoch = 0
         if args.resume is not None:
@@ -465,6 +483,32 @@ def main(argv: list[str] | None = None) -> int:
                 }
                 for _, row in sorted(diagnostics.all_rows.items())
             ]
+            if sample_store is not None:
+                for row in scalar_rows:
+                    sample_id = int(row["sample_id"])
+                    record = sample_store.records.get(sample_id)
+                    if record is not None:
+                        row.update(
+                            {
+                                "student_last_margin": record.last_margin,
+                                "student_robust_margin_ema": record.margin_ema,
+                                "student_seen": record.seen,
+                                "student_robust_correct_frequency": record.robust_correct_frequency,
+                                "student_forgetting_count": record.forgetting_count,
+                                "teacher_clean_entropy": record.teacher_clean_entropy,
+                                "teacher_clean_true_probability": record.teacher_clean_true_probability,
+                                "teacher_clean_max_wrong_probability": record.teacher_clean_max_wrong_probability,
+                                "teacher_clean_prediction": record.teacher_clean_prediction,
+                                "teacher_clean_correct": record.teacher_clean_correct,
+                                "teacher_adversarial_entropy": record.teacher_adversarial_entropy,
+                                "teacher_adversarial_true_probability": (record.teacher_adversarial_true_probability),
+                                "teacher_adversarial_max_wrong_probability": (
+                                    record.teacher_adversarial_max_wrong_probability
+                                ),
+                                "teacher_adversarial_prediction": record.teacher_adversarial_prediction,
+                                "teacher_adversarial_correct": record.teacher_adversarial_correct,
+                            }
+                        )
             stats_path = output_dir / "sample-stats-train.parquet"
 
             def _write_sample_statistics() -> None:

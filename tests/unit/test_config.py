@@ -535,4 +535,9 @@ def test_top_level_configs_resolve_under_controlled_environment(
         assert config.output_dir
         if path.parent.name == "scientific":
             assert config.tier == "production"
-            assert config.method.id == "rslad_frozen_oracle_softening"
+            assert config.method.id in {
+                "pgd_at",
+                "trades",
+                "rslad_logging_only",
+                "rslad_frozen_oracle_softening",
+            }

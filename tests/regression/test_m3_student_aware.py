@@ -28,8 +28,8 @@ from ard.policies import (
     student_risk_from_margin,
     teacher_risk_from_entropy,
 )
-from ard.signals import RobustMarginSignal, shannon_entropy
-from ard.state import SampleStateStore
+from ard.signals import RobustMarginSignal, shannon_entropy, teacher_confidence_primitives
+from ard.state import SampleRecord, SampleStateStore
 from ard.targets import UniformSofteningTeacherTargetPolicy
 
 pytestmark = pytest.mark.t2
@@ -88,6 +88,21 @@ def test_robust_margin_formula_is_detached_fp32_and_excludes_padding() -> None:
     assert torch.equal(signal.valid_mask, torch.tensor([True, False]))
 
 
+def test_teacher_confidence_primitives_are_detached_and_retain_wrong_class_information() -> None:
+    logits = torch.tensor([[2.0, 1.0, -1.0], [0.0, 3.0, 1.0]], dtype=torch.float64, requires_grad=True)
+    labels = torch.tensor([0, 0])
+    observed = teacher_confidence_primitives(logits, labels, torch.tensor([True, True]))
+    probabilities = torch.softmax(logits.detach().float(), dim=1)
+    assert not observed.entropy.requires_grad
+    assert observed.entropy.dtype == torch.float32
+    assert torch.equal(observed.prediction, torch.tensor([0, 1]))
+    assert torch.equal(observed.correct, torch.tensor([True, False]))
+    assert torch.equal(observed.true_probability, probabilities[:, 0])
+    assert torch.equal(observed.max_wrong_probability, torch.tensor([probabilities[0, 1], probabilities[1, 1]]))
+    wrong_confidence = observed.max_wrong_probability - observed.true_probability
+    assert wrong_confidence[0] < 0 and wrong_confidence[1] > 0
+
+
 def test_store_ema_correctness_forgetting_padding_and_exact_roundtrip() -> None:
     store = SampleStateStore(ema_decay=0.9)
     store.record_pending(
@@ -123,6 +138,59 @@ def test_store_ema_correctness_forgetting_padding_and_exact_roundtrip() -> None:
     restored = SampleStateStore(ema_decay=0.9)
     restored.load_state_dict(copy.deepcopy(snapshot))
     assert restored.state_dict() == snapshot
+
+
+def test_store_retains_teacher_clean_and_adversarial_primitives_and_migrates_v1() -> None:
+    labels = torch.tensor([0, 1])
+    valid = torch.tensor([True, True])
+    clean = teacher_confidence_primitives(
+        torch.tensor([[3.0, 1.0], [2.0, 0.0]]),
+        labels,
+        valid,
+    )
+    adversarial = teacher_confidence_primitives(
+        torch.tensor([[1.0, 2.0], [0.5, 1.5]]),
+        labels,
+        valid,
+    )
+    store = SampleStateStore(ema_decay=0.9)
+    store.record_pending(
+        sample_ids=torch.tensor([11, 12]),
+        margins=torch.tensor([0.25, -0.5]),
+        robust_correct=torch.tensor([True, False]),
+        valid_mask=valid,
+        update=8,
+        labels=labels,
+        teacher_clean=clean,
+        teacher_adversarial=adversarial,
+    )
+    store.merge_pending([store.pending_state()])
+    record = store.records[11]
+    assert record.last_margin == pytest.approx(0.25)
+    assert record.true_label == 0
+    assert record.teacher_clean_prediction == 0 and record.teacher_clean_correct is True
+    assert record.teacher_adversarial_prediction == 1 and record.teacher_adversarial_correct is False
+    assert record.teacher_adversarial_max_wrong_probability is not None
+    assert record.teacher_adversarial_true_probability is not None
+    assert record.teacher_adversarial_max_wrong_probability > record.teacher_adversarial_true_probability
+
+    v1 = copy.deepcopy(store.state_dict())
+    v1["format_version"] = 1
+    new_fields = set(SampleRecord.__dataclass_fields__) - {
+        "margin_ema",
+        "seen",
+        "robust_correct_count",
+        "previous_robust_correct",
+        "forgetting_count",
+        "last_update",
+    }
+    for raw_record in v1["records"].values():
+        for field in new_fields:
+            raw_record.pop(field)
+    migrated = SampleStateStore(ema_decay=0.9)
+    migrated.load_state_dict(v1)
+    assert migrated.state_dict()["format_version"] == 2
+    assert migrated.records[11].teacher_clean_entropy is None
 
 
 def test_pending_rank_merge_is_stable_and_duplicate_safe() -> None:
@@ -219,7 +287,15 @@ def test_rslad_policy_fallback_identities() -> None:
 
 @pytest.mark.parametrize(
     "name",
-    ["rslad", "rslad_entropy", "rslad_student", "rslad_joint", "rslad_joint_downweight", "rslad_hard_fallback"],
+    [
+        "rslad",
+        "rslad_logging_only",
+        "rslad_entropy",
+        "rslad_student",
+        "rslad_joint",
+        "rslad_joint_downweight",
+        "rslad_hard_fallback",
+    ],
 )
 def test_rslad_method_ids_are_config_only_switches(name: str) -> None:
     method: dict[str, object] = {

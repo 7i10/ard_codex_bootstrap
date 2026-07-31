@@ -87,7 +87,7 @@ stable sample IDをキーに、EMA、correctness count、forgetting count、last
 - attackとobjectiveは別moduleにする。
 - sample stateの更新時点を明示する。
 - train-time quick PGDと正式evaluationを分離する。
-- controlled SAAD studentはraw-pixel identity adapterを使う（canonical architecture id: `saad_resnet18_cifar_v1`）。MultiStepLRはepoch-endにstepし、epoch 0–99/100–149/150–199でLRは0.1/0.01/0.001。controlled attacksはPGD-10 KL (teacher_clean) とselection PGD-20 CE。
+- controlled SAAD studentはraw-pixel identity adapterを使う（canonical architecture id: `saad_resnet18_cifar_v1`）。MultiStepLRはepoch-endにstepし、epoch 0–99/100–149/150–199でLRは0.1/0.01/0.001。controlled innerはmethod別（PGD-AT CE、TRADES KL/student-clean、RSLAD-family KL/teacher-clean）で、selectionは共通PGD-20 CE。
 - upstream実装はruntime dependencyではなく、oracle/wrapperとする。
 
 ## 5. 初期method構成
@@ -97,6 +97,7 @@ stable sample IDをキーに、EMA、correctness count、forgetting count、last
 | `pgd_at` | student PGD | hard-label CE | none | uniform |
 | `trades` | TRADES inner | TRADES | none | uniform |
 | `rslad` | RSLAD-compatible | hard + robust KD | none | uniform |
+| `rslad_logging_only` | same as RSLAD | exact RSLAD | primitive student/teacher state | uniform; observation-only |
 | `rslad_entropy` | same as RSLAD | same | teacher entropy | entropy weight |
 | `rslad_student` | same as RSLAD | same | robust-margin EMA | student weight |
 | `rslad_joint` | same as RSLAD | same | entropy + margin EMA | joint-risk gate |

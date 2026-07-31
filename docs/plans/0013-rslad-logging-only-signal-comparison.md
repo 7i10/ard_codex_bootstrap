@@ -89,13 +89,16 @@ exact logging-only RSLAD path whose observations do not affect training loss.
     deterministic unit coverage are complete; the teacher-specific table is
     pending M1 artifact replay.
   - Commit: `analysis: compare entropy and margin on RSLAD trajectories`.
-- [ ] M3: exact logging-only capability.
+- [x] M3: exact logging-only capability.
   - Files: trainer diagnostics/state/config plus parity tests and explicit
     logging-only configs after proxy review.
   - Acceptance: bounded RSLAD and logging-only runs have exact model,
     optimizer, scheduler, RNG, and checkpoint parity while recording both
     pre-update signals from the real augmented training trajectory.
   - Commit: separate from replay to keep the publication core reviewable.
+  - Implementation and bounded parity evidence are tracked in
+    `0014-future-method-preparation.md`; no long logging-only run starts before
+    the proxy review.
 - [ ] M4: one consolidated scientific review and result documentation.
 
 ## Agent and review budget
