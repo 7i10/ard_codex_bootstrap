@@ -119,13 +119,38 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 ### 次段階の未着手研究
 
 - core seed-0の8 train、8 PGD、8 AutoAttackはすべて完了しました。Student 2セルのAAは事後追加評価です。
-- seed 1/2、複数seed統計、teacher感度のmean/std/worst/bestは未着手です。
+- 複数seedの性能評価は未完了です。student-history信号については、後述の2教師×2 seed
+  confirmatory blockが実行中です。これは性能主張用の3-seed cohortではありません。
 - controlled protocolでのPGD-AT、TRADES、full SAAD直接比較は未着手です。
 - PGD-AT/TRADESのcanonical configとCUDA synthetic smoke、および
-  Chen/Bartoldson logging-only RSLAD config/parity gateは準備済みです。
-  いずれも200 epoch実験は未開始です。
+  Chen/Bartoldson observed RSLAD config/parity gateは準備済みです。
+  PGD-AT/TRADESの200 epoch実験は未開始です。
 - CIFAR-100、MobileNetV2、Tiny-ImageNet本訓練は未着手です。
 - これらを現在のseed-0結果から自動的に開始する設定にはしていません。
+
+### Student-history confirmatory block（実行中スナップショット）
+
+seed-0だけの関連を一般化せず、teacher依存・seed依存・proxyからexact online historyへの移行を同時に
+確認するため、lossへ介入しないobserved RSLADを2教師×2 seedで実行します。predictor、feature、anchor
+epoch 99、future outcome、split、判定閾値はseed 1/2の結果を見る前に
+[`history_confirmatory_block_v2.yaml`](../configs/analysis/history_confirmatory_block_v2.yaml)へ固定しました。
+
+| Cell | Teacher | Seed | Host/GPU | W&B run | 2026-08-01 launch evidence |
+|---|---|---:|---|---|---|
+| L1 | Bartoldson | 1 | Hamster 1 | `bart-rslad-logging-only-s1-confirm-v1` | 旧SHAで継続中。pool前に直接bridge必須 |
+| L2 | Chen | 1 | Hamster 0 | `chen-rslad-observed-s1-confirm-v2` | epoch 0 finite、45,000 state完備 |
+| L3 | Bartoldson | 2 | Ferret 0 | `bart-rslad-observed-s2-confirm-v2` | epoch 0 finite、45,000 state完備 |
+| L4 | Chen | 2 | Ferret 1 | `chen-rslad-observed-s2-confirm-v2` | epoch 0 finite、45,000 state完備 |
+
+L2--L4の固定SHAは`8254a8899ae7373c2f541d108593e5c8185b26f5`です。L1の旧
+`rslad_logging_only`を新しい`rslad + observation.teacher_response`と同じ集計へ入れるには、各runtime内の
+parity testだけでなく直接cross-version CUDA equalityが必要です。不一致ならL1は運用証拠に留め、同じ新SHAで
+Bartoldson seed 1を置換します。live epochはこの表へ追記せずW&Bまたは`ard.cli.status`を参照します。
+
+confirmatory後の介入は単独runでは判定しません。同じBartoldson epoch-99 stateから、control、
+history/random selector × uniform-softening/KD-downweightの5 armを分岐し、selector効果、介入効果、randomな
+正則化効果を事前定義したcontrastで分けます。history selectorはBartoldsonの両seedが固定Go基準を満たす時
+だけ使用し、mixed/inconclusiveなら開始しません。
 
 ## 4. 現在の正式結果
 

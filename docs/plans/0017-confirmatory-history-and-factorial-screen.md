@@ -80,7 +80,7 @@ intervention utility separately with one common-state five-arm continuation.
   - Test: one CUDA random-start RSLAD observation parity case.
   - Acceptance: design frozen before L2--L4 outcomes; L1 bridge is explicit.
   - Commit: `research: freeze confirmatory history block`.
-- [ ] H1 — launch L2--L4 as clean fixed-SHA long runs.
+- [x] H1 — launch L2--L4 as clean fixed-SHA long runs.
   - Files: no runtime mutation; use canonical observed scientific configs.
   - Acceptance: unique outputs/W&B IDs, exact Git/config/teacher hashes, correct
     GPU, live process, first finite batch/epoch, sample state in checkpoint.
@@ -153,6 +153,14 @@ during waiting. No watchdog/recovery agent is used.
   2.80s`) on Hamster GPU 0. Independent planning identified that this does not
   by itself prove the old/new L1 bridge; direct cross-version parity is now H2a.
   No long run or evaluation was treated as a test.
+- 2026-08-01: frozen design SHA-256 is `a0a7fe0e...`; launch Git SHA is
+  `8254a8899ae7373c2f541d108593e5c8185b26f5`. L2 (Chen seed 1) started on
+  Hamster GPU 0, L3 (Bartoldson seed 2) on Ferret GPU 0 and L4 (Chen seed 2)
+  on Ferret GPU 1. All initialized unique online W&B runs and saved a finite
+  epoch-0 checkpoint with 45,000 format-v3 sample records, `seen=1`, and no
+  missing required teacher-response primitive. Epoch-0 throughput was
+  636.2/163.2/367.0 images/s for L2/L3/L4 respectively. L1 remains active on
+  Hamster GPU 1; Ferret GPU 2 remains free for bounded bridge verification.
 
 ## Completion report
 

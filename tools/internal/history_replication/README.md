@@ -9,3 +9,8 @@ runtime configuration, are not imported by `ard.cli.train`, and must not be
 reused as a generic launch gate. Exact resume of that run uses the original
 Git SHA; future non-intervened observation runs use ordinary `rslad` plus an
 explicit `observation.profile`.
+
+`bridge/` is a bounded, one-time clean-SHA migration verifier used to decide
+whether the historical observation API and the public observation-profile API
+produce exactly equal optimization/sample-state checkpoints. It is internal
+research provenance tooling, not a training method or installed runtime API.
