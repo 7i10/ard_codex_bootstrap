@@ -137,15 +137,17 @@ epoch 99、future outcome、split、判定閾値はseed 1/2の結果を見る前
 
 | Cell | Teacher | Seed | Host/GPU | W&B run | 2026-08-01 launch evidence |
 |---|---|---:|---|---|---|
-| L1 | Bartoldson | 1 | Hamster 1 | `bart-rslad-logging-only-s1-confirm-v1` | 旧SHAで継続中。pool前に直接bridge必須 |
+| L1 | Bartoldson | 1 | Hamster 1 | `bart-rslad-logging-only-s1-confirm-v1` | 旧SHAで継続中。直接bridge pass |
 | L2 | Chen | 1 | Hamster 0 | `chen-rslad-observed-s1-confirm-v2` | epoch 0 finite、45,000 state完備 |
 | L3 | Bartoldson | 2 | Ferret 0 | `bart-rslad-observed-s2-confirm-v2` | epoch 0 finite、45,000 state完備 |
 | L4 | Chen | 2 | Ferret 1 | `chen-rslad-observed-s2-confirm-v2` | epoch 0 finite、45,000 state完備 |
 
 L2--L4の固定SHAは`8254a8899ae7373c2f541d108593e5c8185b26f5`です。L1の旧
-`rslad_logging_only`を新しい`rslad + observation.teacher_response`と同じ集計へ入れるには、各runtime内の
-parity testだけでなく直接cross-version CUDA equalityが必要です。不一致ならL1は運用証拠に留め、同じ新SHAで
-Bartoldson seed 1を置換します。live epochはこの表へ追記せずW&Bまたは`ard.cli.status`を参照します。
+`rslad_logging_only`と新しい`rslad + observation.teacher_response`の直接cross-version CUDA bridgeは、同一
+RTX 4090・同一環境の二epoch deterministic fixtureでcheckpoint/sample state equalityを満たしました。このため
+L1は旧Git lineageを明示したまま同じ観測解析へ含めます。これは200 epoch性能の同値性を主張するものではありません。
+証跡は`tools/internal/history_replication/provenance/observation_bridge_2026-08-01.yaml`です。live epochはこの表へ
+追記せずW&Bまたは`ard.cli.status`を参照します。
 
 confirmatory後の介入は単独runでは判定しません。同じBartoldson epoch-99 stateから、control、
 history/random selector × uniform-softening/KD-downweightの5 armを分岐し、selector効果、介入効果、randomな

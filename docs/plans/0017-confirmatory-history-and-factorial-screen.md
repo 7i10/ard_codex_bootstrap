@@ -4,7 +4,7 @@
 
 - Owner: main thread; shell processes own GPU execution
 - Branch / base SHA: `cleanup/observability-first` / `ad6d26e1c15d90eeb8c1d8b10cfa081a433364b9`
-- Current milestone: H1 launch three additional confirmatory trajectories
+- Current milestone: H2 await the complete four-trajectory block
 - Last updated: 2026-08-01
 
 ## Goal
@@ -89,7 +89,7 @@ intervention utility separately with one common-state five-arm continuation.
   - Output: frozen full table for Teacher-only, Student-only, Main effects and
     Main+product; per-run AUROC/AUPRC/log-loss/prevalence and conditional CIs.
   - Acceptance: no feature/spec changes; teacher/seed dependence reported.
-- [ ] H2a — close the old/new L1 bridge before pooling.
+- [x] H2a — close the old/new L1 bridge before pooling.
   - Acceptance: direct bounded CUDA equality of model, optimizer, scheduler,
     scaler, RNG, sampler, global step and every format-v3 primitive/count.
     Config identity and added forward-count telemetry are the only allowed
@@ -161,6 +161,18 @@ during waiting. No watchdog/recovery agent is used.
   missing required teacher-response primitive. Epoch-0 throughput was
   636.2/163.2/367.0 images/s for L2/L3/L4 respectively. L1 remains active on
   Hamster GPU 1; Ferret GPU 2 remains free for bounded bridge verification.
+- 2026-08-01: direct old/new CUDA bridge passed on the same Ferret RTX 4090
+  (`0fdfaeb...` `observe_teacher_signals` versus `8254a88...`
+  `observation_profile`). The two-epoch deterministic fixture produced equal
+  checkpoint state after removing identity-only fields (`b469c5d3...`) and
+  equal format-v3 sample state (`907ea4c2...`, five records). The raw
+  attestation SHA-256 is `4f98fda4...`; the compact provenance record is
+  `tools/internal/history_replication/provenance/observation_bridge_2026-08-01.yaml`.
+  Therefore L1 is admissible for the frozen observation analysis with its old
+  Git lineage preserved. This bridge does not claim 200-epoch performance
+  equivalence. An initial device-activation failure was fixed by selecting the
+  CUDA device before resetting peak-memory statistics, with a focused unit
+  regression; no long run was affected.
 
 ## Completion report
 

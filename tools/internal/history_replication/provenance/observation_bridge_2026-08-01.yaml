@@ -1,0 +1,34 @@
+schema_version: 1
+result: pass
+scope: observation-runtime migration only; not full-training performance parity
+attestation:
+  run_id: observation-bridge-tool-c918573
+  sha256: 4f98fda41ca7d1f9bdff0e4b04c48b179e09e8f7d64651dd5ec2b5b78669aba7
+  collected_path: /home/shunsukenaito/workspace-local/ferret-results/ard_codex_bootstrap/observation-bridge-tool-c918573/outputs/bridge-attestation.json
+runtime:
+  old_git_sha: 0fdfaeb5809e3b08a0825e2e5caf0bebfa215047
+  old_api: observe_teacher_signals
+  new_git_sha: 8254a8899ae7373c2f541d108593e5c8185b26f5
+  new_api: observation_profile
+  bridge_tool_git_sha: c918573810addde8312af5274b4d5c370143ea52
+fixture:
+  id: synthetic-cifar8-rslad-pgd1-random-start-epochs2
+  device: cuda:0
+  gpu: NVIDIA GeForce RTX 4090
+  gpu_uuid: 13e501b2-0ba0-3dd7-9859-e84d4a1d2af7
+  python: 3.12.13
+  torch: 2.11.0+cu128
+  cuda_runtime: "12.8"
+  deterministic_algorithms: true
+equality:
+  checkpoint_without_identity_sha256: b469c5d39b15fd1788ed4211793c3b117291037663d37e7e882344518c82218f
+  sample_state_sha256: 907ea4c20779b84057a90fe8258406d7282d1057b638da11bb73268dec0b0df7
+  sample_state_record_count: 5
+  old_output_sha256: 1bd8b65127be81a9eb9f6b80fe112143ea16110b1be8bfacfd95f02259906676
+  new_output_sha256: d872ab9087040b9fabc605ce0bfb2def4d3b2c7afe85eb0cb449530cb954cbbd
+allowed_differences:
+  - config identity
+  - W&B tracker run ID
+  - Git/source lineage metadata
+  - observation API metadata
+  - teacher forward-count telemetry
