@@ -106,6 +106,19 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
+        (
+            "src/ard/analysis/intervention_selector.py",
+            "src/ard/analysis/intervention_fork.py",
+            "src/ard/cli/intervention_selector.py",
+        ),
+        (
+            "tests/unit/test_intervention_selector.py",
+            "tests/unit/test_intervention_selector_cli.py",
+            "tests/unit/test_intervention_fork.py",
+        ),
+        ("T0", "T1", "T2"),
+    ),
+    (
         ("src/ard/cli/status.py",),
         ("tests/unit/test_status.py", "tests/unit/test_tracking.py"),
         ("T0", "T1"),

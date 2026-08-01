@@ -26,6 +26,7 @@ from ard.analysis.sample_stats import write_sample_parquet
 from ard.attacks import AttackRequest, LinfPGD
 from ard.config import ExperimentConfig
 from ard.config.schema import training_execution_identity
+from ard.engine.checkpoint import REQUIRED_KEYS
 from ard.signals import RobustMarginSignal
 
 from .signal_audit import (
@@ -218,6 +219,125 @@ def inventory_common_trajectory(
         run_id=run_id,
         config_hash=config_hash,
         scientific_git_sha=next(iter(git_shas)),
+        world_size=next(iter(world_sizes)),
+        checkpoints=checkpoints,
+    )
+
+
+def inventory_feature_trajectory(
+    manifest_path: Path, *, run_id: str, expected_config_hash: str | None = None
+) -> TemporalPanelInventory:
+    """Read only the pre-anchor checkpoints needed for feature-only replay.
+
+    The manifest order is the immutable artifact-publication order.  We use it
+    solely to select the first 20 periodic ``last`` artifacts, then prove that
+    their payload epochs are exactly 4, 9, ..., 99.  In particular, this
+    function must not hash or deserialize any post-anchor checkpoint: those
+    bytes are prospective outcomes and are forbidden inputs to L3 features.
+    """
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RSLADSignalReplayError("run-bundle manifest is unreadable") from exc
+    if not isinstance(manifest, Mapping):
+        raise RSLADSignalReplayError("run-bundle manifest must be a mapping")
+    if manifest.get("run_id") != run_id:
+        raise RSLADSignalReplayError("feature replay manifest run ID does not match the configured run")
+    config_hash = manifest.get("config_hash")
+    if not isinstance(config_hash, str) or len(config_hash) != 64:
+        raise RSLADSignalReplayError("feature replay manifest config hash is invalid")
+    if expected_config_hash is not None and config_hash != expected_config_hash:
+        raise RSLADSignalReplayError("feature replay manifest config hash does not match resolved training config")
+    git = manifest.get("git")
+    scientific_git_sha = git.get("sha") if isinstance(git, Mapping) else None
+    if not isinstance(scientific_git_sha, str) or len(scientific_git_sha) not in {40, 64}:
+        raise RSLADSignalReplayError("feature replay manifest scientific Git SHA is invalid")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise RSLADSignalReplayError("feature replay manifest artifacts must be a list")
+
+    periodic_entries = [
+        (publication_order, entry)
+        for publication_order, entry in enumerate(artifacts)
+        if isinstance(entry, Mapping)
+        and entry.get("type") == "model"
+        and isinstance(entry.get("aliases"), list)
+        and "last" in entry["aliases"]
+    ]
+    if len(periodic_entries) != len(PERIODIC_EPOCHS):
+        raise RSLADSignalReplayError("feature replay requires exactly the immutable 40-checkpoint panel")
+    selected = periodic_entries[: len(FEATURE_EPOCHS)]
+    if len(selected) != len(FEATURE_EPOCHS):  # defensive if the panel constant changes
+        raise RSLADSignalReplayError("feature replay checkpoint-panel selection is incomplete")
+
+    inventory: list[CheckpointInventory] = []
+    world_sizes: set[int] = set()
+    bundle = manifest_path.parent.resolve()
+    for publication_order, entry in selected:
+        name, aliases, expected_sha = entry.get("name"), entry.get("aliases"), entry.get("sha256")
+        local_path, source_path = entry.get("local_path"), entry.get("path")
+        if (
+            not isinstance(name, str)
+            or not name
+            or not isinstance(aliases, list)
+            or not all(isinstance(alias, str) for alias in aliases)
+            or len(set(aliases)) != len(aliases)
+            or not isinstance(expected_sha, str)
+            or len(expected_sha) != 64
+            or not isinstance(local_path, str)
+            or not isinstance(source_path, str)
+        ):
+            raise RSLADSignalReplayError("feature replay periodic artifact metadata is invalid")
+        checkpoint_path = (bundle / local_path / Path(source_path).name).resolve()
+        if bundle not in checkpoint_path.parents or not checkpoint_path.is_file():
+            raise RSLADSignalReplayError("feature replay checkpoint is missing or escapes its run bundle")
+        actual_sha = sha256_file(checkpoint_path)
+        if actual_sha != expected_sha:
+            raise RSLADSignalReplayError("feature replay checkpoint hash does not match its manifest artifact")
+        try:
+            payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        except Exception as exc:  # pragma: no cover - torch serialization exception types vary
+            raise RSLADSignalReplayError("feature replay checkpoint is unreadable") from exc
+        if not isinstance(payload, Mapping) or REQUIRED_KEYS.difference(payload):
+            raise RSLADSignalReplayError("feature replay checkpoint lacks the complete checkpoint contract")
+        epoch = payload.get("epoch")
+        if (
+            isinstance(epoch, bool)
+            or not isinstance(epoch, int)
+            or payload.get("epoch_boundary") != "end"
+            or payload.get("tracker_run_id") != run_id
+            or payload.get("config_hash") != config_hash
+        ):
+            raise RSLADSignalReplayError("feature replay checkpoint identity or epoch boundary is invalid")
+        world_size = _require_int(payload.get("world_size"), name="feature replay checkpoint world_size", minimum=1)
+        world_sizes.add(world_size)
+        inventory.append(
+            CheckpointInventory(
+                run_id=run_id,
+                artifact_name=name,
+                aliases=tuple(aliases),
+                publication_order=publication_order,
+                path=str(checkpoint_path),
+                sha256=actual_sha,
+                epoch=epoch,
+                sample_state_present=isinstance(payload.get("sample_state"), Mapping) and bool(payload["sample_state"]),
+                sample_state_count=(
+                    len(payload["sample_state"].get("records", {}))
+                    if isinstance(payload.get("sample_state"), Mapping)
+                    and isinstance(payload["sample_state"].get("records", {}), Mapping)
+                    else 0
+                ),
+                config_hash=config_hash,
+                scientific_git_sha=scientific_git_sha,
+            )
+        )
+    checkpoints = validate_exact_epoch_schedule(inventory, expected_epochs=FEATURE_EPOCHS)
+    if len(world_sizes) != 1:
+        raise RSLADSignalReplayError("feature replay checkpoints must share one checkpoint world size")
+    return TemporalPanelInventory(
+        run_id=run_id,
+        config_hash=config_hash,
+        scientific_git_sha=scientific_git_sha,
         world_size=next(iter(world_sizes)),
         checkpoints=checkpoints,
     )
@@ -1092,6 +1212,155 @@ def replay_lineage(
             for item in outcome_results
         ],
     }
+
+
+def feature_replay_lineage(
+    *,
+    panel: TemporalPanelInventory,
+    training_config: ExperimentConfig,
+    expected_count: int,
+    replay_batch_size: int,
+    device_type: str,
+    runtime: Mapping[str, Any],
+    feature_seed: int,
+    saved_resolved_config_mapping_sha256: str,
+    saved_resolved_config_file_sha256: str,
+    teacher_metadata: Mapping[str, Any],
+    dataset_identity: Mapping[str, Any],
+    analysis_provenance: Mapping[str, Any],
+    feature_results: Sequence[ReplayCheckpointResult],
+    feature_panel: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Bind L3's pre-anchor feature panel to its exact epoch-99 parent.
+
+    This deliberately has no outcome protocol, outcome replay, or predictive
+    report.  The selector can therefore treat its output as an input-only
+    feature source rather than accidentally interpreting it as prospective
+    intervention evidence.
+    """
+    if expected_count != 45000:
+        raise RSLADSignalReplayError("feature-only replay requires exactly 45,000 stable train IDs")
+    if device_type not in {"cpu", "cuda"}:
+        raise RSLADSignalReplayError("feature-only replay device_type must be cpu or cuda")
+    if tuple(item.epoch for item in panel.checkpoints) != FEATURE_EPOCHS:
+        raise RSLADSignalReplayError("feature-only replay requires the exact epoch-4..99 feature schedule")
+    if (
+        training_config.protocol.id != "controlled_cifar10_r18_v1"
+        or training_config.training.epochs != 200
+        or training_config.training.per_rank_batch_size != 128
+        or training_config.training.global_batch_size != 128
+        or training_config.observation.profile != "teacher_response"
+    ):
+        raise RSLADSignalReplayError("feature-only replay requires the controlled observed-RSLAD parent protocol")
+    if training_config.teacher is None or training_config.teacher.registry_id is None:
+        raise RSLADSignalReplayError("feature-only replay requires a registered robust teacher parent")
+    anchor = panel.checkpoints[-1]
+    try:
+        payload = torch.load(anchor.path, map_location="cpu", weights_only=False)
+    except Exception as exc:  # pragma: no cover - torch serialization exception types vary
+        raise RSLADSignalReplayError("feature-only parent checkpoint is unreadable") from exc
+    if (
+        not isinstance(payload, Mapping)
+        or payload.get("epoch") != FEATURE_EPOCHS[-1]
+        or payload.get("epoch_boundary") != "end"
+        or payload.get("tracker_run_id") != panel.run_id
+        or payload.get("config_hash") != panel.config_hash
+        or _require_int(payload.get("world_size"), name="feature-only parent world_size", minimum=1) != panel.world_size
+    ):
+        raise RSLADSignalReplayError("feature-only parent checkpoint lineage does not match the feature panel")
+    sample_state = payload.get("sample_state")
+    records = sample_state.get("records") if isinstance(sample_state, Mapping) else None
+    if not isinstance(records, Mapping) or len(records) != expected_count:
+        raise RSLADSignalReplayError("feature-only parent checkpoint lacks exactly 45,000 stable sample-state records")
+    try:
+        parent_ids = {
+            int(sample_id)
+            for sample_id in records
+            if not isinstance(sample_id, bool) and isinstance(sample_id, (str, int))
+        }
+    except ValueError as exc:
+        raise RSLADSignalReplayError("feature-only parent sample-state IDs are invalid") from exc
+    feature_ids = {
+        row.get("sample_id")
+        for row in feature_panel
+        if row.get("namespace") == "train"
+        and isinstance(row.get("sample_id"), int)
+        and not isinstance(row.get("sample_id"), bool)
+    }
+    if len(parent_ids) != expected_count or parent_ids != feature_ids:
+        raise RSLADSignalReplayError("feature-only panel stable IDs do not exactly match the epoch-99 parent state")
+    parent_sample_state_sha256 = hashlib.sha256(canonical_json(sample_state)).hexdigest()
+    return {
+        "schema_version": 1,
+        "kind": "l3_checkpoint_panel_feature_source_v1",
+        "analysis_provenance": dict(analysis_provenance),
+        "run_id": panel.run_id,
+        "config_hash": panel.config_hash,
+        "scientific_git_sha": panel.scientific_git_sha,
+        "teacher_registry_id": training_config.teacher.registry_id,
+        "seed": training_config.seeds.model_init,
+        "parent_epoch": FEATURE_EPOCHS[-1],
+        "parent_checkpoint_sha256": anchor.sha256,
+        "parent_sample_state_sha256": parent_sample_state_sha256,
+        "parent_raw_config_sha256": saved_resolved_config_mapping_sha256,
+        "saved_resolved_config_file_sha256": saved_resolved_config_file_sha256,
+        "checkpoint_training": {
+            "world_size": panel.world_size,
+            "execution_identity": training_execution_identity(
+                training=training_config.training, world_size=panel.world_size
+            ),
+        },
+        "attack_identity": training_config.method.attack.identity(),
+        "train_expected_count": expected_count,
+        "teacher": dict(teacher_metadata),
+        "dataset_identity": dict(dataset_identity),
+        "runtime": dict(runtime),
+        "checkpoints": [asdict(item) for item in panel.checkpoints],
+        "feature_protocol": {
+            **domain_replay_protocol(base_seed=feature_seed, domain="feature", device_type=device_type),
+            "batch_size": replay_batch_size,
+            "epochs": list(FEATURE_EPOCHS),
+            "panel_ema_beta": PANEL_EMA_BETA,
+        },
+        "feature_replays": [
+            {"epoch": item.epoch, "attack_seed_base": item.attack_seed_base, "max_abs_delta": item.max_abs_delta}
+            for item in feature_results
+        ],
+    }
+
+
+def write_feature_replay_outputs(
+    *,
+    output_dir: Path,
+    feature_observations: Sequence[Mapping[str, Any]],
+    feature_panel: Sequence[Mapping[str, Any]],
+    lineage: Mapping[str, Any],
+) -> dict[str, Path]:
+    """Write only L3 feature artifacts; outcomes and reports are forbidden."""
+    paths = {
+        "feature_observations": output_dir / "feature-observations.parquet",
+        "feature_panel": output_dir / "feature-panel.parquet",
+        "lineage": output_dir / "lineage.json",
+    }
+    if any(path.exists() for path in paths.values()):
+        raise FileExistsError("refusing to overwrite an existing feature-only replay output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_sample_parquet(
+        sorted(feature_observations, key=lambda row: (int(row["epoch"]), int(row["sample_id"]))),
+        paths["feature_observations"],
+    )
+    write_sample_parquet(sorted(feature_panel, key=lambda row: int(row["sample_id"])), paths["feature_panel"])
+    paths["lineage"].write_bytes(
+        canonical_json(
+            {
+                **lineage,
+                "feature_observations_sha256": sha256_file(paths["feature_observations"]),
+                "feature_panel_sha256": sha256_file(paths["feature_panel"]),
+            }
+        )
+        + b"\n"
+    )
+    return paths
 
 
 def write_replay_outputs(

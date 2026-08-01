@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 import torch
 
+from ard.analysis import intervention_fork
 from ard.analysis.intervention_fork import (
     InterventionForkError,
     build_parent_artifact_attestation,
@@ -335,7 +336,9 @@ def _write_fork_inputs(
     return checkpoint, config_path, manifest, raw, payload, parent_fields
 
 
-def test_common_state_fork_preserves_parent_state_resets_best_and_records_lineage(tmp_path: Path) -> None:
+def test_common_state_fork_preserves_parent_state_resets_best_and_records_lineage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     checkpoint, parent_config, manifest, raw, parent_payload, parent_fields = _write_fork_inputs(tmp_path)
     labels = {0: 0, 1: 0}
     parent_sha = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
@@ -420,6 +423,18 @@ def test_common_state_fork_preserves_parent_state_resets_best_and_records_lineag
 
         path.write_text(yaml.safe_dump(child), encoding="utf-8")
         arm_paths.append(path)
+    # This test owns common-state preservation, not the independently tested
+    # panel-derived selector.  The selector has its own fail-closed fixture in
+    # test_intervention_selector.py.
+    monkeypatch.setattr(
+        intervention_fork,
+        "verify_selector_bundle",
+        lambda **kwargs: {
+            "bundle_sha256": hashlib.sha256(kwargs["bundle_path"].read_bytes()).hexdigest(),
+            "history_mask_sha256": hashlib.sha256(kwargs["history_mask_path"].read_bytes()).hexdigest(),
+            "random_mask_sha256": hashlib.sha256(kwargs["random_mask_path"].read_bytes()).hexdigest(),
+        },
+    )
     created = create_intervention_forks(
         parent_checkpoint=checkpoint,
         parent_resolved_config=parent_config,

@@ -23,6 +23,8 @@ from ard.analysis.rslad_signal_replay import (
     build_outcome_panel,
     checkpoint_cache_identity,
     domain_seed,
+    feature_replay_lineage,
+    inventory_feature_trajectory,
     join_feature_outcome_panels,
     load_cached_checkpoint,
     portable_cifar10_train_identity,
@@ -34,13 +36,14 @@ from ard.analysis.rslad_signal_replay import (
     validate_rslad_replay_attack,
     verify_semantic_sources_tracked,
     write_checkpoint_cache,
+    write_feature_replay_outputs,
     write_replay_outputs,
 )
 from ard.analysis.signal_audit import CheckpointInventory
 from ard.config import load_config
 from ard.config.loader import resolved_config_dict
 from ard.data import IndexedBatch
-from ard.engine.checkpoint import config_digest
+from ard.engine.checkpoint import REQUIRED_KEYS, config_digest
 
 
 def _checkpoint(epoch: int) -> CheckpointInventory:
@@ -162,6 +165,164 @@ def test_feature_and_outcome_seed_domains_are_deterministic_and_independent() ->
     assert feature != outcome
     with pytest.raises(RSLADSignalReplayError, match="domain"):
         domain_seed(base_seed=7, domain="shared")
+
+
+def _manifest_checkpoint_payload(epoch: int) -> dict[str, object]:
+    payload: dict[str, object] = {key: {} for key in REQUIRED_KEYS}
+    payload.update(
+        {
+            "epoch": epoch,
+            "epoch_boundary": "end",
+            "tracker_run_id": "rslad-s0",
+            "config_hash": "a" * 64,
+            "world_size": 1,
+            "sample_state": {},
+        }
+    )
+    return payload
+
+
+def test_feature_inventory_never_deserializes_post_anchor_outcome_checkpoints(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    artifacts: list[dict[str, object]] = []
+    for epoch in PERIODIC_EPOCHS:
+        directory = tmp_path / "artifacts" / f"epoch-{epoch}"
+        directory.mkdir(parents=True)
+        checkpoint = directory / "last.pt"
+        torch.save(_manifest_checkpoint_payload(epoch), checkpoint)
+        artifacts.append(
+            {
+                "type": "model",
+                "name": f"model-rslad-last-{epoch}",
+                "aliases": ["last"],
+                "sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+                "local_path": str(directory.relative_to(tmp_path)),
+                "path": "last.pt",
+            }
+        )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({"run_id": "rslad-s0", "config_hash": "a" * 64, "git": {"sha": "b" * 40}, "artifacts": artifacts}),
+        encoding="utf-8",
+    )
+    original_load = rslad_signal_replay.torch.load
+    opened: list[str] = []
+
+    def only_features(path: object, **kwargs: object) -> object:
+        rendered = str(path)
+        opened.append(rendered)
+        if any(f"epoch-{epoch}" in rendered for epoch in OUTCOME_EPOCHS if epoch > FEATURE_EPOCHS[-1]):
+            raise AssertionError("feature-only inventory opened an outcome checkpoint")
+        return original_load(path, **kwargs)
+
+    monkeypatch.setattr(rslad_signal_replay.torch, "load", only_features)
+    panel = inventory_feature_trajectory(manifest, run_id="rslad-s0", expected_config_hash="a" * 64)
+    assert tuple(item.epoch for item in panel.checkpoints) == FEATURE_EPOCHS
+    assert len(opened) == len(FEATURE_EPOCHS)
+
+
+def test_feature_only_output_has_no_outcome_panel_or_predictive_report(tmp_path: Path) -> None:
+    observations = _replay_rows((4,), samples=2)
+    feature_panel = [
+        {
+            "namespace": "train",
+            "sample_id": row["sample_id"],
+            "class_id": row["class_id"],
+            "feature_epoch": 99,
+            "teacher_entropy_normalized": row["teacher_entropy_normalized"],
+            "student_margin_panel_ema": row["student_probability_margin"],
+            "student_margin_panel_risk": row["student_margin_risk"],
+        }
+        for row in observations
+    ]
+    paths = write_feature_replay_outputs(
+        output_dir=tmp_path,
+        feature_observations=observations,
+        feature_panel=feature_panel,
+        lineage={"schema_version": 1, "kind": "l3_checkpoint_panel_feature_source_v1"},
+    )
+    assert set(paths) == {"feature_observations", "feature_panel", "lineage"}
+    assert not (tmp_path / "outcome-panel.parquet").exists()
+    assert not (tmp_path / "predictive-audit.json").exists()
+    lineage = json.loads(paths["lineage"].read_text(encoding="utf-8"))
+    assert "feature_panel_sha256" in lineage
+    assert not any("outcome" in field or "audit" in field for field in lineage)
+
+
+def test_feature_only_lineage_binds_epoch99_parent_state_and_rejects_stable_id_drift(tmp_path: Path) -> None:
+    base_config = load_config(Path(__file__).parents[2] / "configs" / "experiments" / "synthetic_rslad.yaml")
+    parent_state = {"format_version": 3, "records": {str(index): {} for index in range(45000)}}
+    payload = _manifest_checkpoint_payload(99)
+    payload["tracker_run_id"] = "run"
+    payload["sample_state"] = parent_state
+    checkpoint_path = tmp_path / "epoch99.pt"
+    torch.save(payload, checkpoint_path)
+    anchor = CheckpointInventory(
+        run_id="run",
+        artifact_name="model-rslad-last-99",
+        aliases=("last",),
+        publication_order=19,
+        path=str(checkpoint_path),
+        sha256=hashlib.sha256(checkpoint_path.read_bytes()).hexdigest(),
+        epoch=99,
+        sample_state_present=True,
+        sample_state_count=45000,
+        config_hash="a" * 64,
+        scientific_git_sha="b" * 40,
+    )
+    panel = TemporalPanelInventory(
+        "run", "a" * 64, "b" * 40, 1, tuple(_checkpoint(epoch) for epoch in FEATURE_EPOCHS[:-1]) + (anchor,)
+    )
+    training_config = SimpleNamespace(
+        protocol=SimpleNamespace(id="controlled_cifar10_r18_v1"),
+        training=SimpleNamespace(
+            epochs=200, per_rank_batch_size=128, global_batch_size=128, batchnorm_mode="local_per_rank"
+        ),
+        observation=SimpleNamespace(profile="teacher_response"),
+        teacher=SimpleNamespace(registry_id="bartoldson2024_adversarial_wrn94_16"),
+        seeds=SimpleNamespace(model_init=2),
+        method=base_config.method,
+    )
+    feature_panel = [{"namespace": "train", "sample_id": index} for index in range(45000)]
+    lineage = feature_replay_lineage(
+        panel=panel,
+        training_config=training_config,
+        expected_count=45000,
+        replay_batch_size=128,
+        device_type="cpu",
+        runtime={"selected_device": "cpu"},
+        feature_seed=7,
+        saved_resolved_config_mapping_sha256="c" * 64,
+        saved_resolved_config_file_sha256="d" * 64,
+        teacher_metadata={},
+        dataset_identity={},
+        analysis_provenance={},
+        feature_results=(),
+        feature_panel=feature_panel,
+    )
+    assert lineage["parent_checkpoint_sha256"] == anchor.sha256
+    assert (
+        lineage["parent_sample_state_sha256"]
+        == hashlib.sha256(rslad_signal_replay.canonical_json(parent_state)).hexdigest()
+    )
+    with pytest.raises(RSLADSignalReplayError, match="stable IDs"):
+        feature_replay_lineage(
+            panel=panel,
+            training_config=training_config,
+            expected_count=45000,
+            replay_batch_size=128,
+            device_type="cpu",
+            runtime={"selected_device": "cpu"},
+            feature_seed=7,
+            saved_resolved_config_mapping_sha256="c" * 64,
+            saved_resolved_config_file_sha256="d" * 64,
+            teacher_metadata={},
+            dataset_identity={},
+            analysis_provenance={},
+            feature_results=(),
+            feature_panel=feature_panel[:-1],
+        )
 
 
 def test_fixed_domain_seed_and_cache_identity_include_batch_partition() -> None:

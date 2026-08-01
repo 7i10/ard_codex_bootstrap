@@ -115,6 +115,26 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert logging_prediction.tests == ("tests/unit/test_logging_only_prediction.py",)
     assert logging_prediction.tiers == ("T0", "T1")
 
+    selector = select(
+        (
+            "src/ard/analysis/intervention_selector.py",
+            "src/ard/analysis/intervention_fork.py",
+            "src/ard/cli/intervention_selector.py",
+        ),
+        (
+            *available,
+            "tests/unit/test_intervention_selector.py",
+            "tests/unit/test_intervention_selector_cli.py",
+            "tests/unit/test_intervention_fork.py",
+        ),
+    )
+    assert selector.tests == (
+        "tests/unit/test_intervention_fork.py",
+        "tests/unit/test_intervention_selector.py",
+        "tests/unit/test_intervention_selector_cli.py",
+    )
+    assert selector.tiers == ("T0", "T1", "T2")
+
 
 def test_teacher_acquisition_scripts_select_focused_acquisition_and_registry_tests() -> None:
     available = (

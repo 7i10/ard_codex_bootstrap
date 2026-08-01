@@ -15,6 +15,7 @@ from typing import Any
 import torch
 import yaml
 
+from ard.analysis.intervention_selector import SelectorBundleError, verify_selector_bundle
 from ard.config import ExperimentConfig, load_config, save_resolved_config
 from ard.config.loader import resolved_config_dict
 from ard.config.schema import InterventionConfig
@@ -308,34 +309,6 @@ def _validate_mask(arm: ExperimentConfig, *, train_labels: Mapping[int, int] | N
     assert intervention is not None
     if intervention.mask is None:
         return
-    provenance = intervention.mask.provenance
-    if provenance.source == "seed0_bartoldson_frozen_predictor":
-        assert provenance.selector_spec_path is not None and provenance.approved_selector_spec_sha256 is not None
-        spec_path = provenance.selector_spec_path
-        if not spec_path.is_file() or sha256_file(spec_path) != provenance.approved_selector_spec_sha256:
-            raise InterventionForkError("history selector specification bytes do not match the bound SHA-256")
-        try:
-            spec = json.loads(spec_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise InterventionForkError("history selector specification is unreadable") from exc
-        required = {
-            "confirmatory_design_sha256": "a0a7fe0e70fcc8aaf519440012900c7bd8e6db92a8f0143d06892fca1146dd38",
-            "predictor_spec_sha256": "d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12",
-            "seed0_report_sha256": "d44ee166f8866b77067ebd07757d394a060242c9cf1cdc5d4513f127897981f8",
-            "seed0_lineage_sha256": "9b6ea091dc9ed4ff81bb579bf05d6650ac8e6d4ab6104981c446f29069e4a64e",
-            "anchor_epoch": 99,
-            "input_namespace": "train_sample_state_only",
-        }
-        if (
-            not isinstance(spec, Mapping)
-            or any(spec.get(key) != value for key, value in required.items())
-            or any(key in spec for key in ("evaluation", "autoattack", "post_anchor_outcomes"))
-            or not isinstance(spec.get("coefficients_sha256"), str)
-            or not isinstance(spec.get("preprocessing_sha256"), str)
-        ):
-            raise InterventionForkError(
-                "history selector specification has forbidden inputs or lacks frozen coefficients/preprocessing"
-            )
     # The fork is intentionally data-free.  Runtime validates the complete
     # label namespace before training; here verify immutable mask bytes and
     # self-consistent declared class budget without loading CIFAR.
@@ -356,6 +329,51 @@ def _validate_mask(arm: ExperimentConfig, *, train_labels: Mapping[int, int] | N
             )
         except FixedMaskError as exc:
             raise InterventionForkError("arm mask fails strict train-ID validation") from exc
+
+
+def _validate_selector_bundle(arms: Mapping[str, ExperimentConfig], *, train_labels: Mapping[int, int]) -> None:
+    """Recompute both fixed masks before accepting the factorial fork.
+
+    Hashes in an arm config only establish byte identity.  The selector bundle
+    additionally proves that those bytes are the deterministic seed-0 fit and
+    L3 checkpoint-panel score, which rejects an attacker replacing IDs while
+    recomputing every superficial mask/config hash.
+    """
+    history = _intervention(arms["HS"]).mask
+    random = _intervention(arms["RS"]).mask
+    assert history is not None and random is not None
+    provenance = history.provenance
+    assert provenance.selector_spec_path is not None and provenance.approved_selector_spec_sha256 is not None
+    if (
+        not provenance.selector_spec_path.is_file()
+        or sha256_file(provenance.selector_spec_path) != provenance.approved_selector_spec_sha256
+    ):
+        raise InterventionForkError("history selector bundle bytes do not match the bound SHA-256")
+    parent = _intervention(arms["C"]).parent
+    try:
+        verified = verify_selector_bundle(
+            bundle_path=provenance.selector_spec_path,
+            history_mask_path=history.path,
+            random_mask_path=random.path,
+            expected_parent={
+                "parent_checkpoint_sha256": parent.checkpoint_sha256,
+                "parent_sample_state_sha256": parent.sample_state_sha256,
+                "parent_raw_config_sha256": parent.raw_config_sha256,
+            },
+            expected_train_labels=train_labels,
+        )
+    except SelectorBundleError as exc:
+        raise InterventionForkError("fixed selector bundle does not reproduce") from exc
+    if verified["history_mask_sha256"] != history.sha256 or verified["random_mask_sha256"] != random.sha256:
+        raise InterventionForkError("selector bundle mask hashes do not match registered arms")
+    if history.provenance.approved_selector_spec_sha256 != verified["bundle_sha256"]:
+        raise InterventionForkError("history provenance does not bind the verified selector bundle")
+    random_provenance = random.provenance
+    if (
+        random_provenance.reference_history_mask_sha256 != verified["history_mask_sha256"]
+        or random_provenance.reference_history_selector_spec_sha256 != verified["bundle_sha256"]
+    ):
+        raise InterventionForkError("random provenance does not bind the verified history selector")
 
 
 def _intervention(arm: ExperimentConfig) -> InterventionConfig:
@@ -443,6 +461,7 @@ def create_intervention_forks(
         parent_manifest_path=parent_manifest,
         arm=by_name["C"],
     )
+    _validate_selector_bundle(by_name, train_labels=train_labels)
     output_dirs = [arm.output_dir.resolve() for arm in by_name.values()]
     if len(set(output_dirs)) != len(output_dirs):
         raise InterventionForkError("intervention arms cannot share an output directory")

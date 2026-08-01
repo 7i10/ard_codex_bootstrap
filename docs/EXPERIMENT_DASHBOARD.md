@@ -303,6 +303,33 @@ Bartoldson replayも45,000 IDでterminalとなりました。history-onlyは最�
 `[+0.04549,+0.06027]`）、log-loss `-0.05837`でHistory Goです。両report hashとfrozen-mask 4-arm
 terminal結果はhash-bound launch designへ固定済みです。
 
+### H2 confirmatory history block（完了、全L1--L4 History Go）
+
+凍結済みの四trajectory解析では、L1 (Bartoldson seed 1)、L2 (Chen seed 1)、
+L3 (Bartoldson seed 2)、L4 (Chen seed 2) の history-only AUROC delta が
+それぞれ `+0.0499`、`+0.0686`、`+0.0513`、`+0.0663` となり、全runが
+History Goでした。方向は両teacher・両seedで再現し、このblockではChenのdeltaが
+Bartoldsonより大きい記述的傾向です。teacher-response と student-history の
+product は予測上の記述項であり、介入の因果効果やteacher×signal機構の独立確認ではありません。
+
+各cellは `AUROC / AUPRC / log-loss`（前二つは高いほど、log-lossは低いほど良い）です。
+
+| Run | Teacher-only | Student-only | Main effects | Main + product |
+|---|---:|---:|---:|---:|
+| L1 Bartoldson s1 | .624 / .801 / .584 | .922 / .939 / .302 | .920 / .934 / .303 | .920 / .933 / .302 |
+| L2 Chen s1 | .848 / .831 / .476 | .893 / .825 / .394 | .894 / .827 / .385 | .894 / .829 / .389 |
+| L3 Bartoldson s2 | .626 / .800 / .584 | .927 / .946 / .293 | .924 / .938 / .294 | .924 / .937 / .294 |
+| L4 Chen s2 | .852 / .832 / .471 | .891 / .825 / .398 | .893 / .827 / .388 | .893 / .828 / .392 |
+
+Bartoldsonではteacher追加がStudent-onlyより一貫して悪化し、Chenではmain
+effectsの小さな改善がある一方、productはlog-lossを悪化させました。このため
+次の介入selectorはstudent historyを主信号とし、teacher積gateは採用しません。
+
+次の状態は feature-only L3 replay、凍結selector mask生成、続くcommon-state
+5-arm screenです。H3は「post-H2 prospective intervention screen v2」であり、
+retroactive preregistrationでもindependent confirmationでもありません。現時点で
+live replayやH3 launchは開始済みと扱いません。
+
 ## 5. 出力
 
 ### ローカル

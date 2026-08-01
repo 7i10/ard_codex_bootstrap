@@ -4,7 +4,7 @@
 
 - Owner: main thread; shell processes own GPU execution
 - Branch / base SHA: `cleanup/observability-first` / `ad6d26e1c15d90eeb8c1d8b10cfa081a433364b9`
-- Current milestone: H2 await the complete four-trajectory block; H3 implementation complete but launch blocked
+- Current milestone: H2 complete (all four trajectories History Go); H3 is a post-H2 prospective intervention screen v2 and has not launched
 - Last updated: 2026-08-01
 
 ## Goal
@@ -32,8 +32,9 @@ intervention utility separately with one common-state five-arm continuation.
   `method=rslad, observation.profile=teacher_response`; the one-off launch gate
   and campaign watchdog code are no longer in the public runtime.
 - Seed-0 common-trajectory replay met History Go for Chen (`+0.0622` AUROC)
-  and Bartoldson (`+0.0525` AUROC), but sample bootstrap intervals remain
-  conditional on one training trajectory.
+  and Bartoldson (`+0.0525` AUROC). The frozen H2 block also met History Go
+  for L1/L2/L3/L4 with deltas `+0.0499/+0.0686/+0.0513/+0.0663` AUROC.
+  These are conditional trajectory analyses, not between-seed uncertainty.
 - Hamster exposes two RTX 4090 GPUs in a non-isolated shell; Ferret exposes
   three. L1 occupies Hamster GPU 1 and the other four GPUs were idle at the
   launch preflight.
@@ -73,6 +74,12 @@ intervention utility separately with one common-state five-arm continuation.
   later seed policy separate from this signal screen.
 - The five-arm screen is `C + (history/random) x (softening/downweight)`.
   Random masks are class matched and use the same intervention budget.
+- The intervention budget is fixed at `K=3566`, the earlier seed-0
+  Bartoldson final-error oracle budget. This reuses a pre-existing development
+  budget for comparability; it is not selected from L3 outcomes. History scores
+  are ordered descending with stable sample ID ascending as the tie-break.
+  The class-matched control ranks each candidate by
+  `SHA256(2026080201:class_id:sample_id)` and takes the same per-class counts.
 - If both Bartoldson history runs are No-Go, the screen may use only the same
   frozen current-state baseline if it wins consistently in both runs. Mixed or
   inconclusive selector evidence stops the screen instead of choosing post hoc.
@@ -89,24 +96,31 @@ intervention utility separately with one common-state five-arm continuation.
   - Acceptance: unique outputs/W&B IDs, exact Git/config/teacher hashes, correct
     GPU, live process, first finite batch/epoch, sample state in checkpoint.
   - Rollback: cancel only a failing named run; do not restart successful runs.
-- [ ] H2 — analyze the complete four-trajectory block once.
+- [x] H2 — analyze the complete four-trajectory block once.
   - Output: frozen full table for Teacher-only, Student-only, Main effects and
     Main+product; per-run AUROC/AUPRC/log-loss/prevalence and conditional CIs.
   - Acceptance: no feature/spec changes; teacher/seed dependence reported.
+  - Result: L1 (Bartoldson seed 1) `+0.0499`, L2 (Chen seed 1) `+0.0686`,
+    L3 (Bartoldson seed 2) `+0.0513`, and L4 (Chen seed 2) `+0.0663` AUROC;
+    all four are History Go. The direction replicates across teachers and
+    seeds, with Chen's deltas larger in this block. Teacher-response and
+    student-history product terms remain descriptive predictors, not causal
+    evidence for an intervention.
 - [x] H2a — close the old/new L1 bridge before pooling.
   - Acceptance: direct bounded CUDA equality of model, optimizer, scheduler,
     scaler, RNG, sampler, global step and every format-v3 primitive/count.
     Config identity and added forward-count telemetry are the only allowed
     differences. Failure requires a new-SHA L1 replacement.
-- [x] H3 — implement a registered common-state fork, but do not launch early.
+- [x] H3 — implement a post-H2 prospective intervention screen v2, but do not launch early.
   - Files: analysis/fork CLI, arm configs, focused checkpoint/RNG/lineage tests.
   - Acceptance: the five arms share exact parent state and class budget; only
     selector/intervention changes; test/AA leakage fails closed.
   - Test: actual factory-returned C continuation parity with random-start PGD,
     strict fork/resume, transactional screen creation, selector and artifact
     provenance, fixed-mask formula/gradient and lineage contracts.
-  - Launch remains blocked until H2 selects an admissible selector and real
-    epoch-99 parent/W&B inputs are attested.
+  - This is not a retroactive preregistration or an independent confirmation
+    of H2. Launch remains blocked until the feature-only L3 replay, selector
+    mask generation, and real epoch-99 parent/W&B inputs are attested.
 - [ ] H4 — conditionally launch the five arms and evaluate saved checkpoints.
   - Acceptance: control and factorial contrasts are computed from the same
     branch state; best/last clean/PGD are mandatory; AA follows only for a
@@ -187,7 +201,7 @@ during waiting. No watchdog/recovery agent is used.
   +14.48%) with identical loss and accuracy metrics. Active runs remain
   unchanged; future Ferret launches use 4 workers. Evidence is recorded in
   `tools/internal/performance/provenance/ferret_workers_2026-08-01.yaml`.
-- 2026-08-01: H3 fail-closed fork implementation completed without launching
+- 2026-08-01: post-H2 intervention screen v2 fail-closed fork implementation completed without launching
   an arm. Focused final evidence: intervention unit tests `4 passed`; actual
   factory-C parity plus one-epoch strict resume `2 passed`; changed impact gate
   `23 passed, 1 skipped`; Ruff and changed-source mypy passed. One consolidated
@@ -212,6 +226,10 @@ during waiting. No watchdog/recovery agent is used.
   attempts stopped before output/W&B initialization; the exact-SHA run then
   completed with one evaluation identity. Future launchers must check runtime
   SHA, config parse, teacher bytes and external checkout in one preflight.
+- 2026-08-02: H2 completed with History Go for all L1--L4 (`+0.0499`,
+  `+0.0686`, `+0.0513`, `+0.0663` AUROC, respectively). The next state is
+  feature-only L3 replay, then frozen selector masks, then the common-state
+  five-arm screen. No live replay or H3 launch is claimed here.
 
 ## Completion report
 
