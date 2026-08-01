@@ -198,6 +198,20 @@ during waiting. No watchdog/recovery agent is used.
   actual-C parity test. All were fixed; the final delta review reported no
   remaining P0/P1. This experimental runtime stays on the research branch and
   is not a license to launch before H2.
+- 2026-08-01: L1 (Bartoldson seed 1) completed at epoch 199 and its separate
+  saved-checkpoint PGD-20 evaluation completed online (`best` clean/PGD
+  `83.87/51.00`, `last` `84.70/45.35`). L2 and L4 Chen evaluations also
+  completed (`seed 1` best/last PGD `55.99/55.76`; `seed 2` `55.79/55.67`).
+  These official-test results are recorded but are not predictor inputs and do
+  not change the frozen H2 specification. L3 remained healthy on Ferret at
+  epoch 139; H2 outcome analysis remains blocked until it is terminal.
+- 2026-08-01: evaluation preflight exposed a cross-version operations rule:
+  schema-evolving runs must be evaluated with the exact training Git SHA, not
+  the active canonical worktree. An isolated evaluator must receive the pinned
+  teacher cache and external checkout before its first launch. The initial L2
+  attempts stopped before output/W&B initialization; the exact-SHA run then
+  completed with one evaluation identity. Future launchers must check runtime
+  SHA, config parse, teacher bytes and external checkout in one preflight.
 
 ## Completion report
 
