@@ -78,6 +78,16 @@ intervention utility separately with one common-state five-arm continuation.
   later seed policy separate from this signal screen.
 - The five-arm screen is `C + (history/random) x (softening/downweight)`.
   Random masks are class matched and use the same intervention budget.
+- The first class-matched random mask is a pre-specified screening draw, not an
+  estimate of the random-mask distribution.  For each treatment, if the saved-
+  checkpoint PGD contrast `H-R` is positive or within `0.5` percentage points
+  of zero, generate two additional independently seeded class-matched masks
+  from the same parent and budget before making a selector claim.  A positive
+  selector claim requires History to exceed all three random controls and the
+  random-control mean by at least `0.5` percentage points without a clean-
+  accuracy loss above `0.5` points.  If `H-R < -0.5` points, stop that treatment
+  as a negative screen; do not generalize the result to every possible random
+  draw.  This sequential rule is fixed before H4 outcomes are observed.
 - The intervention budget is fixed at `K=3566`, the earlier seed-0
   Bartoldson final-error oracle budget. This reuses a pre-existing development
   budget for comparability; it is not selected from L3 outcomes. History scores
