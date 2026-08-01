@@ -1,0 +1,35 @@
+schema_version: 1
+purpose: bounded Ferret DataLoader-worker selection under concurrent confirmatory load
+scientific_runtime_git_sha: 8254a8899ae7373c2f541d108593e5c8185b26f5
+host: Ferret
+physical_gpu: 2
+gpu: NVIDIA GeForce RTX 4090
+dataset: cifar10_train_memory_resident_after_startup
+batch_size: 128
+epochs_per_cell: 1
+tracking: offline_sync_not_uploaded
+worker_matrix:
+  run_id: perf-ferret-gpu2-chen-workers-retry2
+  observation_profile: off
+  results:
+    2: {images_per_second: 438.4071882561873, train_seconds: 102.64430238699424, metrics_sha256: 25011c39ea5078abef958d394bd9882cbcb36633a05a75b0e19dd0080e253396}
+    4: {images_per_second: 449.8794595496307, train_seconds: 100.02679394398001, metrics_sha256: a4f63d2cb712d3e57672cfa9044513b4ae3faeb23e940480103a20ea5b0f8efb}
+    8: {images_per_second: 414.29765604864133, train_seconds: 108.61755876001553, metrics_sha256: c7914677e62517c99135967ddc8d82c5b679c219588c6c4b53564f49ffc271bd}
+    12: {images_per_second: 396.84021530803483, train_seconds: 113.39576550998027, metrics_sha256: efa180191dda182da7a356583e541d640cf5b4b96b6890b6cad70ba42f4c9927}
+observed_confirmation:
+  run_id: perf-ferret-gpu2-observed-w4-w8
+  observation_profile: teacher_response
+  results:
+    4: {images_per_second: 387.41286888899583, train_seconds: 116.1551502639777, metrics_sha256: b9b9acb0f8d28033d15ce52ff55fdb68b220761a09c5dacf9126ae22aff36690}
+    8: {images_per_second: 338.4095801706049, train_seconds: 132.97495885699755, metrics_sha256: a083bd1548b7d78689b46412d97a4a32263cbb9fb654cfcc734f8522fd272aa1}
+determinism_check: loss_and_clean_robust_validation_metrics_equal_within_each_matrix
+decision:
+  ferret_num_workers: 4
+  observed_speedup_over_8_workers_percent: 14.48
+  apply_to_active_runs: false
+  reason: changing execution settings mid-run is forbidden
+remaining_profile_questions:
+  - prefetch_factor is currently the PyTorch default and was not varied
+  - pin_memory is currently false and IndexedBatch.to is synchronous
+  - persistent workers require epoch-transform state propagation before they are safe
+  - worker tuning does not explain the full Hamster-versus-Ferret throughput gap

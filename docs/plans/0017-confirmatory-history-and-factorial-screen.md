@@ -62,6 +62,10 @@ intervention utility separately with one common-state five-arm continuation.
 - L2 runs on Hamster GPU 0; L3/L4 run on Ferret GPUs 0/1. This avoids three
   simultaneous Ferret training jobs and leaves Ferret GPU 2 available without
   weakening the single-GPU protocol.
+- For independent future runs, prefer compute-heavy Bartoldson teachers on
+  Hamster and Chen on Ferret. For the five-arm screen, common-host validity
+  takes precedence over per-GPU speed: use one host in waves unless the frozen
+  cross-host C-fork parity gate passes.
 - No result-dependent runtime gate belongs in `ard.cli.train`. The frozen YAML,
   clean Git SHA, resolved config, W&B identity and run bundle are the evidence.
 - Two confirmatory seeds estimate direction replication, not a precise
@@ -173,6 +177,12 @@ during waiting. No watchdog/recovery agent is used.
   equivalence. An initial device-activation failure was fixed by selecting the
   CUDA device before resetting peak-memory statistics, with a focused unit
   regression; no long run was affected.
+- 2026-08-01: L4 (Chen seed 2) completed with exit code 0 at 11:01 JST. A
+  bounded Ferret GPU-2 worker profile found 4 workers faster than 8 for the
+  exact teacher-response observation workload (387.4 versus 338.4 images/s,
+  +14.48%) with identical loss and accuracy metrics. Active runs remain
+  unchanged; future Ferret launches use 4 workers. Evidence is recorded in
+  `tools/internal/performance/provenance/ferret_workers_2026-08-01.yaml`.
 
 ## Completion report
 

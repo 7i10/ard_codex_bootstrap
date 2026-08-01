@@ -140,7 +140,7 @@ epoch 99、future outcome、split、判定閾値はseed 1/2の結果を見る前
 | L1 | Bartoldson | 1 | Hamster 1 | `bart-rslad-logging-only-s1-confirm-v1` | 旧SHAで継続中。直接bridge pass |
 | L2 | Chen | 1 | Hamster 0 | `chen-rslad-observed-s1-confirm-v2` | epoch 0 finite、45,000 state完備 |
 | L3 | Bartoldson | 2 | Ferret 0 | `bart-rslad-observed-s2-confirm-v2` | epoch 0 finite、45,000 state完備 |
-| L4 | Chen | 2 | Ferret 1 | `chen-rslad-observed-s2-confirm-v2` | epoch 0 finite、45,000 state完備 |
+| L4 | Chen | 2 | Ferret 1 | `chen-rslad-observed-s2-confirm-v2` | 200 epoch完了、exit 0 |
 
 L2--L4の固定SHAは`8254a8899ae7373c2f541d108593e5c8185b26f5`です。L1の旧
 `rslad_logging_only`と新しい`rslad + observation.teacher_response`の直接cross-version CUDA bridgeは、同一
@@ -153,6 +153,12 @@ confirmatory後の介入は単独runでは判定しません。同じBartoldson 
 history/random selector × uniform-softening/KD-downweightの5 armを分岐し、selector効果、介入効果、randomな
 正則化効果を事前定義したcontrastで分けます。history selectorはBartoldsonの両seedが固定Go基準を満たす時
 だけ使用し、mixed/inconclusiveなら開始しません。
+
+Ferret GPU 2で同一1-epoch workloadを比較した結果、teacher-response観測時は4 workersが
+387.4 images/s、8 workersが338.4 images/sで、4 workersが14.48%高速でした。loss・accuracyは一致しており、
+次回のFerret launchは`ARD_NUM_WORKERS=4`を既定とします。進行中runの設定は変更しません。CIFAR-10は
+startup後にmemory residentとなるため、dataset再配置はsteady-state差の主因ではありません。prefetch/pinned
+transferは未変更で、worker調整後にも残るhost差をprofileする場合だけ追加します。
 
 ## 4. 現在の正式結果
 

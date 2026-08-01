@@ -31,8 +31,20 @@ Run scripts from the repository root. Configuration precedence is CLI arguments,
 
 The scripts reject unsafe run IDs, non-full SHAs, invalid/duplicate GPU sets, duplicate runs, and selected GPUs with active compute processes. They never change a branch checkout, auto-commit results, or remove a run outside the configured run root.
 
+For a parameter matrix, prefer one tracked wrapper at the prepared SHA or one
+run bundle per cell. Do not embed a generated `bash -lc` loop in a launcher
+argument: local expansion can silently change `$` variables before the command
+is recorded. Validate config overrides with `--dry-run` before reserving a GPU.
+
 ## GPU and experiment integrity
 
 Pass physical indices such as `0`, `0,1`, or `0,1,2`. The launch manifest records physical indices and world size. Do not silently alter batch size, learning rate, schedule, seed semantics, attack settings, or DDP behavior; a three-GPU command is not automatically protocol-equivalent to the canonical two-GPU run.
 
 `collect` excludes checkpoints, W&B offline data, caches, and bytecode by default. Use an explicit include option only after assessing storage and lineage needs.
+
+For this repository's CIFAR-10 single-GPU workload on Ferret, begin with
+`ARD_NUM_WORKERS=4`. A bounded 2026-08-01 teacher-response profile measured
+387.4 images/s with 4 workers versus 338.4 with 8; see
+`tools/internal/performance/provenance/ferret_workers_2026-08-01.yaml`. Treat
+this as host/workload execution metadata, not a scientific hyperparameter, and
+never change it inside an active run.
