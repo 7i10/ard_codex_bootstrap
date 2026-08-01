@@ -107,6 +107,13 @@ intervention utility separately with one common-state five-arm continuation.
   claiming that longitudinal history, rather than current difficulty, causes
   intervention gains.  These are follow-up contracts, not post-hoc changes to
   the active H4 screen.
+- Do not produce a partial CPU-only persistent-error report and then repeat the
+  joins after clean inference.  When the first H4 GPU becomes free, run one
+  integrated existing-artifact audit that adds saved-checkpoint clean forward
+  results to robust trajectory, teacher response, margin trend and cross-seed
+  identity before emitting the table and blinded image panel.  This audit does
+  not train a model or alter H4; a standardized extra PGD replay is a separate
+  conditional follow-up, not part of the default aggregation.
   The class-matched control ranks each candidate by
   `SHA256(2026080201:class_id:sample_id)` and takes the same per-class counts.
 - If both Bartoldson history runs are No-Go, the screen may use only the same
@@ -154,6 +161,15 @@ intervention utility separately with one common-state five-arm continuation.
   - Acceptance: control and factorial contrasts are computed from the same
     branch state; best/last clean/PGD are mandatory; AA follows only for a
     scientifically justified reduced set.
+- [ ] H4a — run one integrated persistent-error taxonomy after an H4 GPU frees.
+  - Inputs: saved epoch-99/199 checkpoints and sample state for Bartoldson and
+    Chen seeds, stable train IDs, teacher clean/adversarial primitives and the
+    raw unaugmented CIFAR-10 train partition.
+  - Output: clean-versus-robust difficulty, teacher correctness/wrong-confidence,
+    pre-anchor and post-anchor margin trend, persistent/recovered/relapsed state,
+    cross-seed overlap, class counts and a blinded suspected-label-noise panel.
+  - Acceptance: one joined report with exact input hashes; no training, no H4
+    contention, no automatic label correction, and no repeated partial report.
 
 ## Agent and review budget
 
