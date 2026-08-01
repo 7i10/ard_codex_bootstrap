@@ -49,6 +49,57 @@ EXPECTED_RUN_IDS = {
     "L3": "bart-rslad-observed-s2-confirm-v2",
     "L4": "chen-rslad-observed-s2-confirm-v2",
 }
+EXPECTED_MANIFEST_LINEAGE = {
+    "L1": {
+        "config_hash": "13326f6b6395e6bc6aaf560f22c38c315b7b07f15957db4f452252f56cf90d2e",
+        "manifest_sha256": "b08565245b08425b9b66ddd8abc2873c9bf5eec0fee6f1919ba2a99e23679cb4",
+        "completion_sha256": "8e4c7f9350f97def5c811b0f86f1f046daea87dbc1413835148968ef006f9d97",
+        "anchor_checkpoint_sha256": "eda548ce6e4555a232d9fee7f8753aadc92ec7995f205f22bc3d25c033a271b2",
+        "final_checkpoint_sha256": "4f2530b03d15182b98d95b69a4eca2a3768ae68e360f8c078e52e643790f60a2",
+        "seed": 1,
+        "teacher_registry_id": "bartoldson2024_adversarial_wrn94_16",
+        "teacher_checkpoint_sha256": "56bbad8ad748df86e67c24dba4f59a9e7d285e583251460b2ed154017a18cb0b",
+        "scientific_git_sha": "0fdfaeb5809e3b08a0825e2e5caf0bebfa215047",
+    },
+    "L2": {
+        "config_hash": "250f24f553dfc3a7dbda13a5e3f0b3a165e8a1bf3247cc8c92d6ebe22b74aeda",
+        "manifest_sha256": "7949f35da70613a52494f81865ddcd5e2a5f02887a8b25b0ac4ac9a2284c8a50",
+        "completion_sha256": "67a023c8a153f3c1e31efc00cff5a5b885737fd94d32f1198991be776b5a825f",
+        "anchor_checkpoint_sha256": "e31273743a08e286576c5533c95b9e9e027419dbcc99620fc28e4d7ad549970f",
+        "final_checkpoint_sha256": "2f23fd3af3eba810ac8e1676d32491542198bd7e9f36e721a72f4e8bf063f79a",
+        "seed": 1,
+        "teacher_registry_id": "chen2021_ltd_wrn34_10",
+        "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+        "scientific_git_sha": "8254a8899ae7373c2f541d108593e5c8185b26f5",
+    },
+    "L3": {
+        "config_hash": "bc9fe4223e00c00a3add329166dc4a7441273fcc94f670f93def3927e805f054",
+        "manifest_sha256": "224a1927cd1675c6c2851eceb6dc4835efbc35008f8de690e2597869258c0890",
+        "completion_sha256": "b86e9cf03b7ac1ee808f9f9006e6a077756eb34135d758aac9edc00e9613b351",
+        "anchor_checkpoint_sha256": "44ac2edb9526917aa3ba1e0f9bd92a3355ed0a93a4a4fce541600a1fc71eb501",
+        "final_checkpoint_sha256": "7601abaf10822819a1fd951198e44027aba8109729764ebe3f64328f35c86fd5",
+        "seed": 2,
+        "teacher_registry_id": "bartoldson2024_adversarial_wrn94_16",
+        "teacher_checkpoint_sha256": "56bbad8ad748df86e67c24dba4f59a9e7d285e583251460b2ed154017a18cb0b",
+        "scientific_git_sha": "8254a8899ae7373c2f541d108593e5c8185b26f5",
+    },
+    "L4": {
+        "config_hash": "8986d2711a55ca635c27c8699da34087c2e54c00249584cf3e3f86ec2b85a1d7",
+        "manifest_sha256": "23953cf0a5cf17c9ad9a902603db628a708e02658aab41a7d0f16c744b65c42e",
+        "completion_sha256": "711ece3074092681b02c905ee356fe6eb32856a31df418a072cbd697d42c8bbb",
+        "anchor_checkpoint_sha256": "6058fc37309b23a4f2395606fbf13bb66a2d8f9ffe9a24e306dd64aadebfaec7",
+        "final_checkpoint_sha256": "ff9af7ecbf677b92fd158b365db0c1bc64f17347e9049897aba7a3be9cd05fb9",
+        "seed": 2,
+        "teacher_registry_id": "chen2021_ltd_wrn34_10",
+        "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+        "scientific_git_sha": "8254a8899ae7373c2f541d108593e5c8185b26f5",
+    },
+}
+EXPECTED_EXTERNAL_COMMITS = {
+    "robustbench": "78fcc9e48a07a861268f295a777b975f25155964",
+    "saad": "295121c5d2eed827b5b2d6aa42307de809bdfada",
+    "trades": "6e8e11b7c281371c2f027ffadfbaea80361f09de",
+}
 
 
 @dataclass(frozen=True)
@@ -268,18 +319,22 @@ def _sha256(value: object, *, name: str) -> str:
     return value
 
 
+def _git_sha(value: object, *, name: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 40
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise LoggingOnlyPredictionError(f"{name} must be a lowercase Git SHA")
+    return value
+
+
 def _validate_export_identity(identity: Mapping[str, Any]) -> dict[str, Any]:
     if identity.get("contract") != EXPORT_CONTRACT or identity.get("expected_count") != EXPECTED_COUNT:
         raise LoggingOnlyPredictionError("state export contract or expected count does not match frozen H2")
     _sha256(identity.get("config_hash"), name="state export config hash")
     _expect(identity.get("world_size"), 1, name="state export world size")
-    scientific_git_sha = identity.get("scientific_git_sha")
-    if (
-        not isinstance(scientific_git_sha, str)
-        or len(scientific_git_sha) != 40
-        or any(character not in "0123456789abcdef" for character in scientific_git_sha)
-    ):
-        raise LoggingOnlyPredictionError("state export scientific Git SHA is invalid")
+    _git_sha(identity.get("scientific_git_sha"), name="state export scientific Git SHA")
     for checkpoint in ("anchor", "final"):
         value = identity.get(checkpoint)
         if not isinstance(value, Mapping):
@@ -287,6 +342,22 @@ def _validate_export_identity(identity: Mapping[str, Any]) -> dict[str, Any]:
         _expect(value.get("epoch"), 99 if checkpoint == "anchor" else 199, name=f"{checkpoint} epoch")
         _sha256(value.get("checkpoint_sha256"), name=f"{checkpoint} checkpoint hash")
         _sha256(value.get("sample_state_sha256"), name=f"{checkpoint} sample-state hash")
+    _sha256(identity.get("run_bundle_manifest_sha256"), name="state export run-bundle manifest hash")
+    _sha256(identity.get("run_bundle_completion_sha256"), name="state export run-bundle completion hash")
+    artifacts = identity.get("checkpoint_artifacts")
+    if not isinstance(artifacts, Mapping):
+        raise LoggingOnlyPredictionError("state export lacks its checkpoint artifact identities")
+    for checkpoint in ("anchor", "final"):
+        artifact = artifacts.get(checkpoint)
+        state = identity[checkpoint]
+        if not isinstance(artifact, Mapping) or not isinstance(state, Mapping):
+            raise LoggingOnlyPredictionError("state export checkpoint artifact identity is invalid")
+        if artifact.get("sha256") != state.get("checkpoint_sha256"):
+            raise LoggingOnlyPredictionError("state export checkpoint artifact hash does not match checkpoint identity")
+        if not isinstance(artifact.get("artifact_name"), str) or not artifact["artifact_name"]:
+            raise LoggingOnlyPredictionError("state export checkpoint artifact name is invalid")
+        if not isinstance(artifact.get("artifact_local_path"), str) or not artifact["artifact_local_path"]:
+            raise LoggingOnlyPredictionError("state export checkpoint artifact local path is invalid")
     provenance = identity.get("analysis_provenance")
     if (
         not isinstance(provenance, Mapping)
@@ -537,12 +608,190 @@ def _trajectory_reports(
         return {label: futures[label].result() for label in labels}
 
 
+def _manifest_checkpoint_artifact(
+    manifest: Mapping[str, Any], *, export_identity: Mapping[str, Any], checkpoint: str
+) -> dict[str, str]:
+    exported = export_identity["checkpoint_artifacts"]
+    assert isinstance(exported, Mapping)
+    expected = exported[checkpoint]
+    assert isinstance(expected, Mapping)
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise LoggingOnlyPredictionError("run-bundle manifest lacks model artifacts")
+    matches = [
+        artifact
+        for artifact in artifacts
+        if isinstance(artifact, Mapping)
+        and artifact.get("type") == "model"
+        and artifact.get("sha256") == expected["sha256"]
+        and isinstance(artifact.get("aliases"), list)
+        and "last" in artifact["aliases"]
+    ]
+    if len(matches) != 1:
+        raise LoggingOnlyPredictionError(f"manifest {checkpoint} checkpoint artifact does not match state export")
+    artifact = matches[0]
+    if (
+        artifact.get("name") != expected["artifact_name"]
+        or artifact.get("local_path") != expected["artifact_local_path"]
+    ):
+        raise LoggingOnlyPredictionError(
+            f"manifest {checkpoint} checkpoint artifact identity does not match state export"
+        )
+    return {
+        "artifact_name": str(artifact["name"]),
+        "artifact_local_path": str(artifact["local_path"]),
+        "sha256": str(artifact["sha256"]),
+    }
+
+
+def _validate_frozen_export_lineage(*, label: str, export_identity: Mapping[str, Any]) -> None:
+    """Require the frozen H2 checkpoint/manifest identities before reading artifacts."""
+    expected = EXPECTED_MANIFEST_LINEAGE[label]
+    for field in ("config_hash", "run_bundle_manifest_sha256", "run_bundle_completion_sha256"):
+        expected_field = {
+            "config_hash": "config_hash",
+            "run_bundle_manifest_sha256": "manifest_sha256",
+            "run_bundle_completion_sha256": "completion_sha256",
+        }[field]
+        if export_identity.get(field) != expected[expected_field]:
+            raise LoggingOnlyPredictionError(f"{label} state export {field} does not match the frozen lineage")
+    for checkpoint in ("anchor", "final"):
+        value = export_identity.get(checkpoint)
+        if (
+            not isinstance(value, Mapping)
+            or value.get("checkpoint_sha256") != expected[f"{checkpoint}_checkpoint_sha256"]
+        ):
+            raise LoggingOnlyPredictionError(
+                f"{label} state export {checkpoint} checkpoint does not match frozen lineage"
+            )
+
+
+def _validate_manifest_lineage(*, label: str, path: Path, export_identity: Mapping[str, Any]) -> dict[str, Any]:
+    """Bind one export to the exact terminal run-bundle lineage before fitting."""
+    resolved = path.resolve()
+    try:
+        raw = resolved.read_bytes()
+        manifest = json.loads(raw)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise LoggingOnlyPredictionError(f"cannot read {label} run-bundle manifest") from exc
+    if not isinstance(manifest, Mapping):
+        raise LoggingOnlyPredictionError(f"{label} run-bundle manifest must be a mapping")
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != export_identity["run_bundle_manifest_sha256"]:
+        raise LoggingOnlyPredictionError(f"{label} run-bundle manifest bytes do not match the state export")
+    expected = EXPECTED_MANIFEST_LINEAGE[label]
+    if digest != expected["manifest_sha256"]:
+        raise LoggingOnlyPredictionError(f"{label} run-bundle manifest bytes do not match the frozen lineage")
+    completion_path = resolved.parent / "completion.json"
+    try:
+        completion_raw = completion_path.read_bytes()
+        completion = json.loads(completion_raw)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise LoggingOnlyPredictionError(f"cannot read {label} run-bundle completion marker") from exc
+    if not isinstance(completion, Mapping):
+        raise LoggingOnlyPredictionError(f"{label} run-bundle completion marker must be a mapping")
+    completion_digest = hashlib.sha256(completion_raw).hexdigest()
+    if completion_digest != export_identity.get("run_bundle_completion_sha256"):
+        raise LoggingOnlyPredictionError(f"{label} completion marker bytes do not match the state export")
+    if completion_digest != expected["completion_sha256"]:
+        raise LoggingOnlyPredictionError(f"{label} completion marker bytes do not match the frozen lineage")
+    if completion.get("status") != "completed":
+        raise LoggingOnlyPredictionError(f"{label} completion marker is not completed")
+    output_dir = completion.get("output_dir")
+    if not isinstance(output_dir, str) or not output_dir or Path(output_dir).name != EXPECTED_RUN_IDS[label]:
+        raise LoggingOnlyPredictionError(f"{label} completion marker output_dir does not identify its run")
+    if manifest.get("run_id") != EXPECTED_RUN_IDS[label] or manifest.get("run_id") != export_identity["run_id"]:
+        raise LoggingOnlyPredictionError(f"{label} manifest run ID does not match its frozen/export identity")
+    _sha256(manifest.get("config_hash"), name=f"{label} manifest config hash")
+    if manifest["config_hash"] != export_identity["config_hash"] or manifest["config_hash"] != expected["config_hash"]:
+        raise LoggingOnlyPredictionError(f"{label} manifest config hash does not match the state export")
+    _expect(manifest.get("world_size"), 1, name=f"{label} manifest world size")
+    _expect(manifest.get("seed"), expected["seed"], name=f"{label} manifest seed")
+    _expect(manifest.get("training_seed"), expected["seed"], name=f"{label} manifest training seed")
+    git = manifest.get("git")
+    if not isinstance(git, Mapping) or git.get("dirty") is not False:
+        raise LoggingOnlyPredictionError(f"{label} manifest scientific Git identity is not clean")
+    git_sha = _git_sha(git.get("sha"), name=f"{label} manifest scientific Git SHA")
+    if git_sha != expected["scientific_git_sha"] or git_sha != export_identity["scientific_git_sha"]:
+        raise LoggingOnlyPredictionError(f"{label} manifest scientific Git SHA does not match frozen/export identity")
+    teacher = manifest.get("teacher")
+    if not isinstance(teacher, Mapping) or teacher.get("source") != "robustbench":
+        raise LoggingOnlyPredictionError(f"{label} manifest teacher lineage is invalid")
+    if teacher.get("registry_id") != expected["teacher_registry_id"]:
+        raise LoggingOnlyPredictionError(f"{label} manifest teacher registry ID does not match frozen identity")
+    declared = _sha256(teacher.get("checkpoint_sha256"), name=f"{label} declared teacher checkpoint SHA")
+    actual = _sha256(teacher.get("checkpoint_actual_sha256"), name=f"{label} actual teacher checkpoint SHA")
+    if declared != actual or declared != expected["teacher_checkpoint_sha256"]:
+        raise LoggingOnlyPredictionError(f"{label} manifest teacher checkpoint SHA does not match frozen identity")
+    external = manifest.get("external")
+    repositories = external.get("repositories") if isinstance(external, Mapping) else None
+    if not isinstance(repositories, Mapping):
+        raise LoggingOnlyPredictionError(f"{label} manifest external lineage is missing")
+    commits: dict[str, str] = {}
+    for name, expected_commit in EXPECTED_EXTERNAL_COMMITS.items():
+        repository = repositories.get(name)
+        checkout = repository.get("checkout") if isinstance(repository, Mapping) else None
+        if not isinstance(repository, Mapping) or repository.get("commit") != expected_commit:
+            raise LoggingOnlyPredictionError(f"{label} manifest {name} commit does not match the frozen lineage")
+        if not isinstance(checkout, Mapping) or checkout.get("head") != expected_commit or checkout.get("status") != "":
+            raise LoggingOnlyPredictionError(f"{label} manifest {name} checkout does not match the frozen lineage")
+        commits[name] = expected_commit
+    if teacher.get("external_commit") != commits["robustbench"]:
+        raise LoggingOnlyPredictionError(f"{label} manifest teacher RobustBench commit does not match lineage")
+    return {
+        "path": str(resolved),
+        "sha256": digest,
+        "completion_path": str(completion_path.resolve()),
+        "completion_sha256": completion_digest,
+        "identity": {
+            "run_id": manifest["run_id"],
+            "config_hash": manifest["config_hash"],
+            "world_size": manifest["world_size"],
+            "seed": manifest["seed"],
+            "scientific_git_sha": git_sha,
+            "teacher": {
+                "registry_id": teacher["registry_id"],
+                "checkpoint_sha256": declared,
+                "checkpoint_actual_sha256": actual,
+            },
+            "external_commits": commits,
+            "checkpoint_artifacts": {
+                checkpoint: _manifest_checkpoint_artifact(
+                    manifest, export_identity=export_identity, checkpoint=checkpoint
+                )
+                for checkpoint in ("anchor", "final")
+            },
+        },
+    }
+
+
+def _validate_manifest_paths(
+    *,
+    manifest_paths: Mapping[str, Path] | None,
+    prepared_exports: Mapping[str, tuple[str, list[dict[str, Any]], dict[str, Any]]],
+) -> dict[str, dict[str, Any]]:
+    if manifest_paths is None or set(manifest_paths) != set(RUN_LABELS):
+        raise LoggingOnlyPredictionError("H2 analysis requires exactly one L1--L4 run-bundle manifest path")
+    if any(not isinstance(path, Path) for path in manifest_paths.values()):
+        raise LoggingOnlyPredictionError("H2 run-bundle manifest paths must be paths")
+    resolved_paths = [path.resolve() for path in manifest_paths.values()]
+    if len(set(resolved_paths)) != len(resolved_paths):
+        raise LoggingOnlyPredictionError("H2 run-bundle manifest paths must be unique resolved paths")
+    return {
+        label: _validate_manifest_lineage(
+            label=label, path=manifest_paths[label], export_identity=prepared_exports[label][2]
+        )
+        for label in RUN_LABELS
+    }
+
+
 def analyze_logging_only_exports(
     exports: Mapping[str, Mapping[str, Any]],
     *,
     design_path: Path | None = None,
     block_path: Path | None = None,
     analysis_provenance: Mapping[str, Any] | None = None,
+    manifest_paths: Mapping[str, Path] | None = None,
 ) -> dict[str, Any]:
     """Apply the frozen H2 contract to labeled, hash-bound state exports."""
     if not exports:
@@ -567,8 +816,10 @@ def analyze_logging_only_exports(
             reference_sample_labels = sample_labels
         elif sample_labels != reference_sample_labels:
             raise LoggingOnlyPredictionError("H2 trajectories do not share one exact sample-ID to true-label mapping")
+        _validate_frozen_export_lineage(label=label, export_identity=source_identity)
         prepared_exports[label] = (run_id, rows, source_identity)
 
+    manifest_inputs = _validate_manifest_paths(manifest_paths=manifest_paths, prepared_exports=prepared_exports)
     trajectory_reports = _trajectory_reports(prepared_exports, design=design)
     reports: dict[str, Any] = {}
     for label, (run_id, rows, source_identity) in prepared_exports.items():
@@ -597,6 +848,7 @@ def analyze_logging_only_exports(
             "analysis_provenance": provenance,
         },
         "runs": reports,
+        "manifest_inputs": manifest_inputs,
         "block": {
             "required_identities": {
                 "L1": {"teacher": "bartoldson2024_adversarial_wrn94_16", "seed": 1},

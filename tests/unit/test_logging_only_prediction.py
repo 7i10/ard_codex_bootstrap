@@ -10,6 +10,8 @@ import pytest
 
 from ard.analysis.logging_only_prediction import (
     EXPECTED_COUNT,
+    EXPECTED_EXTERNAL_COMMITS,
+    EXPECTED_MANIFEST_LINEAGE,
     EXPECTED_RUN_IDS,
     LoggingOnlyPredictionError,
     _features,
@@ -17,6 +19,8 @@ from ard.analysis.logging_only_prediction import (
     _prepare_rows,
     _trajectory_report,
     _trajectory_reports,
+    _validate_frozen_export_lineage,
+    _validate_manifest_lineage,
     analyze_logging_only_exports,
     load_frozen_design,
     load_state_export_with_provenance,
@@ -70,6 +74,20 @@ def _export(
             "config_hash": "c" * 64,
             "scientific_git_sha": "2" * 40,
             "world_size": 1,
+            "run_bundle_manifest_sha256": "3" * 64,
+            "run_bundle_completion_sha256": "4" * 64,
+            "checkpoint_artifacts": {
+                "anchor": {
+                    "artifact_name": "anchor-last",
+                    "artifact_local_path": "artifacts/anchor",
+                    "sha256": "d" * 64,
+                },
+                "final": {
+                    "artifact_name": "final-last",
+                    "artifact_local_path": "artifacts/final",
+                    "sha256": "f" * 64,
+                },
+            },
             "anchor": {"epoch": 99, "checkpoint_sha256": "d" * 64, "sample_state_sha256": "e" * 64},
             "final": {"epoch": 199, "checkpoint_sha256": "f" * 64, "sample_state_sha256": "0" * 64},
             "analysis_provenance": {
@@ -81,6 +99,75 @@ def _export(
         },
         "rows": rows,
     }
+
+
+def _manifest_for_export(tmp_path: Path, *, label: str, export: dict[str, object]) -> tuple[Path, Path]:
+    identity = export["identity"]
+    assert isinstance(identity, dict)
+    expected = EXPECTED_MANIFEST_LINEAGE[label]
+    identity["scientific_git_sha"] = expected["scientific_git_sha"]
+    teacher = {
+        "source": "robustbench",
+        "registry_id": expected["teacher_registry_id"],
+        "checkpoint_sha256": expected["teacher_checkpoint_sha256"],
+        "checkpoint_actual_sha256": expected["teacher_checkpoint_sha256"],
+        "external_commit": EXPECTED_EXTERNAL_COMMITS["robustbench"],
+    }
+    manifest = {
+        "run_id": EXPECTED_RUN_IDS[label],
+        "config_hash": identity["config_hash"],
+        "world_size": 1,
+        "seed": expected["seed"],
+        "training_seed": expected["seed"],
+        "git": {"sha": expected["scientific_git_sha"], "dirty": False},
+        "teacher": teacher,
+        "external": {
+            "repositories": {
+                name: {"commit": commit, "checkout": {"head": commit, "status": ""}}
+                for name, commit in EXPECTED_EXTERNAL_COMMITS.items()
+            }
+        },
+        "artifacts": [
+            {
+                "name": "anchor-last",
+                "type": "model",
+                "aliases": ["last"],
+                "local_path": "artifacts/anchor",
+                "sha256": "d" * 64,
+            },
+            {
+                "name": "final-last",
+                "type": "model",
+                "aliases": ["last"],
+                "local_path": "artifacts/final",
+                "sha256": "f" * 64,
+            },
+        ],
+    }
+    path = tmp_path / f"{label}-manifest.json"
+    encoded = json.dumps(manifest, sort_keys=True).encode()
+    path.write_bytes(encoded)
+    identity["run_bundle_manifest_sha256"] = hashlib.sha256(encoded).hexdigest()
+    completion = path.parent / "completion.json"
+    completion_bytes = json.dumps(
+        {"status": "completed", "output_dir": f"/outputs/{EXPECTED_RUN_IDS[label]}"}, sort_keys=True
+    ).encode()
+    completion.write_bytes(completion_bytes)
+    identity["run_bundle_completion_sha256"] = hashlib.sha256(completion_bytes).hexdigest()
+    return path, completion
+
+
+def _rebind_frozen_lineage(monkeypatch: pytest.MonkeyPatch, *, label: str, export: dict[str, object]) -> None:
+    identity = export["identity"]
+    assert isinstance(identity, dict)
+    lineage = EXPECTED_MANIFEST_LINEAGE[label]
+    monkeypatch.setitem(lineage, "config_hash", identity["config_hash"])
+    monkeypatch.setitem(lineage, "manifest_sha256", identity["run_bundle_manifest_sha256"])
+    monkeypatch.setitem(lineage, "completion_sha256", identity["run_bundle_completion_sha256"])
+    for checkpoint in ("anchor", "final"):
+        checkpoint_identity = identity[checkpoint]
+        assert isinstance(checkpoint_identity, dict)
+        monkeypatch.setitem(lineage, f"{checkpoint}_checkpoint_sha256", checkpoint_identity["checkpoint_sha256"])
 
 
 def test_frozen_design_hash_contract_loads() -> None:
@@ -102,6 +189,87 @@ def test_state_export_rejects_tampered_hash_bound_identity() -> None:
     identity["world_size"] = 2
     with pytest.raises(LoggingOnlyPredictionError, match="world size"):
         _prepare_rows(export)
+
+
+@pytest.mark.parametrize(
+    "drift", ["run_id", "seed", "config", "git", "teacher", "checkpoint", "manifest_bytes", "completion_status"]
+)
+def test_manifest_lineage_rejects_run_id_only_or_tampered_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, drift: str
+) -> None:
+    export = _export(run_id=EXPECTED_RUN_IDS["L1"])
+    path, completion = _manifest_for_export(tmp_path, label="L1", export=export)
+    identity = export["identity"]
+    assert isinstance(identity, dict)
+    _rebind_frozen_lineage(monkeypatch, label="L1", export=export)
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if drift == "run_id":
+        manifest["run_id"] = EXPECTED_RUN_IDS["L2"]
+    elif drift == "seed":
+        manifest["seed"] = 2
+    elif drift == "config":
+        manifest["config_hash"] = "9" * 64
+    elif drift == "git":
+        manifest["git"]["sha"] = "8" * 40
+    elif drift == "teacher":
+        manifest["teacher"]["registry_id"] = "chen2021_ltd_wrn34_10"
+    elif drift == "checkpoint":
+        manifest["teacher"]["checkpoint_sha256"] = "7" * 64
+        manifest["teacher"]["checkpoint_actual_sha256"] = "7" * 64
+    elif drift == "completion_status":
+        completion_bytes = json.dumps(
+            {"status": "failed", "output_dir": f"/outputs/{EXPECTED_RUN_IDS['L1']}"}, sort_keys=True
+        ).encode()
+        completion.write_bytes(completion_bytes)
+        identity["run_bundle_completion_sha256"] = hashlib.sha256(completion_bytes).hexdigest()
+        monkeypatch.setitem(
+            EXPECTED_MANIFEST_LINEAGE["L1"], "completion_sha256", identity["run_bundle_completion_sha256"]
+        )
+        with pytest.raises(LoggingOnlyPredictionError, match="not completed"):
+            _validate_manifest_lineage(label="L1", path=path, export_identity=identity)
+        return
+    else:
+        path.write_text("{}", encoding="utf-8")
+        with pytest.raises(LoggingOnlyPredictionError):
+            _validate_manifest_lineage(label="L1", path=path, export_identity=identity)
+        return
+    encoded = json.dumps(manifest, sort_keys=True).encode()
+    path.write_bytes(encoded)
+    identity["run_bundle_manifest_sha256"] = hashlib.sha256(encoded).hexdigest()
+    with pytest.raises(LoggingOnlyPredictionError):
+        _validate_manifest_lineage(label="L1", path=path, export_identity=identity)
+
+
+def test_manifest_lineage_records_resolved_path_hash_and_validated_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    export = _export(run_id=EXPECTED_RUN_IDS["L3"])
+    path, completion = _manifest_for_export(tmp_path, label="L3", export=export)
+    identity = export["identity"]
+    assert isinstance(identity, dict)
+    _rebind_frozen_lineage(monkeypatch, label="L3", export=export)
+    result = _validate_manifest_lineage(label="L3", path=path, export_identity=identity)
+    assert result["path"] == str(path.resolve())
+    assert result["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert result["completion_path"] == str(completion.resolve())
+    assert result["completion_sha256"] == hashlib.sha256(completion.read_bytes()).hexdigest()
+    assert result["identity"]["teacher"]["registry_id"] == "bartoldson2024_adversarial_wrn94_16"
+
+
+def test_frozen_export_lineage_rejects_exact_checkpoint_drift() -> None:
+    export = _export(run_id=EXPECTED_RUN_IDS["L1"])
+    identity = export["identity"]
+    assert isinstance(identity, dict)
+    identity["config_hash"] = EXPECTED_MANIFEST_LINEAGE["L1"]["config_hash"]
+    identity["run_bundle_manifest_sha256"] = EXPECTED_MANIFEST_LINEAGE["L1"]["manifest_sha256"]
+    identity["run_bundle_completion_sha256"] = EXPECTED_MANIFEST_LINEAGE["L1"]["completion_sha256"]
+    for checkpoint in ("anchor", "final"):
+        value = identity[checkpoint]
+        assert isinstance(value, dict)
+        value["checkpoint_sha256"] = EXPECTED_MANIFEST_LINEAGE["L1"][f"{checkpoint}_checkpoint_sha256"]
+    identity["anchor"]["checkpoint_sha256"] = "9" * 64
+    with pytest.raises(LoggingOnlyPredictionError, match="anchor checkpoint"):
+        _validate_frozen_export_lineage(label="L1", export_identity=identity)
 
 
 def test_state_export_accepts_noncontiguous_cifar_source_ids() -> None:
@@ -189,8 +357,10 @@ def test_block_rejects_missing_or_swapped_frozen_run_ids() -> None:
 
 
 @pytest.mark.parametrize("drift", ["membership", "label"])
-def test_block_rejects_cross_run_source_membership_or_label_drift(drift: str) -> None:
+def test_block_rejects_cross_run_source_membership_or_label_drift(monkeypatch: pytest.MonkeyPatch, drift: str) -> None:
     exports = {label: _export(run_id=EXPECTED_RUN_IDS[label]) for label in ("L1", "L2", "L3", "L4")}
+    for label, export in exports.items():
+        _rebind_frozen_lineage(monkeypatch, label=label, export=export)
     rows = exports["L2"]["rows"]
     assert isinstance(rows, list) and isinstance(rows[-1], dict)
     if drift == "membership":
@@ -204,6 +374,7 @@ def test_block_rejects_cross_run_source_membership_or_label_drift(drift: str) ->
 def test_cli_report_binds_exact_consumed_input_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     inputs = {}
     arguments = []
+    manifest_arguments = []
     for label in ("L1", "L2", "L3", "L4"):
         path = tmp_path / f"{label}.json"
         payload = {"identity": {"run_id": EXPECTED_RUN_IDS[label]}, "rows": []}
@@ -211,9 +382,16 @@ def test_cli_report_binds_exact_consumed_input_bytes(tmp_path: Path, monkeypatch
         path.write_bytes(encoded)
         inputs[label] = (path.resolve(), hashlib.sha256(encoded).hexdigest())
         arguments.extend(["--run", f"{label}={path}"])
+        manifest = tmp_path / f"{label}-manifest.json"
+        manifest.write_text("{}", encoding="utf-8")
+        manifest_arguments.extend(["--manifest", f"{label}={manifest}"])
     output = tmp_path / "report.json"
-    monkeypatch.setattr(prediction_cli, "analyze_logging_only_exports", lambda exports: {"runs": {}})
-    assert prediction_cli.main([*arguments, "--output", str(output)]) == 0
+    monkeypatch.setattr(
+        prediction_cli,
+        "analyze_logging_only_exports",
+        lambda exports, manifest_paths: {"runs": {}, "manifest_inputs": {}},
+    )
+    assert prediction_cli.main([*arguments, *manifest_arguments, "--output", str(output)]) == 0
     report = json.loads(output.read_text(encoding="utf-8"))
     assert report["source_inputs"] == {
         label: {"path": str(path), "sha256": digest} for label, (path, digest) in inputs.items()
