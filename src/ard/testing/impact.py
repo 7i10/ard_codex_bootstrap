@@ -98,6 +98,14 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
+        (
+            "src/ard/analysis/logging_only_prediction.py",
+            "src/ard/cli/logging_only_prediction.py",
+        ),
+        ("tests/unit/test_logging_only_prediction.py",),
+        ("T0", "T1"),
+    ),
+    (
         ("src/ard/cli/status.py",),
         ("tests/unit/test_status.py", "tests/unit/test_tracking.py"),
         ("T0", "T1"),
