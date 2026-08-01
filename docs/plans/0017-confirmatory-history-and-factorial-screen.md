@@ -88,10 +88,25 @@ intervention utility separately with one common-state five-arm continuation.
   accuracy loss above `0.5` points.  If `H-R < -0.5` points, stop that treatment
   as a negative screen; do not generalize the result to every possible random
   draw.  This sequential rule is fixed before H4 outcomes are observed.
-- The intervention budget is fixed at `K=3566`, the earlier seed-0
-  Bartoldson final-error oracle budget. This reuses a pre-existing development
-  budget for comparability; it is not selected from L3 outcomes. History scores
-  are ordered descending with stable sample ID ascending as the tie-break.
+- The intervention budget is fixed at `K=3566`, borrowed from the earlier
+  seed-0 Bartoldson endpoint-error mask only for intervention-budget
+  comparability.  The H4 history IDs themselves are the top-K frozen predictor
+  scores on L3 and contain no future outcomes.  `K` is not a validated
+  forgetting threshold: the source endpoint mask mixed 404 epoch-99-correct to
+  epoch-199-wrong samples with 3,162 samples wrong at both endpoints, whereas
+  the predictor outcome is any post-anchor correct-to-wrong transition.  H4 can
+  test history-ranked versus class-matched-random intervention at a fixed 7.92%
+  budget; it cannot establish an optimal forgetting threshold or attribute an
+  effect specifically to forgetting rather than persistent difficulty.
+  History scores are ordered descending with stable sample ID ascending as the
+  tie-break.
+- A deployable follow-up must separate the anchor-correct forgetting risk set
+  from anchor-wrong persistent-error/recovery states, choose its selection
+  budget on development trajectories only, and match random controls on both
+  class and anchor state.  A current-state selector is also required before
+  claiming that longitudinal history, rather than current difficulty, causes
+  intervention gains.  These are follow-up contracts, not post-hoc changes to
+  the active H4 screen.
   The class-matched control ranks each candidate by
   `SHA256(2026080201:class_id:sample_id)` and takes the same per-class counts.
 - If both Bartoldson history runs are No-Go, the screen may use only the same

@@ -278,6 +278,12 @@ W&B周期checkpoint `last:v19`（epoch 99）と`last:v39`（epoch 199）をraw t
 `rho=0.5`のuniform target softeningを適用します。このmaskはpersistent failureを多く含むため、治療効果の
 oracleではなく、**outcome-informed failure mask**と呼びます。
 
+この3,566件はendpoint定義で、epoch 99正解からepoch 199誤りが404件、両endpointで誤りが3,162件です。
+後者は2 endpointだけでは「全期間で永続的に誤り」と「途中で正解した後に再び誤り」を分離できません。
+また、後続のhistory predictorが予測する任意のpost-anchor正解→誤りtransitionとは別outcomeです。
+したがって3,566は介入budgetの比較には再利用できますが、forgetting predictorの正解maskや本番閾値としては
+扱いません。
+
 | 状態 | Ferret GPU | W&B train ID | Mask |
 |---|---:|---|---|
 | 完了 | — | `bart-oracle-soft-s0-05cd0c6` | outcome-informed failure mask |
