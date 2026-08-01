@@ -107,6 +107,45 @@ intervention utility separately with one common-state five-arm continuation.
   claiming that longitudinal history, rather than current difficulty, causes
   intervention gains.  These are follow-up contracts, not post-hoc changes to
   the active H4 screen.
+- The frozen cross-run predictor remains the transportability and prognostic
+  reference, not the intended deployable method: requiring a completed
+  200-epoch development run for every dataset/student/teacher combination is
+  an explicit practicality limitation.  The first deployable candidate is a
+  run-adaptive one-shot selector computed from the current run at epoch 99 and
+  frozen for epochs 100--199.  It is not described as an online probability
+  model, and it is not updated after intervention changes its own inputs.
+- The initial run-adaptive score family is deliberately small.  On the
+  anchor-correct forgetting risk set, compare percentile midranks of
+  `1 - robust_correct_frequency`, `-robust_margin_ema`, and their equal-weight
+  mean.  Equal feature values receive the same midrank; stable sample-ID order
+  resolves only a top-budget boundary tie.  Frequency-only and margin-only are
+  required ablations because the one-to-one average is a design choice, not a
+  scientific invariant.  Anchor-wrong recovery, relapse and persistent error
+  use a separate analysis and must not be relabeled as forgetting.
+- Rank scores are relative instability scores, not calibrated future-failure
+  probabilities.  Evaluate them with AUROC, AUPRC, precision/recall at the
+  frozen budget and lift over outcome prevalence.  Do not report rank-score
+  log-loss without a separately declared calibration model.  Paired,
+  sample-level bootstrap differences accompany the predeclared point-estimate
+  comparison when feasible.
+- `K=3566` may remain only as the H4 fixed-budget comparability condition.  A
+  follow-up method uses a predeclared top-`q` fraction selected on development
+  trajectories before untouched-seed inspection; neither `K` nor `q` is
+  presented as an estimated forgetting-probability threshold.  Predictor
+  ranking alone cannot establish the intervention-optimal budget.
+- The primary random control for a future forgetting selector is matched on
+  class, anchor-correct state and count.  A current-margin-bin-matched random
+  control is secondary: it tests information beyond current difficulty, but
+  making it primary could condition away part of the intended history score.
+- After H4, first compare the rank family, frozen predictor, instantaneous
+  margin and teacher entropy offline on already completed non-intervened
+  trajectories.  Only an intervention form supported by H4 is then held fixed
+  while comparing no intervention, frozen predictor, run-adaptive rank,
+  current-state selector and matched random.  Do not mix selector and treatment
+  changes in the same contrast.  A delayed within-run supervised predictor is
+  considered only if the rank selector loses material predictive or
+  prescriptive utility; validation-guided bilevel weighting is deferred beyond
+  this screen because it changes the research question and cost structure.
 - Do not produce a partial CPU-only persistent-error report and then repeat the
   joins after clean inference.  When the first H4 GPU becomes free, run one
   integrated existing-artifact audit that adds saved-checkpoint clean forward
@@ -170,6 +209,26 @@ intervention utility separately with one common-state five-arm continuation.
     cross-seed overlap, class counts and a blinded suspected-label-noise panel.
   - Acceptance: one joined report with exact input hashes; no training, no H4
     contention, no automatic label correction, and no repeated partial report.
+- [ ] H5 — evaluate the run-adaptive one-shot selector without redundant training.
+  - Inputs: completed non-intervened L1--L4 trajectories and their frozen
+    anchor/outcome definitions; H4 treatment conclusion remains unchanged.
+  - Primary comparison: frozen cross-run predictor, frequency rank, margin-EMA
+    rank, equal-weight rank, instantaneous margin and teacher entropy on the
+    anchor-correct risk set.
+  - Adoption screen: before inspecting untouched-seed results, freeze the score,
+    budget and bootstrap procedure.  A practical candidate should be within
+    `0.01` AUROC of the frozen predictor, exceed instantaneous margin, retain
+    comparable precision/lift at budget and use one unchanged definition across
+    both teachers and confirmatory seeds.  This is a resource-allocation gate,
+    not a publication-level equivalence claim.
+  - Conditional intervention: only if H4 identifies a usable treatment, compare
+    selectors under that one treatment.  Screening Go requires at least
+    `+0.5` percentage-point best-AA over the predeclared random-control mean,
+    no more than `0.5` point clean loss, and no material loss versus the frozen
+    predictor; confirmatory claims still require from-scratch multiple seeds.
+  - Acceptance: the offline stage launches no new training, future outcomes do
+    not enter score construction, and any later branch records exact parent,
+    selector, budget, treatment and random-control lineage.
 
 ## Agent and review budget
 
