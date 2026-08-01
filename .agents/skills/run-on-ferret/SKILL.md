@@ -12,7 +12,8 @@ Run scripts from the repository root. Configuration precedence is CLI arguments,
 ```bash
 .agents/skills/run-on-ferret/scripts/ferret-preflight
 .agents/skills/run-on-ferret/scripts/ferret-prepare --sha <40-lowercase-hex> --run-id <id>
-.agents/skills/run-on-ferret/scripts/ferret-launch --run-id <id> --gpus 0,1 -- python -m ard.cli.train --config <config>
+.agents/skills/run-on-ferret/scripts/ferret-launch --run-id <id> --gpus 0,1 -- \
+  /usr/bin/env PYTHONPATH=src /absolute/path/to/python -m ard.cli.train --config <config>
 .agents/skills/run-on-ferret/scripts/ferret-status --run-id <id>
 .agents/skills/run-on-ferret/scripts/ferret-logs --run-id <id> --tail 200 --both
 .agents/skills/run-on-ferret/scripts/ferret-collect --run-id <id>
@@ -35,6 +36,23 @@ For a parameter matrix, prefer one tracked wrapper at the prepared SHA or one
 run bundle per cell. Do not embed a generated `bash -lc` loop in a launcher
 argument: local expansion can silently change `$` variables before the command
 is recorded. Validate config overrides with `--dry-run` before reserving a GPU.
+
+## Placement and transfer decision
+
+Before choosing a host, compare input locality and bytes, measured throughput,
+idle GPUs, and expected runtime. Do not treat the current location as fixed:
+use selective `rsync --partial --safe-links` when transfer time is smaller than
+the expected compute saving. Transfer only required checkpoints/configs, verify
+their SHA-256 at the destination, and record the execution host and transferred
+artifact identity. Avoid duplicate computation when the same immutable input
+can be transferred safely.
+
+Do not add a training parity run ceremonially. First name the failure it could
+detect and the decision its result would change. Prefer static Git/config,
+checkpoint, teacher, environment, RNG, and hardware identity checks when a
+short continuation cannot predict long-horizon equivalence. For cross-host
+screens, keep primary contrasts within a host and replicate only a promising
+effect if host sensitivity remains material.
 
 ## GPU and experiment integrity
 

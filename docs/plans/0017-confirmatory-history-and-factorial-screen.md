@@ -63,10 +63,14 @@ intervention utility separately with one common-state five-arm continuation.
 - L2 runs on Hamster GPU 0; L3/L4 run on Ferret GPUs 0/1. This avoids three
   simultaneous Ferret training jobs and leaves Ferret GPU 2 available without
   weakening the single-GPU protocol.
-- For independent future runs, prefer compute-heavy Bartoldson teachers on
-  Hamster and Chen on Ferret. For the five-arm screen, common-host validity
-  takes precedence over per-GPU speed: use one host in waves unless the frozen
-  cross-host C-fork parity gate passes.
+- For independent future runs, compare measured host throughput with artifact
+  transfer size instead of assuming the current artifact location is fixed.
+  Hash-verified rsync is preferred when transfer is cheaper than slower compute.
+- Do not run a short cross-host C continuation: it cannot establish 100-epoch
+  trajectory equivalence. Use static environment/identity preflight, place
+  `HS/RS` on Hamster and `C/HD/RD` on Ferret, and keep the primary selector
+  contrasts within host. Cross-treatment contrasts remain exploratory until a
+  promising effect is replicated without host confounding.
 - No result-dependent runtime gate belongs in `ard.cli.train`. The frozen YAML,
   clean Git SHA, resolved config, W&B identity and run bundle are the evidence.
 - Two confirmatory seeds estimate direction replication, not a precise
@@ -230,6 +234,13 @@ during waiting. No watchdog/recovery agent is used.
   `+0.0686`, `+0.0513`, `+0.0663` AUROC, respectively). The next state is
   feature-only L3 replay, then frozen selector masks, then the common-state
   five-arm screen. No live replay or H3 launch is claimed here.
+- 2026-08-02: L3 feature-only replay completed on Ferret GPU 2 in about 76
+  minutes from fixed SHA `6d77338...`; all 20 epoch-4--99 checkpoints and
+  45,000 stable IDs passed lineage/attack checks. The deterministic selector
+  fit produced `K=3566` with threshold `0.7550193467`; independent output
+  directories reproduced the same coefficients, selected-ID hashes, and class
+  counts. The five-arm launch drops the previously proposed short C parity in
+  favor of static identity checks and within-host primary contrasts.
 
 ## Completion report
 

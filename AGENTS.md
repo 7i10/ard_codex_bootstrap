@@ -31,6 +31,9 @@ Read `docs/README.md`, `docs/SCIENTIFIC_INVARIANTS.md`, `docs/TEST_STRATEGY.md`,
 - Preserve the requested outcome while independently checking environment facts, security boundaries, scientific invariants, and simpler alternatives before adopting a proposed command or architecture.
 - When evidence contradicts a proposed mechanism, explain the evidence, choose the safer or more reproducible design, and record the accepted/rejected assumption in the active plan.
 - Do not perform ceremonial compliance. A named tool, model role, launcher, or review step must provide information or control that materially advances the task.
+- Before adding a parity run or repeated validation, state the failure it can detect and the decision it can change. If a short run cannot resolve the long-horizon risk, use static identity checks and a blocked/randomized experiment design instead.
+- Before assigning remote compute, compare artifact locality and transfer size with measured host throughput. Use hash-verified `rsync` when transfer is cheaper than leaving a long job on the slower host.
+- After a real operational inefficiency, update the narrowest reusable skill or runbook, add a regression only when code caused the failure, and avoid adding campaign-specific checks to the scientific core.
 
 ## Review latency and retry policy
 
