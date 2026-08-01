@@ -2,6 +2,7 @@
 
 from .base import PolicyContext, PolicyOutput, PolicyWeights, WeightPolicy
 from .entropy import EntropyOnlyPolicy
+from .fixed_mask import FixedInterventionMask, FixedMaskError, load_fixed_intervention_mask, selected_ids_sha256
 from .rslad import RSLADBaselinePolicy
 from .student_aware import (
     HardFallbackPolicy,
@@ -15,6 +16,8 @@ from .uniform import UniformPolicy
 
 __all__ = [
     "EntropyOnlyPolicy",
+    "FixedInterventionMask",
+    "FixedMaskError",
     "HardFallbackPolicy",
     "JointDownweightPolicy",
     "JointRiskPolicy",
@@ -25,6 +28,8 @@ __all__ = [
     "StudentRiskPolicy",
     "UniformPolicy",
     "WeightPolicy",
+    "load_fixed_intervention_mask",
+    "selected_ids_sha256",
     "student_risk_from_margin",
     "teacher_risk_from_entropy",
 ]

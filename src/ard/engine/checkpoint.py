@@ -47,6 +47,7 @@ class TrainingState:
     selection_metadata: dict[str, Any]
     tracker_run_id: str | None
     sample_state: dict[str, Any]
+    fork_lineage: dict[str, Any] | None = None
 
 
 def config_digest(config: Mapping[str, Any]) -> str:
@@ -99,6 +100,7 @@ def save_checkpoint(
     selection_metadata: Mapping[str, Any],
     tracker_run_id: str | None,
     config_hash: str,
+    fork_lineage: Mapping[str, Any] | None = None,
 ) -> None:
     local_sampler_state = sampler.state_dict() if sampler is not None and hasattr(sampler, "state_dict") else {}
     rng_by_rank = gather_objects(capture_rng_state())
@@ -125,6 +127,8 @@ def save_checkpoint(
             "config_hash": config_hash,
             "world_size": get_world_size(),
         }
+        if fork_lineage is not None:
+            payload["fork_lineage"] = dict(fork_lineage)
         path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
         os.close(descriptor)
@@ -204,6 +208,9 @@ def load_checkpoint(
     if sampler is not None:
         sampler.load_state_dict(sampler_state_by_rank[rank])
     restore_rng_state(rng_by_rank[rank])
+    raw_fork_lineage = payload.get("fork_lineage")
+    if raw_fork_lineage is not None and not isinstance(raw_fork_lineage, Mapping):
+        raise ValueError("checkpoint fork_lineage must be a mapping when present")
     return TrainingState(
         next_epoch=int(payload["epoch"]) + 1,
         global_step=int(payload["global_step"]),
@@ -211,4 +218,5 @@ def load_checkpoint(
         selection_metadata=dict(payload["selection_metadata"]),
         tracker_run_id=payload["tracker_run_id"],
         sample_state=dict(payload["sample_state"]),
+        fork_lineage=None if raw_fork_lineage is None else dict(raw_fork_lineage),
     )

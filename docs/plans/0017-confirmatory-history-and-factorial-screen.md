@@ -4,7 +4,7 @@
 
 - Owner: main thread; shell processes own GPU execution
 - Branch / base SHA: `cleanup/observability-first` / `ad6d26e1c15d90eeb8c1d8b10cfa081a433364b9`
-- Current milestone: H2 await the complete four-trajectory block
+- Current milestone: H2 await the complete four-trajectory block; H3 implementation complete but launch blocked
 - Last updated: 2026-08-01
 
 ## Goal
@@ -98,11 +98,15 @@ intervention utility separately with one common-state five-arm continuation.
     scaler, RNG, sampler, global step and every format-v3 primitive/count.
     Config identity and added forward-count telemetry are the only allowed
     differences. Failure requires a new-SHA L1 replacement.
-- [ ] H3 — implement a registered common-state fork, but do not launch early.
+- [x] H3 — implement a registered common-state fork, but do not launch early.
   - Files: analysis/fork CLI, arm configs, focused checkpoint/RNG/lineage tests.
   - Acceptance: the five arms share exact parent state and class budget; only
     selector/intervention changes; test/AA leakage fails closed.
-  - Planned commit: `research: add common-state intervention screen`.
+  - Test: actual factory-returned C continuation parity with random-start PGD,
+    strict fork/resume, transactional screen creation, selector and artifact
+    provenance, fixed-mask formula/gradient and lineage contracts.
+  - Launch remains blocked until H2 selects an admissible selector and real
+    epoch-99 parent/W&B inputs are attested.
 - [ ] H4 — conditionally launch the five arms and evaluate saved checkpoints.
   - Acceptance: control and factorial contrasts are computed from the same
     branch state; best/last clean/PGD are mandatory; AA follows only for a
@@ -183,6 +187,17 @@ during waiting. No watchdog/recovery agent is used.
   +14.48%) with identical loss and accuracy metrics. Active runs remain
   unchanged; future Ferret launches use 4 workers. Evidence is recorded in
   `tools/internal/performance/provenance/ferret_workers_2026-08-01.yaml`.
+- 2026-08-01: H3 fail-closed fork implementation completed without launching
+  an arm. Focused final evidence: intervention unit tests `4 passed`; actual
+  factory-C parity plus one-epoch strict resume `2 passed`; changed impact gate
+  `23 passed, 1 skipped`; Ruff and changed-source mypy passed. One consolidated
+  scientific review found seven initial P1 and four closure-delta P1 issues,
+  including broken post-fork resume, unmatched random budgets, partial screen
+  publication, self-declared selector provenance, incomplete parent state,
+  missing parent-best/W&B lineage, dirty launch, and a synthetic rather than
+  actual-C parity test. All were fixed; the final delta review reported no
+  remaining P0/P1. This experimental runtime stays on the research branch and
+  is not a license to launch before H2.
 
 ## Completion report
 

@@ -41,6 +41,26 @@ class ObjectiveTerms:
             clean_kd=self.clean_kd,
         )
 
+    def scale_adversarial_kd(self, multiplier: torch.Tensor, *, coefficient: float) -> ObjectiveTerms:
+        """Scale only an exposed adversarial KD branch before reduction.
+
+        This is intentionally separate from :meth:`apply_policy`: a screen
+        downweight must not accidentally scale clean KD or introduce hard CE.
+        """
+        if self.adversarial_kd is None or self.clean_kd is None:
+            raise ValueError("adversarial-KD scaling requires separately exposed adversarial and clean KD branches")
+        if multiplier.shape != self.kd.shape or multiplier.ndim != 1:
+            raise ValueError("adversarial KD multiplier must match the unreduced objective batch")
+        if not torch.isfinite(multiplier).all() or bool((multiplier < 0).any()):
+            raise ValueError("adversarial KD multiplier must be finite and non-negative")
+        return ObjectiveTerms(
+            hard=self.hard,
+            kd=self.kd + coefficient * (multiplier - 1.0) * self.adversarial_kd,
+            regularization=self.regularization,
+            adversarial_kd=self.adversarial_kd * multiplier,
+            clean_kd=self.clean_kd,
+        )
+
 
 class DistillationObjective(ABC):
     requires_clean_student_logits = False

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 from collections.abc import Mapping
@@ -41,12 +42,14 @@ from ard.models import build_student, build_teacher
 from ard.objectives import DistillationObjective, PGDATObjective, RSLADObjective, TRADESObjective
 from ard.policies import (
     EntropyOnlyPolicy,
+    FixedInterventionMask,
     HardFallbackPolicy,
     JointDownweightPolicy,
     JointRiskPolicy,
     RSLADBaselinePolicy,
     StudentRiskPolicy,
     WeightPolicy,
+    load_fixed_intervention_mask,
 )
 from ard.protocols import ensure_local_trainable
 from ard.schedules import build_scheduler
@@ -60,6 +63,7 @@ from ard.tracking import (
     coordinated_tracker_action,
     validate_tracking_guard,
 )
+from ard.tracking.adapter import collect_git_state
 from ard.tracking.diagnostics import TrainingDiagnostics
 
 
@@ -116,6 +120,115 @@ def _resume_tracker_id(path: Path | None) -> str | None:
     return run_id
 
 
+def _screen_identity_sha256(manifest: Mapping[str, object]) -> str:
+    arms = manifest.get("arms")
+    if not isinstance(arms, list):
+        raise ValueError("completed intervention screen manifest arms must be a list")
+    identity = {
+        "schema_version": 1,
+        "kind": "common_state_intervention_v1",
+        "parent_checkpoint_sha256": manifest.get("parent_checkpoint_sha256"),
+        "parent_run_id": manifest.get("parent_run_id"),
+        "fork_git_sha": manifest.get("fork_git_sha"),
+        "arms": [
+            {
+                "arm": item.get("arm"),
+                "config_hash": item.get("config_hash"),
+                "run_id": item.get("run_id"),
+                "output": item.get("output"),
+            }
+            for item in sorted(
+                (item for item in arms if isinstance(item, Mapping)), key=lambda item: str(item.get("arm"))
+            )
+        ],
+    }
+    return hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    ).hexdigest()
+
+
+def _validate_completed_screen(
+    *, path: Path, config: ExperimentConfig, config_hash: str, lineage: Mapping[str, object]
+) -> None:
+    screen_path = path.parent / "screen-complete.json"
+    try:
+        manifest = json.loads(screen_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("intervention arm requires a readable completed screen manifest") from exc
+    if not isinstance(manifest, Mapping) or manifest.get("status") != "complete":
+        raise ValueError("intervention arm requires a completed screen manifest")
+    if manifest.get("screen_id") != lineage.get("screen_id") or _screen_identity_sha256(manifest) != manifest.get(
+        "screen_id"
+    ):
+        raise ValueError("completed screen manifest identity does not match the fork checkpoint")
+    arms = manifest.get("arms")
+    if not isinstance(arms, list) or len(arms) != 5:
+        raise ValueError("completed screen manifest must contain all five registered arms")
+    entries = [entry for entry in arms if isinstance(entry, Mapping)]
+    names = [entry.get("arm") for entry in entries]
+    run_ids = [entry.get("run_id") for entry in entries]
+    if len(entries) != 5 or set(names) != {"C", "HS", "RS", "HD", "RD"} or len(set(run_ids)) != 5:
+        raise ValueError("completed screen manifest has duplicate or missing sibling identities")
+    expected_arm = config.intervention.arm if config.intervention is not None else None
+    own = next((entry for entry in entries if entry.get("arm") == expected_arm), None)
+    if (
+        not isinstance(own, Mapping)
+        or own.get("config_hash") != config_hash
+        or own.get("run_id") != lineage.get("child_tracker_run_id")
+    ):
+        raise ValueError("completed screen manifest does not bind this arm config and tracking identity")
+    launch_state = collect_git_state(Path.cwd())
+    launch_git = launch_state.get("sha")
+    if (
+        launch_state.get("dirty") is not False
+        or launch_git != lineage.get("fork_git_sha")
+        or manifest.get("fork_git_sha") != launch_git
+    ):
+        raise ValueError("intervention launch Git SHA must exactly match the clean fork Git SHA")
+
+
+def _validate_intervention_resume(path: Path | None, config: ExperimentConfig, *, config_hash: str) -> None:
+    """Keep the registered fork separate from both ordinary resume and parent best."""
+    if path is None:
+        if config.intervention is not None:
+            raise ValueError("intervention arms must start from a registered common-state fork checkpoint")
+        return
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    if not isinstance(payload, dict):
+        raise ValueError("resume checkpoint must be a mapping")
+    lineage = payload.get("fork_lineage")
+    if config.intervention is None:
+        if lineage is not None:
+            raise ValueError("a common-state intervention fork cannot resume as an ordinary run")
+        return
+    if not isinstance(lineage, Mapping):
+        raise ValueError("intervention arms require a registered common-state fork lineage")
+    parent = config.intervention.parent
+    expected = {
+        "kind": "common_state_intervention_v1",
+        "arm": config.intervention.arm,
+        "parent_checkpoint_sha256": parent.checkpoint_sha256,
+        "parent_raw_config_sha256": parent.raw_config_sha256,
+        "parent_git_sha": parent.git_sha,
+        "parent_epoch": 99,
+        "parent_world_size": 1,
+        "parent_teacher_checkpoint_sha256": parent.teacher_checkpoint_sha256,
+        "parent_sample_state_records": 45000,
+        "post_fork_best_scope": True,
+    }
+    if any(lineage.get(key) != value for key, value in expected.items()):
+        raise ValueError("intervention fork lineage does not exactly match the configured parent")
+    metadata = payload.get("selection_metadata")
+    if not isinstance(metadata, Mapping) or metadata.get("scope") != "post_fork_best":
+        raise ValueError("intervention fork must retain the post-fork best selection scope")
+    epoch = payload.get("epoch")
+    if epoch == 99 and payload.get("best_metric") != float("-inf"):
+        raise ValueError("initial intervention fork must reset best selection to the post-fork scope")
+    if not isinstance(epoch, int) or epoch < 99:
+        raise ValueError("intervention fork checkpoint epoch is invalid")
+    _validate_completed_screen(path=path, config=config, config_hash=config_hash, lineage=lineage)
+
+
 def _terminal_resume_requested(*, output_dir: Path, resume: Path | None, epochs: int) -> bool:
     """Read-only terminal-resume preflight before any run-bundle write."""
     if resume is None:
@@ -166,7 +279,11 @@ def _build_method(
             RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
             RSLADBaselinePolicy(),
             None,
-            None,
+            (
+                UniformSofteningTeacherTargetPolicy(rho_max=config.intervention.uniform_target_softening_rho)
+                if config.intervention is not None and config.intervention.kind == "uniform_target_softening"
+                else None
+            ),
         )
     if method.id == "rslad_entropy":
         return (
@@ -230,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
         def _validate_output_guard() -> None:
             validate_tracking_guard(config, root=Path.cwd())
             _guard_output(output_dir, resume=args.resume, config_hash=config_hash)
+            _validate_intervention_resume(args.resume, config, config_hash=config_hash)
 
         run_rank_zero_phase(_validate_output_guard, phase="output guard")
         terminal_resume = run_rank_zero_value(
@@ -272,6 +390,10 @@ def main(argv: list[str] | None = None) -> int:
             if isinstance(active_tracker, LocalTracker):
                 active_tracker.attach_resolved_config(output_dir / "resolved_config.yaml")
             if args.resume is not None:
+                if isinstance(active_tracker, LocalTracker) and config.intervention is not None:
+                    payload = torch.load(args.resume, map_location="cpu", weights_only=False)
+                    assert isinstance(payload, Mapping) and isinstance(payload.get("fork_lineage"), Mapping)
+                    active_tracker.attach_fork_lineage(payload["fork_lineage"])
                 active_tracker.resume(checkpoint_run_id=resumed_run_id, checkpoint_config_hash=config_hash)
 
         coordinated_tracker_action(tracker, phase="tracker attach/resume", action=_attach_resume)
@@ -285,6 +407,7 @@ def main(argv: list[str] | None = None) -> int:
             augmentation_seed=config.seeds.augmentation,
         )
         frozen_risk_lookup: FrozenRiskLookup | None = None
+        intervention_mask: FixedInterventionMask | None = None
         if config.method.id == "rslad_frozen_oracle_softening":
             assert config.method.frozen_oracle_manifest is not None
             assert config.method.frozen_oracle_manifest_sha256 is not None
@@ -319,6 +442,22 @@ def main(argv: list[str] | None = None) -> int:
                     phase="frozen oracle input artifact",
                     action=_record_frozen_oracle_input,
                 )
+        if config.intervention is not None and config.intervention.mask is not None:
+            raw_targets = getattr(train_dataset.dataset.dataset, "targets", None)
+            if not isinstance(raw_targets, (list, tuple)):
+                raise ValueError("intervention training requires immutable source training labels")
+            train_labels = {int(sample_id): int(raw_targets[sample_id]) for sample_id in train_dataset.indices}
+            mask = config.intervention.mask
+            intervention_mask = load_fixed_intervention_mask(
+                mask.path,
+                expected_sha256=mask.sha256,
+                expected_selected_ids_sha256=mask.selected_ids_sha256,
+                expected_selected_count=mask.selected_count,
+                expected_class_counts=mask.selected_class_counts,
+                expected_provenance=mask.provenance.model_dump(mode="json"),
+                train_labels=train_labels,
+                num_classes=config.dataset.num_classes,
+            )
         sampler = EpochShuffleSampler(
             len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
         )
@@ -394,6 +533,12 @@ def main(argv: list[str] | None = None) -> int:
             teacher=teacher,
             sample_store=sample_store,
             target_policy=target_policy,
+            intervention_mask=intervention_mask,
+            adversarial_kd_multiplier=(
+                config.intervention.adversarial_kd_multiplier
+                if config.intervention is not None and config.intervention.kind == "adversarial_kd_downweight"
+                else None
+            ),
             policy_warmup_epochs=(
                 config.method.student_policy_warmup_epochs
                 if config.method.id

@@ -19,6 +19,7 @@ from ard.attacks import AttackGenerator, AttackRequest
 from ard.data import IndexedBatch
 from ard.objectives import DistillationObjective
 from ard.policies import (
+    FixedInterventionMask,
     PolicyContext,
     PolicyWeights,
     WeightPolicy,
@@ -139,10 +140,13 @@ class Trainer:
         seed: int,
         evaluation_attack_seed: int | None = None,
         tracker_run_id: str | None = None,
+        fork_lineage: Mapping[str, Any] | None = None,
         teacher: nn.Module | None = None,
         policy: WeightPolicy | None = None,
         sample_store: SampleStateStore | None = None,
         target_policy: TeacherTargetPolicy | None = None,
+        intervention_mask: FixedInterventionMask | None = None,
+        adversarial_kd_multiplier: float | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
         frozen_risk_lookup: FrozenRiskLookup | None = None,
@@ -160,6 +164,7 @@ class Trainer:
         self.device, self.output_dir, self.config_hash, self.seed = device, output_dir, config_hash, seed
         self.evaluation_attack_seed = seed if evaluation_attack_seed is None else evaluation_attack_seed
         self.tracker_run_id = tracker_run_id
+        self.fork_lineage = None if fork_lineage is None else dict(fork_lineage)
         self.policy = policy
         self.sample_store = sample_store
         if observation_profile not in {"off", "student_history", "teacher_response"}:
@@ -172,6 +177,14 @@ class Trainer:
         if self._records_teacher_response and self.teacher is None:
             raise ValueError("teacher-response observation requires a frozen teacher")
         self.target_policy = target_policy
+        if intervention_mask is not None and (target_policy is None) == (adversarial_kd_multiplier is None):
+            raise ValueError("an intervention mask requires exactly one registered treatment")
+        if intervention_mask is None and adversarial_kd_multiplier is not None:
+            raise ValueError("an adversarial KD intervention multiplier requires a fixed intervention mask")
+        if adversarial_kd_multiplier is not None and not 0.0 <= adversarial_kd_multiplier <= 1.0:
+            raise ValueError("adversarial KD intervention multiplier must be in [0, 1]")
+        self.intervention_mask = intervention_mask
+        self.adversarial_kd_multiplier = adversarial_kd_multiplier
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
         if policy_warmup_epochs < 0:
@@ -470,6 +483,13 @@ class Trainer:
                 valid_mask=valid_mask,
                 student_signals=student_signals,
             )
+            intervention_risk = None
+            if self.intervention_mask is not None:
+                intervention_risk = self.intervention_mask.values(
+                    batch.sample_ids,
+                    device=logits.device,
+                    dtype=logits.dtype,
+                ) * valid_mask.to(device=logits.device, dtype=logits.dtype)
             if self.target_policy is not None:
                 if teacher_clean_logits is None:
                     raise ValueError("teacher target policy requires clean teacher logits")
@@ -477,13 +497,19 @@ class Trainer:
                     raise ValueError("teacher target policy requires an explicit detached risk")
                 target_output = self.target_policy(
                     teacher_logits=teacher_clean_logits,
-                    risk=weights.joint_risk,
+                    risk=weights.joint_risk if intervention_risk is None else intervention_risk,
                     temperature=getattr(self.objective, "temperature", 1.0),
                 )
                 objective_inputs["adversarial_target_probabilities"] = target_output.probabilities
             terms = self.objective(**objective_inputs)
             if weights is not None:
                 terms = terms.apply_policy(weights)
+            if intervention_risk is not None and self.adversarial_kd_multiplier is not None:
+                multiplier = 1.0 - (1.0 - self.adversarial_kd_multiplier) * intervention_risk
+                terms = terms.scale_adversarial_kd(
+                    multiplier,
+                    coefficient=float(getattr(self.objective, "ADVERSARIAL_COEFFICIENT", 1.0)),
+                )
             if self.diagnostics is not None:
                 with suspend_ddp_buffer_broadcasts(self.model), _evaluation_mode(self.model), torch.no_grad():
                     diagnostic_clean = self.model(batch.images).detach()
@@ -693,6 +719,7 @@ class Trainer:
                 selection_metadata=self.selection_metadata,
                 tracker_run_id=self.tracker_run_id,
                 config_hash=self.config_hash,
+                fork_lineage=self.fork_lineage,
             )
             save_checkpoint(self.output_dir / "last.pt", **common)
             if improved:
@@ -733,6 +760,7 @@ class Trainer:
         if self.tracker_run_id is not None and state.tracker_run_id != self.tracker_run_id:
             raise ValueError("checkpoint tracker run ID does not match the active tracker")
         self.tracker_run_id, self.sample_state = state.tracker_run_id, state.sample_state
+        self.fork_lineage = state.fork_lineage
         if self.sample_store is not None:
             self.sample_store.load_state_dict(state.sample_state)
             self.sample_state = self.sample_store.state_dict()

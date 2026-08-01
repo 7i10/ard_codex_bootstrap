@@ -493,6 +493,17 @@ class LocalTracker:
             "summary": {},
             "artifacts": [],
         }
+        if config.intervention is not None:
+            self.manifest["parent_lineage"] = config.intervention.parent.model_dump(mode="json")
+            self.manifest["intervention"] = {
+                "arm": config.intervention.arm,
+                "selector": config.intervention.selector,
+                "kind": config.intervention.kind,
+                "mask": None
+                if config.intervention.mask is None
+                else config.intervention.mask.model_dump(mode="json"),
+                "post_fork_best_scope": True,
+            }
         if prior is not None:
             current_lineage = {key: self.manifest[key] for key in ("git", "external", "teacher")}
             for key, current in current_lineage.items():
@@ -557,6 +568,13 @@ class LocalTracker:
         if not path.is_file():
             raise TrackingError(f"resolved config is missing: {path}")
         shutil.copy2(path, self.bundle_dir / "resolved_config.yaml")
+
+    def attach_fork_lineage(self, lineage: Mapping[str, Any]) -> None:
+        """Persist immutable common-state parent evidence in the child manifest."""
+        if self._terminal_resume:
+            return
+        self.manifest["fork_lineage"] = dict(lineage)
+        _write_json(self.manifest_path, self.manifest)
 
     def _start_wandb(self, wandb_module: Any | None) -> None:
         module = wandb_module

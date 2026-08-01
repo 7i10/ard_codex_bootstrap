@@ -541,6 +541,191 @@ class ObservationConfig(StrictModel):
         return self.profile == "teacher_response"
 
 
+class InterventionParentConfig(StrictModel):
+    """Immutable provenance required for a common-state intervention arm."""
+
+    checkpoint_sha256: str
+    raw_config_sha256: str
+    git_sha: str
+    epoch: Literal[99]
+    world_size: Literal[1]
+    teacher_checkpoint_sha256: str
+    sample_state_records: Literal[45000]
+    sample_state_sha256: str
+    train_partition_manifest: Path
+    train_partition_manifest_sha256: str
+    train_partition_ids_labels_sha256: str
+    artifact_attestation: Path
+    artifact_attestation_sha256: str
+    artifact_inventory: Path
+    artifact_inventory_sha256: str
+
+    @model_validator(mode="after")
+    def validate_hashes(self) -> InterventionParentConfig:
+        for name, value, length in (
+            ("checkpoint_sha256", self.checkpoint_sha256, 64),
+            ("raw_config_sha256", self.raw_config_sha256, 64),
+            ("git_sha", self.git_sha, 40),
+            ("teacher_checkpoint_sha256", self.teacher_checkpoint_sha256, 64),
+            ("sample_state_sha256", self.sample_state_sha256, 64),
+            ("train_partition_manifest_sha256", self.train_partition_manifest_sha256, 64),
+            ("train_partition_ids_labels_sha256", self.train_partition_ids_labels_sha256, 64),
+            ("artifact_attestation_sha256", self.artifact_attestation_sha256, 64),
+            ("artifact_inventory_sha256", self.artifact_inventory_sha256, 64),
+        ):
+            if len(value) != length or any(character not in "0123456789abcdef" for character in value):
+                raise ValueError(f"intervention parent {name} must be a lowercase {length}-character digest")
+        return self
+
+
+class InterventionMaskProvenanceConfig(StrictModel):
+    source: Literal["seed0_bartoldson_frozen_predictor", "class_matched_random"]
+    approved_selector_spec_sha256: str | None = None
+    selector_spec_path: Path | None = None
+    parent_checkpoint_sha256: str
+    parent_sample_state_sha256: str
+    random_seed: int | None = None
+    generator: str | None = None
+    generator_version: str | None = None
+    reference_history_mask_sha256: str | None = None
+    reference_selected_count: int | None = None
+    reference_selected_class_counts: dict[str, int] | None = None
+    reference_history_selector_spec_sha256: str | None = None
+
+    @model_validator(mode="after")
+    def validate_provenance(self) -> InterventionMaskProvenanceConfig:
+        for name, candidate in (
+            ("parent_checkpoint_sha256", self.parent_checkpoint_sha256),
+            ("parent_sample_state_sha256", self.parent_sample_state_sha256),
+        ):
+            if len(candidate) != 64 or any(character not in "0123456789abcdef" for character in candidate):
+                raise ValueError(f"intervention mask provenance {name} must be a lowercase 64-character digest")
+        if self.source == "seed0_bartoldson_frozen_predictor":
+            if self.approved_selector_spec_sha256 is None or self.selector_spec_path is None:
+                raise ValueError("history mask provenance requires an approved selector specification SHA-256")
+            if any(
+                value is not None
+                for value in (
+                    self.random_seed,
+                    self.generator,
+                    self.generator_version,
+                    self.reference_history_mask_sha256,
+                    self.reference_selected_count,
+                    self.reference_selected_class_counts,
+                    self.reference_history_selector_spec_sha256,
+                )
+            ):
+                raise ValueError("history mask provenance cannot carry random-mask fields")
+        else:
+            if (
+                self.approved_selector_spec_sha256 is not None
+                or self.selector_spec_path is not None
+                or any(
+                    value is None
+                    for value in (
+                        self.random_seed,
+                        self.generator,
+                        self.generator_version,
+                        self.reference_history_mask_sha256,
+                        self.reference_selected_count,
+                        self.reference_selected_class_counts,
+                        self.reference_history_selector_spec_sha256,
+                    )
+                )
+            ):
+                raise ValueError("random mask provenance requires fixed generator and reference history budget")
+        if self.approved_selector_spec_sha256 is not None and (
+            len(self.approved_selector_spec_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in self.approved_selector_spec_sha256)
+        ):
+            raise ValueError(
+                "intervention mask provenance approved_selector_spec_sha256 must be a lowercase 64-character digest"
+            )
+        if self.reference_history_mask_sha256 is not None and (
+            len(self.reference_history_mask_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in self.reference_history_mask_sha256)
+        ):
+            raise ValueError(
+                "intervention mask provenance reference_history_mask_sha256 must be a lowercase 64-character digest"
+            )
+        if self.reference_history_selector_spec_sha256 is not None and (
+            len(self.reference_history_selector_spec_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in self.reference_history_selector_spec_sha256)
+        ):
+            raise ValueError(
+                "intervention mask provenance reference selector spec SHA must be a lowercase 64-character digest"
+            )
+        return self
+
+
+class InterventionMaskConfig(StrictModel):
+    """Hash-bound train-only selected IDs for a fixed intervention arm."""
+
+    path: Path
+    sha256: str
+    selected_ids_sha256: str
+    selected_count: int = Field(gt=0)
+    selected_class_counts: dict[str, int]
+    provenance: InterventionMaskProvenanceConfig
+
+    @model_validator(mode="after")
+    def validate_mask(self) -> InterventionMaskConfig:
+        for name, value in (("sha256", self.sha256), ("selected_ids_sha256", self.selected_ids_sha256)):
+            if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+                raise ValueError(f"intervention mask {name} must be a lowercase 64-character digest")
+        counts: dict[int, int] = {}
+        for raw_class, count in self.selected_class_counts.items():
+            try:
+                class_id = int(raw_class)
+            except ValueError as exc:
+                raise ValueError("intervention mask class-count keys must be integer strings") from exc
+            if str(class_id) != raw_class or class_id < 0 or count < 0:
+                raise ValueError("intervention mask class counts must be non-negative canonical integer mappings")
+            counts[class_id] = count
+        if sum(counts.values()) != self.selected_count:
+            raise ValueError("intervention mask selected_count must equal its selected_class_counts total")
+        return self
+
+
+class InterventionConfig(StrictModel):
+    """Registered, precommitted arm semantics for the H3 factorial continuation."""
+
+    arm: Literal["C", "HS", "RS", "HD", "RD"]
+    selector: Literal["none", "student_history", "class_matched_random"]
+    kind: Literal["ordinary_rslad", "uniform_target_softening", "adversarial_kd_downweight"]
+    parent: InterventionParentConfig
+    mask: InterventionMaskConfig | None = None
+    uniform_target_softening_rho: float = Field(default=0.5, ge=0, le=1)
+    adversarial_kd_multiplier: float = Field(default=0.5, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_registered_arm(self) -> InterventionConfig:
+        expected = {
+            "C": ("none", "ordinary_rslad", False),
+            "HS": ("student_history", "uniform_target_softening", True),
+            "RS": ("class_matched_random", "uniform_target_softening", True),
+            "HD": ("student_history", "adversarial_kd_downweight", True),
+            "RD": ("class_matched_random", "adversarial_kd_downweight", True),
+        }[self.arm]
+        if (self.selector, self.kind, self.mask is not None) != expected:
+            raise ValueError("intervention arm must use its registered selector, treatment, and mask presence")
+        if self.uniform_target_softening_rho != 0.5 or self.adversarial_kd_multiplier != 0.5:
+            raise ValueError("the registered intervention screen fixes both treatment strengths at 0.5")
+        if self.mask is not None:
+            parent = self.parent
+            provenance = self.mask.provenance
+            if (
+                provenance.parent_checkpoint_sha256 != parent.checkpoint_sha256
+                or provenance.parent_sample_state_sha256 != parent.sample_state_sha256
+            ):
+                raise ValueError("intervention mask provenance must bind the exact parent checkpoint and sample state")
+            if self.selector == "student_history" and provenance.source != "seed0_bartoldson_frozen_predictor":
+                raise ValueError("history-selected arms require frozen predictor provenance")
+            if self.selector == "class_matched_random" and provenance.source != "class_matched_random":
+                raise ValueError("random-selected arms require class-matched random provenance")
+        return self
+
+
 class EvaluationConfig(StrictModel):
     """Saved-checkpoint evaluation contract; no training-time signal is exposed."""
 
@@ -579,6 +764,7 @@ class ExperimentConfig(StrictModel):
     training: TrainingConfig
     tracking: TrackingConfig = Field(default_factory=TrackingConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
+    intervention: InterventionConfig | None = None
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     output_dir: Path = Path("outputs/dev")
     # Compatibility with M1 checkpoints/configs.  New paths use tracking.run_id.
@@ -653,6 +839,16 @@ class ExperimentConfig(StrictModel):
             raise ValueError("oracle_mask is scientific/dev-only and is forbidden for smoke, repro, and production")
         if self.method.id == "rslad_frozen_oracle_softening" and self.tier not in {"dev", "production"}:
             raise ValueError("rslad_frozen_oracle_softening permits only dev tests or guarded production runs")
+        if self.intervention is not None:
+            if self.method.id != "rslad" or self.method.target_policy is not None:
+                raise ValueError("intervention arms require baseline method=rslad without a method target policy")
+            if self.observation.profile != "teacher_response":
+                raise ValueError("intervention arms require teacher_response parent-compatible observations")
+            if (
+                self.teacher is None
+                or self.teacher.checkpoint_sha256 != self.intervention.parent.teacher_checkpoint_sha256
+            ):
+                raise ValueError("intervention parent teacher SHA must exactly match the arm teacher")
         if self.observation.records_teacher_response and self.teacher is None:
             raise ValueError("observation.profile=teacher_response requires a frozen teacher")
         if self.teacher is not None and self.teacher.source == "fixture" and self.tier not in {"dev", "smoke"}:

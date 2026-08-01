@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+import copy
+import hashlib
+import json
 from collections.abc import Sized
+from dataclasses import asdict
 from pathlib import Path
 from typing import cast
 
+import numpy as np
 import pytest
 import torch
+import yaml
 from torch import nn
 from torch.optim import SGD
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
+from ard.analysis.intervention_fork import build_parent_artifact_attestation, create_intervention_forks
 from ard.attacks import LinfPGD
 from ard.attacks.base import AttackResult
+from ard.config import ExperimentConfig
+from ard.config.loader import resolved_config_dict
 from ard.config.schema import AttackConfig, ModelConfig, SchedulerConfig
 from ard.data import (
     EpochShuffleSampler,
@@ -23,13 +32,13 @@ from ard.data import (
     collate_indexed,
     stratified_train_validation_split,
 )
-from ard.engine.checkpoint import REQUIRED_KEYS, load_checkpoint, save_checkpoint
+from ard.engine.checkpoint import REQUIRED_KEYS, config_digest, load_checkpoint, save_checkpoint
 from ard.engine.trainer import Trainer
 from ard.models import build_student
 from ard.objectives import ObjectiveTerms, PGDATObjective, RSLADObjective
-from ard.policies import EntropyOnlyPolicy, RSLADBaselinePolicy
+from ard.policies import EntropyOnlyPolicy, RSLADBaselinePolicy, selected_ids_sha256
 from ard.schedules import build_scheduler
-from ard.state import SampleStateStore
+from ard.state import SampleRecord, SampleStateStore
 from ard.tracking import NullTracker, coordinated_tracker_action
 from ard.tracking.diagnostics import TrainingDiagnostics
 
@@ -413,6 +422,376 @@ def test_epoch_boundary_resume_matches_uninterrupted_training(tmp_path: Path) ->
         assert uninterrupted_epoch["train_teacher_adversarial_forward_calls"] == 0.0
 
 
+def test_fork_lineage_survives_one_epoch_and_strict_resume_without_relaxing_checkpoint_identity(tmp_path: Path) -> None:
+    lineage = {"kind": "common_state_intervention_v1", "screen_id": "a" * 64, "post_fork_best_scope": True}
+    first = make_trainer(tmp_path / "fork", seed=9)
+    first.fork_lineage = dict(lineage)
+    loader, validation_loader, _ = make_loaders()
+    first.fit(loader, validation_loader=validation_loader, epochs=1)
+    initial = torch.load(tmp_path / "fork" / "last.pt", map_location="cpu", weights_only=False)
+    assert initial["fork_lineage"] == lineage
+
+    resumed = make_trainer(tmp_path / "fork", seed=9)
+    resumed_loader, resumed_validation_loader, resumed_sampler = make_loaders()
+    state = resumed.resume(tmp_path / "fork" / "last.pt", sampler=resumed_sampler)
+    assert state.fork_lineage == lineage and resumed.fork_lineage == lineage
+    resumed.fit(resumed_loader, validation_loader=resumed_validation_loader, epochs=2, start_epoch=state.next_epoch)
+    final = torch.load(tmp_path / "fork" / "last.pt", map_location="cpu", weights_only=False)
+    assert final["fork_lineage"] == lineage
+
+
+def test_c_fork_continuation_is_exact_parity_for_one_optimizer_epoch(tmp_path: Path) -> None:
+    def make(output: Path, *, config_hash: str, tracker_run_id: str) -> Trainer:
+        torch.manual_seed(31)
+        student = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
+        torch.manual_seed(37)
+        teacher = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
+        optimizer = SGD(student.parameters(), lr=0.03, momentum=0.9)
+        return Trainer(
+            model=student,
+            teacher=teacher,
+            optimizer=optimizer,
+            scheduler=StepLR(optimizer, step_size=1),
+            scaler=None,
+            attack=LinfPGD(
+                AttackConfig(
+                    loss="kl",
+                    kl_target="teacher_clean",
+                    epsilon="1/255",
+                    step_size="1/255",
+                    steps=1,
+                    random_start=True,
+                )
+            ),
+            selection_attack=LinfPGD(
+                AttackConfig(
+                    loss="ce",
+                    epsilon="1/255",
+                    step_size="1/255",
+                    steps=1,
+                    random_start=True,
+                    student_mode="eval",
+                    teacher_mode="eval",
+                )
+            ),
+            objective=RSLADObjective(),
+            policy=RSLADBaselinePolicy(),
+            device=torch.device("cpu"),
+            output_dir=output,
+            config_hash=config_hash,
+            seed=9,
+            tracker_run_id=tracker_run_id,
+        )
+
+    # The parent config is deliberately the registered controlled protocol,
+    # while the executable model is a tiny CPU fixture.  Fork construction
+    # validates its immutable control-plane state; continuation below proves
+    # that the returned C checkpoint itself retains executable state exactly.
+    raw: dict[str, object] = {
+        "schema_version": 2,
+        "protocol": {"id": "controlled_cifar10_r18_v1"},
+        "tier": "dev",
+        "seeds": {
+            "split": 20260722,
+            "model_init": 0,
+            "data_order": 0,
+            "augmentation": 0,
+            "train_attack": 0,
+            "evaluation_attack": 0,
+            "qualitative_panel": 0,
+        },
+        "dataset": {"name": "cifar10", "root": str(tmp_path / "cifar"), "num_classes": 10},
+        "student": {
+            "architecture": "saad_resnet18_cifar_v1",
+            "num_classes": 10,
+            "normalization": {"profile": "cifar10_raw_identity"},
+        },
+        "teacher": {
+            "source": "robustbench",
+            "architecture": "robustbench_wide_resnet",
+            "num_classes": 10,
+            "normalization": {"profile": "robustbench_cifar10_bartoldson_embedded"},
+            "preprocessing_owner": "model_embedded",
+            "checkpoint": str(tmp_path / "teacher.pt"),
+            "checkpoint_sha256": "e" * 64,
+            "registry_id": "bartoldson2024_adversarial_wrn94_16",
+        },
+        "method": {
+            "id": "rslad",
+            "version": 1,
+            "attack": {"loss": "kl", "kl_target": "teacher_clean"},
+            "selection_attack": {"loss": "ce", "steps": 20},
+        },
+        "optimizer": {"id": "sgd", "learning_rate": 0.1, "momentum": 0.9, "weight_decay": 0.0005, "nesterov": False},
+        "scheduler": {"id": "multistep", "milestones": [100, 150], "gamma": 0.1, "step_at": "epoch_end"},
+        "training": {"epochs": 200, "per_rank_batch_size": 128, "global_batch_size": 128, "validation_fraction": 0.1},
+        "observation": {"profile": "teacher_response"},
+        "output_dir": str(tmp_path / "parent"),
+        "intervention": None,
+    }
+    parent = ExperimentConfig.model_validate(raw)
+    raw = resolved_config_dict(parent)
+    raw_hash = config_digest(raw)
+    parent_config = tmp_path / "parent.yaml"
+    parent_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    loader_a, validation_a, sampler_a = make_loaders(seed=0)
+    loader_b, validation_b, sampler_b = make_loaders(seed=0)
+    parent_checkpoint = tmp_path / "parent.pt"
+    parent_trainer = make(tmp_path / "parent-runtime", config_hash=raw_hash, tracker_run_id="parent-run")
+    record = asdict(
+        SampleRecord(
+            0.0,
+            100,
+            0,
+            False,
+            0,
+            0,
+            true_label=0,
+            teacher_clean_entropy=0.1,
+            teacher_clean_true_probability=0.8,
+            teacher_clean_max_wrong_probability=0.1,
+            teacher_clean_prediction=0,
+            teacher_clean_correct=True,
+            teacher_adversarial_entropy=0.2,
+            teacher_adversarial_true_probability=0.7,
+            teacher_adversarial_max_wrong_probability=0.2,
+            teacher_adversarial_prediction=0,
+            teacher_adversarial_correct=True,
+            teacher_clean_to_adversarial_margin_response=-0.2,
+            teacher_clean_to_adversarial_js_response=0.01,
+            history_statistics_complete=True,
+        )
+    )
+    sample_state = {
+        "format_version": 3,
+        "ema_decay": 0.9,
+        "records": {str(index): copy.deepcopy(record) for index in range(45_000)},
+        "pending": [],
+        "next_order": 0,
+    }
+    common = dict(
+        epoch=99,
+        model=parent_trainer.model,
+        optimizer=parent_trainer.optimizer,
+        scheduler=parent_trainer.scheduler,
+        scaler=None,
+        sampler=sampler_a,
+        sample_state=sample_state,
+        global_step=35_200,
+        best_metric=0.7,
+        selection_metadata={"metric": "val_pgd_accuracy", "selected_epoch": 42},
+        tracker_run_id="parent-run",
+        config_hash=raw_hash,
+    )
+    save_checkpoint(parent_checkpoint, **common)
+    parent_payload = torch.load(parent_checkpoint, map_location="cpu", weights_only=False)
+    parent_payload["rng"][0]["torch_cuda"] = [torch.tensor([0], dtype=torch.uint8)]
+    parent_payload["sampler_epoch"] = [99]
+    parent_payload["sampler_state"] = [{"epoch": 99, "seed": 0, "rank": 0, "world_size": 1, "shuffle": True}]
+    torch.save(parent_payload, parent_checkpoint)
+    parent_sha = hashlib.sha256(parent_checkpoint.read_bytes()).hexdigest()
+    partition_rows = [[index, 0] for index in range(45_000)]
+    partition_digest = hashlib.sha256(
+        json.dumps(partition_rows, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    partition = tmp_path / "partition.json"
+    partition.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "namespace": "train",
+                "ids_labels": partition_rows,
+                "ids_labels_sha256": partition_digest,
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "config_hash": raw_hash,
+                "run_id": "parent-run",
+                "git": {"sha": "a" * 40},
+                "teacher": {"checkpoint_sha256": "e" * 64},
+            }
+        ),
+        encoding="utf-8",
+    )
+    inventory = tmp_path / "inventory.json"
+    inventory.write_text(
+        json.dumps(
+            {
+                "artifact": {
+                    "name": "model-parent-run-last",
+                    "version": "v19",
+                    "digest": "d" * 32,
+                    "checkpoint_sha256": parent_sha,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    attestation = tmp_path / "attestation.json"
+    attestation.write_text(
+        json.dumps(
+            build_parent_artifact_attestation(
+                parent_manifest=manifest, artifact_inventory=inventory, checkpoint=parent_checkpoint
+            ),
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    parent_fields = {
+        "sample_state_sha256": hashlib.sha256(
+            json.dumps(sample_state, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        ).hexdigest(),
+        "train_partition_manifest": str(partition),
+        "train_partition_manifest_sha256": hashlib.sha256(partition.read_bytes()).hexdigest(),
+        "train_partition_ids_labels_sha256": partition_digest,
+        "artifact_attestation": str(attestation),
+        "artifact_attestation_sha256": hashlib.sha256(attestation.read_bytes()).hexdigest(),
+        "artifact_inventory": str(inventory),
+        "artifact_inventory_sha256": hashlib.sha256(inventory.read_bytes()).hexdigest(),
+    }
+    selector_spec = tmp_path / "selector.json"
+    selector_spec.write_text(
+        json.dumps(
+            {
+                "confirmatory_design_sha256": "a0a7fe0e70fcc8aaf519440012900c7bd8e6db92a8f0143d06892fca1146dd38",
+                "predictor_spec_sha256": "d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12",
+                "seed0_report_sha256": "d44ee166f8866b77067ebd07757d394a060242c9cf1cdc5d4513f127897981f8",
+                "seed0_lineage_sha256": "9b6ea091dc9ed4ff81bb579bf05d6650ac8e6d4ab6104981c446f29069e4a64e",
+                "anchor_epoch": 99,
+                "input_namespace": "train_sample_state_only",
+                "coefficients_sha256": "a" * 64,
+                "preprocessing_sha256": "b" * 64,
+            }
+        ),
+        encoding="utf-8",
+    )
+    selector_sha = hashlib.sha256(selector_spec.read_bytes()).hexdigest()
+
+    def mask(path: Path, sample_id: int, provenance: dict[str, object]) -> dict[str, object]:
+        payload = {
+            "schema_version": 1,
+            "namespace": "train",
+            "num_classes": 10,
+            "selected_ids": [sample_id],
+            "selected_ids_sha256": selected_ids_sha256((sample_id,)),
+            "selected_count": 1,
+            "selected_class_counts": {"0": 1},
+            "provenance": provenance,
+        }
+        path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+        return {
+            "path": str(path),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "selected_ids_sha256": payload["selected_ids_sha256"],
+            "selected_count": 1,
+            "selected_class_counts": {"0": 1},
+            "provenance": provenance,
+        }
+
+    history = mask(
+        tmp_path / "history.json",
+        0,
+        {
+            "source": "seed0_bartoldson_frozen_predictor",
+            "approved_selector_spec_sha256": selector_sha,
+            "selector_spec_path": str(selector_spec),
+            "parent_checkpoint_sha256": parent_sha,
+            "parent_sample_state_sha256": parent_fields["sample_state_sha256"],
+            "random_seed": None,
+            "generator": None,
+            "generator_version": None,
+            "reference_history_mask_sha256": None,
+            "reference_selected_count": None,
+            "reference_selected_class_counts": None,
+            "reference_history_selector_spec_sha256": None,
+        },
+    )
+    random = mask(
+        tmp_path / "random.json",
+        1,
+        {
+            "source": "class_matched_random",
+            "approved_selector_spec_sha256": None,
+            "selector_spec_path": None,
+            "parent_checkpoint_sha256": parent_sha,
+            "parent_sample_state_sha256": parent_fields["sample_state_sha256"],
+            "random_seed": 17,
+            "generator": "numpy_pcg64",
+            "generator_version": "1",
+            "reference_history_mask_sha256": history["sha256"],
+            "reference_selected_count": 1,
+            "reference_selected_class_counts": {"0": 1},
+            "reference_history_selector_spec_sha256": selector_sha,
+        },
+    )
+    arms: list[Path] = []
+    for arm, selector, kind, arm_mask in (
+        ("C", "none", "ordinary_rslad", None),
+        ("HS", "student_history", "uniform_target_softening", history),
+        ("RS", "class_matched_random", "uniform_target_softening", random),
+        ("HD", "student_history", "adversarial_kd_downweight", history),
+        ("RD", "class_matched_random", "adversarial_kd_downweight", random),
+    ):
+        child = copy.deepcopy(raw)
+        child["output_dir"] = str(tmp_path / "screen" / arm)
+        child["intervention"] = {
+            "arm": arm,
+            "selector": selector,
+            "kind": kind,
+            "parent": {
+                "checkpoint_sha256": parent_sha,
+                "raw_config_sha256": raw_hash,
+                "git_sha": "a" * 40,
+                "epoch": 99,
+                "world_size": 1,
+                "teacher_checkpoint_sha256": "e" * 64,
+                "sample_state_records": 45_000,
+                **parent_fields,
+            },
+            "mask": arm_mask,
+        }
+        path = tmp_path / f"{arm}.yaml"
+        path.write_text(yaml.safe_dump(child), encoding="utf-8")
+        arms.append(path)
+    created = create_intervention_forks(
+        parent_checkpoint=parent_checkpoint,
+        parent_resolved_config=parent_config,
+        parent_manifest=manifest,
+        arm_config_paths=arms,
+        root=Path.cwd(),
+        git_state_collector=lambda _root: {"sha": "b" * 40, "dirty": False},
+    )
+    # The returned C checkpoint, rather than a hand-written copy, is resumed.
+    c_payload = torch.load(created["C"], map_location="cpu", weights_only=False)
+    ordinary_path = tmp_path / "ordinary" / "last.pt"
+    ordinary_path.parent.mkdir()
+    ordinary_payload = copy.deepcopy(c_payload)
+    ordinary_payload.pop("fork_lineage")
+    torch.save(ordinary_payload, ordinary_path)
+    ordinary = make(
+        tmp_path / "ordinary",
+        config_hash=str(c_payload["config_hash"]),
+        tracker_run_id=str(c_payload["tracker_run_id"]),
+    )
+    c_fork = make(
+        created["C"].parent, config_hash=str(c_payload["config_hash"]), tracker_run_id=str(c_payload["tracker_run_id"])
+    )
+    ordinary.resume(ordinary_path, sampler=sampler_a)
+    ordinary.fit(loader_a, validation_loader=validation_a, epochs=101, start_epoch=100)
+    c_fork.resume(created["C"], sampler=sampler_b)
+    c_fork.fit(loader_b, validation_loader=validation_b, epochs=101, start_epoch=100)
+    left = torch.load(tmp_path / "ordinary" / "last.pt", map_location="cpu", weights_only=False)
+    right = torch.load(created["C"], map_location="cpu", weights_only=False)
+    for key in REQUIRED_KEYS:
+        assert _state_equal(left[key], right[key]), key
+    assert right["fork_lineage"]["kind"] == "common_state_intervention_v1"
+
+
 def _advance_optimizer_and_schedule(optimizer: SGD, scheduler: object, *, completed_epochs: int) -> None:
     for _ in range(completed_epochs):
         for group in optimizer.param_groups:
@@ -424,6 +803,8 @@ def _advance_optimizer_and_schedule(optimizer: SGD, scheduler: object, *, comple
 
 
 def _state_equal(left: object, right: object) -> bool:
+    if isinstance(left, np.ndarray) and isinstance(right, np.ndarray):
+        return np.array_equal(left, right)
     if isinstance(left, torch.Tensor) and isinstance(right, torch.Tensor):
         return torch.equal(left, right)
     if isinstance(left, dict) and isinstance(right, dict):
