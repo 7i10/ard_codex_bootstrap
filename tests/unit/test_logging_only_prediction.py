@@ -24,7 +24,12 @@ from ard.cli import logging_only_prediction as prediction_cli
 
 
 def _export(
-    *, run_id: str = "run-1", duplicate: bool = False, leakage: bool = False, outcome_mismatch: bool = False
+    *,
+    run_id: str = "run-1",
+    duplicate: bool = False,
+    noncontiguous: bool = False,
+    leakage: bool = False,
+    outcome_mismatch: bool = False,
 ) -> dict[str, object]:
     source_files = {"analysis": "a" * 64, "cli": "b" * 64}
     source_sha256 = hashlib.sha256(json.dumps(source_files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -32,7 +37,13 @@ def _export(
     for sample_id in range(EXPECTED_COUNT):
         forgetting = sample_id % 3 == 0
         row: dict[str, object] = {
-            "sample_id": 0 if duplicate and sample_id == EXPECTED_COUNT - 1 else sample_id,
+            "sample_id": (
+                0
+                if duplicate and sample_id == EXPECTED_COUNT - 1
+                else 49999
+                if noncontiguous and sample_id == EXPECTED_COUNT - 1
+                else sample_id
+            ),
             "true_label": sample_id % 10,
             "anchor_teacher_adversarial_entropy": 0.5,
             "anchor_previous_robust_correct": sample_id % 2 == 0,
@@ -92,6 +103,13 @@ def test_state_export_rejects_tampered_hash_bound_identity() -> None:
         _prepare_rows(export)
 
 
+def test_state_export_accepts_noncontiguous_cifar_source_ids() -> None:
+    _, rows, _ = _prepare_rows(_export(noncontiguous=True))
+    assert len(rows) == EXPECTED_COUNT
+    assert max(int(row["sample_id"]) for row in rows) == 49999
+    assert 44999 not in {int(row["sample_id"]) for row in rows}
+
+
 def test_frozen_feature_sets_and_history_current_decision_shape() -> None:
     row = {
         "teacher": 0.4,
@@ -145,6 +163,19 @@ def test_block_rejects_missing_or_swapped_frozen_run_ids() -> None:
     swapped["L1"] = {"identity": {"run_id": EXPECTED_RUN_IDS["L2"]}}
     with pytest.raises(LoggingOnlyPredictionError, match="L1 does not bind"):
         analyze_logging_only_exports(swapped)
+
+
+@pytest.mark.parametrize("drift", ["membership", "label"])
+def test_block_rejects_cross_run_source_membership_or_label_drift(drift: str) -> None:
+    exports = {label: _export(run_id=EXPECTED_RUN_IDS[label]) for label in ("L1", "L2", "L3", "L4")}
+    rows = exports["L2"]["rows"]
+    assert isinstance(rows, list) and isinstance(rows[-1], dict)
+    if drift == "membership":
+        rows[-1]["sample_id"] = 49999
+    else:
+        rows[-1]["true_label"] = (int(rows[-1]["true_label"]) + 1) % 10
+    with pytest.raises(LoggingOnlyPredictionError, match="sample-ID to true-label"):
+        analyze_logging_only_exports(exports)
 
 
 def test_cli_report_binds_exact_consumed_input_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

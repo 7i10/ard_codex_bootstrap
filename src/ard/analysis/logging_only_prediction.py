@@ -37,6 +37,7 @@ EXPORT_CONTRACT = "logging_only_exact_state_anchor99_final199_v1"
 PREDICTION_CONTRACT = "logging_only_history_prediction_v1"
 EXPECTED_COUNT = 45000
 NUM_CLASSES = 10
+SOURCE_DATASET_COUNT = 50000
 RUN_LABELS = ("L1", "L2", "L3", "L4")
 CURRENT_BASELINES = ("current_correctness", "instantaneous_margin", "current_only")
 MODEL_ORDER = ("teacher_only", "student_only", "main_effects", "main_effects_plus_product", *CURRENT_BASELINES)
@@ -327,7 +328,7 @@ def _prepare_rows(export: Mapping[str, Any]) -> tuple[str, list[dict[str, Any]],
         _reject_feature_leakage(raw)
         sample_id = _require_int(raw.get("sample_id"), name="sample_id", minimum=0)
         class_id = _require_int(raw.get("true_label"), name="true_label", minimum=0)
-        if sample_id in seen or sample_id >= EXPECTED_COUNT or class_id >= NUM_CLASSES:
+        if sample_id in seen or sample_id >= SOURCE_DATASET_COUNT or class_id >= NUM_CLASSES:
             raise LoggingOnlyPredictionError("state export has duplicate/out-of-range stable IDs or class labels")
         seen.add(sample_id)
         entropy = _finite(raw.get("anchor_teacher_adversarial_entropy"), name="anchor teacher adversarial entropy")
@@ -372,8 +373,8 @@ def _prepare_rows(export: Mapping[str, Any]) -> tuple[str, list[dict[str, Any]],
                 "margin_ema_risk": (1.0 - margin_ema) / 2.0,
             }
         )
-    if seen != set(range(EXPECTED_COUNT)):
-        raise LoggingOnlyPredictionError("state export stable IDs must be exactly the 45000-source train partition")
+    if len(seen) != EXPECTED_COUNT:
+        raise LoggingOnlyPredictionError("state export must contain exactly 45000 unique CIFAR source IDs")
     return run_id, prepared, source_identity
 
 
@@ -531,12 +532,22 @@ def analyze_logging_only_exports(
             raise LoggingOnlyPredictionError(f"H2 label {label} does not bind its frozen expected run ID")
     design = load_frozen_design(design_path=design_path, block_path=block_path)
     run_ids: set[str] = set()
-    reports: dict[str, Any] = {}
+    reference_sample_labels: tuple[tuple[int, int], ...] | None = None
+    prepared_exports: dict[str, tuple[str, list[dict[str, Any]], dict[str, Any]]] = {}
     for label in sorted(exports):
         run_id, rows, source_identity = _prepare_rows(exports[label])
         if run_id in run_ids:
             raise LoggingOnlyPredictionError("H2 state exports contain duplicate run IDs")
         run_ids.add(run_id)
+        sample_labels = tuple(sorted((int(row["sample_id"]), int(row["class_id"])) for row in rows))
+        if reference_sample_labels is None:
+            reference_sample_labels = sample_labels
+        elif sample_labels != reference_sample_labels:
+            raise LoggingOnlyPredictionError("H2 trajectories do not share one exact sample-ID to true-label mapping")
+        prepared_exports[label] = (run_id, rows, source_identity)
+
+    reports: dict[str, Any] = {}
+    for label, (run_id, rows, source_identity) in prepared_exports.items():
         reports[label] = {
             "run_id": run_id,
             "source_identity": source_identity,
