@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from ard.analysis import logging_only_prediction
 from ard.analysis.logging_only_prediction import (
     EXPECTED_COUNT,
     EXPECTED_EXTERNAL_COMMITS,
@@ -356,6 +357,24 @@ def test_block_rejects_missing_or_swapped_frozen_run_ids() -> None:
         analyze_logging_only_exports(swapped)
 
 
+def test_dirty_analysis_identity_fails_before_expensive_export_preparation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exports = {label: {"identity": {"run_id": EXPECTED_RUN_IDS[label]}} for label in ("L1", "L2", "L3", "L4")}
+    monkeypatch.setattr(
+        logging_only_prediction,
+        "_tracked_clean_analysis_provenance",
+        lambda: (_ for _ in ()).throw(LoggingOnlyPredictionError("dirty")),
+    )
+    monkeypatch.setattr(
+        logging_only_prediction,
+        "_prepare_rows",
+        lambda _export: (_ for _ in ()).throw(AssertionError("expensive preparation started")),
+    )
+    with pytest.raises(LoggingOnlyPredictionError, match="dirty"):
+        analyze_logging_only_exports(exports)
+
+
 @pytest.mark.parametrize("drift", ["membership", "label"])
 def test_block_rejects_cross_run_source_membership_or_label_drift(monkeypatch: pytest.MonkeyPatch, drift: str) -> None:
     exports = {label: _export(run_id=EXPECTED_RUN_IDS[label]) for label in ("L1", "L2", "L3", "L4")}
@@ -368,7 +387,7 @@ def test_block_rejects_cross_run_source_membership_or_label_drift(monkeypatch: p
     else:
         rows[-1]["true_label"] = (int(rows[-1]["true_label"]) + 1) % 10
     with pytest.raises(LoggingOnlyPredictionError, match="sample-ID to true-label"):
-        analyze_logging_only_exports(exports)
+        analyze_logging_only_exports(exports, analysis_provenance={"test": "fixed"})
 
 
 def test_cli_report_binds_exact_consumed_input_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

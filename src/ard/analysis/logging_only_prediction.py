@@ -802,6 +802,10 @@ def analyze_logging_only_exports(
         identity = export.get("identity") if isinstance(export, Mapping) else None
         if not isinstance(identity, Mapping) or identity.get("run_id") != EXPECTED_RUN_IDS[label]:
             raise LoggingOnlyPredictionError(f"H2 label {label} does not bind its frozen expected run ID")
+    # Establish the immutable analysis identity before parsing four 300 MB
+    # exports or running the bootstrap.  A dirty worktree must fail in seconds,
+    # not after the expensive numerical analysis has completed.
+    provenance = _tracked_clean_analysis_provenance() if analysis_provenance is None else dict(analysis_provenance)
     design = load_frozen_design(design_path=design_path, block_path=block_path)
     run_ids: set[str] = set()
     reference_sample_labels: tuple[tuple[int, int], ...] | None = None
@@ -828,7 +832,6 @@ def analyze_logging_only_exports(
             "source_identity": source_identity,
             **trajectory_reports[label],
         }
-    provenance = _tracked_clean_analysis_provenance() if analysis_provenance is None else dict(analysis_provenance)
     bartoldson_ready = all(
         reports.get(label, {}).get("history_vs_best_current", {}).get("decision") == "go" for label in ("L1", "L3")
     )
