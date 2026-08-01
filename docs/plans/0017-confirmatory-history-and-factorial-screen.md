@@ -4,8 +4,8 @@
 
 - Owner: main thread; shell processes own GPU execution
 - Branch / base SHA: `cleanup/observability-first` / `ad6d26e1c15d90eeb8c1d8b10cfa081a433364b9`
-- Current milestone: H2 complete (all four trajectories History Go); H3 is a post-H2 prospective intervention screen v2 and has not launched
-- Last updated: 2026-08-01
+- Current milestone: H4 five-arm continuation active from the exact epoch-99 L3 parent
+- Last updated: 2026-08-02
 
 ## Goal
 
@@ -251,6 +251,16 @@ during waiting. No watchdog/recovery agent is used.
   directories reproduced the same coefficients, selected-ID hashes, and class
   counts. The five-arm launch drops the previously proposed short C parity in
   favor of static identity checks and within-host primary contrasts.
+- 2026-08-02: the random-control sequential replication rule was fixed and
+  pushed as `561025c` before H4 outcomes. The five checkpoints were created
+  transactionally at clean fork SHA `6d77338...` from epoch-99 parent SHA
+  `44ac2edb...`; copied HS/RS bytes matched Ferret exactly. HS/RS launched on
+  Hamster GPUs 0/1 and C/HD/RD on Ferret GPUs 0/1/2 with online W&B IDs
+  `bart-h3-{hs,rs,c,hd,rd}-s2-20260802-v1`. All five completed finite epoch
+  100: Hamster throughput was `206.5/202.2` images/s and Ferret throughput was
+  `166.7/173.6/165.6` images/s. Epoch-100 validation PGD was
+  `50.62/50.40/50.50/50.56/50.44%` for HS/RS/C/HD/RD. These early values are
+  launch evidence only and are not used for an intervention conclusion.
 
 ## Completion report
 
