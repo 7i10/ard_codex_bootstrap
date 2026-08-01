@@ -12,6 +12,7 @@ import json
 import math
 import subprocess
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,7 @@ PREDICTION_CONTRACT = "logging_only_history_prediction_v1"
 EXPECTED_COUNT = 45000
 NUM_CLASSES = 10
 SOURCE_DATASET_COUNT = 50000
+MAX_TRAJECTORY_WORKERS = 4
 RUN_LABELS = ("L1", "L2", "L3", "L4")
 CURRENT_BASELINES = ("current_correctness", "instantaneous_margin", "current_only")
 MODEL_ORDER = ("teacher_only", "student_only", "main_effects", "main_effects_plus_product", *CURRENT_BASELINES)
@@ -514,6 +516,27 @@ def _trajectory_report(rows: Sequence[dict[str, Any]], *, design: _FrozenDesign)
     }
 
 
+def _trajectory_reports(
+    prepared_exports: Mapping[str, tuple[str, list[dict[str, Any]], dict[str, Any]]],
+    *,
+    design: _FrozenDesign,
+    workers: int = MAX_TRAJECTORY_WORKERS,
+) -> dict[str, dict[str, Any]]:
+    """Fit independent trajectories in bounded processes after identity validation."""
+    if isinstance(workers, bool) or not isinstance(workers, int) or not 1 <= workers <= MAX_TRAJECTORY_WORKERS:
+        raise LoggingOnlyPredictionError(f"trajectory workers must be in [1, {MAX_TRAJECTORY_WORKERS}]")
+    labels = tuple(sorted(prepared_exports))
+    if not labels:
+        raise LoggingOnlyPredictionError("trajectory reports require prepared exports")
+    if workers == 1:
+        return {label: _trajectory_report(prepared_exports[label][1], design=design) for label in labels}
+    with ProcessPoolExecutor(max_workers=min(workers, len(labels))) as executor:
+        futures = {
+            label: executor.submit(_trajectory_report, prepared_exports[label][1], design=design) for label in labels
+        }
+        return {label: futures[label].result() for label in labels}
+
+
 def analyze_logging_only_exports(
     exports: Mapping[str, Mapping[str, Any]],
     *,
@@ -546,12 +569,13 @@ def analyze_logging_only_exports(
             raise LoggingOnlyPredictionError("H2 trajectories do not share one exact sample-ID to true-label mapping")
         prepared_exports[label] = (run_id, rows, source_identity)
 
+    trajectory_reports = _trajectory_reports(prepared_exports, design=design)
     reports: dict[str, Any] = {}
     for label, (run_id, rows, source_identity) in prepared_exports.items():
         reports[label] = {
             "run_id": run_id,
             "source_identity": source_identity,
-            **_trajectory_report(rows, design=design),
+            **trajectory_reports[label],
         }
     provenance = _tracked_clean_analysis_provenance() if analysis_provenance is None else dict(analysis_provenance)
     bartoldson_ready = all(

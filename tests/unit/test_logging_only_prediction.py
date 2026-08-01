@@ -16,6 +16,7 @@ from ard.analysis.logging_only_prediction import (
     _FrozenDesign,
     _prepare_rows,
     _trajectory_report,
+    _trajectory_reports,
     analyze_logging_only_exports,
     load_frozen_design,
     load_state_export_with_provenance,
@@ -154,6 +155,28 @@ def test_frozen_feature_sets_and_history_current_decision_shape() -> None:
         "student_only_to_main_effects",
         "main_effects_to_main_effects_plus_product",
     }
+
+
+def test_parallel_trajectory_reports_match_sequential_fixture() -> None:
+    rows = [
+        {
+            "namespace": "train",
+            "sample_id": index,
+            "class_id": index % 10,
+            "outcome": int(index % 2 == 0),
+            "teacher": 0.1 + 0.8 * (index % 2),
+            "previous_correctness": float(index % 2),
+            "last_margin_risk": 0.2 + 0.6 * (index % 2),
+            "robust_correct_frequency": 0.2 + 0.6 * (index % 2),
+            "margin_ema_risk": 0.1 + 0.7 * (index % 2),
+        }
+        for index in range(100)
+    ]
+    design = _FrozenDesign("test", "a" * 64, "b" * 64, split_seed=1, bootstrap_seed=2, bootstrap_replicates=1)
+    prepared = {label: (label, rows, {}) for label in ("L1", "L2", "L3", "L4")}
+    assert _trajectory_reports(prepared, design=design, workers=4) == _trajectory_reports(
+        prepared, design=design, workers=1
+    )
 
 
 def test_block_rejects_missing_or_swapped_frozen_run_ids() -> None:
