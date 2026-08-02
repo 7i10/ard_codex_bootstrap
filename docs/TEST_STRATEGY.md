@@ -143,6 +143,21 @@ lock名と`CUDA_VISIBLE_DEVICES`を一致させます。GPU testを`pytest-xdist
 
 ## 9. 現在の実行境界
 
+大規模なcheckpoint replayは、full matrixをtest代わりに使いません。最初に実run・実checkpoint・実sparse
+source IDを使うone-checkpoint smokeを行い、公開CLIからParquet schema、lineage、stable-ID/class join、
+non-overwriting report書込までをend-to-endで確認します。feature/outcome/H4aが必要とする観測columnのunionは
+このsmoke前に固定し、GPU replay開始後にschemaを追加しません。
+
+各teacher/jobのone-checkpoint時間を測り、longest-processing-time-firstでGPUへ割り当てます。featureと
+outcomeに依存関係がなければ最初から別GPUで並列化します。checkpoint探索結果はrunごとに一つの
+hash-bound inventory JSONへ固定し、remote/localで再利用します。
+
+bootstrapはpoint estimateと別processにし、事前登録したpoint gateを通過した条件だけを対象にします。
+replicate数、seed、層別、estimatorを変えず、deterministic multiprocessingだけで高速化します。進捗は
+anchor/run/replicateとsource/contract hashを結び付けてatomicに保存し、同一fingerprintだけresume可能にします。
+定常化後のlarge replay analysisは、smoke、GPU replay、回収、point estimate、resumable bootstrapを含めて
+2時間以内を目標にします。
+
 Baseline-readiness M4では、8つのschema-v2 method（`pgd_at`、`trades`、`rslad`、`rslad_entropy`、
 `rslad_student`、`rslad_joint`、`rslad_joint_downweight`、`rslad_hard_fallback`）を同じengineで切り替える
 bounded one-epoch method-switch testを選択対象に含めます。M0–M4は承認済みで、M4 APIとimpact/cache契約は

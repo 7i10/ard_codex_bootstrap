@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from ard.analysis.history_screen import HistoryScreenError, analyze_history_screen
+from ard.analysis.history_screen import HistoryScreenError, analyze_history_screen, build_late_collection
 
 
 def _labeled_path(value: str) -> tuple[str, Path]:
@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
             option, action="append", required=True, type=_labeled_path, metavar="LABEL=PATH", help=help_text
         )
     parser.add_argument("--expected-count", required=True, type=_positive_int)
+    parser.add_argument("--cohort-inventory", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     return parser
 
@@ -67,6 +68,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         for label in sorted(labels)
     }
+    gate, bootstrap_tasks, cohort_sha256 = build_late_collection(
+        cohort_inventory=args.cohort_inventory.resolve(), reports=reports
+    )
     output = args.output.resolve()
     if output.exists():
         raise FileExistsError("refusing to overwrite an existing H5-Late report")
@@ -78,7 +82,14 @@ def main(argv: list[str] | None = None) -> int:
                 "schema_version": 1,
                 "contract": "h5_late_history_screen_collection_v2",
                 "expected_count": args.expected_count,
-                "runs": reports,
+                "runs": {
+                    label: {key: value for key, value in report.items() if key != "_bootstrap_rows"}
+                    for label, report in reports.items()
+                },
+                "cohort_inventory_sha256": cohort_sha256,
+                "primary_bootstrap_gate": gate,
+                "bootstrap_tasks": bootstrap_tasks,
+                "status": gate["status"],
             },
             allow_nan=False,
             sort_keys=True,

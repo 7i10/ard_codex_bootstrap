@@ -17,6 +17,7 @@ class ProtocolSpec:
     runnable_locally: bool
     local_train_reason: str | None
     metadata: Mapping[str, object]
+    required_resume_fork_kind: str | None = None
 
 
 _CONTROLLED_METADATA = MappingProxyType(
@@ -158,6 +159,18 @@ _PILOT_METADATA = MappingProxyType(
     }
 )
 
+# A normal, runnable protocol identity for the scheduler-only control.  Parent
+# provenance and its permitted delta are validated by the analysis fork tool;
+# train sees this as an ordinary strict experiment configuration.
+_DELAYED_MULTISTEP_METADATA = MappingProxyType(
+    {
+        **_CONTROLLED_METADATA,
+        "scheduler": MappingProxyType(
+            {"id": "multistep", "milestones": (120, 170), "gamma": 0.1, "step_at": "epoch_end"}
+        ),
+    }
+)
+
 
 def _pilot_metadata(epochs: int) -> Mapping[str, object]:
     return MappingProxyType(
@@ -210,6 +223,13 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_CONTROLLED_METADATA,
+        ),
+        "controlled_cifar10_r18_delayed_multistep_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_delayed_multistep_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_DELAYED_MULTISTEP_METADATA,
+            required_resume_fork_kind="delayed_multistep_schedule_control_v1",
         ),
         "controlled_cifar10_r18_pilot_v1": ProtocolSpec(
             id="controlled_cifar10_r18_pilot_v1",

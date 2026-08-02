@@ -9,8 +9,9 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from ard.analysis.history_cohort import HistoryCohortError, bind_reports_to_cohort, load_cohort_inventory
 from ard.analysis.rslad_signal_replay import FEATURE_EPOCHS, OUTCOME_EPOCHS, PANEL_EMA_BETA, repository_root_from_source
-from ard.analysis.signal_audit import SignalAuditError, binary_metrics, bootstrap_metric_delta, sha256_file
+from ard.analysis.signal_audit import SignalAuditError, binary_metrics, sha256_file
 
 
 class HistoryEarlyError(ValueError):
@@ -137,6 +138,7 @@ def _lineage(path: Path, obs: Path, key: str, count: int) -> dict[str, Any]:
         "run_id",
         "config_hash",
         "scientific_git_sha",
+        "seed",
         "attack_identity",
         "dataset_identity",
         "teacher",
@@ -194,11 +196,13 @@ def _score(panel: Mapping[int, Mapping[int, Mapping[str, Any]]], a: int) -> dict
 
 
 def _metric(scores: Mapping[int, float], y: Mapping[int, int]) -> dict[str, float | None]:
+    if not y:
+        return {"auroc": None, "auprc": None, "prevalence": None, "count": 0}
     try:
         r = binary_metrics([y[k] for k in sorted(y)], [scores[k] for k in sorted(y)])
     except SignalAuditError:
-        return {"auroc": None, "auprc": None, "prevalence": sum(y.values()) / len(y)}
-    return {"auroc": r["auroc"], "auprc": r["auprc"], "prevalence": r["prevalence"]}
+        return {"auroc": None, "auprc": None, "prevalence": sum(y.values()) / len(y), "count": len(y)}
+    return {"auroc": r["auroc"], "auprc": r["auprc"], "prevalence": r["prevalence"], "count": len(y)}
 
 
 def analyze_history_early(
@@ -257,6 +261,9 @@ def analyze_history_early(
         "input_identity": {
             "run_id": fmeta["run_id"],
             "config_hash": fmeta["config_hash"],
+            "scientific_git_sha": fmeta["scientific_git_sha"],
+            "seed": fmeta["seed"],
+            "teacher_registry_id": fmeta["teacher"].get("registry_id"),
             "feature_observations_sha256": sha256_file(feature_observations),
             "outcome_observations_sha256": sha256_file(outcome_observations),
             "feature_attack_domain": fmeta["feature_protocol"],
@@ -291,26 +298,7 @@ def collection_gate(reports: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
             "point_threshold_met": point_pass,
             "paired_lower_bound": None,
         }
-        if not point_pass:
-            result["status"] = "no_go_point_gate"
-        else:
-            bounds: dict[str, Any] = {}
-            try:
-                for label in ("L1", "L3"):
-                    sample_rows = reports[label]["_post_peak_gate_rows"][str(a)]
-                    bounds[label] = bootstrap_metric_delta(
-                        sample_rows,
-                        baseline=[float(row["baseline"]) for row in sample_rows],
-                        candidate=[float(row["candidate"]) for row in sample_rows],
-                        seed=2026073102,
-                        replicates=2000,
-                    )
-            except (KeyError, SignalAuditError, TypeError, ValueError):
-                result["status"] = "pending_paired_ci_inputs"
-            else:
-                result["paired_lower_bound"] = {label: float(bounds[label]["lower"]) for label in bounds}
-                result["paired_bootstrap"] = bounds
-                result["status"] = "pending_admissibility_review"
+        result["status"] = "point_gate_pass_bootstrap_task_required" if point_pass else "no_go_point_gate"
         rows[str(a)] = result
     return {
         "outcome": "post_peak_forgetting",
@@ -322,3 +310,318 @@ def collection_gate(reports: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
         "status": "sequential_no_automatic_go",
         "anchors": rows,
     }
+
+
+def _online_panel(path: Path, lineage_path: Path, expected_count: int) -> dict[int, dict[int, dict[str, Any]]]:
+    lineage = _json(lineage_path)
+    if (
+        lineage.get("contract") != "h5_online_state_anchor_v1"
+        or lineage.get("expected_count") != expected_count
+        or lineage.get("observations_sha256") != sha256_file(path)
+    ):
+        raise HistoryEarlyError("online state lineage is not the exact hash-bound anchor panel")
+    try:
+        import pyarrow.parquet as pq
+
+        rows = pq.read_table(path).to_pylist()
+    except Exception as exc:
+        raise HistoryEarlyError("online state observations are unreadable") from exc
+    # The revised primary route deliberately does not admit epoch 99 as an
+    # online feature anchor: it is too late to affect the scheduled peak.
+    expected_epochs = {39, 59, 79}
+    result = {epoch: {} for epoch in expected_epochs}
+    for row in rows:
+        epoch = _i(row.get("anchor_epoch"), "online epoch")
+        sample_id = _i(row.get("sample_id"), "online sample ID")
+        label = _i(row.get("true_label"), "online label")
+        if epoch not in result or label >= 10 or sample_id in result[epoch] or row.get("namespace") != "train":
+            raise HistoryEarlyError("online state row ID/epoch contract drifted")
+        hits = _i(row.get("robust_correct_count"), "online robust correct count")
+        frequency = _f(row.get("robust_correct_frequency_inclusive"), "online inclusive frequency", 0, 1)
+        if (
+            not isinstance(row.get("previous_robust_correct"), bool)
+            or hits > epoch + 1
+            or not math.isclose(frequency, hits / (epoch + 1), abs_tol=1e-7)
+        ):
+            raise HistoryEarlyError("online state inclusive correctness contract drifted")
+        margin_ema = _f(row.get("margin_ema"), "online margin EMA", -1, 1)
+        last_margin = _f(row.get("last_margin"), "online last margin", -1, 1)
+        result[epoch][sample_id] = {
+            "label": label,
+            "ok": row["previous_robust_correct"],
+            "frequency": frequency,
+            "ema": margin_ema,
+            "last": last_margin,
+        }
+    if any(len(rows_by_id) != expected_count for rows_by_id in result.values()):
+        raise HistoryEarlyError("online state lacks exact stable-ID coverage")
+    reference = next(iter(result.values()))
+    if any(
+        set(panel) != set(reference) or any(panel[sid]["label"] != reference[sid]["label"] for sid in reference)
+        for panel in result.values()
+    ):
+        raise HistoryEarlyError("online state stable ID/class join drifted")
+    return result
+
+
+def _precision_at_q(scores: Mapping[int, float], outcomes: Mapping[int, int]) -> float:
+    k = max(1, math.floor(0.1 * len(scores)))
+    chosen = sorted(scores, key=lambda sample_id: (-scores[sample_id], sample_id))[:k]
+    return sum(outcomes[sample_id] for sample_id in chosen) / k
+
+
+def _top_q(scores: Mapping[int, float]) -> set[int]:
+    k = max(1, math.floor(0.1 * len(scores)))
+    return set(sorted(scores, key=lambda sample_id: (-scores[sample_id], sample_id))[:k])
+
+
+def _selector_overlap(
+    candidate: Mapping[int, float], baseline: Mapping[int, float], outcomes: Mapping[int, int]
+) -> dict[str, Any]:
+    """Describe the actual 10% intervention masks, not only rank correlation."""
+    selected_candidate = _top_q(candidate)
+    selected_baseline = _top_q(baseline)
+    groups = {
+        "history_only": selected_candidate - selected_baseline,
+        "instantaneous_margin_only": selected_baseline - selected_candidate,
+        "shared": selected_candidate & selected_baseline,
+    }
+
+    def rate(ids: set[int]) -> dict[str, float | int | None]:
+        return {
+            "count": len(ids),
+            "outcome_prevalence": sum(outcomes[sample_id] for sample_id in ids) / len(ids) if ids else None,
+        }
+
+    union = selected_candidate | selected_baseline
+    return {
+        "q": 0.1,
+        "candidate_count": len(selected_candidate),
+        "baseline_count": len(selected_baseline),
+        "jaccard": len(groups["shared"]) / len(union) if union else None,
+        **{name: rate(ids) for name, ids in groups.items()},
+    }
+
+
+def analyze_history_early_online(
+    *,
+    online_states: Path,
+    online_lineage: Path,
+    feature_observations: Path,
+    feature_lineage: Path,
+    outcome_observations: Path,
+    outcome_lineage: Path,
+    expected_count: int,
+    analysis_provenance: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Primary revised-H5: online scores/risk sets with replay-only outcomes."""
+    panel = _online_panel(online_states, online_lineage, expected_count)
+    feature_meta = _lineage(feature_lineage, feature_observations, "feature_observations_sha256", expected_count)
+    outcome_meta = _lineage(outcome_lineage, outcome_observations, "outcome_observations_sha256", expected_count)
+    online_meta = _json(online_lineage)
+    identity_keys = (
+        "run_id",
+        "config_hash",
+        "scientific_git_sha",
+        "seed",
+        "attack_identity",
+        "dataset_identity",
+        "teacher",
+    )
+    if any(
+        online_meta.get(key) != feature_meta[key] or feature_meta[key] != outcome_meta[key] for key in identity_keys
+    ):
+        raise HistoryEarlyError("online/replay lineage identity drifted")
+    feature = _panel(_parquet(feature_observations), FEATURE_EPOCHS, expected_count, "feature replay")
+    replay = _panel(_parquet(outcome_observations), OUTCOME_EPOCHS, expected_count, "outcome replay")
+    if (
+        set(panel[39]) != set(feature[39])
+        or set(panel[39]) != set(replay[99])
+        or any(
+            panel[39][sid]["label"] != feature[39][sid]["c"] or panel[39][sid]["label"] != replay[99][sid]["c"]
+            for sid in panel[39]
+        )
+    ):
+        raise HistoryEarlyError("online/replay stable ID/class join drifted")
+    reports: dict[str, Any] = {}
+    raw: dict[str, Any] = {}
+    for anchor in (39, 59, 79):
+        anchor_correct = {sid for sid, row in panel[anchor].items() if row["ok"]}
+        anchor_wrong = set(panel[anchor]) - anchor_correct
+        rank = {
+            sid: value
+            for sid, value in _mid({sid: 1 - panel[anchor][sid]["frequency"] for sid in panel[anchor]}).items()
+        }
+        ema_rank = _mid({sid: (1 - panel[anchor][sid]["ema"]) / 2 for sid in panel[anchor]})
+        online_rank = {sid: (rank[sid] + ema_rank[sid]) / 2 for sid in panel[anchor]}
+        baseline = {sid: (1 - panel[anchor][sid]["last"]) / 2 for sid in panel[anchor]}
+        replay_rank = _score(feature, anchor)["adaptive_history"]
+        peak = {sid: int(sum(not replay[epoch][sid]["ok"] for epoch in (99, 104, 109)) >= 2) for sid in anchor_correct}
+        non_recovery = {sid: int(all(not replay[epoch][sid]["ok"] for epoch in (99, 104, 109))) for sid in anchor_wrong}
+        ro = {}
+        for sid in anchor_correct:
+            values = [replay[epoch][sid]["ok"] for epoch in range(109, 200, 5)]
+            ro[sid] = int(any(before and not after for before, after in zip(values, values[1:])))
+
+        def summary(outcomes: Mapping[int, int]) -> dict[str, Any]:
+            candidate = {sid: online_rank[sid] for sid in outcomes}
+            current = {sid: baseline[sid] for sid in outcomes}
+            replay_candidate = {sid: replay_rank[sid] for sid in outcomes}
+            return {
+                "online_rank": {
+                    **_metric(candidate, outcomes),
+                    "precision_at_10pct": _precision_at_q(candidate, outcomes) if outcomes else None,
+                },
+                "online_instantaneous_margin": {
+                    **_metric(current, outcomes),
+                    "precision_at_10pct": _precision_at_q(current, outcomes) if outcomes else None,
+                },
+                "top_10pct_mask_overlap": _selector_overlap(candidate, current, outcomes),
+                "replay_pre_anchor_rank_diagnostic": {
+                    "max_feature_epoch": anchor - 5,
+                    "metrics": {
+                        **_metric(replay_candidate, outcomes),
+                        "precision_at_10pct": _precision_at_q(replay_candidate, outcomes) if outcomes else None,
+                    },
+                    "top_10pct_mask_overlap_vs_instantaneous": _selector_overlap(replay_candidate, current, outcomes),
+                },
+            }
+
+        reports[str(anchor)] = {
+            "anchor_inclusive": True,
+            "anchor_correct_peak_failure": summary(peak),
+            "anchor_wrong_non_recovery": summary(non_recovery),
+            "robust_overfitting_secondary": {"gate_eligible": False, "metrics": summary(ro)},
+        }
+        raw[str(anchor)] = {
+            "peak": peak,
+            "non_recovery": non_recovery,
+            "online_rank": online_rank,
+            "baseline": baseline,
+            "class_id": {sid: panel[anchor][sid]["label"] for sid in panel[anchor]},
+        }
+    return {
+        "schema_version": 1,
+        "contract": "h5_early_online_primary_v1",
+        "status": "point_only",
+        "input_identity": {
+            **{key: outcome_meta[key] for key in identity_keys},
+            "teacher_registry_id": outcome_meta["teacher"].get("registry_id"),
+            "online_states_sha256": sha256_file(online_states),
+            "feature_observations_sha256": sha256_file(feature_observations),
+            "outcome_observations_sha256": sha256_file(outcome_observations),
+        },
+        "anchors": [39, 59, 79],
+        "reports": reports,
+        "analysis_provenance": dict(
+            _tracked_clean_provenance() if analysis_provenance is None else analysis_provenance
+        ),
+        "_bootstrap_inputs": raw,
+    }
+
+
+def build_online_bootstrap_tasks(
+    reports: Mapping[str, Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Create only jointly admissible Bartoldson confirmation bootstrap tasks.
+
+    L1/L3 are the pre-registered Bartoldson confirmation trajectories.  Other
+    labels remain visible in the point report but cannot create a bootstrap
+    task, so diagnostic runs never become accidental confirmation evidence.
+    """
+    primary_labels = ("L1", "L3")
+    tasks: list[dict[str, Any]] = []
+    gate: dict[str, Any] = {}
+    for anchor in (39, 59, 79):
+        for outcome_name, raw_key in (("peak_failure", "peak"), ("non_recovery", "non_recovery")):
+            per_run: dict[str, Any] = {}
+            ready = True
+            for label in primary_labels:
+                report = reports.get(label)
+                raw = report.get("_bootstrap_inputs", {}).get(str(anchor)) if isinstance(report, Mapping) else None
+                if not isinstance(raw, Mapping):
+                    per_run[label] = {"pass": False, "reason": "missing_primary_run"}
+                    ready = False
+                    continue
+                outcomes = raw.get(raw_key)
+                online_rank = raw.get("online_rank")
+                baseline = raw.get("baseline")
+                class_id = raw.get("class_id")
+                if not all(isinstance(value, Mapping) for value in (outcomes, online_rank, baseline, class_id)):
+                    per_run[label] = {"pass": False, "reason": "invalid_raw_contract"}
+                    ready = False
+                    continue
+                sample_ids = sorted(outcomes)
+                labels = [outcomes[sample_id] for sample_id in sample_ids]
+                if not sample_ids or not any(labels) or all(labels):
+                    per_run[label] = {"pass": False, "reason": "degenerate_outcome"}
+                    ready = False
+                    continue
+                candidate = [online_rank[sample_id] for sample_id in sample_ids]
+                current = [baseline[sample_id] for sample_id in sample_ids]
+                try:
+                    delta = binary_metrics(labels, candidate)["auroc"] - binary_metrics(labels, current)["auroc"]
+                    candidate_precision = _precision_at_q(
+                        {sample_id: online_rank[sample_id] for sample_id in sample_ids}, outcomes
+                    )
+                    baseline_precision = _precision_at_q(
+                        {sample_id: baseline[sample_id] for sample_id in sample_ids}, outcomes
+                    )
+                except (KeyError, TypeError, SignalAuditError):
+                    per_run[label] = {"pass": False, "reason": "metric_contract_failure"}
+                    ready = False
+                    continue
+                passed = delta >= 0.02 and candidate_precision >= baseline_precision - 0.01
+                per_run[label] = {
+                    "pass": passed,
+                    "delta_auroc": delta,
+                    "candidate_precision_at_10pct": candidate_precision,
+                    "instantaneous_precision_at_10pct": baseline_precision,
+                    "reason": "pass" if passed else "point_criterion_not_met",
+                }
+                ready &= passed
+            gate_key = f"epoch{anchor}-{outcome_name}"
+            gate[gate_key] = {
+                "primary_runs": per_run,
+                "pass": ready,
+                "criterion": "both L1/L3: delta AUROC >= 0.02 and candidate precision@10% >= instantaneous - 0.01",
+                "diagnostic_only_runs": sorted(set(reports) - set(primary_labels)),
+            }
+            if not ready:
+                continue
+            for label in primary_labels:
+                raw = reports[label]["_bootstrap_inputs"][str(anchor)]
+                outcomes = raw[raw_key]
+                sample_ids = sorted(outcomes)
+                tasks.append(
+                    {
+                        "task_id": f"{label}-epoch{anchor}-{outcome_name}",
+                        "run": label,
+                        "anchor": anchor,
+                        "outcome": outcome_name,
+                        "stratum": "online_anchor_correct" if outcome_name == "peak_failure" else "online_anchor_wrong",
+                        "point_gate_pass": True,
+                        "joint_primary_gate": gate_key,
+                        "rows": [
+                            {
+                                "sample_id": sample_id,
+                                "class_id": raw["class_id"][sample_id],
+                                "outcome": outcomes[sample_id],
+                                "baseline": raw["baseline"][sample_id],
+                                "candidate": raw["online_rank"][sample_id],
+                            }
+                            for sample_id in sample_ids
+                        ],
+                    }
+                )
+    return tasks, gate
+
+
+def bind_early_collection_to_cohort(*, cohort_inventory: Path, reports: Mapping[str, Mapping[str, Any]]) -> str:
+    """Bind a point-only H5-Early collection to the immutable L1--L4 inventory."""
+    try:
+        inventory, digest = load_cohort_inventory(cohort_inventory)
+        bind_reports_to_cohort(inventory=inventory, reports=reports)
+    except HistoryCohortError as exc:
+        raise HistoryEarlyError(str(exc)) from exc
+    return digest

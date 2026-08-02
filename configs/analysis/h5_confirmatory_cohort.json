@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "contract": "h5_confirmatory_cohort_inventory_v1",
+  "runs": {
+    "L1": {
+      "run_id": "bart-rslad-logging-only-s1-confirm-v1",
+      "config_hash": "13326f6b6395e6bc6aaf560f22c38c315b7b07f15957db4f452252f56cf90d2e",
+      "scientific_git_sha": "0fdfaeb5809e3b08a0825e2e5caf0bebfa215047",
+      "seed": 1,
+      "teacher_registry_id": "bartoldson2024_adversarial_wrn94_16"
+    },
+    "L2": {
+      "run_id": "chen-rslad-observed-s1-confirm-v2",
+      "config_hash": "250f24f553dfc3a7dbda13a5e3f0b3a165e8a1bf3247cc8c92d6ebe22b74aeda",
+      "scientific_git_sha": "8254a8899ae7373c2f541d108593e5c8185b26f5",
+      "seed": 1,
+      "teacher_registry_id": "chen2021_ltd_wrn34_10"
+    },
+    "L3": {
+      "run_id": "bart-rslad-observed-s2-confirm-v2",
+      "config_hash": "bc9fe4223e00c00a3add329166dc4a7441273fcc94f670f93def3927e805f054",
+      "scientific_git_sha": "8254a8899ae7373c2f541d108593e5c8185b26f5",
+      "seed": 2,
+      "teacher_registry_id": "bartoldson2024_adversarial_wrn94_16"
+    },
+    "L4": {
+      "run_id": "chen-rslad-observed-s2-confirm-v2",
+      "config_hash": "8986d2711a55ca635c27c8699da34087c2e54c00249584cf3e3f86ec2b85a1d7",
+      "scientific_git_sha": "8254a8899ae7373c2f541d108593e5c8185b26f5",
+      "seed": 2,
+      "teacher_registry_id": "chen2021_ltd_wrn34_10"
+    }
+  }
+}

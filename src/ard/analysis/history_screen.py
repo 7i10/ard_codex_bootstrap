@@ -10,6 +10,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from ard.analysis.history_cohort import HistoryCohortError, bind_reports_to_cohort, load_cohort_inventory
 from ard.analysis.intervention_selector import FEATURE_COLUMNS, FEATURE_NAMES
 from ard.analysis.rslad_signal_replay import repository_root_from_source
 from ard.analysis.signal_audit import SignalAuditError, _predict_logistic, binary_metrics, canonical_json, sha256_file
@@ -164,7 +165,7 @@ def _validate_feature_rows(rows: Sequence[Mapping[str, Any]], *, expected_count:
 
 def _validate_online_outcomes(
     value: Mapping[str, Any], *, expected_count: int
-) -> tuple[dict[str, Any], dict[int, tuple[int, int]]]:
+) -> tuple[dict[str, Any], dict[int, dict[str, Any]]]:
     if set(value) != {"identity", "rows"}:
         raise HistoryScreenError("online state export schema must contain identity and rows")
     identity, rows = value.get("identity"), value.get("rows")
@@ -193,7 +194,7 @@ def _validate_online_outcomes(
         or not isinstance(identity.get("config_hash"), str)
     ):
         raise HistoryScreenError("online state export lacks run/config identity")
-    output: dict[int, tuple[int, int]] = {}
+    output: dict[int, dict[str, Any]] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             raise HistoryScreenError("online state-export row must be a mapping")
@@ -218,7 +219,21 @@ def _validate_online_outcomes(
             or outcome != int(final_forgetting > anchor_forgetting)
         ):
             raise HistoryScreenError("online state export forgetting outcome is temporally inconsistent")
-        output[sample_id] = (class_id, outcome)
+        seen = _integer(row.get("anchor_seen"), name="anchor seen", minimum=1)
+        hits = _integer(row.get("anchor_robust_correct_count"), name="anchor robust correct count")
+        previous = _binary(row.get("anchor_previous_robust_correct"), name="anchor robust correctness")
+        ema = _finite(row.get("anchor_margin_ema"), name="anchor margin EMA", lower=-1.0, upper=1.0)
+        last = _finite(row.get("anchor_last_margin"), name="anchor last margin", lower=-1.0, upper=1.0)
+        if seen != ANCHOR_EPOCH + 1 or hits > seen:
+            raise HistoryScreenError("online anchor state is not inclusive through epoch 99")
+        output[sample_id] = {
+            "class_id": class_id,
+            "outcome": outcome,
+            "previous": previous,
+            "frequency": hits / seen,
+            "ema": ema,
+            "last": last,
+        }
     if len(output) != expected_count:
         raise HistoryScreenError("online state export row count differs from expected_count")
     return {
@@ -254,6 +269,7 @@ def _validate_lineage(*, lineage: Mapping[str, Any], feature_path: Path, expecte
     for field in (
         "config_hash",
         "scientific_git_sha",
+        "seed",
         "attack_identity",
         "dataset_identity",
         "teacher",
@@ -340,7 +356,19 @@ def _summary(ids: set[int], outcomes: Mapping[int, int]) -> dict[str, Any]:
     return {"count": len(ids), "outcome_count": positives, "outcome_rate": positives / len(ids) if ids else None}
 
 
-def _score_metrics(*, scores: Mapping[int, float], outcomes: Mapping[int, int], k: int) -> dict[str, float]:
+def _score_metrics(
+    *, scores: Mapping[int, float], outcomes: Mapping[int, int], k: int
+) -> dict[str, float | int | None]:
+    if not scores or k < 1 or not any(outcomes.values()) or all(outcomes.values()):
+        return {
+            "auroc": None,
+            "auprc": None,
+            "precision_at_k": None,
+            "recall_at_k": None,
+            "lift_at_k": None,
+            "positive_prevalence": sum(outcomes.values()) / len(outcomes) if outcomes else None,
+            "count": len(outcomes),
+        }
     ordered_ids = sorted(scores)
     try:
         metrics = binary_metrics(
@@ -358,6 +386,7 @@ def _score_metrics(*, scores: Mapping[int, float], outcomes: Mapping[int, int], 
         "recall_at_k": positives / sum(outcomes.values()),
         "lift_at_k": precision / float(metrics["prevalence"]),
         "positive_prevalence": float(metrics["prevalence"]),
+        "count": len(outcomes),
     }
 
 
@@ -380,7 +409,7 @@ def analyze_history_screen(
         _read_json(online_state_export, name="online state export"), expected_count=expected_count
     )
     if set(feature_rows) != set(outcome_rows) or any(
-        feature_rows[key]["class_id"] != outcome_rows[key][0] for key in feature_rows
+        feature_rows[key]["class_id"] != outcome_rows[key]["class_id"] for key in feature_rows
     ):
         raise HistoryScreenError("replay features and online outcomes do not have an exact stable-ID/class join")
     lineage = _validate_lineage(
@@ -394,44 +423,61 @@ def analyze_history_screen(
     if epoch99_sha != state_identity["anchor_checkpoint_sha256"]:
         raise HistoryScreenError("replay feature and online outcome exports do not share the epoch-99 checkpoint")
     weights, means, scales = _validate_fit(_read_json(frozen_fit, name="frozen fit"), lineage=lineage)
-    eligible = {sample_id: row for sample_id, row in feature_rows.items() if row["correct"] == 1}
-    if len(eligible) < 2:
-        raise HistoryScreenError("anchor-correct population is too small")
-    outcomes = {sample_id: outcome_rows[sample_id][1] for sample_id in eligible}
-    if not any(outcomes.values()) or all(outcomes.values()):
-        raise HistoryScreenError("anchor-correct population must contain both outcome classes")
+    eligible = {sample_id: row for sample_id, row in feature_rows.items() if outcome_rows[sample_id]["previous"] == 1}
+    outcomes = {sample_id: outcome_rows[sample_id]["outcome"] for sample_id in eligible}
     k = math.floor(Q * len(eligible))
-    if k < 1:
-        raise HistoryScreenError("q=0.10 yields an empty risk set")
-    feature_matrix = [[float(row[name]) for name in FEATURE_NAMES] for _, row in sorted(eligible.items())]
-    try:
-        fixed_values = _predict_logistic((weights, means, scales), feature_matrix)
-    except SignalAuditError as exc:
-        raise HistoryScreenError("frozen H2 predictor cannot score the replay feature panel") from exc
-    fixed_scores = {
-        sample_id: score for (sample_id, _), score in zip(sorted(eligible.items()), fixed_values, strict=True)
-    }
-    frequency_rank = _midrank_percentiles(
-        {sample_id: 1.0 - float(row[FEATURE_NAMES[0]]) for sample_id, row in eligible.items()}
-    )
-    margin_rank = _midrank_percentiles({sample_id: float(row[FEATURE_NAMES[1]]) for sample_id, row in eligible.items()})
-    adaptive_scores = {sample_id: (frequency_rank[sample_id] + margin_rank[sample_id]) / 2.0 for sample_id in eligible}
-    fixed_ids, adaptive_ids = _top_k(fixed_scores, k=k), _top_k(adaptive_scores, k=k)
+    if eligible:
+        feature_matrix = [[float(row[name]) for name in FEATURE_NAMES] for _, row in sorted(eligible.items())]
+        try:
+            fixed_values = _predict_logistic((weights, means, scales), feature_matrix)
+        except SignalAuditError as exc:
+            raise HistoryScreenError("frozen H2 predictor cannot score the replay feature panel") from exc
+        fixed_scores = {
+            sample_id: score for (sample_id, _), score in zip(sorted(eligible.items()), fixed_values, strict=True)
+        }
+        frequency_rank = _midrank_percentiles(
+            {sample_id: 1.0 - float(row[FEATURE_NAMES[0]]) for sample_id, row in eligible.items()}
+        )
+        margin_rank = _midrank_percentiles(
+            {sample_id: float(row[FEATURE_NAMES[1]]) for sample_id, row in eligible.items()}
+        )
+        adaptive_scores = {
+            sample_id: (frequency_rank[sample_id] + margin_rank[sample_id]) / 2.0 for sample_id in eligible
+        }
+        online_frequency_rank = _midrank_percentiles(
+            {sample_id: 1.0 - outcome_rows[sample_id]["frequency"] for sample_id in eligible}
+        )
+        online_ema_rank = _midrank_percentiles(
+            {sample_id: (1.0 - outcome_rows[sample_id]["ema"]) / 2.0 for sample_id in eligible}
+        )
+        online_rank = {
+            sample_id: (online_frequency_rank[sample_id] + online_ema_rank[sample_id]) / 2.0 for sample_id in eligible
+        }
+        online_instantaneous = {sample_id: (1.0 - outcome_rows[sample_id]["last"]) / 2.0 for sample_id in eligible}
+    else:
+        fixed_scores = adaptive_scores = online_rank = online_instantaneous = {}
+    fixed_ids = _top_k(fixed_scores, k=k) if k else set()
+    adaptive_ids = _top_k(adaptive_scores, k=k) if k else set()
     common, fixed_only, adaptive_only = fixed_ids & adaptive_ids, fixed_ids - adaptive_ids, adaptive_ids - fixed_ids
     provenance = dict(_tracked_clean_provenance() if analysis_provenance is None else analysis_provenance)
     fixed_metrics, adaptive_metrics = (
         _score_metrics(scores=fixed_scores, outcomes=outcomes, k=k),
         _score_metrics(scores=adaptive_scores, outcomes=outcomes, k=k),
     )
+    online_metrics = _score_metrics(scores=online_rank, outcomes=outcomes, k=k)
+    instantaneous_metrics = _score_metrics(scores=online_instantaneous, outcomes=outcomes, k=k)
     return {
         "schema_version": 1,
         "contract": REPORT_CONTRACT,
-        "diagnostic_only": True,
+        "status": "point_only",
         "q": Q,
         "analysis_provenance": provenance,
         "input_identity": {
             "run_id": lineage["run_id"],
             "config_hash": lineage["config_hash"],
+            "scientific_git_sha": lineage["scientific_git_sha"],
+            "seed": lineage["seed"],
+            "teacher_registry_id": lineage["teacher"].get("registry_id"),
             "feature_panel_sha256": sha256_file(feature_panel),
             "online_state_export_sha256": sha256_file(online_state_export),
             "lineage_sha256": sha256_file(replay_lineage),
@@ -439,7 +485,7 @@ def analyze_history_screen(
         },
         "population": {
             "all_rows": expected_count,
-            "anchor_correct_rows": len(eligible),
+            "anchor_online_correct_rows": len(eligible),
             "anchor_wrong_excluded_rows": expected_count - len(eligible),
             "k": k,
         },
@@ -453,15 +499,36 @@ def analyze_history_screen(
             "metrics": adaptive_metrics,
             "selected_ids_sha256": _hash_ids(sorted(adaptive_ids)),
         },
+        "deployable_online_scores": {
+            "online_rank_inclusive": {
+                "domain": "online_sample_state",
+                "max_feature_epoch": 99,
+                "anchor_inclusive": True,
+                "metrics": online_metrics,
+            },
+            "online_instantaneous_margin": {
+                "domain": "online_sample_state",
+                "max_feature_epoch": 99,
+                "anchor_inclusive": True,
+                "metrics": instantaneous_metrics,
+            },
+        },
+        "correctness_agreement_diagnostic": {
+            "replay_vs_online_anchor": sum(
+                feature_rows[sample_id]["correct"] == outcome_rows[sample_id]["previous"] for sample_id in feature_rows
+            )
+            / expected_count
+        },
         "evaluation_outcome": "online_future_forgetting",
         "deltas_adaptive_minus_fixed": {
             name: adaptive_metrics[name] - fixed_metrics[name]
+            if isinstance(adaptive_metrics[name], float) and isinstance(fixed_metrics[name], float)
+            else None
             for name in ("auroc", "auprc", "precision_at_k", "recall_at_k", "lift_at_k")
         },
         "overlap": {
-            "diagnostic_only": True,
-            "jaccard": len(common) / len(fixed_ids | adaptive_ids),
-            "top_q_overlap": len(common) / k,
+            "jaccard": len(common) / len(fixed_ids | adaptive_ids) if fixed_ids | adaptive_ids else None,
+            "top_q_overlap": len(common) / k if k else None,
             "groups": {
                 "common": _summary(common, outcomes),
                 "fixed_only": _summary(fixed_only, outcomes),
@@ -469,4 +536,76 @@ def analyze_history_screen(
                 "neither": _summary(set(eligible) - fixed_ids - adaptive_ids, outcomes),
             },
         },
+        "_bootstrap_rows": [
+            {
+                "sample_id": sample_id,
+                "class_id": feature_rows[sample_id]["class_id"],
+                "outcome": outcomes[sample_id],
+                "baseline": online_instantaneous[sample_id],
+                "candidate": online_rank[sample_id],
+            }
+            for sample_id in sorted(eligible)
+        ],
     }
+
+
+def _metric_noninferior(candidate: Mapping[str, Any], baseline: Mapping[str, Any], *, tolerance: float) -> bool:
+    return all(
+        isinstance(candidate.get(name), float)
+        and isinstance(baseline.get(name), float)
+        and candidate[name] >= baseline[name] - tolerance
+        for name in ("auroc", "precision_at_k")
+    )
+
+
+def build_late_collection(
+    *, cohort_inventory: Path, reports: Mapping[str, Mapping[str, Any]]
+) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
+    """Apply the pre-registered Late point gate and prepare only valid L1/L3 CIs."""
+    try:
+        inventory, cohort_sha256 = load_cohort_inventory(cohort_inventory)
+        bind_reports_to_cohort(inventory=inventory, reports=reports)
+    except HistoryCohortError as exc:
+        raise HistoryScreenError(str(exc)) from exc
+    all_fixed = {
+        label: _metric_noninferior(
+            reports[label]["deployable_online_scores"]["online_rank_inclusive"]["metrics"],
+            reports[label]["fixed_score"]["metrics"],
+            tolerance=0.01,
+        )
+        for label in reports
+    }
+    bartoldson = {}
+    for label in ("L1", "L3"):
+        online = reports[label]["deployable_online_scores"]["online_rank_inclusive"]["metrics"]
+        instantaneous = reports[label]["deployable_online_scores"]["online_instantaneous_margin"]["metrics"]
+        bartoldson[label] = (
+            isinstance(online.get("auroc"), float)
+            and isinstance(instantaneous.get("auroc"), float)
+            and isinstance(online.get("precision_at_k"), float)
+            and isinstance(instantaneous.get("precision_at_k"), float)
+            and online["auroc"] >= instantaneous["auroc"] + 0.02
+            and online["precision_at_k"] >= instantaneous["precision_at_k"] - 0.01
+        )
+    passed = all(all_fixed.values()) and all(bartoldson.values())
+    gate = {
+        "status": "point_gate_pass_bootstrap_pending" if passed else "no_go_point_gate",
+        "all_l1_l4_online_vs_fixed_within_0_01": all_fixed,
+        "bartoldson_online_vs_instantaneous": bartoldson,
+    }
+    tasks: list[dict[str, Any]] = []
+    if passed:
+        for label in ("L1", "L3"):
+            tasks.append(
+                {
+                    "task_id": f"late-{label}-epoch99-future_forgetting",
+                    "run": label,
+                    "anchor": 99,
+                    "outcome": "future_forgetting",
+                    "stratum": "online_anchor_correct",
+                    "point_gate_pass": True,
+                    "joint_primary_gate": "late_all_l1_l4_and_bartoldson",
+                    "rows": reports[label]["_bootstrap_rows"],
+                }
+            )
+    return gate, tasks, cohort_sha256

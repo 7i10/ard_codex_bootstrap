@@ -17,6 +17,7 @@ from torch.optim import SGD
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
+import ard.analysis.intervention_fork as intervention_fork_module
 from ard.analysis.intervention_fork import build_parent_artifact_attestation, create_intervention_forks
 from ard.attacks import LinfPGD
 from ard.attacks.base import AttackResult
@@ -440,7 +441,9 @@ def test_fork_lineage_survives_one_epoch_and_strict_resume_without_relaxing_chec
     assert final["fork_lineage"] == lineage
 
 
-def test_c_fork_continuation_is_exact_parity_for_one_optimizer_epoch(tmp_path: Path) -> None:
+def test_c_fork_continuation_is_exact_parity_for_one_optimizer_epoch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     def make(output: Path, *, config_hash: str, tracker_run_id: str) -> Trainer:
         torch.manual_seed(31)
         student = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
@@ -585,7 +588,9 @@ def test_c_fork_continuation_is_exact_parity_for_one_optimizer_epoch(tmp_path: P
     )
     save_checkpoint(parent_checkpoint, **common)
     parent_payload = torch.load(parent_checkpoint, map_location="cpu", weights_only=False)
-    parent_payload["rng"][0]["torch_cuda"] = [torch.tensor([0], dtype=torch.uint8)]
+    parent_payload["rng"][0]["torch_cuda"] = (
+        torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [torch.tensor([0], dtype=torch.uint8)]
+    )
     parent_payload["sampler_epoch"] = [99]
     parent_payload["sampler_state"] = [{"epoch": 99, "seed": 0, "rank": 0, "world_size": 1, "shuffle": True}]
     torch.save(parent_payload, parent_checkpoint)
@@ -758,6 +763,9 @@ def test_c_fork_continuation_is_exact_parity_for_one_optimizer_epoch(tmp_path: P
         path = tmp_path / f"{arm}.yaml"
         path.write_text(yaml.safe_dump(child), encoding="utf-8")
         arms.append(path)
+    # Selector-bundle reconstruction has dedicated boundary tests.  This test
+    # isolates whether the returned C checkpoint resumes with exact state.
+    monkeypatch.setattr(intervention_fork_module, "_validate_selector_bundle", lambda *_args, **_kwargs: None)
     created = create_intervention_forks(
         parent_checkpoint=parent_checkpoint,
         parent_resolved_config=parent_config,

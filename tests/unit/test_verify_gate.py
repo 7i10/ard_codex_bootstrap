@@ -129,6 +129,30 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert history_early.tests == ("tests/unit/test_history_early.py",)
     assert history_early.tiers == ("T0", "T1")
 
+    online_state = select(
+        ("src/ard/analysis/history_online_state.py", "src/ard/cli/history_online_state.py"),
+        (*available, "tests/unit/test_history_online_state.py"),
+    )
+    assert online_state.tests == ("tests/unit/test_history_online_state.py",)
+    assert online_state.tiers == ("T0", "T1")
+
+    bootstrap = select(
+        ("src/ard/analysis/history_bootstrap.py", "src/ard/cli/history_bootstrap.py"),
+        (*available, "tests/unit/test_history_bootstrap.py"),
+    )
+    assert bootstrap.tests == ("tests/unit/test_history_bootstrap.py",)
+    assert bootstrap.tiers == ("T0", "T1")
+
+    schedule_control = select(
+        ("src/ard/analysis/schedule_control_fork.py", "src/ard/cli/schedule_control_fork.py"),
+        (*available, "tests/unit/test_schedule_control_fork.py", "tests/unit/test_protocols_schedules.py"),
+    )
+    assert schedule_control.tests == (
+        "tests/unit/test_protocols_schedules.py",
+        "tests/unit/test_schedule_control_fork.py",
+    )
+    assert schedule_control.tiers == ("T0", "T1", "T2")
+
     h4a_taxonomy = select(
         ("src/ard/analysis/h4a_taxonomy.py", "src/ard/cli/h4a_taxonomy.py"),
         (*available, "tests/unit/test_h4a_taxonomy.py"),

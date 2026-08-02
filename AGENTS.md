@@ -39,6 +39,19 @@ Read `docs/README.md`, `docs/SCIENTIFIC_INVARIANTS.md`, `docs/TEST_STRATEGY.md`,
 - Before assigning remote compute, compare artifact locality and transfer size with measured host throughput. Use hash-verified `rsync` when transfer is cheaper than leaving a long job on the slower host.
 - After a real operational inefficiency, update the narrowest reusable skill or runbook, add a regression only when code caused the failure, and avoid adding campaign-specific checks to the scientific core.
 
+## Large replay analysis protocol
+
+- Before a full replay, run one checkpoint end to end using a real run, real checkpoint, and real sparse source sample IDs. The smoke must invoke the public CLI and reach report creation.
+- The smoke must validate the Parquet schema, lineage hashes, stable-ID/class joins, and non-overwriting report output. Unit fixtures with dense IDs are not a substitute.
+- Freeze the union of columns needed by feature, outcome, and downstream taxonomy analyses before GPU launch. Do not extend the observation schema after replay begins.
+- Measure one-checkpoint wall time per teacher/job first. Assign jobs by longest-processing-time-first; large-teacher feature and outcome jobs get separate GPUs before shorter jobs.
+- Feature and outcome replay are independent unless the code proves otherwise. Launch them concurrently from the start.
+- Build one hash-bound checkpoint inventory JSON per run and reuse it for local analysis, remote execution, and collection. Do not repeat filesystem or W&B inventory searches for the same lineage.
+- Compute point estimates before bootstrap. Start bootstrap as a separate process only for preregistered point gates that pass.
+- Keep bootstrap replicate count, seed, strata, and estimator fixed. Reduce latency only by deterministic multiprocessing, never by weakening the scientific contract.
+- Persist bootstrap progress at anchor/run/replicate granularity with source and contract hashes, and resume only matching incomplete work.
+- A steady-state large replay analysis should target at most two hours including smoke, replay, collection, point estimates, and resumable bootstrap. If the estimate exceeds this, redesign scheduling or analysis execution before launch.
+
 ## Review latency and retry policy
 
 - Use one consolidated independent review after the milestone delta and evidence are stable. Re-review only a fix delta for an actual P0/P1 or new contradictory evidence.

@@ -9,7 +9,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from ard.analysis import history_screen
-from ard.analysis.history_screen import HistoryScreenError, analyze_history_screen
+from ard.analysis.history_screen import HistoryScreenError, analyze_history_screen, build_late_collection
 from ard.analysis.intervention_selector import FEATURE_COLUMNS
 from ard.analysis.signal_audit import canonical_json, sha256_file
 from ard.cli.history_screen import main
@@ -45,6 +45,11 @@ def _state_rows() -> list[dict[str, object]]:
             "anchor_epoch": 99,
             "final_epoch": 199,
             "future_online_forgetting": int(sample_id in {8, 9}),
+            "anchor_seen": 100,
+            "anchor_robust_correct_count": 80,
+            "anchor_previous_robust_correct": sample_id < 10,
+            "anchor_margin_ema": 0.1,
+            "anchor_last_margin": 0.2,
             "subsequent_forgetting_increment": int(sample_id in {8, 9}),
             "anchor_forgetting_count": 2,
             "final_forgetting_count": 2 + int(sample_id in {8, 9}),
@@ -98,6 +103,7 @@ def _files(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         "run_id": "run-1",
         "config_hash": "e" * 64,
         "scientific_git_sha": "f" * 40,
+        "seed": 1,
         "train_expected_count": 12,
         "output_parquet_sha256": {"feature_panel": sha256_file(feature_path)},
         "checkpoints": [{"epoch": 99, "sha256": "1" * 64}],
@@ -126,6 +132,92 @@ def _provenance() -> dict[str, object]:
     return {"git": {"sha": "4" * 40, "dirty": False}, "source_files": {"history": "5" * 64}, "source_sha256": "6" * 64}
 
 
+def _late_cohort(path: Path) -> dict[str, dict[str, object]]:
+    runs = {
+        "L1": {
+            "run_id": "l1",
+            "config_hash": "1" * 64,
+            "scientific_git_sha": "a" * 40,
+            "seed": 1,
+            "teacher_registry_id": "bartoldson2024_adversarial_wrn94_16",
+        },
+        "L2": {
+            "run_id": "l2",
+            "config_hash": "2" * 64,
+            "scientific_git_sha": "b" * 40,
+            "seed": 1,
+            "teacher_registry_id": "chen2021_ltd_wrn34_10",
+        },
+        "L3": {
+            "run_id": "l3",
+            "config_hash": "3" * 64,
+            "scientific_git_sha": "c" * 40,
+            "seed": 2,
+            "teacher_registry_id": "bartoldson2024_adversarial_wrn94_16",
+        },
+        "L4": {
+            "run_id": "l4",
+            "config_hash": "4" * 64,
+            "scientific_git_sha": "d" * 40,
+            "seed": 2,
+            "teacher_registry_id": "chen2021_ltd_wrn34_10",
+        },
+    }
+    path.write_text(json.dumps({"schema_version": 1, "contract": "h5_confirmatory_cohort_inventory_v1", "runs": runs}))
+    return runs
+
+
+def _late_reports(identities: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:
+    def metrics(auroc: float, precision: float) -> dict[str, float]:
+        return {"auroc": auroc, "precision_at_k": precision}
+
+    return {
+        label: {
+            "input_identity": identity,
+            "fixed_score": {"metrics": metrics(0.80, 0.50)},
+            "deployable_online_scores": {
+                "online_rank_inclusive": {"metrics": metrics(0.82, 0.50)},
+                "online_instantaneous_margin": {"metrics": metrics(0.79, 0.50)},
+            },
+            "_bootstrap_rows": [
+                {"sample_id": i, "class_id": i % 10, "outcome": int(i < 10), "baseline": i / 30, "candidate": i / 25}
+                for i in range(30)
+            ],
+        }
+        for label, identity in identities.items()
+    }
+
+
+def test_late_point_gate_requires_all_runs_and_creates_only_paired_bartoldson_tasks(tmp_path: Path) -> None:
+    identities = _late_cohort(tmp_path / "cohort.json")
+    reports = _late_reports(identities)
+    gate, tasks, _ = build_late_collection(cohort_inventory=tmp_path / "cohort.json", reports=reports)
+    assert gate["status"] == "point_gate_pass_bootstrap_pending"
+    assert {task["run"] for task in tasks} == {"L1", "L3"}
+    reports["L2"]["deployable_online_scores"]["online_rank_inclusive"]["metrics"]["auroc"] = 0.70
+    gate, tasks, _ = build_late_collection(cohort_inventory=tmp_path / "cohort.json", reports=reports)
+    assert gate["status"] == "no_go_point_gate"
+    assert tasks == []
+
+
+def test_late_empty_anchor_correct_population_reports_degenerate_metrics(tmp_path: Path) -> None:
+    feature, state, lineage, fit = _files(tmp_path)
+    raw = json.loads(state.read_text())
+    for row in raw["rows"]:
+        row["anchor_previous_robust_correct"] = False
+    state.write_text(json.dumps(raw))
+    report = analyze_history_screen(
+        feature_panel=feature,
+        online_state_export=state,
+        replay_lineage=lineage,
+        frozen_fit=fit,
+        expected_count=12,
+        analysis_provenance=_provenance(),
+    )
+    assert report["population"]["anchor_online_correct_rows"] == 0
+    assert report["deployable_online_scores"]["online_rank_inclusive"]["metrics"]["auroc"] is None
+
+
 def test_h5_late_uses_one_replay_feature_panel_and_online_forgetting_outcome(tmp_path: Path) -> None:
     feature, state, lineage, fit = _files(tmp_path)
     report = analyze_history_screen(
@@ -138,7 +230,12 @@ def test_h5_late_uses_one_replay_feature_panel_and_online_forgetting_outcome(tmp
     )
     assert report["evaluation_outcome"] == "online_future_forgetting"
     assert report["fixed_score"]["training_outcome"] == "checkpoint_panel_forgetting"
-    assert report["population"] == {"all_rows": 12, "anchor_correct_rows": 10, "anchor_wrong_excluded_rows": 2, "k": 1}
+    assert report["population"] == {
+        "all_rows": 12,
+        "anchor_online_correct_rows": 10,
+        "anchor_wrong_excluded_rows": 2,
+        "k": 1,
+    }
     assert report["fixed_score"]["metrics"]["precision_at_k"] == 1.0
     assert report["adaptive_score"]["metrics"]["precision_at_k"] == 1.0
     assert report["overlap"]["groups"]["common"]["count"] == 1
@@ -284,27 +381,7 @@ def test_h5_late_cli_repeated_labeled_inputs(tmp_path: Path, monkeypatch: pytest
     feature, state, lineage, fit = _files(tmp_path)
     output = tmp_path / "report.json"
     monkeypatch.setattr(history_screen, "_tracked_clean_provenance", _provenance)
-    assert (
-        main(
-            [
-                "--feature-panel",
-                f"L1={feature}",
-                "--online-state-export",
-                f"L1={state}",
-                "--replay-lineage",
-                f"L1={lineage}",
-                "--frozen-fit",
-                f"L1={fit}",
-                "--expected-count",
-                "12",
-                "--output",
-                str(output),
-            ]
-        )
-        == 0
-    )
-    assert json.loads(output.read_text(encoding="utf-8"))["runs"]["L1"]["diagnostic_only"] is True
-    with pytest.raises(FileExistsError):
+    with pytest.raises(SystemExit):
         main(
             [
                 "--feature-panel",

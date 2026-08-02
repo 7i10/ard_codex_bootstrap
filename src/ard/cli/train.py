@@ -52,7 +52,7 @@ from ard.policies import (
     WeightPolicy,
     load_fixed_intervention_mask,
 )
-from ard.protocols import ensure_local_trainable
+from ard.protocols import ensure_local_trainable, get_protocol
 from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
 from ard.targets import TeacherTargetPolicy, UniformSofteningTeacherTargetPolicy
@@ -199,7 +199,7 @@ def _validate_intervention_resume(path: Path | None, config: ExperimentConfig, *
         raise ValueError("resume checkpoint must be a mapping")
     lineage = payload.get("fork_lineage")
     if config.intervention is None:
-        if lineage is not None:
+        if isinstance(lineage, Mapping) and lineage.get("kind") == "common_state_intervention_v1":
             raise ValueError("a common-state intervention fork cannot resume as an ordinary run")
         return
     if not isinstance(lineage, Mapping):
@@ -228,6 +228,45 @@ def _validate_intervention_resume(path: Path | None, config: ExperimentConfig, *
     if not isinstance(epoch, int) or epoch < 99:
         raise ValueError("intervention fork checkpoint epoch is invalid")
     _validate_completed_screen(path=path, config=config, config_hash=config_hash, lineage=lineage)
+
+
+def _validate_required_fork_resume(path: Path | None, config: ExperimentConfig, *, config_hash: str) -> None:
+    """Apply a protocol-declared fork requirement without method-specific gates.
+
+    Parent state and permitted deltas are verified once by the analysis fork
+    tool.  Runtime only establishes that this normal config resumes the exact
+    child checkpoint, under the same clean code identity that created it.
+    """
+    if config.intervention is not None:
+        return
+    required_kind = get_protocol(config.protocol.id).required_resume_fork_kind
+    if path is None:
+        if required_kind is not None:
+            raise ValueError(f"{config.protocol.id} requires a registered {required_kind} resume checkpoint")
+        return
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    if not isinstance(payload, dict):
+        raise ValueError("resume checkpoint must be a mapping")
+    lineage = payload.get("fork_lineage")
+    if required_kind is None:
+        if lineage is not None:
+            raise ValueError("ordinary protocols cannot resume a fork-lineage checkpoint")
+        return
+    if not isinstance(lineage, Mapping) or lineage.get("kind") != required_kind:
+        raise ValueError(f"{config.protocol.id} requires matching {required_kind} fork lineage")
+    if lineage.get("child_config_sha256") != config_hash or lineage.get("child_tracker_run_id") != payload.get(
+        "tracker_run_id"
+    ):
+        raise ValueError("required fork lineage does not bind this child config and tracker run ID")
+    if lineage.get("post_fork_best_scope") is not True:
+        raise ValueError("required fork lineage lacks explicit post-fork best-selection scope")
+    launch = collect_git_state(Path.cwd())
+    if (
+        launch.get("dirty") is not False
+        or not isinstance(launch.get("sha"), str)
+        or launch.get("sha") != lineage.get("fork_git_sha")
+    ):
+        raise ValueError("required fork launch must use the clean Git SHA that created the fork")
 
 
 def _terminal_resume_requested(*, output_dir: Path, resume: Path | None, epochs: int) -> bool:
@@ -349,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:
             validate_tracking_guard(config, root=Path.cwd())
             _guard_output(output_dir, resume=args.resume, config_hash=config_hash)
             _validate_intervention_resume(args.resume, config, config_hash=config_hash)
+            _validate_required_fork_resume(args.resume, config, config_hash=config_hash)
 
         run_rank_zero_phase(_validate_output_guard, phase="output guard")
         terminal_resume = run_rank_zero_value(
@@ -391,10 +431,10 @@ def main(argv: list[str] | None = None) -> int:
             if isinstance(active_tracker, LocalTracker):
                 active_tracker.attach_resolved_config(output_dir / "resolved_config.yaml")
             if args.resume is not None:
-                if isinstance(active_tracker, LocalTracker) and config.intervention is not None:
+                if isinstance(active_tracker, LocalTracker):
                     payload = torch.load(args.resume, map_location="cpu", weights_only=False)
-                    assert isinstance(payload, Mapping) and isinstance(payload.get("fork_lineage"), Mapping)
-                    active_tracker.attach_fork_lineage(payload["fork_lineage"])
+                    if isinstance(payload, Mapping) and isinstance(payload.get("fork_lineage"), Mapping):
+                        active_tracker.attach_fork_lineage(payload["fork_lineage"])
                 active_tracker.resume(checkpoint_run_id=resumed_run_id, checkpoint_config_hash=config_hash)
 
         coordinated_tracker_action(tracker, phase="tracker attach/resume", action=_attach_resume)

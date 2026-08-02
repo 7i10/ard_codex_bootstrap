@@ -54,24 +54,37 @@ before consuming a new confirmation seed.
 - Accept H5 top-q overlap reporting.  At `q=10%`, report Jaccard, overlap,
   common/fixed-only/rank-only/neither counts, forgetting prevalence,
   precision, recall, and lift.  Overlap is diagnostic, not a new gate.
-- Compare fixed and rank scores only on the same hash-bound replay feature
-  panel.  Applying replay-fitted coefficients to online SampleStateStore
-  frequency/EMA would mix feature definitions and is rejected.  H5-Late uses
-  the pre-existing seed-0 fit and replay features for both scores, then joins
-  the exact epoch-99/199 online state outcome by stable ID.  This explicitly
-  tests transfer from the predictor's checkpoint-panel training outcome to
-  online future forgetting and avoids redundant outcome-checkpoint replay.
+- Keep the completed fixed-versus-rank result as an explicitly named
+  `H5-Late replay-domain formula comparison`.  It tests whether a simple rank
+  formula can replace logistic regression when both consume the same replay
+  panel; it is not the deployable selector gate.
+- Add a separate deployable comparison on the exact epoch-99
+  `SampleStateStore`: frozen replay predictor, replay rank, inclusive online
+  rank, and online instantaneous margin are evaluated on the same exact
+  online-anchor-correct IDs and online future-forgetting outcome.  The frozen
+  coefficients remain replay-only and are never applied to online state.
+  Online `last_margin` is the latest per-sample training observation and is
+  not described as synchronized checkpoint inference.
 - Split H5 into H5-Late and H5-Early.  H5-Late keeps anchor checkpoint 99 and
   outcome through 199.  H5-Early uses checkpoints 39/59/79 and two distinct
   outcomes: peak-window error and post-peak forgetting.
-- Define peak-window error as wrong at at least two of checkpoint epochs
-  `99/104/109`.  Define post-peak forgetting on epoch-109-correct samples as a
-  later correct-to-wrong transition through epoch 199.  Do not mix these
-  saved-state outcomes with validation PGD.
-- Keep the run-adaptive score fixed as the equal-weight percentile midrank of
-  low robust-correct frequency and negative margin EMA.  Frequency-only and
-  margin-only are diagnostics; the fixed cross-run predictor and best
-  instantaneous current-state feature are references.
+- H5-Early primary anchors are exactly `39/59/79`; epoch 99 is a
+  non-prospective H5-Late reference and cannot enter the early gate.  The
+  deployable score is the equal-weight percentile midrank of exact inclusive
+  online low robust-correct frequency and negative margin EMA.  Replay history
+  ending at `anchor-5` is a lead-time diagnostic only.
+- Split the Best-oriented outcome by the online state available at the anchor.
+  For anchor-correct samples, peak-window failure means wrong at at least two
+  of replay epochs `99/104/109`.  For anchor-wrong samples, non-recovery means
+  wrong at all three peak-window epochs.  Never pool these risk sets.
+- Define the RO secondary outcome on all online-anchor-correct samples as any
+  replay correct-to-wrong transition in `109->114->...->199`; do not condition
+  eligibility on future epoch-109 correctness.  Recovered/relapsed
+  anchor-wrong samples remain an H4a category rather than the primary RO gate.
+- The predeclared current-state baseline is exact online instantaneous margin
+  risk `(1-last_margin)/2`.  Current correctness is constant inside each
+  anchor-correct/wrong stratum and is reported as state, not selected post hoc
+  as a composite baseline.
 - H4a primary states are mutually exclusive: anchor-correct becomes stable or
   future-forgetting; anchor-wrong becomes persistent-wrong, recovered-stable,
   or recovered-relapsed.  Teacher adversarial correctness and student
@@ -98,7 +111,7 @@ before consuming a new confirmation seed.
     are named without launching replacement training.
   - Rollback: none; read-only.
 
-- [ ] M1 -- implement H5-Late overlap and score diagnostics without altering
+- [x] M1 -- implement H5-Late replay-domain overlap and score diagnostics without altering
   frozen H2/replay/selector code.
   - Files: new `src/ard/analysis/history_screen.py`, CLI, focused unit tests.
   - Owner: one Terra implementation pass after this contract is frozen.
@@ -108,12 +121,15 @@ before consuming a new confirmation seed.
     hash-bound report covers L1--L4; no GPU training.
   - Commit: `analysis: add hash-bound H5 history screen`.
 
-- [ ] M2 -- add parameterized multi-anchor state export and H5-Early outcomes.
-  - Files: new module/CLI and focused tests; frozen H2 modules remain unchanged.
+- [~] M2 -- add parameterized exact-online anchor export and corrected
+  H5-Late/H5-Early outcomes.
+  - Files: new CPU-only online-state module/CLI, corrected H5 modules/CLIs and
+    focused tests; frozen H2 and replay modules remain unchanged.
   - Tests: epoch-label conversion, exact checkpoint sequence, disjoint risk
     sets, future leakage, stable-ID joins and anchor permutation invariance.
-  - Acceptance: separate best-oriented and RO-oriented tables at epochs
-    39/59/79/99.
+  - Acceptance: deployable Late comparison at epoch 99; separate prospective
+    failure/non-recovery and secondary RO tables at epochs 39/59/79; epoch 99
+    is reference-only.
 
 - [~] M3 -- produce bounded H4a taxonomy by reusing the H5 matrix.
   - Files: analysis module/CLI, report schema, tests.
@@ -145,7 +161,16 @@ agent, repeated review, or GPU job is needed for M0/M1.
 - Focused unit tests for the new analysis contracts.
 - `scripts/verify.py --changed` once per coherent milestone; cached passes are
   accepted.
+- Before any future full replay, run one real-checkpoint/sparse-ID end-to-end
+  smoke through CLI, Parquet, lineage, stable-ID join, and report write.  Freeze
+  the feature/outcome/H4a column union before launch.
+- Inventory checkpoints once into hash-bound JSON; measure per-job wall time,
+  schedule longest first, and run independent feature/outcome jobs in parallel.
 - One read-only execution on actual L1--L4 exports after exact input inventory.
+- Separate point estimates from bootstrap.  Run the fixed 2,000-replicate,
+  fixed-seed, class-stratified bootstrap only after its point gate passes;
+  preserve anchor/run/replicate progress for exact resume and use deterministic
+  multiprocessing without changing sampled replicates.
 - GPU replay only for fields absent from checkpoint state (notably student
   clean correctness), batched once for H5/H4a.
 - Production training, official test, and AutoAttack are deferred.
@@ -164,6 +189,61 @@ agent, repeated review, or GPU job is needed for M0/M1.
 - Rare teacher-wrong groups: report mass/headroom before spending a long run.
 
 ## Progress log
+
+- 2026-08-02: The revised H5 implementation now separates point estimates
+  from the fixed 2,000-replicate bootstrap, binds L1--L4 to
+  `configs/analysis/h5_confirmatory_cohort.json` (SHA-256
+  `328eb6706efcf62fcb8c5a1bd807817764e8b98372723dbe7014f84ec5285a43`),
+  fingerprints the shared estimator source, passes the large task to each
+  worker once, and persists deterministic per-task replicate progress.  Early
+  and Late emit no confirmatory Go before both Bartoldson paired-CI lower
+  bounds pass; peak-failure and non-recovery remain separate routes.
+- 2026-08-02: One consolidated scientific review found no P0 and four P1s:
+  an unguarded delayed-schedule launch, missing H5-Late allocation gate,
+  relabelable Early cohorts/premature confirmation, and incomplete bootstrap
+  source/task binding.  All four were fixed.  The delayed schedule now uses a
+  generic protocol-declared fork-resume contract rather than a method-specific
+  train gate.  The two P2 findings (empty-stratum division and replicate-wise
+  45k-row pickling) were fixed in the same delta.
+- 2026-08-02: Integrated focused verification passed (`123 passed`, one
+  pre-existing runpy warning).  The impact-selected gate was then run once in
+  the non-isolated shell required by local Gloo sockets and passed (`24
+  passed in 20.80s`).  A checkpoint fixture was made GPU-visible-safe by using
+  genuine CUDA RNG state when CUDA is available; production validation was not
+  relaxed.  Real sparse-ID checkpoint smoke remains required after committing
+  the tracked-clean analysis source.
+- 2026-08-02: The bounded fix-delta review returned no P0/P1.  Its two P2
+  lineage findings were closed without changing an estimator or gate:
+  bootstrap now rejects duplicate gate/run tasks and enforces the exact Early
+  and Late task identities, while delayed-schedule fork lineage records the
+  parent tracking run ID.  The affected Ruff and unit checks passed (`8
+  passed in 6.90s`); the unchanged broad gate was not repeated.
+- 2026-08-02: The already-running legacy H5-Early collection completed without
+  interruption at
+  `h5-matrix-6e5dcf5/h5-early-L1-L4.json` (SHA-256
+  `45a5b66a0ed8182c75ba74b80f86643ef7e9cfae66745a8b632aed6654eef707`).
+  Its serial 2,000-replicate bootstrap took substantially longer than the point
+  estimates and had no progress checkpoint.  The artifact is retained only as
+  a retrospective RO diagnostic; it cannot select a Best-oriented anchor or
+  authorize v2.  Revised analyses separate point estimation from deterministic,
+  resumable multiprocessing bootstrap and apply the latter only after a frozen
+  point gate passes.
+- 2026-08-02: Schema-v2 replay completed for L1--L4 without new training or
+  official-test use.  Canonical replay-domain H5-Late and H4a reports were
+  generated.  The original H5-Early bootstrap is retained only as a
+  development/retrospective RO diagnostic because it conditions on future
+  epoch-109 correctness and gates on the wrong objective.  It cannot choose a
+  Best-oriented anchor or v2 route.
+- 2026-08-02: Real-input smoke found and fixed two P1 defects: sparse original
+  CIFAR IDs were incorrectly bounded by the 45,000-row count, and the
+  `python -m ard.cli.history_early` entrypoint did not invoke `main`.  Focused
+  tests passed (`13 passed`), and corrected H5-Early/H4a CLIs consumed the real
+  45,000-ID L4 artifacts successfully (`4b10c90`).
+- 2026-08-02: Scientific delta review rejected replay-derived rank as the
+  deployable H5 gate and rejected future-conditioned RO as an early-anchor
+  gate.  The revised contracts above were frozen before reading corrected
+  H5 results.  Existing GPU replay remains useful for common-attack outcomes
+  and H4a primitives; no replay rerun is required.
 
 - 2026-08-02: One Sol planning pass accepted H5 overlap, modified H5-Early and
   H4a, rejected immediate seed-3 launch, and rejected the proposed epoch-99

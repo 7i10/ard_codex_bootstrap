@@ -10,7 +10,13 @@ import pyarrow.parquet as pq
 import pytest
 
 from ard.analysis import history_early
-from ard.analysis.history_early import OBS_COLS, HistoryEarlyError, analyze_history_early, collection_gate
+from ard.analysis.history_early import (
+    OBS_COLS,
+    HistoryEarlyError,
+    analyze_history_early,
+    build_online_bootstrap_tasks,
+    collection_gate,
+)
 from ard.analysis.rslad_signal_replay import FEATURE_EPOCHS, OUTCOME_EPOCHS, build_feature_panel
 from ard.analysis.signal_audit import sha256_file
 
@@ -57,6 +63,7 @@ def _lineage(path: Path, obs: Path, key: str) -> None:
                 "run_id": "run",
                 "config_hash": "a" * 64,
                 "scientific_git_sha": "b" * 40,
+                "seed": 1,
                 "train_expected_count": 12,
                 key: sha256_file(obs),
                 "attack_identity": {"steps": 10},
@@ -159,10 +166,10 @@ def test_collection_gate_is_predeclared_pending_ci() -> None:
     gate = collection_gate({"L1": report, "L3": report})
     assert gate["status"] == "sequential_no_automatic_go"
     assert gate["anchors"]["39"]["point_threshold_met"]
-    assert gate["anchors"]["39"]["status"] == "pending_paired_ci_inputs"
+    assert gate["anchors"]["39"]["status"] == "point_gate_pass_bootstrap_task_required"
 
 
-def test_collection_gate_rejects_point_fail_without_running_a_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_collection_gate_rejects_point_fail_without_running_a_bootstrap() -> None:
     report = {
         "tables": {
             "39": {
@@ -174,13 +181,35 @@ def test_collection_gate_rejects_point_fail_without_running_a_bootstrap(monkeypa
         }
     }
 
-    def unexpected_bootstrap(*_args: object, **_kwargs: object) -> object:
-        raise AssertionError("point-fail anchors must not bootstrap")
-
-    monkeypatch.setattr(history_early, "bootstrap_metric_delta", unexpected_bootstrap)
     gate = collection_gate({"L1": report, "L3": report})
     assert gate["anchors"]["39"]["status"] == "no_go_point_gate"
     assert gate["anchors"]["39"]["paired_lower_bound"] is None
+
+
+def test_empty_early_stratum_is_degenerate_no_go_without_division() -> None:
+    assert history_early._metric({}, {}) == {"auroc": None, "auprc": None, "prevalence": None, "count": 0}
+
+
+def test_online_bootstrap_requires_both_bartoldson_confirmations_and_excludes_diagnostics() -> None:
+    outcomes = {sample_id: int(sample_id < 10) for sample_id in range(20)}
+    raw = {
+        "peak": outcomes,
+        "non_recovery": outcomes,
+        "online_rank": {sample_id: float(outcomes[sample_id]) for sample_id in outcomes},
+        "baseline": {sample_id: float(1 - outcomes[sample_id]) for sample_id in outcomes},
+        "class_id": {sample_id: sample_id % 10 for sample_id in outcomes},
+    }
+    reports = {label: {"_bootstrap_inputs": {"39": raw}} for label in ("L1", "L2", "L3", "L4")}
+    tasks, gate = build_online_bootstrap_tasks(reports)
+    assert {task["run"] for task in tasks} == {"L1", "L3"}
+    assert {task["outcome"] for task in tasks} == {"peak_failure", "non_recovery"}
+    assert gate["epoch39-peak_failure"]["pass"]
+    assert gate["epoch39-peak_failure"]["diagnostic_only_runs"] == ["L2", "L4"]
+
+    failed = {**reports, "L3": {"_bootstrap_inputs": {"39": {**raw, "online_rank": raw["baseline"]}}}}
+    tasks, gate = build_online_bootstrap_tasks(failed)
+    assert tasks == []
+    assert not gate["epoch39-peak_failure"]["pass"]
 
 
 def test_anchor99_history_features_match_the_frozen_h5_feature_panel() -> None:

@@ -40,6 +40,7 @@ class ProtocolConfig(StrictModel):
         "saad_paper_reproduction_v1",
         "saad_code_295121c_audit_v1",
         "controlled_cifar10_r18_v1",
+        "controlled_cifar10_r18_delayed_multistep_v1",
         "controlled_cifar10_r18_pilot_v1",
         "controlled_cifar10_r18_pilot_1ep_v1",
         "controlled_cifar10_r18_pilot_3ep_v1",
@@ -895,7 +896,11 @@ class ExperimentConfig(StrictModel):
             if smoke_errors:
                 raise ValueError("synthetic_smoke_v2 contract violation: " + "; ".join(smoke_errors))
             return
-        if self.protocol.id not in {"controlled_cifar10_r18_v1", *pilot_protocols}:
+        if self.protocol.id not in {
+            "controlled_cifar10_r18_v1",
+            "controlled_cifar10_r18_delayed_multistep_v1",
+            *pilot_protocols,
+        }:
             return
         metadata = spec.metadata
         errors: list[str] = []

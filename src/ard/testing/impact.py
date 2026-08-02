@@ -120,11 +120,16 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
+        ("src/ard/analysis/history_cohort.py",),
+        ("tests/unit/test_history_cohort.py",),
+        ("T0", "T1"),
+    ),
+    (
         (
             "src/ard/analysis/history_screen.py",
             "src/ard/cli/history_screen.py",
         ),
-        ("tests/unit/test_history_screen.py",),
+        ("tests/unit/test_history_screen.py", "tests/unit/test_history_cohort.py"),
         ("T0", "T1"),
     ),
     (
@@ -132,8 +137,23 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
             "src/ard/analysis/history_early.py",
             "src/ard/cli/history_early.py",
         ),
-        ("tests/unit/test_history_early.py",),
+        ("tests/unit/test_history_early.py", "tests/unit/test_history_cohort.py"),
         ("T0", "T1"),
+    ),
+    (
+        ("src/ard/analysis/history_online_state.py", "src/ard/cli/history_online_state.py"),
+        ("tests/unit/test_history_online_state.py",),
+        ("T0", "T1"),
+    ),
+    (
+        ("src/ard/analysis/history_bootstrap.py", "src/ard/cli/history_bootstrap.py"),
+        ("tests/unit/test_history_bootstrap.py",),
+        ("T0", "T1"),
+    ),
+    (
+        ("src/ard/analysis/schedule_control_fork.py", "src/ard/cli/schedule_control_fork.py"),
+        ("tests/unit/test_schedule_control_fork.py", "tests/unit/test_protocols_schedules.py"),
+        ("T0", "T1", "T2"),
     ),
     (
         (
