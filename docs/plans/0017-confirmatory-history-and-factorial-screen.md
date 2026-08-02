@@ -88,6 +88,28 @@ intervention utility separately with one common-state five-arm continuation.
   accuracy loss above `0.5` points.  If `H-R < -0.5` points, stop that treatment
   as a negative screen; do not generalize the result to every possible random
   draw.  This sequential rule is fixed before H4 outcomes are observed.
+- Protocol amendment after H4 validation and before any official-test result:
+  the original sequential rule above would request two more random masks for
+  both treatments.  The clarified primary objective is improvement of best
+  robust accuracy, for which H4 validation is a futility No-Go: `HS-RS` is
+  `+0.08` point, `HD-RD` is `+0.16`, `HS-C` is `+0.04`, and `HD-C` is `+0.12`,
+  all below the predeclared `+0.5`-point allocation gate.  Therefore no extra
+  random continuation is launched for the primary objective.  This is a
+  documented resource-allocation amendment, not the original preregistered
+  outcome.  In exchange, H4 cannot support a confirmatory History-versus-random
+  selector claim from one random draw.  The validation-only late-training
+  signal (`HS-RS` last `+0.76`, `HD-RD` last `+0.26`) remains exploratory.  A
+  future robust-overfitting study would be separately frozen and would start
+  with softening random masks `RS2/RS3`; it is not part of the best-accuracy
+  path and is not triggered by official-test results.
+- Before official-test evaluation, its use is frozen to terminal H4 reporting:
+  evaluate all five arms on CIFAR-10 test with best/last clean and PGD-20 CE,
+  fixed evaluation seed and exact saved threat identity; do not run AutoAttack.
+  Test results cannot change H5 score features, score formula, budget,
+  treatment choice, or random-control allocation.  Any later method developed
+  after viewing these results requires confirmation on new training seeds and
+  preferably a second dataset/architecture; this H4 test set is not reused as
+  that method's development criterion.
 - The intervention budget is fixed at `K=3566`, borrowed from the earlier
   seed-0 Bartoldson endpoint-error mask only for intervention-budget
   comparability.  The H4 history IDs themselves are the top-K frozen predictor
@@ -129,9 +151,12 @@ intervention utility separately with one common-state five-arm continuation.
   sample-level bootstrap differences accompany the predeclared point-estimate
   comparison when feasible.
 - `K=3566` may remain only as the H4 fixed-budget comparability condition.  A
-  follow-up method uses a predeclared top-`q` fraction selected on development
-  trajectories before untouched-seed inspection; neither `K` nor `q` is
-  presented as an estimated forgetting-probability threshold.  Predictor
+  follow-up method uses a primary top-`q=10%` fraction of the anchor-correct
+  risk set.  This round number is frozen before H4 official-test inspection for
+  portability and is not claimed optimal; `q=5%` and `q=20%` are offline
+  ranking sensitivity reports only, not additional intervention branches.
+  Neither `K` nor `q` is presented as an estimated forgetting-probability
+  threshold.  Predictor
   ranking alone cannot establish the intervention-optimal budget.
 - The primary random control for a future forgetting selector is matched on
   class, anchor-correct state and count.  A current-margin-bin-matched random
@@ -200,6 +225,12 @@ intervention utility separately with one common-state five-arm continuation.
   - Acceptance: control and factorial contrasts are computed from the same
     branch state; best/last clean/PGD are mandatory; AA follows only for a
     scientifically justified reduced set.
+  - Primary objective: best robust accuracy.  Validation screening is No-Go;
+    official test closes H4 but does not reopen treatment or selector tuning.
+  - Secondary validation summaries: report epoch-120--199 mean PGD,
+    epoch-100--199 PGD area/mean and late slope for all arms as descriptive
+    robust-overfitting evidence.  Because these summaries were added after the
+    endpoint results were inspected, they are explicitly exploratory.
 - [ ] H4a — run one integrated persistent-error taxonomy after an H4 GPU frees.
   - Inputs: saved epoch-99/199 checkpoints and sample state for Bartoldson and
     Chen seeds, stable train IDs, teacher clean/adversarial primitives and the
@@ -212,20 +243,26 @@ intervention utility separately with one common-state five-arm continuation.
 - [ ] H5 — evaluate the run-adaptive one-shot selector without redundant training.
   - Inputs: completed non-intervened L1--L4 trajectories and their frozen
     anchor/outcome definitions; H4 treatment conclusion remains unchanged.
-  - Primary comparison: frozen cross-run predictor, frequency rank, margin-EMA
-    rank, equal-weight rank, instantaneous margin and teacher entropy on the
-    anchor-correct risk set.
-  - Adoption screen: before inspecting untouched-seed results, freeze the score,
-    budget and bootstrap procedure.  A practical candidate should be within
-    `0.01` AUROC of the frozen predictor, exceed instantaneous margin, retain
-    comparable precision/lift at budget and use one unchanged definition across
-    both teachers and confirmatory seeds.  This is a resource-allocation gate,
-    not a publication-level equivalence claim.
+  - Primary score: equal-weight percentile midrank of low robust-correctness
+    frequency and negative robust-margin EMA, with `q=10%` on the anchor-correct
+    risk set.  Frequency-only and margin-only are required diagnostic ablations;
+    instantaneous margin, teacher entropy and the frozen cross-run predictor are
+    references.  This feature family and budget are fixed before H4 test.
+  - Adoption screen: on L1--L4 development trajectories, the primary score
+    should be within `0.01` AUROC of the frozen predictor, exceed instantaneous
+    margin, retain comparable precision/lift at budget and use one unchanged
+    definition across both teachers and seeds.  L1--L4 are not called untouched
+    confirmation because their outcomes informed the earlier history analysis.
+    Confirmation requires a new seed or domain after the score is frozen.
+    This is a resource-allocation gate, not a publication-level equivalence claim.
   - Conditional intervention: only if H4 identifies a usable treatment, compare
     selectors under that one treatment.  Screening Go requires at least
     `+0.5` percentage-point best-AA over the predeclared random-control mean,
     no more than `0.5` point clean loss, and no material loss versus the frozen
     predictor; confirmatory claims still require from-scratch multiple seeds.
+    Since H4 is best-accuracy No-Go for both tested treatments, H5 initially
+    remains prediction/deployability analysis and does not automatically launch
+    a softening or downweight continuation.
   - Acceptance: the offline stage launches no new training, future outcomes do
     not enter score construction, and any later branch records exact parent,
     selector, budget, treatment and random-control lineage.
@@ -351,6 +388,17 @@ during waiting. No watchdog/recovery agent is used.
   `166.7/173.6/165.6` images/s. Epoch-100 validation PGD was
   `50.62/50.40/50.50/50.56/50.44%` for HS/RS/C/HD/RD. These early values are
   launch evidence only and are not used for an intervention conclusion.
+- 2026-08-02: all five H4 continuations completed and synced to W&B without a
+  recorded training error.  Validation best PGD for `HS/RS/C/HD/RD` was
+  `51.60/51.52/51.56/51.68/51.52%`; last was
+  `47.60/46.84/46.98/47.68/47.42%`, and all best epochs were 105.  Best
+  contrasts are below the `+0.5`-point gate, so the clarified best-accuracy
+  objective stops extra random allocation before official-test inspection.
+  This post-validation resource decision supersedes execution of the earlier
+  random-replication rule but does not rewrite its provenance or license a
+  History-versus-random claim.  H4 test metrics, the H5 score family and the
+  new-seed confirmation boundary are frozen by this plan revision before
+  launching official evaluation.
 
 ## Completion report
 
