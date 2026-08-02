@@ -27,6 +27,7 @@ from ard.analysis.rslad_signal_replay import (
     inventory_feature_trajectory,
     join_feature_outcome_panels,
     load_cached_checkpoint,
+    outcome_replay_lineage,
     portable_cifar10_train_identity,
     predictive_audit,
     replay_lineage,
@@ -37,6 +38,7 @@ from ard.analysis.rslad_signal_replay import (
     verify_semantic_sources_tracked,
     write_checkpoint_cache,
     write_feature_replay_outputs,
+    write_outcome_replay_outputs,
     write_replay_outputs,
 )
 from ard.analysis.signal_audit import CheckpointInventory
@@ -303,6 +305,50 @@ def test_feature_only_output_has_no_outcome_panel_or_predictive_report(tmp_path:
     lineage = json.loads(paths["lineage"].read_text(encoding="utf-8"))
     assert "feature_panel_sha256" in lineage
     assert not any("outcome" in field or "audit" in field for field in lineage)
+
+
+def test_outcome_only_output_binds_only_the_post_anchor_panel(tmp_path: Path) -> None:
+    config = load_config(Path(__file__).parents[2] / "configs" / "experiments" / "synthetic_rslad.yaml")
+    panel = TemporalPanelInventory(
+        "rslad-s0", "a" * 64, "b" * 40, 1, tuple(_checkpoint(epoch) for epoch in PERIODIC_EPOCHS)
+    )
+    results = tuple(
+        rslad_signal_replay.ReplayCheckpointResult(
+            epoch=epoch,
+            seed_domain="outcome",
+            attack_seed_base=epoch,
+            max_abs_delta=0.0,
+            rows=tuple(_replay_rows((epoch,), samples=2)),
+        )
+        for epoch in OUTCOME_EPOCHS
+    )
+    lineage = outcome_replay_lineage(
+        panel=panel,
+        training_config=config,
+        expected_count=2,
+        replay_batch_size=2,
+        device_type="cpu",
+        runtime={"selected_device": "cpu"},
+        outcome_seed=11,
+        saved_resolved_config_mapping_sha256="c" * 64,
+        saved_resolved_config_file_sha256="d" * 64,
+        teacher_metadata={},
+        dataset_identity={},
+        analysis_provenance={},
+        outcome_results=results,
+    )
+    assert lineage["kind"] == "h5_checkpoint_panel_outcome_source_v1"
+    assert lineage["observation_schema_version"] == 2
+    assert "feature_protocol" not in lineage
+    rows = [row for result in results for row in result.rows]
+    paths = write_outcome_replay_outputs(
+        output_dir=tmp_path,
+        outcome_observations=rows,
+        outcome_panel=build_outcome_panel(rows, expected_count=2),
+        lineage=lineage,
+    )
+    assert set(paths) == {"outcome_observations", "outcome_panel", "lineage"}
+    assert not (tmp_path / "feature-observations.parquet").exists()
 
 
 def test_feature_only_lineage_binds_epoch99_parent_state_and_rejects_stable_id_drift(tmp_path: Path) -> None:
@@ -640,6 +686,43 @@ def test_common_trajectory_replay_passes_saved_checkpoint_hash_to_strict_loader(
     )
     assert captured["expected"] == checkpoint.config_hash
     assert len(result.rows) == 2
+    for row in result.rows:
+        assert row["observation_schema_version"] == 2
+        for domain in ("teacher_clean", "teacher_adversarial"):
+            assert 0.0 <= row[f"{domain}_true_probability"] <= 1.0
+            assert 0.0 <= row[f"{domain}_max_wrong_probability"] <= 1.0
+            assert -1.0 <= row[f"{domain}_probability_margin"] <= 1.0
+            assert 0.0 <= row[f"{domain}_entropy_normalized"] <= 1.0
+            assert row[f"{domain}_probability_margin"] == pytest.approx(
+                row[f"{domain}_true_probability"] - row[f"{domain}_max_wrong_probability"]
+            )
+            assert row[f"{domain}_wrong_confidence"] == pytest.approx(
+                row[f"{domain}_max_wrong_probability"] - row[f"{domain}_true_probability"]
+            )
+        assert row["teacher_clean_to_adversarial_prediction_flip"] == (
+            row["teacher_clean_prediction"] != row["teacher_adversarial_prediction"]
+        )
+        assert row["teacher_clean_to_adversarial_true_probability_delta"] == pytest.approx(
+            row["teacher_adversarial_true_probability"] - row["teacher_clean_true_probability"]
+        )
+        assert row["teacher_clean_to_adversarial_margin_delta"] == pytest.approx(
+            row["teacher_adversarial_probability_margin"] - row["teacher_clean_probability_margin"]
+        )
+    assert all(parameter.grad is None for parameter in teacher.parameters())
+
+
+def test_classification_primitives_preserve_prediction_correctness_and_probability_algebra() -> None:
+    logits = torch.tensor([[5.0, 1.0, 0.0], [0.0, 4.0, 3.0]], requires_grad=True)
+    labels = torch.tensor([0, 2])
+    primitives = rslad_signal_replay._classification_primitives(logits, labels)
+    assert primitives["prediction"].tolist() == [0, 1]
+    assert primitives["correct"].tolist() == [True, False]
+    assert torch.allclose(primitives["margin"], primitives["true_probability"] - primitives["max_wrong_probability"])
+    assert torch.allclose(
+        primitives["wrong_confidence"], primitives["max_wrong_probability"] - primitives["true_probability"]
+    )
+    assert torch.all((primitives["entropy"] >= 0) & (primitives["entropy"] <= 1))
+    assert all(not value.requires_grad for value in primitives.values())
 
 
 def test_predictive_audit_compares_fixed_models_on_one_split_and_applies_history_go() -> None:

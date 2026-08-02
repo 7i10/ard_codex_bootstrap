@@ -60,6 +60,7 @@ DOMAIN_SEED_FORMULA = (
     "attack_seed_base=sha256(canonical_json(['rslad-common-trajectory-v1',base_seed,domain]))[:8]&((1<<63)-1); "
     "batch_seed=attack_seed_base+1000003*batch_index"
 )
+OBSERVATION_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -439,7 +440,8 @@ def checkpoint_cache_identity(
     """Identity that must match before a checkpoint replay cache is trusted."""
     seed = domain_seed(base_seed=base_seed, domain=seed_domain)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
+        "observation_schema_version": OBSERVATION_SCHEMA_VERSION,
         "source_files": source_hashes(),
         "checkpoint": {
             "run_id": checkpoint.run_id,
@@ -578,6 +580,45 @@ def _normalized_entropy(logits: torch.Tensor) -> torch.Tensor:
     return normalized
 
 
+def _classification_primitives(logits: torch.Tensor, labels: torch.Tensor) -> dict[str, torch.Tensor]:
+    """Detached per-sample probability primitives for offline H4a routing only."""
+    if logits.ndim != 2 or logits.shape[0] != labels.numel() or logits.shape[1] < 2:
+        raise RSLADSignalReplayError("classification logits/labels shape contract drifted")
+    if labels.ndim != 1 or bool((labels < 0).any()) or bool((labels >= logits.shape[1]).any()):
+        raise RSLADSignalReplayError("classification labels are outside the logit class range")
+    probabilities = F.softmax(logits.detach().float(), dim=1)
+    true_probability = probabilities.gather(1, labels[:, None]).squeeze(1)
+    wrong = probabilities.clone()
+    wrong.scatter_(1, labels[:, None], -float("inf"))
+    max_wrong_probability, _ = wrong.max(dim=1)
+    prediction = logits.detach().argmax(dim=1)
+    margin = true_probability - max_wrong_probability
+    entropy = _normalized_entropy(logits)
+    if not all(
+        torch.isfinite(value).all()
+        for value in (probabilities, true_probability, max_wrong_probability, margin, entropy)
+    ):
+        raise RSLADSignalReplayError("classification primitives must be finite")
+    if (
+        bool((true_probability < 0).any())
+        or bool((true_probability > 1).any())
+        or bool((max_wrong_probability < 0).any())
+        or bool((max_wrong_probability > 1).any())
+        or bool((margin < -1).any())
+        or bool((margin > 1).any())
+    ):
+        raise RSLADSignalReplayError("classification probability primitive is outside its range")
+    return {
+        "prediction": prediction,
+        "correct": prediction.eq(labels),
+        "true_probability": true_probability,
+        "max_wrong_probability": max_wrong_probability,
+        "wrong_confidence": max_wrong_probability - true_probability,
+        "margin": margin,
+        "entropy": entropy,
+    }
+
+
 def replay_checkpoint_rows(
     *,
     checkpoint: CheckpointInventory,
@@ -610,6 +651,7 @@ def replay_checkpoint_rows(
         generator = torch.Generator(device=device).manual_seed(attack_seed_base + 1_000_003 * batch_index)
         with torch.no_grad(), torch.autocast(device_type=device.type, enabled=False):
             teacher_clean_logits = teacher(batch.images.float()).detach().float()
+            student_clean_logits = student(batch.images.float()).detach().float()
         result = attack.generate(
             AttackRequest(
                 inputs=batch.images,
@@ -624,7 +666,9 @@ def replay_checkpoint_rows(
         with torch.no_grad(), torch.autocast(device_type=device.type, enabled=False):
             student_logits = student(result.adversarial.float()).detach().float()
             teacher_logits = teacher(result.adversarial.float()).detach().float()
-            entropy = _normalized_entropy(teacher_logits)
+            teacher_clean = _classification_primitives(teacher_clean_logits, batch.labels)
+            teacher_adv = _classification_primitives(teacher_logits, batch.labels)
+            student_clean = _classification_primitives(student_clean_logits, batch.labels)
             margin = margin_signal.compute(
                 student_adv_logits=student_logits,
                 labels=batch.labels,
@@ -639,13 +683,52 @@ def replay_checkpoint_rows(
         for parameter in teacher.parameters():
             if parameter.requires_grad or parameter.grad is not None:
                 raise RSLADSignalReplayError("common-trajectory replay populated a teacher parameter gradient")
-        for sample_id, class_id, entropy_value, margin_value, risk_value, correct in zip(
+        for (
+            sample_id,
+            class_id,
+            entropy_value,
+            margin_value,
+            risk_value,
+            correct,
+            tc_pred,
+            tc_ok,
+            tc_true,
+            tc_wrong,
+            tc_wrong_confidence,
+            tc_margin,
+            tc_entropy,
+            ta_pred,
+            ta_ok,
+            ta_true,
+            ta_wrong,
+            ta_wrong_confidence,
+            ta_margin,
+            sc_pred,
+            sc_ok,
+            sc_margin,
+        ) in zip(
             batch.sample_ids.tolist(),
             batch.labels.tolist(),
-            entropy.tolist(),
+            teacher_adv["entropy"].tolist(),
             margin.tolist(),
             student_risk.tolist(),
             robust_correct.tolist(),
+            teacher_clean["prediction"].tolist(),
+            teacher_clean["correct"].tolist(),
+            teacher_clean["true_probability"].tolist(),
+            teacher_clean["max_wrong_probability"].tolist(),
+            teacher_clean["wrong_confidence"].tolist(),
+            teacher_clean["margin"].tolist(),
+            teacher_clean["entropy"].tolist(),
+            teacher_adv["prediction"].tolist(),
+            teacher_adv["correct"].tolist(),
+            teacher_adv["true_probability"].tolist(),
+            teacher_adv["max_wrong_probability"].tolist(),
+            teacher_adv["wrong_confidence"].tolist(),
+            teacher_adv["margin"].tolist(),
+            student_clean["prediction"].tolist(),
+            student_clean["correct"].tolist(),
+            student_clean["margin"].tolist(),
             strict=True,
         ):
             rows.append(
@@ -658,6 +741,27 @@ def replay_checkpoint_rows(
                     "student_probability_margin": float(margin_value),
                     "student_margin_risk": float(risk_value),
                     "robust_correct": bool(correct),
+                    "observation_schema_version": OBSERVATION_SCHEMA_VERSION,
+                    "teacher_clean_prediction": int(tc_pred),
+                    "teacher_clean_correct": bool(tc_ok),
+                    "teacher_clean_true_probability": float(tc_true),
+                    "teacher_clean_max_wrong_probability": float(tc_wrong),
+                    "teacher_clean_wrong_confidence": float(tc_wrong_confidence),
+                    "teacher_clean_probability_margin": float(tc_margin),
+                    "teacher_clean_entropy_normalized": float(tc_entropy),
+                    "teacher_adversarial_prediction": int(ta_pred),
+                    "teacher_adversarial_correct": bool(ta_ok),
+                    "teacher_adversarial_true_probability": float(ta_true),
+                    "teacher_adversarial_max_wrong_probability": float(ta_wrong),
+                    "teacher_adversarial_wrong_confidence": float(ta_wrong_confidence),
+                    "teacher_adversarial_probability_margin": float(ta_margin),
+                    "teacher_adversarial_entropy_normalized": float(entropy_value),
+                    "teacher_clean_to_adversarial_prediction_flip": bool(tc_pred != ta_pred),
+                    "teacher_clean_to_adversarial_true_probability_delta": float(ta_true - tc_true),
+                    "teacher_clean_to_adversarial_margin_delta": float(ta_margin - tc_margin),
+                    "student_clean_prediction": int(sc_pred),
+                    "student_clean_correct": bool(sc_ok),
+                    "student_clean_probability_margin": float(sc_margin),
                 }
             )
         student.zero_grad(set_to_none=True)
@@ -1294,6 +1398,7 @@ def feature_replay_lineage(
     result = {
         "schema_version": 1,
         "kind": "l3_checkpoint_panel_feature_source_v1",
+        "observation_schema_version": OBSERVATION_SCHEMA_VERSION,
         "analysis_provenance": dict(analysis_provenance),
         "run_id": panel.run_id,
         "config_hash": panel.config_hash,
@@ -1333,6 +1438,66 @@ def feature_replay_lineage(
     return result
 
 
+def outcome_replay_lineage(
+    *,
+    panel: TemporalPanelInventory,
+    training_config: ExperimentConfig,
+    expected_count: int,
+    replay_batch_size: int,
+    device_type: str,
+    runtime: Mapping[str, Any],
+    outcome_seed: int,
+    saved_resolved_config_mapping_sha256: str,
+    saved_resolved_config_file_sha256: str,
+    teacher_metadata: Mapping[str, Any],
+    dataset_identity: Mapping[str, Any],
+    analysis_provenance: Mapping[str, Any],
+    outcome_results: Sequence[ReplayCheckpointResult],
+    historical_config_compatibility: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Bind an outcome-only replay to the exact post-anchor checkpoint panel."""
+    if tuple(item.epoch for item in panel.checkpoints) != PERIODIC_EPOCHS:
+        raise RSLADSignalReplayError("outcome-only replay requires the exact immutable periodic checkpoint panel")
+    if tuple(item.epoch for item in outcome_results) != OUTCOME_EPOCHS:
+        raise RSLADSignalReplayError("outcome-only replay requires exact epoch-99..199 observations")
+    result: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "h5_checkpoint_panel_outcome_source_v1",
+        "observation_schema_version": OBSERVATION_SCHEMA_VERSION,
+        "analysis_provenance": dict(analysis_provenance),
+        "run_id": panel.run_id,
+        "config_hash": panel.config_hash,
+        "saved_resolved_config_mapping_sha256": saved_resolved_config_mapping_sha256,
+        "saved_resolved_config_file_sha256": saved_resolved_config_file_sha256,
+        "scientific_git_sha": panel.scientific_git_sha,
+        "checkpoint_training": {
+            "world_size": panel.world_size,
+            "execution_identity": training_execution_identity(
+                training=training_config.training, world_size=panel.world_size
+            ),
+        },
+        "attack_identity": training_config.method.attack.identity(),
+        "train_expected_count": expected_count,
+        "teacher": dict(teacher_metadata),
+        "dataset_identity": dict(dataset_identity),
+        "runtime": dict(runtime),
+        "checkpoints": [asdict(item) for item in panel.checkpoints],
+        "outcome_protocol": {
+            **domain_replay_protocol(base_seed=outcome_seed, domain="outcome", device_type=device_type),
+            "batch_size": replay_batch_size,
+            "epochs": list(OUTCOME_EPOCHS),
+            "outcome": "checkpoint_panel_correct_to_wrong_through_epoch_199",
+        },
+        "outcome_replays": [
+            {"epoch": item.epoch, "attack_seed_base": item.attack_seed_base, "max_abs_delta": item.max_abs_delta}
+            for item in outcome_results
+        ],
+    }
+    if historical_config_compatibility is not None:
+        result["historical_config_compatibility"] = dict(historical_config_compatibility)
+    return result
+
+
 def write_feature_replay_outputs(
     *,
     output_dir: Path,
@@ -1360,6 +1525,40 @@ def write_feature_replay_outputs(
                 **lineage,
                 "feature_observations_sha256": sha256_file(paths["feature_observations"]),
                 "feature_panel_sha256": sha256_file(paths["feature_panel"]),
+            }
+        )
+        + b"\n"
+    )
+    return paths
+
+
+def write_outcome_replay_outputs(
+    *,
+    output_dir: Path,
+    outcome_observations: Sequence[Mapping[str, Any]],
+    outcome_panel: Sequence[Mapping[str, Any]],
+    lineage: Mapping[str, Any],
+) -> dict[str, Path]:
+    """Write a resumable outcome-only panel without replaying pre-anchor features."""
+    paths = {
+        "outcome_observations": output_dir / "outcome-observations.parquet",
+        "outcome_panel": output_dir / "outcome-panel.parquet",
+        "lineage": output_dir / "lineage.json",
+    }
+    if any(path.exists() for path in paths.values()):
+        raise FileExistsError("refusing to overwrite an existing outcome-only replay output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_sample_parquet(
+        sorted(outcome_observations, key=lambda row: (int(row["epoch"]), int(row["sample_id"]))),
+        paths["outcome_observations"],
+    )
+    write_sample_parquet(sorted(outcome_panel, key=lambda row: int(row["sample_id"])), paths["outcome_panel"])
+    paths["lineage"].write_bytes(
+        canonical_json(
+            {
+                **lineage,
+                "outcome_observations_sha256": sha256_file(paths["outcome_observations"]),
+                "outcome_panel_sha256": sha256_file(paths["outcome_panel"]),
             }
         )
         + b"\n"

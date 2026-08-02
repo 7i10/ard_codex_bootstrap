@@ -4,7 +4,7 @@
 
 - Owner: main thread; one Sol planning pass, one Terra implementation pass
 - Branch / base SHA: `research/h5-early-late` / `d1984cd`
-- Current milestone: M0 compact input generation active; M1 implementation complete pending real-data report
+- Current milestone: M0 compact input generation active; M1/M2 implementation complete pending real-data reports
 - Last updated: 2026-08-02
 
 ## Goal
@@ -190,6 +190,16 @@ agent, repeated review, or GPU job is needed for M0/M1.
   and training remain strict.  Focused verification passed (`76 passed`); the
   L1/L2 exact online epoch-99/199 state exports were generated with 45,000 rows
   each.  GPU feature replay will be restarted from the clean M1 commit.
+- 2026-08-02: An observation-first audit stopped the first partial GPU replay
+  after only L1/L2/L4 `2/9/3` cached checkpoints.  Completing it would have
+  forced a second H4a replay because teacher correctness/wrong-confidence and
+  student clean/robust state were not persisted.  Observation schema v2 now
+  records detached teacher clean/adversarial probability primitives,
+  clean-to-adversarial deltas, and student-clean primitives during the same
+  common-PGD replay.  The frozen H5 feature-panel columns/formulas do not
+  change; cache/source identity prevents schema-v1 reuse.  M2 focused tests
+  passed (`77 passed`), and the impact-selected T0/T1 suites passed
+  (`6 + 39 + 33`).  No official test or new training was consumed.
 
 ## Completion report
 

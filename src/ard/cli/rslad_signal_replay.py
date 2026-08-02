@@ -25,6 +25,7 @@ from ard.analysis.rslad_signal_replay import (
     inventory_feature_trajectory,
     join_feature_outcome_panels,
     load_cached_checkpoint,
+    outcome_replay_lineage,
     portable_cifar10_train_identity,
     predictive_audit,
     replay_checkpoint_rows,
@@ -34,6 +35,7 @@ from ard.analysis.rslad_signal_replay import (
     validate_rslad_replay_attack,
     write_checkpoint_cache,
     write_feature_replay_outputs,
+    write_outcome_replay_outputs,
     write_replay_outputs,
 )
 from ard.analysis.signal_audit import inventory_run_bundle
@@ -151,10 +153,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir", required=True, type=Path, help="New output directory or cache-only resumable directory."
     )
     parser.add_argument("--device", required=True, help="Replay device, for example cuda:0.")
-    parser.add_argument(
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
         "--feature-only",
         action="store_true",
         help="Replay only the epoch-4..99 feature panel; never read post-anchor outcome checkpoints.",
+    )
+    modes.add_argument(
+        "--outcome-only",
+        action="store_true",
+        help="Replay only epoch-99..199 outcomes; never recompute feature observations.",
     )
     return parser
 
@@ -279,7 +287,9 @@ def main(argv: list[str] | None = None) -> int:
     saved_resolved = _load_mapping(resolved_path)
     saved_digests = saved_resolved_config_digests(resolved_path)
     training_config, historical_compatibility = (
-        load_feature_only_replay_config(resolved_path) if args.feature_only else (load_config(resolved_path), None)
+        load_feature_only_replay_config(resolved_path)
+        if args.feature_only or args.outcome_only
+        else (load_config(resolved_path), None)
     )
     validate_rslad_replay_attack(training_config)
     if training_config.teacher is None:
@@ -312,6 +322,56 @@ def main(argv: list[str] | None = None) -> int:
     execution_runtime = runtime_identity(device)
     checkpoint_by_epoch = {item.epoch: item for item in inventory.checkpoints}
     cache_dir = output_dir / "checkpoint-cache"
+    if args.outcome_only:
+        outcome_seed = _require_int(config, "outcome_attack_seed")
+        if feature_seed == outcome_seed:
+            raise RSLADSignalReplayError("feature_attack_seed and outcome_attack_seed must be independent")
+        outcomes = [
+            _replay_with_cache(
+                cache_dir=cache_dir,
+                checkpoint=checkpoint_by_epoch[epoch],
+                training_config=training_config,
+                teacher=teacher,
+                loader=loader,
+                device=device,
+                seed_domain="outcome",
+                base_seed=outcome_seed,
+                expected_count=expected_count,
+                replay_batch_size=batch_size,
+                saved_resolved_config_mapping_sha256=saved_digests["mapping_sha256"],
+                saved_resolved_config_file_sha256=saved_digests["file_sha256"],
+                teacher_metadata=teacher_metadata,
+                dataset_identity=dataset_identity,
+                analysis_provenance=analysis_provenance,
+            )
+            for epoch in OUTCOME_EPOCHS
+        ]
+        outcome_rows = tuple(row for item in outcomes for row in item.rows)
+        outcome_panel = build_outcome_panel(outcome_rows, expected_count=expected_count)
+        lineage = outcome_replay_lineage(
+            panel=inventory,
+            training_config=training_config,
+            expected_count=expected_count,
+            replay_batch_size=batch_size,
+            device_type=device.type,
+            runtime=execution_runtime,
+            outcome_seed=outcome_seed,
+            saved_resolved_config_mapping_sha256=saved_digests["mapping_sha256"],
+            saved_resolved_config_file_sha256=saved_digests["file_sha256"],
+            teacher_metadata=teacher_metadata,
+            dataset_identity=dataset_identity,
+            analysis_provenance=analysis_provenance,
+            outcome_results=outcomes,
+            historical_config_compatibility=historical_compatibility,
+        )
+        paths = write_outcome_replay_outputs(
+            output_dir=output_dir,
+            outcome_observations=outcome_rows,
+            outcome_panel=outcome_panel,
+            lineage=lineage,
+        )
+        print(json.dumps({name: str(path) for name, path in sorted(paths.items())}, sort_keys=True))
+        return 0
     features = [
         _replay_with_cache(
             cache_dir=cache_dir,

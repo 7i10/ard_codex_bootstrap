@@ -122,6 +122,13 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert history_screen.tests == ("tests/unit/test_history_screen.py",)
     assert history_screen.tiers == ("T0", "T1")
 
+    history_early = select(
+        ("src/ard/analysis/history_early.py", "src/ard/cli/history_early.py"),
+        (*available, "tests/unit/test_history_early.py"),
+    )
+    assert history_early.tests == ("tests/unit/test_history_early.py",)
+    assert history_early.tiers == ("T0", "T1")
+
     selector = select(
         (
             "src/ard/analysis/intervention_selector.py",
