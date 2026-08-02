@@ -1230,6 +1230,7 @@ def feature_replay_lineage(
     analysis_provenance: Mapping[str, Any],
     feature_results: Sequence[ReplayCheckpointResult],
     feature_panel: Sequence[Mapping[str, Any]],
+    historical_config_compatibility: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Bind L3's pre-anchor feature panel to its exact epoch-99 parent.
 
@@ -1290,7 +1291,7 @@ def feature_replay_lineage(
     if len(parent_ids) != expected_count or parent_ids != feature_ids:
         raise RSLADSignalReplayError("feature-only panel stable IDs do not exactly match the epoch-99 parent state")
     parent_sample_state_sha256 = hashlib.sha256(canonical_json(sample_state)).hexdigest()
-    return {
+    result = {
         "schema_version": 1,
         "kind": "l3_checkpoint_panel_feature_source_v1",
         "analysis_provenance": dict(analysis_provenance),
@@ -1327,6 +1328,9 @@ def feature_replay_lineage(
             for item in feature_results
         ],
     }
+    if historical_config_compatibility is not None:
+        result["historical_config_compatibility"] = dict(historical_config_compatibility)
+    return result
 
 
 def write_feature_replay_outputs(

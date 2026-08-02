@@ -121,6 +121,14 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/history_screen.py",
+            "src/ard/cli/history_screen.py",
+        ),
+        ("tests/unit/test_history_screen.py",),
+        ("T0", "T1"),
+    ),
+    (
+        (
             "src/ard/analysis/intervention_selector.py",
             "src/ard/analysis/intervention_fork.py",
             "src/ard/cli/intervention_selector.py",

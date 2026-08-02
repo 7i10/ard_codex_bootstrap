@@ -42,8 +42,63 @@ from ard.analysis.rslad_signal_replay import (
 from ard.analysis.signal_audit import CheckpointInventory
 from ard.config import load_config
 from ard.config.loader import resolved_config_dict
+from ard.config.schema import NormalizationConfig
 from ard.data import IndexedBatch
 from ard.engine.checkpoint import REQUIRED_KEYS, config_digest
+
+
+def _historical_replay_config(*, logging_only: bool) -> dict[str, object]:
+    raw = resolved_config_dict(
+        load_config(Path(__file__).parents[2] / "configs" / "experiments" / "synthetic_rslad.yaml")
+    )
+    raw["teacher"] = {
+        "source": "robustbench",
+        "architecture": "robustbench_wide_resnet",
+        "num_classes": 10,
+        "normalization": resolved_config_dict(
+            load_config(Path(__file__).parents[2] / "configs" / "experiments" / "synthetic_rslad.yaml")
+        )["teacher"]["normalization"],
+        "preprocessing_owner": "teacher_adapter",
+        "checkpoint": "/obsolete-host/Chen2021LTD_WRN34_10.pt",
+        "checkpoint_sha256": "d" * 64,
+        "registry_id": "chen2021_ltd_wrn34_10",
+        "threat_norm": "linf",
+        "threat_epsilon": "8/255",
+        "fixture_seed": 1729,
+    }
+    raw["teacher"]["normalization"] = NormalizationConfig(profile="cifar10_raw_identity").model_dump(mode="json")
+    raw["observation"] = {"profile": "teacher_response"}
+    if logging_only:
+        raw["method"]["id"] = "rslad_logging_only"
+        raw.pop("observation")
+        raw["research_design"] = {
+            "id": "logging_only_history_confirmatory_v1",
+            "manifest": "configs/analysis/logging_only_history_confirmatory_v1.yaml",
+            "sha256": "a" * 64,
+        }
+    return raw
+
+
+def _fake_teacher_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    preprocessing = SimpleNamespace(
+        owner="teacher_adapter",
+        profile="cifar10_raw_identity",
+        mean=(0.0, 0.0, 0.0),
+        std=(1.0, 1.0, 1.0),
+        normalization=lambda: NormalizationConfig(profile="cifar10_raw_identity"),
+    )
+    spec = SimpleNamespace(
+        registry_id="chen2021_ltd_wrn34_10",
+        architecture="robustbench_wide_resnet",
+        preprocessing=preprocessing,
+        threat=SimpleNamespace(norm="linf", epsilon="8/255"),
+        checkpoint_sha256="d" * 64,
+    )
+    registry = SimpleNamespace(
+        spec=lambda registry_id: spec if registry_id == spec.registry_id else None,
+        checkpoint_path=lambda _spec: tmp_path / "current.pt",
+    )
+    monkeypatch.setattr("ard.cli.rslad_signal_replay.TeacherRegistry.load", lambda: registry)
 
 
 def _checkpoint(epoch: int) -> CheckpointInventory:
@@ -306,6 +361,24 @@ def test_feature_only_lineage_binds_epoch99_parent_state_and_rejects_stable_id_d
         lineage["parent_sample_state_sha256"]
         == hashlib.sha256(rslad_signal_replay.canonical_json(parent_state)).hexdigest()
     )
+    compatibility = feature_replay_lineage(
+        panel=panel,
+        training_config=training_config,
+        expected_count=45000,
+        replay_batch_size=128,
+        device_type="cpu",
+        runtime={"selected_device": "cpu"},
+        feature_seed=7,
+        saved_resolved_config_mapping_sha256="c" * 64,
+        saved_resolved_config_file_sha256="d" * 64,
+        teacher_metadata={},
+        dataset_identity={},
+        analysis_provenance={},
+        feature_results=(),
+        feature_panel=feature_panel,
+        historical_config_compatibility={"kind": "feature_only_historical_config_compatibility_v1"},
+    )
+    assert compatibility["historical_config_compatibility"]["kind"] == "feature_only_historical_config_compatibility_v1"
     with pytest.raises(RSLADSignalReplayError, match="stable IDs"):
         feature_replay_lineage(
             panel=panel,
@@ -496,6 +569,46 @@ def test_saved_resolved_config_mapping_digest_is_distinct_from_file_byte_digest(
     reformatted_digests = saved_resolved_config_digests(reformatted)
     assert reformatted_digests["mapping_sha256"] == digests["mapping_sha256"]
     assert reformatted_digests["file_sha256"] != digests["file_sha256"]
+
+
+@pytest.mark.parametrize("logging_only", (True, False))
+def test_feature_only_replay_compatibility_accepts_both_historical_config_shapes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, logging_only: bool
+) -> None:
+    from ard.cli.rslad_signal_replay import load_feature_only_replay_config
+
+    _fake_teacher_registry(monkeypatch, tmp_path)
+    saved = tmp_path / ("l1.yaml" if logging_only else "l2.yaml")
+    saved.write_text(
+        yaml.safe_dump(_historical_replay_config(logging_only=logging_only), sort_keys=False), encoding="utf-8"
+    )
+    config, compatibility = load_feature_only_replay_config(saved)
+
+    assert config.method.id == "rslad"
+    assert config.observation.profile == "teacher_response"
+    assert config.teacher is not None and config.teacher.checkpoint == tmp_path / "current.pt"
+    assert compatibility["source_method_id"] == ("rslad_logging_only" if logging_only else "rslad")
+
+
+def test_feature_only_replay_compatibility_rejects_unknown_logging_metadata_and_teacher_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ard.cli.rslad_signal_replay import load_feature_only_replay_config
+
+    _fake_teacher_registry(monkeypatch, tmp_path)
+    raw = _historical_replay_config(logging_only=True)
+    raw["research_design"]["unexpected"] = True
+    saved = tmp_path / "unknown.yaml"
+    saved.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    with pytest.raises(RSLADSignalReplayError, match="unknown logging-only design"):
+        load_feature_only_replay_config(saved)
+
+    raw = _historical_replay_config(logging_only=False)
+    raw["teacher"]["normalization"] = NormalizationConfig(profile="cifar10_standard").model_dump(mode="json")
+    drifted = tmp_path / "teacher-drift.yaml"
+    drifted.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    with pytest.raises(RSLADSignalReplayError, match="teacher semantics"):
+        load_feature_only_replay_config(drifted)
 
 
 def test_common_trajectory_replay_passes_saved_checkpoint_hash_to_strict_loader(

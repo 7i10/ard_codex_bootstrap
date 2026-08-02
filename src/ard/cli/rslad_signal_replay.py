@@ -39,8 +39,109 @@ from ard.analysis.rslad_signal_replay import (
 from ard.analysis.signal_audit import inventory_run_bundle
 from ard.analysis.teacher_risk_replay import build_replay_loader
 from ard.config import load_config
+from ard.config.loader import load_resolved_config_for_evaluation
+from ard.config.schema import ExperimentConfig, TeacherConfig
 from ard.engine.checkpoint import config_digest
 from ard.models import build_teacher
+from ard.models.teacher_registry import TeacherRegistry
+
+_LOGGING_ONLY_DESIGN_ID = "logging_only_history_confirmatory_v1"
+
+
+def _sha256(value: object, *, name: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise RSLADSignalReplayError(f"{name} must be a lowercase SHA-256")
+    return value
+
+
+def _validate_feature_only_historical_metadata(raw: Mapping[str, Any]) -> None:
+    """Allow only the retired logging-only observation envelope, never objective drift."""
+    method = raw.get("method")
+    if not isinstance(method, Mapping) or not isinstance(method.get("id"), str):
+        raise RSLADSignalReplayError("saved resolved config lacks a method ID")
+    source_method = method["id"]
+    observation = raw.get("observation")
+    if observation is not None and observation != {"profile": "teacher_response"}:
+        raise RSLADSignalReplayError("feature-only replay rejects unknown observation metadata drift")
+    design = raw.get("research_design")
+    if source_method == "rslad_logging_only":
+        if (
+            not isinstance(design, Mapping)
+            or set(design) != {"id", "manifest", "sha256"}
+            or design.get("id") != _LOGGING_ONLY_DESIGN_ID
+            or not isinstance(design.get("manifest"), str)
+        ):
+            raise RSLADSignalReplayError("feature-only replay rejects unknown logging-only design metadata")
+        _sha256(design.get("sha256"), name="logging-only design SHA-256")
+    elif source_method == "rslad":
+        if design is not None:
+            raise RSLADSignalReplayError("ordinary RSLAD feature replay rejects research-design metadata")
+    else:
+        raise RSLADSignalReplayError("feature-only replay supports only historical RSLAD/logging-only RSLAD")
+
+
+def _reconcile_feature_only_teacher(config: ExperimentConfig) -> tuple[ExperimentConfig, dict[str, object]]:
+    """Rebind storage-only registry metadata after checking the historical teacher semantics."""
+    historical = config.teacher
+    if historical is None or historical.source != "robustbench" or historical.registry_id is None:
+        raise RSLADSignalReplayError("feature-only replay requires a RobustBench teacher with registry ID")
+    registry = TeacherRegistry.load()
+    spec = registry.spec(historical.registry_id)
+    semantics_match = (
+        historical.architecture == spec.architecture
+        and historical.num_classes == 10
+        and historical.preprocessing_owner == spec.preprocessing.owner
+        and historical.normalization.profile == spec.preprocessing.profile
+        and historical.normalization.mean == spec.preprocessing.mean
+        and historical.normalization.std == spec.preprocessing.std
+        and historical.threat_norm == spec.threat.norm
+        and historical.threat_epsilon == spec.threat.epsilon
+        and historical.checkpoint_sha256 == spec.checkpoint_sha256
+    )
+    if not semantics_match or spec.checkpoint_sha256 is None:
+        raise RSLADSignalReplayError("historical teacher semantics do not match the current pinned registry")
+    runtime_teacher = TeacherConfig(
+        source="robustbench",
+        architecture=spec.architecture,
+        num_classes=10,
+        normalization=spec.preprocessing.normalization(),
+        preprocessing_owner=spec.preprocessing.owner,
+        checkpoint=registry.checkpoint_path(spec),
+        checkpoint_sha256=spec.checkpoint_sha256,
+        registry_id=spec.registry_id,
+        threat_norm=spec.threat.norm,
+        threat_epsilon=spec.threat.epsilon,
+        fixture_seed=historical.fixture_seed,
+    )
+    return config.model_copy(update={"teacher": runtime_teacher}), {
+        "kind": "feature_only_historical_config_compatibility_v1",
+        "teacher_registry_id": spec.registry_id,
+        "historical_checkpoint_sha256": historical.checkpoint_sha256,
+        "runtime_checkpoint_path": str(registry.checkpoint_path(spec)),
+        "allowed_registry_metadata_evolution": ["checkpoint_path", "normalization.provenance"],
+    }
+
+
+def load_feature_only_replay_config(resolved_path: Path) -> tuple[ExperimentConfig, dict[str, object]]:
+    """Load a historical config into a replay-only RSLAD view without rewriting saved bytes."""
+    raw = _load_mapping(resolved_path)
+    _validate_feature_only_historical_metadata(raw)
+    try:
+        resolved = load_resolved_config_for_evaluation(resolved_path)
+    except ValueError as exc:
+        raise RSLADSignalReplayError("saved resolved config is not a compatible historical RSLAD config") from exc
+    runtime, teacher_migration = _reconcile_feature_only_teacher(resolved.config)
+    return runtime, {
+        "source_method_id": resolved.migration["source_method_id"],
+        "runtime_method_id": runtime.method.id,
+        "observation_profile": runtime.observation.profile,
+        "config_migration": resolved.migration["applied"],
+        "teacher_migration": teacher_migration,
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -177,7 +278,9 @@ def main(argv: list[str] | None = None) -> int:
     resolved_path = manifest_path.parent / "resolved_config.yaml"
     saved_resolved = _load_mapping(resolved_path)
     saved_digests = saved_resolved_config_digests(resolved_path)
-    training_config = load_config(resolved_path)
+    training_config, historical_compatibility = (
+        load_feature_only_replay_config(resolved_path) if args.feature_only else (load_config(resolved_path), None)
+    )
     validate_rslad_replay_attack(training_config)
     if training_config.teacher is None:
         raise RSLADSignalReplayError("common-trajectory replay requires a registered teacher")
@@ -247,6 +350,7 @@ def main(argv: list[str] | None = None) -> int:
             analysis_provenance=analysis_provenance,
             feature_results=features,
             feature_panel=feature_panel,
+            historical_config_compatibility=historical_compatibility,
         )
         paths = write_feature_replay_outputs(
             output_dir=output_dir,
