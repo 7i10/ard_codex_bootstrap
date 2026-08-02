@@ -91,6 +91,20 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/epoch_metrics.py",
+            "src/ard/analysis/wandb_history.py",
+            "scripts/analyze_wandb_ro.py",
+            "scripts/tag_wandb_runs.py",
+        ),
+        (
+            "tests/unit/test_epoch_metrics.py",
+            "tests/unit/test_wandb_history.py",
+            "tests/integration/test_tracking_evaluation.py",
+        ),
+        ("T0", "T1"),
+    ),
+    (
+        (
             "src/ard/analysis/logging_only_state.py",
             "src/ard/cli/logging_only_state.py",
         ),

@@ -149,6 +149,13 @@ def test_offline_training_bundle_and_checkpoint_publication(offline_run: dict[st
     copied = torch.load(published, map_location="cpu", weights_only=False)["model"]
     assert original.keys() == copied.keys()
     assert all(torch.equal(original[key], copied[key]) for key in original)
+    epoch_metrics = output / "epoch-metrics.parquet"
+    assert epoch_metrics.is_file()
+    epoch_rows = pq.read_table(epoch_metrics).to_pylist()
+    assert [row["epoch"] for row in epoch_rows] == [0]
+    epoch_entry = next(entry for entry in manifest["artifacts"] if entry["type"] == "epoch-metrics")
+    assert (bundle / epoch_entry["local_path"] / "epoch-metrics.parquet").is_file()
+    assert manifest["summary"]["epoch_metrics_complete"] is True
 
 
 def test_diagnostics_off_constructs_no_diagnostics_or_sample_statistics(
@@ -681,6 +688,35 @@ def test_terminal_sparse_artifact_resume_is_byte_for_byte_read_only(tmp_path: Pa
     assert _tree_bytes(output) == before
 
 
+def test_terminal_resume_allows_legacy_manifest_without_epoch_metric_capability(tmp_path: Path) -> None:
+    output, _ = _three_epoch_terminal_run(tmp_path)
+    manifest_path = output / "run-bundle" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["summary"].pop("epoch_metrics_complete")
+    manifest["artifacts"] = [entry for entry in manifest["artifacts"] if entry.get("type") != "epoch-metrics"]
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    before = _tree_bytes(output)
+
+    assert train_cli.main(["--config", str(output / "resolved_config.yaml"), "--resume", str(output / "last.pt")]) == 0
+
+    assert _tree_bytes(output) == before
+
+
+def test_terminal_resume_rejects_new_capability_manifest_missing_epoch_artifact(tmp_path: Path) -> None:
+    output, _ = _three_epoch_terminal_run(tmp_path)
+    manifest_path = output / "run-bundle" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert "epoch_metrics_complete" in manifest["summary"]
+    manifest["artifacts"] = [entry for entry in manifest["artifacts"] if entry.get("type") != "epoch-metrics"]
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    before = _tree_bytes(output)
+
+    with pytest.raises(TrackingError, match="prior artifacts are incomplete"):
+        train_cli.main(["--config", str(output / "resolved_config.yaml"), "--resume", str(output / "last.pt")])
+
+    assert _tree_bytes(output) == before
+
+
 def test_corrupt_terminal_artifact_resume_fails_without_mutation(tmp_path: Path) -> None:
     output, _ = _three_epoch_terminal_run(tmp_path)
     manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
@@ -759,3 +795,46 @@ def test_terminal_partial_run_rejects_nonterminal_resume_without_mutation(
     with pytest.raises(TrackingError, match="completed epoch boundary"):
         train_cli.main(["--config", str(config_path), "--resume", str(output / "last.pt")])
     assert _tree_bytes(output) == before
+
+
+def test_interrupted_local_tracker_resume_merges_epoch_store_with_global_step(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "interrupted-local-tracker"
+    config = _training_config(output)
+    config["training"]["epochs"] = 2
+    config["tracking"].update({"mode": "offline", "run_id": "interrupted-local"})
+    config_path = tmp_path / "interrupted-local-tracker.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    original_fit = Trainer.fit
+
+    def interrupt_after_first_callback(self: Trainer, *args: object, **kwargs: object) -> list[dict[str, float]]:
+        if kwargs.get("start_epoch", 0) != 0:
+            return original_fit(self, *args, **kwargs)
+        callback = kwargs["on_epoch_end"]
+        assert callable(callback)
+
+        def abort_after_record(metrics: dict[str, float], improved: bool) -> None:
+            callback(metrics, improved)
+            raise RuntimeError("injected interruption after local metric write")
+
+        kwargs["on_epoch_end"] = abort_after_record
+        return original_fit(self, *args, **kwargs)
+
+    monkeypatch.setattr(Trainer, "fit", interrupt_after_first_callback)
+    with pytest.raises(RuntimeError, match="injected interruption"):
+        train_cli.main(["--config", str(config_path)])
+
+    epoch_store = output / "epoch-metrics.jsonl"
+    metric_store = output / "run-bundle" / "metrics.jsonl"
+    first_epoch = [json.loads(line) for line in epoch_store.read_text(encoding="utf-8").splitlines()]
+    first_tracker = [json.loads(line) for line in metric_store.read_text(encoding="utf-8").splitlines()]
+    assert first_epoch == first_tracker
+    assert [row["epoch"] for row in first_epoch] == [0]
+    assert isinstance(first_epoch[0]["global_step"], int)
+
+    assert train_cli.main(["--config", str(config_path), "--resume", str(output / "last.pt")]) == 0
+    merged_epoch = [json.loads(line) for line in epoch_store.read_text(encoding="utf-8").splitlines()]
+    merged_tracker = [json.loads(line) for line in metric_store.read_text(encoding="utf-8").splitlines()]
+    assert merged_epoch == merged_tracker
+    assert [row["epoch"] for row in merged_epoch] == [0, 1]

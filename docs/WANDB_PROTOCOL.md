@@ -119,6 +119,21 @@ last_pgd_accuracy
 robust_overfit_gap
 ```
 
+新規runではrank 0が同じepoch rowを`epoch-metrics.jsonl`へatomicに保存し、resume時はsample/stateと
+同様に既存epochをexact mergeします。同じepochの異なるrowは失敗し、欠落を補間しません。正常終了時は
+`epoch-metrics-<run-id>` Parquet artifactを公開します。canonical 200 epoch runはさらに次をsummaryへ保存します。
+
+```text
+val_pgd_mean_epoch_100_199
+val_pgd_mean_epoch_120_199
+val_pgd_mean_epoch_150_199
+val_pgd_normalized_auc_epoch_100_199
+val_pgd_slope_epoch_120_199
+```
+
+いずれもtraining中のvalidation PGD trajectoryであり、official test PGD/AutoAttackの代用にはしません。
+200 epochが完全に揃わないrunはcoverageだけを記録し、late summaryを生成しません。
+
 evaluationはcheckpointごとに`eval_clean_accuracy`と`eval_pgd_accuracy`を記録し、
 summaryへ`evaluation_checkpoints`を保存します。clean、PGD、AutoAttackを同じmetric名へ混ぜません。
 AutoAttack resultにはexplicit seedと`evaluation.autoattack_batch_size`を保存し、全dataset tensorを
@@ -163,6 +178,7 @@ train run:
 - `model-<run-id>-best`（alias `best`, file SHA-256）
 - `model-<run-id>-last`（alias `last`, file SHA-256）
 - `sample-stats-<run-id>`（Parquet, file SHA-256）
+- `epoch-metrics-<run-id>`（exact epoch trajectory Parquet, file SHA-256）
 - `run-bundle-<run-id>`（全file hashから作るdirectory digest）
 - frozen-oracle runだけ`frozen-oracle-input-<run-id>`（exact mask JSON、alias `input`、file SHA-256）
 
@@ -210,15 +226,37 @@ manifest/artifactsを除いたexact file digestを`failure_snapshot`へ保存し
 集約は`ard.cli.status`を使い、GPU pollingやcampaign watchdogをtraining correctnessの条件にしません。
 
 全epoch完了後のterminal no-op resumeは、prior terminal statusとcompletion marker、best/last・sample-stats・
-run-bundle artifactの存在、file artifactのsource/local content hashを検証してから終了します。summary、artifact
-history、sample-stat bytesは再生成しません。
+run-bundle artifactの存在、file artifactのsource/local content hashを検証してから終了します。新形式summaryが
+`epoch_metrics_complete`を持つ場合はepoch-metrics artifactも必須です。旧manifestは互換性のためこの新artifactを
+要求しません。summary、artifact history、sample-stat bytesは再生成しません。
+
+## 8. 履歴解析とrun分類
+
+W&B project全体のhistoryを反復scanしません。解析対象は
+`configs/analysis/wandb_ro_cohort.yaml`のexact run IDに固定し、次を使用します。
+
+```bash
+PYTHONPATH=src python scripts/analyze_wandb_ro.py \
+  --cohort configs/analysis/wandb_ro_cohort.yaml
+```
+
+新規runはepoch-metrics artifactを優先し、旧runだけを`run.history`で取得します。旧履歴はcohortで明示した
+inclusive `epoch_start..epoch_end`（通常runは`0..199`、epoch-99 forkは`100..199`）がuniqueかつ完全な場合だけ
+採用します。既知の旧run cohortは`trajectory_source: legacy_history`を宣言し、存在しない新artifactの列挙を
+省きます。finished cohortの成功結果は
+`.cache/wandb-history/`へfingerprint付きで保存し、同じ解析は`cached: true`としてhistory取得を省きます。
+再取得は`--force`で明示します。
+
+既存runは移動・削除せず、`configs/analysis/wandb_run_tags.yaml`の明示registryからadditiveに分類します。
+`scripts/tag_wandb_runs.py`はdry-runがdefaultで、`--apply`後も既存tagを保持し、再実行はno-opです。
+artifactを持つrunを別projectへ移すとartifact lineageが自動追随しないため、画面整理にはtagとsaved viewを使います。
 
 Tiny-ImageNet evaluation adapterのsplit identityは、expected digestなしでは`computed`、expected digest一致時は
 `computed-and-matched`です。一方、resolved training configだけから復元するtraining dataset identityは
 `expected-unverified`であり、training時のobserved digestではありません。Tiny-ImageNetのT5/paper集計前には、
 observed training split identityをtraining lineageへ永続化して評価時に照合する追加実装が必要です。
 
-## 8. Verified scope
+## 9. Verified scope
 
 Teacher acquisition templates and registry inspection do not initialize W&B.
 Until a checkpoint is explicitly registered and a reproducible run approved,

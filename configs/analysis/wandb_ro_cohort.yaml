@@ -1,0 +1,37 @@
+entity: shunsuke-n-waseda-university
+project: single-teacher-ard
+metric: val_pgd_accuracy
+expected_epochs: 200
+trajectory_source: legacy_history
+runs:
+  - run_id: prod-chen-rslad-s0-2d54b82
+  - run_id: prod-chen-entropy-s0-2d54b82
+  - run_id: prod-chen-student-s0-2d54b82
+  - run_id: prod-chen-joint-s0-2d54b82
+  - run_id: prod-bart-rslad-s0-2d54b82
+  - run_id: prod-bart-entropy-s0-2d54b82
+  - run_id: prod-bart-student-s0-2d54b82
+  - run_id: prod-bart-joint-s0-2d54b82
+  - run_id: bart-oracle-soft-s0-05cd0c6
+  - run_id: bart-rand1-soft-s0-05cd0c6
+  - run_id: bart-rand2-soft-s0-05cd0c6
+  - run_id: bart-rand3-soft-s0-05cd0c6
+  - run_id: bart-rslad-logging-only-s1-confirm-v1
+  - run_id: chen-rslad-observed-s1-confirm-v2
+  - run_id: bart-rslad-observed-s2-confirm-v2
+  - run_id: chen-rslad-observed-s2-confirm-v2
+  - run_id: bart-h3-c-s2-20260802-v1
+    epoch_start: 100
+    epoch_end: 199
+  - run_id: bart-h3-hs-s2-20260802-v1
+    epoch_start: 100
+    epoch_end: 199
+  - run_id: bart-h3-rs-s2-20260802-v1
+    epoch_start: 100
+    epoch_end: 199
+  - run_id: bart-h3-hd-s2-20260802-v1
+    epoch_start: 100
+    epoch_end: 199
+  - run_id: bart-h3-rd-s2-20260802-v1
+    epoch_start: 100
+    epoch_end: 199

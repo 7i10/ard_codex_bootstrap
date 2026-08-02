@@ -1,0 +1,112 @@
+entity: shunsuke-n-waseda-university
+project: single-teacher-ard
+runs:
+  # Canonical seed-0 comparison. These are primary evidence, not multi-seed confirmation.
+  - run_id: prod-chen-rslad-s0-2d54b82
+    tags: [canonical-seed0, primary-evidence, teacher-chen, method-rslad]
+  - run_id: prod-chen-entropy-s0-2d54b82
+    tags: [canonical-seed0, primary-evidence, teacher-chen, method-entropy]
+  - run_id: prod-chen-student-s0-2d54b82
+    tags: [canonical-seed0, primary-evidence, teacher-chen, method-student-v1]
+  - run_id: prod-chen-joint-s0-2d54b82
+    tags: [canonical-seed0, primary-evidence, teacher-chen, method-joint-v1]
+  - run_id: prod-bart-rslad-s0-2d54b82
+    tags: [canonical-seed0, primary-evidence, teacher-bartoldson, method-rslad]
+  - run_id: prod-bart-entropy-s0-2d54b82
+    tags: [canonical-seed0, primary-evidence, teacher-bartoldson, method-entropy]
+  - run_id: prod-bart-student-s0-2d54b82
+    tags: [canonical-seed0, primary-evidence, teacher-bartoldson, method-student-v1]
+  - run_id: prod-bart-joint-s0-2d54b82
+    tags: [canonical-seed0, primary-evidence, teacher-bartoldson, method-joint-v1]
+
+  # Saved-checkpoint official PGD/AutoAttack evaluations for the canonical runs.
+  - run_id: eval-7008ebd671ee70b41990
+    tags: [canonical-seed0, official-evaluation, attack-pgd20]
+  - run_id: eval-7b10222b14d776f001ca
+    tags: [canonical-seed0, official-evaluation, attack-pgd20]
+  - run_id: eval-141ef2fedeb6cd23c4fe
+    tags: [canonical-seed0, official-evaluation, attack-pgd20]
+  - run_id: eval-1eefd911db6c022c20f6
+    tags: [canonical-seed0, official-evaluation, attack-pgd20]
+  - run_id: eval-78ffd40168b6d8a1d3c8
+    tags: [canonical-seed0, official-evaluation, attack-pgd20]
+  - run_id: eval-8ff463c11843dfdd9b24
+    tags: [canonical-seed0, official-evaluation, attack-pgd20]
+  - run_id: eval-3839fd906dfc2aa5b318
+    tags: [canonical-seed0, official-evaluation, attack-pgd20]
+  - run_id: eval-0970af3946e2f896e15d
+    tags: [canonical-seed0, official-evaluation, attack-pgd20]
+  - run_id: eval-7ebd06a00e4f8f2d996d
+    tags: [canonical-seed0, official-evaluation, attack-autoattack]
+  - run_id: eval-d35bce64e04dbdbdd56e
+    tags: [canonical-seed0, official-evaluation, attack-autoattack]
+  - run_id: eval-ae9e62a7694d143f3fb9
+    tags: [canonical-seed0, official-evaluation, attack-autoattack]
+  - run_id: eval-eafdd255adb7eb585582
+    tags: [canonical-seed0, official-evaluation, attack-autoattack]
+  - run_id: eval-ff1c4b50655af6d7997a
+    tags: [canonical-seed0, official-evaluation, attack-autoattack]
+  - run_id: eval-6dcf1b78a77d3258b2e0
+    tags: [canonical-seed0, official-evaluation, attack-autoattack]
+  - run_id: eval-180f437c57a483fdf8e7
+    tags: [canonical-seed0, official-evaluation, attack-autoattack]
+  - run_id: eval-f9f84e63660ac6825d93
+    tags: [canonical-seed0, official-evaluation, attack-autoattack]
+
+  # Analysis and intervention evidence; retain but keep separate from primary comparisons.
+  - run_id: bart-oracle-soft-s0-05cd0c6
+    tags: [research-evidence, outcome-informed-mask, teacher-bartoldson]
+  - run_id: bart-rand1-soft-s0-05cd0c6
+    tags: [research-evidence, random-control, teacher-bartoldson]
+  - run_id: bart-rand2-soft-s0-05cd0c6
+    tags: [research-evidence, random-control, teacher-bartoldson]
+  - run_id: bart-rand3-soft-s0-05cd0c6
+    tags: [research-evidence, random-control, teacher-bartoldson]
+  - run_id: bart-rslad-logging-only-s1-confirm-v1
+    tags: [research-evidence, logging-only, teacher-bartoldson, seed1]
+  - run_id: chen-rslad-observed-s1-confirm-v2
+    tags: [research-evidence, logging-only, teacher-chen, seed1]
+  - run_id: bart-rslad-observed-s2-confirm-v2
+    tags: [research-evidence, logging-only, teacher-bartoldson, seed2]
+  - run_id: chen-rslad-observed-s2-confirm-v2
+    tags: [research-evidence, logging-only, teacher-chen, seed2]
+  - run_id: bart-h3-c-s2-20260802-v1
+    tags: [research-evidence, h4-factorial, arm-control, teacher-bartoldson, seed2]
+  - run_id: bart-h3-hs-s2-20260802-v1
+    tags: [research-evidence, h4-factorial, arm-history-softening, teacher-bartoldson, seed2]
+  - run_id: bart-h3-rs-s2-20260802-v1
+    tags: [research-evidence, h4-factorial, arm-random-softening, teacher-bartoldson, seed2]
+  - run_id: bart-h3-hd-s2-20260802-v1
+    tags: [research-evidence, h4-factorial, arm-history-downweight, teacher-bartoldson, seed2]
+  - run_id: bart-h3-rd-s2-20260802-v1
+    tags: [research-evidence, h4-factorial, arm-random-downweight, teacher-bartoldson, seed2]
+
+  # Useful engineering references.
+  - run_id: ard-32a10cb8a2cab31a
+    tags: [reference, world-size2]
+  - run_id: eval-1ef1f9bf888a3f2ef1fb
+    tags: [reference, world-size2, official-evaluation]
+  - run_id: pilot-h-chen-rslad-s0-2d54b82
+    tags: [accepted-pilot, teacher-chen]
+  - run_id: pilot-f-bart-rslad-s0-2d54b82
+    tags: [accepted-pilot, teacher-bartoldson]
+  - run_id: pilot-h-chen-joint-s0-2d54b82
+    tags: [accepted-pilot, teacher-chen]
+  - run_id: eval-9bfe992e255a93963ea5
+    tags: [accepted-pilot, official-evaluation]
+  - run_id: eval-4d63212beaf3ba36872d
+    tags: [accepted-pilot, official-evaluation]
+  - run_id: eval-6954e9df43e0a4e6839e
+    tags: [accepted-pilot, official-evaluation]
+
+  # Retained for traceability, hidden by the default important-run view.
+  - run_id: ard-cde030a72ddca4b9
+    tags: [superseded]
+  - run_id: eval-92f3750eb628e93d6060
+    tags: [superseded]
+  - run_id: pilot-h-chen-joint-s0-712b878
+    tags: [superseded]
+  - run_id: pilot-h-chen-rslad-s0-712b878
+    tags: [superseded]
+  - run_id: eval-6f99576e8fa285a61f12
+    tags: [superseded]

@@ -136,6 +136,27 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert selector.tiers == ("T0", "T1", "T2")
 
 
+def test_wandb_history_tools_select_only_tracking_history_contracts() -> None:
+    available = (
+        "tests/unit/test_epoch_metrics.py",
+        "tests/unit/test_wandb_history.py",
+        "tests/integration/test_tracking_evaluation.py",
+        "tests/smoke/test_training_smoke.py",
+        "tests/unit/test_pgd.py",
+    )
+    selected = select(
+        (
+            "src/ard/analysis/epoch_metrics.py",
+            "src/ard/analysis/wandb_history.py",
+            "scripts/analyze_wandb_ro.py",
+            "scripts/tag_wandb_runs.py",
+        ),
+        available,
+    )
+    assert selected.tests == tuple(sorted(available[:3]))
+    assert selected.tiers == ("T0", "T1")
+
+
 def test_teacher_acquisition_scripts_select_focused_acquisition_and_registry_tests() -> None:
     available = (
         "tests/unit/test_external_management.py",

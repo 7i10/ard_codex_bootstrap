@@ -420,16 +420,18 @@ local manifestを保存した上で
 
 ### 推奨するW&B view
 
-現在run tagsは全件空です。campaign中に命名規則を変更せず、まず次のfilterで4 viewへ分けます。
+2026-08-02に`configs/analysis/wandb_run_tags.yaml`のexact ID registryをdry-run後に適用しました。既存tag、
+run ID、project、artifactは変更せず、再dry-runが全件`changed: false`になることを確認しています。
 
-1. **Paper candidate**: `tier=production`かつgroupに`-ws1-`を含む
-2. **Official evaluation**: 1に加えて`job_type=evaluation`
-3. **Reference ws2**: groupに`localbn-ws2`を含む
-4. **Pilots/history**: `tier=pilot`
+1. **Primary seed-0**: tag `canonical-seed0` + `primary-evidence`
+2. **Official evaluation**: tag `official-evaluation`、attack別に`attack-pgd20` / `attack-autoattack`
+3. **Research evidence**: tag `research-evidence`（logging-only、outcome-informed、H4 factorialを含む）
+4. **Accepted pilots/reference**: tag `accepted-pilot`または`reference`
+5. **通常非表示**: tag `superseded`
 
-campaign完了後に、同じ分類を`paper-candidate`、`reference-ws2`、`accepted-pilot`、`superseded` tagとして
-付与すると見通しが良くなります。既存evaluation run名はPGD/AAを画面上で判別しにくいため、次campaignでは
-display nameへ`pgd`または`autoattack`を含めます。seed-0 campaign途中ではlineageを変えないため実施しません。
+`canonical-seed0`は主要比較であり、複数seed確認済みという意味ではありません。削除やproject移動はartifact
+lineageを壊すため行わず、W&B workspaceでは上記tagのsaved viewを作成します。新しい分類はregistryへexact IDを
+追加してからdry-runし、未知runを名前パターンだけで自動分類しません。
 
 ## 7. 更新ルール
 

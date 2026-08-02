@@ -499,9 +499,7 @@ class LocalTracker:
                 "arm": config.intervention.arm,
                 "selector": config.intervention.selector,
                 "kind": config.intervention.kind,
-                "mask": None
-                if config.intervention.mask is None
-                else config.intervention.mask.model_dump(mode="json"),
+                "mask": None if config.intervention.mask is None else config.intervention.mask.model_dump(mode="json"),
                 "post_fork_best_scope": True,
             }
         if prior is not None:
@@ -785,9 +783,17 @@ class LocalTracker:
             raise TrackingError("no-op resume prior artifacts are invalid")
         aliases = {alias for entry in entries if isinstance(entry, dict) for alias in entry.get("aliases", [])}
         requires_sample_stats = self.config.tracking.diagnostics_mode != "off"
+        summary = prior.get("summary")
+        requires_epoch_metrics = isinstance(summary, Mapping) and "epoch_metrics_complete" in summary
         has_sample_stats = any(isinstance(entry, dict) and entry.get("type") == "sample-stats" for entry in entries)
+        has_epoch_metrics = any(isinstance(entry, dict) and entry.get("type") == "epoch-metrics" for entry in entries)
         has_bundle = any(isinstance(entry, dict) and entry.get("type") == "run-bundle" for entry in entries)
-        if not {"best", "last"}.issubset(aliases) or (requires_sample_stats and not has_sample_stats) or not has_bundle:
+        if (
+            not {"best", "last"}.issubset(aliases)
+            or (requires_sample_stats and not has_sample_stats)
+            or (requires_epoch_metrics and not has_epoch_metrics)
+            or not has_bundle
+        ):
             raise TrackingError("no-op resume prior artifacts are incomplete")
         latest_source_entry: dict[tuple[str, str], int] = {}
         for index, entry in enumerate(entries):

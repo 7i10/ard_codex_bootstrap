@@ -16,6 +16,7 @@ from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 from ard.analysis import write_sample_parquet
+from ard.analysis.epoch_metrics import EpochMetricStore, epoch_trajectory_summary, write_epoch_metrics_parquet
 from ard.analysis.frozen_oracle import FrozenRiskLookup, load_frozen_risk_lookup
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, load_config, save_resolved_config
@@ -574,6 +575,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps({"output_dir": str(output_dir), "history": []}, sort_keys=True))
             return 0
 
+        epoch_store = EpochMetricStore(output_dir / "epoch-metrics.jsonl") if is_rank_zero() else None
+        if epoch_store is not None and isinstance(active_tracker, LocalTracker):
+            # A resumed process receives the complete prior local trajectory,
+            # not merely the rows produced by this invocation.
+            epoch_store.merge_tracker_jsonl(active_tracker.metrics_path)
+
         def _record_epoch(metrics: Mapping[str, float], improved: bool) -> None:
             # Every rank enters one phase after checkpoint writes.  The best
             # conditional lives inside the rank-zero closure, never around a
@@ -581,6 +588,11 @@ def main(argv: list[str] | None = None) -> int:
             def record(active_tracker: ExperimentTracker) -> None:
                 values = dict(metrics)
                 values["epoch"] = trainer.current_epoch
+                values["global_step"] = trainer.global_step
+                if epoch_store is not None:
+                    epoch_store.merge((values,))
+                # Reject a conflicting resumed epoch before the remote backend
+                # can receive a second row for that epoch.
                 active_tracker.log_metrics(values, step=trainer.global_step)
                 publish_models = (
                     trainer.current_epoch + 1 == config.training.epochs
@@ -691,6 +703,16 @@ def main(argv: list[str] | None = None) -> int:
             selected_pgd = _selection_metric(selected_pgd, name="selected PGD accuracy")
             last_clean = _selection_metric(last_clean, name="last clean accuracy")
             last_pgd = _selection_metric(last_pgd, name="last PGD accuracy")
+            if epoch_store is None:
+                raise RuntimeError("rank-zero finalization requires an epoch metric store")
+            epoch_rows = epoch_store.rows()
+            epoch_artifact = output_dir / "epoch-metrics.parquet"
+            write_epoch_metrics_parquet(epoch_rows, epoch_artifact)
+            active_tracker.log_artifact(
+                epoch_artifact,
+                name=f"epoch-metrics-{active_tracker.run_id}",
+                artifact_type="epoch-metrics",
+            )
             if stats_path is not None:
                 active_tracker.log_artifact(
                     stats_path, name=f"sample-stats-{active_tracker.run_id}", artifact_type="sample-stats"
@@ -704,6 +726,7 @@ def main(argv: list[str] | None = None) -> int:
                     "last_clean_accuracy": last_clean,
                     "last_pgd_accuracy": last_pgd,
                     "robust_overfit_gap": selected_pgd - last_pgd,
+                    **epoch_trajectory_summary(epoch_rows, expected_epochs=config.training.epochs),
                 }
             )
             bundle = output_dir / "run-bundle"
