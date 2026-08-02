@@ -129,6 +129,13 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert history_early.tests == ("tests/unit/test_history_early.py",)
     assert history_early.tiers == ("T0", "T1")
 
+    h4a_taxonomy = select(
+        ("src/ard/analysis/h4a_taxonomy.py", "src/ard/cli/h4a_taxonomy.py"),
+        (*available, "tests/unit/test_h4a_taxonomy.py"),
+    )
+    assert h4a_taxonomy.tests == ("tests/unit/test_h4a_taxonomy.py",)
+    assert h4a_taxonomy.tiers == ("T0", "T1")
+
     selector = select(
         (
             "src/ard/analysis/intervention_selector.py",

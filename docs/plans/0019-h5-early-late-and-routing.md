@@ -115,7 +115,7 @@ before consuming a new confirmation seed.
   - Acceptance: separate best-oriented and RO-oriented tables at epochs
     39/59/79/99.
 
-- [ ] M3 -- produce bounded H4a taxonomy by reusing the H5 matrix.
+- [~] M3 -- produce bounded H4a taxonomy by reusing the H5 matrix.
   - Files: analysis module/CLI, report schema, tests.
   - Tests: exhaustive/disjoint taxonomy, transition fixtures, lineage joins.
   - Acceptance: primary state counts, teacher/student cross-tabs, continuous
@@ -200,6 +200,14 @@ agent, repeated review, or GPU job is needed for M0/M1.
   change; cache/source identity prevents schema-v1 reuse.  M2 focused tests
   passed (`77 passed`), and the impact-selected T0/T1 suites passed
   (`6 + 39 + 33`).  No official test or new training was consumed.
+- 2026-08-02: M3 implementation adds a read-only schema-v2 H4a taxonomy and
+  blinded stable-ID manifest.  Early taxonomy uses only feature-domain
+  anchor-to-99 transitions at epochs 39/59/79; late taxonomy uses only the
+  independent outcome-domain 99-to-199 transitions.  It reports exhaustive
+  primary groups, continuous teacher confidence/margin summaries, cross-tabs,
+  class/ID hashes, same-panel endpoint-error coverage, and within-teacher
+  cross-seed Jaccard.  No route or threshold is defined.  Focused unit tests
+  passed (`38 passed`); real L1--L4 reports remain pending schema-v2 replay.
 
 ## Completion report
 
