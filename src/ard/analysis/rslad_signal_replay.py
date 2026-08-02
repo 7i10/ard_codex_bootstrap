@@ -1470,6 +1470,7 @@ def outcome_replay_lineage(
         "saved_resolved_config_mapping_sha256": saved_resolved_config_mapping_sha256,
         "saved_resolved_config_file_sha256": saved_resolved_config_file_sha256,
         "scientific_git_sha": panel.scientific_git_sha,
+        "seed": training_config.seeds.model_init,
         "checkpoint_training": {
             "world_size": panel.world_size,
             "execution_identity": training_execution_identity(

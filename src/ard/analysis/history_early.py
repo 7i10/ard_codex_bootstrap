@@ -125,7 +125,14 @@ def _panel(
     return out
 
 
-def _lineage(path: Path, obs: Path, key: str, count: int) -> dict[str, Any]:
+def _lineage(
+    path: Path,
+    obs: Path,
+    key: str,
+    count: int,
+    *,
+    allow_historical_outcome_seed_omission: bool = False,
+) -> dict[str, Any]:
     x = _json(path)
     if (
         x.get("schema_version") != 1
@@ -138,7 +145,6 @@ def _lineage(path: Path, obs: Path, key: str, count: int) -> dict[str, Any]:
         "run_id",
         "config_hash",
         "scientific_git_sha",
-        "seed",
         "attack_identity",
         "dataset_identity",
         "teacher",
@@ -146,7 +152,11 @@ def _lineage(path: Path, obs: Path, key: str, count: int) -> dict[str, Any]:
     ):
         if k not in x:
             raise HistoryEarlyError("lineage identity incomplete")
-    return x
+    if "seed" in x:
+        return {**x, "_outcome_seed_compatibility": "declared"}
+    if allow_historical_outcome_seed_omission and key == "outcome_observations_sha256":
+        return {**x, "_outcome_seed_compatibility": "historical_missing_seed"}
+    raise HistoryEarlyError("lineage identity incomplete")
 
 
 def _mid(v: Mapping[int, float]) -> dict[int, float]:
@@ -417,13 +427,18 @@ def analyze_history_early_online(
     """Primary revised-H5: online scores/risk sets with replay-only outcomes."""
     panel = _online_panel(online_states, online_lineage, expected_count)
     feature_meta = _lineage(feature_lineage, feature_observations, "feature_observations_sha256", expected_count)
-    outcome_meta = _lineage(outcome_lineage, outcome_observations, "outcome_observations_sha256", expected_count)
+    outcome_meta = _lineage(
+        outcome_lineage,
+        outcome_observations,
+        "outcome_observations_sha256",
+        expected_count,
+        allow_historical_outcome_seed_omission=True,
+    )
     online_meta = _json(online_lineage)
     identity_keys = (
         "run_id",
         "config_hash",
         "scientific_git_sha",
-        "seed",
         "attack_identity",
         "dataset_identity",
         "teacher",
@@ -431,6 +446,11 @@ def analyze_history_early_online(
     if any(
         online_meta.get(key) != feature_meta[key] or feature_meta[key] != outcome_meta[key] for key in identity_keys
     ):
+        raise HistoryEarlyError("online/replay lineage identity drifted")
+    if online_meta.get("seed") != feature_meta["seed"]:
+        raise HistoryEarlyError("online/replay lineage identity drifted")
+    outcome_seed_status = outcome_meta["_outcome_seed_compatibility"]
+    if outcome_seed_status == "declared" and outcome_meta["seed"] != feature_meta["seed"]:
         raise HistoryEarlyError("online/replay lineage identity drifted")
     feature = _panel(_parquet(feature_observations), FEATURE_EPOCHS, expected_count, "feature replay")
     replay = _panel(_parquet(outcome_observations), OUTCOME_EPOCHS, expected_count, "outcome replay")
@@ -505,11 +525,15 @@ def analyze_history_early_online(
         "contract": "h5_early_online_primary_v1",
         "status": "point_only",
         "input_identity": {
-            **{key: outcome_meta[key] for key in identity_keys},
+            **{key: feature_meta[key] for key in (*identity_keys, "seed")},
             "teacher_registry_id": outcome_meta["teacher"].get("registry_id"),
             "online_states_sha256": sha256_file(online_states),
             "feature_observations_sha256": sha256_file(feature_observations),
             "outcome_observations_sha256": sha256_file(outcome_observations),
+            "outcome_seed_compatibility": {
+                "status": outcome_seed_status,
+                "effective_seed": feature_meta["seed"],
+            },
         },
         "anchors": [39, 59, 79],
         "reports": reports,

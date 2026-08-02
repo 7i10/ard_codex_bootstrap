@@ -34,6 +34,10 @@ PARENT_MILESTONES = (100, 150)
 CHILD_MILESTONES = (120, 170)
 PARENT_EPOCH = 79
 PARENT_GLOBAL_STEP = 28_160
+_LOGGING_ONLY_METHOD_ID = "rslad_logging_only"
+_LOGGING_ONLY_DESIGN_ID = "logging_only_history_confirmatory_v1"
+_LOGGING_ONLY_DESIGN_MANIFEST = "configs/analysis/logging_only_history_confirmatory_v1.yaml"
+_LOGGING_ONLY_DESIGN_SHA256 = "d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12"
 
 
 class ScheduleControlForkError(RuntimeError):
@@ -78,6 +82,72 @@ def _require_mapping(value: object, *, name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ScheduleControlForkError(f"{name} must be a mapping")
     return value
+
+
+def _validate_historical_logging_only_metadata(raw: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Accept exactly the retired, parity-attested L1 envelope.
+
+    This is deliberately narrower than evaluation compatibility.  A schedule
+    fork is a new training run, so only the known historical config shape may
+    cross that boundary; arbitrary legacy metadata must not become a general
+    resume escape hatch.
+    """
+    method = _require_mapping(raw.get("method"), name="historical parent method")
+    if method.get("id") != _LOGGING_ONLY_METHOD_ID:
+        raise ScheduleControlForkError("historical parent is not retired logging-only RSLAD")
+    if "observation" in raw:
+        raise ScheduleControlForkError("historical logging-only parent must have no observation metadata")
+    design = _require_mapping(raw.get("research_design"), name="historical logging-only research design")
+    if (
+        set(design) != {"id", "manifest", "sha256"}
+        or design.get("id") != _LOGGING_ONLY_DESIGN_ID
+        or design.get("manifest") != _LOGGING_ONLY_DESIGN_MANIFEST
+    ):
+        raise ScheduleControlForkError("historical logging-only parent has incompatible research-design metadata")
+    digest = design.get("sha256")
+    if digest != _LOGGING_ONLY_DESIGN_SHA256:
+        raise ScheduleControlForkError("historical logging-only parent has incompatible research-design SHA-256")
+    return design
+
+
+def _parent_runtime_view(raw: Mapping[str, Any]) -> tuple[ExperimentConfig, dict[str, object] | None]:
+    """Build the strict runtime view while retaining the original config hash.
+
+    ``rslad_logging_only`` was loss-identical to RSLAD and was retired after
+    L1.  Its exact, hash-bound source mapping remains the checkpoint identity;
+    this function creates only the child runtime comparison view.
+    """
+    method = _require_mapping(raw.get("method"), name="parent method")
+    if method.get("id") == _LOGGING_ONLY_METHOD_ID:
+        design = _validate_historical_logging_only_metadata(raw)
+        migrated = copy.deepcopy(dict(raw))
+        migrated_method = _require_mapping(migrated.get("method"), name="historical parent method")
+        migrated_method["id"] = "rslad"
+        migrated.pop("research_design")
+        migrated["observation"] = {"profile": "teacher_response"}
+        try:
+            config = ExperimentConfig.model_validate(migrated)
+        except ValueError as exc:
+            raise ScheduleControlForkError("historical logging-only parent cannot migrate to strict RSLAD") from exc
+        return config, {
+            "kind": "historical_logging_only_runtime_migration_v1",
+            "source_method_id": _LOGGING_ONLY_METHOD_ID,
+            "runtime_method_id": "rslad",
+            "source_observation": "absent",
+            "runtime_observation_profile": "teacher_response",
+            "research_design": dict(design),
+            "applied": [
+                "rslad_logging_only_to_rslad",
+                "research_design_removed",
+                "teacher_response_observation_added",
+            ],
+        }
+    if "research_design" in raw:
+        raise ScheduleControlForkError("ordinary RSLAD parent cannot contain research-design metadata")
+    try:
+        return ExperimentConfig.model_validate(raw), None
+    except ValueError as exc:
+        raise ScheduleControlForkError("parent resolved config is not strict runnable configuration") from exc
 
 
 def _spec_parent(spec_path: Path) -> tuple[dict[str, Any], str]:
@@ -212,7 +282,7 @@ def _validate_parent(
     artifact_attestation: Path,
     child: ExperimentConfig,
     parent: Mapping[str, Any],
-) -> tuple[dict[str, Any], ExperimentConfig, dict[str, Any]]:
+) -> tuple[dict[str, Any], ExperimentConfig, dict[str, Any], dict[str, object] | None]:
     if artifact_inventory.resolve() != Path(str(parent["artifact_inventory"])).resolve():
         raise ScheduleControlForkError("artifact inventory path does not match schedule-control spec")
     if artifact_attestation.resolve() != Path(str(parent["artifact_attestation"])).resolve():
@@ -223,10 +293,7 @@ def _validate_parent(
     raw_hash = config_digest(raw)
     if raw_hash != parent["raw_config_sha256"]:
         raise ScheduleControlForkError("parent raw resolved config SHA-256 does not match schedule-control lineage")
-    try:
-        source = ExperimentConfig.model_validate(raw)
-    except ValueError as exc:
-        raise ScheduleControlForkError("parent resolved config is not strict runnable configuration") from exc
+    source, compatibility_migration = _parent_runtime_view(raw)
     if source.intervention is not None:
         raise ScheduleControlForkError("schedule-control parent must be ordinary observed RSLAD")
     if (
@@ -335,7 +402,7 @@ def _validate_parent(
         or attestation.get("artifact") != artifact
     ):
         raise ScheduleControlForkError("artifact attestation does not bind immutable parent lineage")
-    return payload, source, dict(artifact)
+    return payload, source, dict(artifact), compatibility_migration
 
 
 def _validate_allowed_delta(*, parent: ExperimentConfig, child: ExperimentConfig) -> None:
@@ -393,7 +460,7 @@ def create_schedule_control_fork(
     if child.intervention is not None:
         raise ScheduleControlForkError("schedule-control child cannot be an intervention arm")
     parent, spec_sha256 = _spec_parent(spec_path)
-    payload, source, artifact = _validate_parent(
+    payload, source, artifact, compatibility_migration = _validate_parent(
         checkpoint=parent_checkpoint,
         parent_resolved_config=parent_resolved_config,
         parent_manifest=parent_manifest,
@@ -424,7 +491,7 @@ def create_schedule_control_fork(
     transformed["selection_metadata"] = _post_fork_selection_metadata(
         _require_mapping(payload["selection_metadata"], name="parent selection metadata")
     )
-    transformed["fork_lineage"] = {
+    fork_lineage: dict[str, object] = {
         "kind": SCHEDULE_CONTROL_KIND,
         "child_tracker_run_id": child_run_id,
         "parent_tracker_run_id": payload["tracker_run_id"],
@@ -445,6 +512,9 @@ def create_schedule_control_fork(
         "fork_git_sha": git_sha,
         "post_fork_best_scope": True,
     }
+    if compatibility_migration is not None:
+        fork_lineage["parent_config_compatibility_migration"] = compatibility_migration
+    transformed["fork_lineage"] = fork_lineage
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".schedule-control-", dir=output.parent))
     try:

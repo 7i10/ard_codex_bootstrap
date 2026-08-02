@@ -153,6 +153,13 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     )
     assert schedule_control.tiers == ("T0", "T1", "T2")
 
+    schedule_inputs = select(
+        ("tools/internal/schedule_control/prepare_inputs.py",),
+        (*available, "tests/unit/test_schedule_control_inputs.py"),
+    )
+    assert schedule_inputs.tests == ("tests/unit/test_schedule_control_inputs.py",)
+    assert schedule_inputs.tiers == ("T0", "T1", "T2")
+
     h4a_taxonomy = select(
         ("src/ard/analysis/h4a_taxonomy.py", "src/ard/cli/h4a_taxonomy.py"),
         (*available, "tests/unit/test_h4a_taxonomy.py"),

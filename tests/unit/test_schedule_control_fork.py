@@ -17,6 +17,7 @@ from torch.optim import SGD
 from ard.analysis.intervention_fork import build_parent_artifact_attestation
 from ard.analysis.schedule_control_fork import (
     ScheduleControlForkError,
+    _parent_runtime_view,
     _validate_scheduler_parent,
     create_schedule_control_fork,
 )
@@ -108,9 +109,19 @@ def _advance(optimizer: SGD, scheduler: object, epochs: int) -> None:
         scheduler.step()  # type: ignore[union-attr]
 
 
-def _inputs(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path, Path, dict[str, object]]:
+def _inputs(
+    tmp_path: Path, *, historical_logging_only: bool = False
+) -> tuple[Path, Path, Path, Path, Path, Path, dict[str, object]]:
     parent = ExperimentConfig.model_validate(_raw_config(tmp_path))
     raw = resolved_config_dict(parent)
+    if historical_logging_only:
+        raw["method"]["id"] = "rslad_logging_only"  # type: ignore[index]
+        raw.pop("observation")
+        raw["research_design"] = {
+            "id": "logging_only_history_confirmatory_v1",
+            "manifest": "configs/analysis/logging_only_history_confirmatory_v1.yaml",
+            "sha256": "d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12",
+        }
     config_hash = config_digest(raw)
     resolved = tmp_path / "parent-resolved.yaml"
     resolved.write_text(yaml.safe_dump(raw), encoding="utf-8")
@@ -363,6 +374,99 @@ def test_epoch79_schedule_control_preserves_state_replaces_only_future_milestone
     assert _equal(left_model.state_dict(), right_model.state_dict())
     assert _equal(left_optimizer.state_dict(), right_optimizer.state_dict())
     assert _equal(left_scheduler.state_dict(), right_scheduler.state_dict())
+
+
+def test_schedule_control_migrates_only_the_retired_logging_only_l1_parent(tmp_path: Path) -> None:
+    checkpoint, resolved, manifest, inventory, attestation, _, fields = _inputs(tmp_path, historical_logging_only=True)
+    child_path = _child_config(tmp_path, _raw_config(tmp_path), fields)
+    created = create_schedule_control_fork(
+        parent_checkpoint=checkpoint,
+        parent_resolved_config=resolved,
+        parent_manifest=manifest,
+        artifact_inventory=inventory,
+        artifact_attestation=attestation,
+        spec_path=_spec(tmp_path, fields),
+        child_config_path=child_path,
+        root=Path.cwd(),
+        git_state_collector=lambda _: {"sha": "b" * 40, "dirty": False},
+    )
+
+    child = torch.load(created, map_location="cpu", weights_only=False)
+    migration = child["fork_lineage"]["parent_config_compatibility_migration"]
+    assert migration == {
+        "kind": "historical_logging_only_runtime_migration_v1",
+        "source_method_id": "rslad_logging_only",
+        "runtime_method_id": "rslad",
+        "source_observation": "absent",
+        "runtime_observation_profile": "teacher_response",
+        "research_design": {
+            "id": "logging_only_history_confirmatory_v1",
+            "manifest": "configs/analysis/logging_only_history_confirmatory_v1.yaml",
+            "sha256": "d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12",
+        },
+        "applied": [
+            "rslad_logging_only_to_rslad",
+            "research_design_removed",
+            "teacher_response_observation_added",
+        ],
+    }
+    assert load_config(child_path).method.id == "rslad"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("id", "unknown_logging_design", "research-design metadata"),
+        ("sha256", "a" * 64, "research-design SHA-256"),
+    ),
+)
+def test_schedule_control_rejects_wrong_historical_logging_only_design(
+    tmp_path: Path, field: str, value: str, message: str
+) -> None:
+    raw = resolved_config_dict(ExperimentConfig.model_validate(_raw_config(tmp_path)))
+    raw["method"]["id"] = "rslad_logging_only"  # type: ignore[index]
+    raw.pop("observation")
+    raw["research_design"] = {
+        "id": "logging_only_history_confirmatory_v1",
+        "manifest": "configs/analysis/logging_only_history_confirmatory_v1.yaml",
+        "sha256": "d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12",
+    }
+    raw["research_design"][field] = value  # type: ignore[index]
+    with pytest.raises(ScheduleControlForkError, match=message):
+        _parent_runtime_view(raw)
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value"),
+    (
+        ("method", "temperature", 2.0),
+        ("attack", "steps", 9),
+    ),
+)
+def test_schedule_control_rejects_objective_or_attack_delta_after_historical_migration(
+    tmp_path: Path, section: str, field: str, value: object
+) -> None:
+    checkpoint, resolved, manifest, inventory, attestation, _, fields = _inputs(tmp_path, historical_logging_only=True)
+    child_path = _child_config(tmp_path, _raw_config(tmp_path), fields)
+    child = yaml.safe_load(child_path.read_text(encoding="utf-8"))
+    target = child["method"] if section == "method" else child["method"]["attack"]
+    target[field] = value
+    child_path.write_text(yaml.safe_dump(child), encoding="utf-8")
+    # Protocol schema rejects a changed attack before the fork is opened;
+    # objective-only drift reaches the fork allowlist.  Neither may create a
+    # schedule-control child from the historical parent.
+    with pytest.raises((ValueError, ScheduleControlForkError), match="method.attack.steps|outside output/tracking"):
+        create_schedule_control_fork(
+            parent_checkpoint=checkpoint,
+            parent_resolved_config=resolved,
+            parent_manifest=manifest,
+            artifact_inventory=inventory,
+            artifact_attestation=attestation,
+            spec_path=_spec(tmp_path, fields),
+            child_config_path=child_path,
+            root=Path.cwd(),
+            git_state_collector=lambda _: {"sha": "b" * 40, "dirty": False},
+        )
 
 
 def test_schedule_control_rejects_non_allowlisted_delta_and_non_predecay_parent(tmp_path: Path) -> None:

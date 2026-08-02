@@ -12,7 +12,6 @@ from ard.analysis.history_early import (
     analyze_history_early_online,
     bind_early_collection_to_cohort,
     build_online_bootstrap_tasks,
-    collection_gate,
 )
 
 
@@ -27,12 +26,26 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     for x in ("--feature-observations", "--outcome-observations", "--feature-lineage", "--outcome-lineage"):
         p.add_argument(x, required=False, action="append", type=_lp, metavar="LABEL=PATH")
-    p.add_argument("--online-states", required=False, action="append", type=_lp, metavar="LABEL=PATH")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--online-states", required=False, action="append", type=_lp, metavar="LABEL=PATH")
+    mode.add_argument(
+        "--legacy-retrospective-ro",
+        action="store_true",
+        help=(
+            "write the historical future-conditioned RO diagnostic only; "
+            "never use this report to select a Best-oriented anchor or v2 route"
+        ),
+    )
     p.add_argument("--online-lineage", required=False, action="append", type=_lp, metavar="LABEL=PATH")
     p.add_argument("--expected-count", required=True, type=int)
     p.add_argument("--cohort-inventory", required=True, type=Path)
     p.add_argument("--output", required=True, type=Path)
     a = p.parse_args(argv)
+    if not a.online_states and not a.legacy_retrospective_ro:
+        raise HistoryEarlyError(
+            "corrected H5-Early requires --online-states and --online-lineage; "
+            "the historical retrospective RO diagnostic requires explicit --legacy-retrospective-ro"
+        )
     if bool(a.online_states) != bool(a.online_lineage):
         raise HistoryEarlyError("online states and online lineage must be supplied together")
     if a.online_states:
@@ -92,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     if not all((a.feature_observations, a.outcome_observations, a.feature_lineage, a.outcome_lineage)):
-        raise HistoryEarlyError("either replay panels or online state panels are required")
+        raise HistoryEarlyError("legacy retrospective RO requires replay feature and outcome observations with lineage")
     groups = [
         dict(a.feature_observations),
         dict(a.outcome_observations),
@@ -119,7 +132,6 @@ def main(argv: list[str] | None = None) -> int:
         )
         for label in sorted(labels)
     }
-    gate = collection_gate(reports)
     cohort_sha256 = bind_early_collection_to_cohort(cohort_inventory=a.cohort_inventory.resolve(), reports=reports)
     public_reports = {
         label: {key: value for key, value in report.items() if key != "_post_peak_gate_rows"}
@@ -133,9 +145,9 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(
             {
                 "schema_version": 1,
-                "contract": "h5_early_collection_v1",
+                "contract": "h5_early_legacy_retrospective_ro_collection_v1",
+                "scientific_status": "retrospective_ro_diagnostic_only",
                 "reports": public_reports,
-                "primary_selection_gate": gate,
                 "cohort_inventory_sha256": cohort_sha256,
             },
             sort_keys=True,

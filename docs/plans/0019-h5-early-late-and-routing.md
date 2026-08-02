@@ -100,6 +100,21 @@ before consuming a new confirmation seed.
 - Defer seed-3 common parents.  L1--L4 are development trajectories; after
   freezing H5/H4a, one unseen Bartoldson seed is the first confirmation run.
   Chen follows only as a no-harm check after a Bartoldson candidate passes.
+- Corrected online H5-Early is the required path.  The old replay-only report
+  is an explicit `--legacy-retrospective-ro` diagnostic, never a selector,
+  Best-oriented anchor decision, bootstrap authorization, or v2 route gate.
+- Start the epoch-79 delayed-schedule controls only after the real sparse-ID
+  smoke; they may run in parallel with the CPU H5 collection because their
+  lineage and outcome do not depend on the point-report result.
+- The final Best-accuracy Go comparison is the selected candidate `B*` versus
+  its matched ordinary-RSLAD control.  Entropy-only is retained as a
+  robust-overfitting/stability baseline, not the primary decision comparator.
+- Confirmation is fixed before official-test opening: unseen Bartoldson seeds
+  3 and 4, followed by Chen no-harm checks only if both Bartoldson results meet
+  the frozen rule.  This replaces a single-seed confirmation claim.
+- Hard-label routing and true-label-anchored routing are separate interventions
+  and controls; neither result may be interpreted as evidence for the other.
+  `peak_failure` and `non_recovery` remain independent selection/route gates.
 
 ## Milestones
 
@@ -146,8 +161,9 @@ before consuming a new confirmation seed.
     samples retain ordinary KD; stronger KD is not assumed beneficial.
   - Acceptance: design and Go/No-Go thresholds frozen before any unseen seed.
 
-- [ ] M5 -- launch one blinded Bartoldson confirmation parent/screen only after
-  M1--M4 and review.  Start Chen only as the predeclared no-harm check.
+- [ ] M5 -- after M1--M4 and review, confirm the frozen selected `B*` route on
+  unseen Bartoldson seeds 3 and 4 against matched controls.  Start Chen only
+  as the predeclared no-harm check after both Bartoldson confirmations pass.
 
 ## Agent and review budget
 

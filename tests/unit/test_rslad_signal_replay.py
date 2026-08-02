@@ -339,6 +339,7 @@ def test_outcome_only_output_binds_only_the_post_anchor_panel(tmp_path: Path) ->
     )
     assert lineage["kind"] == "h5_checkpoint_panel_outcome_source_v1"
     assert lineage["observation_schema_version"] == 2
+    assert lineage["seed"] == config.seeds.model_init
     assert "feature_protocol" not in lineage
     rows = [row for result in results for row in result.rows]
     paths = write_outcome_replay_outputs(

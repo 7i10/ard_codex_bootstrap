@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 import pytest
 import torch
 
+from ard.analysis.history_early import HistoryEarlyError
 from ard.analysis.history_online_state import (
     HistoryOnlineStateError,
     OnlineStateExport,
@@ -191,6 +192,58 @@ def test_online_export_exact_sparse_shuffled_ids_and_nonoverwrite(tmp_path: Path
         write_online_anchors(output_dir=tmp_path / "out", export=export)
 
 
+def test_early_cli_requires_online_primary_or_explicit_legacy_opt_in(tmp_path: Path) -> None:
+    common = [
+        "--expected-count",
+        "10",
+        "--cohort-inventory",
+        str(tmp_path / "cohort.json"),
+        "--output",
+        str(tmp_path / "out.json"),
+    ]
+    with pytest.raises(HistoryEarlyError, match="corrected H5-Early requires --online-states"):
+        early_main(common)
+    with pytest.raises(SystemExit):
+        early_main([*common, "--legacy-retrospective-ro", "--online-states", "L1=state.json"])
+
+
+def test_early_cli_explicit_legacy_marks_retrospective_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "ard.cli.history_early.analyze_history_early",
+        lambda **_: {"tables": {}, "_post_peak_gate_rows": {"future_conditioned": True}},
+    )
+    monkeypatch.setattr("ard.cli.history_early.bind_early_collection_to_cohort", lambda **_: "a" * 64)
+    output = tmp_path / "legacy.json"
+    assert (
+        early_main(
+            [
+                "--legacy-retrospective-ro",
+                "--expected-count",
+                "10",
+                "--cohort-inventory",
+                str(tmp_path / "cohort.json"),
+                "--output",
+                str(output),
+                "--feature-observations",
+                "L1=feature.parquet",
+                "--feature-lineage",
+                "L1=feature.json",
+                "--outcome-observations",
+                "L1=outcome.parquet",
+                "--outcome-lineage",
+                "L1=outcome.json",
+            ]
+        )
+        == 0
+    )
+    report = json.loads(output.read_text())
+    assert report["contract"] == "h5_early_legacy_retrospective_ro_collection_v1"
+    assert report["scientific_status"] == "retrospective_ro_diagnostic_only"
+    assert "primary_selection_gate" not in report
+
+
 def test_online_export_rejects_missing_sha_identity_and_seen_drift(tmp_path: Path) -> None:
     checkpoints, lineage = _inputs(tmp_path)
     with pytest.raises(HistoryOnlineStateError, match="checkpoint schedule"):
@@ -330,3 +383,27 @@ def test_public_online_export_to_early_point_cli_contract(tmp_path: Path, monkey
     assert changed["bootstrap_tasks"] == result["bootstrap_tasks"]
     assert changed_peak["online_rank"] == peak["online_rank"]
     assert changed_peak["replay_pre_anchor_rank_diagnostic"] != peak["replay_pre_anchor_rank_diagnostic"]
+
+    historical_outcome = json.loads(lineages["L1"][2].read_text())
+    historical_outcome.pop("seed")
+    historical_outcome_path = tmp_path / "L1-outcome-historical-no-seed.json"
+    historical_outcome_path.write_text(json.dumps(historical_outcome))
+    historical_report = tmp_path / "point-historical-outcome-seed.json"
+    historical_argv = list(argv)
+    historical_argv[historical_argv.index(str(report))] = str(historical_report)
+    historical_argv[historical_argv.index(f"L1={lineages['L1'][2]}")] = f"L1={historical_outcome_path}"
+    assert early_main(historical_argv) == 0
+    assert (
+        json.loads(historical_report.read_text())["reports"]["L1"]["input_identity"]["outcome_seed_compatibility"]
+        == {"status": "historical_missing_seed", "effective_seed": 1}
+    )
+
+    mismatched_outcome = json.loads(lineages["L1"][2].read_text())
+    mismatched_outcome["seed"] = 999
+    mismatched_outcome_path = tmp_path / "L1-outcome-mismatched-seed.json"
+    mismatched_outcome_path.write_text(json.dumps(mismatched_outcome))
+    mismatched_argv = list(argv)
+    mismatched_argv[mismatched_argv.index(str(report))] = str(tmp_path / "point-mismatched-outcome-seed.json")
+    mismatched_argv[mismatched_argv.index(f"L1={lineages['L1'][2]}")] = f"L1={mismatched_outcome_path}"
+    with pytest.raises(HistoryEarlyError, match="online/replay lineage identity drifted"):
+        early_main(mismatched_argv)
