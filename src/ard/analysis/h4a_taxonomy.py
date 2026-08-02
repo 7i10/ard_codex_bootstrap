@@ -152,7 +152,10 @@ def _close(left: float, right: float, *, name: str) -> None:
 def _validated_row(row: Mapping[str, Any], *, expected_count: int) -> dict[str, Any]:
     if row.get("namespace") != "train" or row.get("observation_schema_version") != OBSERVATION_SCHEMA_VERSION:
         raise H4aTaxonomyError("row namespace/schema contract drifted")
-    sample_id = _integer(row.get("sample_id"), name="sample ID", upper=expected_count)
+    # CIFAR validation uses a stable subset of original train IDs, not a
+    # reindexed 0..N-1 range.  Completeness is established by exact count,
+    # uniqueness, and cross-epoch ID/class joins in ``_domain_panel``.
+    sample_id = _integer(row.get("sample_id"), name="sample ID")
     class_id = _integer(row.get("class_id"), name="class ID", upper=10)
     epoch = _integer(row.get("epoch"), name="epoch")
     robust_correct = _bool(row.get("robust_correct"), name="robust correctness")

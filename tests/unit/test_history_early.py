@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import runpy
+import sys
 from pathlib import Path
 
 import pyarrow as pa
@@ -13,6 +15,16 @@ from ard.analysis.rslad_signal_replay import FEATURE_EPOCHS, OUTCOME_EPOCHS, bui
 from ard.analysis.signal_audit import sha256_file
 
 pytestmark = pytest.mark.t1
+
+
+def test_history_early_module_execution_invokes_the_cli_guard(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["ard.cli.history_early", "--help"])
+    with pytest.raises(SystemExit) as exit_status:
+        runpy.run_module("ard.cli.history_early", run_name="__main__")
+    assert exit_status.value.code == 0
+    assert "--feature-observations" in capsys.readouterr().out
 
 
 def _rows(epochs: tuple[int, ...]) -> list[dict[str, object]]:

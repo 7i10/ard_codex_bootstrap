@@ -167,6 +167,21 @@ def test_h4a_is_row_order_invariant_and_never_uses_cross_domain_transition(tmp_p
     assert report["late"]["anchors"]["99"]["primary_groups"]["stable_correct"]["count"] == 6
 
 
+def test_h4a_accepts_sparse_original_dataset_ids_with_exact_panel_joins(tmp_path: Path) -> None:
+    feature, outcome, feature_lineage, outcome_lineage = _inputs(tmp_path)
+    for path, lineage, key, protocol in (
+        (feature, feature_lineage, "feature_observations_sha256", "feature_protocol"),
+        (outcome, outcome_lineage, "outcome_observations_sha256", "outcome_protocol"),
+    ):
+        rows = pq.read_table(path).to_pylist()
+        for row in rows:
+            row["sample_id"] = int(row["sample_id"]) + 40
+        pq.write_table(pa.Table.from_pylist(rows), path)
+        _lineage(lineage, path, key=key, protocol=protocol)
+    report = _analyze((feature, outcome, feature_lineage, outcome_lineage))
+    assert report["early"]["anchors"]["39"]["primary_groups"]["stable_correct"]["count"] == 6
+
+
 def test_h4a_rejects_schema_algebra_and_lineage_drift(tmp_path: Path) -> None:
     feature, outcome, feature_lineage, outcome_lineage = _inputs(tmp_path)
     rows = pq.read_table(feature).to_pylist()
