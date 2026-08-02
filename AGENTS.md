@@ -49,6 +49,9 @@ Read `docs/README.md`, `docs/SCIENTIFIC_INVARIANTS.md`, `docs/TEST_STRATEGY.md`,
 
 - Establish a baseline commit early so `git diff` and impact-selected tests remain narrow. Do not manufacture retrospective milestone history.
 - After a milestone passes its selected tests and scientific review, create one cohesive commit with the plan updated. Verify the staged diff and final status first.
+- Keep integration branches short-lived. Merge a coherent, verified milestone back to `master`; do not wait for an entire experiment campaign or accumulate unrelated milestones on one branch.
+- Before merging, verify both worktrees are clean, the branch is pushed, `master` has not diverged, and active experiments are pinned to immutable SHAs. Prefer `--ff-only` when `master` is an ancestor.
+- Detached experiment worktrees do not require delaying an otherwise safe merge. Retain the remote integration branch until other hosts have fetched the merged `master`, then delete it separately.
 - Never commit `.external/`, outputs, caches, W&B offline data, credentials, datasets, or checkpoints unless an explicit artifact policy says otherwise.
 - Commits are allowed as part of normal work. Do not push, force-push, rewrite published history, or create remote state without an explicit user request.
 
