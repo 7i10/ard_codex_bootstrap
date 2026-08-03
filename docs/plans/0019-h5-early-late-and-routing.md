@@ -4,8 +4,8 @@
 
 - Owner: main thread; one Sol planning pass, one Terra implementation pass
 - Branch / base SHA: `research/h5-early-late` / `d1984cd`
-- Current milestone: M0 compact input generation active; M1/M2 implementation complete pending real-data reports
-- Last updated: 2026-08-02
+- Current milestone: complete; H5/H4a reports and both schedule controls verified
+- Last updated: 2026-08-03
 
 ## Goal
 
@@ -118,7 +118,7 @@ before consuming a new confirmation seed.
 
 ## Milestones
 
-- [ ] M0 -- inventory exact L1--L4 periodic checkpoint bytes/manifests,
+- [x] M0 -- inventory exact L1--L4 periodic checkpoint bytes/manifests,
   replay panels, and frozen predictor identities.
   - Files: this plan and read-only artifact inventory output outside Git.
   - Tests: checkpoint epoch/state/identity validation only.
@@ -136,7 +136,7 @@ before consuming a new confirmation seed.
     hash-bound report covers L1--L4; no GPU training.
   - Commit: `analysis: add hash-bound H5 history screen`.
 
-- [~] M2 -- add parameterized exact-online anchor export and corrected
+- [x] M2 -- add parameterized exact-online anchor export and corrected
   H5-Late/H5-Early outcomes.
   - Files: new CPU-only online-state module/CLI, corrected H5 modules/CLIs and
     focused tests; frozen H2 and replay modules remain unchanged.
@@ -146,24 +146,29 @@ before consuming a new confirmation seed.
     failure/non-recovery and secondary RO tables at epochs 39/59/79; epoch 99
     is reference-only.
 
-- [~] M3 -- produce bounded H4a taxonomy by reusing the H5 matrix.
+- [x] M3 -- produce bounded H4a taxonomy by reusing the H5 matrix.
   - Files: analysis module/CLI, report schema, tests.
   - Tests: exhaustive/disjoint taxonomy, transition fixtures, lineage joins.
   - Acceptance: primary state counts, teacher/student cross-tabs, continuous
     wrong-confidence/margin trend, cross-seed overlap, and oracle headroom.
 
-- [ ] M4 -- decide schedule control and at most two v2 routes.
+- [x] M4 -- decide schedule control and at most two v2 routes.
   - Schedule control requires a distinct protocol and epoch-79 parent.  Tests
     must match an uninterrupted delayed scheduler reference and allow no other
     checkpoint-state delta.
-  - Candidate routing starts with student high-risk plus teacher wrong -> turn
-    off adversarial KD and use hard-label/true-label anchoring.  Teacher-correct
-    samples retain ordinary KD; stronger KD is not assumed beneficial.
+  - Delayed RSLAD `[120,170]` is retained as the stronger matched control: it
+    improved Best by only `+0.06/+0.18 pp`, but improved Last by
+    `+0.64/+0.76 pp` and reduced the RO gap by `0.58 pp` on both L1/L3.
+    This is not a material schedule-improvement claim.
+  - Bartoldson teacher-adversarial-wrong mass is too small for a sole route
+    gate (`6/10110`, `4/8856` among future-forgetting; about `1.7--1.8%`
+    among persistent-wrong).  Teacher correctness is therefore a moderator,
+    not the primary selector.
+  - The next bounded design and its Go/No-Go rules are frozen in plan 0020.
   - Acceptance: design and Go/No-Go thresholds frozen before any unseen seed.
 
-- [ ] M5 -- after M1--M4 and review, confirm the frozen selected `B*` route on
-  unseen Bartoldson seeds 3 and 4 against matched controls.  Start Chen only
-  as the predeclared no-harm check after both Bartoldson confirmations pass.
+- [x] M5 -- close H5/H4a and hand the next development/confirmation sequence
+  to plan 0020.  No unseen seed, official test, or AutoAttack was consumed.
 
 ## Agent and review budget
 
@@ -305,6 +310,32 @@ agent, repeated review, or GPU job is needed for M0/M1.
   cross-seed Jaccard.  No route or threshold is defined.  Focused unit tests
   passed (`38 passed`); real L1--L4 reports remain pending schema-v2 replay.
 
+- 2026-08-03: Corrected H5-Early point estimation and the preregistered
+  2,000-replicate bootstrap completed.  All six anchor/route pairs passed;
+  the independently selected earliest prospective anchor is epoch 39 for
+  both `peak_failure` and `non_recovery`.  At epoch 39, history-minus-current
+  margin AUROC CIs were `[0.06351, 0.07870]` and `[0.04945, 0.06447]` for
+  peak failure, and `[0.17412, 0.18681]` and `[0.16501, 0.17873]` for
+  non-recovery on L1/L3.  H5-Late also passed, with online-rank-minus-current
+  margin CIs `[0.093439, 0.102660]` and `[0.090928, 0.100104]`.
+- 2026-08-03: H4a completed on the same hash-bound replay matrix.  It showed
+  that Bartoldson teacher-adversarial-wrong examples are nearly absent in the
+  future-forgetting group and under two percent in persistent-wrong, while
+  Chen persistent-wrong has about 42% teacher-adversarial-wrong.  This rejects
+  teacher-wrong-only gating as the Bartoldson main route while retaining it as
+  a moderator and Chen safety diagnostic.
+- 2026-08-03: Both delayed-schedule controls completed with exit code 0,
+  finite metrics, best/last checkpoints, complete sample state, and matching
+  artifact hashes.  SC-L1 Best/Last PGD were `51.88/47.64%` (Best epoch 124,
+  RO gap `4.24 pp`); SC-L3 were `51.74/47.74%` (Best epoch 122, RO gap
+  `4.00 pp`).  Relative to normal RSLAD, mean Best changed only `+0.12 pp`,
+  mean Last `+0.70 pp`, and mean RO gap `-0.58 pp`.
+
 ## Completion report
 
-Pending.
+H5-Early, H5-Late, H4a, and both delayed-schedule controls are complete and
+lineage-verified.  The results establish a deployable epoch-39 student-history
+selector but do not establish a successful intervention.  The delayed schedule
+is a stronger stability-aware control, not a Best-accuracy result.  Official
+test and AutoAttack remained sealed.  Plan 0020 defines the bounded
+Best-oriented intervention screen and confirmation gates.

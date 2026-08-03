@@ -119,8 +119,8 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 ### 次段階の未着手研究
 
 - core seed-0の8 train、8 PGD、8 AutoAttackはすべて完了しました。Student 2セルのAAは事後追加評価です。
-- 複数seedの性能評価は未完了です。student-history信号については、後述の2教師×2 seed
-  confirmatory blockが実行中です。これは性能主張用の3-seed cohortではありません。
+- 複数seedの性能評価は未完了です。student-history信号の2教師×2 seed
+  confirmatory blockは完了しましたが、これは性能主張用の3-seed cohortではありません。
 - controlled protocolでのPGD-AT、TRADES、full SAAD直接比較は未着手です。
 - PGD-AT/TRADESのcanonical configとCUDA synthetic smoke、および
   Chen/Bartoldson observed RSLAD config/parity gateは準備済みです。
@@ -128,19 +128,19 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 - CIFAR-100、MobileNetV2、Tiny-ImageNet本訓練は未着手です。
 - これらを現在のseed-0結果から自動的に開始する設定にはしていません。
 
-### Student-history confirmatory block（実行中スナップショット）
+### Student-history confirmatory block（完了）
 
 seed-0だけの関連を一般化せず、teacher依存・seed依存・proxyからexact online historyへの移行を同時に
 確認するため、lossへ介入しないobserved RSLADを2教師×2 seedで実行します。predictor、feature、anchor
 epoch 99、future outcome、split、判定閾値はseed 1/2の結果を見る前に
 [`history_confirmatory_block_v2.yaml`](../configs/analysis/history_confirmatory_block_v2.yaml)へ固定しました。
 
-| Cell | Teacher | Seed | Host/GPU | W&B run | 2026-08-01 launch evidence |
+| Cell | Teacher | Seed | Host/GPU | W&B run | Status |
 |---|---|---:|---|---|---|
-| L1 | Bartoldson | 1 | Hamster 1 | `bart-rslad-logging-only-s1-confirm-v1` | 旧SHAで継続中。直接bridge pass |
-| L2 | Chen | 1 | Hamster 0 | `chen-rslad-observed-s1-confirm-v2` | epoch 0 finite、45,000 state完備 |
-| L3 | Bartoldson | 2 | Ferret 0 | `bart-rslad-observed-s2-confirm-v2` | epoch 0 finite、45,000 state完備 |
-| L4 | Chen | 2 | Ferret 1 | `chen-rslad-observed-s2-confirm-v2` | 200 epoch完了、exit 0 |
+| L1 | Bartoldson | 1 | Hamster 1 | `bart-rslad-logging-only-s1-confirm-v1` | 200 epoch完了、解析採用 |
+| L2 | Chen | 1 | Hamster 0 | `chen-rslad-observed-s1-confirm-v2` | 200 epoch完了、解析採用 |
+| L3 | Bartoldson | 2 | Ferret 0 | `bart-rslad-observed-s2-confirm-v2` | 200 epoch完了、解析採用 |
+| L4 | Chen | 2 | Ferret 1 | `chen-rslad-observed-s2-confirm-v2` | 200 epoch完了、解析採用 |
 
 L2--L4の固定SHAは`8254a8899ae7373c2f541d108593e5c8185b26f5`です。L1の旧
 `rslad_logging_only`と新しい`rslad + observation.teacher_response`の直接cross-version CUDA bridgeは、同一
@@ -149,10 +149,17 @@ L1は旧Git lineageを明示したまま同じ観測解析へ含めます。こ�
 証跡は`tools/internal/history_replication/provenance/observation_bridge_2026-08-01.yaml`です。live epochはこの表へ
 追記せずW&Bまたは`ard.cli.status`を参照します。
 
-confirmatory後の介入は単独runでは判定しません。同じBartoldson epoch-99 stateから、control、
-history/random selector × uniform-softening/KD-downweightの5 armを分岐し、selector効果、介入効果、randomな
-正則化効果を事前定義したcontrastで分けます。history selectorはBartoldsonの両seedが固定Go基準を満たす時
-だけ使用し、mixed/inconclusiveなら開始しません。
+補正済みH5-Early/H5-LateとH4aも完了しました。exact online historyはcurrent marginを両Bartoldson seedで
+上回り、Best目的の最早anchorはepoch 39です。一方、Bartoldsonのteacher-adversarial-wrong例は
+future-forgetting群で`6/10110`、`4/8856`しかなく、teacher-wrong-only gateは主routeに使いません。
+
+epoch-79から分岐したdelayed-schedule controlも2 seedとも完了しました。normal RSLAD比の平均差はBest
+`+0.12 pp`、Last `+0.70 pp`、RO gap `-0.58 pp`です。Best改善としては小さいためschedule自体の成功主張は
+せず、次の介入に対する強いmatched controlとして使います。
+
+次は[Best-oriented v2 plan](plans/0020-best-oriented-history-routing-v2.md)に従い、epoch-39 online historyの
+PF/NR上位10%へtrue-label anchorを適用します。各routeにclass/state/count-matched randomを置き、選択効果と
+一般的な介入効果を同じdevelopment blockで分離します。official testとAutoAttackは引き続き封印します。
 
 Ferret GPU 2で同一1-epoch workloadを比較した結果、teacher-response観測時は4 workersが
 387.4 images/s、8 workersが338.4 images/sで、4 workersが14.48%高速でした。loss・accuracyは一致しており、
