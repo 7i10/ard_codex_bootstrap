@@ -548,7 +548,7 @@ class InterventionParentConfig(StrictModel):
     checkpoint_sha256: str
     raw_config_sha256: str
     git_sha: str
-    epoch: Literal[99]
+    epoch: Literal[39, 99]
     world_size: Literal[1]
     teacher_checkpoint_sha256: str
     sample_state_records: Literal[45000]
@@ -580,7 +580,12 @@ class InterventionParentConfig(StrictModel):
 
 
 class InterventionMaskProvenanceConfig(StrictModel):
-    source: Literal["seed0_bartoldson_frozen_predictor", "class_matched_random"]
+    source: Literal[
+        "seed0_bartoldson_frozen_predictor",
+        "class_matched_random",
+        "online_history_epoch39_v2",
+        "class_state_count_matched_random_epoch39_v2",
+    ]
     approved_selector_spec_sha256: str | None = None
     selector_spec_path: Path | None = None
     parent_checkpoint_sha256: str
@@ -592,6 +597,23 @@ class InterventionMaskProvenanceConfig(StrictModel):
     reference_selected_count: int | None = None
     reference_selected_class_counts: dict[str, int] | None = None
     reference_history_selector_spec_sha256: str | None = None
+    route: Literal["peak_failure", "non_recovery"] | None = None
+    anchor_robust_correct: bool | None = None
+
+    def exact_payload(self) -> dict[str, object]:
+        """Return the byte-level payload expected by the corresponding mask.
+
+        H3 masks intentionally serialized their explicit ``null`` fields;
+        epoch-39 v2 masks omit unavailable fields.  Keep that distinction so
+        extending the schema cannot invalidate the already-registered H3
+        manifests.
+        """
+        payload = self.model_dump(mode="json")
+        if self.source in {"online_history_epoch39_v2", "class_state_count_matched_random_epoch39_v2"}:
+            return {key: value for key, value in payload.items() if value is not None}
+        payload.pop("route", None)
+        payload.pop("anchor_robust_correct", None)
+        return payload
 
     @model_validator(mode="after")
     def validate_provenance(self) -> InterventionMaskProvenanceConfig:
@@ -617,7 +639,7 @@ class InterventionMaskProvenanceConfig(StrictModel):
                 )
             ):
                 raise ValueError("history mask provenance cannot carry random-mask fields")
-        else:
+        elif self.source == "class_matched_random":
             if (
                 self.approved_selector_spec_sha256 is not None
                 or self.selector_spec_path is not None
@@ -635,6 +657,44 @@ class InterventionMaskProvenanceConfig(StrictModel):
                 )
             ):
                 raise ValueError("random mask provenance requires fixed generator and reference history budget")
+        elif self.source == "online_history_epoch39_v2":
+            if self.approved_selector_spec_sha256 is None or self.selector_spec_path is None:
+                raise ValueError("online-history mask provenance requires an approved selector specification SHA-256")
+            if self.route is None or self.anchor_robust_correct is None:
+                raise ValueError("online-history mask provenance requires route and anchor correctness")
+            if any(
+                value is not None
+                for value in (
+                    self.random_seed,
+                    self.generator,
+                    self.generator_version,
+                    self.reference_history_mask_sha256,
+                    self.reference_selected_count,
+                    self.reference_selected_class_counts,
+                    self.reference_history_selector_spec_sha256,
+                )
+            ):
+                raise ValueError("online-history mask provenance cannot carry random-mask fields")
+        else:
+            if (
+                self.approved_selector_spec_sha256 is not None
+                or self.selector_spec_path is not None
+                or self.route is None
+                or self.anchor_robust_correct is None
+                or any(
+                    value is None
+                    for value in (
+                        self.random_seed,
+                        self.generator,
+                        self.generator_version,
+                        self.reference_history_mask_sha256,
+                        self.reference_selected_count,
+                        self.reference_selected_class_counts,
+                        self.reference_history_selector_spec_sha256,
+                    )
+                )
+            ):
+                raise ValueError("v2 random mask provenance requires route, generator, and reference history budget")
         if self.approved_selector_spec_sha256 is not None and (
             len(self.approved_selector_spec_sha256) != 64
             or any(character not in "0123456789abcdef" for character in self.approved_selector_spec_sha256)
@@ -689,29 +749,65 @@ class InterventionMaskConfig(StrictModel):
 
 
 class InterventionConfig(StrictModel):
-    """Registered, precommitted arm semantics for the H3 factorial continuation."""
+    """Registered immutable intervention arms; legacy H3 and epoch-39 v2 are disjoint."""
 
-    arm: Literal["C", "HS", "RS", "HD", "RD"]
-    selector: Literal["none", "student_history", "class_matched_random"]
-    kind: Literal["ordinary_rslad", "uniform_target_softening", "adversarial_kd_downweight"]
+    arm: Literal["C", "HS", "RS", "HD", "RD", "PF_TA", "PF_R", "NR_TA", "NR_R"]
+    selector: Literal[
+        "none", "student_history", "class_matched_random", "online_history", "class_state_count_matched_random"
+    ]
+    kind: Literal[
+        "ordinary_rslad",
+        "uniform_target_softening",
+        "adversarial_kd_downweight",
+        "teacher_target_true_label_mix",
+    ]
     parent: InterventionParentConfig
     mask: InterventionMaskConfig | None = None
+    selector_bundle_path: Path | None = None
+    selector_bundle_sha256: str | None = None
     uniform_target_softening_rho: float = Field(default=0.5, ge=0, le=1)
     adversarial_kd_multiplier: float = Field(default=0.5, ge=0, le=1)
 
     @model_validator(mode="after")
     def validate_registered_arm(self) -> InterventionConfig:
-        expected = {
+        legacy = {
             "C": ("none", "ordinary_rslad", False),
             "HS": ("student_history", "uniform_target_softening", True),
             "RS": ("class_matched_random", "uniform_target_softening", True),
             "HD": ("student_history", "adversarial_kd_downweight", True),
             "RD": ("class_matched_random", "adversarial_kd_downweight", True),
-        }[self.arm]
+        }
+        v2 = {
+            "PF_TA": ("online_history", "teacher_target_true_label_mix", True, "peak_failure", True),
+            "PF_R": ("class_state_count_matched_random", "teacher_target_true_label_mix", True, "peak_failure", True),
+            "NR_TA": ("online_history", "teacher_target_true_label_mix", True, "non_recovery", False),
+            "NR_R": ("class_state_count_matched_random", "teacher_target_true_label_mix", True, "non_recovery", False),
+        }
+        if self.arm in legacy:
+            expected = legacy[self.arm]
+            if self.parent.epoch != 99:
+                raise ValueError("legacy intervention arms require the epoch-99 parent contract")
+        else:
+            selector, kind, has_mask, route, anchor_correct = v2[self.arm]
+            expected = (selector, kind, has_mask)
+            if self.parent.epoch != 39:
+                raise ValueError("history-routing v2 arms require the epoch-39 parent contract")
+            if self.mask is not None and (
+                self.mask.provenance.route != route or self.mask.provenance.anchor_robust_correct is not anchor_correct
+            ):
+                raise ValueError("history-routing v2 mask provenance route/state does not match its registered arm")
+            if self.selector_bundle_path is None or self.selector_bundle_sha256 is None:
+                raise ValueError("history-routing v2 arms require an immutable selector bundle path and SHA-256")
+            if len(self.selector_bundle_sha256) != 64 or any(
+                character not in "0123456789abcdef" for character in self.selector_bundle_sha256
+            ):
+                raise ValueError("history-routing v2 selector bundle SHA-256 must be a lowercase 64-character digest")
         if (self.selector, self.kind, self.mask is not None) != expected:
             raise ValueError("intervention arm must use its registered selector, treatment, and mask presence")
-        if self.uniform_target_softening_rho != 0.5 or self.adversarial_kd_multiplier != 0.5:
+        if self.arm in legacy and (self.uniform_target_softening_rho != 0.5 or self.adversarial_kd_multiplier != 0.5):
             raise ValueError("the registered intervention screen fixes both treatment strengths at 0.5")
+        if self.arm in legacy and (self.selector_bundle_path is not None or self.selector_bundle_sha256 is not None):
+            raise ValueError("legacy intervention arms must not carry history-routing v2 selector bundles")
         if self.mask is not None:
             parent = self.parent
             provenance = self.mask.provenance
@@ -724,6 +820,13 @@ class InterventionConfig(StrictModel):
                 raise ValueError("history-selected arms require frozen predictor provenance")
             if self.selector == "class_matched_random" and provenance.source != "class_matched_random":
                 raise ValueError("random-selected arms require class-matched random provenance")
+            if self.selector == "online_history" and provenance.source != "online_history_epoch39_v2":
+                raise ValueError("online history-selected arms require epoch-39 online provenance")
+            if (
+                self.selector == "class_state_count_matched_random"
+                and provenance.source != "class_state_count_matched_random_epoch39_v2"
+            ):
+                raise ValueError("v2 random-selected arms require class/state/count-matched provenance")
         return self
 
 

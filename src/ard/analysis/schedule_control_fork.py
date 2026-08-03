@@ -110,7 +110,7 @@ def _validate_historical_logging_only_metadata(raw: Mapping[str, Any]) -> Mappin
     return design
 
 
-def _parent_runtime_view(raw: Mapping[str, Any]) -> tuple[ExperimentConfig, dict[str, object] | None]:
+def parent_runtime_view(raw: Mapping[str, Any]) -> tuple[ExperimentConfig, dict[str, object] | None]:
     """Build the strict runtime view while retaining the original config hash.
 
     ``rslad_logging_only`` was loss-identical to RSLAD and was retired after
@@ -148,6 +148,11 @@ def _parent_runtime_view(raw: Mapping[str, Any]) -> tuple[ExperimentConfig, dict
         return ExperimentConfig.model_validate(raw), None
     except ValueError as exc:
         raise ScheduleControlForkError("parent resolved config is not strict runnable configuration") from exc
+
+
+# Historical callers used the private spelling while this is a narrow, shared
+# compatibility boundary for the two epoch-boundary continuation tools.
+_parent_runtime_view = parent_runtime_view
 
 
 def _spec_parent(spec_path: Path) -> tuple[dict[str, Any], str]:
@@ -204,7 +209,7 @@ def _spec_parent(spec_path: Path) -> tuple[dict[str, Any], str]:
     return values, sha256_file(spec_path)
 
 
-def _validate_train_partition(parent: Mapping[str, Any], *, labels: Mapping[int, int], num_classes: int) -> None:
+def validate_train_partition(parent: Mapping[str, Any], *, labels: Mapping[int, int], num_classes: int) -> None:
     path = Path(str(parent["train_partition_manifest"]))
     if not path.is_file() or sha256_file(path) != parent["train_partition_manifest_sha256"]:
         raise ScheduleControlForkError("train-partition manifest bytes do not match bound SHA-256")
@@ -231,6 +236,9 @@ def _validate_train_partition(parent: Mapping[str, Any], *, labels: Mapping[int,
         raise ScheduleControlForkError("train-partition manifest ID/label digest does not match")
     if dict(normalized) != dict(labels):
         raise ScheduleControlForkError("parent sample state does not exactly match train partition identity")
+
+
+_validate_train_partition = validate_train_partition
 
 
 def _validate_scheduler_parent(payload: Mapping[str, Any]) -> None:

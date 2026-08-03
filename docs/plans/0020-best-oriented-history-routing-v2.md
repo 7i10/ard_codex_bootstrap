@@ -5,7 +5,7 @@
 - Owner: main thread; one planning pass, one core implementation owner, one
   consolidated scientific review after focused evidence is stable
 - Base scientific SHA: `cd56b729948782e82d446b186a58bd89a1817303`
-- Current milestone: M0 design frozen; implementation not started
+- Current milestone: M2 real-checkpoint branch smoke
 - Last updated: 2026-08-03
 
 ## Goal
@@ -93,7 +93,7 @@ mixing coefficient, or score on the same L1/L3 outcomes.
 ## Milestones
 
 - [x] M0 -- freeze evidence, formula, controls, gates, and official-test seal.
-- [ ] M1 -- implement the minimal reusable route.
+- [x] M1 -- implement the minimal reusable route.
   - Add `teacher_target_true_label_mix@1` behind the existing target-policy
     boundary; do not duplicate the trainer.
   - Generate PF/NR history and matched-random masks once at epoch 39 with
@@ -102,7 +102,7 @@ mixing coefficient, or score on the same L1/L3 outcomes.
   - Reuse fixed-mask loading, stable IDs, DDP broadcast, checkpoint/resume,
     RSLAD attack/objective, and tracker lineage.
   - Keep teacher moderator observations detached from loss.
-- [ ] M2 -- focused verification and one real-checkpoint branch smoke.
+- [~] M2 -- focused verification and one real-checkpoint branch smoke.
   - Formula and selected-only target application; finite unreduced loss and
     gradients; teacher parameter gradients remain `None`.
   - Attack/threat identity, clean branch, non-selected samples, and loss scale
@@ -155,3 +155,22 @@ student-history result; it means the prescriptive intervention failed.
   attributed solely to delayed scheduling because C uses the same schedule.
 - Official test remains sealed until the route and confirmation results are
   frozen; subsequent methods require fresh seeds or datasets.
+
+## Progress log
+
+- 2026-08-03: Implemented the detached selected-only true-label target, exact
+  epoch-39 online selector, PF/NR history and matched-random masks, four-arm
+  fork/resume lineage, and rank-zero immutable input artifacts.  One
+  consolidated scientific review found four P1 contract gaps: rank domain did
+  not match H5, historical L1 config was unreadable, train-partition identity
+  was not checked, and input artifacts were not durable/resume-safe.  All were
+  fixed; two bounded artifact-idempotency follow-ups closed actual P1s.  Final
+  review reports no remaining P0/P1.
+- 2026-08-03: Focused evidence includes `23 passed, 1 skipped` from the
+  impact-selected gate, `5 passed` for selector/target/artifact tests,
+  `1 passed` for the 45,000-ID epoch-39 selector-to-fork regression,
+  `7 passed` for schedule-control compatibility, `25 passed` for strict
+  config, and `1 passed` for the host-local four-arm preparation utility.
+  A real L1 epoch-39 selector smoke produced 2,160 PF and 2,339 NR selections
+  with exact class-matched random controls.  No training, official test, or
+  AutoAttack has run yet; the one-branch GPU resume smoke remains M2.

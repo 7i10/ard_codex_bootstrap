@@ -102,7 +102,12 @@ def load_fixed_intervention_mask(
     provenance = payload["provenance"]
     if not isinstance(provenance, dict) or provenance != dict(expected_provenance):
         raise FixedMaskError("intervention mask provenance does not match the hash-bound arm configuration")
-    if provenance.get("source") not in {"seed0_bartoldson_frozen_predictor", "class_matched_random"}:
+    if provenance.get("source") not in {
+        "seed0_bartoldson_frozen_predictor",
+        "class_matched_random",
+        "online_history_epoch39_v2",
+        "class_state_count_matched_random_epoch39_v2",
+    }:
         raise FixedMaskError("intervention mask provenance source is forbidden or unknown")
     return FixedInterventionMask(
         selected_ids=frozenset(selected_ids),

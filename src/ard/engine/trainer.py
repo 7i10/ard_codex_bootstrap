@@ -499,6 +499,7 @@ class Trainer:
                     teacher_logits=teacher_clean_logits,
                     risk=weights.joint_risk if intervention_risk is None else intervention_risk,
                     temperature=getattr(self.objective, "temperature", 1.0),
+                    labels=batch.labels if getattr(self.target_policy, "requires_labels", False) else None,
                 )
                 objective_inputs["adversarial_target_probabilities"] = target_output.probabilities
             terms = self.objective(**objective_inputs)

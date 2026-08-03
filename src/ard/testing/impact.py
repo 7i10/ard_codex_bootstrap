@@ -182,6 +182,22 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1", "T2"),
     ),
     (
+        (
+            "src/ard/analysis/history_routing_v2.py",
+            "src/ard/cli/history_routing_v2.py",
+            "src/ard/targets/",
+            "tools/internal/history_routing_v2/",
+        ),
+        (
+            "tests/unit/test_history_routing_v2.py",
+            "tests/unit/test_history_routing_v2_inputs.py",
+            "tests/unit/test_intervention_fork.py",
+            "tests/regression/test_m2_baselines.py",
+            "tests/regression/test_m3_student_aware.py",
+        ),
+        ("T0", "T1", "T2"),
+    ),
+    (
         ("src/ard/cli/status.py",),
         ("tests/unit/test_status.py", "tests/unit/test_tracking.py"),
         ("T0", "T1"),

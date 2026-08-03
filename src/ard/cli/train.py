@@ -6,7 +6,7 @@ import argparse
 import hashlib
 import json
 import random
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import cast
 
@@ -55,7 +55,7 @@ from ard.policies import (
 from ard.protocols import ensure_local_trainable, get_protocol
 from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
-from ard.targets import TeacherTargetPolicy, UniformSofteningTeacherTargetPolicy
+from ard.targets import TeacherTargetPolicy, TrueLabelMixTeacherTargetPolicy, UniformSofteningTeacherTargetPolicy
 from ard.tracking import (
     ExperimentTracker,
     LocalTracker,
@@ -127,7 +127,7 @@ def _screen_identity_sha256(manifest: Mapping[str, object]) -> str:
         raise ValueError("completed intervention screen manifest arms must be a list")
     identity = {
         "schema_version": 1,
-        "kind": "common_state_intervention_v1",
+        "kind": manifest.get("kind"),
         "parent_checkpoint_sha256": manifest.get("parent_checkpoint_sha256"),
         "parent_run_id": manifest.get("parent_run_id"),
         "fork_git_sha": manifest.get("fork_git_sha"),
@@ -163,12 +163,15 @@ def _validate_completed_screen(
     ):
         raise ValueError("completed screen manifest identity does not match the fork checkpoint")
     arms = manifest.get("arms")
-    if not isinstance(arms, list) or len(arms) != 5:
-        raise ValueError("completed screen manifest must contain all five registered arms")
+    v2 = config.intervention is not None and config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}
+    expected_kind = "history_routing_v2_intervention_v1" if v2 else "common_state_intervention_v1"
+    expected_arms = {"PF_TA", "PF_R", "NR_TA", "NR_R"} if v2 else {"C", "HS", "RS", "HD", "RD"}
+    if manifest.get("kind") != expected_kind or not isinstance(arms, list) or len(arms) != len(expected_arms):
+        raise ValueError("completed intervention screen has the wrong registered kind or arm count")
     entries = [entry for entry in arms if isinstance(entry, Mapping)]
     names = [entry.get("arm") for entry in entries]
     run_ids = [entry.get("run_id") for entry in entries]
-    if len(entries) != 5 or set(names) != {"C", "HS", "RS", "HD", "RD"} or len(set(run_ids)) != 5:
+    if len(entries) != len(expected_arms) or set(names) != expected_arms or len(set(run_ids)) != len(expected_arms):
         raise ValueError("completed screen manifest has duplicate or missing sibling identities")
     expected_arm = config.intervention.arm if config.intervention is not None else None
     own = next((entry for entry in entries if entry.get("arm") == expected_arm), None)
@@ -205,16 +208,17 @@ def _validate_intervention_resume(path: Path | None, config: ExperimentConfig, *
     if not isinstance(lineage, Mapping):
         raise ValueError("intervention arms require a registered common-state fork lineage")
     parent = config.intervention.parent
+    v2 = config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}
     expected = {
-        "kind": "common_state_intervention_v1",
+        "kind": "history_routing_v2_intervention_v1" if v2 else "common_state_intervention_v1",
         "arm": config.intervention.arm,
         "parent_checkpoint_sha256": parent.checkpoint_sha256,
         "parent_raw_config_sha256": parent.raw_config_sha256,
         "parent_git_sha": parent.git_sha,
-        "parent_epoch": 99,
+        "parent_epoch": parent.epoch,
         "parent_world_size": 1,
         "parent_teacher_checkpoint_sha256": parent.teacher_checkpoint_sha256,
-        "parent_sample_state_records": 45000,
+        "parent_sample_state_records": parent.sample_state_records,
         "post_fork_best_scope": True,
     }
     if any(lineage.get(key) != value for key, value in expected.items()):
@@ -223,9 +227,9 @@ def _validate_intervention_resume(path: Path | None, config: ExperimentConfig, *
     if not isinstance(metadata, Mapping) or metadata.get("scope") != "post_fork_best":
         raise ValueError("intervention fork must retain the post-fork best selection scope")
     epoch = payload.get("epoch")
-    if epoch == 99 and payload.get("best_metric") != float("-inf"):
+    if epoch == parent.epoch and payload.get("best_metric") != float("-inf"):
         raise ValueError("initial intervention fork must reset best selection to the post-fork scope")
-    if not isinstance(epoch, int) or epoch < 99:
+    if not isinstance(epoch, int) or epoch < parent.epoch:
         raise ValueError("intervention fork checkpoint epoch is invalid")
     _validate_completed_screen(path=path, config=config, config_hash=config_hash, lineage=lineage)
 
@@ -322,7 +326,11 @@ def _build_method(
             (
                 UniformSofteningTeacherTargetPolicy(rho_max=config.intervention.uniform_target_softening_rho)
                 if config.intervention is not None and config.intervention.kind == "uniform_target_softening"
-                else None
+                else (
+                    TrueLabelMixTeacherTargetPolicy()
+                    if config.intervention is not None and config.intervention.kind == "teacher_target_true_label_mix"
+                    else None
+                )
             ),
         )
     if method.id == "rslad_entropy":
@@ -361,6 +369,74 @@ def _build_method(
             None,
         )
     raise RuntimeError(f"unsupported validated method: {method.id}")
+
+
+def _attach_history_routing_v2_input_artifacts(
+    *,
+    tracker: ExperimentTracker,
+    config: ExperimentConfig,
+    resume: Path | None,
+    coordinator: Callable[..., None] = coordinated_tracker_action,
+) -> None:
+    """Record immutable v2 mask/bundle inputs once, owned by rank zero."""
+    intervention = config.intervention
+    if intervention is None or intervention.arm not in {"PF_TA", "PF_R", "NR_TA", "NR_R"}:
+        return
+    assert intervention.mask is not None
+    bundle_path = intervention.selector_bundle_path
+    bundle_sha = intervention.selector_bundle_sha256
+    assert bundle_path is not None and bundle_sha is not None
+    mask_path = intervention.mask.path
+    mask_name = f"history-routing-v2-mask-{tracker.run_id}-{intervention.arm.lower()}"
+    bundle_name = f"history-routing-v2-selector-{tracker.run_id}"
+
+    initial_fork = resume is None
+    if resume is not None:
+        payload = torch.load(resume, map_location="cpu", weights_only=False)
+        if not isinstance(payload, Mapping):
+            raise ValueError("history-routing v2 resume checkpoint must be a mapping")
+        lineage = payload.get("fork_lineage")
+        if not isinstance(lineage, Mapping) or (
+            lineage.get("kind") != "history_routing_v2_intervention_v1"
+            or lineage.get("arm") != intervention.arm
+            or lineage.get("parent_epoch") != intervention.parent.epoch
+            or lineage.get("child_tracker_run_id") != tracker.run_id
+            or payload.get("tracker_run_id") != tracker.run_id
+        ):
+            raise ValueError("history-routing v2 resume checkpoint does not bind this child artifact lineage")
+        epoch = payload.get("epoch")
+        if not isinstance(epoch, int) or epoch < intervention.parent.epoch:
+            raise ValueError("history-routing v2 resume checkpoint precedes its registered fork boundary")
+        initial_fork = epoch == intervention.parent.epoch
+
+    def record(active_tracker: ExperimentTracker) -> None:
+        if not isinstance(active_tracker, LocalTracker):
+            raise TrackingError("history-routing v2 artifact registration requires a rank-zero LocalTracker")
+        statuses = (
+            active_tracker.local_analysis_input_status(name=mask_name, sha256=intervention.mask.sha256),
+            active_tracker.local_analysis_input_status(name=bundle_name, sha256=bundle_sha),
+        )
+        if statuses == ("exact", "exact"):
+            return
+        if statuses != ("absent", "absent"):
+            phase = "initial fork" if initial_fork else "later resume"
+            raise TrackingError(f"history-routing v2 {phase} has conflicting local analysis-input artifact evidence")
+        if not initial_fork:
+            raise TrackingError("history-routing v2 later resume lacks exact local analysis-input artifact evidence")
+        active_tracker.log_artifact(
+            mask_path,
+            name=mask_name,
+            artifact_type="analysis-input",
+            aliases=("input",),
+        )
+        active_tracker.log_artifact(
+            bundle_path,
+            name=bundle_name,
+            artifact_type="analysis-input",
+            aliases=("input",),
+        )
+
+    coordinator(tracker, phase="history-routing v2 input artifacts", action=record)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -495,10 +571,17 @@ def main(argv: list[str] | None = None) -> int:
                 expected_selected_ids_sha256=mask.selected_ids_sha256,
                 expected_selected_count=mask.selected_count,
                 expected_class_counts=mask.selected_class_counts,
-                expected_provenance=mask.provenance.model_dump(mode="json"),
+                expected_provenance=mask.provenance.exact_payload(),
                 train_labels=train_labels,
                 num_classes=config.dataset.num_classes,
             )
+            if config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}:
+                bundle_path = config.intervention.selector_bundle_path
+                bundle_sha = config.intervention.selector_bundle_sha256
+                assert bundle_path is not None and bundle_sha is not None
+                if not bundle_path.is_file() or hashlib.sha256(bundle_path.read_bytes()).hexdigest() != bundle_sha:
+                    raise ValueError("history-routing v2 selector bundle bytes do not match the registered SHA-256")
+                _attach_history_routing_v2_input_artifacts(tracker=active_tracker, config=config, resume=args.resume)
         sampler = EpochShuffleSampler(
             len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
         )

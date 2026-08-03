@@ -4,6 +4,7 @@ from .teacher import (
     IdentityTeacherTargetPolicy,
     TeacherTargetOutput,
     TeacherTargetPolicy,
+    TrueLabelMixTeacherTargetPolicy,
     UniformSofteningTeacherTargetPolicy,
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "IdentityTeacherTargetPolicy",
     "TeacherTargetOutput",
     "TeacherTargetPolicy",
+    "TrueLabelMixTeacherTargetPolicy",
     "UniformSofteningTeacherTargetPolicy",
 ]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
 
@@ -11,6 +12,15 @@ import pytest
 import torch
 
 from ard.analysis import intervention_fork
+from ard.analysis.history_routing_v2 import (
+    HistoryRoutingV2Error,
+    build_history_routing_v2_bundle,
+    create_history_routing_v2_forks,
+    verify_history_routing_v2_bundle,
+)
+from ard.analysis.history_routing_v2 import (
+    canonical_json as history_routing_canonical_json,
+)
 from ard.analysis.intervention_fork import (
     InterventionForkError,
     build_parent_artifact_attestation,
@@ -527,6 +537,190 @@ def test_common_state_fork_preserves_parent_state_resets_best_and_records_lineag
             root=Path.cwd(),
             git_state_collector=lambda _root: {"sha": "b" * 40, "dirty": False},
         )
+
+
+def test_epoch39_online_selector_bundle_recomputes_exact_history_and_random_masks(tmp_path: Path) -> None:
+    checkpoint, parent_config, manifest, raw, payload, parent_fields = _write_fork_inputs(tmp_path)
+    runtime_raw = copy.deepcopy(raw)
+    raw["method"]["id"] = "rslad_logging_only"
+    raw.pop("observation")
+    raw["research_design"] = {
+        "id": "logging_only_history_confirmatory_v1",
+        "manifest": "configs/analysis/logging_only_history_confirmatory_v1.yaml",
+        "sha256": "d653d9ef08cfa94976a0e3279166b47543d16f3eaadb69810769470b77838c12",
+    }
+    import yaml
+
+    parent_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    parent_manifest = json.loads(manifest.read_text(encoding="utf-8"))
+    parent_manifest["config_hash"] = config_digest(raw)
+    manifest.write_text(json.dumps(parent_manifest), encoding="utf-8")
+    state = copy.deepcopy(payload["sample_state"])
+    records = state["records"]
+    assert isinstance(records, dict)
+    for raw_id, record in records.items():
+        assert isinstance(record, dict)
+        sample_id = int(raw_id)
+        record.update(
+            {
+                "seen": 40,
+                "robust_correct_count": sample_id % 40,
+                "margin_ema": (sample_id % 21 - 10) / 10,
+                "previous_robust_correct": sample_id % 2 == 0,
+            }
+        )
+    payload.update(
+        {
+            "epoch": 39,
+            "global_step": 14_080,
+            "sampler_epoch": [39],
+            "sampler_state": [{"epoch": 39, "seed": 0, "rank": 0, "world_size": 1, "shuffle": True}],
+            "sample_state": state,
+            "config_hash": config_digest(raw),
+            "scheduler": {
+                "milestones": Counter({100: 1, 150: 1}),
+                "last_epoch": 40,
+                "_last_lr": [0.1],
+            },
+        }
+    )
+    torch.save(payload, checkpoint)
+    parent_sha = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+    parent_fields["sample_state_sha256"] = hashlib.sha256(history_routing_canonical_json(state)).hexdigest()
+    inventory = Path(str(parent_fields["artifact_inventory"]))
+    inventory.write_text(
+        json.dumps(
+            {
+                "artifact": {
+                    "name": "model-parent-run-last",
+                    "version": "v19",
+                    "digest": "d" * 32,
+                    "checkpoint_sha256": parent_sha,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    attestation = Path(str(parent_fields["artifact_attestation"]))
+    attestation.write_text(
+        json.dumps(
+            build_parent_artifact_attestation(
+                parent_manifest=manifest,
+                artifact_inventory=inventory,
+                checkpoint=checkpoint,
+            ),
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    parent_fields["artifact_inventory_sha256"] = hashlib.sha256(inventory.read_bytes()).hexdigest()
+    parent_fields["artifact_attestation_sha256"] = hashlib.sha256(attestation.read_bytes()).hexdigest()
+    created = build_history_routing_v2_bundle(
+        parent_checkpoint=checkpoint,
+        parent_resolved_config=parent_config,
+        parent_manifest=manifest,
+        train_partition_manifest=Path(str(parent_fields["train_partition_manifest"])),
+        train_partition_manifest_sha256=str(parent_fields["train_partition_manifest_sha256"]),
+        train_partition_ids_labels_sha256=str(parent_fields["train_partition_ids_labels_sha256"]),
+        output_dir=tmp_path / "v2-bundle",
+    )
+    verified = verify_history_routing_v2_bundle(bundle_path=created["bundle"])
+    assert (
+        json.loads(created["peak_failure_history"].read_text(encoding="utf-8"))["selected_ids_sha256"]
+        == "d08e8bf6d1c83975e4d76d8d57cee86d8c9658139dc82e98040f684c16fdee6b"
+    )
+    assert {route: value["selected_count"] for route, value in verified["routes"].items()} == {
+        "peak_failure": 2250,
+        "non_recovery": 2250,
+    }
+    parent = {
+        "checkpoint_sha256": parent_sha,
+        "raw_config_sha256": config_digest(raw),
+        "git_sha": "a" * 40,
+        "epoch": 39,
+        "world_size": 1,
+        "teacher_checkpoint_sha256": "e" * 64,
+        "sample_state_records": 45000,
+        **parent_fields,
+    }
+    arm_paths: list[Path] = []
+    for arm, route, selection in (
+        ("PF_TA", "peak_failure", "history"),
+        ("PF_R", "peak_failure", "random"),
+        ("NR_TA", "non_recovery", "history"),
+        ("NR_R", "non_recovery", "random"),
+    ):
+        child = copy.deepcopy(runtime_raw)
+        child["protocol"] = {"id": "controlled_cifar10_r18_delayed_multistep_v1"}
+        child["scheduler"] = {"id": "multistep", "milestones": [120, 170], "gamma": 0.1, "step_at": "epoch_end"}
+        child["output_dir"] = str(tmp_path / "v2-screen" / arm)
+        mask_path = created[f"{route}_{selection}"]
+        mask_raw = json.loads(mask_path.read_text(encoding="utf-8"))
+        mask = {
+            name: mask_raw[name]
+            for name in ("selected_ids_sha256", "selected_count", "selected_class_counts", "provenance")
+        }
+        mask.update({"path": str(mask_path), "sha256": hashlib.sha256(mask_path.read_bytes()).hexdigest()})
+        child["intervention"] = {
+            "arm": arm,
+            "selector": "online_history" if selection == "history" else "class_state_count_matched_random",
+            "kind": "teacher_target_true_label_mix",
+            "parent": parent,
+            "mask": mask,
+            "selector_bundle_path": str(created["bundle"]),
+            "selector_bundle_sha256": hashlib.sha256(created["bundle"].read_bytes()).hexdigest(),
+        }
+        path = tmp_path / f"{arm}.yaml"
+        import yaml
+
+        path.write_text(yaml.safe_dump(child), encoding="utf-8")
+        arm_paths.append(path)
+    forks = create_history_routing_v2_forks(
+        parent_checkpoint=checkpoint,
+        parent_resolved_config=parent_config,
+        parent_manifest=manifest,
+        arm_config_paths=arm_paths,
+        root=Path.cwd(),
+        git_state_collector=lambda _root: {"sha": "b" * 40, "dirty": False},
+    )
+    child = torch.load(forks["PF_TA"], map_location="cpu", weights_only=False)
+    assert child["epoch"] == 39 and child["best_metric"] == float("-inf")
+    assert child["scheduler"]["milestones"] == Counter({120: 1, 170: 1})
+    assert child["fork_lineage"]["kind"] == "history_routing_v2_intervention_v1"
+    assert child["fork_lineage"]["parent_runtime_migration"] == {
+        "kind": "historical_logging_only_runtime_migration_v1",
+        "source_method_id": "rslad_logging_only",
+        "runtime_method_id": "rslad",
+        "source_observation": "absent",
+        "runtime_observation_profile": "teacher_response",
+        "research_design": raw["research_design"],
+        "applied": [
+            "rslad_logging_only_to_rslad",
+            "research_design_removed",
+            "teacher_response_observation_added",
+        ],
+    }
+    original_partition = json.loads(Path(str(parent_fields["train_partition_manifest"])).read_text(encoding="utf-8"))
+    for drift_name, changed_row in (("id", [50_000, 0]), ("label", [0, 1])):
+        drifted = copy.deepcopy(original_partition)
+        drifted["ids_labels"][0] = changed_row
+        drifted["ids_labels"] = sorted(drifted["ids_labels"])
+        drifted["ids_labels_sha256"] = hashlib.sha256(
+            json.dumps(drifted["ids_labels"], sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        partition_path = Path(str(parent_fields["train_partition_manifest"]))
+        partition_path.write_text(json.dumps(drifted), encoding="utf-8")
+        with pytest.raises(HistoryRoutingV2Error, match="train partition"):
+            build_history_routing_v2_bundle(
+                parent_checkpoint=checkpoint,
+                parent_resolved_config=parent_config,
+                parent_manifest=manifest,
+                train_partition_manifest=partition_path,
+                train_partition_manifest_sha256=hashlib.sha256(partition_path.read_bytes()).hexdigest(),
+                train_partition_ids_labels_sha256=drifted["ids_labels_sha256"],
+                output_dir=tmp_path / f"v2-{drift_name}-drift",
+            )
+        partition_path.write_text(json.dumps(original_partition), encoding="utf-8")
 
 
 def test_common_state_fork_rejects_parent_hash_drift_before_creating_outputs(tmp_path: Path) -> None:

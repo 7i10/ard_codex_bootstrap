@@ -323,7 +323,7 @@ def _validate_mask(arm: ExperimentConfig, *, train_labels: Mapping[int, int] | N
                 expected_selected_ids_sha256=intervention.mask.selected_ids_sha256,
                 expected_selected_count=intervention.mask.selected_count,
                 expected_class_counts=intervention.mask.selected_class_counts,
-                expected_provenance=intervention.mask.provenance.model_dump(mode="json"),
+                expected_provenance=intervention.mask.provenance.exact_payload(),
                 train_labels=train_labels,
                 num_classes=arm.dataset.num_classes,
             )
@@ -449,10 +449,27 @@ def create_intervention_forks(
     git_state_collector: Callable[[Path], Mapping[str, Any]] = collect_git_state,
 ) -> dict[str, Path]:
     """Create all five child epoch-99 checkpoints without invoking training."""
+    probe_arms = [load_config(path) for path in arm_config_paths]
+    if probe_arms and all(
+        arm.intervention is not None and arm.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}
+        for arm in probe_arms
+    ):
+        # The H5-derived epoch-39 route is a separate scientific contract; do
+        # not make its looser arm shape an exception in this legacy H3 path.
+        from ard.analysis.history_routing_v2 import create_history_routing_v2_forks
+
+        return create_history_routing_v2_forks(
+            parent_checkpoint=parent_checkpoint,
+            parent_resolved_config=parent_resolved_config,
+            parent_manifest=parent_manifest,
+            arm_config_paths=arm_config_paths,
+            root=root,
+            git_state_collector=git_state_collector,
+        )
     parent_raw = _load_mapping(parent_resolved_config, name="parent resolved config")
     source = ExperimentConfig.model_validate(parent_raw)
     manifest = _load_json_mapping(parent_manifest, name="parent manifest")
-    arms = [load_config(path) for path in arm_config_paths]
+    arms = probe_arms
     by_name = _validate_screen(arms)
     payload, train_labels, parent_artifact = _validate_parent(
         checkpoint=parent_checkpoint,

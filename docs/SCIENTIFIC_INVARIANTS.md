@@ -165,3 +165,7 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
 ## M0 schema v2 target policy
 
 Schema v2 は `teacher_target_uniform_mix@1` を student/joint の adversarial student-KD branch にのみ適用する。teacher probabilities は `softmax(z_t/T)` とし、uniform mixing は `rho_max=0.5`、clean KD target は変更しない。student/joint の main semantics では hard-label fallback は使用しない。旧挙動は明示的な `rslad_hard_fallback@1` ablation としてのみ扱う。
+
+## Best-oriented history-routing v2
+
+`teacher_target_true_label_mix@1` はepoch 39完了時に固定したbinary train-ID maskへだけ適用する。selected sampleのadversarial RSLAD targetは`0.5 * softmax(z_teacher_clean/T) + 0.5 * one_hot(y)`、unselected sampleは通常RSLAD targetと完全に同一である。clean KD branch、attack、temperature、`T^2` scaling、branch coefficient、reductionは変更しない。selectorは全45,000 train sample上でinclusive online correctness-frequency riskとnegative margin EMAをそれぞれmidrankし、等重み合成後にanchor-correct/anchor-wrongへ分けて各上位10%を固定する。future outcome、official test、teacher correctnessはselectionへ使用しない。

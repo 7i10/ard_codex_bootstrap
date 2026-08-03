@@ -165,6 +165,8 @@ freeze済みです。最終host gate `scripts/verify.py --changed --force --non-
 `209 passed, 2 skipped`で、再確認は18 commandsすべて`cached pass`でした。skipはopt-in SAAD/TRADES upstream subprocess oracleです。
 `make lint`はRuff 99 files、mypy 57 source files、import `2 passed`、train/evaluate CLI helpがpassしました。
 
+Best-oriented history-routing v2では、target mixtureとselected-only gradient、全train母集団rankからPF/NRを分ける順序、stable-ID tie break、class/state/count-matched random、historical L1 config migration、train-partition完全一致、epoch-39 forkのscheduler/RNG/sample-state parity、rank-zero input artifactの初回・再開冪等性をT1/T2で固定します。実験開始前に実epoch-39 checkpointからselector、mask、4 fork、1 branch resumeまでのbounded GPU smokeを1回だけ行い、official testとAutoAttackは使用しません。
+
 以下はbaseline-readiness M4以前のbootstrapで記録済みのhistorical evidenceです。
 
 - `make lint`: Ruff format/check 87 files、mypy 51 source files、import tests `2 passed`、train/evaluateの

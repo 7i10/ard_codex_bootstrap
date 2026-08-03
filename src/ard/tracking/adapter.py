@@ -760,6 +760,35 @@ class LocalTracker:
             _write_json(self.manifest_path, self.manifest)
             raise
 
+    def local_analysis_input_status(self, *, name: str, sha256: str) -> str:
+        """Classify one durable analysis-input name as absent, exact, or conflicting.
+
+        Resume paths use this rather than treating a non-null checkpoint as
+        evidence that immutable analysis inputs reached the local manifest.
+        """
+        entries = self.manifest.get("artifacts")
+        if not isinstance(entries, list):
+            return "conflict"
+        matches = [entry for entry in entries if isinstance(entry, Mapping) and entry.get("name") == name]
+        if not matches:
+            return "absent"
+        if len(matches) != 1:
+            return "conflict"
+        entry = matches[0]
+        if entry.get("type") != "analysis-input" or entry.get("aliases") != ["input"] or entry.get("sha256") != sha256:
+            return "conflict"
+        local_path = entry.get("local_path")
+        if not isinstance(local_path, str):
+            return "conflict"
+        candidate = (self.bundle_dir / local_path).resolve()
+        if self.bundle_dir.resolve() not in candidate.parents or not candidate.is_dir():
+            return "conflict"
+        files = [path for path in candidate.iterdir() if path.is_file()]
+        return "exact" if len(files) == 1 and sha256_file(files[0]) == sha256 else "conflict"
+
+    def has_exact_local_analysis_input(self, *, name: str, sha256: str) -> bool:
+        return self.local_analysis_input_status(name=name, sha256=sha256) == "exact"
+
     def set_summary(self, values: Mapping[str, Any]) -> None:
         self.manifest["summary"].update(dict(values))
         _write_json(self.manifest_path, self.manifest)
