@@ -196,14 +196,16 @@ prefixをepoch 80--99だけ選択サンプルへ使います。true-label harden
 | 実行中 | Ferret 0 | L3 / PF-H | `pv3-bart-s2-9792655-pf_ret_h` | fixed-SHA process / W&B online確認 |
 | 実行中 | Ferret 1 | L3 / NR-H | `pv3-bart-s2-9792655-nr_pfx_h` | fixed-SHA process / W&B online確認 |
 | 実行中 | Ferret 2 | L3 / PF-R | `pv3-bart-s2-9792655-pf_ret_r` | smoke合格後に開始 |
-| GPU待ち | Hamster | L1 / PF-R | `pv3-bart-s1-9792655-pf_ret_r` | fork済み、未学習 |
-| GPU待ち | Hamster | L1 / NR-R | `pv3-bart-s1-9792655-nr_pfx_r` | fork済み、未学習 |
-| GPU待ち | Ferret | L3 / NR-R | `pv3-bart-s2-9792655-nr_pfx_r` | prepared fixed-SHA worktree / fork済み |
+| 自動待機 | Hamster 0 | L1 / PF-R | `pv3-bart-s1-9792655-pf_ret_r` | PF-Hの正常epoch-199完了後だけ開始 |
+| 自動待機 | Hamster 1 | L1 / NR-R | `pv3-bart-s1-9792655-nr_pfx_r` | NR-Hの正常epoch-199完了後だけ開始 |
+| 自動待機 | Ferret 1 | L3 / NR-R | `pv3-bart-s2-9792655-nr_pfx_r` | NR-Hのremote completed確認後だけ開始 |
 
 全runはGit `97926553ed6773666df915860460b90c353e721d`、1 GPU、batch 128、local BN、
 delayed milestones 120/170へ固定しています。以前のFerret 4-worker profileは有望ですが、このpaired screenでは
 fork契約を変えないため8 workersを維持します。開発結果はvalidationだけで判定し、official test・AutoAttack・
 Chen・未使用seedはGo判定まで封印します。
+Successor queueは`.cache/`内の運用stateであり科学coreには含めません。predecessorがfailed、cancelled、
+orphaned、またはepoch 199未到達なら自動開始せず、成功時だけ同じhost/GPUを再利用します。
 
 ## 4. 現在の正式結果
 

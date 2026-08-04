@@ -221,7 +221,9 @@ M2 launch evidence (2026-08-05):
   records, finite metrics, W&B online identity, and distinct best/last state;
 - after that smoke, L3 PF-H, NR-H, and PF-R were launched on Ferret GPUs
   0/1/2. L1 PF-H and NR-H continue on Hamster GPUs 0/1. The three remaining
-  H/R children stay sealed until a predecessor releases the same-host GPU;
+  H/R children are armed as detached successors and start only after the
+  paired predecessor records `status=completed` at epoch 199 and releases the
+  same-host GPU. A failed/cancelled/orphaned predecessor blocks its successor;
   official test and AutoAttack remain unused.
 
 ## Test selection
