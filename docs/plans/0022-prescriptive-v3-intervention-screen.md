@@ -5,7 +5,7 @@
 - Owner: main thread; one Terra implementation owner; one consolidated
   scientific review after formula/resume evidence is stable
 - Development teachers/seeds: Bartoldson L1 seed 1 and L3 seed 2 only
-- Current milestone: M2 real-parent fork and CUDA smoke
+- Current milestone: M4 eight-arm development queue in progress
 - Last updated: 2026-08-05
 
 ## Why this screen exists
@@ -175,7 +175,7 @@ schedule are not tuned on L1/L3 outcomes.
   counts/hashes for L1/L3.
 - [x] M1 -- implement PF target and NR attack-prefix boundaries plus config,
   checkpoint/resume, artifact identity, and focused tests.
-- [ ] M2 -- create hash-bound H/R forks from both epoch-79 parents and run one
+- [x] M2 -- create hash-bound H/R forks from both epoch-79 parents and run one
   real-parent one-epoch smoke per mechanism.
 - [x] M3 -- run one consolidated scientific review; fix only P0/P1 findings.
 - [ ] M4 -- launch the eight-arm development queue, monitor automatically, and
@@ -204,6 +204,25 @@ launch after the preregistered real-parent CUDA smoke. The review also kept
 `num_workers=8`; the measured Ferret speedup at 4 workers is not mixed into
 this paired screen without a separate execution-identity delta and parity
 evidence.
+
+M2 launch evidence (2026-08-05):
+
+- implementation/fork Git SHA:
+  `97926553ed6773666df915860460b90c353e721d`;
+- L1 masks: PF H/R 691 each, NR H/R 2,318 each; L3 masks: PF H/R
+  715 each, NR H/R 2,315 each. H/R class, epoch-79 route state, and
+  epoch-34 teacher-adversarial-correct strata match exactly;
+- all four L1 and all four L3 initial child checkpoints were atomically
+  generated from the registered epoch-79 parent and passed initial resume
+  identity validation;
+- L1 PF-H and NR-H completed epoch 80 on separate Hamster RTX 4090s. PF-H
+  recorded train loss `.719874`, validation PGD `.4126`, 205.87 images/s;
+  NR-H recorded validation PGD `.3878`. Both retained LR `.1`, 45,000 sample
+  records, finite metrics, W&B online identity, and distinct best/last state;
+- after that smoke, L3 PF-H, NR-H, and PF-R were launched on Ferret GPUs
+  0/1/2. L1 PF-H and NR-H continue on Hamster GPUs 0/1. The three remaining
+  H/R children stay sealed until a predecessor releases the same-host GPU;
+  official test and AutoAttack remain unused.
 
 ## Test selection
 

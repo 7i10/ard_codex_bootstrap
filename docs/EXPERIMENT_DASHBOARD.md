@@ -182,6 +182,29 @@ Ferret GPU 2で同一1-epoch workloadを比較した結果、teacher-response観
 startup後にmemory residentとなるため、dataset再配置はsteady-state差の主因ではありません。prefetch/pinned
 transferは未変更で、worker調整後にも残るhost差をprofileする場合だけ追加します。
 
+### ★ Prescriptive v3 intervention screen（実行中）
+
+v2の失敗分析から、Student historyを予後予測として残し、介入をPFの時間的一貫性とNRの入力側learnabilityへ
+分離しました。PFはepoch-79 Student anchorをteacher targetへ25%混合し、NRは同じPGD-10 trajectoryのstep-5
+prefixをepoch 80--99だけ選択サンプルへ使います。true-label hardening、KD weight変更、attack budget変更は
+行いません。詳細な数式、mask、停止基準は[Plan 0022](plans/0022-prescriptive-v3-intervention-screen.md)です。
+
+| 状態 | Host/GPU | Cell | W&B run ID | 現在の証拠 |
+|---|---|---|---|---|
+| 実行中 | Hamster 0 | L1 / PF-H | `pv3-bart-s1-9792655-pf_ret_h` | epoch 80 smoke完了、val PGD 41.26% |
+| 実行中 | Hamster 1 | L1 / NR-H | `pv3-bart-s1-9792655-nr_pfx_h` | epoch 80 smoke完了、val PGD 38.78% |
+| 実行中 | Ferret 0 | L3 / PF-H | `pv3-bart-s2-9792655-pf_ret_h` | fixed-SHA process / W&B online確認 |
+| 実行中 | Ferret 1 | L3 / NR-H | `pv3-bart-s2-9792655-nr_pfx_h` | fixed-SHA process / W&B online確認 |
+| 実行中 | Ferret 2 | L3 / PF-R | `pv3-bart-s2-9792655-pf_ret_r` | smoke合格後に開始 |
+| GPU待ち | Hamster | L1 / PF-R | `pv3-bart-s1-9792655-pf_ret_r` | fork済み、未学習 |
+| GPU待ち | Hamster | L1 / NR-R | `pv3-bart-s1-9792655-nr_pfx_r` | fork済み、未学習 |
+| GPU待ち | Ferret | L3 / NR-R | `pv3-bart-s2-9792655-nr_pfx_r` | prepared fixed-SHA worktree / fork済み |
+
+全runはGit `97926553ed6773666df915860460b90c353e721d`、1 GPU、batch 128、local BN、
+delayed milestones 120/170へ固定しています。以前のFerret 4-worker profileは有望ですが、このpaired screenでは
+fork契約を変えないため8 workersを維持します。開発結果はvalidationだけで判定し、official test・AutoAttack・
+Chen・未使用seedはGo判定まで封印します。
+
 ## 4. 現在の正式結果
 
 以下はすべてCIFAR-10 official test **10,000例**です。PGDはCE PGD-20、AAはstandard AutoAttackです。
