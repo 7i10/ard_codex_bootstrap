@@ -382,6 +382,10 @@ def analyze_pre39_prescriptive(
     analysis_provenance: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Produce point estimates and routing audit from one hash-bound replay pair."""
+    # Fail on source/worktree drift before reading roughly two million replay
+    # rows.  This keeps a provenance error cheap and prevents repeated wasted
+    # CPU work when another bounded writer is active.
+    provenance = dict(_provenance() if analysis_provenance is None else analysis_provenance)
     feature, outcome, feature_meta, outcome_meta = _validate_inputs(
         feature_observations=feature_observations,
         outcome_observations=outcome_observations,
@@ -492,7 +496,7 @@ def analyze_pre39_prescriptive(
             "outcome_attack_domain": outcome_meta["outcome_protocol"],
         },
         "anchor_reports": anchors,
-        "analysis_provenance": dict(_provenance() if analysis_provenance is None else analysis_provenance),
+        "analysis_provenance": provenance,
         "_bootstrap_rows": bootstrap_rows,
         "_mask_ids": mask_ids,
     }

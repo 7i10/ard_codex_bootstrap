@@ -280,3 +280,27 @@ def test_pre39_bootstrap_is_deterministic_and_resumes(tmp_path: Path) -> None:
     assert {key: resumed[key] for key in ("completed_replicates", "lower", "upper")} == {
         key: fresh[key] for key in ("completed_replicates", "lower", "upper")
     }
+
+
+def test_pre39_checks_provenance_before_loading_large_inputs(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def fail_provenance() -> dict[str, object]:
+        calls.append("provenance")
+        raise Pre39PrescriptiveError("dirty source")
+
+    def unexpected_inputs(**_: object) -> object:
+        calls.append("inputs")
+        raise AssertionError("large inputs must not be read before provenance")
+
+    monkeypatch.setattr("ard.analysis.pre39_prescriptive._provenance", fail_provenance)
+    monkeypatch.setattr("ard.analysis.pre39_prescriptive._validate_inputs", unexpected_inputs)
+    with pytest.raises(Pre39PrescriptiveError, match="dirty source"):
+        analyze_pre39_prescriptive(
+            feature_observations=Path("feature.parquet"),
+            outcome_observations=Path("outcome.parquet"),
+            feature_lineage=Path("feature.json"),
+            outcome_lineage=Path("outcome.json"),
+            expected_count=45_000,
+        )
+    assert calls == ["provenance"]

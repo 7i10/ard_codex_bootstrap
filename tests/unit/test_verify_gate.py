@@ -150,6 +150,13 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert pre39.tests == ("tests/unit/test_pre39_prescriptive.py",)
     assert pre39.tiers == ("T0", "T1")
 
+    rescue_harm = select(
+        ("src/ard/analysis/rescue_harm.py", "src/ard/cli/rescue_harm.py"),
+        (*available, "tests/unit/test_rescue_harm.py"),
+    )
+    assert rescue_harm.tests == ("tests/unit/test_rescue_harm.py",)
+    assert rescue_harm.tiers == ("T0", "T1")
+
     schedule_control = select(
         ("src/ard/analysis/schedule_control_fork.py", "src/ard/cli/schedule_control_fork.py"),
         (*available, "tests/unit/test_schedule_control_fork.py", "tests/unit/test_protocols_schedules.py"),
