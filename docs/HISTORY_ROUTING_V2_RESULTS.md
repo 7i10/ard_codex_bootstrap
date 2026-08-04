@@ -125,22 +125,45 @@ Best PGDは改善しなかった」ことであり、次の機構はまだ仮説
 - 高いtrain-sample予測AUROCはvalidation robust accuracyの改善を保証しない。選択sampleの
   rescueと、非選択sampleを含むspillover harmを同時に測る必要がある。
 
-次は新規訓練より先に、既存L1/L3のControl/history/random armを同一attack・同一epochで
-再評価し、sampleをrescued / harmed / stable / unchanged failureへ分ける。さらに選択群の
-target変更量、teacher clean-to-adversarial response、固定panelのloss-gradient方向を監査する。
-これは個別因果効果の推定ではなく、PF temporal stabilizationとNR input-side curriculumの
-どちらを次の直交介入候補へ残すかを決めるretrospective moderation分析である。契約は
-[Plan 0021](plans/0021-pre39-prescriptive-routing.md)へ固定する。
+この機構監査は完了した。L1/L3の5 armをepoch `99/104/109/199`で共通CE-PGD20により
+再評価し、合計40 checkpoint replayを得た。最終epochの選択sample内net rescue
+（rescued minus harmed）はPF-history対PF-randomでseed 1が`50 vs 17`、seed 2が
+`39 vs 4`だった。一方、model-wide net rescueは両seedで負であり、選択sampleの局所的な
+回収が非選択sampleへのspilloverで相殺されるという説明と整合する。NRはhistory/randomの
+優位がseedとepochで安定しなかった。
+
+選択sampleのtarget L1変化はPF-historyで約`.19`、NR-historyで約`.15`であり、介入が
+near no-opだったという説明は棄却した。ただしBartoldson教師は対象sampleの99%以上で
+正解しており、`0.5*p_teacher+0.5*one_hot(y)`は有益なsoft targetを保持するより
+hardeningする介入だった。replayから得たrescue/harmは共有model下のmoderationであり、
+sample単位の因果効果とは解釈しない。実装中にselector eligibilityをreplay correctnessから
+再構成していたdomain bugも検出し、parent checkpointのexact online SampleStateStoreへ
+結合するよう修正した。GPU replayの再実行は不要だった。
+
+さらにepoch 34のexact online stateで、より早い予測可能性を確認した。PF AUROCは
+L1/L3で`.9090/.8936`（instantaneous margin `.8677/.8663`、teacher entropy
+`.6690/.6797`）、NRは`.7850/.7696`（`.7159/.7039`、`.4575/.4637`）だった。
+したがってStudent historyは予後信号として保持し、次の介入はPFとNRを分離する。
+
+- PF: epoch-79 Studentを固定anchorにし、epochs 80--129だけ
+  `0.75*p_teacher+0.25*p_anchor`を使って過去の正しいStudent応答を保持する。
+- NR: teacher targetを変更せず、epochs 80--99だけ同一PGD-10 trajectoryのstep-5 prefixを
+  selected sampleへ適用してinput-side learnabilityを検証する。
+
+各routeはhistory選択とclass/state/teacher-state/count-matched randomを2 seedで比較し、
+既存delayed-schedule controlを再利用する。仕様・停止基準は
+[Plan 0022](plans/0022-prescriptive-v3-intervention-screen.md)へ固定した。
 
 ## 未確認事項と次の研究判断
 
 - `q`、anchor、mix係数を同じL1/L3結果で再調整しない。
 - official test、AutoAttack、Bartoldson seeds 3/4、Chen no-harmはDevelopment No-Goにより未実行。
-- true-label anchor routeは閉じる。次は既存trajectoryを使い、epoch 39以前のanchor、
-  student-vs-teacher比較、persistent-error taxonomyをread-onlyで完了する。
-- 次の介入は、teacher-correct/teacher-wrongとpersistent/future-failureを踏まえて最大2つの
-  直交候補に固定する。候補例はadversarial KD downweightとteacher-correct時のKD維持だが、
-  解析前に実験条件として確定しない。
+- true-label anchor routeは閉じた。epoch 39以前のanchor、student-vs-teacher比較、
+  completed-arm rescue/harm監査も完了した。
+- 次の介入はPF retentionとNR PGD-prefix curriculumの2候補に固定済みである。L1/L3の
+  validationだけで開発判定し、係数、期間、mask、scheduleを結果後に再調整しない。
+- v3がDevelopment Goの場合だけ未使用Bartoldson seed、Chen no-harm、最後にofficial
+  PGD/AutoAttackへ進む。No-Goの場合はこの2 treatment familyを閉じる。
 - full SAAD、TRADES、PGD-ATは提案法と独立したbaseline gapとして残る。
 
 事前登録した設計と停止規則は

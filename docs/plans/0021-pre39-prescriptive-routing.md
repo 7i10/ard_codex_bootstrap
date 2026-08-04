@@ -5,7 +5,7 @@
 - Owner: main thread; one research-planner pass, one Terra implementation
   owner, one consolidated scientific review after real reports are stable
 - Branch / base SHA: `research/prescriptive-routing-v3` / `2adce67`
-- Current milestone: M0 input freeze
+- Current milestone: M3 intervention freeze
 - Last updated: 2026-08-05
 
 ## Goal
@@ -29,8 +29,9 @@ treatment.
   true-label-anchor families on L1/L3 outcomes.
 - Do not use official CIFAR-10 test, AutoAttack, unseen Bartoldson seeds, or
   Chen no-harm seeds for development.
-- Do not rerun GPU replay: the schema-v2 feature/outcome column union already
-  contains the required teacher and student primitives.
+- Do not rerun the L1--L4 trajectory feature/outcome replay: its schema-v2
+  column union already contains the required teacher and student primitives.
+  The completed-v2 arm replay below is a separate common-attack outcome audit.
 - Do not transfer every periodic checkpoint.  Retrieve only an exact online
   candidate anchor after the cheaper replay-domain point screen passes.
 - Do not equate failure prognosis with positive treatment response.
@@ -166,7 +167,7 @@ not launch until exact equations and controls are frozen.
   - Acceptance: all replay inputs exist; missing exact-online bytes are named
     without downloading them.
   - Commit: included with M1.
-- [ ] M1 -- implement the CPU-only pre-39 point screen and routing audit.
+- [x] M1 -- implement the CPU-only pre-39 point screen and routing audit.
   - Files: new analysis module/CLI and focused unit tests; do not change the
     trainer, objective, attack, or frozen H5 estimator.
   - Owner: one Terra implementation pass because estimator/lineage code is a
@@ -177,11 +178,11 @@ not launch until exact equations and controls are frozen.
   - Acceptance: one CLI produces a hash-bound L1--L4 point report from the
     real replay matrix without CUDA or network.
   - Commit: `analysis: add pre39 prescriptive routing audit`.
-- [ ] M2 -- apply the point gate, run only the admissible paired bootstrap,
+- [x] M2 -- apply the point gate, run only the admissible paired bootstrap,
   and, if needed, export one candidate exact-online anchor.
   - Tests: deterministic/resumable bootstrap and exact checkpoint state.
   - Acceptance: earliest anchor is fixed or epoch 39 retained; no GPU replay.
-- [ ] M2b -- complete the v2 rescue/harm and target-change audit.
+- [x] M2b -- complete the v2 rescue/harm and target-change audit.
   - Files: a reusable paired-checkpoint observation CLI, CPU report CLI,
     focused tests, and hash-bound reports; no training-loop change.
   - Execution: one real checkpoint smoke, then independent fixed-epoch replay
@@ -250,6 +251,33 @@ sync pass is needed before an API is frozen.
 - 2026-08-05: Added a completed-v2 rescue/harm and target-change audit.  PF
   temporal stabilization and NR input-side curriculum are hypotheses only;
   neither is an experiment until this audit fixes mechanism and headroom.
+- 2026-08-05: The replay-domain point screen nominated epoch 34. Both
+  Bartoldson development seeds passed the fixed 2,000-replicate paired
+  bootstrap against instantaneous margin and teacher entropy. Exact
+  epoch-34 SampleStateStore exports were then hash-bound for L1/L3; no image
+  replay was repeated.
+- 2026-08-05: Exact-online epoch 34 confirmed the signal. PF AUROC was
+  `.9090/.8936` for L1/L3 versus instantaneous `.8677/.8663` and teacher
+  `.6690/.6797`; NR was `.7850/.7696` versus `.7159/.7039` and
+  `.4575/.4637`. Precision@10% also met the frozen gate on both seeds. All
+  eight class-stratified paired 2,000-replicate AUROC intervals were positive;
+  the smallest lower bound was `.0208` (L3 PF versus instantaneous margin).
+- 2026-08-05: Completed all 40 fixed-checkpoint arm replays (2 seeds x 5 arms
+  x 4 epochs) under the common CE-PGD20 contract. A real-report failure found
+  that selector eligibility had been incorrectly reconstructed from replay
+  correctness instead of the parent online SampleStateStore. The analysis
+  was fixed with a real-domain regression; no GPU replay or training rerun was
+  needed. See debugging note 0023.
+- 2026-08-05: Rescue/Harm showed positive selected-sample last-checkpoint net
+  rescue for PF history versus random on both seeds (`50 vs 17`, `39 vs 4`),
+  while model-wide spillover and validation Best remained non-positive. NR was
+  not stable across seed/epoch. Mean selected target L1 changes were about
+  `.19` for PF-history and `.15` for NR-history, rejecting the near-no-op
+  explanation but not identifying individual causal effects.
+- 2026-08-05: Opened Plan 0022. It freezes PF anchored Student-target
+  consistency and NR exact PGD-prefix curriculum as separate development
+  mechanisms, with H/R controls and epoch-79 parents. No official test or
+  confirmation seed has been opened.
 
 ## Completion report
 

@@ -5,7 +5,7 @@
 - Owner: main thread; one Terra implementation owner; one consolidated
   scientific review after formula/resume evidence is stable
 - Development teachers/seeds: Bartoldson L1 seed 1 and L3 seed 2 only
-- Current milestone: M0 frozen design
+- Current milestone: M1 implementation
 - Last updated: 2026-08-05
 
 ## Why this screen exists
@@ -143,6 +143,20 @@ Prediction authorization, applied before training:
 - paired class-stratified 2,000-replicate lower bounds must be positive;
 - Student precision@10% may be at most `.01` below either comparator.
 
+Authorization completed on 2026-08-05. All eight paired 95% intervals for
+Student-history AUROC minus the comparator were strictly positive:
+
+| Run | Route | vs instantaneous | vs teacher entropy |
+|---|---|---:|---:|
+| L1 | PF | `[.0348, .0482]` | `[.2244, .2565]` |
+| L3 | PF | `[.0208, .0335]` | `[.1970, .2309]` |
+| L1 | NR | `[.0625, .0754]` | `[.3164, .3381]` |
+| L3 | NR | `[.0599, .0720]` | `[.2951, .3167]` |
+
+Each interval used the frozen 2,000-replicate, class-stratified, paired
+bootstrap with seed `2026080501`; resumable progress and final JSON are kept
+outside Git under `.cache/analysis/pre39-68b7177/`.
+
 Treatment Go, computed from validation only:
 
 - two-seed mean Best CE-PGD20 improvement H-C at least `+0.50 pp`;
@@ -157,7 +171,7 @@ schedule are not tuned on L1/L3 outcomes.
 
 ## Milestones
 
-- [ ] M0 -- close exact-online point/bootstrap authorization and freeze route
+- [x] M0 -- close exact-online point/bootstrap authorization and freeze route
   counts/hashes for L1/L3.
 - [ ] M1 -- implement PF target and NR attack-prefix boundaries plus config,
   checkpoint/resume, artifact identity, and focused tests.
