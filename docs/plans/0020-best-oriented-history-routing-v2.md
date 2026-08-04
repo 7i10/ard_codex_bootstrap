@@ -5,8 +5,8 @@
 - Owner: main thread; one planning pass, one core implementation owner, one
   consolidated scientific review after focused evidence is stable
 - Base scientific SHA: `cd56b729948782e82d446b186a58bd89a1817303`
-- Current milestone: M2 real-checkpoint branch smoke
-- Last updated: 2026-08-03
+- Current milestone: complete -- Development No-Go; M5/M6 stopped by design
+- Last updated: 2026-08-05
 
 ## Goal
 
@@ -102,7 +102,7 @@ mixing coefficient, or score on the same L1/L3 outcomes.
   - Reuse fixed-mask loading, stable IDs, DDP broadcast, checkpoint/resume,
     RSLAD attack/objective, and tracker lineage.
   - Keep teacher moderator observations detached from loss.
-- [~] M2 -- focused verification and one real-checkpoint branch smoke.
+- [x] M2 -- focused verification and one real-checkpoint branch smoke.
   - Formula and selected-only target application; finite unreduced loss and
     gradients; teacher parameter gradients remain `None`.
   - Attack/threat identity, clean branch, non-selected samples, and loss scale
@@ -111,16 +111,16 @@ mixing coefficient, or score on the same L1/L3 outcomes.
     class/state/count-matched random, DDP agreement, checkpoint/resume parity.
   - Run one synthetic GPU smoke and one real epoch-39 single-branch smoke,
     then one focused changed-path gate and one consolidated scientific review.
-- [ ] M3 -- launch the L1/L3 development block using longest-job-first host
+- [x] M3 -- launch the L1/L3 development block using longest-job-first host
   placement and hash-verified transfer where cheaper than recomputation.
   Reuse C; run the eight new history/random continuations.  Do not add an
   operational campaign framework to the scientific core.
-- [ ] M4 -- apply the frozen development gate and select at most one route.
+- [x] M4 -- apply the frozen development gate and select at most one route.
   No official test/AA and no post-result hyperparameter adjustment.
-- [ ] M5 -- only after Development Go, run the selected frozen route and its
-  matched delayed control on unseen Bartoldson seeds 3 and 4.
-- [ ] M6 -- only after both Bartoldson confirmations pass, run Chen seeds 3
-  and 4 as no-harm checks; then freeze and open official evaluation once.
+- [x] M5 -- not launched: Development No-Go activated the preregistered stop
+  rule, so unseen Bartoldson seeds 3/4 remain sealed.
+- [x] M6 -- not launched by design: Chen no-harm and official evaluation are
+  conditional on Bartoldson confirmation.
 
 ## Confirmation and stop rules
 
@@ -174,3 +174,14 @@ student-history result; it means the prescriptive intervention failed.
   A real L1 epoch-39 selector smoke produced 2,160 PF and 2,339 NR selections
   with exact class-matched random controls.  No training, official test, or
   AutoAttack has run yet; the one-branch GPU resume smoke remains M2.
+- 2026-08-05: M2--M4 completed.  Both delayed controls and all eight L1/L3
+  intervention continuations finished at Git SHA
+  `2337b9d89c8319b39edf7067f08b3d4aa82e0ce0`.  PF-TA versus C had two-seed
+  mean Best/Last/RO differences of `-0.18/-0.38/+0.20 pp`; NR-TA versus C had
+  `-0.17/-0.15/-0.02 pp`.  NR history beat its matched random arm by
+  `+0.15 pp` mean Best, but both seeds remained below C.  Neither route met
+  the preregistered `+0.50 pp` Best gate, so this true-label-anchor family is
+  Development No-Go.  No official test, AutoAttack, confirmation seed, or
+  Chen no-harm run was launched.  Frozen tables, run IDs, trajectory AUC, and
+  interpretation are in
+  [`HISTORY_ROUTING_V2_RESULTS.md`](../HISTORY_ROUTING_V2_RESULTS.md).

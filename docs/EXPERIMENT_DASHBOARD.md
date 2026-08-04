@@ -1,6 +1,6 @@
 # 実験ダッシュボード
 
-科学結果スナップショット: **2026-08-01 00:50 JST**
+科学結果スナップショット: **2026-08-05 JST**
 
 このページは、人間が研究目的、条件、確定済み進捗、結果、W&B上のrunの役割を一か所で確認するための
 台帳です。live process状態は本文へ手入力せず、run bundleとW&Bから導出します。
@@ -126,6 +126,8 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
   Chen/Bartoldson observed RSLAD config/parity gateは準備済みです。
   PGD-AT/TRADESの200 epoch実験は未開始です。
 - CIFAR-100、MobileNetV2、Tiny-ImageNet本訓練は未着手です。
+- Best-oriented history-routing v2のdevelopment blockは完了しNo-Goです。停止規則により
+  Bartoldson seeds 3/4、Chen no-harm、v2 official PGD/AAは未着手のままです。
 - これらを現在のseed-0結果から自動的に開始する設定にはしていません。
 
 ### Student-history confirmatory block（完了）
@@ -157,9 +159,22 @@ epoch-79から分岐したdelayed-schedule controlも2 seedとも完了しまし
 `+0.12 pp`、Last `+0.70 pp`、RO gap `-0.58 pp`です。Best改善としては小さいためschedule自体の成功主張は
 せず、次の介入に対する強いmatched controlとして使います。
 
-次は[Best-oriented v2 plan](plans/0020-best-oriented-history-routing-v2.md)に従い、epoch-39 online historyの
-PF/NR上位10%へtrue-label anchorを適用します。各routeにclass/state/count-matched randomを置き、選択効果と
-一般的な介入効果を同じdevelopment blockで分離します。official testとAutoAttackは引き続き封印します。
+### Best-oriented history routing v2（完了、Development No-Go）
+
+[事前登録plan](plans/0020-best-oriented-history-routing-v2.md)どおり、epoch-39 online historyのPF/NR上位10%と
+class/state/count-matched randomへ同じtrue-label anchorを適用し、Bartoldson 2 seedで比較しました。
+
+| 比較（2 seed平均） | Best PGD | Last PGD | RO gap | 判定 |
+|---|---:|---:|---:|---|
+| PF-TA - C | -0.18 pp | -0.38 pp | +0.20 pp | No-Go |
+| PF-TA - PF-R | -0.13 pp | -0.18 pp | +0.05 pp | selector優位なし |
+| NR-TA - C | -0.17 pp | -0.15 pp | -0.02 pp | No-Go |
+| NR-TA - NR-R | +0.15 pp | +0.11 pp | +0.04 pp | randomには小さく一貫して優位 |
+
+NRでhistory選択がrandomを両seedともBestで上回った一方、通常のdelayed RSLAD controlを超えませんでした。
+したがってstudent historyの予測力は維持しつつ、今回のtrue-label target mixをBest改善手法として停止します。
+official test、AutoAttack、未使用seed、Chen no-harmは開発判断に使っていません。完全なrun表、trajectory AUC、
+lineageと次の判断は[History-routing v2 results](HISTORY_ROUTING_V2_RESULTS.md)に固定しました。
 
 Ferret GPU 2で同一1-epoch workloadを比較した結果、teacher-response観測時は4 workersが
 387.4 images/s、8 workersが338.4 images/sで、4 workersが14.48%高速でした。loss・accuracyは一致しており、

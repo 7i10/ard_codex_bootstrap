@@ -1,6 +1,7 @@
 # Documentation index
 
 - [Experiment dashboard](EXPERIMENT_DASHBOARD.md): 人間向けの目的、条件、確定結果、W&B run分類
+- [History-routing v2 results](HISTORY_ROUTING_V2_RESULTS.md): exact online historyを用いたBest-oriented介入の2-seed結果とDevelopment No-Go判定
 - [Seed-0 signal audit](SIGNAL_AUDIT.md): Student/Joint signalの探索的関連、周期checkpoint、正式判定の境界
 - [Reproduction status](REPRODUCTION_STATUS.md): 実装済み機能、実行済み検証、未実行の重い実験、実際のCLI手順
 - [Research decisions](RESEARCH_DECISIONS.md): 今回の研究・実装で固定した方針
