@@ -143,6 +143,13 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert bootstrap.tests == ("tests/unit/test_history_bootstrap.py",)
     assert bootstrap.tiers == ("T0", "T1")
 
+    pre39 = select(
+        ("src/ard/analysis/pre39_prescriptive.py", "src/ard/cli/pre39_prescriptive.py"),
+        (*available, "tests/unit/test_pre39_prescriptive.py"),
+    )
+    assert pre39.tests == ("tests/unit/test_pre39_prescriptive.py",)
+    assert pre39.tiers == ("T0", "T1")
+
     schedule_control = select(
         ("src/ard/analysis/schedule_control_fork.py", "src/ard/cli/schedule_control_fork.py"),
         (*available, "tests/unit/test_schedule_control_fork.py", "tests/unit/test_protocols_schedules.py"),

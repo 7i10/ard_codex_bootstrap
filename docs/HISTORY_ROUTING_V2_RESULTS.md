@@ -106,6 +106,32 @@ Last `+0.32 pp`、RO gap `-0.52 pp`対Cもseed 1で再現せず、RO改善の確
    treatment-target alignmentの可能性を残すが、true-label mixはCを超えず、今回の
    intervention familyはBest目的で停止する。
 
+## No-Goの機構仮説（未実証）
+
+この実験が直接示したのは「将来失敗を予測できるsampleへtrue-label mixを適用しても
+Best PGDは改善しなかった」ことであり、次の機構はまだ仮説である。
+
+- Student historyは将来最初に崩れるsampleを検出していても、モデル全体を崩す原因や
+  正の介入効果を持つsampleを検出しているとは限らない。予後予測と介入utilityを分ける。
+- `0.5 * p_teacher + 0.5 * one_hot(y)`はsofteningではなく、教師が正しい場合には
+  targetをone-hot側へhardeningする。Bartoldsonでteacher-adversarial-wrongが稀である
+  ことを踏まえると、IRTの問題をteacher-wrongとして修正した介入ではない。
+- PFはanchor時点ですでに正しいため、必要なのは外部teacher targetのhardeningより
+  過去Student状態の保持かもしれない。NRはanchor時点で誤っており、teacherが正しい
+  場合はtarget変更よりinput-side learnabilityの改善が適合する可能性がある。
+- 固定maskをepoch 40--199へ適用したため、後に回復したsampleへ介入し続ける一方、
+  後発の不安定sampleを拾えない。ただし動的maskには介入とsignalのfeedbackがあるため、
+  現結果から直ちにオンライン更新を採用しない。
+- 高いtrain-sample予測AUROCはvalidation robust accuracyの改善を保証しない。選択sampleの
+  rescueと、非選択sampleを含むspillover harmを同時に測る必要がある。
+
+次は新規訓練より先に、既存L1/L3のControl/history/random armを同一attack・同一epochで
+再評価し、sampleをrescued / harmed / stable / unchanged failureへ分ける。さらに選択群の
+target変更量、teacher clean-to-adversarial response、固定panelのloss-gradient方向を監査する。
+これは個別因果効果の推定ではなく、PF temporal stabilizationとNR input-side curriculumの
+どちらを次の直交介入候補へ残すかを決めるretrospective moderation分析である。契約は
+[Plan 0021](plans/0021-pre39-prescriptive-routing.md)へ固定する。
+
 ## 未確認事項と次の研究判断
 
 - `q`、anchor、mix係数を同じL1/L3結果で再調整しない。
