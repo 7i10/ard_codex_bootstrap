@@ -123,7 +123,8 @@ def main(argv: list[str] | None = None) -> int:
             output=args.output.resolve(),
             expected_count=args.expected_count,
         )
-    print(json.dumps({"contract": value["contract"]}, sort_keys=True))
+    contract = value.get("contract", "completed_v2_checkpoint_inventory_v1")
+    print(json.dumps({"contract": contract}, sort_keys=True))
     return 0
 
 

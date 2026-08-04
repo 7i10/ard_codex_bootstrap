@@ -19,9 +19,35 @@ from ard.analysis.rescue_harm import (
 )
 from ard.analysis.rslad_signal_replay import FEATURE_EPOCHS
 from ard.analysis.signal_audit import sha256_file
+from ard.cli.rescue_harm import main as rescue_harm_main
 from ard.engine.checkpoint import REQUIRED_KEYS
 
 pytestmark = pytest.mark.t1
+
+
+def test_rescue_harm_inventory_cli_prints_its_contract(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        "ard.cli.rescue_harm.build_checkpoint_inventory",
+        lambda **_: {"schema_version": 1},
+    )
+    assert rescue_harm_main(
+        [
+            "inventory",
+            "--manifest",
+            "manifest.json",
+            "--resolved-config",
+            "config.yaml",
+            "--arm",
+            "control",
+            "--seed",
+            "1",
+            "--output",
+            "inventory.json",
+        ]
+    ) == 0
+    assert json.loads(capsys.readouterr().out) == {"contract": "completed_v2_checkpoint_inventory_v1"}
 
 
 def _digest(path: Path) -> str:
