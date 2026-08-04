@@ -21,6 +21,7 @@ from ard.analysis.rslad_signal_replay import FEATURE_EPOCHS
 from ard.analysis.signal_audit import sha256_file
 from ard.cli.rescue_harm import main as rescue_harm_main
 from ard.engine.checkpoint import REQUIRED_KEYS
+from ard.state.sample_store import SampleRecord, SampleStateStore
 
 pytestmark = pytest.mark.t1
 
@@ -32,21 +33,24 @@ def test_rescue_harm_inventory_cli_prints_its_contract(
         "ard.cli.rescue_harm.build_checkpoint_inventory",
         lambda **_: {"schema_version": 1},
     )
-    assert rescue_harm_main(
-        [
-            "inventory",
-            "--manifest",
-            "manifest.json",
-            "--resolved-config",
-            "config.yaml",
-            "--arm",
-            "control",
-            "--seed",
-            "1",
-            "--output",
-            "inventory.json",
-        ]
-    ) == 0
+    assert (
+        rescue_harm_main(
+            [
+                "inventory",
+                "--manifest",
+                "manifest.json",
+                "--resolved-config",
+                "config.yaml",
+                "--arm",
+                "control",
+                "--seed",
+                "1",
+                "--output",
+                "inventory.json",
+            ]
+        )
+        == 0
+    )
     assert json.loads(capsys.readouterr().out) == {"contract": "completed_v2_checkpoint_inventory_v1"}
 
 
@@ -61,9 +65,7 @@ def _checkpoint(epoch: int, *, run_id: str, config_hash: str) -> dict[str, objec
 
 
 @pytest.mark.parametrize("arm", ["control", "PF_TA", "PF_R", "NR_TA", "NR_R"])
-def test_rescue_harm_inventory_accepts_real_arms_and_rejects_payload_epoch_drift(
-    tmp_path: Path, arm: str
-) -> None:
+def test_rescue_harm_inventory_accepts_real_arms_and_rejects_payload_epoch_drift(tmp_path: Path, arm: str) -> None:
     run_id, config_hash = "run", "a" * 64
     entries = []
     for epoch in EPOCHS:
@@ -215,21 +217,53 @@ def _write_arm(tmp_path: Path, arm: str, ids: tuple[int, ...], *, control: bool)
     return observations, lineage
 
 
-def _report_inputs(tmp_path: Path) -> tuple[dict[str, tuple[Path, Path]], Path, Path, Path]:
+def _parent_checkpoint(tmp_path: Path, ids: tuple[int, ...]) -> tuple[Path, str, str]:
+    store = SampleStateStore(ema_decay=0.9)
+    # Deliberately unlike `_feature_row` robustness: the selector's epoch-39
+    # eligibility is the online state, never the common-PGD replay result.
+    online_correct = {2, 5, 21, 34}
+    store.records = {
+        sample_id: SampleRecord(
+            margin_ema=0.2,
+            seen=40,
+            robust_correct_count=20,
+            previous_robust_correct=sample_id in online_correct,
+            forgetting_count=0,
+            last_update=39,
+            last_margin=0.2,
+            true_label=sample_id % 10,
+        )
+        for sample_id in ids
+    }
+    payload = {key: {} for key in REQUIRED_KEYS}
+    payload.update({"epoch": 39, "epoch_boundary": "end", "sample_state": store.state_dict()})
+    checkpoint = tmp_path / "parent-epoch39.pt"
+    torch.save(payload, checkpoint)
+    return (
+        checkpoint,
+        _digest(checkpoint),
+        hashlib.sha256(
+            json.dumps(payload["sample_state"], sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        ).hexdigest(),
+    )
+
+
+def _report_inputs(tmp_path: Path) -> tuple[dict[str, tuple[Path, Path]], Path, Path, Path, Path]:
     ids = (2, 5, 8, 13, 21, 34)
     observations = {"control": _write_arm(tmp_path, "control", ids, control=True)}
     observations.update(
         {arm: _write_arm(tmp_path, arm, ids, control=False) for arm in ("PF_H", "PF_R", "NR_H", "NR_R")}
     )
+    parent_checkpoint, checkpoint_sha, state_sha = _parent_checkpoint(tmp_path, ids)
     masks = tmp_path / "history-routing-v2-bundle.json"
-    parent = {"checkpoint_sha256": "c" * 64, "sample_state_sha256": "d" * 64, "epoch": 39}
+    parent = {"checkpoint_sha256": checkpoint_sha, "sample_state_sha256": state_sha, "epoch": 39}
     paths = {
         "peak_failure": {"history": "/remote/pf-history.json", "random": "/remote/pf-random.json"},
         "non_recovery": {"history": "/remote/nr-history.json", "random": "/remote/nr-random.json"},
     }
     selection = {
         "peak_failure": {"selected_count": 2, "selected_class_counts": {"2": 1, "5": 1}, "eligible_count": 4},
-        "non_recovery": {"selected_count": 1, "selected_class_counts": {"1": 1}, "eligible_count": 2},
+        "non_recovery": {"selected_count": 1, "selected_class_counts": {"8": 1}, "eligible_count": 2},
     }
     masks.write_text(
         json.dumps(
@@ -247,8 +281,8 @@ def _report_inputs(tmp_path: Path) -> tuple[dict[str, tuple[Path, Path]], Path, 
     mask_specs = {
         "pf-history.json": ([2, 5], "peak_failure", "history"),
         "pf-random.json": ([2, 5], "peak_failure", "random"),
-        "nr-history.json": ([21], "non_recovery", "history"),
-        "nr-random.json": ([21], "non_recovery", "random"),
+        "nr-history.json": ([8], "non_recovery", "history"),
+        "nr-random.json": ([8], "non_recovery", "random"),
     }
     labels = {sample_id: sample_id % 10 for sample_id in ids}
     for name, (selected, route, kind) in mask_specs.items():
@@ -283,11 +317,11 @@ def _report_inputs(tmp_path: Path) -> tuple[dict[str, tuple[Path, Path]], Path, 
             encoding="utf-8",
         )
     feature, feature_lineage = _write_feature(tmp_path, ids)
-    return observations, masks, feature, feature_lineage
+    return observations, masks, feature, feature_lineage, parent_checkpoint
 
 
 def test_rescue_harm_report_categories_spillover_mix_formula_and_row_order(tmp_path: Path) -> None:
-    observations, masks, feature, feature_lineage = _report_inputs(tmp_path)
+    observations, masks, feature, feature_lineage, parent_checkpoint = _report_inputs(tmp_path)
     # Delayed children have distinct resolved-config hashes; paired replay
     # identity is instead student/data/attack/teacher/seed based.
     child_lineage = json.loads(observations["PF_H"][1].read_text(encoding="utf-8"))
@@ -298,6 +332,7 @@ def test_rescue_harm_report_categories_spillover_mix_formula_and_row_order(tmp_p
         mask_bundle=masks,
         feature_observations=feature,
         feature_lineage=feature_lineage,
+        parent_checkpoint=parent_checkpoint,
         output=tmp_path / "report.json",
         expected_count=6,
     )
@@ -311,6 +346,11 @@ def test_rescue_harm_report_categories_spillover_mix_formula_and_row_order(tmp_p
     assert pf["categories"]["all"]["net_rescue"] == 0
     assert pf["categories"]["selected"]["count"] == 2
     assert pf["categories"]["non_selected"]["count"] == 4
+    # Online PF contains 21/34 while the fixed replay calls those samples
+    # wrong; the selector domain must remain the settled parent state.
+    assert pf["categories"]["eligible"]["count"] == 4
+    assert result["input_identity"]["eligibility_domain"] == "epoch39_parent_sample_state.previous_robust_correct"
+    assert result["input_identity"]["outcome_domain"] == "fixed_checkpoint_common_ce_pgd20_replay.robust_correct"
     assert pf["true_label_mix_l1_distance"]["selected"]["mean"] == pytest.approx(((1 - 0.22) + (1 - 0.25)) / 2)
     assert result["diagnostics"]["kl_js"] == "not_available_without_full_distribution"
     with pytest.raises(FileExistsError, match="refusing to overwrite"):
@@ -319,6 +359,7 @@ def test_rescue_harm_report_categories_spillover_mix_formula_and_row_order(tmp_p
             mask_bundle=masks,
             feature_observations=feature,
             feature_lineage=feature_lineage,
+            parent_checkpoint=parent_checkpoint,
             output=tmp_path / "report.json",
             expected_count=6,
         )
@@ -332,6 +373,7 @@ def test_rescue_harm_report_categories_spillover_mix_formula_and_row_order(tmp_p
         mask_bundle=masks,
         feature_observations=feature,
         feature_lineage=feature_lineage,
+        parent_checkpoint=parent_checkpoint,
         output=tmp_path / "rerun.json",
         expected_count=6,
     )
@@ -339,7 +381,7 @@ def test_rescue_harm_report_categories_spillover_mix_formula_and_row_order(tmp_p
 
 
 def test_rescue_harm_rejects_attack_lineage_drift_and_frozen_mask_future_fields(tmp_path: Path) -> None:
-    observations, masks, feature, feature_lineage = _report_inputs(tmp_path)
+    observations, masks, feature, feature_lineage, parent_checkpoint = _report_inputs(tmp_path)
     bad = json.loads(observations["PF_R"][1].read_text(encoding="utf-8"))
     bad["attack_identity"] = {"loss": "ce", "steps": 10}
     observations["PF_R"][1].write_text(json.dumps(bad), encoding="utf-8")
@@ -349,6 +391,7 @@ def test_rescue_harm_rejects_attack_lineage_drift_and_frozen_mask_future_fields(
             mask_bundle=masks,
             feature_observations=feature,
             feature_lineage=feature_lineage,
+            parent_checkpoint=parent_checkpoint,
             output=tmp_path / "bad.json",
             expected_count=6,
         )
@@ -357,8 +400,39 @@ def test_rescue_harm_rejects_attack_lineage_drift_and_frozen_mask_future_fields(
     assert "outcome" not in json.loads(masks.read_text(encoding="utf-8"))
 
 
+def test_rescue_harm_rejects_wrong_parent_checkpoint_and_sample_state_hash(tmp_path: Path) -> None:
+    observations, masks, feature, feature_lineage, parent_checkpoint = _report_inputs(tmp_path)
+    payload = torch.load(parent_checkpoint, map_location="cpu", weights_only=False)
+    payload["global_step"] = 1
+    wrong_checkpoint = tmp_path / "wrong-parent.pt"
+    torch.save(payload, wrong_checkpoint)
+    with pytest.raises(RescueHarmError, match="checkpoint SHA"):
+        report_rescue_harm(
+            observations=observations,
+            mask_bundle=masks,
+            feature_observations=feature,
+            feature_lineage=feature_lineage,
+            parent_checkpoint=wrong_checkpoint,
+            output=tmp_path / "wrong-parent.json",
+            expected_count=6,
+        )
+    bundle = json.loads(masks.read_text(encoding="utf-8"))
+    bundle["parent"]["sample_state_sha256"] = "0" * 64
+    masks.write_text(json.dumps(bundle), encoding="utf-8")
+    with pytest.raises(RescueHarmError, match="sample-state SHA"):
+        report_rescue_harm(
+            observations=observations,
+            mask_bundle=masks,
+            feature_observations=feature,
+            feature_lineage=feature_lineage,
+            parent_checkpoint=parent_checkpoint,
+            output=tmp_path / "wrong-state.json",
+            expected_count=6,
+        )
+
+
 def test_rescue_harm_merge_turns_single_epoch_replays_into_formal_resumable_panel(tmp_path: Path) -> None:
-    observations, _, _, _ = _report_inputs(tmp_path)
+    observations, _, _, _, _ = _report_inputs(tmp_path)
     full_observations, full_lineage = observations["control"]
     table = pq.read_table(full_observations)
     base_lineage = json.loads(full_lineage.read_text(encoding="utf-8"))

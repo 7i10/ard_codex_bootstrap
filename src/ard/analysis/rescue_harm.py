@@ -27,6 +27,7 @@ from ard.attacks import AttackRequest, LinfPGD
 from ard.config.loader import load_resolved_config_for_evaluation, resolved_config_dict
 from ard.engine.checkpoint import REQUIRED_KEYS
 from ard.policies import selected_ids_sha256
+from ard.state import SampleStateStore
 
 
 class RescueHarmError(ValueError):
@@ -547,8 +548,87 @@ def _resolve_mask_path(bundle: Path, value: object) -> Path:
     raise RescueHarmError("selector mask path is unavailable locally and has no bundle-relative fallback")
 
 
-def _mask_bundle(path: Path, *, feature: Mapping[int, Mapping[str, Any]]) -> dict[str, set[int]]:
-    """Load actual epoch-39 selector masks; eligibility comes only from feature state."""
+def _parent_online_state(
+    checkpoint: Path, *, parent: Mapping[str, Any], feature: Mapping[int, Mapping[str, Any]]
+) -> tuple[dict[int, bool], dict[str, str]]:
+    """Bind eligibility to the exact settled online state that made the masks."""
+    if not checkpoint.is_file() or sha256_file(checkpoint) != _sha(parent.get("checkpoint_sha256")):
+        raise RescueHarmError("parent checkpoint SHA does not match selector bundle")
+    try:
+        payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
+    except Exception as exc:  # pragma: no cover - torch error details vary
+        raise RescueHarmError("parent checkpoint is unreadable") from exc
+    if (
+        not isinstance(payload, Mapping)
+        or REQUIRED_KEYS.difference(payload)
+        or payload.get("epoch") != 39
+        or payload.get("epoch_boundary") != "end"
+    ):
+        raise RescueHarmError("parent checkpoint is not the exact epoch-39 end boundary")
+    state = payload.get("sample_state")
+    expected_keys = {"format_version", "ema_decay", "records", "pending", "next_order"}
+    if (
+        not isinstance(state, Mapping)
+        or set(state) != expected_keys
+        or state.get("format_version") != 3
+        or state.get("pending") != []
+        or isinstance(state.get("next_order"), bool)
+        or not isinstance(state.get("next_order"), int)
+        or state["next_order"] < 0
+        or isinstance(state.get("ema_decay"), bool)
+        or not isinstance(state.get("ema_decay"), (int, float))
+        or not 0 <= float(state["ema_decay"]) < 1
+        or not isinstance(state.get("records"), Mapping)
+    ):
+        raise RescueHarmError("parent checkpoint lacks a settled format-v3 SampleStateStore")
+    state_sha = _hash(state)
+    if state_sha != _sha(parent.get("sample_state_sha256")):
+        raise RescueHarmError("parent sample-state SHA does not match selector bundle")
+    store = SampleStateStore(ema_decay=float(state["ema_decay"]))
+    try:
+        store.load_state_dict(state)
+    except (TypeError, ValueError) as exc:
+        raise RescueHarmError("parent checkpoint SampleStateStore records are invalid") from exc
+    if store.pending or len(store.records) != len(feature):
+        raise RescueHarmError("parent checkpoint SampleStateStore is not settled/exact")
+    online: dict[int, bool] = {}
+    for raw_id, record in state["records"].items():
+        if not isinstance(raw_id, str) or not raw_id.isdigit() or not isinstance(record, Mapping):
+            raise RescueHarmError("parent sample-state stable-ID record is invalid")
+        sample_id = int(raw_id)
+        label, previous, seen, hits = (
+            record.get("true_label"),
+            record.get("previous_robust_correct"),
+            record.get("seen"),
+            record.get("robust_correct_count"),
+        )
+        if (
+            sample_id in online
+            or isinstance(label, bool)
+            or not isinstance(label, int)
+            or not 0 <= label < 10
+            or not isinstance(previous, bool)
+            or isinstance(seen, bool)
+            or not isinstance(seen, int)
+            or seen != 40
+            or isinstance(hits, bool)
+            or not isinstance(hits, int)
+            or not 0 <= hits <= seen
+            or record.get("history_statistics_complete") is not True
+            or sample_id not in feature
+            or feature[sample_id]["class_id"] != label
+        ):
+            raise RescueHarmError("parent sample-state stable-ID/class/temporal join drifted")
+        online[sample_id] = previous
+    if set(online) != set(feature):
+        raise RescueHarmError("parent sample-state and feature replay stable-ID set drifted")
+    return online, {"checkpoint_sha256": sha256_file(checkpoint), "sample_state_sha256": state_sha}
+
+
+def _mask_bundle(
+    path: Path, *, feature: Mapping[int, Mapping[str, Any]], parent_checkpoint: Path
+) -> tuple[dict[str, set[int]], dict[str, str]]:
+    """Load frozen masks and their exact online, rather than replay, eligibility."""
     value = _json(path, name="epoch39 selector bundle")
     required = {"schema_version", "kind", "parent", "selection", "mask_paths"}
     if (
@@ -565,6 +645,7 @@ def _mask_bundle(path: Path, *, feature: Mapping[int, Mapping[str, Any]]) -> dic
         or not isinstance(paths, Mapping)
     ):
         raise RescueHarmError("selector bundle parent/selection lineage drifted")
+    online, parent_identity = _parent_online_state(parent_checkpoint, parent=parent, feature=feature)
     route_specs = {
         "PF_H": ("peak_failure", "history", True),
         "PF_R": ("peak_failure", "random", True),
@@ -638,15 +719,15 @@ def _mask_bundle(path: Path, *, feature: Mapping[int, Mapping[str, Any]]) -> dic
                 raise RescueHarmError("history selector mask does not bind this bundle")
         elif provenance.get("reference_history_selector_spec_sha256") != bundle_sha:
             raise RescueHarmError("random selector mask does not bind this bundle")
-        eligible = {sample_id for sample_id, row in feature.items() if bool(row["robust_correct"]) is anchor_correct}
+        eligible = {sample_id for sample_id, previous in online.items() if previous is anchor_correct}
         if not selected.issubset(eligible) or metadata.get("eligible_count") != len(eligible):
-            raise RescueHarmError("selector mask does not match epoch39 feature-route eligibility")
+            raise RescueHarmError("selector mask does not match epoch39 online-state route eligibility")
         result[arm] = selected
-    # These route populations are recomputed from epoch-39 robust correctness,
-    # never from future outcome fields or a serialized eligibility list.
-    result["PF"] = {sample_id for sample_id, row in feature.items() if bool(row["robust_correct"])}
+    # Eligibility is the parent checkpoint's online pre-update observation;
+    # replay robust correctness remains exclusive to Control-to-arm outcomes.
+    result["PF"] = {sample_id for sample_id, previous in online.items() if previous}
     result["NR"] = set(feature) - result["PF"]
-    return result
+    return result, parent_identity
 
 
 def _summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -705,6 +786,7 @@ def report_rescue_harm(
     mask_bundle: Path,
     feature_observations: Path,
     feature_lineage: Path,
+    parent_checkpoint: Path,
     output: Path,
     expected_count: int,
 ) -> dict[str, Any]:
@@ -735,7 +817,7 @@ def report_rescue_harm(
         feature[sample_id]["class_id"] != control[EPOCHS[0]][sample_id]["class_id"] for sample_id in ids
     ):
         raise RescueHarmError("epoch39 feature replay stable-ID/class join drifted")
-    masks = _mask_bundle(mask_bundle, feature=feature)
+    masks, parent_identity = _mask_bundle(mask_bundle, feature=feature, parent_checkpoint=parent_checkpoint)
     per_epoch: dict[str, Any] = {}
     for epoch in EPOCHS:
         epoch_report: dict[str, Any] = {}
@@ -796,6 +878,10 @@ def report_rescue_harm(
             "mask_bundle_sha256": sha256_file(mask_bundle),
             "feature_lineage_sha256": sha256_file(feature_lineage),
             "attack_identity": control_meta["attack_identity"],
+            "parent_checkpoint_sha256": parent_identity["checkpoint_sha256"],
+            "parent_sample_state_sha256": parent_identity["sample_state_sha256"],
+            "eligibility_domain": "epoch39_parent_sample_state.previous_robust_correct",
+            "outcome_domain": "fixed_checkpoint_common_ce_pgd20_replay.robust_correct",
         },
         "epochs_report": per_epoch,
         "diagnostics": {
@@ -804,8 +890,7 @@ def report_rescue_harm(
             "official_test": "not_used",
         },
         "true_label_mix_l1_formula": (
-            "||p_teacher - (0.5*p_teacher + 0.5*one_hot(y))||_1 "
-            "= 1 - p_teacher_clean(y); exact for all samples"
+            "||p_teacher - (0.5*p_teacher + 0.5*one_hot(y))||_1 = 1 - p_teacher_clean(y); exact for all samples"
         ),
     }
     output.parent.mkdir(parents=True, exist_ok=True)

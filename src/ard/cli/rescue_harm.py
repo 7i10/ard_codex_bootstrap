@@ -70,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     report.add_argument("--mask-bundle", required=True, type=Path)
     report.add_argument("--feature-observations", required=True, type=Path)
     report.add_argument("--feature-lineage", required=True, type=Path)
+    report.add_argument("--parent-checkpoint", required=True, type=_labeled_path, metavar="LABEL=PATH")
     report.add_argument("--output", required=True, type=Path)
     report.add_argument("--expected-count", required=True, type=int)
     args = parser.parse_args(argv)
@@ -108,18 +109,21 @@ def main(argv: list[str] | None = None) -> int:
         )
     else:
         observation, lineage = dict(args.observations), dict(args.lineage)
+        parent_label, parent_checkpoint = args.parent_checkpoint
         if (
             set(observation) != set(ARMS)
             or set(lineage) != set(ARMS)
             or len(observation) != len(args.observations)
             or len(lineage) != len(args.lineage)
+            or parent_label not in {"L1", "L3"}
         ):
-            raise RescueHarmError("report requires one unique observation/lineage pair for each arm")
+            raise RescueHarmError("report requires one unique observation/lineage pair and L1/L3 parent checkpoint")
         value = report_rescue_harm(
             observations={arm: (observation[arm].resolve(), lineage[arm].resolve()) for arm in ARMS},
             mask_bundle=args.mask_bundle.resolve(),
             feature_observations=args.feature_observations.resolve(),
             feature_lineage=args.feature_lineage.resolve(),
+            parent_checkpoint=parent_checkpoint.resolve(),
             output=args.output.resolve(),
             expected_count=args.expected_count,
         )
