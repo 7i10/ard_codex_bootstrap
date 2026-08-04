@@ -171,6 +171,11 @@ _DELAYED_MULTISTEP_METADATA = MappingProxyType(
     }
 )
 
+# This is intentionally a distinct identity from the scheduler-only control:
+# it has the same controlled execution budget and delayed milestones, but may
+# resume only a hash-bound prescriptive-v3 fork.
+_PRESCRIPTIVE_V3_METADATA = _DELAYED_MULTISTEP_METADATA
+
 
 def _pilot_metadata(epochs: int) -> Mapping[str, object]:
     return MappingProxyType(
@@ -230,6 +235,13 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             local_train_reason=None,
             metadata=_DELAYED_MULTISTEP_METADATA,
             required_resume_fork_kind="delayed_multistep_schedule_control_v1",
+        ),
+        "controlled_cifar10_r18_prescriptive_v3_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_prescriptive_v3_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_PRESCRIPTIVE_V3_METADATA,
+            required_resume_fork_kind="prescriptive_v3_intervention_v1",
         ),
         "controlled_cifar10_r18_pilot_v1": ProtocolSpec(
             id="controlled_cifar10_r18_pilot_v1",

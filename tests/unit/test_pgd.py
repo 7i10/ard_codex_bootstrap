@@ -63,6 +63,28 @@ def test_pgd_trace_collection_is_explicit_and_exact() -> None:
     assert all(isinstance(loss, float) and torch.isfinite(torch.tensor(loss)) for loss in result.step_losses)
 
 
+def test_pgd_captured_prefix_is_from_the_same_random_start_trajectory() -> None:
+    torch.manual_seed(31)
+    model = linear_model()
+    inputs, labels = torch.rand(4, 3, 4, 4), torch.tensor([0, 1, 2, 0])
+    config = AttackConfig(epsilon="8/255", step_size="2/255", steps=10, random_start=True, student_mode="eval")
+    prefix = LinfPGD(config).generate(
+        AttackRequest(
+            inputs=inputs,
+            labels=labels,
+            student=model,
+            generator=torch.Generator().manual_seed(17),
+            capture_step=5,
+        )
+    )
+    five = LinfPGD(config.model_copy(update={"steps": 5})).generate(
+        AttackRequest(inputs=inputs, labels=labels, student=model, generator=torch.Generator().manual_seed(17))
+    )
+    assert prefix.captured_adversarial is not None
+    assert torch.equal(prefix.captured_adversarial, five.adversarial)
+    assert (prefix.captured_adversarial - inputs).abs().max() <= 8 / 255 + 1e-7
+
+
 def test_kl_pgd_and_frozen_teacher_input_gradient_contract() -> None:
     student = linear_model()
     teacher = linear_model()

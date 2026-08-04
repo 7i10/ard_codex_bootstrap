@@ -146,3 +146,42 @@ class TrueLabelMixTeacherTargetPolicy(TeacherTargetPolicy):
             mixed = (1.0 - rho[:, None]) * teacher_probabilities + rho[:, None] * one_hot
             probabilities = torch.where((rho == 0)[:, None], teacher_probabilities, mixed).detach()
         return TeacherTargetOutput(probabilities=probabilities, rho=rho)
+
+
+class AnchoredTeacherTargetPolicy(TeacherTargetPolicy):
+    """Selected-only 0.75 teacher / 0.25 frozen-anchor outer target.
+
+    The anchor logits are supplied by the trainer from a frozen eval-mode
+    checkpoint copy.  This policy owns no attack input: inner PGD continues to
+    consume the ordinary teacher-clean target.
+    """
+
+    TEACHER_MIX = 0.75
+    ANCHOR_MIX = 0.25
+
+    def __call__(
+        self,
+        *,
+        teacher_logits: torch.Tensor,
+        risk: torch.Tensor,
+        temperature: float,
+        labels: torch.Tensor | None = None,
+        anchor_logits: torch.Tensor | None = None,
+    ) -> TeacherTargetOutput:
+        if labels is not None or anchor_logits is None:
+            raise ValueError("anchored teacher target requires anchor logits and no labels")
+        if teacher_logits.ndim != 2 or teacher_logits.shape[1] < 2 or anchor_logits.shape != teacher_logits.shape:
+            raise ValueError("anchored teacher/anchor logits must be aligned [batch, class]")
+        if risk.ndim != 1 or risk.shape[0] != teacher_logits.shape[0] or temperature <= 0:
+            raise ValueError("anchored teacher target risk/temperature is invalid")
+        with torch.no_grad():
+            teacher = F.softmax(teacher_logits.detach().float() / temperature, dim=1)
+            anchor = F.softmax(anchor_logits.detach().float() / temperature, dim=1)
+            selected = risk.detach()
+            if not torch.isfinite(teacher).all() or not torch.isfinite(anchor).all():
+                raise FloatingPointError("anchored target logits are non-finite")
+            if not bool(((selected == 0) | (selected == 1)).all()):
+                raise ValueError("anchored teacher target risk must be a binary immutable mask")
+            mixed = self.TEACHER_MIX * teacher + self.ANCHOR_MIX * anchor
+            probabilities = torch.where(selected[:, None].bool(), mixed, teacher).detach()
+        return TeacherTargetOutput(probabilities=probabilities, rho=(self.ANCHOR_MIX * selected).detach())

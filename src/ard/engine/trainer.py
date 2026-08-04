@@ -33,7 +33,7 @@ from ard.signals import (
     teacher_confidence_primitives,
 )
 from ard.state import SampleStateStore
-from ard.targets import TeacherTargetPolicy
+from ard.targets import AnchoredTeacherTargetPolicy, TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 
 from .checkpoint import TrainingState, load_checkpoint, save_checkpoint
@@ -146,6 +146,8 @@ class Trainer:
         sample_store: SampleStateStore | None = None,
         target_policy: TeacherTargetPolicy | None = None,
         intervention_mask: FixedInterventionMask | None = None,
+        anchor_model: nn.Module | None = None,
+        prescriptive_v3_route: str | None = None,
         adversarial_kd_multiplier: float | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
@@ -177,13 +179,36 @@ class Trainer:
         if self._records_teacher_response and self.teacher is None:
             raise ValueError("teacher-response observation requires a frozen teacher")
         self.target_policy = target_policy
-        if intervention_mask is not None and (target_policy is None) == (adversarial_kd_multiplier is None):
+        if (
+            intervention_mask is not None
+            and prescriptive_v3_route != "nr_prefix"
+            and (target_policy is None) == (adversarial_kd_multiplier is None)
+        ):
             raise ValueError("an intervention mask requires exactly one registered treatment")
         if intervention_mask is None and adversarial_kd_multiplier is not None:
             raise ValueError("an adversarial KD intervention multiplier requires a fixed intervention mask")
         if adversarial_kd_multiplier is not None and not 0.0 <= adversarial_kd_multiplier <= 1.0:
             raise ValueError("adversarial KD intervention multiplier must be in [0, 1]")
         self.intervention_mask = intervention_mask
+        if prescriptive_v3_route not in {None, "pf_retention", "nr_prefix"}:
+            raise ValueError("prescriptive route must be pf_retention or nr_prefix")
+        if (anchor_model is not None) != (prescriptive_v3_route == "pf_retention"):
+            raise ValueError("only PF retention requires one frozen anchor model")
+        if prescriptive_v3_route is not None and intervention_mask is None:
+            raise ValueError("prescriptive treatment requires a fixed intervention mask")
+        if prescriptive_v3_route == "pf_retention" and not isinstance(target_policy, AnchoredTeacherTargetPolicy):
+            raise ValueError("PF retention requires the anchored teacher target")
+        self.prescriptive_v3_route = prescriptive_v3_route
+        self.anchor_model = None if anchor_model is None else anchor_model.to(device)
+        if self.anchor_model is not None:
+            for parameter in self.anchor_model.parameters():
+                parameter.requires_grad_(False)
+                parameter.grad = None
+            # A retention anchor is a fixed epoch-79 reference, not a second
+            # train-mode network.  ``_anchor_logits`` reasserts eval mode for
+            # the forward, while this persistent mode prevents accidental BN
+            # state updates should a future call site bypass that helper.
+            self.anchor_model.eval()
         self.adversarial_kd_multiplier = adversarial_kd_multiplier
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
@@ -206,6 +231,14 @@ class Trainer:
             "seed_protocol": "seed+1000003*global_step+10007*rank+590017; one advancing generator per pass",
             "selected_epoch": None,
         }
+        if prescriptive_v3_route is not None:
+            self.selection_metadata["prescriptive_v3"] = {
+                "route": prescriptive_v3_route,
+                "selected_ids_sha256": intervention_mask.selected_ids_digest if intervention_mask is not None else None,
+                "active_epochs": [80, 129] if prescriptive_v3_route == "pf_retention" else [80, 99],
+                "selected_attack_input": "full_step10" if prescriptive_v3_route == "pf_retention" else "step5_prefix",
+                "unselected_attack_input": "full_step10",
+            }
         self.sample_state: dict[str, Any] = {} if sample_store is None else sample_store.state_dict()
         self.diagnostics = diagnostics
         # This detached cache is strictly intra-batch diagnostic reuse.  It is
@@ -238,6 +271,24 @@ class Trainer:
         if batch.state_update_mask is None:
             return torch.ones(batch.labels.shape[0], device=batch.labels.device, dtype=torch.float32)
         return batch.state_update_mask.to(dtype=torch.float32)
+
+    def _prescriptive_active(self) -> bool:
+        return (self.prescriptive_v3_route == "pf_retention" and 80 <= self.current_epoch <= 129) or (
+            self.prescriptive_v3_route == "nr_prefix" and 80 <= self.current_epoch <= 99
+        )
+
+    def _anchor_logits(self, images: torch.Tensor) -> torch.Tensor:
+        if self.anchor_model is None:
+            raise RuntimeError("anchored target requested without a frozen epoch-79 model")
+        with (
+            _evaluation_mode(self.anchor_model),
+            torch.no_grad(),
+            torch.autocast(device_type=self.device.type, enabled=False),
+        ):
+            logits = self.anchor_model(images.float()).detach().float()
+        if not bool(torch.isfinite(logits).all()):
+            raise FloatingPointError("frozen anchor logits are non-finite")
+        return logits
 
     def _flush_sample_store(self) -> None:
         """Replicate valid sparse observations before a checkpoint is written."""
@@ -419,15 +470,29 @@ class Trainer:
                     teacher=self.teacher,
                     target_logits=teacher_clean_logits,
                     generator=self._attack_generator(),
+                    capture_step=5
+                    if self.prescriptive_v3_route == "nr_prefix" and self._prescriptive_active()
+                    else None,
                 )
             )
-            logits = self.model(attack_result.adversarial)
             valid_mask = mask.to(dtype=torch.bool)
+            adversarial = attack_result.adversarial
+            if self.prescriptive_v3_route == "nr_prefix" and self._prescriptive_active():
+                if attack_result.captured_adversarial is None or self.intervention_mask is None:
+                    raise RuntimeError("NR prefix treatment did not capture the existing PGD-10 step-5 state")
+                selected = (
+                    self.intervention_mask.values(batch.sample_ids, device=adversarial.device, dtype=torch.bool)
+                    & valid_mask
+                )
+                adversarial = torch.where(
+                    selected[:, None, None, None], attack_result.captured_adversarial, adversarial
+                )
+            logits = self.model(adversarial)
             observed_teacher_clean = observed_teacher_adversarial = None
             teacher_clean_to_adversarial_margin_response = teacher_clean_to_adversarial_js_response = None
             if self._records_teacher_response:
                 assert self.teacher is not None and teacher_clean_logits is not None
-                teacher_adversarial_logits = self._teacher_adversarial_response(attack_result.adversarial)
+                teacher_adversarial_logits = self._teacher_adversarial_response(adversarial)
                 observed_teacher_clean = teacher_confidence_primitives(
                     teacher_clean_logits,
                     batch.labels,
@@ -478,7 +543,7 @@ class Trainer:
                 objective_inputs["clean_student_logits"] = clean_student_logits
             weights = self._policy_weights(
                 batch=batch,
-                adversarial=attack_result.adversarial,
+                adversarial=adversarial,
                 logits=logits,
                 valid_mask=valid_mask,
                 student_signals=student_signals,
@@ -490,6 +555,9 @@ class Trainer:
                     device=logits.device,
                     dtype=logits.dtype,
                 ) * valid_mask.to(device=logits.device, dtype=logits.dtype)
+            treatment_risk = intervention_risk
+            if treatment_risk is not None and not self._prescriptive_active():
+                treatment_risk = torch.zeros_like(treatment_risk)
             if self.target_policy is not None:
                 if teacher_clean_logits is None:
                     raise ValueError("teacher target policy requires clean teacher logits")
@@ -497,9 +565,20 @@ class Trainer:
                     raise ValueError("teacher target policy requires an explicit detached risk")
                 target_output = self.target_policy(
                     teacher_logits=teacher_clean_logits,
-                    risk=weights.joint_risk if intervention_risk is None else intervention_risk,
+                    risk=weights.joint_risk if treatment_risk is None else treatment_risk,
                     temperature=getattr(self.objective, "temperature", 1.0),
                     labels=batch.labels if getattr(self.target_policy, "requires_labels", False) else None,
+                    **(
+                        {
+                            "anchor_logits": (
+                                self._anchor_logits(batch.images)
+                                if self._prescriptive_active()
+                                else teacher_clean_logits
+                            ),
+                        }
+                        if isinstance(self.target_policy, AnchoredTeacherTargetPolicy)
+                        else {}
+                    ),
                 )
                 objective_inputs["adversarial_target_probabilities"] = target_output.probabilities
             terms = self.objective(**objective_inputs)
@@ -516,7 +595,7 @@ class Trainer:
                     diagnostic_clean = self.model(batch.images).detach()
                 teacher_prediction = teacher_entropy = None
                 if self.teacher is not None:
-                    teacher_adversarial_logits = self._teacher_adversarial_response(attack_result.adversarial)
+                    teacher_adversarial_logits = self._teacher_adversarial_response(adversarial)
                     teacher_prediction = teacher_adversarial_logits.argmax(1)
                     teacher_entropy = shannon_entropy(teacher_adversarial_logits)
                 prior_margin = None if self.sample_store is None else self.sample_store.margin_ema(batch.sample_ids)
@@ -550,7 +629,7 @@ class Trainer:
                 if panel_positions:
                     positions = torch.tensor(panel_positions, device=self.device)
                     clean_images = batch.images.index_select(0, positions).detach().cpu()
-                    adversarial_images = attack_result.adversarial.index_select(0, positions).detach().cpu()
+                    adversarial_images = adversarial.index_select(0, positions).detach().cpu()
                     perturbations = (adversarial_images - clean_images).detach()
                     panel_media = {
                         position: (clean_images[index], adversarial_images[index], perturbations[index])

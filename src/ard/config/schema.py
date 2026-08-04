@@ -41,6 +41,7 @@ class ProtocolConfig(StrictModel):
         "saad_code_295121c_audit_v1",
         "controlled_cifar10_r18_v1",
         "controlled_cifar10_r18_delayed_multistep_v1",
+        "controlled_cifar10_r18_prescriptive_v3_v1",
         "controlled_cifar10_r18_pilot_v1",
         "controlled_cifar10_r18_pilot_1ep_v1",
         "controlled_cifar10_r18_pilot_3ep_v1",
@@ -548,7 +549,7 @@ class InterventionParentConfig(StrictModel):
     checkpoint_sha256: str
     raw_config_sha256: str
     git_sha: str
-    epoch: Literal[39, 99]
+    epoch: Literal[39, 79, 99]
     world_size: Literal[1]
     teacher_checkpoint_sha256: str
     sample_state_records: Literal[45000]
@@ -585,6 +586,8 @@ class InterventionMaskProvenanceConfig(StrictModel):
         "class_matched_random",
         "online_history_epoch39_v2",
         "class_state_count_matched_random_epoch39_v2",
+        "prescriptive_v3_online_history",
+        "prescriptive_v3_matched_random",
     ]
     approved_selector_spec_sha256: str | None = None
     selector_spec_path: Path | None = None
@@ -609,7 +612,12 @@ class InterventionMaskProvenanceConfig(StrictModel):
         manifests.
         """
         payload = self.model_dump(mode="json")
-        if self.source in {"online_history_epoch39_v2", "class_state_count_matched_random_epoch39_v2"}:
+        if self.source in {
+            "online_history_epoch39_v2",
+            "class_state_count_matched_random_epoch39_v2",
+            "prescriptive_v3_online_history",
+            "prescriptive_v3_matched_random",
+        }:
             return {key: value for key, value in payload.items() if value is not None}
         payload.pop("route", None)
         payload.pop("anchor_robust_correct", None)
@@ -657,7 +665,7 @@ class InterventionMaskProvenanceConfig(StrictModel):
                 )
             ):
                 raise ValueError("random mask provenance requires fixed generator and reference history budget")
-        elif self.source == "online_history_epoch39_v2":
+        elif self.source in {"online_history_epoch39_v2", "prescriptive_v3_online_history"}:
             if self.approved_selector_spec_sha256 is None or self.selector_spec_path is None:
                 raise ValueError("online-history mask provenance requires an approved selector specification SHA-256")
             if self.route is None or self.anchor_robust_correct is None:
@@ -830,6 +838,65 @@ class InterventionConfig(StrictModel):
         return self
 
 
+class PrescriptiveV3Config(StrictModel):
+    """Separate epoch-79 retention/prefix treatment contract; never v2."""
+
+    arm: Literal["PF_RET_H", "PF_RET_R", "NR_PFX_H", "NR_PFX_R"]
+    parent: InterventionParentConfig
+    mask: InterventionMaskConfig
+    selector_bundle_path: Path
+    selector_bundle_sha256: str
+    anchor_checkpoint: Path
+    anchor_checkpoint_sha256: str
+    pf_teacher_mix: float = 0.75
+    pf_anchor_mix: float = 0.25
+    pf_start_epoch: int = 80
+    pf_end_epoch: int = 129
+    nr_prefix_step: int = 5
+    nr_full_steps: int = 10
+    nr_start_epoch: int = 80
+    nr_end_epoch: int = 99
+
+    @model_validator(mode="after")
+    def validate_contract(self) -> PrescriptiveV3Config:
+        if self.parent.epoch != 79:
+            raise ValueError("prescriptive v3 arms require the epoch-79 parent")
+        expected_source = (
+            "prescriptive_v3_online_history" if self.arm.endswith("_H") else "prescriptive_v3_matched_random"
+        )
+        route = "peak_failure" if self.arm.startswith("PF_") else "non_recovery"
+        if self.mask.provenance.source != expected_source or self.mask.provenance.route != route:
+            raise ValueError("prescriptive v3 arm/mask provenance route drifted")
+        if (
+            self.mask.provenance.parent_checkpoint_sha256 != self.parent.checkpoint_sha256
+            or self.mask.provenance.parent_sample_state_sha256 != self.parent.sample_state_sha256
+        ):
+            raise ValueError("prescriptive v3 mask provenance must bind the exact parent checkpoint and state")
+        expected_anchor_state = self.arm.startswith("PF_")
+        if self.mask.provenance.anchor_robust_correct is not expected_anchor_state:
+            raise ValueError("prescriptive v3 mask anchor state does not match its PF/NR route")
+        for name, value in (
+            ("selector bundle", self.selector_bundle_sha256),
+            ("anchor checkpoint", self.anchor_checkpoint_sha256),
+        ):
+            if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+                raise ValueError(f"prescriptive v3 {name} SHA-256 must be lowercase")
+        if self.anchor_checkpoint_sha256 != self.parent.checkpoint_sha256:
+            raise ValueError("prescriptive v3 anchor must be the exact epoch-79 parent")
+        if (
+            self.pf_teacher_mix != 0.75
+            or self.pf_anchor_mix != 0.25
+            or self.pf_start_epoch != 80
+            or self.pf_end_epoch != 129
+            or self.nr_prefix_step != 5
+            or self.nr_full_steps != 10
+            or self.nr_start_epoch != 80
+            or self.nr_end_epoch != 99
+        ):
+            raise ValueError("prescriptive v3 treatment values are frozen by the registered contract")
+        return self
+
+
 class EvaluationConfig(StrictModel):
     """Saved-checkpoint evaluation contract; no training-time signal is exposed."""
 
@@ -869,6 +936,7 @@ class ExperimentConfig(StrictModel):
     tracking: TrackingConfig = Field(default_factory=TrackingConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
     intervention: InterventionConfig | None = None
+    prescriptive_v3: PrescriptiveV3Config | None = None
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     output_dir: Path = Path("outputs/dev")
     # Compatibility with M1 checkpoints/configs.  New paths use tracking.run_id.
@@ -953,6 +1021,19 @@ class ExperimentConfig(StrictModel):
                 or self.teacher.checkpoint_sha256 != self.intervention.parent.teacher_checkpoint_sha256
             ):
                 raise ValueError("intervention parent teacher SHA must exactly match the arm teacher")
+        if self.prescriptive_v3 is not None:
+            if (
+                self.intervention is not None
+                or self.method.id != "rslad"
+                or self.observation.profile != "teacher_response"
+                or self.protocol.id != "controlled_cifar10_r18_prescriptive_v3_v1"
+            ):
+                raise ValueError("prescriptive v3 requires its standalone observed RSLAD protocol identity")
+            if (
+                self.teacher is None
+                or self.teacher.checkpoint_sha256 != self.prescriptive_v3.parent.teacher_checkpoint_sha256
+            ):
+                raise ValueError("prescriptive v3 parent teacher SHA must exactly match the arm teacher")
         if self.observation.records_teacher_response and self.teacher is None:
             raise ValueError("observation.profile=teacher_response requires a frozen teacher")
         if self.teacher is not None and self.teacher.source == "fixture" and self.tier not in {"dev", "smoke"}:
@@ -1002,6 +1083,7 @@ class ExperimentConfig(StrictModel):
         if self.protocol.id not in {
             "controlled_cifar10_r18_v1",
             "controlled_cifar10_r18_delayed_multistep_v1",
+            "controlled_cifar10_r18_prescriptive_v3_v1",
             *pilot_protocols,
         }:
             return

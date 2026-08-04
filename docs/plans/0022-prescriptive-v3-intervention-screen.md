@@ -5,7 +5,7 @@
 - Owner: main thread; one Terra implementation owner; one consolidated
   scientific review after formula/resume evidence is stable
 - Development teachers/seeds: Bartoldson L1 seed 1 and L3 seed 2 only
-- Current milestone: M1 implementation
+- Current milestone: M2 real-parent fork and CUDA smoke
 - Last updated: 2026-08-05
 
 ## Why this screen exists
@@ -173,14 +173,37 @@ schedule are not tuned on L1/L3 outcomes.
 
 - [x] M0 -- close exact-online point/bootstrap authorization and freeze route
   counts/hashes for L1/L3.
-- [ ] M1 -- implement PF target and NR attack-prefix boundaries plus config,
+- [x] M1 -- implement PF target and NR attack-prefix boundaries plus config,
   checkpoint/resume, artifact identity, and focused tests.
 - [ ] M2 -- create hash-bound H/R forks from both epoch-79 parents and run one
   real-parent one-epoch smoke per mechanism.
-- [ ] M3 -- run one consolidated scientific review; fix only P0/P1 findings.
+- [x] M3 -- run one consolidated scientific review; fix only P0/P1 findings.
 - [ ] M4 -- launch the eight-arm development queue, monitor automatically, and
   evaluate Best/Last on validation only.
 - [ ] M5 -- update result docs, commit, push, and merge the coherent milestone.
+
+M1 verification evidence (2026-08-05):
+
+- initial implementation gate: 56 focused tests passed; the impact-selected
+  non-scientific gate reported 23 passed and 1 skipped;
+- review-delta artifact/provenance checks: 16 focused tests passed;
+- exact initial-fork mutation and route-boundary nodes: 2 passed;
+- actual-Trainer inactive PF/NR loss/gradient/optimizer/RNG parity and active
+  PF frozen-anchor contracts: 3 passed;
+- uninterrupted versus resumed NR epoch-99-to-100 boundary, including model,
+  optimizer, scheduler, SampleStateStore, RNG, selection state, and metrics:
+  1 passed;
+- targeted Ruff and `git diff --check` passed. Exact commands are retained in
+  the milestone handoff; unchanged successful commands were not rerun.
+
+The consolidated review found no P0 and initially found two P1s: the initial
+epoch-79 child bytes were not checked against the completed-screen SHA, and
+the central numerical/resume contracts lacked direct regressions. Both were
+fixed. The fix-delta review found no remaining P0/P1 and authorized long-run
+launch after the preregistered real-parent CUDA smoke. The review also kept
+`num_workers=8`; the measured Ferret speedup at 4 workers is not mixed into
+this paired screen without a separate execution-identity delta and parity
+evidence.
 
 ## Test selection
 

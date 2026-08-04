@@ -179,6 +179,14 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1", "T2"),
     ),
     (
+        (
+            "src/ard/analysis/prescriptive_v3.py",
+            "src/ard/cli/prescriptive_v3.py",
+        ),
+        ("tests/unit/test_prescriptive_v3.py", "tests/unit/test_schedule_control_fork.py"),
+        ("T0", "T1", "T2"),
+    ),
+    (
         ("tools/internal/schedule_control/",),
         ("tests/unit/test_schedule_control_inputs.py",),
         ("T0", "T1", "T2"),

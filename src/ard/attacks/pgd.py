@@ -81,6 +81,8 @@ class LinfPGD(AttackGenerator):
         epsilon = self.config.epsilon_value
         step_size = self.config.step_size_value
         assert epsilon is not None and step_size is not None  # resolved by AttackConfig validation
+        if request.capture_step is not None and not 1 <= request.capture_step < self.config.steps:
+            raise ValueError("captured PGD step must be a strict positive prefix of the configured trajectory")
         delta = torch.zeros_like(clean)
         if self.config.random_start and epsilon > 0:
             delta.uniform_(-epsilon, epsilon, generator=request.generator)
@@ -88,6 +90,7 @@ class LinfPGD(AttackGenerator):
         initial_delta = delta.detach().clone()
         adversarial = (clean + delta).detach()
         losses: list[float] | None = [] if self.config.trace_step_losses else None
+        captured = None
         with _temporary_modes(
             request.student,
             request.teacher,
@@ -95,7 +98,7 @@ class LinfPGD(AttackGenerator):
             teacher_train=self.config.teacher_mode == "train",
         ):
             target_logits = self._target_logits(request, clean)
-            for _ in range(self.config.steps):
+            for step in range(1, self.config.steps + 1):
                 adversarial.requires_grad_(True)
                 with torch.autocast(device_type=adversarial.device.type, enabled=False):
                     logits = request.student(adversarial.float())
@@ -106,12 +109,15 @@ class LinfPGD(AttackGenerator):
                 adversarial = adversarial.detach() + step_size * gradient.detach().sign()
                 delta = (adversarial - clean).clamp(-epsilon, epsilon)
                 adversarial = (clean + delta).clamp(0, 1).detach()
+                if step == request.capture_step:
+                    captured = adversarial.clone()
         final_delta = adversarial - clean
         return AttackResult(
             adversarial=adversarial,
             initial_delta=initial_delta,
             step_losses=() if losses is None else tuple(losses),
             max_abs_delta=float(final_delta.detach().abs().amax().cpu()),
+            captured_adversarial=captured,
         )
 
 

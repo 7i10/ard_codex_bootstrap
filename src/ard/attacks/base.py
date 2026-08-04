@@ -17,6 +17,7 @@ class AttackRequest:
     teacher: nn.Module | None = None
     target_logits: torch.Tensor | None = None
     generator: torch.Generator | None = None
+    capture_step: int | None = None
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class AttackResult:
     initial_delta: torch.Tensor
     step_losses: tuple[float, ...]
     max_abs_delta: float
+    captured_adversarial: torch.Tensor | None = None
 
 
 class AttackGenerator(ABC):

@@ -55,7 +55,12 @@ from ard.policies import (
 from ard.protocols import ensure_local_trainable, get_protocol
 from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
-from ard.targets import TeacherTargetPolicy, TrueLabelMixTeacherTargetPolicy, UniformSofteningTeacherTargetPolicy
+from ard.targets import (
+    AnchoredTeacherTargetPolicy,
+    TeacherTargetPolicy,
+    TrueLabelMixTeacherTargetPolicy,
+    UniformSofteningTeacherTargetPolicy,
+)
 from ard.tracking import (
     ExperimentTracker,
     LocalTracker,
@@ -163,9 +168,15 @@ def _validate_completed_screen(
     ):
         raise ValueError("completed screen manifest identity does not match the fork checkpoint")
     arms = manifest.get("arms")
-    v2 = config.intervention is not None and config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}
-    expected_kind = "history_routing_v2_intervention_v1" if v2 else "common_state_intervention_v1"
-    expected_arms = {"PF_TA", "PF_R", "NR_TA", "NR_R"} if v2 else {"C", "HS", "RS", "HD", "RD"}
+    if config.prescriptive_v3 is not None:
+        expected_kind = "prescriptive_v3_intervention_v1"
+        expected_arms = {"PF_RET_H", "PF_RET_R", "NR_PFX_H", "NR_PFX_R"}
+        expected_arm = config.prescriptive_v3.arm
+    else:
+        v2 = config.intervention is not None and config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}
+        expected_kind = "history_routing_v2_intervention_v1" if v2 else "common_state_intervention_v1"
+        expected_arms = {"PF_TA", "PF_R", "NR_TA", "NR_R"} if v2 else {"C", "HS", "RS", "HD", "RD"}
+        expected_arm = config.intervention.arm if config.intervention is not None else None
     if manifest.get("kind") != expected_kind or not isinstance(arms, list) or len(arms) != len(expected_arms):
         raise ValueError("completed intervention screen has the wrong registered kind or arm count")
     entries = [entry for entry in arms if isinstance(entry, Mapping)]
@@ -173,7 +184,6 @@ def _validate_completed_screen(
     run_ids = [entry.get("run_id") for entry in entries]
     if len(entries) != len(expected_arms) or set(names) != expected_arms or len(set(run_ids)) != len(expected_arms):
         raise ValueError("completed screen manifest has duplicate or missing sibling identities")
-    expected_arm = config.intervention.arm if config.intervention is not None else None
     own = next((entry for entry in entries if entry.get("arm") == expected_arm), None)
     if (
         not isinstance(own, Mapping)
@@ -181,6 +191,17 @@ def _validate_completed_screen(
         or own.get("run_id") != lineage.get("child_tracker_run_id")
     ):
         raise ValueError("completed screen manifest does not bind this arm config and tracking identity")
+    # Only the initial epoch-79 fork must have the immutable screen byte hash.
+    # Later epoch-boundary resumes intentionally rewrite last.pt in place.
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    if not isinstance(payload, Mapping):
+        raise ValueError("completed screen fork checkpoint is unreadable")
+    parent_epoch = lineage.get("parent_epoch")
+    if payload.get("epoch") == parent_epoch:
+        expected_sha = own.get("fork_checkpoint_sha256")
+        actual_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+        if not isinstance(expected_sha, str) or actual_sha != expected_sha:
+            raise ValueError("initial screen fork checkpoint bytes do not match its completed screen manifest")
     launch_state = collect_git_state(Path.cwd())
     launch_git = launch_state.get("sha")
     if (
@@ -194,13 +215,43 @@ def _validate_completed_screen(
 def _validate_intervention_resume(path: Path | None, config: ExperimentConfig, *, config_hash: str) -> None:
     """Keep the registered fork separate from both ordinary resume and parent best."""
     if path is None:
-        if config.intervention is not None:
+        if config.intervention is not None or config.prescriptive_v3 is not None:
             raise ValueError("intervention arms must start from a registered common-state fork checkpoint")
         return
     payload = torch.load(path, map_location="cpu", weights_only=False)
     if not isinstance(payload, dict):
         raise ValueError("resume checkpoint must be a mapping")
     lineage = payload.get("fork_lineage")
+    if config.prescriptive_v3 is not None:
+        if not isinstance(lineage, Mapping):
+            raise ValueError("prescriptive v3 arms require a registered fork lineage")
+        parent = config.prescriptive_v3.parent
+        expected = {
+            "kind": "prescriptive_v3_intervention_v1",
+            "arm": config.prescriptive_v3.arm,
+            "parent_checkpoint_sha256": parent.checkpoint_sha256,
+            "parent_raw_config_sha256": parent.raw_config_sha256,
+            "parent_git_sha": parent.git_sha,
+            "parent_epoch": parent.epoch,
+            "parent_world_size": 1,
+            "parent_teacher_checkpoint_sha256": parent.teacher_checkpoint_sha256,
+            "parent_sample_state_records": parent.sample_state_records,
+            "parent_sample_state_sha256": parent.sample_state_sha256,
+            "selector_bundle_sha256": config.prescriptive_v3.selector_bundle_sha256,
+            "post_fork_best_scope": True,
+        }
+        if any(lineage.get(key) != value for key, value in expected.items()):
+            raise ValueError("prescriptive v3 fork lineage does not exactly match the configured parent and inputs")
+        metadata = payload.get("selection_metadata")
+        if not isinstance(metadata, Mapping) or metadata.get("scope") != "post_fork_best":
+            raise ValueError("prescriptive v3 fork must retain the post-fork best selection scope")
+        epoch = payload.get("epoch")
+        if epoch == parent.epoch and payload.get("best_metric") != float("-inf"):
+            raise ValueError("initial prescriptive v3 fork must reset post-fork best selection")
+        if not isinstance(epoch, int) or epoch < parent.epoch:
+            raise ValueError("prescriptive v3 fork checkpoint epoch is invalid")
+        _validate_completed_screen(path=path, config=config, config_hash=config_hash, lineage=lineage)
+        return
     if config.intervention is None:
         if isinstance(lineage, Mapping) and lineage.get("kind") == "common_state_intervention_v1":
             raise ValueError("a common-state intervention fork cannot resume as an ordinary run")
@@ -241,7 +292,7 @@ def _validate_required_fork_resume(path: Path | None, config: ExperimentConfig, 
     tool.  Runtime only establishes that this normal config resumes the exact
     child checkpoint, under the same clean code identity that created it.
     """
-    if config.intervention is not None:
+    if config.intervention is not None or config.prescriptive_v3 is not None:
         return
     required_kind = get_protocol(config.protocol.id).required_resume_fork_kind
     if path is None:
@@ -324,7 +375,9 @@ def _build_method(
             RSLADBaselinePolicy(),
             None,
             (
-                UniformSofteningTeacherTargetPolicy(rho_max=config.intervention.uniform_target_softening_rho)
+                AnchoredTeacherTargetPolicy()
+                if config.prescriptive_v3 is not None and config.prescriptive_v3.arm.startswith("PF_")
+                else UniformSofteningTeacherTargetPolicy(rho_max=config.intervention.uniform_target_softening_rho)
                 if config.intervention is not None and config.intervention.kind == "uniform_target_softening"
                 else (
                     TrueLabelMixTeacherTargetPolicy()
@@ -437,6 +490,78 @@ def _attach_history_routing_v2_input_artifacts(
         )
 
     coordinator(tracker, phase="history-routing v2 input artifacts", action=record)
+
+
+def _attach_prescriptive_v3_input_artifacts(
+    *,
+    tracker: ExperimentTracker,
+    config: ExperimentConfig,
+    resume: Path | None,
+    coordinator: Callable[..., None] = coordinated_tracker_action,
+) -> None:
+    """Record immutable v3 inputs exactly at the epoch-79 fork boundary.
+
+    V3 children must always be launched with ``--resume``.  A non-null resume
+    therefore does *not* distinguish the initial child launch from a later
+    restart.  The child checkpoint epoch is the durable boundary: epoch 79
+    creates the three (PF) or two (NR) analysis-input records, while a later
+    resume requires the exact records to already be present.
+    """
+    spec = config.prescriptive_v3
+    if spec is None:
+        return
+    if resume is None:
+        raise ValueError("prescriptive v3 input artifacts require the registered fork checkpoint")
+    payload = torch.load(resume, map_location="cpu", weights_only=False)
+    if not isinstance(payload, Mapping):
+        raise ValueError("prescriptive v3 resume checkpoint must be a mapping")
+    lineage = payload.get("fork_lineage")
+    if not isinstance(lineage, Mapping) or (
+        lineage.get("kind") != "prescriptive_v3_intervention_v1"
+        or lineage.get("arm") != spec.arm
+        or lineage.get("parent_epoch") != spec.parent.epoch
+        or lineage.get("child_tracker_run_id") != tracker.run_id
+        or payload.get("tracker_run_id") != tracker.run_id
+    ):
+        raise ValueError("prescriptive v3 resume checkpoint does not bind this child artifact lineage")
+    epoch = payload.get("epoch")
+    if not isinstance(epoch, int) or epoch < spec.parent.epoch:
+        raise ValueError("prescriptive v3 resume checkpoint precedes its registered fork boundary")
+    initial_fork = epoch == spec.parent.epoch
+    inputs: list[tuple[Path, str, str]] = [
+        (spec.selector_bundle_path, "selector", spec.selector_bundle_sha256),
+        (spec.mask.path, "mask", spec.mask.sha256),
+    ]
+    # The parent SHA is still bound in every NR config, but NR never loads an
+    # anchor model.  Publishing it as an anchor input would falsely imply a
+    # target-side intervention on the NR arm.
+    if spec.arm.startswith("PF_"):
+        inputs.append((spec.anchor_checkpoint, "anchor", spec.anchor_checkpoint_sha256))
+
+    def record(active_tracker: ExperimentTracker) -> None:
+        if not isinstance(active_tracker, LocalTracker):
+            raise TrackingError("prescriptive v3 artifact registration requires a rank-zero LocalTracker")
+        names = [f"prescriptive-v3-{suffix}-{active_tracker.run_id}" for _, suffix, _ in inputs]
+        statuses = tuple(
+            active_tracker.local_analysis_input_status(name=name, sha256=digest)
+            for name, (_, _, digest) in zip(names, inputs, strict=True)
+        )
+        if all(status == "exact" for status in statuses):
+            return
+        if any(status != "absent" for status in statuses):
+            phase = "initial fork" if initial_fork else "later resume"
+            raise TrackingError(f"prescriptive v3 {phase} has conflicting local analysis-input artifact evidence")
+        if not initial_fork:
+            raise TrackingError("prescriptive v3 later resume lacks exact local analysis-input artifact evidence")
+        for (path, suffix, _), name in zip(inputs, names, strict=True):
+            active_tracker.log_artifact(
+                path,
+                name=name,
+                artifact_type="analysis-input",
+                aliases=("input",),
+            )
+
+    coordinator(tracker, phase="prescriptive v3 input artifacts", action=record)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -559,23 +684,46 @@ def main(argv: list[str] | None = None) -> int:
                     phase="frozen oracle input artifact",
                     action=_record_frozen_oracle_input,
                 )
-        if config.intervention is not None and config.intervention.mask is not None:
+        mask_config = (
+            config.intervention.mask
+            if config.intervention is not None and config.intervention.mask is not None
+            else config.prescriptive_v3.mask
+            if config.prescriptive_v3 is not None
+            else None
+        )
+        if mask_config is not None:
             raw_targets = getattr(train_dataset.dataset.dataset, "targets", None)
             if not isinstance(raw_targets, (list, tuple)):
                 raise ValueError("intervention training requires immutable source training labels")
             train_labels = {int(sample_id): int(raw_targets[sample_id]) for sample_id in train_dataset.indices}
-            mask = config.intervention.mask
             intervention_mask = load_fixed_intervention_mask(
-                mask.path,
-                expected_sha256=mask.sha256,
-                expected_selected_ids_sha256=mask.selected_ids_sha256,
-                expected_selected_count=mask.selected_count,
-                expected_class_counts=mask.selected_class_counts,
-                expected_provenance=mask.provenance.exact_payload(),
+                mask_config.path,
+                expected_sha256=mask_config.sha256,
+                expected_selected_ids_sha256=mask_config.selected_ids_sha256,
+                expected_selected_count=mask_config.selected_count,
+                expected_class_counts=mask_config.selected_class_counts,
+                expected_provenance=mask_config.provenance.exact_payload(),
                 train_labels=train_labels,
                 num_classes=config.dataset.num_classes,
             )
-            if config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}:
+            if config.prescriptive_v3 is not None:
+                bundle_path = config.prescriptive_v3.selector_bundle_path
+                anchor_path = config.prescriptive_v3.anchor_checkpoint
+                if (
+                    not bundle_path.is_file()
+                    or hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+                    != config.prescriptive_v3.selector_bundle_sha256
+                    or not anchor_path.is_file()
+                    or hashlib.sha256(anchor_path.read_bytes()).hexdigest()
+                    != config.prescriptive_v3.anchor_checkpoint_sha256
+                ):
+                    raise ValueError("prescriptive v3 analysis inputs do not match registered SHA-256 bytes")
+                _attach_prescriptive_v3_input_artifacts(
+                    tracker=active_tracker,
+                    config=config,
+                    resume=args.resume,
+                )
+            if config.intervention is not None and config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}:
                 bundle_path = config.intervention.selector_bundle_path
                 bundle_sha = config.intervention.selector_bundle_sha256
                 assert bundle_path is not None and bundle_sha is not None
@@ -616,6 +764,24 @@ def main(argv: list[str] | None = None) -> int:
         if initialized_distributed:
             student = wrap_ddp(student, device)
         teacher = None if config.teacher is None else build_teacher(config.teacher, tier=config.tier)
+        anchor_model: nn.Module | None = None
+        if config.prescriptive_v3 is not None and config.prescriptive_v3.arm.startswith("PF_"):
+            anchor_path = config.prescriptive_v3.anchor_checkpoint
+            if (
+                not anchor_path.is_file()
+                or hashlib.sha256(anchor_path.read_bytes()).hexdigest()
+                != config.prescriptive_v3.anchor_checkpoint_sha256
+            ):
+                raise ValueError("prescriptive v3 anchor checkpoint bytes do not match the registered SHA-256")
+            anchor_payload = torch.load(anchor_path, map_location="cpu", weights_only=False)
+            if (
+                not isinstance(anchor_payload, Mapping)
+                or anchor_payload.get("epoch") != 79
+                or anchor_payload.get("epoch_boundary") != "end"
+            ):
+                raise ValueError("prescriptive v3 anchor is not the exact epoch-79 end-boundary checkpoint")
+            anchor_model = build_student(config.student, tier=config.tier)
+            anchor_model.load_state_dict(anchor_payload["model"], strict=True)
         optimizer = SGD(
             student.parameters(),
             lr=config.optimizer.learning_rate,
@@ -658,6 +824,14 @@ def main(argv: list[str] | None = None) -> int:
             sample_store=sample_store,
             target_policy=target_policy,
             intervention_mask=intervention_mask,
+            anchor_model=anchor_model,
+            prescriptive_v3_route=(
+                "pf_retention"
+                if config.prescriptive_v3 is not None and config.prescriptive_v3.arm.startswith("PF_")
+                else "nr_prefix"
+                if config.prescriptive_v3 is not None
+                else None
+            ),
             adversarial_kd_multiplier=(
                 config.intervention.adversarial_kd_multiplier
                 if config.intervention is not None and config.intervention.kind == "adversarial_kd_downweight"

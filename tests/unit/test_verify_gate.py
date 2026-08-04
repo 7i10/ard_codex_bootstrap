@@ -180,6 +180,16 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     )
     assert schedule_control.tiers == ("T0", "T1", "T2")
 
+    prescriptive_v3 = select(
+        ("src/ard/analysis/prescriptive_v3.py", "src/ard/cli/prescriptive_v3.py"),
+        (*available, "tests/unit/test_prescriptive_v3.py", "tests/unit/test_schedule_control_fork.py"),
+    )
+    assert prescriptive_v3.tests == (
+        "tests/unit/test_prescriptive_v3.py",
+        "tests/unit/test_schedule_control_fork.py",
+    )
+    assert prescriptive_v3.tiers == ("T0", "T1", "T2")
+
     schedule_inputs = select(
         ("tools/internal/schedule_control/prepare_inputs.py",),
         (*available, "tests/unit/test_schedule_control_inputs.py"),
