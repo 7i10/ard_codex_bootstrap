@@ -60,7 +60,10 @@ def _checkpoint(epoch: int, *, run_id: str, config_hash: str) -> dict[str, objec
     return payload
 
 
-def test_rescue_harm_inventory_rejects_byte_and_payload_epoch_drift(tmp_path: Path) -> None:
+@pytest.mark.parametrize("arm", ["control", "PF_TA", "PF_R", "NR_TA", "NR_R"])
+def test_rescue_harm_inventory_accepts_real_arms_and_rejects_payload_epoch_drift(
+    tmp_path: Path, arm: str
+) -> None:
     run_id, config_hash = "run", "a" * 64
     entries = []
     for epoch in EPOCHS:
@@ -73,7 +76,7 @@ def test_rescue_harm_inventory_rejects_byte_and_payload_epoch_drift(tmp_path: Pa
             {
                 "schema_version": 1,
                 "run_id": run_id,
-                "arm": "control",
+                "arm": arm,
                 "seed": 1,
                 "teacher": {"registry_id": "t"},
                 "config_hash": config_hash,

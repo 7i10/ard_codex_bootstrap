@@ -140,7 +140,7 @@ def load_checkpoint_inventory(path: Path) -> Inventory:
     if (
         not isinstance(run_id, str)
         or not run_id
-        or arm not in ARMS
+        or arm not in set(SOURCE_ARM.values())
         or isinstance(seed, bool)
         or not isinstance(seed, int)
     ):
