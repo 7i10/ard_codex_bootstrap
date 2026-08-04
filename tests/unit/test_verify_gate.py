@@ -163,6 +163,12 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     )
     assert pre39_online.tests == ("tests/unit/test_pre39_online_state.py",)
     assert pre39_online.tiers == ("T0", "T1")
+    pre39_confirm = select(
+        ("src/ard/analysis/pre39_online_confirm.py", "src/ard/cli/pre39_online_confirm.py"),
+        (*available, "tests/unit/test_pre39_online_confirm.py"),
+    )
+    assert pre39_confirm.tests == ("tests/unit/test_pre39_online_confirm.py",)
+    assert pre39_confirm.tiers == ("T0", "T1")
 
     schedule_control = select(
         ("src/ard/analysis/schedule_control_fork.py", "src/ard/cli/schedule_control_fork.py"),

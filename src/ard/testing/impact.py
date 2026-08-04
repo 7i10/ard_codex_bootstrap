@@ -169,6 +169,11 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
+        ("src/ard/analysis/pre39_online_confirm.py", "src/ard/cli/pre39_online_confirm.py"),
+        ("tests/unit/test_pre39_online_confirm.py",),
+        ("T0", "T1"),
+    ),
+    (
         ("src/ard/analysis/schedule_control_fork.py", "src/ard/cli/schedule_control_fork.py"),
         ("tests/unit/test_schedule_control_fork.py", "tests/unit/test_protocols_schedules.py"),
         ("T0", "T1", "T2"),
