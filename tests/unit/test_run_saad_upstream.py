@@ -6,22 +6,29 @@ import hashlib
 import importlib.util
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+import torch
 import yaml
 
 from scripts.run_saad_upstream import (
     BARTOLDSON_SHA256,
     CHEN_SHA256,
+    CHEN_WRN34_20_SHA256,
     CIFAR10_ARCHIVE_SHA256,
     CIFAR10_EXTRACTED_SHA256,
+    PAPER_WD_PATCH,
+    PAPER_WD_VARIANT,
+    UNMODIFIED_VARIANT,
     GPUSampler,
     SAADConfig,
     SAADLaunchError,
     build_runtime_command,
     classify_smoke,
+    entrypoint_identity,
     launch_identity,
     launch_source_files,
     load_config,
@@ -108,6 +115,21 @@ def test_checked_in_operational_config_is_strictly_parseable() -> None:
     chen = load_config(Path(__file__).parents[2] / "configs" / "upstream" / "saad_chen_seed0.yaml")
     assert chen.teacher_name == "Chen2021LTD_WRN34_10"
     assert chen.teacher_checkpoint_sha256 == CHEN_SHA256
+    chen20_upstream = load_config(
+        Path(__file__).parents[2] / "configs" / "upstream" / "saad_chen_wrn34_20_upstream_seed0.yaml"
+    )
+    chen20_paper = load_config(
+        Path(__file__).parents[2] / "configs" / "upstream" / "saad_chen_wrn34_20_paper_wd_seed0.yaml"
+    )
+    assert chen20_upstream.teacher_checkpoint_sha256 == CHEN_WRN34_20_SHA256
+    assert chen20_upstream.source_variant == UNMODIFIED_VARIANT
+    assert chen20_upstream.weight_decay == 0.0002
+    assert chen20_upstream.physical_gpu == 0
+    assert chen20_paper.teacher_checkpoint_sha256 == CHEN_WRN34_20_SHA256
+    assert chen20_paper.source_variant == PAPER_WD_VARIANT
+    assert chen20_paper.source_patch == PAPER_WD_PATCH
+    assert chen20_paper.weight_decay == 0.0005
+    assert chen20_paper.physical_gpu == 1
     lock = (Path(__file__).parents[2] / "requirements" / "saad-upstream-runtime.lock").read_text(encoding="utf-8")
     for pin in ("Jinja2==3.1.6", "timm==1.0.9", "pandas==2.2.3", "gdown==5.1.0", "setuptools==75.3.0"):
         assert pin in lock
@@ -143,6 +165,39 @@ def test_chen_profile_binds_checkpoint_and_command(tmp_path: Path) -> None:
     command = upstream_args(config=config, batch_size=128)
     assert command[command.index("--teacher_name") + 1] == "Chen2021LTD_WRN34_10"
     assert command[command.index("--wandb_name") + 1] == "full-saad-chen-seed0"
+
+
+def test_paper_variant_binds_patch_weight_decay_and_rejects_drift(tmp_path: Path) -> None:
+    raw = _raw_config(tmp_path)
+    raw["source"] = {
+        "variant": PAPER_WD_VARIANT,
+        "patch": str(PAPER_WD_PATCH),
+        "patch_sha256": hashlib.sha256(PAPER_WD_PATCH.read_bytes()).hexdigest(),
+    }
+    protocol = raw["protocol"]
+    inputs = raw["inputs"]
+    gpu = raw["gpu"]
+    assert isinstance(protocol, dict) and isinstance(inputs, dict) and isinstance(gpu, dict)
+    protocol["teacher_name"] = "Chen2021LTD_WRN34_20"
+    protocol["weight_decay"] = 0.0005
+    inputs["teacher_checkpoint_sha256"] = CHEN_WRN34_20_SHA256
+    gpu["physical_id"] = 1
+    config = _config(tmp_path, raw)
+    command = upstream_args(config=config, batch_size=128)
+    assert command[command.index("--wd") + 1] == "0.0005"
+    assert command[command.index("--wandb_name") + 1].endswith("-paper-wd5e4")
+    sources = launch_source_files(tmp_path / "saad.yaml", config)
+    assert sources["upstream_patch"]["sha256"] == source_patch_sha256(config)
+
+    protocol["weight_decay"] = 0.0002
+    with pytest.raises(SAADLaunchError, match="protocol drift"):
+        _config(tmp_path, raw)
+    protocol["weight_decay"] = 0.0005
+    source = raw["source"]
+    assert isinstance(source, dict)
+    source["patch_sha256"] = "0" * 64
+    with pytest.raises(SAADLaunchError, match="patch SHA-256 mismatch"):
+        _config(tmp_path, raw)
 
 
 @pytest.mark.parametrize("value", (None, "expandable_segments:False", "max_split_size_mb:128"))
@@ -223,6 +278,78 @@ def test_safe_staging_uses_symlinks_and_refuses_overwrite(tmp_path: Path) -> Non
     assert staged_teacher.resolve() == teacher.resolve()
     with pytest.raises(SAADLaunchError, match="overwrite"):
         stage_inputs(config=config, saad=source, output_dir=config.output_dir)
+
+
+def test_paper_variant_materializes_only_patched_saad_entrypoint(tmp_path: Path) -> None:
+    source = tmp_path / "source-saad"
+    source.mkdir()
+    original = "optimizer = torch.optim.SGD(student.parameters(), lr=args.lr, momentum=0.9, weight_decay=2e-4)"
+    (source / "saad.py").write_text(f"before\n{original}\nafter\n", encoding="utf-8")
+    (source / "autoattack").mkdir()
+    (source / "autoattack" / "__init__.py").write_text("AutoAttack = object\n", encoding="utf-8")
+    dataset = tmp_path / "dataset"
+    dataset.mkdir()
+    teacher = tmp_path / "teacher.pt"
+    teacher.write_bytes(b"teacher")
+    base = SAADConfig(
+        runtime_python=tmp_path / "python",
+        pytorch_cuda_alloc_conf="expandable_segments:True",
+        dataset_root=dataset,
+        teacher_checkpoint=teacher,
+        teacher_checkpoint_sha256=CHEN_WRN34_20_SHA256,
+        teacher_name="Chen2021LTD_WRN34_20",
+        run_name="full-saad-chen34-20-seed0-paper-wd5e4",
+        output_dir=tmp_path / "fresh-output",
+        smoke_batch_size=16,
+        smoke_loss_events=2,
+        physical_gpu=1,
+        teacher_logit_contract={},
+    )
+    config = replace(
+        base,
+        source_variant=PAPER_WD_VARIANT,
+        source_patch=PAPER_WD_PATCH,
+        source_patch_sha256=hashlib.sha256(PAPER_WD_PATCH.read_bytes()).hexdigest(),
+        weight_decay=0.0005,
+    )
+    stage = stage_inputs(config=config, saad=source, output_dir=config.output_dir)
+    assert not (stage / "saad.py").is_symlink()
+    patched = (stage / "saad.py").read_text(encoding="utf-8")
+    replacement = "optimizer = torch.optim.SGD(student.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.wd)"
+    assert patched == f"before\n{replacement}\nafter\n"
+    assert (stage / "autoattack").is_symlink()
+    assert (source / "saad.py").read_text(encoding="utf-8") == f"before\n{original}\nafter\n"
+
+
+def source_patch_sha256(config: SAADConfig) -> str:
+    assert config.source_patch is not None
+    return hashlib.sha256(config.source_patch.read_bytes()).hexdigest()
+
+
+def test_variant_fixed_batch_optimizer_delta_is_only_weight_decay() -> None:
+    inputs = torch.tensor([[0.25, -0.5], [0.75, 0.125]], dtype=torch.float64)
+    targets = torch.tensor([[0.4], [-0.2]], dtype=torch.float64)
+    initial = torch.tensor([[0.3, -0.7]], dtype=torch.float64)
+    upstream_parameter = torch.nn.Parameter(initial.clone())
+    paper_parameter = torch.nn.Parameter(initial.clone())
+
+    upstream_logits = inputs @ upstream_parameter.t()
+    paper_logits = inputs @ paper_parameter.t()
+    assert torch.equal(upstream_logits, paper_logits)
+    upstream_loss = (upstream_logits - targets).square().mean()
+    paper_loss = (paper_logits - targets).square().mean()
+    assert torch.equal(upstream_loss, paper_loss)
+    upstream_loss.backward()
+    paper_loss.backward()
+    assert upstream_parameter.grad is not None and paper_parameter.grad is not None
+    assert torch.equal(upstream_parameter.grad, paper_parameter.grad)
+
+    upstream_optimizer = torch.optim.SGD([upstream_parameter], lr=0.1, momentum=0.9, weight_decay=0.0002)
+    paper_optimizer = torch.optim.SGD([paper_parameter], lr=0.1, momentum=0.9, weight_decay=0.0005)
+    upstream_optimizer.step()
+    paper_optimizer.step()
+    expected_difference = -0.1 * (0.0005 - 0.0002) * initial
+    torch.testing.assert_close(paper_parameter - upstream_parameter, expected_difference, rtol=0, atol=1e-14)
 
 
 @pytest.mark.parametrize(
@@ -416,11 +543,19 @@ def _write_smoke_evidence(
                 "upstream_args": upstream_args(config=config, batch_size=batch),
                 "launch_identity": {
                     "ard_git": {"head": head, "dirty": False},
-                    "source_files": launch_source_files(config_path),
+                    "source_files": launch_source_files(config_path, config),
+                    "source_variant": config.source_variant,
+                    "entrypoint": entrypoint_identity(
+                        config=config, saad=Path(__file__).parents[2] / ".external" / "saad"
+                    ),
                 },
+                "physical_gpu": config.physical_gpu,
                 "inputs": inputs,
                 "teacher_logit_evidence": {"identity": teacher_evidence["identity"]},
-                "environment": {"PYTORCH_CUDA_ALLOC_CONF": config.pytorch_cuda_alloc_conf},
+                "environment": {
+                    "PYTORCH_CUDA_ALLOC_CONF": config.pytorch_cuda_alloc_conf,
+                    "CUDA_VISIBLE_DEVICES": str(config.physical_gpu),
+                },
                 "runtime_provenance": {
                     "present": True,
                     "modules": {
@@ -437,6 +572,7 @@ def _write_smoke_evidence(
         json.dumps(
             {
                 "gpu": {
+                    "physical_gpu": config.physical_gpu,
                     "errors": [],
                     "peak_memory_mib": peak_memory_mib,
                     "peak_temperature_c": 45,
@@ -501,6 +637,56 @@ def test_full_execute_requires_hash_bound_two_smoke_bundle(tmp_path: Path, monke
             inputs=inputs,
             teacher_evidence=teacher_evidence,
             manifest_paths=[smoke16, smoke128],
+        )
+
+
+@pytest.mark.parametrize("drift", ("manifest", "environment", "telemetry"))
+def test_full_execute_rejects_opposite_gpu_smoke_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, drift: str
+) -> None:
+    config_path = tmp_path / "saad.yaml"
+    config_path.write_text(yaml.safe_dump(_raw_config(tmp_path)), encoding="utf-8")
+    config = load_config(config_path)
+    head = "1" * 40
+    monkeypatch.setattr(
+        "scripts.run_saad_upstream._git",
+        lambda _directory, *arguments: head if arguments == ("rev-parse", "HEAD") else "",
+    )
+    inputs: dict[str, object] = {"dataset": {"sha256": "2" * 64}, "teacher": {"sha256": "3" * 64}}
+    teacher_evidence: dict[str, object] = {"identity": {"sha256": "4" * 64}}
+    manifests = [
+        _write_smoke_evidence(
+            root=tmp_path,
+            config=config,
+            config_path=config_path,
+            batch=batch,
+            events=events,
+            inputs=inputs,
+            teacher_evidence=teacher_evidence,
+            head=head,
+            peak_memory_mib=4000,
+        )
+        for batch, events in ((16, 2), (128, 10))
+    ]
+    manifest_path = manifests[0]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    telemetry_path = manifest_path.parent / "telemetry.json"
+    telemetry = json.loads(telemetry_path.read_text(encoding="utf-8"))
+    if drift == "manifest":
+        manifest["physical_gpu"] = 1
+    elif drift == "environment":
+        manifest["environment"]["CUDA_VISIBLE_DEVICES"] = "1"
+    else:
+        telemetry["gpu"]["physical_gpu"] = 1
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    telemetry_path.write_text(json.dumps(telemetry), encoding="utf-8")
+    with pytest.raises(SAADLaunchError, match="physical GPU identity mismatch"):
+        verify_smoke_evidence_bundle(
+            config=config,
+            config_path=config_path,
+            inputs=inputs,
+            teacher_evidence=teacher_evidence,
+            manifest_paths=manifests,
         )
 
 

@@ -173,6 +173,10 @@ AA `51.90%`と数値が同じでも、full SAADが同等または無効と結論
 weight decayだけを`5e-4`へ直すpaper-hyperparameter-aligned variantを比較します。
 Pは厳密な論文再現とは呼びません。詳細とVRAM分岐は
 [`Plan 0028`](plans/0028-chen-wrn34-20-paper-code-oracles.md)に固定します。
+WRN34-20 checkpointの取得・strict registrationとU/P実装は完了しました。checkpointは
+`738,377,702` bytes、SHA-256 `dbfc7cfe...fa28`、`184,531,674` parametersで、二runtime間の
+固定入力logitはexact一致しました。現在はclean committed SHAからU/Pそれぞれのbatch-16/
+batch-128 GPU smokeを行う段階であり、長期runはまだ開始していません。
 
 ### Student-history confirmatory block（完了）
 

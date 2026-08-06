@@ -51,6 +51,41 @@ teachers:
     checkpoint_path: teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt
     checkpoint_sha256: fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983
     checkpoint_status: verified
+  chen2021_ltd_wrn34_20:
+    source: robustbench
+    upstream_model_id: Chen2021LTD_WRN34_20
+    architecture: robustbench_wide_resnet
+    factory:
+      module: robustbench.model_zoo.architectures.wide_resnet
+      symbol: WideResNet
+      kwargs:
+        depth: 34
+        widen_factor: 20
+        sub_block1: false
+    dataset: cifar10
+    threat:
+      norm: linf
+      epsilon: 8/255
+      input_domain: pixel_0_1
+    preprocessing:
+      owner: teacher_adapter
+      profile: cifar10_raw_identity
+      mean:
+      - 0.0
+      - 0.0
+      - 0.0
+      std:
+      - 1.0
+      - 1.0
+      - 1.0
+      provenance: RobustBench Chen2021LTD_WRN34_20 registry uses raw [0,1] inputs;
+        ARD adapter owns explicit identity.
+    expected_parameter_count: 184531674
+    upstream_locator: robustbench/model_zoo/cifar10.py:Chen2021LTD_WRN34_20
+    checkpoint_filename: Chen2021LTD_WRN34_20.pt
+    checkpoint_path: teacher_cache/robustbench/Chen2021LTD_WRN34_20.pt
+    checkpoint_sha256: dbfc7cfe402d9ddf6cbe47c4809eab97fcccce7b6a254030cdca2640639cfa28
+    checkpoint_status: verified
   bartoldson2024_adversarial_wrn94_16:
     source: robustbench
     upstream_model_id: Bartoldson2024Adversarial_WRN-94-16

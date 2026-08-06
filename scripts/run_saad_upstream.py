@@ -30,14 +30,25 @@ SAAD_COMMIT = "295121c5d2eed827b5b2d6aa42307de809bdfada"
 ROBUSTBENCH_COMMIT = "78fcc9e48a07a861268f295a777b975f25155964"
 BARTOLDSON_SHA256 = "56bbad8ad748df86e67c24dba4f59a9e7d285e583251460b2ed154017a18cb0b"
 CHEN_SHA256 = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+CHEN_WRN34_20_SHA256 = "dbfc7cfe402d9ddf6cbe47c4809eab97fcccce7b6a254030cdca2640639cfa28"
+UNMODIFIED_VARIANT = "unmodified_upstream"
+PAPER_WD_VARIANT = "paper_weight_decay_5e4"
+PAPER_WD_PATCH = ROOT / "patches" / "saad" / "0001-use-cli-weight-decay.patch"
 TEACHER_PROFILES = {
     "Bartoldson2024Adversarial_WRN-94-16": {
         "checkpoint_sha256": BARTOLDSON_SHA256,
         "run_name": "full-saad-bartoldson-seed0",
+        "variants": frozenset({UNMODIFIED_VARIANT}),
     },
     "Chen2021LTD_WRN34_10": {
         "checkpoint_sha256": CHEN_SHA256,
         "run_name": "full-saad-chen-seed0",
+        "variants": frozenset({UNMODIFIED_VARIANT}),
+    },
+    "Chen2021LTD_WRN34_20": {
+        "checkpoint_sha256": CHEN_WRN34_20_SHA256,
+        "run_name": "full-saad-chen34-20-seed0",
+        "variants": frozenset({UNMODIFIED_VARIANT, PAPER_WD_VARIANT}),
     },
 }
 CIFAR10_ARCHIVE_SHA256 = "6d958be074577803d12ecdefd02955f39262c83c16fe9348329d7fe0b5c001ce"
@@ -73,6 +84,10 @@ class SAADConfig:
     smoke_loss_events: int
     physical_gpu: int
     teacher_logit_contract: dict[str, Any]
+    source_variant: str = UNMODIFIED_VARIANT
+    source_patch: Path | None = None
+    source_patch_sha256: str | None = None
+    weight_decay: float = 0.0002
 
 
 def _sha256(path: Path) -> str:
@@ -98,23 +113,34 @@ def _git(directory: Path, *arguments: str) -> str:
     return completed.stdout.strip()
 
 
-def launch_source_files(config_path: Path) -> dict[str, dict[str, str]]:
+def launch_source_files(config_path: Path, config: SAADConfig | None = None) -> dict[str, dict[str, str]]:
     """Hash every local source/config input that changes launch semantics."""
-    return {
+    sources = {
         "launcher": _file_identity(Path(__file__)),
         "runtime_bootstrap": _file_identity(ROOT / "scripts" / "saad_runtime_bootstrap.py"),
         "config": _file_identity(config_path),
         "runtime_lock": _file_identity(ROOT / "requirements" / "saad-upstream-runtime.lock"),
         "teacher_probe": _file_identity(ROOT / "scripts" / "saad_teacher_probe.py"),
     }
+    if config is not None and config.source_patch is not None:
+        sources["upstream_patch"] = _file_identity(config.source_patch)
+    return sources
 
 
-def launch_identity(*, config_path: Path, command: list[str]) -> dict[str, Any]:
+def launch_identity(
+    *,
+    config_path: Path,
+    command: list[str],
+    config: SAADConfig | None = None,
+    entrypoint: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Hash every local input that changes an upstream launch's semantics."""
     return {
         "ard_git": {"head": _git(ROOT, "rev-parse", "HEAD"), "dirty": bool(_git(ROOT, "status", "--porcelain"))},
         "command_sha256": _canonical_sha256(command),
-        "source_files": launch_source_files(config_path),
+        "source_files": launch_source_files(config_path, config),
+        "source_variant": config.source_variant if config is not None else UNMODIFIED_VARIANT,
+        "entrypoint": entrypoint,
     }
 
 
@@ -136,11 +162,25 @@ def load_config(path: Path) -> SAADConfig:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as error:
         raise SAADLaunchError(f"unable to read upstream SAAD config {path}: {error}") from error
-    root = _checked_mapping(
-        raw,
-        context="config",
-        keys={"version", "runtime", "inputs", "output", "smoke", "gpu", "protocol", "teacher_logit_contract"},
-    )
+    if not isinstance(raw, dict):
+        raise SAADLaunchError("config must be a mapping")
+    required_root_keys = {
+        "version",
+        "runtime",
+        "inputs",
+        "output",
+        "smoke",
+        "gpu",
+        "protocol",
+        "teacher_logit_contract",
+    }
+    unknown_root_keys = set(raw) - required_root_keys - {"source"}
+    missing_root_keys = required_root_keys - set(raw)
+    if unknown_root_keys:
+        raise SAADLaunchError(f"config has unknown keys: {sorted(unknown_root_keys)}")
+    if missing_root_keys:
+        raise SAADLaunchError(f"config is missing keys: {sorted(missing_root_keys)}")
+    root = raw
     if root["version"] != 1:
         raise SAADLaunchError("config.version must be exactly 1")
     runtime = _checked_mapping(
@@ -156,6 +196,10 @@ def load_config(path: Path) -> SAADConfig:
     output = _checked_mapping(root["output"], context="output", keys={"directory"})
     smoke = _checked_mapping(root["smoke"], context="smoke", keys={"batch_size", "loss_events"})
     gpu = _checked_mapping(root["gpu"], context="gpu", keys={"physical_id"})
+    source = root.get("source")
+    if source is None:
+        source = {"variant": UNMODIFIED_VARIANT, "patch": None, "patch_sha256": None}
+    source = _checked_mapping(source, context="source", keys={"variant", "patch", "patch_sha256"})
     teacher_logit_contract = _checked_mapping(
         root["teacher_logit_contract"],
         context="teacher_logit_contract",
@@ -210,7 +254,6 @@ def load_config(path: Path) -> SAADConfig:
         "nowand": 1,
         "lr": 0.1,
         "momentum": 0.9,
-        "weight_decay": 0.0002,
         "milestones": [100, 150],
         "inner_steps": 10,
         "epsilon": "8/255",
@@ -218,10 +261,19 @@ def load_config(path: Path) -> SAADConfig:
         "entropy_multiplier": 5,
     }
     teacher_name = protocol.get("teacher_name")
+    if not isinstance(teacher_name, str):
+        raise SAADLaunchError("protocol.teacher_name must be a string")
     profile = TEACHER_PROFILES.get(teacher_name)
+    variant = source.get("variant")
+    expected_weight_decay = 0.0005 if variant == PAPER_WD_VARIANT else 0.0002
+    frozen["weight_decay"] = expected_weight_decay
     protocol_without_teacher = {key: value for key, value in protocol.items() if key != "teacher_name"}
     if profile is None:
         raise SAADLaunchError(f"teacher_name is not an allowed upstream profile: {teacher_name!r}")
+    if variant not in {UNMODIFIED_VARIANT, PAPER_WD_VARIANT}:
+        raise SAADLaunchError(f"unknown upstream source variant: {variant!r}")
+    if variant not in profile["variants"]:
+        raise SAADLaunchError(f"source variant {variant!r} is not approved for {teacher_name}")
     if protocol_without_teacher != frozen:
         changed = {
             key: {"expected": frozen[key], "actual": protocol_without_teacher.get(key)}
@@ -241,8 +293,11 @@ def load_config(path: Path) -> SAADConfig:
         raise SAADLaunchError("smoke.batch_size must be 16 or 128")
     if not isinstance(smoke["loss_events"], int) or not 2 <= smoke["loss_events"] <= 10:
         raise SAADLaunchError("smoke.loss_events must be within [2, 10]")
-    if gpu["physical_id"] != 0:
-        raise SAADLaunchError("gpu.physical_id must be frozen Hamster GPU 0")
+    expected_physical_gpu = 1 if variant == PAPER_WD_VARIANT else 0
+    if gpu["physical_id"] != expected_physical_gpu:
+        raise SAADLaunchError(
+            f"gpu.physical_id must be {expected_physical_gpu} for source variant {variant!r}"
+        )
     expected_logit_contract = {
         "reference_torch": "2.11.0+cu128",
         "candidate_torch": "2.4.1+cu121",
@@ -260,6 +315,19 @@ def load_config(path: Path) -> SAADConfig:
         candidate = Path(value)
         return candidate if candidate.is_absolute() else ROOT / candidate
 
+    patch_value = source.get("patch")
+    patch_sha256 = source.get("patch_sha256")
+    patch_path: Path | None = None
+    if variant == UNMODIFIED_VARIANT:
+        if patch_value is not None or patch_sha256 is not None:
+            raise SAADLaunchError("unmodified upstream variant forbids a patch")
+    else:
+        patch_path = project_path(patch_value, field="source.patch")
+        if patch_path.resolve() != PAPER_WD_PATCH.resolve():
+            raise SAADLaunchError("paper weight-decay variant requires the approved patch path")
+        if not patch_path.is_file() or not isinstance(patch_sha256, str) or _sha256(patch_path) != patch_sha256:
+            raise SAADLaunchError("paper weight-decay patch SHA-256 mismatch")
+
     return SAADConfig(
         runtime_python=project_path(runtime["python"], field="runtime.python"),
         pytorch_cuda_alloc_conf=runtime["pytorch_cuda_alloc_conf"],
@@ -267,12 +335,18 @@ def load_config(path: Path) -> SAADConfig:
         teacher_checkpoint=project_path(inputs["teacher_checkpoint"], field="inputs.teacher_checkpoint"),
         teacher_checkpoint_sha256=inputs["teacher_checkpoint_sha256"],
         teacher_name=teacher_name,
-        run_name=str(profile["run_name"]),
+        run_name=(
+            f"{profile['run_name']}-paper-wd5e4" if variant == PAPER_WD_VARIANT else str(profile["run_name"])
+        ),
         output_dir=project_path(output["directory"], field="output.directory"),
         smoke_batch_size=smoke["batch_size"],
         smoke_loss_events=smoke["loss_events"],
         physical_gpu=gpu["physical_id"],
         teacher_logit_contract=teacher_logit_contract,
+        source_variant=variant,
+        source_patch=patch_path,
+        source_patch_sha256=patch_sha256,
+        weight_decay=expected_weight_decay,
     )
 
 
@@ -363,12 +437,66 @@ def stage_inputs(*, config: SAADConfig, saad: Path, output_dir: Path) -> Path:
     for source in saad.iterdir():
         if source.name in {".git", "__pycache__", "models"}:
             continue
+        if source.name == "saad.py" and config.source_variant == PAPER_WD_VARIANT:
+            _write_paper_weight_decay_variant(source=source, destination=stage / source.name, config=config)
+            continue
         _safe_symlink(stage / source.name, source, stage_root=stage)
     _safe_symlink(output_dir / "dataset", config.dataset_root, stage_root=output_dir)
     model_dir = stage / "models" / "cifar10" / "Linf"
     model_dir.mkdir(parents=True)
     _safe_symlink(model_dir / f"{config.teacher_name}.pt", config.teacher_checkpoint, stage_root=stage)
     return stage
+
+
+def _write_paper_weight_decay_variant(*, source: Path, destination: Path, config: SAADConfig) -> None:
+    """Materialize the one-line paper-aligned patch without editing upstream."""
+    if config.source_patch is None or config.source_patch_sha256 is None:
+        raise SAADLaunchError("paper weight-decay variant has no hash-bound patch")
+    if _sha256(config.source_patch) != config.source_patch_sha256:
+        raise SAADLaunchError("paper weight-decay patch drifted before staging")
+    original = "optimizer = torch.optim.SGD(student.parameters(), lr=args.lr, momentum=0.9, weight_decay=2e-4)"
+    replacement = "optimizer = torch.optim.SGD(student.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.wd)"
+    text = source.read_text(encoding="utf-8")
+    if text.count(original) != 1 or replacement in text:
+        raise SAADLaunchError("pinned upstream optimizer source no longer matches the approved patch preimage")
+    patch_text = config.source_patch.read_text(encoding="utf-8")
+    if f"-{original}" not in patch_text or f"+{replacement}" not in patch_text:
+        raise SAADLaunchError("approved patch content does not describe the expected optimizer change")
+    destination.write_text(text.replace(original, replacement), encoding="utf-8")
+
+
+def entrypoint_identity(
+    *, config: SAADConfig, saad: Path, staged_entrypoint: Path | None = None
+) -> dict[str, Any]:
+    """Bind the exact upstream and executed ``saad.py`` bytes."""
+    upstream = saad / "saad.py"
+    if not upstream.is_file():
+        raise SAADLaunchError("pinned upstream saad.py is absent")
+    original = "optimizer = torch.optim.SGD(student.parameters(), lr=args.lr, momentum=0.9, weight_decay=2e-4)"
+    replacement = "optimizer = torch.optim.SGD(student.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.wd)"
+    upstream_text = upstream.read_text(encoding="utf-8")
+    if upstream_text.count(original) != 1 or replacement in upstream_text:
+        raise SAADLaunchError("pinned upstream optimizer source no longer matches the approved preimage")
+    executed_text = upstream_text
+    changed_lines = 0
+    if config.source_variant == PAPER_WD_VARIANT:
+        executed_text = upstream_text.replace(original, replacement)
+        changed_lines = 1
+    executed_sha256 = hashlib.sha256(executed_text.encode("utf-8")).hexdigest()
+    if staged_entrypoint is not None:
+        if not staged_entrypoint.is_file() or _sha256(staged_entrypoint) != executed_sha256:
+            raise SAADLaunchError("staged saad.py bytes differ from the approved source variant")
+        if config.source_variant == UNMODIFIED_VARIANT and (
+            not staged_entrypoint.is_symlink() or staged_entrypoint.resolve() != upstream.resolve()
+        ):
+            raise SAADLaunchError("unmodified upstream variant must execute the original saad.py symlink")
+    return {
+        "variant": config.source_variant,
+        "upstream": _file_identity(upstream),
+        "executed_sha256": executed_sha256,
+        "changed_lines": changed_lines,
+        "patch_sha256": config.source_patch_sha256,
+    }
 
 
 def upstream_args(*, config: SAADConfig, batch_size: int) -> list[str]:
@@ -399,7 +527,7 @@ def upstream_args(*, config: SAADConfig, batch_size: int) -> list[str]:
         "--momentum",
         "0.9",
         "--wd",
-        "0.0002",
+        str(config.weight_decay),
         "--teacher_name",
         config.teacher_name,
         "--student",
@@ -684,11 +812,13 @@ def verify_smoke_evidence_bundle(
     inputs: dict[str, Any],
     teacher_evidence: dict[str, Any],
     manifest_paths: list[Path],
+    saad: Path | None = None,
 ) -> dict[str, Any]:
     """Validate the two preregistered smokes before a heavy process exists."""
     if len(manifest_paths) != 2:
         raise SAADLaunchError("full execution requires exactly two smoke manifests")
-    expected_sources = launch_source_files(config_path)
+    expected_sources = launch_source_files(config_path, config)
+    expected_entrypoint = entrypoint_identity(config=config, saad=saad or (ROOT / ".external" / "saad"))
     expected_git = _git(ROOT, "rev-parse", "HEAD")
     if _git(ROOT, "status", "--porcelain"):
         raise SAADLaunchError("full execution requires a clean ARD Git tree")
@@ -726,6 +856,20 @@ def verify_smoke_evidence_bundle(
             raise SAADLaunchError(f"batch-{batch} smoke Git identity mismatch")
         if identity.get("source_files") != expected_sources:
             raise SAADLaunchError(f"batch-{batch} smoke source identity mismatch")
+        if identity.get("source_variant") != config.source_variant:
+            raise SAADLaunchError(f"batch-{batch} smoke source variant mismatch")
+        if identity.get("entrypoint") != expected_entrypoint:
+            raise SAADLaunchError(f"batch-{batch} smoke executed entrypoint mismatch")
+        environment = manifest.get("environment")
+        gpu = telemetry.get("gpu")
+        if (
+            manifest.get("physical_gpu") != config.physical_gpu
+            or not isinstance(environment, dict)
+            or environment.get("CUDA_VISIBLE_DEVICES") != str(config.physical_gpu)
+            or not isinstance(gpu, dict)
+            or gpu.get("physical_gpu") != config.physical_gpu
+        ):
+            raise SAADLaunchError(f"batch-{batch} smoke physical GPU identity mismatch")
         if manifest.get("inputs") != inputs:
             raise SAADLaunchError(f"batch-{batch} smoke input identity mismatch")
         if manifest.get("teacher_logit_evidence", {}).get("identity") != teacher_evidence["identity"]:
@@ -917,6 +1061,7 @@ def main(argv: list[str] | None = None) -> int:
             inputs=inputs,
             teacher_evidence=teacher_logit_evidence,
             manifest_paths=args.smoke_manifest,
+            saad=saad,
         )
         if args.execute and args.mode == "full" and teacher_logit_evidence is not None
         else None
@@ -944,11 +1089,14 @@ def main(argv: list[str] | None = None) -> int:
         config, mode=args.mode, smoke_batch_size=args.smoke_batch_size, output_dir=args.output_dir
     )
     stage = stage_inputs(config=config, saad=saad, output_dir=config.output_dir)
+    executed_entrypoint = entrypoint_identity(config=config, saad=saad, staged_entrypoint=stage / "saad.py")
     provenance = config.output_dir / "runtime-provenance.json"
     command = build_runtime_command(
         config=config, stage=stage, saad=saad, robustbench=robustbench, provenance=provenance, batch_size=batch
     )
-    identity = launch_identity(config_path=args.config.resolve(), command=command)
+    identity = launch_identity(
+        config_path=args.config.resolve(), command=command, config=config, entrypoint=executed_entrypoint
+    )
     started = time.time()
     if args.mode == "full":
         _write_json_exclusive(
@@ -1022,6 +1170,7 @@ def main(argv: list[str] | None = None) -> int:
             "mode": args.mode,
             "physical_gpu": config.physical_gpu,
             "upstream": {"saad_commit": SAAD_COMMIT, "robustbench_commit": ROBUSTBENCH_COMMIT},
+            "source_variant": config.source_variant,
             "inputs": inputs,
             "teacher_logit_contract": config.teacher_logit_contract,
             "teacher_logit_evidence": teacher_logit_evidence,

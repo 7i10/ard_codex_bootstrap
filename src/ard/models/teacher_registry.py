@@ -128,7 +128,11 @@ class TeacherRegistry:
         ):
             raise TeacherRegistryError("teacher lock has invalid pinned RobustBench repository/license evidence")
         specs = {registry_id: _parse_spec(registry_id, entry) for registry_id, entry in teachers.items()}
-        if set(specs) != {"chen2021_ltd_wrn34_10", "bartoldson2024_adversarial_wrn94_16"}:
+        if set(specs) != {
+            "chen2021_ltd_wrn34_10",
+            "chen2021_ltd_wrn34_20",
+            "bartoldson2024_adversarial_wrn94_16",
+        }:
             raise TeacherRegistryError("teacher lock must contain exactly the approved RobustBench registry IDs")
         return cls(
             root=selected_root,

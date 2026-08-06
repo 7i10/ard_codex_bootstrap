@@ -177,6 +177,7 @@ def test_unimplemented_preprocessing_owners_fail_closed(
 def test_robustbench_registry_is_exact_and_requires_no_model_construction() -> None:
     registry = TeacherRegistry.load(Path(__file__).resolve().parents[2])
     chen = registry.spec("chen2021_ltd_wrn34_10")
+    chen20 = registry.spec("chen2021_ltd_wrn34_20")
     bartoldson = registry.spec("bartoldson2024_adversarial_wrn94_16")
     assert (chen.upstream_model_id, chen.factory.module, chen.factory.symbol, dict(chen.factory.kwargs)) == (
         "Chen2021LTD_WRN34_10",
@@ -187,6 +188,17 @@ def test_robustbench_registry_is_exact_and_requires_no_model_construction() -> N
     assert chen.expected_parameter_count == 46_160_474
     assert chen.preprocessing.owner == "teacher_adapter"
     assert chen.preprocessing.normalization().profile == "cifar10_raw_identity"
+    assert (chen20.upstream_model_id, chen20.factory.module, chen20.factory.symbol, dict(chen20.factory.kwargs)) == (
+        "Chen2021LTD_WRN34_20",
+        "robustbench.model_zoo.architectures.wide_resnet",
+        "WideResNet",
+        {"depth": 34, "widen_factor": 20, "sub_block1": False},
+    )
+    assert chen20.expected_parameter_count == 184_531_674
+    assert chen20.preprocessing.owner == "teacher_adapter"
+    assert chen20.preprocessing.normalization().profile == "cifar10_raw_identity"
+    assert chen20.checkpoint_status == "verified"
+    assert chen20.checkpoint_sha256 == "dbfc7cfe402d9ddf6cbe47c4809eab97fcccce7b6a254030cdca2640639cfa28"
     assert (bartoldson.upstream_model_id, bartoldson.factory.module, bartoldson.factory.symbol) == (
         "Bartoldson2024Adversarial_WRN-94-16",
         "robustbench.model_zoo.architectures.dm_wide_resnet",
@@ -203,7 +215,7 @@ def test_robustbench_registry_is_exact_and_requires_no_model_construction() -> N
     assert bartoldson.expected_parameter_count == 365_915_610
     assert bartoldson.preprocessing.owner == "model_embedded"
     assert bartoldson.preprocessing.normalization().profile == "robustbench_cifar10_bartoldson_embedded"
-    for spec in (chen, bartoldson):
+    for spec in (chen, chen20, bartoldson):
         assert spec.checkpoint_status in {"missing", "verified"}
         assert (spec.checkpoint_status == "missing") == (spec.checkpoint_sha256 is None)
 

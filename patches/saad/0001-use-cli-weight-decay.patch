@@ -1,0 +1,8 @@
+diff --git a/saad.py b/saad.py
+--- a/saad.py
++++ b/saad.py
+@@ -39,3 +39,3 @@
+-optimizer = torch.optim.SGD(student.parameters(), lr=args.lr, momentum=0.9, weight_decay=2e-4)
++optimizer = torch.optim.SGD(student.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.wd)
+ progress_bar = ProgressBar()
+ swa_model = AveragedModel(student)

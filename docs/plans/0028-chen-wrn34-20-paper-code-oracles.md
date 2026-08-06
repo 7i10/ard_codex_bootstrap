@@ -6,7 +6,7 @@
 - Branch / base SHA: `master`; implementation begins from the then-current
   clean pushed SHA
 - Host: Hamster only; Ferret is forbidden
-- Current milestone: M0 plan frozen; TRADES AutoAttack is still active
+- Current milestone: M0/M1 complete; M2 GPU smoke pending
 - Last updated: 2026-08-07
 
 ## Goal
@@ -84,7 +84,7 @@ gap. Seed 0 is diagnostic and is not a reproduction claim.
 
 ## Milestones
 
-- [ ] M0 -- extend acquisition/teacher/launcher registries for WRN34-20,
+- [x] M0 -- extend acquisition/teacher/launcher registries for WRN34-20,
   acquire once through pinned RobustBench, calculate SHA-256, strict-load and
   bounded-forward audit, and atomically update `teachers.lock.yaml`.
   - Files: teacher lock, acquisition script, teacher registry, upstream launcher
@@ -92,7 +92,7 @@ gap. Seed 0 is diagnostic and is not a reproduction claim.
   - Acceptance: exact ID/architecture/parameter count/checkpoint hash and
     logits are recorded; runtime never auto-downloads.
   - Commit: `feat: lock Chen WRN34-20 teacher`.
-- [ ] M1 -- create U and P immutable source identities. Store the minimal P
+- [x] M1 -- create U and P immutable source identities. Store the minimal P
   patch as a hash-bound external patch and apply it only to an ephemeral
   external worktree/staging area.
   - Acceptance: U remains byte-identical and clean; P changes only optimizer
@@ -163,6 +163,23 @@ configs/docs remain after the API is fixed.
 - 2026-08-07: plan frozen after PGD-AT closure and while TRADES AutoAttack was
   active. Hamster GPU 1 was idle. No WRN34-20 checkpoint had been downloaded and
   no U/P long run had been launched.
+- 2026-08-07: M0 acquired `Chen2021LTD_WRN34_20` once through the pinned
+  RobustBench downloader. The complete checkpoint is `738,377,702` bytes with
+  SHA-256 `dbfc7cfe402d9ddf6cbe47c4809eab97fcccce7b6a254030cdca2640639cfa28`;
+  strict construction found exactly `184,531,674` parameters and finite
+  `[1,10]` logits. It was atomically installed into `teacher_cache` and the lock
+  was advanced from `missing` to `verified`. No runtime download path was added.
+- 2026-08-07: the cross-runtime four-input teacher probe passed between PyTorch
+  `2.11.0+cu128` and `2.4.1+cu121` with identical argmax and zero observed logit
+  difference. M1 added explicit U/P configs and a valid one-line external patch;
+  dry-run commands bind the same teacher and `--wd 0.0002` versus `0.0005`.
+  The executed `saad.py` hash, variant, patch hash, changed-line count and
+  physical GPU are part of smoke/heavy lineage. Focused verification reported
+  `161 passed`, Ruff passed, targeted mypy passed, `git diff --check` passed and
+  the patch applies cleanly to the pinned upstream source. Consolidated review
+  initially found two P1 and one P2 lineage/regression gaps; the focused fixes
+  added three-way GPU identity validation, exact staged-entrypoint evidence and
+  an optimizer-delta regression. Delta re-review reported no remaining P0/P1.
 
 ## Completion report
 

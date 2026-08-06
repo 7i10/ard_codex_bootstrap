@@ -297,7 +297,11 @@ class TeacherConfig(StrictModel):
     preprocessing_owner: Literal["teacher_adapter", "model_embedded"] = "teacher_adapter"
     checkpoint: Path | None = None
     checkpoint_sha256: str | None = None
-    registry_id: Literal["chen2021_ltd_wrn34_10", "bartoldson2024_adversarial_wrn94_16"] | None = None
+    registry_id: Literal[
+        "chen2021_ltd_wrn34_10",
+        "chen2021_ltd_wrn34_20",
+        "bartoldson2024_adversarial_wrn94_16",
+    ] | None = None
     threat_norm: Literal["linf"] = "linf"
     threat_epsilon: str = "8/255"
     fixture_seed: int = 1729

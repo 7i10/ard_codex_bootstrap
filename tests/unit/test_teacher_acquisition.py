@@ -106,6 +106,10 @@ def test_acquisition_requires_explicit_opt_in_and_allowlist(tmp_path: Path) -> N
         )
 
 
+def test_wrn34_20_is_explicitly_acquisition_allowlisted() -> None:
+    assert "chen2021_ltd_wrn34_20" in acquire_script.ALLOWED_REGISTRY_IDS
+
+
 def test_acquisition_validates_staging_and_publishes_without_retaining_stage(tmp_path: Path) -> None:
     registry = _Registry(_spec())
     model_dir = tmp_path / "models"

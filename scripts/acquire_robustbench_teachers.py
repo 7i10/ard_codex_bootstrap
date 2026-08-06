@@ -36,7 +36,13 @@ from ard.models.teacher_registry import (  # noqa: E402
     sha256_file,
 )
 
-ALLOWED_REGISTRY_IDS = frozenset({"chen2021_ltd_wrn34_10", "bartoldson2024_adversarial_wrn94_16"})
+ALLOWED_REGISTRY_IDS = frozenset(
+    {
+        "chen2021_ltd_wrn34_10",
+        "chen2021_ltd_wrn34_20",
+        "bartoldson2024_adversarial_wrn94_16",
+    }
+)
 DEFAULT_MODEL_DIR = ROOT.parent / "datasets" / "ard" / "teachers" / "robustbench"
 
 
