@@ -77,6 +77,16 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
+        (
+            "scripts/run_saad_upstream.py",
+            "scripts/saad_runtime_bootstrap.py",
+            "configs/upstream/",
+            "requirements/saad-upstream-runtime.lock",
+        ),
+        ("tests/unit/test_run_saad_upstream.py",),
+        ("T0", "T1"),
+    ),
+    (
         ("scripts/verify.py", "src/ard/testing/", "Makefile", ".gitignore"),
         ("tests/unit/test_verify_gate.py",),
         ("T0", "T1"),
@@ -403,7 +413,16 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T1", "T3"),
     ),
     (
-        ("configs/",),
+        (
+            "configs/analysis/",
+            "configs/audit/",
+            "configs/experiments/",
+            "configs/pilot/",
+            "configs/production/",
+            "configs/protocols/",
+            "configs/scientific/",
+            "configs/teachers/",
+        ),
         (
             "tests/unit/test_config.py",
             "tests/regression/test_m2_baselines.py",
@@ -414,7 +433,7 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T2", "T3"),
     ),
     (
-        ("pyproject.toml", "requirements/"),
+        ("pyproject.toml", "requirements/constraints.txt"),
         (
             "tests/unit/test_verify_gate.py",
             "tests/unit/test_config.py",

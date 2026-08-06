@@ -1,0 +1,47 @@
+version: 1
+runtime:
+  python: /home/shunsukenaito/.conda/envs/saad-oracle-py311/bin/python
+  python_version: 3.11.15
+inputs:
+  dataset_root: /home/shunsukenaito/workspace-local/datasets/ard/torchvision
+  cifar10_archive_sha256: 6d958be074577803d12ecdefd02955f39262c83c16fe9348329d7fe0b5c001ce
+  teacher_checkpoint: teacher_cache/robustbench/Bartoldson2024Adversarial_WRN-94-16.pt
+  teacher_checkpoint_sha256: 56bbad8ad748df86e67c24dba4f59a9e7d285e583251460b2ed154017a18cb0b
+output:
+  directory: outputs/upstream/saad-bartoldson-seed0
+smoke:
+  batch_size: 128
+  loss_events: 2
+gpu:
+  physical_id: 0
+teacher_logit_contract:
+  reference_torch: 2.11.0+cu128
+  candidate_torch: 2.4.1+cu121
+  fixed_input_count: 4
+  atol: 0.0001
+  rtol: 0
+  require_argmax_equal: true
+  measured_max_abs: 0.000080824
+  measured_mean_abs: 0.000030991
+protocol:
+  method: saad
+  epochs: 200
+  batch_size: 128
+  seed: 0
+  student: RES-18
+  teacher_name: Bartoldson2024Adversarial_WRN-94-16
+  dataset: cifar10
+  swa_epoch: 95
+  beta: 0
+  gamma: 1
+  igdm_alpha: 1
+  lambda_inner: 1
+  nowand: 1
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 0.0002
+  milestones: [100, 150]
+  inner_steps: 10
+  epsilon: 8/255
+  step_size: 2/255
+  entropy_multiplier: 5
