@@ -6,7 +6,7 @@
 - Host: Hamster only; Ferret is forbidden
 - Base SHA: PGD-AT `c2220f11738e8963b922ae379a047a862ffa5915`;
   TRADES must launch from the then-current clean pushed SHA
-- Current milestone: PGD-AT official PGD complete/AutoAttack active; TRADES active
+- Current milestone: PGD-AT closed; TRADES official AutoAttack active
 - Last updated: 2026-08-07
 
 ## Question and order
@@ -57,9 +57,8 @@ clean-to-adversarial KL implementation with beta 6.
 - [x] B1 -- launch PGD-AT seed 0 on Hamster GPU 1, verify first epoch, and
   validate its successful 200-epoch terminal state.
 - [x] B2 -- after PGD-AT terminal validation, launch TRADES seed 0 on GPU 1.
-- [ ] B3 -- evaluate both best/last on official clean/PGD-20, then schedule
-  AutoAttack only after validation results are recorded without changing the
-  frozen training protocol.
+- [ ] B3 -- close both best/last official clean/PGD-20 and AutoAttack. PGD-AT
+  is complete; TRADES AutoAttack remains active.
 
 ## Stop conditions
 
@@ -127,20 +126,24 @@ to observed accuracy.
   modules, so it is not recorded as a pass. Scientific delta review found no
   P0/P1; training config hash, checkpoint hash, threat equality and W&B group
   remain unchanged.
+- 2026-08-07: PGD-AT AutoAttack completed in a separate saved-checkpoint
+  process. Best AA was `47.63%`; last AA was `40.36%`, a `7.27 pp` gap. The
+  installed AutoAttack source is bound to commit
+  `a39220048b3c9f2cca9a4d3a54604793c68eca7e` and source SHA-256
+  `e74d6dab0e34faf840f1bdfe0f77e9ddcc5f753a7426cbaa54b11bf17f896487`.
+- 2026-08-07: TRADES reached 200/200 epochs. Validation best was epoch 154:
+  clean `82.00%`, PGD-20 `48.62%`; last was clean `83.10%`, PGD-20 `45.74%`.
+  Official saved-checkpoint evaluation then reported best clean/PGD-20
+  `81.35%/47.83%` and last `82.20%/45.46%`, an official robust gap of
+  `2.37 pp`. The separate best/last AutoAttack service is active on Hamster
+  GPU 0; GPU 1 is idle.
 
 ## Hamster-only next execution block
 
-1. **GPU 0:** evaluate PGD-AT best and last on official CIFAR-10 clean and
-   CE-PGD-20 from the saved checkpoints. Record the results before starting
-   AutoAttack; then run pinned AutoAttack for best and last in the separate
-   evaluation process.
-2. **GPU 1:** start controlled TRADES seed 0 from the latest clean pushed SHA,
-   with `configs/scientific/cifar10_r18_trades.yaml` unchanged. Reuse the
-   existing CUDA smoke evidence; only perform the cheap environment, config,
-   W&B and GPU preflight.
-3. After TRADES finishes, evaluate its best and last with the same official
-   clean/PGD-20 and AutoAttack contract.
-4. Close the seed-0 baseline screen using official-test Best, Last, and robust
+1. **GPU 0:** let the active TRADES best/last AutoAttack process finish; do not
+   duplicate or pre-empt it.
+2. Record the pinned AutoAttack Best/Last result and close B3.
+3. Close the seed-0 baseline screen using official-test Best, Last, and robust
    overfitting gap only. Do not compare PGD-AT validation values with the
    existing official RSLAD/entropy table.
 

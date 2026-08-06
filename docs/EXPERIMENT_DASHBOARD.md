@@ -121,13 +121,14 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 - core seed-0の8 train、8 PGD、8 AutoAttackはすべて完了しました。Student 2セルのAAは事後追加評価です。
 - 複数seedの性能評価は未完了です。student-history信号の2教師×2 seed
   confirmatory blockは完了しましたが、これは性能主張用の3-seed cohortではありません。
-- controlled protocolのPGD-AT seed 0は200 epoch完了し、official test評価待ちです。
-  TRADES seed 0は未着手です。isolated upstream full SAADはChen seed 0のcode-oracleが
+- controlled protocolのPGD-AT seed 0は200 epochとofficial test PGD/AutoAttackまで完了しました。
+  TRADES seed 0は200 epochとofficial test PGDまで完了し、AutoAttackを実行中です。
+  isolated upstream full SAADはChen seed 0のcode-oracleが
   完了し、Bartoldson seed 0は実行準備と実データsmokeまで完了しましたが、論文設定の
   single-GPU batch 128がHamster RTX 4090でOOMとなり、200 epochは未開始です。
 - PGD-AT/TRADESのcanonical configとCUDA synthetic smoke、および
   Chen/Bartoldson observed RSLAD config/parity gateは準備済みです。
-  PGD-ATは200 epoch完了、TRADESは未開始です。
+  PGD-AT/TRADESはいずれも200 epoch完了です。
 - CIFAR-100、MobileNetV2、Tiny-ImageNet本訓練は未着手です。
 - Best-oriented history-routing v2のdevelopment blockは完了しNo-Goです。停止規則により
   Bartoldson seeds 3/4、Chen no-harm、v2 official PGD/AAは未着手のままです。
@@ -157,18 +158,21 @@ fragmentation OOMを避けましたが、残り約834 MiBではresume不能な20
 
 | Run | Status | Best / final result | Interpretation |
 |---|---|---|---|
-| Controlled PGD-AT seed 0 | train完了、official test未評価 | val best epoch 102: clean 83.14 / PGD-20 51.80; last: 85.08 / 43.26 | validation RO gap 8.54 pp。official値とは比較しない |
+| Controlled PGD-AT seed 0 | train、official PGD、AA完了 | official best: clean 82.01 / PGD-20 51.12 / AA 47.63; last: clean 84.46 / PGD-20 41.89 / AA 40.36 | official PGD gap 9.23 pp、AA gap 7.27 pp。強いROを確認 |
 | Upstream Chen34-10 full SAAD seed 0 | code oracle完了 | final SWA: clean 83.85 / PGD-20 56.40 / C&W 52.98 / AA 51.90 | upstream実行経路の結果。paper-protocol/controlled比較ではない |
-| Controlled TRADES seed 0 | 未着手 | -- | PGD-AT official評価とHamster 2 GPUで並列開始予定 |
+| Controlled TRADES seed 0 | train、official PGD完了、AA実行中 | official best: clean 81.35 / PGD-20 47.83; last: clean 82.20 / PGD-20 45.46 | official PGD gap 2.37 pp。AA完了までは最終比較しない |
 
 Chen upstream oracleは約8時間9分で正常終了しました。commandはupstream既定の
 weight decay `2e-4`で、論文Appendix Bの`5e-4`と異なります。またteacherはWRN34-10であり、
 論文のfull-SAAD ERT表のWRN34-20とは異なります。したがって、controlled Chen/RSLAD best
 AA `51.90%`と数値が同じでも、full SAADが同等または無効と結論しません。
 
-次はHamster GPU 0でPGD-AT best/lastのofficial clean/PGD-20→AutoAttack、GPU 1で
-controlled TRADES seed 0を並列実行します。Ferretは使用しません。両baselineをofficial
-Best/Last/RO gapで閉じるまで、新しいstudent-history介入は開始しません。
+次は実行中のTRADES best/last AutoAttackを閉じます。その後は
+`Chen2021LTD_WRN34_20`を取得・hash固定し、同一teacher/seedで、(U) pinned upstreamを
+一切変更しないcode oracle（実効weight decay `2e-4`）と、(P) 論文Appendix Bに合わせて
+weight decayだけを`5e-4`へ直すpaper-hyperparameter-aligned variantを比較します。
+Pは厳密な論文再現とは呼びません。詳細とVRAM分岐は
+[`Plan 0028`](plans/0028-chen-wrn34-20-paper-code-oracles.md)に固定します。
 
 ### Student-history confirmatory block（完了）
 
