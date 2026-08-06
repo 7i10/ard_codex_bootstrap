@@ -464,6 +464,11 @@ def observe_loss_chunk(buffer: str, chunk: bytes) -> tuple[str, tuple[float, ...
     return text[matches[-1].end() :], tuple(values), tuple(invalid)
 
 
+def read_available_pipe_bytes(stream: Any) -> bytes:
+    """Read promptly from a subprocess pipe; ``BufferedReader.read(n)`` waits for ``n`` bytes."""
+    return os.read(stream.fileno(), 4096)
+
+
 def runtime_environment(*, physical_gpu: int) -> dict[str, str]:
     """Prevent source-tree bytecode writes and ambient user-site imports."""
     environment = os.environ.copy()
@@ -576,7 +581,7 @@ def supervise_smoke(
         text = ""
         with destination.open("xb") as handle:
             while True:
-                chunk = stream.read(4096)
+                chunk = read_available_pipe_bytes(stream)
                 if not chunk:
                     break
                 handle.write(chunk)

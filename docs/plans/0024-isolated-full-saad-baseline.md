@@ -159,3 +159,12 @@ the blocker is documented without changing the protocol.  Only an exit-zero
   readiness review found that upstream progress is printed to stdout rather
   than stderr; the supervisor was corrected to observe both unbuffered streams
   before any live run, with chunked/CR/non-finite parsing regressions.
+- 2026-08-06: the first batch-16 live attempt reached the exact pinned runtime,
+  real CIFAR bytes and real Bartoldson teacher and emitted 15 finite losses,
+  but was conservatively classified `smoke_failure`: Python's buffered
+  `read(4096)` delayed delivery until 15 progress records had accumulated,
+  exceeding the preregistered 10-record ceiling.  Peak physical-GPU memory was
+  5,226 MiB, utilization 77% and temperature 40 C; import provenance and all
+  input/source hashes matched.  This was a supervisor I/O defect, not a model
+  failure.  The reader now uses prompt pipe bytes (`os.read`) and its focused
+  regression passes (`18 passed`); a fresh batch-16 smoke is required.

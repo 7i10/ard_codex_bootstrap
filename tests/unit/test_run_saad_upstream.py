@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 from types import ModuleType
 
@@ -20,6 +21,7 @@ from scripts.run_saad_upstream import (
     launch_identity,
     load_config,
     observe_loss_chunk,
+    read_available_pipe_bytes,
     runtime_environment,
     select_execution,
     stage_inputs,
@@ -212,6 +214,18 @@ def test_stdout_progress_loss_stream_handles_split_chunks_cr_and_nonfinite_once(
     assert values == () and invalid == ("nan",)
     _, values, invalid = observe_loss_chunk(buffer, b"")
     assert values == () and invalid == ()
+
+
+def test_prompt_pipe_read_does_not_wait_for_buffer_fill() -> None:
+    read_fd, write_fd = os.pipe()
+    try:
+        with os.fdopen(read_fd, "rb", closefd=True) as reader:
+            os.write(write_fd, b"\rloss: 1.25 |")
+            # The writer intentionally remains open and contributes far fewer
+            # than 4096 bytes.  BufferedReader.read(4096) would block here.
+            assert read_available_pipe_bytes(reader) == b"\rloss: 1.25 |"
+    finally:
+        os.close(write_fd)
 
 
 def test_runtime_bootstrap_has_explicit_two_autoattack_origins() -> None:
