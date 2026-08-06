@@ -168,3 +168,10 @@ the blocker is documented without changing the protocol.  Only an exit-zero
   input/source hashes matched.  This was a supervisor I/O defect, not a model
   failure.  The reader now uses prompt pipe bytes (`os.read`) and its focused
   regression passes (`18 passed`); a fresh batch-16 smoke is required.
+- 2026-08-06: fresh batch-16 at Git `13ca475` passed with exactly two finite
+  losses and `expected_smoke_termination` in 8.81 seconds.  All import,
+  source, command and input identities matched a clean Git tree.  The 5-second
+  telemetry cadence missed the short GPU-active window (622 MiB/0% reported),
+  while the longer failed attempt had measured 5,226 MiB/77%.  The cadence was
+  therefore tightened to 0.5 seconds with a schema/peak regression; batch-16
+  is rerun once for trustworthy telemetry before batch-128.

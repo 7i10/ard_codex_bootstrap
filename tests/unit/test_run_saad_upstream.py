@@ -14,6 +14,7 @@ from scripts.run_saad_upstream import (
     BARTOLDSON_SHA256,
     CIFAR10_ARCHIVE_SHA256,
     CIFAR10_EXTRACTED_SHA256,
+    GPUSampler,
     SAADConfig,
     SAADLaunchError,
     build_runtime_command,
@@ -25,6 +26,7 @@ from scripts.run_saad_upstream import (
     runtime_environment,
     select_execution,
     stage_inputs,
+    telemetry_summary,
     upstream_args,
     verify_inputs,
 )
@@ -247,6 +249,23 @@ def test_runtime_environment_rejects_ambient_import_paths(monkeypatch: pytest.Mo
     assert environment["CUDA_VISIBLE_DEVICES"] == "0"
     assert environment["PYTHONDONTWRITEBYTECODE"] == "1"
     assert environment["PYTHONUNBUFFERED"] == "1"
+
+
+def test_gpu_telemetry_samples_short_smokes_at_half_second_and_has_stable_schema() -> None:
+    assert GPUSampler(physical_gpu=0).interval_seconds == 0.5
+    telemetry = telemetry_summary(
+        physical_gpu=0,
+        samples=[{"memory_mib": 5226, "utilization_percent": 77, "temperature_c": 42}],
+        errors=[],
+    )
+    assert telemetry == {
+        "physical_gpu": 0,
+        "samples": [{"memory_mib": 5226, "utilization_percent": 77, "temperature_c": 42}],
+        "peak_memory_mib": 5226,
+        "peak_utilization_percent": 77,
+        "peak_temperature_c": 42,
+        "errors": [],
+    }
 
 
 def test_launch_identity_hashes_command_sources_and_current_git_state() -> None:

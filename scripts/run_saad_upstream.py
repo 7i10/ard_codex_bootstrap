@@ -488,7 +488,7 @@ def runtime_environment(*, physical_gpu: int) -> dict[str, str]:
 class GPUSampler:
     """Best-effort physical-GPU telemetry, independent of CUDA device remapping."""
 
-    def __init__(self, *, physical_gpu: int, interval_seconds: float = 5.0) -> None:
+    def __init__(self, *, physical_gpu: int, interval_seconds: float = 0.5) -> None:
         self.physical_gpu = physical_gpu
         self.interval_seconds = interval_seconds
         self.samples: list[dict[str, Any]] = []
@@ -542,17 +542,22 @@ class GPUSampler:
     def stop(self) -> dict[str, Any]:
         self._stop.set()
         self._thread.join(timeout=self.interval_seconds + 1)
-        peak_memory = max((sample["memory_mib"] for sample in self.samples), default=None)
-        peak_utilization = max((sample["utilization_percent"] for sample in self.samples), default=None)
-        peak_temperature = max((sample["temperature_c"] for sample in self.samples), default=None)
-        return {
-            "physical_gpu": self.physical_gpu,
-            "samples": self.samples,
-            "peak_memory_mib": peak_memory,
-            "peak_utilization_percent": peak_utilization,
-            "peak_temperature_c": peak_temperature,
-            "errors": self.errors,
-        }
+        return telemetry_summary(physical_gpu=self.physical_gpu, samples=self.samples, errors=self.errors)
+
+
+def telemetry_summary(*, physical_gpu: int, samples: list[dict[str, Any]], errors: list[str]) -> dict[str, Any]:
+    """Return a stable telemetry schema even when a short run has no sample."""
+    peak_memory = max((sample["memory_mib"] for sample in samples), default=None)
+    peak_utilization = max((sample["utilization_percent"] for sample in samples), default=None)
+    peak_temperature = max((sample["temperature_c"] for sample in samples), default=None)
+    return {
+        "physical_gpu": physical_gpu,
+        "samples": samples,
+        "peak_memory_mib": peak_memory,
+        "peak_utilization_percent": peak_utilization,
+        "peak_temperature_c": peak_temperature,
+        "errors": errors,
+    }
 
 
 def runtime_provenance(path: Path) -> dict[str, Any]:
