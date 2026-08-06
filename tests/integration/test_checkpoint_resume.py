@@ -372,12 +372,18 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
         "train_teacher_adversarial_forward_calls",
         "val_clean_accuracy",
         "val_pgd_accuracy",
+        "learning_rate",
+        "next_learning_rate",
     }
     assert history[0]["train_valid_examples"] == float(len(cast(Sized, loader.dataset)))
     assert history[0]["train_teacher_clean_forward_calls"] == 0.0
     assert history[0]["train_teacher_adversarial_forward_calls"] == 0.0
     assert history[0]["train_cuda_peak_allocated_bytes"] == 0.0
     assert history[0]["train_cuda_peak_reserved_bytes"] == 0.0
+    assert history[0]["learning_rate"] == pytest.approx(0.03)
+    assert history[0]["next_learning_rate"] == pytest.approx(0.024)
+    assert history[1]["learning_rate"] == pytest.approx(0.024)
+    assert history[1]["next_learning_rate"] == pytest.approx(0.0192)
     assert callback_metrics == history
     assert payload["selection_metadata"]["metric"] == "val_pgd_accuracy"
     assert payload["selection_metadata"]["tie_break"] == "earliest_epoch"

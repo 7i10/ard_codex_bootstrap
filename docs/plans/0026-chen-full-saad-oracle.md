@@ -6,7 +6,7 @@
   after live evidence is stable
 - Host: Hamster GPU 0 only; Ferret is forbidden
 - Base SHA: `3217ca7c1f4523a7efde48e68d0b3431128c4e33`
-- Current milestone: M3 heavy run active; first-epoch evidence pending
+- Current milestone: M3 heavy run active; first-epoch gate passed
 - Last updated: 2026-08-06
 
 ## Question
@@ -88,7 +88,7 @@ best/last/resume remain explicit limitations.
 - [x] M2 -- on M1 Go only, add the heavy evidence gate, prelaunch manifest and
   crash-resilient terminal evidence, then run one consolidated scientific
   delta review.  Fix/re-review only an actual P0/P1.
-- [ ] M3 -- on Go only, commit/push immutable code, launch 200 epochs on GPU 0,
+- [x] M3 -- on Go only, commit/push immutable code, launch 200 epochs on GPU 0,
   and verify first-epoch train plus per-epoch PGD-20 are finite.  On No-Go,
   close without altering the protocol.
 
@@ -163,3 +163,10 @@ or lower-batch feasibility run is part of this plan.
   hashes and resource observations.  The process is active and owns 3,806 MiB
   at launch.  First-epoch train/PGD-20 evidence remains required before M3 is
   complete.
+- 2026-08-06: M3 first-epoch gate passed.  Upstream emitted finite training
+  losses and completed the separate per-epoch PGD-20 path; the first two
+  reported PGD-20 accuracies are `0.1624` and `0.2174`.  The run remained
+  active at epoch 3 with approximately 30.5 training epochs/hour, peak 4,034
+  MiB, peak utilization 100%, peak 55 C, and no telemetry errors.  Final SWA,
+  final evaluation and in-process AutoAttack remain pending and may add
+  substantial time beyond the roughly 6.6-hour training estimate.

@@ -764,6 +764,10 @@ class Trainer:
         history = []
         for epoch in range(start_epoch, epochs):
             self.current_epoch = epoch
+            # Record the rate that actually governs this epoch before the
+            # epoch-end scheduler transition.  ``next_learning_rate`` below
+            # is the checkpointed rate that a resume will use next.
+            epoch_learning_rate = float(self.optimizer.param_groups[0]["lr"])
             sampler = loader.sampler
             if hasattr(sampler, "set_epoch"):
                 sampler.set_epoch(epoch)
@@ -817,6 +821,8 @@ class Trainer:
                 "train_teacher_adversarial_forward_calls": train_metrics.get("teacher_adversarial_forward_calls", 0.0),
                 "val_clean_accuracy": validation_metrics["clean_accuracy"],
                 "val_pgd_accuracy": validation_metrics["pgd_accuracy"],
+                "learning_rate": epoch_learning_rate,
+                "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
             }
             history.append(epoch_metrics)
             # The callback is deliberately after both atomic checkpoints; it
