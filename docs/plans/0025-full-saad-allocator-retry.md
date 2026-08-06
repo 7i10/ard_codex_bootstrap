@@ -5,7 +5,7 @@
 - Owner: main thread; one Terra implementation owner
 - Host: Hamster GPU 0 only; Ferret is forbidden
 - Base SHA: `ff2c931c32fc90efeff29d4240fcde08804cb5a4`
-- Current milestone: M0 allocator contract
+- Current milestone: M1 bounded allocator smokes
 - Last updated: 2026-08-06
 
 ## Question
@@ -48,7 +48,7 @@ a second allocator setting.
 
 ## Milestones
 
-- [ ] M0 -- add strict allocator identity, explicit 2/10-event smoke selection
+- [x] M0 -- add strict allocator identity, explicit 2/10-event smoke selection
   and fail-closed full mode; focused tests and immutable commit.
 - [ ] M1 -- run batch-16/2 and batch-128/10 bounded smokes on Hamster GPU 0.
 - [ ] M2 -- if and only if M1 is Go, implement the scientific review's P1
@@ -72,3 +72,12 @@ The plan completes either with a safely launched exact heavy run after every
 gate, or with a documented allocator No-Go and no heavy process.  A lower-batch
 upstream feasibility run or clean-room controlled approximation requires a new
 scientific plan and cannot be relabeled as this oracle.
+
+## Progress log
+
+- 2026-08-06: M0 fixes the allocator to
+  `expandable_segments:True`, records it in the child environment/manifest,
+  adds an execute-only 2--10 loss quota, and makes full execution fail closed
+  before checkout/staging/process creation.  Focused verification passed:
+  `pytest -q tests/unit/test_run_saad_upstream.py` (`26 passed`), Ruff check and
+  format check, `git diff --check`, and impact-selected T0/T1 (`26 passed`).

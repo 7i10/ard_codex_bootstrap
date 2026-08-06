@@ -21,10 +21,12 @@ from scripts.run_saad_upstream import (
     classify_smoke,
     launch_identity,
     load_config,
+    main,
     observe_loss_chunk,
     read_available_pipe_bytes,
     runtime_environment,
     select_execution,
+    select_smoke_loss_events,
     stage_inputs,
     telemetry_summary,
     upstream_args,
@@ -37,7 +39,11 @@ pytestmark = [pytest.mark.t1, pytest.mark.unit]
 def _raw_config(tmp_path: Path) -> dict[str, object]:
     return {
         "version": 1,
-        "runtime": {"python": str(tmp_path / "python"), "python_version": "3.11.15"},
+        "runtime": {
+            "python": str(tmp_path / "python"),
+            "python_version": "3.11.15",
+            "pytorch_cuda_alloc_conf": "expandable_segments:True",
+        },
         "inputs": {
             "dataset_root": str(tmp_path / "dataset"),
             "cifar10_archive_sha256": CIFAR10_ARCHIVE_SHA256,
@@ -94,6 +100,7 @@ def test_checked_in_operational_config_is_strictly_parseable() -> None:
     assert config.smoke_batch_size == 128
     assert config.physical_gpu == 0
     assert str(config.runtime_python) == "/home/shunsukenaito/.conda/envs/saad-oracle-py311/bin/python"
+    assert config.pytorch_cuda_alloc_conf == "expandable_segments:True"
     assert config.teacher_logit_contract["atol"] == 0.0001
     lock = (Path(__file__).parents[2] / "requirements" / "saad-upstream-runtime.lock").read_text(encoding="utf-8")
     for pin in ("Jinja2==3.1.6", "timm==1.0.9", "pandas==2.2.3", "gdown==5.1.0", "setuptools==75.3.0"):
@@ -110,6 +117,19 @@ def test_operational_config_rejects_unknown_key_and_protocol_drift(tmp_path: Pat
     assert isinstance(protocol, dict)
     protocol["epochs"] = 199
     with pytest.raises(SAADLaunchError, match="protocol drift"):
+        _config(tmp_path, raw)
+
+
+@pytest.mark.parametrize("value", (None, "expandable_segments:False", "max_split_size_mb:128"))
+def test_operational_config_requires_exact_allocator(value: str | None, tmp_path: Path) -> None:
+    raw = _raw_config(tmp_path)
+    runtime = raw["runtime"]
+    assert isinstance(runtime, dict)
+    if value is None:
+        del runtime["pytorch_cuda_alloc_conf"]
+    else:
+        runtime["pytorch_cuda_alloc_conf"] = value
+    with pytest.raises(SAADLaunchError, match="pytorch_cuda_alloc_conf"):
         _config(tmp_path, raw)
 
 
@@ -159,6 +179,7 @@ def test_safe_staging_uses_symlinks_and_refuses_overwrite(tmp_path: Path) -> Non
     teacher.write_bytes(b"teacher")
     config = SAADConfig(
         runtime_python=tmp_path / "python",
+        pytorch_cuda_alloc_conf="expandable_segments:True",
         dataset_root=dataset,
         teacher_checkpoint=teacher,
         output_dir=tmp_path / "fresh-output",
@@ -244,11 +265,17 @@ def test_runtime_bootstrap_has_explicit_two_autoattack_origins() -> None:
 def test_runtime_environment_rejects_ambient_import_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PYTHONPATH", "/unsafe/import")
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
-    environment = runtime_environment(physical_gpu=0)
+    environment = runtime_environment(physical_gpu=0, pytorch_cuda_alloc_conf="expandable_segments:True")
     assert "PYTHONPATH" not in environment
     assert environment["CUDA_VISIBLE_DEVICES"] == "0"
+    assert environment["PYTORCH_CUDA_ALLOC_CONF"] == "expandable_segments:True"
     assert environment["PYTHONDONTWRITEBYTECODE"] == "1"
     assert environment["PYTHONUNBUFFERED"] == "1"
+
+
+def test_runtime_environment_rejects_wrong_allocator() -> None:
+    with pytest.raises(SAADLaunchError, match="PYTORCH_CUDA_ALLOC_CONF"):
+        runtime_environment(physical_gpu=0, pytorch_cuda_alloc_conf="expandable_segments:False")
 
 
 def test_gpu_telemetry_samples_short_smokes_at_half_second_and_has_stable_schema() -> None:
@@ -288,6 +315,38 @@ def test_execute_requires_fresh_output_override_and_explicit_smoke_variant(tmp_p
     assert full_batch == 128 and full.output_dir == tmp_path / "full"
     with pytest.raises(SAADLaunchError, match="invalid in full"):
         select_execution(config, mode="full", smoke_batch_size=128, output_dir=tmp_path / "bad")
+
+
+@pytest.mark.parametrize("quota", (1, 11))
+def test_smoke_loss_event_override_is_execute_only_and_bounded(tmp_path: Path, quota: int) -> None:
+    config = _config(tmp_path)
+    with pytest.raises(SAADLaunchError, match="within"):
+        select_smoke_loss_events(config, mode="smoke", execute=True, smoke_loss_events=quota)
+    with pytest.raises(SAADLaunchError, match="execute-only"):
+        select_smoke_loss_events(config, mode="smoke", execute=False, smoke_loss_events=2)
+    with pytest.raises(SAADLaunchError, match="only in smoke"):
+        select_smoke_loss_events(config, mode="full", execute=True, smoke_loss_events=2)
+    assert select_smoke_loss_events(config, mode="smoke", execute=True, smoke_loss_events=10) == 10
+    assert select_smoke_loss_events(config, mode="smoke", execute=True, smoke_loss_events=None) == 2
+
+
+def test_full_execute_is_fail_closed_before_staging_or_output_creation(tmp_path: Path) -> None:
+    config_path = tmp_path / "saad.yaml"
+    config_path.write_text(yaml.safe_dump(_raw_config(tmp_path)), encoding="utf-8")
+    fresh_output = tmp_path / "full-output"
+    with pytest.raises(SAADLaunchError, match="later P1 evidence gate"):
+        main(
+            [
+                "--config",
+                str(config_path),
+                "--mode",
+                "full",
+                "--execute",
+                "--output-dir",
+                str(fresh_output),
+            ]
+        )
+    assert not fresh_output.exists()
 
 
 def test_cifar_integrity_requires_every_extracted_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

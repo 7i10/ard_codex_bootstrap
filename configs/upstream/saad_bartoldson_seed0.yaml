@@ -2,6 +2,7 @@ version: 1
 runtime:
   python: /home/shunsukenaito/.conda/envs/saad-oracle-py311/bin/python
   python_version: 3.11.15
+  pytorch_cuda_alloc_conf: expandable_segments:True
 inputs:
   dataset_root: /home/shunsukenaito/workspace-local/datasets/ard/torchvision
   cifar10_archive_sha256: 6d958be074577803d12ecdefd02955f39262c83c16fe9348329d7fe0b5c001ce

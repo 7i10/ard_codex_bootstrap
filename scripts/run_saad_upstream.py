@@ -40,6 +40,7 @@ CIFAR10_EXTRACTED_SHA256 = {
     "readme.html": "4d1c3fb199d6a183ae03f5162b469d7bc04edf2fad9547bd5f224271d52f98e5",
     "test_batch": "f53d8d457504f7cff4ea9e021afcf0e0ad8e24a91f3fc42091b8adef61157831",
 }
+PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True"
 LOSS_TOKEN_RE = re.compile(r"loss:\s*([^\s|]+)(?=[\s|])")
 
 
@@ -50,6 +51,7 @@ class SAADLaunchError(RuntimeError):
 @dataclass(frozen=True)
 class SAADConfig:
     runtime_python: Path
+    pytorch_cuda_alloc_conf: str
     dataset_root: Path
     teacher_checkpoint: Path
     output_dir: Path
@@ -122,7 +124,11 @@ def load_config(path: Path) -> SAADConfig:
     )
     if root["version"] != 1:
         raise SAADLaunchError("config.version must be exactly 1")
-    runtime = _checked_mapping(root["runtime"], context="runtime", keys={"python", "python_version"})
+    runtime = _checked_mapping(
+        root["runtime"],
+        context="runtime",
+        keys={"python", "python_version", "pytorch_cuda_alloc_conf"},
+    )
     inputs = _checked_mapping(
         root["inputs"],
         context="inputs",
@@ -204,6 +210,8 @@ def load_config(path: Path) -> SAADConfig:
         raise SAADLaunchError(f"protocol drift is forbidden: {json.dumps(changed, sort_keys=True)}")
     if runtime["python_version"] != "3.11.15":
         raise SAADLaunchError("runtime.python_version must be 3.11.15")
+    if runtime["pytorch_cuda_alloc_conf"] != PYTORCH_CUDA_ALLOC_CONF:
+        raise SAADLaunchError(f"runtime.pytorch_cuda_alloc_conf must be exactly {PYTORCH_CUDA_ALLOC_CONF!r}")
     if inputs["cifar10_archive_sha256"] != CIFAR10_ARCHIVE_SHA256:
         raise SAADLaunchError("CIFAR-10 archive hash differs from frozen input")
     if inputs["teacher_checkpoint_sha256"] != BARTOLDSON_SHA256:
@@ -235,6 +243,7 @@ def load_config(path: Path) -> SAADConfig:
 
     return SAADConfig(
         runtime_python=project_path(runtime["python"], field="runtime.python"),
+        pytorch_cuda_alloc_conf=runtime["pytorch_cuda_alloc_conf"],
         dataset_root=project_path(inputs["dataset_root"], field="inputs.dataset_root"),
         teacher_checkpoint=project_path(inputs["teacher_checkpoint"], field="inputs.teacher_checkpoint"),
         output_dir=project_path(output["directory"], field="output.directory"),
@@ -469,13 +478,16 @@ def read_available_pipe_bytes(stream: Any) -> bytes:
     return os.read(stream.fileno(), 4096)
 
 
-def runtime_environment(*, physical_gpu: int) -> dict[str, str]:
+def runtime_environment(*, physical_gpu: int, pytorch_cuda_alloc_conf: str) -> dict[str, str]:
     """Prevent source-tree bytecode writes and ambient user-site imports."""
+    if pytorch_cuda_alloc_conf != PYTORCH_CUDA_ALLOC_CONF:
+        raise SAADLaunchError(f"PYTORCH_CUDA_ALLOC_CONF must be exactly {PYTORCH_CUDA_ALLOC_CONF!r}")
     environment = os.environ.copy()
     environment.pop("PYTHONPATH", None)
     environment.update(
         {
             "CUDA_VISIBLE_DEVICES": str(physical_gpu),
+            "PYTORCH_CUDA_ALLOC_CONF": pytorch_cuda_alloc_conf,
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONUNBUFFERED": "1",
             "PYTHONNOUSERSITE": "1",
@@ -574,7 +586,13 @@ def runtime_provenance(path: Path) -> dict[str, Any]:
 
 
 def supervise_smoke(
-    command: list[str], *, cwd: Path, output_dir: Path, requested_events: int, physical_gpu: int
+    command: list[str],
+    *,
+    cwd: Path,
+    output_dir: Path,
+    requested_events: int,
+    physical_gpu: int,
+    pytorch_cuda_alloc_conf: str,
 ) -> SmokeResult:
     """Stream immutable logs, then stop the complete upstream process group on loss quota."""
     stdout_path, stderr_path = output_dir / "stdout.log", output_dir / "stderr.log"
@@ -605,7 +623,7 @@ def supervise_smoke(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
-        env=runtime_environment(physical_gpu=physical_gpu),
+        env=runtime_environment(physical_gpu=physical_gpu, pytorch_cuda_alloc_conf=pytorch_cuda_alloc_conf),
     )
     assert process.stdout is not None and process.stderr is not None
     workers = [
@@ -666,15 +684,37 @@ def select_execution(
     return replace(config, output_dir=selected_output), smoke_batch_size
 
 
+def select_smoke_loss_events(config: SAADConfig, *, mode: str, execute: bool, smoke_loss_events: int | None) -> int:
+    """Permit a bounded smoke quota override without mutating frozen YAML."""
+    if smoke_loss_events is None:
+        return config.smoke_loss_events
+    if not execute:
+        raise SAADLaunchError("--smoke-loss-events is execute-only")
+    if mode != "smoke":
+        raise SAADLaunchError("--smoke-loss-events is valid only in smoke mode")
+    if not 2 <= smoke_loss_events <= 10:
+        raise SAADLaunchError("--smoke-loss-events must be within [2, 10]")
+    return smoke_loss_events
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--mode", choices=("smoke", "full"), required=True)
     parser.add_argument("--smoke-batch-size", choices=(16, 128), type=int)
+    parser.add_argument("--smoke-loss-events", type=int)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--execute", action="store_true", help="execute only after printing/validating frozen identity")
     args = parser.parse_args(argv)
     config = load_config(args.config)
+    if args.execute and args.mode == "full":
+        raise SAADLaunchError("full execution is blocked until the later P1 evidence gate passes")
+    requested_events = select_smoke_loss_events(
+        config,
+        mode=args.mode,
+        execute=args.execute,
+        smoke_loss_events=args.smoke_loss_events,
+    )
     saad = verified_saad_clone(ROOT)
     robustbench = verified_checkout(ROOT, "robustbench", commit=ROBUSTBENCH_COMMIT)
     inputs = verify_inputs(config)
@@ -687,7 +727,13 @@ def main(argv: list[str] | None = None) -> int:
             batch = args.smoke_batch_size or config.smoke_batch_size
         print(
             json.dumps(
-                {"mode": args.mode, "command": upstream_args(batch_size=batch), "inputs": inputs}, sort_keys=True
+                {
+                    "mode": args.mode,
+                    "command": upstream_args(batch_size=batch),
+                    "inputs": inputs,
+                    "requested_smoke_loss_events": requested_events if args.mode == "smoke" else None,
+                },
+                sort_keys=True,
             )
         )
         return 0
@@ -706,12 +752,14 @@ def main(argv: list[str] | None = None) -> int:
             command,
             cwd=stage,
             output_dir=config.output_dir,
-            requested_events=config.smoke_loss_events,
+            requested_events=requested_events,
             physical_gpu=config.physical_gpu,
+            pytorch_cuda_alloc_conf=config.pytorch_cuda_alloc_conf,
         )
         terminal = {
             "state": result.state,
             "loss_events": result.loss_events,
+            "requested_smoke_loss_events": requested_events,
             "invalid_loss_tokens": list(result.invalid_loss_tokens),
             "returncode": result.returncode,
         }
@@ -723,7 +771,14 @@ def main(argv: list[str] | None = None) -> int:
         sampler.start()
         with stdout.open("xb") as out, stderr.open("xb") as err:
             completed = subprocess.run(
-                command, cwd=stage, stdout=out, stderr=err, env=runtime_environment(physical_gpu=config.physical_gpu)
+                command,
+                cwd=stage,
+                stdout=out,
+                stderr=err,
+                env=runtime_environment(
+                    physical_gpu=config.physical_gpu,
+                    pytorch_cuda_alloc_conf=config.pytorch_cuda_alloc_conf,
+                ),
             )
         gpu_telemetry = sampler.stop()
         terminal = {
@@ -749,6 +804,7 @@ def main(argv: list[str] | None = None) -> int:
                 "WANDB_MODE": "disabled",
                 "PYTHONPATH": None,
                 "CUDA_VISIBLE_DEVICES": str(config.physical_gpu),
+                "PYTORCH_CUDA_ALLOC_CONF": config.pytorch_cuda_alloc_conf,
             },
             "runtime_provenance": runtime_provenance(provenance),
             "started_unix": started,
