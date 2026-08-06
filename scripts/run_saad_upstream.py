@@ -2,7 +2,7 @@
 """Run the pinned full-SAAD oracle without importing it into ARD.
 
 This launcher is intentionally an operational boundary, not a second training
-engine.  It only accepts the frozen Bartoldson/SAAD protocol, stages symlinks
+engine.  It only accepts frozen Bartoldson/Chen SAAD profiles, stages symlinks
 in a fresh output directory, and delegates Python import ordering to
 ``saad_runtime_bootstrap.py``.  The upstream checkout is never edited.
 """
@@ -29,6 +29,17 @@ ROOT = Path(__file__).resolve().parents[1]
 SAAD_COMMIT = "295121c5d2eed827b5b2d6aa42307de809bdfada"
 ROBUSTBENCH_COMMIT = "78fcc9e48a07a861268f295a777b975f25155964"
 BARTOLDSON_SHA256 = "56bbad8ad748df86e67c24dba4f59a9e7d285e583251460b2ed154017a18cb0b"
+CHEN_SHA256 = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+TEACHER_PROFILES = {
+    "Bartoldson2024Adversarial_WRN-94-16": {
+        "checkpoint_sha256": BARTOLDSON_SHA256,
+        "run_name": "full-saad-bartoldson-seed0",
+    },
+    "Chen2021LTD_WRN34_10": {
+        "checkpoint_sha256": CHEN_SHA256,
+        "run_name": "full-saad-chen-seed0",
+    },
+}
 CIFAR10_ARCHIVE_SHA256 = "6d958be074577803d12ecdefd02955f39262c83c16fe9348329d7fe0b5c001ce"
 CIFAR10_EXTRACTED_SHA256 = {
     "batches.meta": "f962466ef690d46b226450fb9aadc74ba4bc64a76aa526b5827fe4bc5c7125cb",
@@ -54,6 +65,9 @@ class SAADConfig:
     pytorch_cuda_alloc_conf: str
     dataset_root: Path
     teacher_checkpoint: Path
+    teacher_checkpoint_sha256: str
+    teacher_name: str
+    run_name: str
     output_dir: Path
     smoke_batch_size: int
     smoke_loss_events: int
@@ -91,6 +105,7 @@ def launch_identity(*, config_path: Path, command: list[str]) -> dict[str, Any]:
         "runtime_bootstrap": _file_identity(ROOT / "scripts" / "saad_runtime_bootstrap.py"),
         "config": _file_identity(config_path),
         "runtime_lock": _file_identity(ROOT / "requirements" / "saad-upstream-runtime.lock"),
+        "teacher_probe": _file_identity(ROOT / "scripts" / "saad_teacher_probe.py"),
     }
     return {
         "ard_git": {"head": _git(ROOT, "rev-parse", "HEAD"), "dirty": bool(_git(ROOT, "status", "--porcelain"))},
@@ -147,8 +162,6 @@ def load_config(path: Path) -> SAADConfig:
             "atol",
             "rtol",
             "require_argmax_equal",
-            "measured_max_abs",
-            "measured_mean_abs",
         },
     )
     protocol = _checked_mapping(
@@ -184,7 +197,6 @@ def load_config(path: Path) -> SAADConfig:
         "batch_size": 128,
         "seed": 0,
         "student": "RES-18",
-        "teacher_name": "Bartoldson2024Adversarial_WRN-94-16",
         "dataset": "cifar10",
         "swa_epoch": 95,
         "beta": 0,
@@ -201,11 +213,16 @@ def load_config(path: Path) -> SAADConfig:
         "step_size": "2/255",
         "entropy_multiplier": 5,
     }
-    if protocol != frozen:
+    teacher_name = protocol.get("teacher_name")
+    profile = TEACHER_PROFILES.get(teacher_name)
+    protocol_without_teacher = {key: value for key, value in protocol.items() if key != "teacher_name"}
+    if profile is None:
+        raise SAADLaunchError(f"teacher_name is not an allowed upstream profile: {teacher_name!r}")
+    if protocol_without_teacher != frozen:
         changed = {
-            key: {"expected": frozen[key], "actual": protocol.get(key)}
+            key: {"expected": frozen[key], "actual": protocol_without_teacher.get(key)}
             for key in frozen
-            if protocol.get(key) != frozen[key]
+            if protocol_without_teacher.get(key) != frozen[key]
         }
         raise SAADLaunchError(f"protocol drift is forbidden: {json.dumps(changed, sort_keys=True)}")
     if runtime["python_version"] != "3.11.15":
@@ -214,8 +231,8 @@ def load_config(path: Path) -> SAADConfig:
         raise SAADLaunchError(f"runtime.pytorch_cuda_alloc_conf must be exactly {PYTORCH_CUDA_ALLOC_CONF!r}")
     if inputs["cifar10_archive_sha256"] != CIFAR10_ARCHIVE_SHA256:
         raise SAADLaunchError("CIFAR-10 archive hash differs from frozen input")
-    if inputs["teacher_checkpoint_sha256"] != BARTOLDSON_SHA256:
-        raise SAADLaunchError("Bartoldson checkpoint hash differs from frozen input")
+    if inputs["teacher_checkpoint_sha256"] != profile["checkpoint_sha256"]:
+        raise SAADLaunchError(f"{teacher_name} checkpoint hash differs from frozen input")
     if not isinstance(smoke["batch_size"], int) or smoke["batch_size"] not in {16, 128}:
         raise SAADLaunchError("smoke.batch_size must be 16 or 128")
     if not isinstance(smoke["loss_events"], int) or not 2 <= smoke["loss_events"] <= 10:
@@ -229,8 +246,6 @@ def load_config(path: Path) -> SAADConfig:
         "atol": 0.0001,
         "rtol": 0,
         "require_argmax_equal": True,
-        "measured_max_abs": 0.000080824,
-        "measured_mean_abs": 0.000030991,
     }
     if teacher_logit_contract != expected_logit_contract:
         raise SAADLaunchError("teacher_logit_contract differs from the frozen cross-runtime contract")
@@ -246,6 +261,9 @@ def load_config(path: Path) -> SAADConfig:
         pytorch_cuda_alloc_conf=runtime["pytorch_cuda_alloc_conf"],
         dataset_root=project_path(inputs["dataset_root"], field="inputs.dataset_root"),
         teacher_checkpoint=project_path(inputs["teacher_checkpoint"], field="inputs.teacher_checkpoint"),
+        teacher_checkpoint_sha256=inputs["teacher_checkpoint_sha256"],
+        teacher_name=teacher_name,
+        run_name=str(profile["run_name"]),
         output_dir=project_path(output["directory"], field="output.directory"),
         smoke_batch_size=smoke["batch_size"],
         smoke_loss_events=smoke["loss_events"],
@@ -294,8 +312,11 @@ def verify_inputs(config: SAADConfig) -> dict[str, Any]:
         if actual_hash != expected_hash:
             raise SAADLaunchError(f"local CIFAR-10 extracted file hash differs: {name}")
         extracted[name] = _file_identity(source)
-    if not config.teacher_checkpoint.is_file() or _sha256(config.teacher_checkpoint) != BARTOLDSON_SHA256:
-        raise SAADLaunchError("local Bartoldson checkpoint hash differs from frozen input")
+    if (
+        not config.teacher_checkpoint.is_file()
+        or _sha256(config.teacher_checkpoint) != config.teacher_checkpoint_sha256
+    ):
+        raise SAADLaunchError(f"local {config.teacher_name} checkpoint hash differs from frozen input")
     return {
         "cifar10_archive": _file_identity(archive),
         "cifar10_extracted": extracted,
@@ -342,11 +363,11 @@ def stage_inputs(*, config: SAADConfig, saad: Path, output_dir: Path) -> Path:
     _safe_symlink(output_dir / "dataset", config.dataset_root, stage_root=output_dir)
     model_dir = stage / "models" / "cifar10" / "Linf"
     model_dir.mkdir(parents=True)
-    _safe_symlink(model_dir / "Bartoldson2024Adversarial_WRN-94-16.pt", config.teacher_checkpoint, stage_root=stage)
+    _safe_symlink(model_dir / f"{config.teacher_name}.pt", config.teacher_checkpoint, stage_root=stage)
     return stage
 
 
-def upstream_args(*, batch_size: int) -> list[str]:
+def upstream_args(*, config: SAADConfig, batch_size: int) -> list[str]:
     """Return the entire frozen argument vector; callers cannot append drift."""
     if batch_size not in {16, 128}:
         raise SAADLaunchError("smoke batch must be 16 or 128")
@@ -376,7 +397,7 @@ def upstream_args(*, batch_size: int) -> list[str]:
         "--wd",
         "0.0002",
         "--teacher_name",
-        "Bartoldson2024Adversarial_WRN-94-16",
+        config.teacher_name,
         "--student",
         "RES-18",
         "--dataset",
@@ -388,7 +409,7 @@ def upstream_args(*, batch_size: int) -> list[str]:
         "--nowand",
         "1",
         "--wandb_name",
-        "full-saad-bartoldson-seed0",
+        config.run_name,
         "--seed",
         "0",
     ]
@@ -413,7 +434,7 @@ def build_runtime_command(
         "--provenance",
         str(provenance),
         "--",
-        *upstream_args(batch_size=batch_size),
+        *upstream_args(config=config, batch_size=batch_size),
     ]
 
 
@@ -585,6 +606,39 @@ def runtime_provenance(path: Path) -> dict[str, Any]:
     return {"present": True, "identity": _file_identity(path), "modules": value}
 
 
+def verify_teacher_logit_evidence(config: SAADConfig, path: Path) -> dict[str, Any]:
+    """Require measured cross-runtime evidence rather than a YAML assertion."""
+    if not path.is_file():
+        raise SAADLaunchError("teacher-logit evidence is absent")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SAADLaunchError(f"teacher-logit evidence is unreadable: {error}") from error
+    if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("passed") is not True:
+        raise SAADLaunchError("teacher-logit evidence is not a passing schema-v1 comparison")
+    expected = {
+        "teacher_name": config.teacher_name,
+        "checkpoint_sha256": config.teacher_checkpoint_sha256,
+        "contract": config.teacher_logit_contract,
+        "probe_source_sha256": _sha256(ROOT / "scripts" / "saad_teacher_probe.py"),
+    }
+    for key, expected_value in expected.items():
+        if value.get(key) != expected_value:
+            raise SAADLaunchError(f"teacher-logit evidence identity mismatch: {key}")
+    fixed_input = value.get("fixed_input")
+    observed = value.get("observed")
+    if (
+        not isinstance(fixed_input, dict)
+        or len(str(fixed_input.get("sha256", ""))) != 64
+        or not isinstance(observed, dict)
+        or not math.isfinite(float(observed.get("max_abs", math.nan)))
+        or observed.get("argmax_equal") is not True
+        or float(observed["max_abs"]) > float(config.teacher_logit_contract["atol"])
+    ):
+        raise SAADLaunchError("teacher-logit evidence has invalid measured values")
+    return {"identity": _file_identity(path), "comparison": value}
+
+
 def supervise_smoke(
     command: list[str],
     *,
@@ -703,12 +757,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mode", choices=("smoke", "full"), required=True)
     parser.add_argument("--smoke-batch-size", choices=(16, 128), type=int)
     parser.add_argument("--smoke-loss-events", type=int)
+    parser.add_argument("--teacher-logit-evidence", type=Path)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--execute", action="store_true", help="execute only after printing/validating frozen identity")
     args = parser.parse_args(argv)
     config = load_config(args.config)
     if args.execute and args.mode == "full":
         raise SAADLaunchError("full execution is blocked until the later P1 evidence gate passes")
+    if not args.execute and args.teacher_logit_evidence is not None:
+        raise SAADLaunchError("--teacher-logit-evidence is execute-only")
+    if args.execute and args.teacher_logit_evidence is None:
+        raise SAADLaunchError("--teacher-logit-evidence is required for execution")
     requested_events = select_smoke_loss_events(
         config,
         mode=args.mode,
@@ -718,6 +777,11 @@ def main(argv: list[str] | None = None) -> int:
     saad = verified_saad_clone(ROOT)
     robustbench = verified_checkout(ROOT, "robustbench", commit=ROBUSTBENCH_COMMIT)
     inputs = verify_inputs(config)
+    teacher_logit_evidence = (
+        verify_teacher_logit_evidence(config, args.teacher_logit_evidence.resolve())
+        if args.teacher_logit_evidence is not None
+        else None
+    )
     if not args.execute:
         if args.mode == "full":
             if args.smoke_batch_size is not None:
@@ -729,7 +793,7 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(
                 {
                     "mode": args.mode,
-                    "command": upstream_args(batch_size=batch),
+                    "command": upstream_args(config=config, batch_size=batch),
                     "inputs": inputs,
                     "requested_smoke_loss_events": requested_events if args.mode == "smoke" else None,
                 },
@@ -794,9 +858,10 @@ def main(argv: list[str] | None = None) -> int:
             "upstream": {"saad_commit": SAAD_COMMIT, "robustbench_commit": ROBUSTBENCH_COMMIT},
             "inputs": inputs,
             "teacher_logit_contract": config.teacher_logit_contract,
+            "teacher_logit_evidence": teacher_logit_evidence,
             "command": command,
             "launch_identity": identity,
-            "upstream_args": upstream_args(batch_size=batch),
+            "upstream_args": upstream_args(config=config, batch_size=batch),
             "environment": {
                 "PYTHONDONTWRITEBYTECODE": "1",
                 "PYTHONUNBUFFERED": "1",

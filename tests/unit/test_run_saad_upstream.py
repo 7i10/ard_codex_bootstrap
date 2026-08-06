@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 from types import ModuleType
@@ -12,6 +14,7 @@ import yaml
 
 from scripts.run_saad_upstream import (
     BARTOLDSON_SHA256,
+    CHEN_SHA256,
     CIFAR10_ARCHIVE_SHA256,
     CIFAR10_EXTRACTED_SHA256,
     GPUSampler,
@@ -31,6 +34,7 @@ from scripts.run_saad_upstream import (
     telemetry_summary,
     upstream_args,
     verify_inputs,
+    verify_teacher_logit_evidence,
 )
 
 pytestmark = [pytest.mark.t1, pytest.mark.unit]
@@ -60,8 +64,6 @@ def _raw_config(tmp_path: Path) -> dict[str, object]:
             "atol": 0.0001,
             "rtol": 0,
             "require_argmax_equal": True,
-            "measured_max_abs": 0.000080824,
-            "measured_mean_abs": 0.000030991,
         },
         "protocol": {
             "method": "saad",
@@ -102,6 +104,9 @@ def test_checked_in_operational_config_is_strictly_parseable() -> None:
     assert str(config.runtime_python) == "/home/shunsukenaito/.conda/envs/saad-oracle-py311/bin/python"
     assert config.pytorch_cuda_alloc_conf == "expandable_segments:True"
     assert config.teacher_logit_contract["atol"] == 0.0001
+    chen = load_config(Path(__file__).parents[2] / "configs" / "upstream" / "saad_chen_seed0.yaml")
+    assert chen.teacher_name == "Chen2021LTD_WRN34_10"
+    assert chen.teacher_checkpoint_sha256 == CHEN_SHA256
     lock = (Path(__file__).parents[2] / "requirements" / "saad-upstream-runtime.lock").read_text(encoding="utf-8")
     for pin in ("Jinja2==3.1.6", "timm==1.0.9", "pandas==2.2.3", "gdown==5.1.0", "setuptools==75.3.0"):
         assert pin in lock
@@ -118,6 +123,25 @@ def test_operational_config_rejects_unknown_key_and_protocol_drift(tmp_path: Pat
     protocol["epochs"] = 199
     with pytest.raises(SAADLaunchError, match="protocol drift"):
         _config(tmp_path, raw)
+    raw = _raw_config(tmp_path)
+    protocol = raw["protocol"]
+    assert isinstance(protocol, dict)
+    protocol["teacher_name"] = "unknown"
+    with pytest.raises(SAADLaunchError, match="allowed upstream profile"):
+        _config(tmp_path, raw)
+
+
+def test_chen_profile_binds_checkpoint_and_command(tmp_path: Path) -> None:
+    raw = _raw_config(tmp_path)
+    protocol = raw["protocol"]
+    inputs = raw["inputs"]
+    assert isinstance(protocol, dict) and isinstance(inputs, dict)
+    protocol["teacher_name"] = "Chen2021LTD_WRN34_10"
+    inputs["teacher_checkpoint_sha256"] = CHEN_SHA256
+    config = _config(tmp_path, raw)
+    command = upstream_args(config=config, batch_size=128)
+    assert command[command.index("--teacher_name") + 1] == "Chen2021LTD_WRN34_10"
+    assert command[command.index("--wandb_name") + 1] == "full-saad-chen-seed0"
 
 
 @pytest.mark.parametrize("value", (None, "expandable_segments:False", "max_split_size_mb:128"))
@@ -135,8 +159,8 @@ def test_operational_config_requires_exact_allocator(value: str | None, tmp_path
 
 def test_full_command_is_frozen_and_smoke_batch_is_explicit(tmp_path: Path) -> None:
     config = _config(tmp_path)
-    smoke = upstream_args(batch_size=config.smoke_batch_size)
-    full = upstream_args(batch_size=128)
+    smoke = upstream_args(config=config, batch_size=config.smoke_batch_size)
+    full = upstream_args(config=config, batch_size=128)
     assert "--batch" in smoke and smoke[smoke.index("--batch") + 1] == "16"
     assert full[full.index("--batch") + 1] == "128"
     assert "--teacher_name" in full
@@ -144,7 +168,7 @@ def test_full_command_is_frozen_and_smoke_batch_is_explicit(tmp_path: Path) -> N
     assert full[full.index("--depth") + 1] == "0"
     assert full[full.index("--widen_factor") + 1] == "0"
     with pytest.raises(SAADLaunchError, match="smoke batch"):
-        upstream_args(batch_size=64)
+        upstream_args(config=config, batch_size=64)
 
 
 def test_runtime_command_cannot_forward_arbitrary_upstream_arguments(tmp_path: Path) -> None:
@@ -182,6 +206,9 @@ def test_safe_staging_uses_symlinks_and_refuses_overwrite(tmp_path: Path) -> Non
         pytorch_cuda_alloc_conf="expandable_segments:True",
         dataset_root=dataset,
         teacher_checkpoint=teacher,
+        teacher_checkpoint_sha256=BARTOLDSON_SHA256,
+        teacher_name="Bartoldson2024Adversarial_WRN-94-16",
+        run_name="full-saad-bartoldson-seed0",
         output_dir=tmp_path / "fresh-output",
         smoke_batch_size=16,
         smoke_loss_events=2,
@@ -278,6 +305,31 @@ def test_runtime_environment_rejects_wrong_allocator() -> None:
         runtime_environment(physical_gpu=0, pytorch_cuda_alloc_conf="expandable_segments:False")
 
 
+def test_teacher_logit_evidence_is_measured_hash_bound_and_profile_specific(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    probe = Path(__file__).parents[2] / "scripts" / "saad_teacher_probe.py"
+    probe_sha = hashlib.sha256(probe.read_bytes()).hexdigest()
+    evidence = {
+        "schema_version": 1,
+        "passed": True,
+        "teacher_name": config.teacher_name,
+        "checkpoint_sha256": config.teacher_checkpoint_sha256,
+        "fixed_input": {"formula": "fixed", "sha256": "a" * 64},
+        "contract": config.teacher_logit_contract,
+        "observed": {"max_abs": 0.00001, "mean_abs": 0.000001, "argmax_equal": True},
+        "probe_source_sha256": probe_sha,
+    }
+    path = tmp_path / "teacher-evidence.json"
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+    verified = verify_teacher_logit_evidence(config, path)
+    assert verified["comparison"]["passed"] is True
+    evidence["teacher_name"] = "Chen2021LTD_WRN34_10"
+    path.unlink()
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+    with pytest.raises(SAADLaunchError, match="teacher_name"):
+        verify_teacher_logit_evidence(config, path)
+
+
 def test_gpu_telemetry_samples_short_smokes_at_half_second_and_has_stable_schema() -> None:
     assert GPUSampler(physical_gpu=0).interval_seconds == 0.5
     telemetry = telemetry_summary(
@@ -302,7 +354,13 @@ def test_launch_identity_hashes_command_sources_and_current_git_state() -> None:
     )
     assert len(identity["command_sha256"]) == 64
     assert len(identity["ard_git"]["head"]) == 40
-    assert set(identity["source_files"]) == {"launcher", "runtime_bootstrap", "config", "runtime_lock"}
+    assert set(identity["source_files"]) == {
+        "launcher",
+        "runtime_bootstrap",
+        "config",
+        "runtime_lock",
+        "teacher_probe",
+    }
 
 
 def test_execute_requires_fresh_output_override_and_explicit_smoke_variant(tmp_path: Path) -> None:
@@ -364,7 +422,7 @@ def test_cifar_integrity_requires_every_extracted_file(tmp_path: Path, monkeypat
         if path == archive:
             return CIFAR10_ARCHIVE_SHA256
         if path == config.teacher_checkpoint:
-            return BARTOLDSON_SHA256
+            return config.teacher_checkpoint_sha256
         return CIFAR10_EXTRACTED_SHA256[path.name]
 
     monkeypatch.setattr("scripts.run_saad_upstream._sha256", fake_hash)
