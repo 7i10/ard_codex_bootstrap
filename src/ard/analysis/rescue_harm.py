@@ -26,6 +26,8 @@ from ard.analysis.teacher_risk_replay import build_replay_loader, load_historica
 from ard.attacks import AttackRequest, LinfPGD
 from ard.config.loader import load_resolved_config_for_evaluation, resolved_config_dict
 from ard.engine.checkpoint import REQUIRED_KEYS
+from ard.evaluation.saved_checkpoint import load_saved_student_checkpoint
+from ard.models import build_student, build_teacher
 from ard.policies import selected_ids_sha256
 from ard.state import SampleStateStore
 
@@ -53,6 +55,35 @@ OBSERVATION_COLUMNS = (
     "robust_probability_margin",
 )
 CATEGORIES = ("rescued", "harmed", "stable_correct", "unchanged_failure")
+
+# The v3 panel is deliberately separate from completed-v2.  In particular,
+# epoch 79 is represented by one exact shared parent checkpoint, never by a
+# copied child artifact.
+V3_EPOCHS = (79, 99, 119, 129, 149, 199)
+V3_ARMS = ("C", "PF-H", "PF-R", "NR-H", "NR-R")
+V3_CHILD_TO_CONFIG_ARM = {"PF-H": "PF_RET_H", "PF-R": "PF_RET_R", "NR-H": "NR_PFX_H", "NR-R": "NR_PFX_R"}
+V3_OBSERVATION_COLUMNS = OBSERVATION_COLUMNS + (
+    "teacher_clean_prediction",
+    "teacher_clean_correct",
+    "teacher_clean_true_probability",
+    "teacher_clean_probability_margin",
+    "teacher_clean_entropy_normalized",
+    "teacher_adversarial_prediction",
+    "teacher_adversarial_correct",
+    "teacher_adversarial_true_probability",
+    "teacher_adversarial_probability_margin",
+    "teacher_adversarial_entropy_normalized",
+    "teacher_clean_to_adversarial_kl",
+    "teacher_clean_to_adversarial_prediction_flip",
+    "teacher_clean_to_adversarial_true_probability_delta",
+    "teacher_clean_to_adversarial_margin_delta",
+    "route",
+    "mask_selected",
+    "intervention_active",
+    "intervention_identity",
+    "pf_anchor_clean_probability_margin",
+    "pf_anchor_adversarial_probability_margin",
+)
 
 
 @dataclass(frozen=True)
@@ -240,6 +271,167 @@ def build_checkpoint_inventory(
     return value
 
 
+def _checkpoint_state_sha(path: Path) -> str:
+    try:
+        payload = torch.load(path, map_location="cpu", weights_only=False)
+    except Exception as exc:  # pragma: no cover - torch error details vary
+        raise RescueHarmError("checkpoint payload is unreadable") from exc
+    if not isinstance(payload, Mapping) or REQUIRED_KEYS.difference(payload):
+        raise RescueHarmError("checkpoint payload lacks complete lineage")
+    state = payload.get("sample_state")
+    if not isinstance(state, Mapping):
+        raise RescueHarmError("checkpoint payload lacks sample-state lineage")
+    return _hash(state)
+
+
+def _v3_mask_and_parent(config: Any, *, arm: str) -> dict[str, Any]:
+    """Return only bytes explicitly frozen by the v3 child config."""
+    if arm == "C":
+        return {"kind": "shared_parent_control"}
+    spec = config.prescriptive_v3
+    if spec is None or spec.arm != V3_CHILD_TO_CONFIG_ARM[arm]:
+        raise RescueHarmError("v3 resolved config arm contract drifted")
+    mask_path, bundle_path, parent_path = spec.mask.path, spec.selector_bundle_path, spec.anchor_checkpoint
+    for path, digest, name in (
+        (mask_path, spec.mask.sha256, "mask"),
+        (bundle_path, spec.selector_bundle_sha256, "selector bundle"),
+        (parent_path, spec.anchor_checkpoint_sha256, "epoch-79 parent"),
+    ):
+        if not path.is_file() or sha256_file(path) != _sha(digest):
+            raise RescueHarmError(f"v3 {name} bytes do not match the resolved config")
+    if spec.parent.checkpoint_sha256 != spec.anchor_checkpoint_sha256:
+        raise RescueHarmError("v3 parent/anchor checkpoint identity drifted")
+    for path, digest, name in (
+        (spec.parent.train_partition_manifest, spec.parent.train_partition_manifest_sha256, "parent partition"),
+        (spec.parent.artifact_attestation, spec.parent.artifact_attestation_sha256, "parent attestation"),
+        (spec.parent.artifact_inventory, spec.parent.artifact_inventory_sha256, "parent artifact inventory"),
+    ):
+        if not path.is_file() or sha256_file(path) != _sha(digest):
+            raise RescueHarmError(f"v3 {name} bytes do not match the resolved config")
+    parent_state = _checkpoint_state_sha(parent_path)
+    if parent_state != _sha(spec.parent.sample_state_sha256):
+        raise RescueHarmError("v3 parent sample-state identity drifted")
+    return {
+        "kind": "prescriptive_v3_epoch79_parent_v1",
+        "checkpoint_path": str(parent_path.resolve()),
+        "checkpoint_sha256": spec.anchor_checkpoint_sha256,
+        "sample_state_sha256": parent_state,
+        "parent_raw_config_sha256": spec.parent.raw_config_sha256,
+        "parent_git_sha": spec.parent.git_sha,
+        "parent_train_partition_manifest_sha256": spec.parent.train_partition_manifest_sha256,
+        "parent_train_partition_ids_labels_sha256": spec.parent.train_partition_ids_labels_sha256,
+        "parent_artifact_attestation_sha256": spec.parent.artifact_attestation_sha256,
+        "parent_artifact_inventory_sha256": spec.parent.artifact_inventory_sha256,
+        "mask_path": str(mask_path.resolve()),
+        "mask_sha256": spec.mask.sha256,
+        "selected_ids_sha256": spec.mask.selected_ids_sha256,
+        "selector_bundle_path": str(bundle_path.resolve()),
+        "selector_bundle_sha256": spec.selector_bundle_sha256,
+        "route": "PF" if arm.startswith("PF-") else "NR",
+        "arm": spec.arm,
+    }
+
+
+def _explicit_v3_control_parent(*, checkpoint: Path, children: Sequence[CheckpointInventory]) -> dict[str, Any]:
+    if not checkpoint.is_file():
+        raise RescueHarmError("v3 control shared epoch-79 parent checkpoint is unavailable")
+    parent_sha, state_sha = sha256_file(checkpoint), _checkpoint_state_sha(checkpoint)
+    payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
+    if not isinstance(payload, Mapping) or REQUIRED_KEYS.difference(payload) or payload.get("epoch") != 79:
+        raise RescueHarmError("v3 control shared parent is not an exact epoch-79 checkpoint")
+    for child in children:
+        child_payload = torch.load(Path(child.path), map_location="cpu", weights_only=False)
+        lineage = child_payload.get("fork_lineage") if isinstance(child_payload, Mapping) else None
+        if (
+            not isinstance(lineage, Mapping)
+            or lineage.get("parent_epoch") != 79
+            or lineage.get("parent_checkpoint_sha256") != parent_sha
+            or lineage.get("parent_sample_state_sha256") != state_sha
+        ):
+            raise RescueHarmError("v3 delayed-control checkpoint fork lineage does not bind the shared epoch-79 parent")
+    return {
+        "kind": "explicit_shared_epoch79_parent_v1",
+        "checkpoint_path": str(checkpoint.resolve()),
+        "checkpoint_sha256": parent_sha,
+        "sample_state_sha256": state_sha,
+    }
+
+
+def build_v3_checkpoint_inventory(
+    *,
+    manifest: Path,
+    resolved_config: Path,
+    arm: str,
+    seed: int,
+    output: Path,
+    epochs: Sequence[int] = V3_EPOCHS,
+    shared_parent_checkpoint: Path | None = None,
+) -> dict[str, Any]:
+    """Freeze a v3 panel from checkpoint bytes, not artifact names/versions."""
+    if output.exists():
+        raise FileExistsError("refusing to overwrite checkpoint inventory")
+    requested = tuple(epochs)
+    if arm not in V3_ARMS or requested != tuple(sorted(set(requested))) or not set(requested).issubset(V3_EPOCHS):
+        raise RescueHarmError("v3 inventory requires a sorted unique requested v3 common-epoch set")
+    if 79 not in requested:
+        raise RescueHarmError("v3 common epoch contract must retain the shared epoch-79 parent")
+    evaluation = load_resolved_config_for_evaluation(resolved_config)
+    config = evaluation.config
+    if config.teacher is None:
+        raise RescueHarmError("v3 inventory requires a frozen teacher")
+    if arm != "C" and shared_parent_checkpoint is not None:
+        raise RescueHarmError("v3 child inventory represents epoch-79 only through its config parent")
+    entries = list(inventory_run_bundle(manifest))
+    if not entries or len({item.run_id for item in entries}) != 1:
+        raise RescueHarmError("v3 manifest lacks one immutable run identity")
+    wanted = set(requested) - {79}
+    selected = [item for item in entries if item.epoch in wanted and item.periodic_last]
+    if tuple(sorted(item.epoch for item in selected)) != tuple(sorted(wanted)) or len(
+        {item.epoch for item in selected}
+    ) != len(selected):
+        raise RescueHarmError("v3 manifest lacks exactly the requested periodic checkpoint bytes")
+    if any(item.config_hash != evaluation.raw_config_hash for item in selected):
+        raise RescueHarmError("v3 checkpoint config hash does not match resolved config")
+    if arm == "C":
+        if shared_parent_checkpoint is None:
+            raise RescueHarmError("v3 control inventory requires --shared-parent-checkpoint for epoch-79")
+        parent = _explicit_v3_control_parent(checkpoint=shared_parent_checkpoint, children=selected)
+    else:
+        parent = _v3_mask_and_parent(config, arm=arm)
+    checkpoint_rows = []
+    for item in sorted(selected, key=lambda value: value.epoch):
+        path = Path(item.path)
+        checkpoint_rows.append(
+            {
+                "epoch": item.epoch,
+                "path": str(path.resolve()),
+                "sha256": item.sha256,
+                "sample_state_sha256": _checkpoint_state_sha(path),
+                "scientific_git_sha": item.scientific_git_sha,
+            }
+        )
+    value = {
+        "schema_version": 3,
+        "contract": "prescriptive_v3_rescue_harm_inventory_v1",
+        "run_id": entries[0].run_id,
+        "arm": arm,
+        "seed": seed,
+        "requested_epochs": list(requested),
+        "config_sha256": evaluation.raw_config_hash,
+        "scientific_git_sha": entries[0].scientific_git_sha,
+        "teacher": config.teacher.model_dump(mode="json"),
+        "dataset_identity": logical_dataset_identity(resolved_config_dict(config), train_expected_count=45_000),
+        "attack_identity": config.method.selection_attack.model_dump(mode="json"),
+        "source_manifest_sha256": sha256_file(manifest),
+        "source_resolved_config_sha256": sha256_file(resolved_config),
+        "parent": parent,
+        "checkpoints": checkpoint_rows,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(canonical_json(value) + b"\n")
+    return value
+
+
 def _ce_pgd20(config: Any) -> None:
     attack = config.method.selection_attack
     if (
@@ -261,6 +453,159 @@ def _primitives(logits: torch.Tensor, labels: torch.Tensor) -> tuple[torch.Tenso
     masked.scatter_(1, labels[:, None], float("-inf"))
     wrong = masked.max(dim=1).values
     return prediction, prediction.eq(labels), true - wrong
+
+
+def _teacher_primitives(logits: torch.Tensor, labels: torch.Tensor) -> dict[str, torch.Tensor]:
+    probabilities = F.softmax(logits.float(), dim=1)
+    prediction, correct, margin = _primitives(logits, labels)
+    true = probabilities.gather(1, labels[:, None]).squeeze(1)
+    entropy = -(probabilities * F.log_softmax(logits.float(), dim=1)).sum(dim=1)
+    normalized_entropy = entropy / torch.log(torch.tensor(logits.shape[1], device=logits.device, dtype=entropy.dtype))
+    if not torch.isfinite(normalized_entropy).all():
+        raise RescueHarmError("teacher response primitives are non-finite")
+    return {
+        "probabilities": probabilities,
+        "prediction": prediction,
+        "correct": correct,
+        "true": true,
+        "margin": margin,
+        "entropy": normalized_entropy,
+    }
+
+
+def _teacher_response_kl(clean_logits: torch.Tensor, adversarial_logits: torch.Tensor) -> torch.Tensor:
+    """Compute KL(p_T(clean) || p_T(x_adv^S)) without probability-log NaNs."""
+    clean_log = F.log_softmax(clean_logits.float(), dim=1)
+    adversarial_log = F.log_softmax(adversarial_logits.float(), dim=1)
+    value = (clean_log.exp() * (clean_log - adversarial_log)).sum(dim=1)
+    if not torch.isfinite(value).all():
+        raise RescueHarmError("teacher clean-to-adversarial KL is non-finite")
+    return value
+
+
+def _load_v3_inventory(path: Path) -> dict[str, Any]:
+    value = _json(path, name="v3 checkpoint inventory")
+    required = {
+        "schema_version",
+        "contract",
+        "run_id",
+        "arm",
+        "seed",
+        "requested_epochs",
+        "config_sha256",
+        "scientific_git_sha",
+        "teacher",
+        "dataset_identity",
+        "attack_identity",
+        "source_manifest_sha256",
+        "source_resolved_config_sha256",
+        "parent",
+        "checkpoints",
+    }
+    if (
+        set(value) != required
+        or value.get("schema_version") != 3
+        or value.get("contract") != "prescriptive_v3_rescue_harm_inventory_v1"
+    ):
+        raise RescueHarmError("v3 checkpoint inventory schema/contract drifted")
+    requested = tuple(value.get("requested_epochs", ()))
+    if (
+        value.get("arm") not in V3_ARMS
+        or not requested
+        or requested != tuple(sorted(set(requested)))
+        or not set(requested).issubset(V3_EPOCHS)
+        or 79 not in requested
+    ):
+        raise RescueHarmError("v3 inventory common-epoch contract drifted")
+    if not isinstance(value.get("parent"), Mapping) or not isinstance(value.get("checkpoints"), list):
+        raise RescueHarmError("v3 inventory parent/checkpoint lineage is invalid")
+    for key in ("config_sha256", "source_manifest_sha256", "source_resolved_config_sha256"):
+        _sha(value.get(key))
+    parent = value["parent"]
+    if value["arm"] == "C":
+        for key in ("checkpoint_path", "checkpoint_sha256", "sample_state_sha256"):
+            if key not in parent:
+                raise RescueHarmError("v3 control inventory shared-parent lineage is incomplete")
+        parent_path = Path(str(parent["checkpoint_path"]))
+        if (
+            parent.get("kind") != "explicit_shared_epoch79_parent_v1"
+            or not parent_path.is_file()
+            or sha256_file(parent_path) != _sha(parent["checkpoint_sha256"])
+            or _checkpoint_state_sha(parent_path) != _sha(parent["sample_state_sha256"])
+        ):
+            raise RescueHarmError("v3 control shared epoch-79 parent bytes drifted")
+        parent_payload = torch.load(parent_path, map_location="cpu", weights_only=False)
+        if not isinstance(parent_payload, Mapping) or parent_payload.get("epoch") != 79:
+            raise RescueHarmError("v3 control shared parent epoch drifted")
+    else:
+        for key in (
+            "checkpoint_path",
+            "checkpoint_sha256",
+            "sample_state_sha256",
+            "mask_path",
+            "mask_sha256",
+            "selector_bundle_path",
+            "selector_bundle_sha256",
+        ):
+            if key not in parent:
+                raise RescueHarmError("v3 child inventory parent/mask lineage is incomplete")
+        parent_path = Path(str(parent["checkpoint_path"]))
+        if not parent_path.is_file() or sha256_file(parent_path) != _sha(parent["checkpoint_sha256"]):
+            raise RescueHarmError("v3 shared parent checkpoint bytes drifted")
+        if _checkpoint_state_sha(parent_path) != _sha(parent["sample_state_sha256"]):
+            raise RescueHarmError("v3 shared parent sample-state bytes drifted")
+        for path_key, hash_key in (("mask_path", "mask_sha256"), ("selector_bundle_path", "selector_bundle_sha256")):
+            source = Path(str(parent[path_key]))
+            if not source.is_file() or sha256_file(source) != _sha(parent[hash_key]):
+                raise RescueHarmError("v3 mask/bundle bytes drifted")
+    epochs = set(value["requested_epochs"])
+    seen: set[int] = set()
+    for row in value["checkpoints"]:
+        if not isinstance(row, Mapping) or set(row) != {
+            "epoch",
+            "path",
+            "sha256",
+            "sample_state_sha256",
+            "scientific_git_sha",
+        }:
+            raise RescueHarmError("v3 checkpoint inventory row schema drifted")
+        epoch = _integer(row["epoch"], name="v3 checkpoint epoch")
+        if epoch not in epochs or epoch in seen or (value["arm"] != "C" and epoch == 79):
+            raise RescueHarmError("v3 checkpoint epochs must use the shared-parent representation")
+        source = Path(str(row["path"]))
+        if (
+            not source.is_file()
+            or sha256_file(source) != _sha(row["sha256"])
+            or _checkpoint_state_sha(source) != _sha(row["sample_state_sha256"])
+        ):
+            raise RescueHarmError("v3 checkpoint/hash/sample-state drifted")
+        payload = torch.load(source, map_location="cpu", weights_only=False)
+        if (
+            payload.get("epoch") != epoch
+            or payload.get("tracker_run_id") != value["run_id"]
+            or payload.get("config_hash") != value["config_sha256"]
+        ):
+            raise RescueHarmError("v3 checkpoint payload identity drifted")
+        seen.add(epoch)
+    if seen != epochs - {79}:
+        raise RescueHarmError("v3 inventory lacks requested common checkpoint bytes")
+    return value
+
+
+def _v3_selected_ids(parent: Mapping[str, Any]) -> set[int]:
+    if parent.get("kind") in {"shared_parent_control", "explicit_shared_epoch79_parent_v1"}:
+        return set()
+    mask = _json(Path(str(parent["mask_path"])), name="v3 mask")
+    ids = mask.get("selected_ids")
+    if (
+        not isinstance(ids, list)
+        or tuple(ids) != tuple(sorted(ids))
+        or len(ids) != len(set(ids))
+        or any(isinstance(item, bool) or not isinstance(item, int) for item in ids)
+        or selected_ids_sha256(tuple(ids)) != parent.get("selected_ids_sha256")
+    ):
+        raise RescueHarmError("v3 mask selected stable IDs/hash drifted")
+    return set(ids)
 
 
 def replay_inventory(
@@ -376,6 +721,203 @@ def replay_inventory(
         "student_identity": _student_identity(config),
         "runtime": runtime_identity(device),
         "row_count": len(rows),
+        "analysis_provenance": provenance,
+    }
+    output_lineage.parent.mkdir(parents=True, exist_ok=True)
+    output_lineage.write_bytes(canonical_json(lineage) + b"\n")
+    return lineage
+
+
+def replay_v3_inventory(
+    *,
+    resolved_config: Path,
+    inventory_path: Path,
+    output_parquet: Path,
+    output_lineage: Path,
+    device: torch.device,
+    batch_size: int,
+    analysis_seed: int,
+    expected_count: int = 45_000,
+    expected_epochs: Sequence[int] | None = None,
+    emit_epochs: Sequence[int] | None = None,
+) -> dict[str, Any]:
+    """Replay the frozen v3 union, including teacher response on student CE-PGD20 inputs.
+
+    This is intentionally a separate entry point: accepting a v2 inventory here
+    would silently omit the v3 parent/mask and teacher-response contracts.
+    """
+    if output_parquet.exists() or output_lineage.exists():
+        raise FileExistsError("refusing to overwrite rescue/harm replay output")
+    if (
+        device.type not in {"cpu", "cuda"}
+        or (device.type == "cuda" and not torch.cuda.is_available())
+        or batch_size < 1
+    ):
+        raise RescueHarmError("v3 replay device or batch size is invalid")
+    provenance = _tracked_clean_provenance()
+    inventory = _load_v3_inventory(inventory_path)
+    if expected_epochs is not None and tuple(expected_epochs) != tuple(inventory["requested_epochs"]):
+        raise RescueHarmError("v3 replay --epoch selection does not match the immutable inventory epochs")
+    emitted = tuple(
+        (
+            inventory["requested_epochs"]
+            if inventory["arm"] == "C"
+            else [epoch for epoch in inventory["requested_epochs"] if epoch != 79]
+        )
+        if emit_epochs is None
+        else emit_epochs
+    )
+    if (
+        not emitted
+        or emitted != tuple(sorted(set(emitted)))
+        or not set(emitted).issubset(inventory["requested_epochs"])
+    ):
+        raise RescueHarmError("v3 replay emitted epochs must be a non-empty immutable inventory subset")
+    evaluation = load_resolved_config_for_evaluation(resolved_config)
+    config = evaluation.config
+    if config.teacher is None or evaluation.raw_config_hash != inventory["config_sha256"]:
+        raise RescueHarmError("v3 resolved config does not match immutable inventory")
+    if (
+        config.teacher.model_dump(mode="json") != inventory["teacher"]
+        or config.dataset.name != "cifar10"
+        or config.dataset.split != "train"
+    ):
+        raise RescueHarmError("v3 teacher/dataset identity drifted")
+    _ce_pgd20(config)
+    loader = build_replay_loader(config, batch_size=batch_size)
+    if expected_count < 1 or len(loader.dataset) != expected_count:
+        raise RescueHarmError("v3 replay requires the exact frozen stable train-ID population")
+    selected_ids = _v3_selected_ids(inventory["parent"])
+    if selected_ids and not selected_ids.issubset(
+        {int(item) for batch in loader for item in batch.sample_ids.tolist()}
+    ):
+        raise RescueHarmError("v3 mask is outside the frozen train stable-ID population")
+    teacher = build_teacher(config.teacher, tier=config.tier).to(device).eval()
+    if any(parameter.requires_grad for parameter in teacher.parameters()):
+        raise RescueHarmError("v3 replay teacher is not frozen")
+    rows: list[dict[str, Any]] = []
+    source_rows = {int(row["epoch"]): row for row in inventory["checkpoints"]}
+    parent = inventory["parent"]
+    source_rows[79] = {"epoch": 79, "path": parent["checkpoint_path"], "sha256": parent["checkpoint_sha256"]}
+    attack = LinfPGD(config.method.selection_attack)
+    anchor: torch.nn.Module | None = None
+    for epoch in inventory["requested_epochs"]:
+        source = source_rows[epoch]
+        student = build_student(config.student, tier=config.tier).to(device)
+        payload = load_saved_student_checkpoint(Path(str(source["path"])), student)
+        if not isinstance(payload, Mapping) or REQUIRED_KEYS.difference(payload) or payload.get("epoch") != epoch:
+            raise RescueHarmError("v3 replay checkpoint payload drifted")
+        student.eval()
+        if inventory["arm"].startswith("PF-") and epoch == 79:
+            anchor = student
+        if inventory["arm"].startswith("PF-") and anchor is None:
+            raise RescueHarmError("v3 PF replay cannot derive anchor alignment from shared epoch-79 parent")
+        if epoch not in emitted:
+            continue
+        for batch_index, raw_batch in enumerate(loader):
+            batch = raw_batch.to(device)
+            generator = torch.Generator(device=device).manual_seed(analysis_seed + 1_000_003 * batch_index)
+            with torch.no_grad(), torch.autocast(device_type=device.type, enabled=False):
+                clean_logits = student(batch.images.float()).float()
+            result = attack.generate(
+                AttackRequest(inputs=batch.images, labels=batch.labels, student=student, generator=generator)
+            )
+            if result.max_abs_delta > float(config.method.selection_attack.epsilon_value) + 1e-7:
+                raise RescueHarmError("v3 CE-PGD20 replay violated pixel-space Linf bound")
+            with torch.no_grad(), torch.autocast(device_type=device.type, enabled=False):
+                robust_logits = student(result.adversarial.float()).float()
+                teacher_clean_logits = teacher(batch.images.float()).float()
+                teacher_adversarial_logits = teacher(result.adversarial.float()).float()
+                tc = _teacher_primitives(teacher_clean_logits, batch.labels)
+                ta = _teacher_primitives(teacher_adversarial_logits, batch.labels)
+                kl = _teacher_response_kl(teacher_clean_logits, teacher_adversarial_logits)
+                clean_prediction, clean_correct, clean_margin = _primitives(clean_logits, batch.labels)
+                robust_prediction, robust_correct, robust_margin = _primitives(robust_logits, batch.labels)
+                if anchor is not None:
+                    ac = _primitives(anchor(batch.images.float()).float(), batch.labels)[2]
+                    aa = _primitives(anchor(result.adversarial.float()).float(), batch.labels)[2]
+                else:
+                    ac = aa = None
+            route = "control" if inventory["arm"] == "C" else ("PF" if inventory["arm"].startswith("PF-") else "NR")
+            active = bool(epoch >= 80 and ((route == "PF" and epoch <= 129) or (route == "NR" and epoch <= 99)))
+            identity = (
+                "control"
+                if route == "control"
+                else "pf_teacher_0.75_anchor_0.25_epochs80_129"
+                if route == "PF"
+                else "nr_prefix_pgd5_selected_epochs80_99_else_pgd10"
+            )
+            for offset, sample_id in enumerate(batch.sample_ids.tolist()):
+                is_selected = int(sample_id) in selected_ids
+                rows.append(
+                    {
+                        "namespace": "train",
+                        "run_id": inventory["run_id"],
+                        "arm": inventory["arm"],
+                        "seed": inventory["seed"],
+                        "epoch": epoch,
+                        "sample_id": int(sample_id),
+                        "class_id": int(batch.labels[offset]),
+                        "clean_prediction": int(clean_prediction[offset]),
+                        "clean_correct": bool(clean_correct[offset]),
+                        "clean_probability_margin": float(clean_margin[offset]),
+                        "robust_prediction": int(robust_prediction[offset]),
+                        "robust_correct": bool(robust_correct[offset]),
+                        "robust_probability_margin": float(robust_margin[offset]),
+                        "teacher_clean_prediction": int(tc["prediction"][offset]),
+                        "teacher_clean_correct": bool(tc["correct"][offset]),
+                        "teacher_clean_true_probability": float(tc["true"][offset]),
+                        "teacher_clean_probability_margin": float(tc["margin"][offset]),
+                        "teacher_clean_entropy_normalized": float(tc["entropy"][offset]),
+                        "teacher_adversarial_prediction": int(ta["prediction"][offset]),
+                        "teacher_adversarial_correct": bool(ta["correct"][offset]),
+                        "teacher_adversarial_true_probability": float(ta["true"][offset]),
+                        "teacher_adversarial_probability_margin": float(ta["margin"][offset]),
+                        "teacher_adversarial_entropy_normalized": float(ta["entropy"][offset]),
+                        "teacher_clean_to_adversarial_kl": float(kl[offset]),
+                        "teacher_clean_to_adversarial_prediction_flip": bool(
+                            tc["prediction"][offset] != ta["prediction"][offset]
+                        ),
+                        "teacher_clean_to_adversarial_true_probability_delta": float(
+                            ta["true"][offset] - tc["true"][offset]
+                        ),
+                        "teacher_clean_to_adversarial_margin_delta": float(ta["margin"][offset] - tc["margin"][offset]),
+                        "route": route,
+                        "mask_selected": is_selected,
+                        "intervention_active": bool(active and is_selected),
+                        "intervention_identity": identity,
+                        "pf_anchor_clean_probability_margin": None if ac is None else float(ac[offset]),
+                        "pf_anchor_adversarial_probability_margin": None if aa is None else float(aa[offset]),
+                    }
+                )
+        if student is not anchor:
+            student.zero_grad(set_to_none=True)
+    expected = expected_count * len(emitted)
+    if len(rows) != expected:
+        raise RescueHarmError("v3 replay lacks exact stable-ID coverage")
+    write_sample_parquet(sorted(rows, key=lambda row: (int(row["epoch"]), int(row["sample_id"]))), output_parquet)
+    lineage = {
+        "schema_version": 3,
+        "contract": "prescriptive_v3_rescue_harm_replay_v1",
+        "observations_sha256": sha256_file(output_parquet),
+        "inventory_sha256": sha256_file(inventory_path),
+        "run_id": inventory["run_id"],
+        "arm": inventory["arm"],
+        "seed": inventory["seed"],
+        "requested_epochs": list(emitted),
+        "parent_epochs": inventory["requested_epochs"],
+        "config_sha256": inventory["config_sha256"],
+        "scientific_git_sha": inventory["scientific_git_sha"],
+        "teacher": inventory["teacher"],
+        "dataset_identity": inventory["dataset_identity"],
+        "attack_identity": inventory["attack_identity"],
+        "source_manifest_sha256": inventory["source_manifest_sha256"],
+        "source_resolved_config_sha256": inventory["source_resolved_config_sha256"],
+        "parent": inventory["parent"],
+        "checkpoints": inventory["checkpoints"],
+        "analysis_seed": analysis_seed,
+        "row_count": len(rows),
+        "observation_columns": list(V3_OBSERVATION_COLUMNS),
         "analysis_provenance": provenance,
     }
     output_lineage.parent.mkdir(parents=True, exist_ok=True)
@@ -534,6 +1076,90 @@ def merge_epoch_replays(
     output_lineage.parent.mkdir(parents=True, exist_ok=True)
     output_lineage.write_bytes(canonical_json(lineage) + b"\n")
     return lineage
+
+
+def merge_v3_epoch_replays(
+    *, inputs: Mapping[int, tuple[Path, Path]], output_parquet: Path, output_lineage: Path
+) -> dict[str, Any]:
+    """Merge v3 smoke replays, retaining one shared epoch-79 parent row set."""
+    if output_parquet.exists() or output_lineage.exists():
+        raise FileExistsError("refusing to overwrite merged rescue/harm replay output")
+    if set(inputs) != set(V3_EPOCHS):
+        raise RescueHarmError("v3 merge requires exactly one input for each frozen common epoch")
+    lineages: dict[int, dict[str, Any]] = {}
+    rows_by_epoch: dict[int, list[dict[str, Any]]] = {}
+    identity_keys = (
+        "run_id",
+        "arm",
+        "seed",
+        "config_sha256",
+        "scientific_git_sha",
+        "teacher",
+        "dataset_identity",
+        "attack_identity",
+        "source_manifest_sha256",
+        "source_resolved_config_sha256",
+        "parent",
+        "analysis_seed",
+        "analysis_provenance",
+        "observation_columns",
+    )
+    for epoch in V3_EPOCHS:
+        path, lineage_path = inputs[epoch]
+        lineage = _json(lineage_path, name=f"v3 epoch-{epoch} lineage")
+        requested = tuple(lineage.get("requested_epochs", ()))
+        if (
+            lineage.get("schema_version") != 3
+            or lineage.get("contract") != "prescriptive_v3_rescue_harm_replay_v1"
+            or lineage.get("observations_sha256") != sha256_file(path)
+            or epoch not in requested
+            or requested != tuple(sorted(set(requested)))
+            or not set(requested).issubset(V3_EPOCHS)
+            or tuple(lineage.get("observation_columns", ())) != V3_OBSERVATION_COLUMNS
+        ):
+            raise RescueHarmError("v3 single-epoch replay lineage drifted or mixes a v2 contract")
+        try:
+            import pyarrow.parquet as pq
+
+            rows = [dict(row) for row in pq.read_table(path).to_pylist() if row.get("epoch") == epoch]
+        except Exception as exc:  # pragma: no cover
+            raise RescueHarmError("v3 single-epoch observations are unreadable") from exc
+        if not rows or any(row.get("epoch") != epoch for row in rows):
+            raise RescueHarmError("v3 single-epoch observation epoch drifted")
+        ids = [row.get("sample_id") for row in rows]
+        if any(not isinstance(item, int) for item in ids) or len(ids) != len(set(ids)):
+            raise RescueHarmError("v3 single-epoch stable-ID contract drifted")
+        lineages[epoch], rows_by_epoch[epoch] = lineage, rows
+    reference = lineages[79]
+    if any(any(lineages[epoch].get(key) != reference.get(key) for key in identity_keys) for epoch in V3_EPOCHS[1:]):
+        raise RescueHarmError("v3 single-epoch replay identity drifted")
+    classes = {int(row["sample_id"]): int(row["class_id"]) for row in rows_by_epoch[79]}
+    if any(
+        {int(row["sample_id"]): int(row["class_id"]) for row in rows_by_epoch[epoch]} != classes
+        for epoch in V3_EPOCHS[1:]
+    ):
+        raise RescueHarmError("v3 single-epoch stable ID/class join drifted")
+    rows = [
+        row for epoch in V3_EPOCHS for row in sorted(rows_by_epoch[epoch], key=lambda value: int(value["sample_id"]))
+    ]
+    write_sample_parquet(rows, output_parquet)
+    checkpoints = [
+        row for epoch in V3_EPOCHS for row in lineages[epoch].get("checkpoints", []) if row.get("epoch") == epoch
+    ]
+    output = {
+        **{
+            key: value
+            for key, value in reference.items()
+            if key not in {"observations_sha256", "requested_epochs", "row_count", "checkpoints"}
+        },
+        "observations_sha256": sha256_file(output_parquet),
+        "requested_epochs": list(V3_EPOCHS),
+        "checkpoints": checkpoints,
+        "row_count": len(rows),
+    }
+    output_lineage.parent.mkdir(parents=True, exist_ok=True)
+    output_lineage.write_bytes(canonical_json(output) + b"\n")
+    return output
 
 
 def _resolve_mask_path(bundle: Path, value: object) -> Path:
@@ -905,3 +1531,337 @@ def _float_summary(values: Sequence[float]) -> dict[str, float | int | None]:
         "min": min(values) if values else None,
         "max": max(values) if values else None,
     }
+
+
+def _read_v3_observations(
+    path: Path, lineage_path: Path, *, arm: str, require_parent_epoch: bool = True
+) -> tuple[dict[str, Any], dict[int, dict[int, dict[str, Any]]]]:
+    lineage = _json(lineage_path, name=f"{arm} v3 lineage")
+    required = {
+        "schema_version",
+        "contract",
+        "observations_sha256",
+        "inventory_sha256",
+        "run_id",
+        "arm",
+        "seed",
+        "requested_epochs",
+        "parent_epochs",
+        "config_sha256",
+        "scientific_git_sha",
+        "teacher",
+        "dataset_identity",
+        "attack_identity",
+        "source_manifest_sha256",
+        "source_resolved_config_sha256",
+        "parent",
+        "checkpoints",
+        "analysis_seed",
+        "row_count",
+        "observation_columns",
+        "analysis_provenance",
+    }
+    if (
+        set(lineage) != required
+        or lineage.get("schema_version") != 3
+        or lineage.get("contract") != "prescriptive_v3_rescue_harm_replay_v1"
+        or lineage.get("arm") != arm
+        or lineage.get("observations_sha256") != sha256_file(path)
+    ):
+        raise RescueHarmError("v3 observation lineage drifted or mixes a v2 contract")
+    epochs = tuple(lineage.get("requested_epochs", ()))
+    parent_epochs = tuple(lineage.get("parent_epochs", ()))
+    if (
+        not epochs
+        or epochs != tuple(sorted(set(epochs)))
+        or not set(epochs).issubset(V3_EPOCHS)
+        or (require_parent_epoch and 79 not in epochs)
+        or not parent_epochs
+        or parent_epochs != tuple(sorted(set(parent_epochs)))
+        or not set(epochs).issubset(parent_epochs)
+        or 79 not in parent_epochs
+        or tuple(lineage.get("observation_columns", ())) != V3_OBSERVATION_COLUMNS
+    ):
+        raise RescueHarmError("v3 observations do not contain the frozen common epoch/schema union")
+    try:
+        import pyarrow.parquet as pq
+
+        table = pq.read_table(path)
+    except Exception as exc:  # pragma: no cover
+        raise RescueHarmError("v3 observations are unreadable") from exc
+    if tuple(table.column_names) != V3_OBSERVATION_COLUMNS:
+        raise RescueHarmError("v3 observation parquet schema drifted")
+    panels = {epoch: {} for epoch in epochs}
+    for row in table.to_pylist():
+        epoch, sample_id, class_id = row.get("epoch"), row.get("sample_id"), row.get("class_id")
+        if (
+            epoch not in panels
+            or not isinstance(sample_id, int)
+            or not isinstance(class_id, int)
+            or sample_id in panels[epoch]
+            or row.get("namespace") != "train"
+            or row.get("run_id") != lineage["run_id"]
+            or row.get("arm") != arm
+            or row.get("seed") != lineage["seed"]
+        ):
+            raise RescueHarmError("v3 common epoch/stable-ID row identity drifted")
+        if (
+            not isinstance(row.get("clean_correct"), bool)
+            or not isinstance(row.get("robust_correct"), bool)
+            or not isinstance(row.get("mask_selected"), bool)
+            or not isinstance(row.get("intervention_active"), bool)
+        ):
+            raise RescueHarmError("v3 correctness/mask contract drifted")
+        if arm.startswith("PF-") and (
+            row.get("pf_anchor_clean_probability_margin") is None
+            or row.get("pf_anchor_adversarial_probability_margin") is None
+        ):
+            raise RescueHarmError("v3 PF anchor alignment is unavailable; refusing to fabricate it")
+        if not arm.startswith("PF-") and (
+            row.get("pf_anchor_clean_probability_margin") is not None
+            or row.get("pf_anchor_adversarial_probability_margin") is not None
+        ):
+            raise RescueHarmError("v3 non-PF row contains fabricated anchor alignment")
+        panels[epoch][sample_id] = dict(row)
+    if lineage["row_count"] != sum(len(panel) for panel in panels.values()) or any(
+        not panel for panel in panels.values()
+    ):
+        raise RescueHarmError("v3 observation row count drifted")
+    reference = panels[79] if 79 in panels else panels[epochs[0]]
+    if any(
+        set(panel) != set(reference)
+        or any(panel[item]["class_id"] != reference[item]["class_id"] for item in reference)
+        for panel in panels.values()
+    ):
+        raise RescueHarmError("v3 stable sparse ID/class join drifted")
+    return lineage, panels
+
+
+def smoke_v3_report(
+    *, observations: Path, lineage: Path, arm: str, epoch: int, expected_count: int, output: Path
+) -> dict[str, Any]:
+    """Validate one v3 target replay without constructing paired outcomes."""
+    if output.exists():
+        raise FileExistsError("refusing to overwrite v3 smoke report")
+    if arm not in V3_ARMS or epoch not in V3_EPOCHS:
+        raise RescueHarmError("v3 smoke report arm/epoch is invalid")
+    meta, panels = _read_v3_observations(observations, lineage, arm=arm, require_parent_epoch=False)
+    if tuple(meta["requested_epochs"]) != (epoch,) or epoch not in panels or len(panels[epoch]) != expected_count:
+        raise RescueHarmError(
+            "v3 smoke report requires exactly one emitted target epoch and expected sparse population"
+        )
+    rows = panels[epoch]
+    if any(row["class_id"] < 0 or row["class_id"] >= 10 for row in rows.values()):
+        raise RescueHarmError("v3 smoke report class IDs are invalid")
+    result = {
+        "schema_version": 3,
+        "contract": "prescriptive_v3_rescue_harm_smoke_report_v1",
+        "arm": arm,
+        "epoch": epoch,
+        "input_identity": {
+            "observations_sha256": sha256_file(observations),
+            "lineage_sha256": sha256_file(lineage),
+            "parent": meta["parent"],
+            "attack_identity": meta["attack_identity"],
+            "analysis_provenance": meta["analysis_provenance"],
+        },
+        "stable_sparse_ids_sha256": _hash(sorted((sample_id, row["class_id"]) for sample_id, row in rows.items())),
+        "count": len(rows),
+        "intervention": {
+            "active_count": sum(bool(row["intervention_active"]) for row in rows.values()),
+            "identity": sorted({str(row["intervention_identity"]) for row in rows.values()}),
+        },
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(canonical_json(result) + b"\n")
+    return result
+
+
+def report_v3_rescue_harm(
+    *,
+    observations: Mapping[str, tuple[Path, Path]],
+    output: Path,
+    expected_count: int,
+    report_epochs: Sequence[int] = V3_EPOCHS,
+) -> dict[str, Any]:
+    """Point report for v3 moderation and spillover; never an individual causal estimate."""
+    if output.exists():
+        raise FileExistsError("refusing to overwrite rescue/harm report")
+    if set(observations) != set(V3_ARMS):
+        raise RescueHarmError("v3 report requires C/PF-H/PF-R/NR-H/NR-R observations")
+    parsed = {arm: _read_v3_observations(*observations[arm], arm=arm, require_parent_epoch=False) for arm in V3_ARMS}
+    control_meta, control = parsed["C"]
+    source_epochs = tuple(control_meta["requested_epochs"])
+    selected_epochs = tuple(report_epochs)
+    if (
+        not selected_epochs
+        or selected_epochs != tuple(sorted(set(selected_epochs)))
+        or not set(selected_epochs).issubset(source_epochs)
+        or source_epochs != V3_EPOCHS
+        or any(tuple(parsed[arm][0]["requested_epochs"]) != V3_EPOCHS[1:] for arm in V3_ARMS[1:])
+        or any(tuple(parsed[arm][0]["parent_epochs"]) != V3_EPOCHS for arm in V3_ARMS)
+    ):
+        raise RescueHarmError("v3 report epochs do not match one immutable common replay panel")
+    if selected_epochs != V3_EPOCHS and len(selected_epochs) != 1:
+        raise RescueHarmError("v3 smoke report permits exactly one explicit common epoch")
+    ids = set(control[79])
+    identity = ("seed", "dataset_identity", "attack_identity", "teacher", "analysis_seed", "analysis_provenance")
+    if len(ids) != expected_count or any(
+        any(parsed[arm][0].get(key) != control_meta.get(key) for key in identity) for arm in V3_ARMS[1:]
+    ):
+        raise RescueHarmError("v3 arm attack/teacher/seed/dataset identity drifted")
+    c79 = next((row for row in control_meta["checkpoints"] if row.get("epoch") == 79), control_meta["parent"])
+    if not isinstance(c79, Mapping):
+        raise RescueHarmError("v3 control lineage lacks its shared epoch-79 parent checkpoint")
+    c79_sha = c79.get("sha256", c79.get("checkpoint_sha256"))
+    c79_state = c79.get("sample_state_sha256")
+    if not isinstance(c79_sha, str) or not isinstance(c79_state, str):
+        raise RescueHarmError("v3 control shared parent SHA/state is incomplete")
+    child_git = {parsed[arm][0].get("scientific_git_sha") for arm in V3_ARMS[1:]}
+    if len(child_git) != 1:
+        raise RescueHarmError("v3 PF/NR children must share one scientific Git identity")
+    for arm in V3_ARMS[1:]:
+        parent = parsed[arm][0]["parent"]
+        if parent.get("checkpoint_sha256") != c79_sha or parent.get("sample_state_sha256") != c79_state:
+            raise RescueHarmError("v3 child does not bind the control shared epoch-79 parent/state")
+        child_reference = parsed[arm][1][V3_EPOCHS[1]]
+        if set(child_reference) != ids or any(
+            child_reference[item]["class_id"] != control[V3_EPOCHS[1]][item]["class_id"] for item in ids
+        ):
+            raise RescueHarmError("v3 arms do not share one exact sparse-ID/class population")
+    reports: dict[str, Any] = {}
+    for epoch in selected_epochs:
+        reports[str(epoch)] = {}
+        for arm in V3_ARMS[1:]:
+            if epoch == 79:
+                reports[str(epoch)][arm] = {
+                    "shared_parent_baseline": True,
+                    "count": len(ids),
+                    "robust_correct": sum(bool(row["robust_correct"]) for row in control[79].values()),
+                }
+                continue
+            rows = []
+            for sample_id in sorted(ids):
+                c, a = control[epoch][sample_id], parsed[arm][1][epoch][sample_id]
+                rows.append(
+                    {
+                        "category": _category(bool(c["robust_correct"]), bool(a["robust_correct"])),
+                        "selected": bool(a["mask_selected"]),
+                        "clean_transition": f"{int(bool(c['clean_correct']))}->{int(bool(a['clean_correct']))}",
+                        "robust_transition": f"{int(bool(c['robust_correct']))}->{int(bool(a['robust_correct']))}",
+                        "clean_margin_delta": float(a["clean_probability_margin"])
+                        - float(c["clean_probability_margin"]),
+                        "robust_margin_delta": float(a["robust_probability_margin"])
+                        - float(c["robust_probability_margin"]),
+                        "teacher_clean_to_adversarial_kl": float(a["teacher_clean_to_adversarial_kl"]),
+                        "teacher_clean_to_adversarial_true_probability_delta": float(
+                            a["teacher_clean_to_adversarial_true_probability_delta"]
+                        ),
+                        "teacher_clean_to_adversarial_margin_delta": float(
+                            a["teacher_clean_to_adversarial_margin_delta"]
+                        ),
+                        "intervention_active": bool(a["intervention_active"]),
+                        "intervention_identity": str(a["intervention_identity"]),
+                        "pf_anchor_clean_probability_margin": a["pf_anchor_clean_probability_margin"],
+                        "pf_anchor_adversarial_probability_margin": a["pf_anchor_adversarial_probability_margin"],
+                        "student_minus_anchor_clean_margin": None
+                        if a["pf_anchor_clean_probability_margin"] is None
+                        else float(a["clean_probability_margin"]) - float(a["pf_anchor_clean_probability_margin"]),
+                        "student_minus_anchor_robust_margin": None
+                        if a["pf_anchor_adversarial_probability_margin"] is None
+                        else float(a["robust_probability_margin"])
+                        - float(a["pf_anchor_adversarial_probability_margin"]),
+                    }
+                )
+            if sum(_summary(rows)["categories"].values()) != len(rows):
+                raise RescueHarmError("v3 rescue/harm categories are not exhaustive")
+            groups = {
+                "all": rows,
+                "selected": [row for row in rows if row["selected"]],
+                "non_selected": [row for row in rows if not row["selected"]],
+            }
+            reports[str(epoch)][arm] = {
+                "categories": {name: _summary(group) for name, group in groups.items()},
+                "spillover_net_rescue": _summary(groups["non_selected"])["net_rescue"],
+                "transitions": {
+                    name: {
+                        "clean": {
+                            value: sum(row["clean_transition"] == value for row in group)
+                            for value in ("0->0", "0->1", "1->0", "1->1")
+                        },
+                        "robust": {
+                            value: sum(row["robust_transition"] == value for row in group)
+                            for value in ("0->0", "0->1", "1->0", "1->1")
+                        },
+                    }
+                    for name, group in groups.items()
+                },
+                "margin_change": {
+                    name: {
+                        "clean": _float_summary([row["clean_margin_delta"] for row in group]),
+                        "robust": _float_summary([row["robust_margin_delta"] for row in group]),
+                    }
+                    for name, group in groups.items()
+                },
+                "teacher_response": {
+                    name: {
+                        "clean_to_student_adversarial_kl": _float_summary(
+                            [row["teacher_clean_to_adversarial_kl"] for row in group]
+                        ),
+                        "true_probability_delta": _float_summary(
+                            [row["teacher_clean_to_adversarial_true_probability_delta"] for row in group]
+                        ),
+                        "margin_delta": _float_summary(
+                            [row["teacher_clean_to_adversarial_margin_delta"] for row in group]
+                        ),
+                    }
+                    for name, group in groups.items()
+                },
+                "intervention": {
+                    "active_count": sum(row["intervention_active"] for row in rows),
+                    "active_selected_count": sum(row["intervention_active"] and row["selected"] for row in rows),
+                    "identity": sorted({row["intervention_identity"] for row in rows}),
+                    "nr_phase": "pre_window"
+                    if arm.startswith("NR-") and epoch < 80
+                    else "active_window"
+                    if arm.startswith("NR-") and epoch <= 99
+                    else "post_window"
+                    if arm.startswith("NR-")
+                    else "not_applicable",
+                },
+            }
+            if arm.startswith("PF-"):
+                reports[str(epoch)][arm]["pf_anchor_alignment"] = {
+                    name: {
+                        "anchor_clean_margin": _float_summary(
+                            [float(row["pf_anchor_clean_probability_margin"]) for row in group]
+                        ),
+                        "anchor_adversarial_margin": _float_summary(
+                            [float(row["pf_anchor_adversarial_probability_margin"]) for row in group]
+                        ),
+                        "student_minus_anchor_clean_margin": _float_summary(
+                            [float(row["student_minus_anchor_clean_margin"]) for row in group]
+                        ),
+                        "student_minus_anchor_adversarial_margin": _float_summary(
+                            [float(row["student_minus_anchor_robust_margin"]) for row in group]
+                        ),
+                    }
+                    for name, group in groups.items()
+                }
+    result = {
+        "schema_version": 3,
+        "contract": "prescriptive_v3_rescue_harm_report_v1",
+        "exploratory_model_level_moderation_not_identifiable_unit_causal_effect": True,
+        "epochs": list(selected_epochs),
+        "input_identity": {
+            "arm_lineage_sha256": {arm: sha256_file(observations[arm][1]) for arm in V3_ARMS},
+            "shared_parent_checkpoint_sha256": c79_sha,
+            "shared_parent_sample_state_sha256": c79_state,
+            "attack_identity": control_meta["attack_identity"],
+            "arm_scientific_git_sha": {arm: parsed[arm][0]["scientific_git_sha"] for arm in V3_ARMS},
+        },
+        "epochs_report": reports,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(canonical_json(result) + b"\n")
+    return result

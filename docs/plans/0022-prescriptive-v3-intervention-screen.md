@@ -5,8 +5,8 @@
 - Owner: main thread; one Terra implementation owner; one consolidated
   scientific review after formula/resume evidence is stable
 - Development teachers/seeds: Bartoldson L1 seed 1 and L3 seed 2 only
-- Current milestone: M4 eight-arm development queue in progress
-- Last updated: 2026-08-05
+- Current milestone: M5 result closure; Development No-Go
+- Last updated: 2026-08-06
 
 ## Why this screen exists
 
@@ -178,7 +178,7 @@ schedule are not tuned on L1/L3 outcomes.
 - [x] M2 -- create hash-bound H/R forks from both epoch-79 parents and run one
   real-parent one-epoch smoke per mechanism.
 - [x] M3 -- run one consolidated scientific review; fix only P0/P1 findings.
-- [ ] M4 -- launch the eight-arm development queue, monitor automatically, and
+- [x] M4 -- launch the eight-arm development queue, monitor automatically, and
   evaluate Best/Last on validation only.
 - [ ] M5 -- update result docs, commit, push, and merge the coherent milestone.
 
@@ -225,6 +225,27 @@ M2 launch evidence (2026-08-05):
   paired predecessor records `status=completed` at epoch 199 and releases the
   same-host GPU. A failed/cancelled/orphaned predecessor blocks its successor;
   official test and AutoAttack remain unused.
+
+M4 result evidence (2026-08-06):
+
+- all eight children reached epoch 199 with application exit code 0 at Git
+  `97926553ed6773666df915860460b90c353e721d`; four L1 manifests are local and
+  four L3 fixed-SHA remote manifests were read back from Ferret;
+- PF-H minus delayed control, averaged over L1/L3, was `-0.06 pp` Best PGD,
+  `-0.67 pp` Best clean, `-0.23 pp` Last PGD, and `+0.17 pp` RO gap.  PF-H
+  minus matched random was only `+0.04 pp` Best PGD and was negative on L1
+  (`-0.04 pp`);
+- NR-H minus delayed control was `-0.15 pp` Best PGD, `-0.37 pp` Best clean,
+  `-0.43 pp` Last PGD, and `+0.28 pp` RO gap.  NR-H minus matched random was
+  `-0.17 pp` Best PGD (`-0.34/0.00 pp` on L1/L3);
+- neither route met the preregistered `+0.50 pp` mean Best-PGD threshold,
+  per-seed non-negativity, clean, RO, and matched-random gates.  Both treatment
+  families are therefore Development No-Go.  Official test, AutoAttack,
+  Chen, and unused Bartoldson seeds remain sealed.
+
+The follow-up mechanism and prescriptive-utility boundary is frozen in
+[Plan 0023](0023-prescriptive-v3-closure-and-utility-pivot.md).  The v3
+coefficients, durations, masks, and schedules will not be retuned on L1/L3.
 
 ## Test selection
 
