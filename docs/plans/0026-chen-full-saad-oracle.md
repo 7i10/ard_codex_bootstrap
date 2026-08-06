@@ -6,8 +6,8 @@
   after live evidence is stable
 - Host: Hamster GPU 0 only; Ferret is forbidden
 - Base SHA: `3217ca7c1f4523a7efde48e68d0b3431128c4e33`
-- Current milestone: M3 heavy run active; first-epoch gate passed
-- Last updated: 2026-08-06
+- Current milestone: M3 complete; terminal results recorded
+- Last updated: 2026-08-07
 
 ## Question
 
@@ -170,3 +170,18 @@ or lower-batch feasibility run is part of this plan.
   MiB, peak utilization 100%, peak 55 C, and no telemetry errors.  Final SWA,
   final evaluation and in-process AutoAttack remain pending and may add
   substantial time beyond the roughly 6.6-hour training estimate.
+- 2026-08-07: M3 completed successfully (`returncode=0`) after 8 h 08 m 51 s.
+  The upstream final SWA checkpoint reported clean `83.85%`, PGD-20 `56.40%`,
+  C&W `52.98%`, FGSM `61.40%`, and AutoAttack `51.90%`. The output model,
+  launch manifest, stdout, stderr and GPU telemetry are hash-bound in
+  `outputs/upstream/saad-chen-s0-full-6cd0fb3/terminal.json`; peak observed GPU
+  memory was 4,036 MiB and no telemetry error was recorded.
+
+  This closes the **code-oracle run**, not a paper-protocol reproduction. The
+  pinned upstream command uses weight decay `2e-4`, whereas the paper appendix
+  specifies `5e-4`, and this run uses the WRN34-10 teacher while the paper's
+  full-SAAD ERT table reports WRN34-20. Upstream also evaluates the official
+  test during training, saves only final SWA, and has no best/last or resume
+  contract. Therefore the `51.90%` AA value must not be treated as a directly
+  matched paper target or as a controlled comparison with this repository's
+  saved-best RSLAD result.

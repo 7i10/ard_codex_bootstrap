@@ -121,12 +121,13 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 - core seed-0の8 train、8 PGD、8 AutoAttackはすべて完了しました。Student 2セルのAAは事後追加評価です。
 - 複数seedの性能評価は未完了です。student-history信号の2教師×2 seed
   confirmatory blockは完了しましたが、これは性能主張用の3-seed cohortではありません。
-- controlled protocolでのPGD-AT、TRADES直接比較は未着手です。isolated upstream
-  full SAADはBartoldson seed 0の実行準備と実データsmokeまで完了しましたが、論文設定の
+- controlled protocolのPGD-AT seed 0は200 epoch完了し、official test評価待ちです。
+  TRADES seed 0は未着手です。isolated upstream full SAADはChen seed 0のcode-oracleが
+  完了し、Bartoldson seed 0は実行準備と実データsmokeまで完了しましたが、論文設定の
   single-GPU batch 128がHamster RTX 4090でOOMとなり、200 epochは未開始です。
 - PGD-AT/TRADESのcanonical configとCUDA synthetic smoke、および
   Chen/Bartoldson observed RSLAD config/parity gateは準備済みです。
-  PGD-AT/TRADESの200 epoch実験は未開始です。
+  PGD-ATは200 epoch完了、TRADESは未開始です。
 - CIFAR-100、MobileNetV2、Tiny-ImageNet本訓練は未着手です。
 - Best-oriented history-routing v2のdevelopment blockは完了しNo-Goです。停止規則により
   Bartoldson seeds 3/4、Chen no-harm、v2 official PGD/AAは未着手のままです。
@@ -151,6 +152,23 @@ Bartoldson WRN-94-16を24GB single GPUへ載せられないという実行条件
 [`Plan 0025`](plans/0025-full-saad-allocator-retry.md)を参照してください。allocator-only retryは
 fragmentation OOMを避けましたが、残り約834 MiBではresume不能な200 epoch runの安全余裕が不足するため、
 結果を見た後に基準を緩めず停止しました。
+
+### Hamster baseline update（2026-08-07）
+
+| Run | Status | Best / final result | Interpretation |
+|---|---|---|---|
+| Controlled PGD-AT seed 0 | train完了、official test未評価 | val best epoch 102: clean 83.14 / PGD-20 51.80; last: 85.08 / 43.26 | validation RO gap 8.54 pp。official値とは比較しない |
+| Upstream Chen34-10 full SAAD seed 0 | code oracle完了 | final SWA: clean 83.85 / PGD-20 56.40 / C&W 52.98 / AA 51.90 | upstream実行経路の結果。paper-protocol/controlled比較ではない |
+| Controlled TRADES seed 0 | 未着手 | -- | PGD-AT official評価とHamster 2 GPUで並列開始予定 |
+
+Chen upstream oracleは約8時間9分で正常終了しました。commandはupstream既定の
+weight decay `2e-4`で、論文Appendix Bの`5e-4`と異なります。またteacherはWRN34-10であり、
+論文のfull-SAAD ERT表のWRN34-20とは異なります。したがって、controlled Chen/RSLAD best
+AA `51.90%`と数値が同じでも、full SAADが同等または無効と結論しません。
+
+次はHamster GPU 0でPGD-AT best/lastのofficial clean/PGD-20→AutoAttack、GPU 1で
+controlled TRADES seed 0を並列実行します。Ferretは使用しません。両baselineをofficial
+Best/Last/RO gapで閉じるまで、新しいstudent-history介入は開始しません。
 
 ### Student-history confirmatory block（完了）
 

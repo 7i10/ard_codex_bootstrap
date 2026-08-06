@@ -4,9 +4,10 @@
 
 - Owner: main thread
 - Host: Hamster only; Ferret is forbidden
-- Base SHA: `6cd0fb3aef5b2374e208b063e72521c83d930152`
-- Current milestone: PGD-AT seed-0 training active
-- Last updated: 2026-08-06
+- Base SHA: PGD-AT `c2220f11738e8963b922ae379a047a862ffa5915`;
+  TRADES must launch from the then-current clean pushed SHA
+- Current milestone: PGD-AT training complete; official evaluation and TRADES pending
+- Last updated: 2026-08-07
 
 ## Question and order
 
@@ -15,8 +16,13 @@ Run the already implemented teacherless baselines under
 adversarial training:
 
 1. PGD-AT seed 0 on Hamster GPU 1;
-2. TRADES seed 0 on the same GPU only after PGD-AT reaches a valid terminal
-   state and its saved best/last checkpoints are intact.
+2. evaluate its saved best/last checkpoints on official CIFAR-10 test;
+3. run TRADES seed 0 on Hamster in parallel with the PGD-AT evaluation once
+   the PGD-AT terminal state and saved checkpoints are verified.
+
+Ferret is not used. The two Hamster GPUs may run independent saved-checkpoint
+evaluation and training jobs concurrently; there is no scientific dependency
+between them.
 
 These are controlled comparisons, not claims of exact official-paper
 reproduction.  TRADES uses the repository's documented clean-CE plus
@@ -48,7 +54,8 @@ clean-to-adversarial KL implementation with beta 6.
 ## Progress
 
 - [x] B0 -- commit/push this frozen launch record and pass the cheap preflight.
-- [ ] B1 -- launch PGD-AT seed 0 on Hamster GPU 1 and verify first epoch.
+- [x] B1 -- launch PGD-AT seed 0 on Hamster GPU 1, verify first epoch, and
+  validate its successful 200-epoch terminal state.
 - [ ] B2 -- after PGD-AT terminal validation, launch TRADES seed 0 on GPU 1.
 - [ ] B3 -- evaluate both best/last on official clean/PGD-20, then schedule
   AutoAttack only after validation results are recorded without changing the
@@ -89,3 +96,47 @@ to observed accuracy.
   passed (`3 passed, 3 deselected`).  The change is observation-only and does
   not alter scheduler timing, optimizer state or checkpoint contents, so no
   second scientific review cycle was added.
+- 2026-08-07: B1 reached a valid terminal state with 200/200 epoch rows and a
+  finished W&B run (`pgd-at-controlled-s0-c2220f1`). Best was epoch 102:
+  validation clean `83.14%`, validation CE-PGD-20 `51.80%`. Last was epoch
+  199: clean `85.08%`, PGD-20 `43.26%`, an `8.54 pp` best-to-last robust gap.
+  Mean validation PGD accuracy was `46.326%` over epochs 100--199, `45.325%`
+  over 120--199, and `44.698%` over 150--199. Distinct best/last checkpoint
+  epochs, complete state, W&B identity, and SHA-256 values were verified.
+  These are validation results, not official-test results.
+
+## Hamster-only next execution block
+
+1. **GPU 0:** evaluate PGD-AT best and last on official CIFAR-10 clean and
+   CE-PGD-20 from the saved checkpoints. Record the results before starting
+   AutoAttack; then run pinned AutoAttack for best and last in the separate
+   evaluation process.
+2. **GPU 1:** start controlled TRADES seed 0 from the latest clean pushed SHA,
+   with `configs/scientific/cifar10_r18_trades.yaml` unchanged. Reuse the
+   existing CUDA smoke evidence; only perform the cheap environment, config,
+   W&B and GPU preflight.
+3. After TRADES finishes, evaluate its best and last with the same official
+   clean/PGD-20 and AutoAttack contract.
+4. Close the seed-0 baseline screen using official-test Best, Last, and robust
+   overfitting gap only. Do not compare PGD-AT validation values with the
+   existing official RSLAD/entropy table.
+
+This block changes no method based on official-test observations. It closes
+already-frozen baselines. No new student-history intervention is launched:
+Plans 0022/0023 found prediction without actionable Best improvement.
+
+## Decision after B3
+
+- If controlled TRADES is at least as strong as the controlled distillation
+  methods within the uncertainty of one seed, prioritize robust-overfitting and
+  teacher-transfer mechanism analysis rather than another sample-gating v4.
+- If RSLAD materially exceeds TRADES while Chen full-SAAD does not improve over
+  RSLAD, treat teacher transfer as useful but the present SAAD oracle as
+  insufficient evidence for entropy/IGDM gains under the controlled protocol.
+- Do not run Bartoldson upstream full-SAAD on Hamster: exact batch 128 exceeded
+  the preregistered 24-GB safety bound. Batch reduction or two-GPU execution
+  would change the frozen upstream execution identity.
+- A paper-level performance claim requires additional seeds. After seed-0
+  baseline closure, freeze a narrow replication cohort (PGD-AT, TRADES, and the
+  closest controlled distillation baseline) before inspecting any new official
+  test results; do not expand all historical 8 cells.

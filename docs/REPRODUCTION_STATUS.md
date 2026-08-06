@@ -23,7 +23,9 @@ Baseline-readinessのM0–M4は承認済みです。最終bounded T0–T3 gate�
 同一の最終fingerprintの再確認は18 commandsすべて`cached pass`でした。
 Ruff/mypy/import/CLI gateもpassしました。Real teacher取得・audit、Chen pilot、saved-checkpoint PGD evaluation、
 pilot W&B offline-syncに加え、single-GPU seed-0 production 8 train、official PGD-20、saved best/lastへの
-standard AutoAttackを実行済みです。multi-seed集計、full SAAD、追加baselineはdeferredです。
+standard AutoAttackを実行済みです。controlled PGD-AT seed 0 trainingとisolated upstream
+Chen34-10 full-SAAD code oracleも完了しました。PGD-AT official evaluation、controlled
+TRADES、multi-seed集計は未完了です。
 
 全8手法でattackはpixel-space `[0,1]`、`Linf`、`epsilon=8/255`、
 `step_size=2/255`、10 steps、random startです。checkpoint selection attackは同じbudgetのhard-label CEです。
