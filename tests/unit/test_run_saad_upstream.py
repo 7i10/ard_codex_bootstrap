@@ -23,8 +23,8 @@ from scripts.run_saad_upstream import (
     build_runtime_command,
     classify_smoke,
     launch_identity,
+    launch_source_files,
     load_config,
-    main,
     observe_loss_chunk,
     read_available_pipe_bytes,
     runtime_environment,
@@ -34,6 +34,7 @@ from scripts.run_saad_upstream import (
     telemetry_summary,
     upstream_args,
     verify_inputs,
+    verify_smoke_evidence_bundle,
     verify_teacher_logit_evidence,
 )
 
@@ -388,21 +389,132 @@ def test_smoke_loss_event_override_is_execute_only_and_bounded(tmp_path: Path, q
     assert select_smoke_loss_events(config, mode="smoke", execute=True, smoke_loss_events=None) == 2
 
 
-def test_full_execute_is_fail_closed_before_staging_or_output_creation(tmp_path: Path) -> None:
+def _write_smoke_evidence(
+    *,
+    root: Path,
+    config: SAADConfig,
+    config_path: Path,
+    batch: int,
+    events: int,
+    inputs: dict[str, object],
+    teacher_evidence: dict[str, object],
+    head: str,
+    peak_memory_mib: int,
+) -> Path:
+    output = root / f"smoke-{batch}"
+    output.mkdir()
+    manifest_path = output / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "terminal": {
+                    "state": "expected_smoke_termination",
+                    "requested_smoke_loss_events": events,
+                    "loss_events": events,
+                    "invalid_loss_tokens": [],
+                },
+                "upstream_args": upstream_args(config=config, batch_size=batch),
+                "launch_identity": {
+                    "ard_git": {"head": head, "dirty": False},
+                    "source_files": launch_source_files(config_path),
+                },
+                "inputs": inputs,
+                "teacher_logit_evidence": {"identity": teacher_evidence["identity"]},
+                "environment": {"PYTORCH_CUDA_ALLOC_CONF": config.pytorch_cuda_alloc_conf},
+                "runtime_provenance": {
+                    "present": True,
+                    "modules": {
+                        "torch": {"version": "2.4.1+cu121"},
+                        "robustbench": {"path": "/fixed/robustbench"},
+                        "saad_stage": {"path": str(output / "stage")},
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output / "telemetry.json").write_text(
+        json.dumps(
+            {
+                "gpu": {
+                    "errors": [],
+                    "peak_memory_mib": peak_memory_mib,
+                    "peak_temperature_c": 45,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path
+
+
+def test_full_execute_requires_hash_bound_two_smoke_bundle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "saad.yaml"
+    config_path.write_text(yaml.safe_dump(_raw_config(tmp_path)), encoding="utf-8")
+    config = load_config(config_path)
+    head = "1" * 40
+    monkeypatch.setattr(
+        "scripts.run_saad_upstream._git",
+        lambda _directory, *arguments: head if arguments == ("rev-parse", "HEAD") else "",
+    )
+    inputs: dict[str, object] = {"dataset": {"sha256": "2" * 64}, "teacher": {"sha256": "3" * 64}}
+    teacher_evidence: dict[str, object] = {"identity": {"sha256": "4" * 64}}
+    smoke16 = _write_smoke_evidence(
+        root=tmp_path,
+        config=config,
+        config_path=config_path,
+        batch=16,
+        events=2,
+        inputs=inputs,
+        teacher_evidence=teacher_evidence,
+        head=head,
+        peak_memory_mib=1400,
+    )
+    smoke128 = _write_smoke_evidence(
+        root=tmp_path,
+        config=config,
+        config_path=config_path,
+        batch=128,
+        events=10,
+        inputs=inputs,
+        teacher_evidence=teacher_evidence,
+        head=head,
+        peak_memory_mib=4000,
+    )
+    bundle = verify_smoke_evidence_bundle(
+        config=config,
+        config_path=config_path,
+        inputs=inputs,
+        teacher_evidence=teacher_evidence,
+        manifest_paths=[smoke16, smoke128],
+    )
+    assert set(bundle["batches"]) == {16, 128}
+    assert bundle["batches"][128]["peak_memory_mib"] == 4000
+
+    telemetry = json.loads((smoke128.parent / "telemetry.json").read_text(encoding="utf-8"))
+    telemetry["gpu"]["peak_memory_mib"] = 22501
+    (smoke128.parent / "telemetry.json").write_text(json.dumps(telemetry), encoding="utf-8")
+    with pytest.raises(SAADLaunchError, match="exceeds 22500"):
+        verify_smoke_evidence_bundle(
+            config=config,
+            config_path=config_path,
+            inputs=inputs,
+            teacher_evidence=teacher_evidence,
+            manifest_paths=[smoke16, smoke128],
+        )
+
+
+def test_full_execute_rejects_missing_smoke_bundle_before_output_creation(tmp_path: Path) -> None:
     config_path = tmp_path / "saad.yaml"
     config_path.write_text(yaml.safe_dump(_raw_config(tmp_path)), encoding="utf-8")
     fresh_output = tmp_path / "full-output"
-    with pytest.raises(SAADLaunchError, match="later P1 evidence gate"):
-        main(
-            [
-                "--config",
-                str(config_path),
-                "--mode",
-                "full",
-                "--execute",
-                "--output-dir",
-                str(fresh_output),
-            ]
+    with pytest.raises(SAADLaunchError, match="exactly two smoke manifests"):
+        verify_smoke_evidence_bundle(
+            config=load_config(config_path),
+            config_path=config_path,
+            inputs={},
+            teacher_evidence={"identity": {}},
+            manifest_paths=[],
         )
     assert not fresh_output.exists()
 

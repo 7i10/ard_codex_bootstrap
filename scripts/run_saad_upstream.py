@@ -98,19 +98,23 @@ def _git(directory: Path, *arguments: str) -> str:
     return completed.stdout.strip()
 
 
-def launch_identity(*, config_path: Path, command: list[str]) -> dict[str, Any]:
-    """Hash every local input that changes an upstream launch's semantics."""
-    source_files = {
+def launch_source_files(config_path: Path) -> dict[str, dict[str, str]]:
+    """Hash every local source/config input that changes launch semantics."""
+    return {
         "launcher": _file_identity(Path(__file__)),
         "runtime_bootstrap": _file_identity(ROOT / "scripts" / "saad_runtime_bootstrap.py"),
         "config": _file_identity(config_path),
         "runtime_lock": _file_identity(ROOT / "requirements" / "saad-upstream-runtime.lock"),
         "teacher_probe": _file_identity(ROOT / "scripts" / "saad_teacher_probe.py"),
     }
+
+
+def launch_identity(*, config_path: Path, command: list[str]) -> dict[str, Any]:
+    """Hash every local input that changes an upstream launch's semantics."""
     return {
         "ard_git": {"head": _git(ROOT, "rev-parse", "HEAD"), "dirty": bool(_git(ROOT, "status", "--porcelain"))},
         "command_sha256": _canonical_sha256(command),
-        "source_files": source_files,
+        "source_files": launch_source_files(config_path),
     }
 
 
@@ -444,6 +448,16 @@ def _write_json_exclusive(path: Path, value: dict[str, Any]) -> None:
         handle.write("\n")
 
 
+def _write_json_atomic(path: Path, value: dict[str, Any]) -> None:
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
+    with temporary.open("w", encoding="utf-8") as handle:
+        json.dump(value, handle, sort_keys=True, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
+
+
 @dataclass(frozen=True)
 class SmokeResult:
     state: str
@@ -521,9 +535,10 @@ def runtime_environment(*, physical_gpu: int, pytorch_cuda_alloc_conf: str) -> d
 class GPUSampler:
     """Best-effort physical-GPU telemetry, independent of CUDA device remapping."""
 
-    def __init__(self, *, physical_gpu: int, interval_seconds: float = 0.5) -> None:
+    def __init__(self, *, physical_gpu: int, interval_seconds: float = 0.5, snapshot_path: Path | None = None) -> None:
         self.physical_gpu = physical_gpu
         self.interval_seconds = interval_seconds
+        self.snapshot_path = snapshot_path
         self.samples: list[dict[str, Any]] = []
         self.errors: list[str] = []
         self._stop = threading.Event()
@@ -561,6 +576,19 @@ class GPUSampler:
                     "temperature_c": temperature_c,
                 }
             )
+            if self.snapshot_path is not None:
+                _write_json_atomic(
+                    self.snapshot_path,
+                    {
+                        "state": "running",
+                        "updated_unix": time.time(),
+                        "gpu": telemetry_summary(
+                            physical_gpu=self.physical_gpu,
+                            samples=self.samples,
+                            errors=self.errors,
+                        ),
+                    },
+                )
         except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
             self.errors.append(str(error))
 
@@ -637,6 +665,103 @@ def verify_teacher_logit_evidence(config: SAADConfig, path: Path) -> dict[str, A
     ):
         raise SAADLaunchError("teacher-logit evidence has invalid measured values")
     return {"identity": _file_identity(path), "comparison": value}
+
+
+def _read_json_mapping(path: Path, *, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SAADLaunchError(f"{label} is unreadable: {error}") from error
+    if not isinstance(value, dict):
+        raise SAADLaunchError(f"{label} must be a JSON mapping")
+    return value
+
+
+def verify_smoke_evidence_bundle(
+    *,
+    config: SAADConfig,
+    config_path: Path,
+    inputs: dict[str, Any],
+    teacher_evidence: dict[str, Any],
+    manifest_paths: list[Path],
+) -> dict[str, Any]:
+    """Validate the two preregistered smokes before a heavy process exists."""
+    if len(manifest_paths) != 2:
+        raise SAADLaunchError("full execution requires exactly two smoke manifests")
+    expected_sources = launch_source_files(config_path)
+    expected_git = _git(ROOT, "rev-parse", "HEAD")
+    if _git(ROOT, "status", "--porcelain"):
+        raise SAADLaunchError("full execution requires a clean ARD Git tree")
+    expected_quotas = {16: 2, 128: 10}
+    observed: dict[int, dict[str, Any]] = {}
+    runtime_identity: Any = None
+    for raw_path in manifest_paths:
+        path = raw_path.resolve()
+        manifest = _read_json_mapping(path, label="smoke manifest")
+        telemetry_path = path.parent / "telemetry.json"
+        telemetry = _read_json_mapping(telemetry_path, label="smoke telemetry")
+        args = manifest.get("upstream_args")
+        if not isinstance(args, list) or "--batch" not in args:
+            raise SAADLaunchError("smoke manifest has no batch identity")
+        try:
+            batch = int(args[args.index("--batch") + 1])
+        except (ValueError, IndexError, TypeError) as error:
+            raise SAADLaunchError("smoke manifest batch identity is malformed") from error
+        if batch not in expected_quotas or batch in observed:
+            raise SAADLaunchError("smoke manifests must contain unique batch 16 and 128 evidence")
+        if args != upstream_args(config=config, batch_size=batch):
+            raise SAADLaunchError(f"batch-{batch} smoke upstream command drift")
+        terminal = manifest.get("terminal")
+        if not isinstance(terminal, dict) or terminal.get("state") != "expected_smoke_termination":
+            raise SAADLaunchError(f"batch-{batch} smoke did not pass")
+        if (
+            terminal.get("requested_smoke_loss_events") != expected_quotas[batch]
+            or terminal.get("loss_events") != expected_quotas[batch]
+        ):
+            raise SAADLaunchError(f"batch-{batch} smoke loss quota mismatch")
+        if terminal.get("invalid_loss_tokens") != []:
+            raise SAADLaunchError(f"batch-{batch} smoke contains invalid losses")
+        identity = manifest.get("launch_identity")
+        if not isinstance(identity, dict) or identity.get("ard_git") != {"head": expected_git, "dirty": False}:
+            raise SAADLaunchError(f"batch-{batch} smoke Git identity mismatch")
+        if identity.get("source_files") != expected_sources:
+            raise SAADLaunchError(f"batch-{batch} smoke source identity mismatch")
+        if manifest.get("inputs") != inputs:
+            raise SAADLaunchError(f"batch-{batch} smoke input identity mismatch")
+        if manifest.get("teacher_logit_evidence", {}).get("identity") != teacher_evidence["identity"]:
+            raise SAADLaunchError(f"batch-{batch} teacher-logit evidence mismatch")
+        if manifest.get("environment", {}).get("PYTORCH_CUDA_ALLOC_CONF") != config.pytorch_cuda_alloc_conf:
+            raise SAADLaunchError(f"batch-{batch} allocator identity mismatch")
+        provenance = manifest.get("runtime_provenance")
+        if not isinstance(provenance, dict) or provenance.get("present") is not True:
+            raise SAADLaunchError(f"batch-{batch} runtime provenance is absent")
+        modules = provenance.get("modules")
+        if isinstance(modules, dict):
+            modules = {key: value for key, value in modules.items() if key != "saad_stage"}
+        if runtime_identity is None:
+            runtime_identity = modules
+        elif modules != runtime_identity:
+            raise SAADLaunchError("smoke runtime/import provenance differs across batches")
+        gpu = telemetry.get("gpu")
+        if not isinstance(gpu, dict) or gpu.get("errors") != []:
+            raise SAADLaunchError(f"batch-{batch} GPU telemetry is invalid")
+        peak = gpu.get("peak_memory_mib")
+        temperature = gpu.get("peak_temperature_c")
+        if not isinstance(peak, int) or not isinstance(temperature, int):
+            raise SAADLaunchError(f"batch-{batch} GPU telemetry peaks are absent")
+        if batch == 128 and peak > 22500:
+            raise SAADLaunchError(f"batch-128 smoke peak memory {peak} MiB exceeds 22500 MiB")
+        if temperature >= 80:
+            raise SAADLaunchError(f"batch-{batch} smoke temperature is unsafe")
+        observed[batch] = {
+            "manifest": _file_identity(path),
+            "telemetry": _file_identity(telemetry_path),
+            "peak_memory_mib": peak,
+            "peak_temperature_c": temperature,
+        }
+    if set(observed) != set(expected_quotas):
+        raise SAADLaunchError("smoke evidence is incomplete")
+    return {"batches": observed, "runtime_import_provenance": runtime_identity}
 
 
 def supervise_smoke(
@@ -758,16 +883,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--smoke-batch-size", choices=(16, 128), type=int)
     parser.add_argument("--smoke-loss-events", type=int)
     parser.add_argument("--teacher-logit-evidence", type=Path)
+    parser.add_argument("--smoke-manifest", type=Path, action="append", default=[])
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--execute", action="store_true", help="execute only after printing/validating frozen identity")
     args = parser.parse_args(argv)
     config = load_config(args.config)
-    if args.execute and args.mode == "full":
-        raise SAADLaunchError("full execution is blocked until the later P1 evidence gate passes")
     if not args.execute and args.teacher_logit_evidence is not None:
         raise SAADLaunchError("--teacher-logit-evidence is execute-only")
     if args.execute and args.teacher_logit_evidence is None:
         raise SAADLaunchError("--teacher-logit-evidence is required for execution")
+    if args.mode != "full" and args.smoke_manifest:
+        raise SAADLaunchError("--smoke-manifest is valid only in full mode")
+    if not args.execute and args.smoke_manifest:
+        raise SAADLaunchError("--smoke-manifest is execute-only")
     requested_events = select_smoke_loss_events(
         config,
         mode=args.mode,
@@ -780,6 +908,17 @@ def main(argv: list[str] | None = None) -> int:
     teacher_logit_evidence = (
         verify_teacher_logit_evidence(config, args.teacher_logit_evidence.resolve())
         if args.teacher_logit_evidence is not None
+        else None
+    )
+    heavy_gate_evidence = (
+        verify_smoke_evidence_bundle(
+            config=config,
+            config_path=args.config.resolve(),
+            inputs=inputs,
+            teacher_evidence=teacher_logit_evidence,
+            manifest_paths=args.smoke_manifest,
+        )
+        if args.execute and args.mode == "full" and teacher_logit_evidence is not None
         else None
     )
     if not args.execute:
@@ -811,6 +950,28 @@ def main(argv: list[str] | None = None) -> int:
     )
     identity = launch_identity(config_path=args.config.resolve(), command=command)
     started = time.time()
+    if args.mode == "full":
+        _write_json_exclusive(
+            config.output_dir / "launch-manifest.json",
+            {
+                "schema_version": 1,
+                "state": "launched",
+                "started_unix": started,
+                "physical_gpu": config.physical_gpu,
+                "command": command,
+                "launch_identity": identity,
+                "inputs": inputs,
+                "teacher_logit_evidence": teacher_logit_evidence,
+                "heavy_gate_evidence": heavy_gate_evidence,
+                "limitations": {
+                    "upstream_resume": False,
+                    "upstream_best_last": False,
+                    "upstream_test_each_epoch": True,
+                    "upstream_final_swa_only": True,
+                    "upstream_autoattack_in_process": True,
+                },
+            },
+        )
     if args.mode == "smoke":
         result = supervise_smoke(
             command,
@@ -831,7 +992,11 @@ def main(argv: list[str] | None = None) -> int:
     else:
         stdout = config.output_dir / "stdout.log"
         stderr = config.output_dir / "stderr.log"
-        sampler = GPUSampler(physical_gpu=config.physical_gpu)
+        sampler = GPUSampler(
+            physical_gpu=config.physical_gpu,
+            interval_seconds=5.0,
+            snapshot_path=config.output_dir / "live-telemetry.json",
+        )
         sampler.start()
         with stdout.open("xb") as out, stderr.open("xb") as err:
             completed = subprocess.run(
@@ -843,6 +1008,7 @@ def main(argv: list[str] | None = None) -> int:
                     physical_gpu=config.physical_gpu,
                     pytorch_cuda_alloc_conf=config.pytorch_cuda_alloc_conf,
                 ),
+                start_new_session=True,
             )
         gpu_telemetry = sampler.stop()
         terminal = {
@@ -859,6 +1025,7 @@ def main(argv: list[str] | None = None) -> int:
             "inputs": inputs,
             "teacher_logit_contract": config.teacher_logit_contract,
             "teacher_logit_evidence": teacher_logit_evidence,
+            "heavy_gate_evidence": heavy_gate_evidence,
             "command": command,
             "launch_identity": identity,
             "upstream_args": upstream_args(config=config, batch_size=batch),
@@ -891,6 +1058,22 @@ def main(argv: list[str] | None = None) -> int:
         },
     )
     _write_json_exclusive(config.output_dir / "telemetry.json", {"mode": args.mode, "gpu": gpu_telemetry, **terminal})
+    if args.mode == "full":
+        terminal_files = {
+            name: _file_identity(config.output_dir / name)
+            for name in ("stdout.log", "stderr.log", "telemetry.json", "runtime-provenance.json")
+            if (config.output_dir / name).is_file()
+        }
+        _write_json_exclusive(
+            config.output_dir / "terminal.json",
+            {
+                "schema_version": 1,
+                "finished_unix": time.time(),
+                "terminal": terminal,
+                "launch_manifest": _file_identity(config.output_dir / "launch-manifest.json"),
+                "files": terminal_files,
+            },
+        )
     print(json.dumps(terminal, sort_keys=True))
     return 0 if terminal["state"] in {"expected_smoke_termination", "completed"} else 1
 

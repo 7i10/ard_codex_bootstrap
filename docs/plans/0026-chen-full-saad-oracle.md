@@ -6,7 +6,7 @@
   after live evidence is stable
 - Host: Hamster GPU 0 only; Ferret is forbidden
 - Base SHA: `3217ca7c1f4523a7efde48e68d0b3431128c4e33`
-- Current milestone: M1 real Chen evidence and bounded smokes
+- Current milestone: M2 heavy-run safety gate
 - Last updated: 2026-08-06
 
 ## Question
@@ -83,7 +83,7 @@ best/last/resume remain explicit limitations.
 - [x] M0 -- whitelist Chen without weakening the Bartoldson contract; add the
   standalone cross-runtime teacher probe and require its hash-bound evidence
   for smoke.  Full execution remains fail-closed.  Focused tests.
-- [ ] M1 -- generate real Chen teacher evidence; run batch-16/2 and
+- [x] M1 -- generate real Chen teacher evidence; run batch-16/2 and
   batch-128/10 smokes once; estimate first-epoch and full cost.
 - [ ] M2 -- on M1 Go only, add the heavy evidence gate, prelaunch manifest and
   crash-resilient terminal evidence, then run one consolidated scientific
@@ -130,3 +130,19 @@ or lower-batch feasibility run is part of this plan.
   until M1 Go and the P1 heavy safeguards are implemented.  Focused launcher
   tests passed (`28 passed`), Ruff passed, and the impact-selected upstream
   regression gate passed (`23 passed, 1 skipped`).
+- 2026-08-06: M1 passed on Hamster GPU 0 from clean SHA `4b09a4c`.  The
+  cross-runtime probe passed with identical argmax, max absolute logit delta
+  `2.384185791015625e-07`, mean delta `5.41098415851593e-08`, and fixed-input
+  SHA-256 `626e4472a39e54c7c28b3af117763b9756c51047f731b698a60b26351b485626`.
+  Batch 16 reached 2/2 finite losses in 5.886 seconds with peak 1,434 MiB.
+  Batch 128 reached 10/10 finite losses in 8.791 seconds with peak 3,978 MiB,
+  98% peak utilization, 43 C, flat final memory, and no telemetry errors.
+  Both terminated only through the expected bounded-smoke supervisor.  This is
+  a gate result, not an accuracy or runtime estimate for 200 epochs.
+- 2026-08-06: M2 implementation binds exactly those two smoke variants to the
+  current clean Git/source/config/input/probe/import/allocator identities,
+  rejects command or resource drift before staging, writes an immutable launch
+  manifest before child creation, atomically refreshes live GPU telemetry, and
+  writes separate terminal file hashes.  The focused launcher suite passed
+  (`29 passed`) before the final one-line exact-command assertion; the complete
+  selected evidence is recorded after the post-change gate below.
