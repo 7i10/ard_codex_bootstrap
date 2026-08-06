@@ -161,11 +161,11 @@ baseline.
 
 - [x] M0 -- record all eight terminal manifests, exact validation results and
   the No-Go decision; freeze this plan.
-- [ ] M1 -- write one hash-bound checkpoint inventory, generalize the existing
+- [x] M1 -- write one hash-bound checkpoint inventory, generalize the existing
   rescue/harm analysis to v3, pass one real-checkpoint/sparse-ID CLI smoke,
   then run only the common-epoch replay and point report.
-- [ ] M2 -- implement and run the offline teacher-response and first-order
-  utility audit only for decision-relevant panels; no training mutation.
+- [ ] M2 -- implement and run the offline teacher-response point audit only.
+  The first-order gradient audit is skipped by its frozen M1 launch gate.
 - [ ] M3 -- run one consolidated scientific review and freeze zero, one, or at
   most two candidate interventions.
 - [ ] M4 -- if and only if M3 admits a candidate, implement its isolated
@@ -235,6 +235,22 @@ synchronization.  GPU jobs are shell processes, not reasoning-agent tasks.
   one-checkpoint smoke path.  Child replay now references the exact shared
   epoch-79 parent without repeating its PGD/teacher inference; only the
   control emits the shared-parent baseline rows.
+- 2026-08-06: the real PF-H epoch-99 public-CLI smoke covered all 45,000
+  sparse train IDs in 250.18 seconds at batch 128; GPU utilization reached
+  100% with 3.8 GiB used.  Ten L1/L3 common-epoch panels and both point
+  reports then completed.  Ferret was occupied by unrelated work, so the 25
+  decision-relevant L3 checkpoints (2.607 GiB) were transferred at about
+  111 MB/s; every checkpoint, config, mask and bundle matched its inventory
+  SHA before Hamster replay.
+- 2026-08-06: M1 did not support the proposed spillover-cancellation
+  mechanism.  At the primary PF epoch 119, selected H net rescue was `-2`
+  on L1 and `+20` on L3, versus matched-R `-17` and `+37`; non-selected H
+  net rescue was `-225` and `+1243`.  At the primary NR epoch 99, selected H
+  was `+14/-4` versus R `-9/+13`.  H benefit and H-over-R direction therefore
+  did not reproduce.  Because PF selected benefit was non-positive on L1 and
+  spillover cancellation was absent on L3, the preregistered gradient-utility
+  audit is a No-Launch.  Only the cheap epoch-79 teacher-response point audit
+  remains in M2.
 
 ## Completion report
 

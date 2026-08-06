@@ -182,30 +182,38 @@ Ferret GPU 2で同一1-epoch workloadを比較した結果、teacher-response観
 startup後にmemory residentとなるため、dataset再配置はsteady-state差の主因ではありません。prefetch/pinned
 transferは未変更で、worker調整後にも残るhost差をprofileする場合だけ追加します。
 
-### ★ Prescriptive v3 intervention screen（実行中）
+### ★ Prescriptive v3 intervention screen（完了、Best目的ではNo-Go）
 
 v2の失敗分析から、Student historyを予後予測として残し、介入をPFの時間的一貫性とNRの入力側learnabilityへ
 分離しました。PFはepoch-79 Student anchorをteacher targetへ25%混合し、NRは同じPGD-10 trajectoryのstep-5
 prefixをepoch 80--99だけ選択サンプルへ使います。true-label hardening、KD weight変更、attack budget変更は
 行いません。詳細な数式、mask、停止基準は[Plan 0022](plans/0022-prescriptive-v3-intervention-screen.md)です。
 
-| 状態 | Host/GPU | Cell | W&B run ID | 現在の証拠 |
+| 状態 | Host | Cell | W&B run ID | Validation Best PGD / Last PGD |
 |---|---|---|---|---|
-| 実行中 | Hamster 0 | L1 / PF-H | `pv3-bart-s1-9792655-pf_ret_h` | epoch 80 smoke完了、val PGD 41.26% |
-| 実行中 | Hamster 1 | L1 / NR-H | `pv3-bart-s1-9792655-nr_pfx_h` | epoch 80 smoke完了、val PGD 38.78% |
-| 実行中 | Ferret 0 | L3 / PF-H | `pv3-bart-s2-9792655-pf_ret_h` | fixed-SHA process / W&B online確認 |
-| 実行中 | Ferret 1 | L3 / NR-H | `pv3-bart-s2-9792655-nr_pfx_h` | fixed-SHA process / W&B online確認 |
-| 実行中 | Ferret 2 | L3 / PF-R | `pv3-bart-s2-9792655-pf_ret_r` | smoke合格後に開始 |
-| 自動待機 | Hamster 0 | L1 / PF-R | `pv3-bart-s1-9792655-pf_ret_r` | PF-Hの正常epoch-199完了後だけ開始 |
-| 自動待機 | Hamster 1 | L1 / NR-R | `pv3-bart-s1-9792655-nr_pfx_r` | NR-Hの正常epoch-199完了後だけ開始 |
-| 自動待機 | Ferret 1 | L3 / NR-R | `pv3-bart-s2-9792655-nr_pfx_r` | NR-Hのremote completed確認後だけ開始 |
+| 完了 | Hamster | L1 / PF-H | `pv3-bart-s1-9792655-pf_ret_h` | 51.72 / 47.38 |
+| 完了 | Hamster | L1 / PF-R | `pv3-bart-s1-9792655-pf_ret_r` | 51.76 / 47.28 |
+| 完了 | Hamster | L1 / NR-H | `pv3-bart-s1-9792655-nr_pfx_h` | 51.72 / 47.32 |
+| 完了 | Hamster | L1 / NR-R | `pv3-bart-s1-9792655-nr_pfx_r` | 52.06 / 47.72 |
+| 完了 | Ferret | L3 / PF-H | `pv3-bart-s2-9792655-pf_ret_h` | 51.78 / 47.54 |
+| 完了 | Ferret | L3 / PF-R | `pv3-bart-s2-9792655-pf_ret_r` | 51.66 / 47.44 |
+| 完了 | Ferret | L3 / NR-H | `pv3-bart-s2-9792655-nr_pfx_h` | 51.60 / 47.20 |
+| 完了 | Ferret | L3 / NR-R | `pv3-bart-s2-9792655-nr_pfx_r` | 51.60 / 48.04 |
 
 全runはGit `97926553ed6773666df915860460b90c353e721d`、1 GPU、batch 128、local BN、
 delayed milestones 120/170へ固定しています。以前のFerret 4-worker profileは有望ですが、このpaired screenでは
 fork契約を変えないため8 workersを維持します。開発結果はvalidationだけで判定し、official test・AutoAttack・
 Chen・未使用seedはGo判定まで封印します。
-Successor queueは`.cache/`内の運用stateであり科学coreには含めません。predecessorがfailed、cancelled、
-orphaned、またはepoch 199未到達なら自動開始せず、成功時だけ同じhost/GPUを再利用します。
+全8 childと2 delayed controlはterminalです。PF-Hの平均Best PGD差はcontrol比`-0.06 pp`、
+NR-Hは`-0.15 pp`で、事前の`+0.50 pp`基準を満たしませんでした。official testとAutoAttackは
+この開発判断に使っていません。
+
+同一CE-PGD20でepoch `79/99/119/129/149/199`を再推論したmechanism auditでも、History対象の
+利益はseed間で再現しませんでした。主endpointのselected net rescueはPF-HがL1 `-2`、L3 `+20`
+（matched random `-17/+37`）、NR-HがL1 `+14`、L3 `-4`（matched random `-9/+13`）です。
+したがってStudent historyは予後信号として残りますが、PF/NRの介入selectorとしてはNo-Goです。
+PFのselected benefitと負のspilloverが両seedで再現しなかったため、高価なgradient-utility replayも
+事前gateに従って実行しません。詳細は[Plan 0023](plans/0023-prescriptive-v3-closure-and-utility-pivot.md)です。
 
 ## 4. 現在の正式結果
 
