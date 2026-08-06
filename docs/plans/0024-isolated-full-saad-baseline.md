@@ -6,7 +6,7 @@
   scientific review after live smoke evidence is stable
 - Host: Hamster only; Ferret is explicitly out of scope
 - Base SHA: `246976064ad1213a16c054b0921f68ae3d914aeb`
-- Current milestone: M1 bounded Hamster smoke
+- Current milestone: complete through mandatory gate failure
 - Last updated: 2026-08-06
 
 ## Goal
@@ -56,14 +56,13 @@ input must match the existing strict adapter before a heavy launch.
 - [x] M0 -- implement strict operational config, runtime lock, artifact
   staging, import provenance, immutable manifest/logs and expected-smoke
   termination.  Do not touch the scientific core.
-- [ ] M1 -- provision the separate pinned runtime, pass dependency/import and
+- [x] M1 -- provision the separate pinned runtime, pass dependency/import and
   teacher-logit preflight, then run one batch-16 forward smoke and one exact
   batch-128 multi-batch smoke on Hamster.
-- [ ] M2 -- estimate time/VRAM and launch Bartoldson full-SAAD seed 0 only if
-  every launch gate below passes.
-- [ ] M3 -- verify first-epoch finite training and PGD-20, then leave the
-  immutable job running or collect its terminal result without starting a
-  second baseline.
+- [x] M2 -- measured exact batch-128 VRAM; the mandatory gate failed and the
+  Bartoldson full-SAAD seed-0 heavy run was correctly not launched.
+- [x] M3 -- not applicable after the mandatory M2 failure; there is no heavy
+  run whose first epoch or PGD-20 can be verified.
 
 ## Bounded smoke contract
 
@@ -175,3 +174,23 @@ the blocker is documented without changing the protocol.  Only an exit-zero
   while the longer failed attempt had measured 5,226 MiB/77%.  The cadence was
   therefore tightened to 0.5 seconds with a schema/peak regression; batch-16
   is rerun once for trustworthy telemetry before batch-128.
+- 2026-08-06: fixed-telemetry batch-16 at clean Git `ff2c931` passed with two
+  finite losses and `expected_smoke_termination` in 8.55 seconds.  Peak GPU-0
+  memory was 5,226 MiB, utilization 71%, temperature 41 C, with 17 telemetry
+  samples and no telemetry error.  The subsequent exact batch-128 smoke failed
+  before its first loss in the teacher input-gradient forward with
+  `torch.OutOfMemoryError`; peak physical memory was 24,080/24,564 MiB,
+  utilization 100% and temperature 43 C.  Runtime/import/source/input lineage
+  remained clean and fixed at `ff2c931`.  By the frozen launch gate, this blocks
+  M2 and the 200-epoch job: no automatic batch reduction, two-GPU conversion or
+  heavy launch was performed.  The failed process did not reach per-epoch test
+  evaluation, save a checkpoint or initialize W&B.
+- 2026-08-06: the consolidated scientific review found no defect in the smoke
+  source/input/import lineage and confirmed the batch-128 OOM as a P0 launch
+  blocker.  It also found two P1 safeguards required before any future heavy
+  authorization: machine-enforced hash-bound smoke/logit/VRAM gates, and a
+  pre-process immutable launch manifest with crash-resilient terminalization.
+  Those are not reasons to weaken this failed gate.  A single preregistered
+  `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` retry was judged an
+  admissible next diagnosis because it changes allocator behavior, not batch,
+  BN, loss, attack, schedule or data; it is handled separately in Plan 0025.

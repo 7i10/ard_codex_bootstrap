@@ -109,14 +109,23 @@ Known upstream observations, not copied behavior:
   does not expose a separate saved-checkpoint evaluation/resume lifecycle or
   distinct best checkpoint. This repository does not use that behavior; full
   SAAD is only available through `scripts/run_saad_upstream.py` as a verified
-  clone subprocess (`--dry-run` by default for inspection).
-- 2026-07-31 preflight verified the exact checkout, but the current `adv`
-  environment cannot import upstream `saad.py`: the checkout-local
+  clone subprocess (validation/command inspection unless `--execute` is
+  supplied with a fresh output directory).
+- The `adv` environment cannot import upstream `saad.py`: checkout-local
   `autoattack` shadows the installed package while pinned RobustBench imports
   `autoattack.state`, which that checkout-local revision does not provide.
-  No training started. Full SAAD requires a separately pinned compatible
-  dependency environment or a documented patch; silently changing which
-  AutoAttack implementation is imported is forbidden.
+  Plan 0024 therefore uses a separate locked Python 3.11.15 / PyTorch 2.4.1
+  runtime and an import-order bootstrap.  It proves pinned RobustBench and the
+  official `autoattack.state` origin first, then restores SAAD's own local
+  `AutoAttack` for the upstream evaluator; both origins and hashes are saved.
+- On 2026-08-06, the real Bartoldson teacher and CIFAR-10 batch-16 smoke passed
+  on Hamster GPU 0 with two finite full-SAAD losses (peak 5,226 MiB).  The exact
+  upstream batch-128 condition failed before its first loss during the teacher
+  input-gradient forward with CUDA OOM (peak 24,080/24,564 MiB).  The frozen
+  gate therefore blocked the 200-epoch run.  No batch reduction, multi-GPU
+  conversion, per-epoch test evaluation, checkpoint or W&B run was started.
+  This is a hardware-fit result for the pinned Bartoldson/full-SAAD runtime,
+  not evidence that the objective itself fails.
 - This repository does not copy an upstream optimizer/scheduler/training
   schedule into the CIFAR templates. Those values are required explicitly as
   environment-expanded inputs until a dependency-complete T4 reproduction

@@ -1,6 +1,6 @@
 # 実験ダッシュボード
 
-科学結果スナップショット: **2026-08-05 JST**
+科学結果スナップショット: **2026-08-06 JST**
 
 このページは、人間が研究目的、条件、確定済み進捗、結果、W&B上のrunの役割を一か所で確認するための
 台帳です。live process状態は本文へ手入力せず、run bundleとW&Bから導出します。
@@ -121,7 +121,9 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 - core seed-0の8 train、8 PGD、8 AutoAttackはすべて完了しました。Student 2セルのAAは事後追加評価です。
 - 複数seedの性能評価は未完了です。student-history信号の2教師×2 seed
   confirmatory blockは完了しましたが、これは性能主張用の3-seed cohortではありません。
-- controlled protocolでのPGD-AT、TRADES、full SAAD直接比較は未着手です。
+- controlled protocolでのPGD-AT、TRADES直接比較は未着手です。isolated upstream
+  full SAADはBartoldson seed 0の実行準備と実データsmokeまで完了しましたが、論文設定の
+  single-GPU batch 128がHamster RTX 4090でOOMとなり、200 epochは未開始です。
 - PGD-AT/TRADESのcanonical configとCUDA synthetic smoke、および
   Chen/Bartoldson observed RSLAD config/parity gateは準備済みです。
   PGD-AT/TRADESの200 epoch実験は未開始です。
@@ -129,6 +131,22 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 - Best-oriented history-routing v2のdevelopment blockは完了しNo-Goです。停止規則により
   Bartoldson seeds 3/4、Chen no-harm、v2 official PGD/AAは未着手のままです。
 - これらを現在のseed-0結果から自動的に開始する設定にはしていません。
+
+### Isolated upstream full SAAD readiness（2026-08-06）
+
+公式checkout `295121c5...`、pinned RobustBench、teacher checkpoint、CIFAR bytes、
+別runtimeとAutoAttack import originをhash固定しました。Ferretは使用していません。
+
+| Gate | Hamster GPU 0 result | 判定 |
+|---|---|---|
+| Bartoldson / full SAAD / batch 16 / 2 batch | finite loss、8.55秒、peak 5,226 MiB、util 71% | pass |
+| Bartoldson / full SAAD / batch 128 / first batch | teacher input-gradient forwardでCUDA OOM、peak 24,080/24,564 MiB | fail |
+| 200 epoch upstream oracle | 未開始 | batch-128 gateによりblocked |
+
+これはfull SAADの科学的効果を否定する結果ではなく、固定したupstream batch 128と
+Bartoldson WRN-94-16を24GB single GPUへ載せられないという実行条件の結果です。
+自動的なbatch縮小・2-GPU化は論文設定/実行identityを変えるため行っていません。詳細は
+[`Plan 0024`](plans/0024-isolated-full-saad-baseline.md)を参照してください。
 
 ### Student-history confirmatory block（完了）
 
