@@ -6,7 +6,7 @@
   after live evidence is stable
 - Host: Hamster GPU 0 only; Ferret is forbidden
 - Base SHA: `3217ca7c1f4523a7efde48e68d0b3431128c4e33`
-- Current milestone: M2 heavy-run safety gate
+- Current milestone: M3 heavy run active; first-epoch evidence pending
 - Last updated: 2026-08-06
 
 ## Question
@@ -85,7 +85,7 @@ best/last/resume remain explicit limitations.
   for smoke.  Full execution remains fail-closed.  Focused tests.
 - [x] M1 -- generate real Chen teacher evidence; run batch-16/2 and
   batch-128/10 smokes once; estimate first-epoch and full cost.
-- [ ] M2 -- on M1 Go only, add the heavy evidence gate, prelaunch manifest and
+- [x] M2 -- on M1 Go only, add the heavy evidence gate, prelaunch manifest and
   crash-resilient terminal evidence, then run one consolidated scientific
   delta review.  Fix/re-review only an actual P0/P1.
 - [ ] M3 -- on Go only, commit/push immutable code, launch 200 epochs on GPU 0,
@@ -146,3 +146,20 @@ or lower-batch feasibility run is part of this plan.
   writes separate terminal file hashes.  The focused launcher suite passed
   (`29 passed`) before the final one-line exact-command assertion; the complete
   selected evidence is recorded after the post-change gate below.
+- 2026-08-06: M2 passed from clean pushed SHA
+  `6cd0fb3aef5b2374e208b063e72521c83d930152`.  The post-change focused and
+  impact-selected launcher suites each passed (`29 passed`).  Fresh bounded
+  smokes passed at 2/2 and 10/10 finite losses; batch 16 peaked at 1,348 MiB
+  and 30 C, while batch 128 peaked at 3,978 MiB, 99% utilization, and 42 C.
+  The hash-bound heavy-gate verifier accepted the exact two-manifest bundle.
+  A consolidated scientific-contract review found no P0/P1; independent-agent
+  review could not be started because the existing thread tree was at its
+  fixed limit, so no repeated reviewer was launched.
+- 2026-08-06: M3 launched as Hamster user service
+  `ard-saad-chen-s0-6cd0fb3.service` on physical GPU 0.  Invocation ID is
+  `b1ed179b4e4e43dba2c33528adc4cf0a`; immutable output is
+  `outputs/upstream/saad-chen-s0-full-6cd0fb3`.  The prelaunch manifest binds
+  the clean source SHA, teacher checkpoint, teacher-logit evidence, both smoke
+  hashes and resource observations.  The process is active and owns 3,806 MiB
+  at launch.  First-epoch train/PGD-20 evidence remains required before M3 is
+  complete.
