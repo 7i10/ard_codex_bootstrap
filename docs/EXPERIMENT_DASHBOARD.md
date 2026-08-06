@@ -141,12 +141,16 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 |---|---|---|
 | Bartoldson / full SAAD / batch 16 / 2 batch | finite loss、8.55秒、peak 5,226 MiB、util 71% | pass |
 | Bartoldson / full SAAD / batch 128 / first batch | teacher input-gradient forwardでCUDA OOM、peak 24,080/24,564 MiB | fail |
-| 200 epoch upstream oracle | 未開始 | batch-128 gateによりblocked |
+| allocator-only batch 128 / 10 batch | 10 finite updates、22.70秒、peak 23,730/24,564 MiB | unsafe headroom No-Go |
+| 200 epoch upstream oracle | 未開始 | preregistered 22,500-MiB safety gateによりblocked |
 
 これはfull SAADの科学的効果を否定する結果ではなく、固定したupstream batch 128と
 Bartoldson WRN-94-16を24GB single GPUへ載せられないという実行条件の結果です。
 自動的なbatch縮小・2-GPU化は論文設定/実行identityを変えるため行っていません。詳細は
-[`Plan 0024`](plans/0024-isolated-full-saad-baseline.md)を参照してください。
+[`Plan 0024`](plans/0024-isolated-full-saad-baseline.md)と
+[`Plan 0025`](plans/0025-full-saad-allocator-retry.md)を参照してください。allocator-only retryは
+fragmentation OOMを避けましたが、残り約834 MiBではresume不能な200 epoch runの安全余裕が不足するため、
+結果を見た後に基準を緩めず停止しました。
 
 ### Student-history confirmatory block（完了）
 

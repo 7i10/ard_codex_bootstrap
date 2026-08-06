@@ -126,6 +126,12 @@ Known upstream observations, not copied behavior:
   conversion, per-epoch test evaluation, checkpoint or W&B run was started.
   This is a hardware-fit result for the pinned Bartoldson/full-SAAD runtime,
   not evidence that the objective itself fails.
+- One preregistered allocator-only follow-up used
+  `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`, without changing the
+  scientific protocol.  Batch 128 then completed ten finite updates, but peak
+  memory was 23,730/24,564 MiB, leaving only about 834 MiB.  It failed the
+  predeclared 22,500-MiB long-run safety ceiling, so the threshold was not
+  relaxed and the non-resumable 200-epoch upstream run remains unstarted.
 - This repository does not copy an upstream optimizer/scheduler/training
   schedule into the CIFAR templates. Those values are required explicitly as
   environment-expanded inputs until a dependency-complete T4 reproduction

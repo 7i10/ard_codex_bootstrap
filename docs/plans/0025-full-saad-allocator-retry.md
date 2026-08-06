@@ -5,7 +5,7 @@
 - Owner: main thread; one Terra implementation owner
 - Host: Hamster GPU 0 only; Ferret is forbidden
 - Base SHA: `ff2c931c32fc90efeff29d4240fcde08804cb5a4`
-- Current milestone: M1 bounded allocator smokes
+- Current milestone: complete; preregistered memory-headroom No-Go
 - Last updated: 2026-08-06
 
 ## Question
@@ -50,12 +50,14 @@ a second allocator setting.
 
 - [x] M0 -- add strict allocator identity, explicit 2/10-event smoke selection
   and fail-closed full mode; focused tests and immutable commit.
-- [ ] M1 -- run batch-16/2 and batch-128/10 bounded smokes on Hamster GPU 0.
-- [ ] M2 -- if and only if M1 is Go, implement the scientific review's P1
-  heavy-launch safeguards: hash-bound successful smoke/logit/VRAM evidence,
-  pre-process immutable launch manifest and crash-resilient terminal evidence.
-- [ ] M3 -- after one delta review, launch the exact heavy run and verify its
-  first finite epoch plus PGD-20.  If M1 is No-Go, document closure instead.
+- [x] M1 -- ran batch-16/2 and batch-128/10 bounded smokes on Hamster GPU 0;
+  both were finite, but batch-128 failed the frozen memory-headroom gate.
+- [x] M2 -- correctly skipped after M1 No-Go.  The scientific review's P1
+  heavy-launch safeguards (hash-bound smoke/logit/VRAM evidence, pre-process
+  immutable launch manifest and crash-resilient terminal evidence) remain
+  mandatory if different hardware later authorizes a heavy launch.
+- [x] M3 -- closed without a heavy run after the preregistered M1 No-Go; no
+  first epoch, per-epoch test evaluation, PGD-20, checkpoint or W&B run exists.
 
 ## Tests
 
@@ -81,3 +83,11 @@ scientific plan and cannot be relabeled as this oracle.
   before checkout/staging/process creation.  Focused verification passed:
   `pytest -q tests/unit/test_run_saad_upstream.py` (`26 passed`), Ruff check and
   format check, `git diff --check`, and impact-selected T0/T1 (`26 passed`).
+- 2026-08-06: at clean Git `02d1921`, allocator batch-16/2 passed in 8.71
+  seconds with peak 4,966 MiB, utilization 86% and temperature 39 C.  Exact
+  batch-128/10 then passed ten finite full-SAAD updates in 22.70 seconds with
+  no telemetry error and flat final memory, but peak memory was 23,730 of
+  24,564 MiB (only about 834 MiB physical headroom).  This exceeds the frozen
+  22,500-MiB ceiling, so M1 is terminal No-Go even though fragmentation no
+  longer caused an immediate OOM.  The threshold was not relaxed after seeing
+  the result, no second allocator was tried and no heavy process was started.
