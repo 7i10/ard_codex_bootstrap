@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from .schema import ExperimentConfig
+from .schema import EvaluationConfig, ExperimentConfig
 
 ENV_PATTERN = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 
@@ -73,6 +73,34 @@ def load_config(path: Path, overrides: list[str] | tuple[str, ...] = ()) -> Expe
     for override in overrides:
         _apply_override(expanded, override)
     return ExperimentConfig.model_validate(expanded)
+
+
+def load_evaluation_config(
+    path: Path,
+    *,
+    training_config: ExperimentConfig,
+    overrides: list[str] | tuple[str, ...] = (),
+) -> ExperimentConfig:
+    """Load a full evaluation config or a strict ``evaluation:`` overlay.
+
+    The sibling resolved training config remains the only source of training
+    identity.  A partial overlay may replace evaluation fields only; omitted
+    fields retain the saved training evaluation contract.
+    """
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("evaluation config must be a YAML mapping")
+    expanded = _expand_environment(raw)
+    for override in overrides:
+        _apply_override(expanded, override)
+    if "schema_version" in expanded:
+        return ExperimentConfig.model_validate(expanded)
+    if set(expanded) != {"evaluation"} or not isinstance(expanded["evaluation"], dict):
+        raise ValueError("partial evaluation config may contain only an evaluation mapping")
+    evaluation = training_config.evaluation.model_dump(mode="json")
+    evaluation.update(expanded["evaluation"])
+    validated = EvaluationConfig.model_validate(evaluation)
+    return training_config.model_copy(update={"evaluation": validated})
 
 
 def load_resolved_config_for_evaluation(path: Path) -> EvaluationResolvedConfig:

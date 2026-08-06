@@ -6,7 +6,7 @@
 - Host: Hamster only; Ferret is forbidden
 - Base SHA: PGD-AT `c2220f11738e8963b922ae379a047a862ffa5915`;
   TRADES must launch from the then-current clean pushed SHA
-- Current milestone: PGD-AT training complete; official evaluation and TRADES pending
+- Current milestone: PGD-AT official PGD complete/AutoAttack active; TRADES active
 - Last updated: 2026-08-07
 
 ## Question and order
@@ -56,7 +56,7 @@ clean-to-adversarial KL implementation with beta 6.
 - [x] B0 -- commit/push this frozen launch record and pass the cheap preflight.
 - [x] B1 -- launch PGD-AT seed 0 on Hamster GPU 1, verify first epoch, and
   validate its successful 200-epoch terminal state.
-- [ ] B2 -- after PGD-AT terminal validation, launch TRADES seed 0 on GPU 1.
+- [x] B2 -- after PGD-AT terminal validation, launch TRADES seed 0 on GPU 1.
 - [ ] B3 -- evaluate both best/last on official clean/PGD-20, then schedule
   AutoAttack only after validation results are recorded without changing the
   frozen training protocol.
@@ -104,6 +104,29 @@ to observed accuracy.
   over 120--199, and `44.698%` over 150--199. Distinct best/last checkpoint
   epochs, complete state, W&B identity, and SHA-256 values were verified.
   These are validation results, not official-test results.
+- 2026-08-07: B2 launched from clean pushed SHA
+  `f0c3acedbdda9b032531bd72f0ec54684bee6d47` as
+  `ard-trades-s0-f0c3ace.service` on Hamster GPU 1. W&B run
+  `trades-controlled-s0-f0c3ace` is online. Epoch 0 was finite: loss
+  `2.29275`, clean/robust train accuracy `22.31%/21.82%`, validation clean/PGD
+  `31.44%/17.52%`, LR/next LR `0.1/0.1`, and 993.1 images/s. No teacher
+  forward occurred, as required for TRADES.
+- 2026-08-07: PGD-AT official saved-checkpoint CE-PGD-20 evaluation completed
+  in W&B run `eval-36f06cb488a12bc3a27a`. Best: clean `82.01%`, PGD-20
+  `51.12%`; last: clean `84.46%`, PGD-20 `41.89%`. The official robust gap is
+  `9.23 pp`. The separate best/last AutoAttack process is active as
+  `ard-eval-pgd-at-s0-aa-f0c3ace.service` on Hamster GPU 0.
+- 2026-08-07: the first PGD evaluation launch failed before dataset/GPU work
+  because the checked-in partial `configs/evaluation/pgd_saved_checkpoint.yaml`
+  was validated as a full experiment config. The successful retry used the
+  complete saved training config. A focused fix now merges a strict
+  evaluation-only overlay onto that saved identity before validation; the
+  overlay cannot mutate method/training identity or bypass AutoAttack opt-in.
+  Ruff passed and two focused offline evaluation regressions passed. A focused
+  mypy invocation reached unrelated pre-existing errors in three imported
+  modules, so it is not recorded as a pass. Scientific delta review found no
+  P0/P1; training config hash, checkpoint hash, threat equality and W&B group
+  remain unchanged.
 
 ## Hamster-only next execution block
 

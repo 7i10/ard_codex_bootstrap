@@ -16,8 +16,8 @@ import torch
 from torch.utils.data import DataLoader
 
 from ard.attacks import LinfPGD
-from ard.config import ExperimentConfig, load_config, save_resolved_config
-from ard.config.loader import load_resolved_config_for_evaluation, resolved_config_dict
+from ard.config import ExperimentConfig, save_resolved_config
+from ard.config.loader import load_evaluation_config, load_resolved_config_for_evaluation, resolved_config_dict
 from ard.config.schema import training_execution_identity
 from ard.data import EpochShuffleSampler, IndexedBatch, build_dataset, collate_indexed
 from ard.engine import config_digest
@@ -166,7 +166,17 @@ def _evaluation_preflight_config(config: ExperimentConfig, training_config: Expe
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    config = load_config(args.config, args.overrides)
+    if args.checkpoint_dir is not None:
+        checkpoint_parent = args.checkpoint_dir.resolve()
+    else:
+        assert args.checkpoint is not None
+        checkpoint_parent = args.checkpoint.resolve().parent
+    training_config_path = args.train_config or (checkpoint_parent / "resolved_config.yaml")
+    if not training_config_path.is_file():
+        raise FileNotFoundError(f"sibling resolved training config is missing: {training_config_path}")
+    resolved_training = load_resolved_config_for_evaluation(training_config_path)
+    training_config = resolved_training.config
+    config = load_evaluation_config(args.config, training_config=training_config, overrides=args.overrides)
     if config.evaluation.dataset is None:
         raise ValueError("evaluation requires evaluation.dataset with an official val or test split")
     if config.evaluation.autoattack and not args.allow_autoattack:
@@ -174,11 +184,6 @@ def main(argv: list[str] | None = None) -> int:
     checkpoints = _checkpoint_paths(
         checkpoint=args.checkpoint, checkpoint_dir=args.checkpoint_dir, selection=config.evaluation.checkpoints
     )
-    training_config_path = args.train_config or (checkpoints[0].parent / "resolved_config.yaml")
-    if not training_config_path.is_file():
-        raise FileNotFoundError(f"sibling resolved training config is missing: {training_config_path}")
-    resolved_training = load_resolved_config_for_evaluation(training_config_path)
-    training_config = resolved_training.config
     _validate_evaluation_tracking_identity(config, training_config)
     # The training config remains the canonical lineage/config-hash source.
     # Only use the evaluation host's already-verified checkpoint location for

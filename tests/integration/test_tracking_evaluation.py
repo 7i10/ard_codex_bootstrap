@@ -323,6 +323,59 @@ def test_saved_checkpoint_evaluation_is_canonical_and_aggregates(offline_run: di
         assert grouped[alias]["mean"] == pytest.approx(by_alias[alias]["pgd_accuracy"])
 
 
+def test_partial_evaluation_overlay_inherits_strict_training_identity(
+    offline_run: dict[str, Any], tmp_path: Path
+) -> None:
+    output: Path = offline_run["output"]
+    overlay = tmp_path / "evaluation-overlay.yaml"
+    overlay.write_text(
+        yaml.safe_dump(
+            {
+                "evaluation": {
+                    "checkpoints": "best",
+                    "panel_size": 1,
+                    "write_sample_stats": False,
+                    "autoattack": False,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    evaluation_output = tmp_path / "overlay-evaluation"
+    assert (
+        evaluate_cli.main(
+            [
+                "--config",
+                str(overlay),
+                "--checkpoint-dir",
+                str(output),
+                "--output",
+                str(evaluation_output),
+            ]
+        )
+        == 0
+    )
+    results = json.loads((evaluation_output / "evaluation-results.json").read_text(encoding="utf-8"))
+    assert len(results) == 1
+    assert results[0]["checkpoint_alias"] == "best"
+    assert results[0]["dataset_identity"]["split"] == "test"
+    assert results[0]["method_identity"] == offline_run["config"].method.model_dump(mode="json")
+    assert results[0]["sample_stats"] is None
+
+
+def test_partial_evaluation_overlay_cannot_mutate_training_identity_or_bypass_autoattack_opt_in(
+    offline_run: dict[str, Any], tmp_path: Path
+) -> None:
+    output: Path = offline_run["output"]
+    overlay = tmp_path / "evaluation-overlay.yaml"
+    overlay.write_text(yaml.safe_dump({"evaluation": {"checkpoints": "best"}}), encoding="utf-8")
+    base_args = ["--config", str(overlay), "--checkpoint-dir", str(output)]
+    with pytest.raises(ValueError, match="may contain only an evaluation mapping"):
+        evaluate_cli.main([*base_args, "method.id=trades"])
+    with pytest.raises(ValueError, match="AutoAttack is opt-in"):
+        evaluate_cli.main([*base_args, "evaluation.autoattack=true"])
+
+
 def test_evaluation_run_bundle_contains_complete_artifact_lineage(offline_run: dict[str, Any]) -> None:
     output: Path = offline_run["output"]
     evaluation_output = output / "evaluation"
