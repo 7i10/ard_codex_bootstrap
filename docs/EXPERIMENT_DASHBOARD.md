@@ -215,6 +215,13 @@ NR-Hは`-0.15 pp`で、事前の`+0.50 pp`基準を満たしませんでした�
 PFのselected benefitと負のspilloverが両seedで再現しなかったため、高価なgradient-utility replayも
 事前gateに従って実行しません。詳細は[Plan 0023](plans/0023-prescriptive-v3-closure-and-utility-pivot.md)です。
 
+epoch-79のteacher responseが実際のrescue対harmをStudent history以上に説明するかも、hash-bound
+held-out auditで確認しました。PF-Hでは`S -> S+T` AUROCがL1 `0.6742 -> 0.5985`、L3
+`0.3308 -> 0.3077`と両方悪化しました。NR-HではL1 `0.8000 -> 0.8500`、L3
+`0.7778 -> 0.8889`と改善しましたが、matched-randomのL1が`0.4599 -> 0.4444`と逆転し、
+事前gateを満たしません。候補routeは0で、bootstrap・新規training・official evaluationは未実行です。
+この開発分岐の結論は、Student historyは`predictable`だが、今回のPF/NRでは`actionable`ではない、です。
+
 ## 4. 現在の正式結果
 
 以下はすべてCIFAR-10 official test **10,000例**です。PGDはCE PGD-20、AAはstandard AutoAttackです。

@@ -5,7 +5,7 @@
 - Owner: main thread; one Terra analysis owner; one consolidated scientific
   review after real reports are stable
 - Branch / base SHA: `master` / `e6aee0b`
-- Current milestone: M0 result and analysis-contract freeze
+- Current milestone: complete -- no intervention candidate nominated
 - Last updated: 2026-08-06
 
 ## Goal
@@ -164,16 +164,18 @@ baseline.
 - [x] M1 -- write one hash-bound checkpoint inventory, generalize the existing
   rescue/harm analysis to v3, pass one real-checkpoint/sparse-ID CLI smoke,
   then run only the common-epoch replay and point report.
-- [ ] M2 -- implement and run the offline teacher-response point audit only.
+- [x] M2 -- implement and run the offline teacher-response point audit only.
   The first-order gradient audit is skipped by its frozen M1 launch gate.
-- [ ] M3 -- run one consolidated scientific review and freeze zero, one, or at
+- [x] M3 -- run one consolidated scientific review and freeze zero, one, or at
   most two candidate interventions.
-- [ ] M4 -- if and only if M3 admits a candidate, implement its isolated
+- [x] M4 -- if and only if M3 admits a candidate, implement its isolated
   boundary, run focused formula/gradient/resume tests and one real-parent
-  smoke, then launch the four-child L1/L3 screen.
-- [ ] M5 -- on Development Go only, execute untouched-seed confirmation,
+  smoke, then launch the four-child L1/L3 screen.  No candidate was admitted,
+  so no implementation or child was launched.
+- [x] M5 -- on Development Go only, execute untouched-seed confirmation,
   Chen no-harm and saved-checkpoint official evaluation.  On No-Go, close the
-  sample-wise branch and complete the negative-result report.
+  sample-wise branch and complete the negative-result report.  The No-Go path
+  was taken; official test and AutoAttack remained sealed.
 
 ## Agent and review budget
 
@@ -251,7 +253,32 @@ synchronization.  GPU jobs are shell processes, not reasoning-agent tasks.
   spillover cancellation was absent on L3, the preregistered gradient-utility
   audit is a No-Launch.  Only the cheap epoch-79 teacher-response point audit
   remains in M2.
+- 2026-08-06: M2a ran from tracked-clean analysis commit
+  `e67abc8024d9352b35e3e4fb7985206bf1765f5e`.  Its hash-bound point report is
+  `76cbf914dc091246994833696d7cebbab41c6cc5febf38c02f371ae513910c06`.
+  For PF-H, adding teacher response to Student history changed held-out AUROC
+  from `0.6742` to `0.5985` on L1 and `0.3308` to `0.3077` on L3.  For NR-H,
+  it changed `0.8000` to `0.8500` and `0.7778` to `0.8889`, with lower log
+  loss on both seeds, but the matched-random sensitivity reversed on L1
+  (`0.4599` to `0.4444`).  PF failed the primary incremental and decile gates;
+  NR failed the preregistered matched-random gate.  The held-out discordant
+  support was also small (PF L1/L3 `23/33`, NR `13/6`).  No route was
+  nominated, no bootstrap was authorized, and no new training was launched.
+- 2026-08-06: the consolidated review found four P1 input-contract gaps
+  (real nested dataset schema, complete CE-PGD20 identity, attack-seed/control
+  identity, and SampleState range validation).  Focused regressions fixed all
+  four; the delta review found no remaining P0/P1.  The completed result is
+  therefore `predictable but not actionable` for the tested PF/NR families.
 
 ## Completion report
 
-Pending M1--M5.
+The completed v3 screen did not improve Best PGD and did not reproduce a
+History-over-random treatment effect.  The offline mechanism audit rejected
+spillover cancellation, and the teacher-response audit nominated neither PF
+nor NR.  Student history remains a strong prognostic signal, but none of the
+tested target-retention or attack-prefix interventions converts it into stable
+treatment utility.  This plan is closed without using official test data,
+AutoAttack, untouched confirmation seeds, Chen no-harm runs, or additional
+200-epoch training.  The next research plan must either change the causal
+intervention question or return to independent baseline closure; it must not
+retune these v3 arms on L1/L3.
