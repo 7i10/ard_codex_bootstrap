@@ -65,6 +65,38 @@ def test_rescue_harm_inventory_cli_prints_its_contract(
     assert json.loads(capsys.readouterr().out) == {"contract": "completed_v2_checkpoint_inventory_v1"}
 
 
+def test_v3_inventory_cli_forwards_resolved_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        "ard.cli.rescue_harm.build_v3_checkpoint_inventory",
+        lambda **kwargs: captured.update(kwargs) or {"contract": "prescriptive_v3_rescue_harm_inventory_v1"},
+    )
+    assert (
+        rescue_harm_main(
+            [
+                "inventory",
+                "--contract",
+                "v3",
+                "--manifest",
+                "manifest.json",
+                "--resolved-config",
+                "config.yaml",
+                "--arm",
+                "PF-H",
+                "--seed",
+                "1",
+                "--output",
+                str(tmp_path / "inventory.json"),
+            ]
+        )
+        == 0
+    )
+    assert captured["resolved_config"] == Path("config.yaml").resolve()
+    assert json.loads(capsys.readouterr().out) == {"contract": "prescriptive_v3_rescue_harm_inventory_v1"}
+
+
 def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 

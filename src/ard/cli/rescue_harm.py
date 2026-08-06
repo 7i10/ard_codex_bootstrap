@@ -110,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise RescueHarmError("v3 inventory arm must be C/PF-H/PF-R/NR-H/NR-R")
             value = build_v3_checkpoint_inventory(
                 manifest=args.manifest.resolve(),
+                resolved_config=args.resolved_config.resolve(),
                 arm=arm,
                 seed=args.seed,
                 output=args.output.resolve(),
