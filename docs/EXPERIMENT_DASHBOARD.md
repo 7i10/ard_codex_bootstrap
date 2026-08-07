@@ -128,7 +128,8 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
   single-GPU batch 128がHamster RTX 4090でOOMとなり、200 epochは未開始です。
   Chen WRN34-20のunmodified/paper-aligned seed-0 pairはsmoke合格後に開始しましたが、
   `Linger=no`のuser managerがlogoutで終了し、epoch 137/134途中で同時停止しました。
-  upstreamにresume checkpointがないため、最終結果は未取得です。
+  upstreamにresume checkpointがないため、最終結果は未取得です。`Linger=yes`確認後、
+  2026-08-07 21:54 JSTに同じclean SHAからU/Pをepoch 0で再起動し、現在実行中です。
 - PGD-AT/TRADESのcanonical configとCUDA synthetic smoke、および
   Chen/Bartoldson observed RSLAD config/parity gateは準備済みです。
   PGD-AT/TRADESはいずれも200 epoch完了です。

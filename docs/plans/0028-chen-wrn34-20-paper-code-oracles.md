@@ -6,7 +6,7 @@
 - Branch / base SHA: `master`; implementation begins from the then-current
   clean pushed SHA
 - Host: Hamster only; Ferret is forbidden
-- Current milestone: M0--M2 complete; M3 interrupted by user-manager shutdown
+- Current milestone: M0--M2 complete; M3 retry active with `Linger=yes`
 - Last updated: 2026-08-07
 
 ## Goal
@@ -259,6 +259,16 @@ remaining paper/code/runtime gap before another oracle method or teacher.
 - The partial common-epoch SWA test PGD trace is not a final result and is not
   compared between arms because it uses official test data. Neither run
   produced the final model, PGD/CW/FGSM result or AutoAttack result.
+- 2026-08-07 21:54 JST: `loginctl` reported `Linger=yes`; both GPUs were idle,
+  the detached execution worktree was clean at
+  `52affda329562d1493cbea1e77154be81b24ac3c`, existing smoke bundles matched,
+  and fresh retry outputs were absent. U/P seed 0 restarted from epoch 0 as
+  `ard-saad-chen3420-u-s0-r1-52affda.service` on GPU 0 and
+  `ard-saad-chen3420-p-s0-r1-52affda.service` on GPU 1. Invocation IDs are
+  `65959f08729e40408fe4af588d895814` and
+  `a7db1a9f43a14af3aa0cbbca912df1ad`. Both reported finite epoch-1 losses,
+  correct source/GPU lineage, about `7.5 GiB` memory, 98% GPU utilization and
+  empty telemetry error lists. No smoke or numerical test was repeated.
 
 ## Completion report
 
