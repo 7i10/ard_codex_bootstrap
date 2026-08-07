@@ -24,6 +24,7 @@ Read `docs/README.md`, `docs/SCIENTIFIC_INVARIANTS.md`, `docs/TEST_STRATEGY.md`,
 - Invoke `bug_investigator` only when the cause is genuinely unclear. A known mechanical failure goes directly to its owning writer with a focused regression.
 - Agent reports contain changed files, exact commands/results, open findings, and decisions only. Do not paste long logs, repeat closed findings, or narrate routine steps.
 - Before a broad gate, run a cheap environment preflight for required Git, external checkout, CUDA/GPU identity, DDP sockets, and optional W&B/Parquet dependencies.
+- Before launching a long-lived `systemd --user` job, require `loginctl show-user "$USER" -p Linger --value` to report `yes`. A transient user service is not detached from logout when linger is disabled; do not treat `systemd-run --user` alone as persistence.
 - Classify bounded work before orchestration. Pure run tagging, read-only reporting, and UI/view organization use an operational fast lane: one owner, focused tests, and no scientific reviewer unless metric semantics, resume, artifacts, or result lineage change.
 - Freeze lineage, resume, cache invalidation, and external-API inputs before handing work to the writer. Aim for one implementation turn; a follow-up requires new live evidence or a concrete review finding.
 - A bounded non-GPU operational change should normally reach focused verification within 15 minutes. If it does not, stop adding scope, report the serial bottleneck, and choose the smallest remaining completion path.

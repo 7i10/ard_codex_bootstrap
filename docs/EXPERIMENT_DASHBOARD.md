@@ -122,10 +122,13 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 - 複数seedの性能評価は未完了です。student-history信号の2教師×2 seed
   confirmatory blockは完了しましたが、これは性能主張用の3-seed cohortではありません。
 - controlled protocolのPGD-AT seed 0は200 epochとofficial test PGD/AutoAttackまで完了しました。
-  TRADES seed 0は200 epochとofficial test PGDまで完了し、AutoAttackを実行中です。
+  TRADES seed 0も200 epochとofficial test PGD/AutoAttackまで完了しました。
   isolated upstream full SAADはChen seed 0のcode-oracleが
   完了し、Bartoldson seed 0は実行準備と実データsmokeまで完了しましたが、論文設定の
   single-GPU batch 128がHamster RTX 4090でOOMとなり、200 epochは未開始です。
+  Chen WRN34-20のunmodified/paper-aligned seed-0 pairはsmoke合格後に開始しましたが、
+  `Linger=no`のuser managerがlogoutで終了し、epoch 137/134途中で同時停止しました。
+  upstreamにresume checkpointがないため、最終結果は未取得です。
 - PGD-AT/TRADESのcanonical configとCUDA synthetic smoke、および
   Chen/Bartoldson observed RSLAD config/parity gateは準備済みです。
   PGD-AT/TRADESはいずれも200 epoch完了です。
@@ -160,23 +163,26 @@ fragmentation OOMを避けましたが、残り約834 MiBではresume不能な20
 |---|---|---|---|
 | Controlled PGD-AT seed 0 | train、official PGD、AA完了 | official best: clean 82.01 / PGD-20 51.12 / AA 47.63; last: clean 84.46 / PGD-20 41.89 / AA 40.36 | official PGD gap 9.23 pp、AA gap 7.27 pp。強いROを確認 |
 | Upstream Chen34-10 full SAAD seed 0 | code oracle完了 | final SWA: clean 83.85 / PGD-20 56.40 / C&W 52.98 / AA 51.90 | upstream実行経路の結果。paper-protocol/controlled比較ではない |
-| Controlled TRADES seed 0 | train、official PGD完了、AA実行中 | official best: clean 81.35 / PGD-20 47.83; last: clean 82.20 / PGD-20 45.46 | official PGD gap 2.37 pp。AA完了までは最終比較しない |
+| Controlled TRADES seed 0 | train、official PGD、AA完了 | official best: clean 81.35 / PGD-20 47.83 / AA 45.14; last: clean 82.20 / PGD-20 45.46 / AA 43.25 | official PGD gap 2.37 pp、AA gap 1.89 pp |
 
 Chen upstream oracleは約8時間9分で正常終了しました。commandはupstream既定の
 weight decay `2e-4`で、論文Appendix Bの`5e-4`と異なります。またteacherはWRN34-10であり、
 論文のfull-SAAD ERT表のWRN34-20とは異なります。したがって、controlled Chen/RSLAD best
 AA `51.90%`と数値が同じでも、full SAADが同等または無効と結論しません。
 
-次は実行中のTRADES best/last AutoAttackを閉じます。その後は
-`Chen2021LTD_WRN34_20`を取得・hash固定し、同一teacher/seedで、(U) pinned upstreamを
-一切変更しないcode oracle（実効weight decay `2e-4`）と、(P) 論文Appendix Bに合わせて
-weight decayだけを`5e-4`へ直すpaper-hyperparameter-aligned variantを比較します。
-Pは厳密な論文再現とは呼びません。詳細とVRAM分岐は
-[`Plan 0028`](plans/0028-chen-wrn34-20-paper-code-oracles.md)に固定します。
+TRADES best/last AutoAttackは完了しました。次は
+`Chen2021LTD_WRN34_20`の同一teacher/seedで、(U) pinned upstreamを一切変更しない
+code oracle（実効weight decay `2e-4`）と、(P) 論文Appendix Bに合わせてweight decayだけを
+`5e-4`へ直すpaper-hyperparameter-aligned variantを完了させます。Pは厳密な論文再現とは
+呼びません。詳細と再実行gateは[`Plan 0028`](plans/0028-chen-wrn34-20-paper-code-oracles.md)に固定します。
 WRN34-20 checkpointの取得・strict registrationとU/P実装は完了しました。checkpointは
 `738,377,702` bytes、SHA-256 `dbfc7cfe...fa28`、`184,531,674` parametersで、二runtime間の
-固定入力logitはexact一致しました。現在はclean committed SHAからU/Pそれぞれのbatch-16/
-batch-128 GPU smokeを行う段階であり、長期runはまだ開始していません。
+固定入力logitはexact一致しました。U/Pそれぞれのbatch-16/batch-128 GPU smokeは合格し、
+WRN34-20はsingle-GPU batch 128で約7.5 GiBに収まりました。最初の長期runはUがepoch 137途中、
+Pがepoch 134途中までfiniteに進みましたが、user manager shutdownで同時停止しました。これはOOMや
+科学値の失敗ではありません。upstreamは最終時にしかmodelを保存しないため、`Linger=yes`をhost
+preflightへ追加した後、同じimmutable SHAからfresh outputへepoch 0再実行します。途中の
+official-test PGD曲線をvariant選択には使いません。
 
 ### Student-history confirmatory block（完了）
 

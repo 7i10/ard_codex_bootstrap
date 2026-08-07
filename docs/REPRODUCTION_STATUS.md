@@ -25,7 +25,8 @@ Ruff/mypy/import/CLI gateもpassしました。Real teacher取得・audit、Chen
 pilot W&B offline-syncに加え、single-GPU seed-0 production 8 train、official PGD-20、saved best/lastへの
 standard AutoAttackを実行済みです。controlled PGD-AT seed 0 trainingとisolated upstream
 Chen34-10 full-SAAD code oracleも完了しました。PGD-AT official evaluation、controlled
-TRADES、multi-seed集計は未完了です。
+TRADESのtrainingおよびofficial best/last PGD-20/AutoAttackも完了しました。
+multi-seed集計は未完了です。
 
 全8手法でattackはpixel-space `[0,1]`、`Linf`、`epsilon=8/255`、
 `step_size=2/255`、10 steps、random startです。checkpoint selection attackは同じbudgetのhard-label CEです。
