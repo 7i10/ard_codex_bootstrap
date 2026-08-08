@@ -1,0 +1,11 @@
+schema_version: 1
+contract: ffnr_strong_replay_ce_pgd20_v1
+run_id: chen-rslad-observed-s1-confirm-v2
+manifest: ../../outputs/scientific/chen-rslad-observed-s1-confirm-v2/run-bundle/manifest.json
+checkpoint_inventory: ../../.cache/analysis/ffnr-strong-replay/l2-checkpoint-inventory.json
+semantic_role: feature
+epochs: [39, 59, 79]
+train_expected_count: 45000
+replay_batch_size: 128
+attack_seed: 20260808
+replay_device_type: cuda

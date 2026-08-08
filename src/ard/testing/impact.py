@@ -110,6 +110,15 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/ffnr_strong_replay.py",
+            "src/ard/cli/ffnr_strong_replay.py",
+            "configs/analysis/ffnr_strong_replay_",
+        ),
+        ("tests/unit/test_ffnr_strong_replay.py",),
+        ("T0", "T1", "T2"),
+    ),
+    (
+        (
             "src/ard/analysis/epoch_metrics.py",
             "src/ard/analysis/wandb_history.py",
             "scripts/analyze_wandb_ro.py",
