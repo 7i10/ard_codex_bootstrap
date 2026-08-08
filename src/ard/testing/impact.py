@@ -119,6 +119,15 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/ffnr_strong_point.py",
+            "src/ard/cli/ffnr_strong_point.py",
+            "configs/analysis/ffnr_strong_point_v1.yaml",
+        ),
+        ("tests/unit/test_ffnr_strong_point.py",),
+        ("T0", "T1", "T2"),
+    ),
+    (
+        (
             "src/ard/analysis/epoch_metrics.py",
             "src/ard/analysis/wandb_history.py",
             "scripts/analyze_wandb_ro.py",
