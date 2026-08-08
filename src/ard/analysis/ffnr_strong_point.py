@@ -174,8 +174,15 @@ def _strong_lineage(
         "requested_epochs",
         "saved_resolved_config_mapping_sha256",
         "manifest_sha256",
+        "checkpoint_inventory",
+        "checkpoint_inventory_sha256",
+        "attack_identity_sha256",
     }
-    if not required.issubset(lineage) or lineage["attack_identity"] != expected_selection_attack():
+    if (
+        not required.issubset(lineage)
+        or lineage["attack_identity"] != expected_selection_attack()
+        or lineage["attack_identity_sha256"] != hashlib.sha256(canonical_json(lineage["attack_identity"])).hexdigest()
+    ):
         raise StrongPointError("strong replay lineage identity/CE-PGD20 contract drifted")
     runtime = lineage["runtime"]
     expected_flags = {
@@ -363,7 +370,7 @@ def _strong_panel(
     return panel
 
 
-def _teacher_wrong_confidence(probabilities: Sequence[float], label: int) -> tuple[float, float]:
+def _teacher_signed_wrong_class_dominance_margin(probabilities: Sequence[float], label: int) -> tuple[float, float]:
     prediction = max(range(10), key=lambda index: probabilities[index])
     wrong = max(value for index, value in enumerate(probabilities) if index != label)
     return float(prediction != label), wrong - probabilities[label]
@@ -387,12 +394,12 @@ def _strong_scores(panel: Mapping[int, Mapping[int, Mapping[str, Any]]], anchor:
             item: float(row["logit_drop"]) for item, row in panel[anchor].items()
         },
         "D_teacher_clean_adversarial_js": {item: float(row["teacher_js"]) for item, row in panel[anchor].items()},
-        "D_teacher_adversarial_wrong_confidence": {
-            item: _teacher_wrong_confidence(row["teacher_adv"], int(row["class_id"]))[1]
+        "D_teacher_signed_wrong_class_dominance_margin": {
+            item: _teacher_signed_wrong_class_dominance_margin(row["teacher_adv"], int(row["class_id"]))[1]
             for item, row in panel[anchor].items()
         },
         "D_teacher_adversarial_incorrect": {
-            item: _teacher_wrong_confidence(row["teacher_adv"], int(row["class_id"]))[0]
+            item: _teacher_signed_wrong_class_dominance_margin(row["teacher_adv"], int(row["class_id"]))[0]
             for item, row in panel[anchor].items()
         },
     }
@@ -567,6 +574,46 @@ def _cross_seed_predictor_mask_stability(
     return rows
 
 
+def _file_identity(path: Path) -> dict[str, str]:
+    if not path.is_file():
+        raise StrongPointError(f"strong point input file is missing: {path}")
+    return {"path": str(path), "sha256": sha256_file(path)}
+
+
+def _replay_contract_identity(lineage: Mapping[str, Any]) -> dict[str, Any]:
+    inventory = lineage.get("checkpoint_inventory")
+    declared_inventory_sha = lineage.get("checkpoint_inventory_sha256")
+    if not isinstance(inventory, str) or not isinstance(declared_inventory_sha, str):
+        raise StrongPointError("strong replay checkpoint inventory lineage is invalid")
+    inventory_identity = _file_identity(Path(inventory))
+    if inventory_identity["sha256"] != declared_inventory_sha:
+        raise StrongPointError("strong replay checkpoint inventory byte hash drifted")
+    requested_epochs = lineage.get("requested_epochs")
+    checkpoints = lineage.get("checkpoints")
+    if not isinstance(requested_epochs, list) or not isinstance(checkpoints, list):
+        raise StrongPointError("strong replay requested checkpoint lineage is invalid")
+    normalized_checkpoints: list[dict[str, Any]] = []
+    for checkpoint in checkpoints:
+        if not isinstance(checkpoint, Mapping):
+            raise StrongPointError("strong replay checkpoint entry is invalid")
+        epoch, path, digest = checkpoint.get("epoch"), checkpoint.get("path"), checkpoint.get("sha256")
+        if isinstance(epoch, bool) or not isinstance(epoch, int) or not isinstance(path, str) or not isinstance(digest, str):
+            raise StrongPointError("strong replay checkpoint entry is invalid")
+        normalized_checkpoints.append({"epoch": epoch, "path": path, "sha256": digest})
+    if [entry["epoch"] for entry in normalized_checkpoints] != requested_epochs:
+        raise StrongPointError("strong replay requested checkpoint epochs drifted")
+    attack = lineage["attack_identity"]
+    if not isinstance(attack, Mapping):
+        raise StrongPointError("strong replay attack identity is invalid")
+    return {
+        "checkpoint_inventory": inventory_identity,
+        "requested_epochs": list(requested_epochs),
+        "requested_checkpoints": normalized_checkpoints,
+        "attack_identity": dict(attack),
+        "attack_identity_sha256": lineage["attack_identity_sha256"],
+    }
+
+
 def analyze_strong_run(
     *,
     label: str,
@@ -611,6 +658,20 @@ def analyze_strong_run(
         validation_manifest=validation_manifest,
         validation_history=validation_history,
     )
+    input_bytes = {
+        "feature_observations": _file_identity(feature_observations),
+        "feature_lineage": _file_identity(feature_lineage),
+        "outcome_observations": _file_identity(outcome_observations),
+        "outcome_lineage": _file_identity(outcome_lineage),
+        "online_states": _file_identity(online_states),
+        "online_lineage": _file_identity(online_lineage),
+        "validation_history": _file_identity(validation_history),
+        "validation_manifest": _file_identity(validation_manifest),
+    }
+    replay_contracts = {
+        "feature": _replay_contract_identity(feature_meta),
+        "outcome": _replay_contract_identity(outcome_meta),
+    }
     feature_epochs, outcome_epochs = tuple(feature_meta["requested_epochs"]), tuple(outcome_meta["requested_epochs"])
     if feature_epochs != ANCHORS or not outcome_epochs or any(anchor >= min(outcome_epochs) for anchor in anchors):
         raise StrongPointError("strong replay epoch coverage creates temporal leakage or omits an anchor")
@@ -699,8 +760,17 @@ def analyze_strong_run(
         "input_identity": {
             **identity,
             "stable_id_class_universe_sha256": expected_universe_sha256,
+            "input_bytes": input_bytes,
+            "strong_replay_contracts": replay_contracts,
         },
         "ground_truth_attack_status": "selection_CE_PGD20_primary_point_analysis",
+        "score_definitions": {
+            "D_teacher_signed_wrong_class_dominance_margin": {
+                "definition": "max_{c!=y} p_T(c|x_adv)-p_T(y|x_adv)",
+                "range": "[-1,1]",
+                "direction": "larger=higher-risk",
+            }
+        },
         "candidates": reports,
         "_point_rows": rows,
         "_formula_masks": masks,

@@ -73,7 +73,7 @@ def _row(sample_id: int, class_id: int, epoch: int, *, wrong: bool) -> dict[str,
 
 
 def _strong_lineage_payload(
-    observations: Path, *, role: str, epochs: tuple[int, ...], expected_count: int, universe: str
+    observations: Path, *, role: str, epochs: tuple[int, ...], expected_count: int, universe: str, inventory: Path
 ) -> dict[str, object]:
     return {
         "contract": "ffnr_strong_replay_ce_pgd20_v1",
@@ -86,9 +86,12 @@ def _strong_lineage_payload(
         "run_id": "chen-run",
         "saved_resolved_config_mapping_sha256": "a" * 64,
         "manifest_sha256": "0" * 64,
+        "checkpoint_inventory": str(inventory),
+        "checkpoint_inventory_sha256": sha256_file(inventory),
         "teacher": {"registry_id": "chen2021_ltd_wrn34_10"},
         "dataset_identity": {"dataset": {"name": "cifar10", "split": "train"}},
         "attack_identity": expected_selection_attack(),
+        "attack_identity_sha256": hashlib.sha256(canonical_json(expected_selection_attack())).hexdigest(),
         "analysis_provenance": {"source_sha256": "c" * 64},
         "runtime": {
             "deterministic_backend": {
@@ -100,7 +103,7 @@ def _strong_lineage_payload(
             }
         },
         "stable_id_class_universe": {"count": expected_count, "sha256": universe},
-        "checkpoints": [{"epoch": epoch, "sha256": "d" * 64} for epoch in epochs],
+        "checkpoints": [{"epoch": epoch, "path": f"/checkpoint-{epoch}.pt", "sha256": "d" * 64} for epoch in epochs],
     }
 
 
@@ -122,18 +125,20 @@ def _inputs(tmp_path: Path) -> tuple[dict[str, Path], str]:
     ]
     pq.write_table(pa.Table.from_pylist(feature_rows), feature)
     pq.write_table(pa.Table.from_pylist(outcome_rows), outcome)
+    inventory = tmp_path / "checkpoint-inventory.json"
+    inventory.write_text("{\"contract\":\"fixture\"}\n")
     feature_lineage, outcome_lineage = tmp_path / "feature.json", tmp_path / "outcome.json"
     feature_lineage.write_text(
         json.dumps(
             _strong_lineage_payload(
-                feature, role="feature", epochs=feature_epochs, expected_count=len(ids), universe=universe
+                feature, role="feature", epochs=feature_epochs, expected_count=len(ids), universe=universe, inventory=inventory
             )
         )
     )
     outcome_lineage.write_text(
         json.dumps(
             _strong_lineage_payload(
-                outcome, role="outcome", epochs=outcome_epochs, expected_count=len(ids), universe=universe
+                outcome, role="outcome", epochs=outcome_epochs, expected_count=len(ids), universe=universe, inventory=inventory
             )
         )
     )
@@ -241,6 +246,38 @@ def test_id_class_join_temporal_leakage_metrics_and_nonoverwrite(tmp_path: Path,
     assert report["input_identity"]["config_hash"] == "a" * 64
     assert report["input_identity"]["scientific_git_sha"] == "b" * 40
     assert report["input_identity"]["seed"] == 1
+    assert set(report["input_identity"]["input_bytes"]) == {
+        "feature_observations",
+        "feature_lineage",
+        "outcome_observations",
+        "outcome_lineage",
+        "online_states",
+        "online_lineage",
+        "validation_history",
+        "validation_manifest",
+    }
+    assert report["input_identity"]["strong_replay_contracts"]["feature"]["attack_identity"] == expected_selection_attack()
+    assert report["score_definitions"]["D_teacher_signed_wrong_class_dominance_margin"] == {
+        "definition": "max_{c!=y} p_T(c|x_adv)-p_T(y|x_adv)",
+        "range": "[-1,1]",
+        "direction": "larger=higher-risk",
+    }
+    history_rows = [json.loads(line) for line in inputs["validation_history"].read_text().splitlines()]
+    history_rows[0]["val_pgd_accuracy"] = 0.401
+    inputs["validation_history"].write_text("\n".join(json.dumps(row) for row in history_rows) + "\n")
+    changed_history_report = analyze_strong_run(
+        label="L2",
+        expected_count=4,
+        expected_universe_sha256=universe,
+        deltas_pp=(1.0,),
+        window_sizes=(3,),
+        thresholds=("majority",),
+        **inputs,
+    )
+    assert (
+        changed_history_report["input_identity"]["input_bytes"]["validation_history"]["sha256"]
+        != report["input_identity"]["input_bytes"]["validation_history"]["sha256"]
+    )
     candidate = next(item for item in report["candidates"] if not item["censored"])
     metrics = candidate["anchors"]["39"]["FF"]["L_adversarial_cross_entropy"]
     assert metrics["positive_count"] == 1 and metrics["auroc"] is not None
@@ -251,6 +288,7 @@ def test_id_class_join_temporal_leakage_metrics_and_nonoverwrite(tmp_path: Path,
         _strong_panel(changed, epochs=(39, 59, 79), expected_count=4, expected_universe_sha256=universe)
     leaked = json.loads(inputs["outcome_lineage"].read_text())
     leaked["requested_epochs"] = [79]
+    leaked["checkpoints"] = [{**leaked["checkpoints"][-1], "epoch": 79}]
     leaked["row_count"] = 4
     inputs["outcome_lineage"].write_text(json.dumps(leaked))
     with pytest.raises(StrongPointError, match="temporal leakage"):
