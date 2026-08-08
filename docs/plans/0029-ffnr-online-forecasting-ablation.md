@@ -144,10 +144,10 @@ separate; means are secondary summaries only.
   sparse-ID joins, FF/NR disjoint completeness, score direction/ties,
   AUROC/AUPRC/top-q, mask stability, domain separation, and no official-test
   input.
-- [ ] Rerun the CPU point analysis on L1--L4 as a five-epoch KL-PGD10 development
+- [x] Rerun the CPU point analysis on L1--L4 as a five-epoch KL-PGD10 development
   sensitivity analysis.  Do not bootstrap until the
   preregistered point comparison requiring it is chosen.
-- [ ] Regenerate a compact GT comparison and feature-availability report for human
+- [x] Regenerate a compact GT comparison and feature-availability report for human
   review.  Do not select an ambiguous GT automatically.
 
 ## GPU follow-up
@@ -204,17 +204,17 @@ one-checkpoint smoke.
 
 ## Completion conditions
 
-- [ ] CPU analysis is reproducible from one command and creates hash-bound,
+- [x] CPU analysis is reproducible from one command and creates hash-bound,
   non-overwriting reports for all four development trajectories.
-- [ ] GT candidate tables expose censoring, prevalence, and overlap without
+- [x] GT candidate tables expose censoring, prevalence, and overlap without
   using prediction performance to select a target.
-- [ ] FF and NR are disjoint and exactly partition future failures at every
+- [x] FF and NR are disjoint and exactly partition future failures at every
   analyzed anchor.
-- [ ] Available L/T/S/D ablations and mask stability metrics are reported per
+- [x] Available L/T/S/D ablations and mask stability metrics are reported per
   teacher and seed; unavailable primitives have explicit reasons.
-- [ ] Focused tests and impact-selected tests have recorded commands/results.
-- [ ] One consolidated scientific review has no unresolved P0/P1.
-- [ ] Current Chen WRN34-20 GPU jobs were not interrupted.
+- [x] Focused tests and impact-selected tests have recorded commands/results.
+- [x] One consolidated scientific review has no unresolved P0/P1.
+- [x] Current Chen WRN34-20 GPU jobs were not interrupted.
 
 ## Progress log
 
@@ -268,3 +268,12 @@ one-checkpoint smoke.
   summaries/Parquet.  The final impact gate selected T0/T1 only and passed
   (`10 + 33` tests).  No unresolved P0/P1 remains in the correctly blocked
   implementation.
+- 2026-08-08: collected the complete L3/L4 Ferret bundles and regenerated the
+  formal point report from clean immutable `44c7ff9`.  It completed in 7m41s
+  with 6.20 GiB peak RSS.  L1/L3 remain censored; L2 has 12 admissible
+  candidates and L4 has 6.  Complete L4 raw/grid Best are 196/194, correcting
+  the rejected truncated-history values 185/174.  The six formula-matched Chen
+  masks have cross-seed Jaccard `0.557--0.615`; no GT or predictor was selected
+  and no bootstrap was launched.  Chen-only CE-PGD20 replay is now authorized
+  for the union of admissible window epochs, while Bartoldson replay remains
+  blocked by missing same-stage checkpoints rather than GPU availability.
