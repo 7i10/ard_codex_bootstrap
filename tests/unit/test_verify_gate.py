@@ -101,6 +101,17 @@ def test_signal_audit_paths_select_only_the_focused_audit_test() -> None:
     assert new_replay.tests == ("tests/unit/test_rslad_signal_replay.py",)
     assert new_replay.tiers == ("T0", "T1")
 
+    ffnr = select(
+        (
+            "src/ard/analysis/ffnr_forecasting.py",
+            "src/ard/cli/ffnr_forecasting.py",
+            "configs/analysis/ffnr_forecasting_v1.yaml",
+        ),
+        (*available, "tests/unit/test_ffnr_forecasting.py", "tests/integration/test_synthetic_training.py"),
+    )
+    assert ffnr.tests == ("tests/unit/test_ffnr_forecasting.py",)
+    assert ffnr.tiers == ("T0", "T1")
+
     logging_state = select(
         ("src/ard/analysis/logging_only_state.py", "src/ard/cli/logging_only_state.py"),
         (*available, "tests/unit/test_logging_only_state.py"),

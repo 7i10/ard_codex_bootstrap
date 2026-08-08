@@ -101,6 +101,15 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/ffnr_forecasting.py",
+            "src/ard/cli/ffnr_forecasting.py",
+            "configs/analysis/ffnr_forecasting_v1.yaml",
+        ),
+        ("tests/unit/test_ffnr_forecasting.py",),
+        ("T0", "T1"),
+    ),
+    (
+        (
             "src/ard/analysis/epoch_metrics.py",
             "src/ard/analysis/wandb_history.py",
             "scripts/analyze_wandb_ro.py",
@@ -414,7 +423,6 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
-            "configs/analysis/",
             "configs/audit/",
             "configs/experiments/",
             "configs/pilot/",

@@ -1,0 +1,50 @@
+schema_version: 1
+contract: ffnr_forecasting_v1
+expected_count: 45000
+cohort_inventory: configs/analysis/h5_confirmatory_cohort.json
+scheduler_stages:
+  - [0, 99]
+  - [100, 149]
+  - [150, 199]
+anchors: [39, 59, 79]
+candidate_grid:
+  deltas_pp: [0.25, 0.5, 1.0]
+  window_sizes: [3, 5, 7]
+  thresholds: [majority, two_thirds, all]
+runs:
+  L1:
+    feature_observations: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L1-feature/feature-observations.parquet
+    feature_lineage: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L1-feature/lineage.json
+    outcome_observations: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L1-outcome/outcome-observations.parquet
+    outcome_lineage: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L1-outcome/lineage.json
+    online_states: .cache/analysis/h5-online-cd56b72/L1/online-anchor-states.parquet
+    online_lineage: .cache/analysis/h5-online-cd56b72/L1/lineage.json
+    validation_history: outputs/scientific/bart-rslad-logging-only-s1-confirm-v1/run-bundle/metrics.jsonl
+    validation_manifest: outputs/scientific/bart-rslad-logging-only-s1-confirm-v1/run-bundle/manifest.json
+  L2:
+    feature_observations: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L2-feature/feature-observations.parquet
+    feature_lineage: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L2-feature/lineage.json
+    outcome_observations: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L2-outcome/outcome-observations.parquet
+    outcome_lineage: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L2-outcome/lineage.json
+    online_states: .cache/analysis/h5-online-cd56b72/L2/online-anchor-states.parquet
+    online_lineage: .cache/analysis/h5-online-cd56b72/L2/lineage.json
+    validation_history: outputs/scientific/chen-rslad-observed-s1-confirm-v2/run-bundle/metrics.jsonl
+    validation_manifest: outputs/scientific/chen-rslad-observed-s1-confirm-v2/run-bundle/manifest.json
+  L3:
+    feature_observations: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L3-feature/feature-observations.parquet
+    feature_lineage: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L3-feature/lineage.json
+    outcome_observations: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L3-outcome/outcome-observations.parquet
+    outcome_lineage: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L3-outcome/lineage.json
+    online_states: .cache/analysis/h5-online-cd56b72/L3/online-anchor-states.parquet
+    online_lineage: .cache/analysis/h5-online-cd56b72/L3/lineage.json
+    validation_history: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/bart-rslad-observed-s2-confirm-v2/outputs/scientific/bart-rslad-observed-s2-confirm-v2/run-bundle/metrics.jsonl
+    validation_manifest: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/bart-rslad-observed-s2-confirm-v2/outputs/scientific/bart-rslad-observed-s2-confirm-v2/run-bundle/manifest.json
+  L4:
+    feature_observations: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L4-feature/feature-observations.parquet
+    feature_lineage: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L4-feature/lineage.json
+    outcome_observations: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L4-outcome/outcome-observations.parquet
+    outcome_lineage: /home/islab/workspace-local/shunsuke.naito/ard-analysis/h5-matrix-6e5dcf5/L4-outcome/lineage.json
+    online_states: .cache/analysis/h5-online-cd56b72/L4/online-anchor-states.parquet
+    online_lineage: .cache/analysis/h5-online-cd56b72/L4/lineage.json
+    validation_history: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/chen-rslad-observed-s2-confirm-v2/outputs/scientific/chen-rslad-observed-s2-confirm-v2/run-bundle/metrics.jsonl
+    validation_manifest: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/chen-rslad-observed-s2-confirm-v2/outputs/scientific/chen-rslad-observed-s2-confirm-v2/run-bundle/manifest.json
