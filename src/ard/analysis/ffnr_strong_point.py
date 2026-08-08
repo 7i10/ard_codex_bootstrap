@@ -429,6 +429,144 @@ def _top_mask(scores: Mapping[int, float]) -> set[int]:
     return {item for item in order if scores[item] >= boundary}
 
 
+def _top_mask_key(key: object) -> tuple[str, int, str, str]:
+    if not isinstance(key, str):
+        raise StrongPointError("top10 mask key is invalid")
+    parts = key.split(":", 4)
+    if len(parts) != 5 or parts[0] != "top10" or not parts[1] or not parts[3] or not parts[4]:
+        raise StrongPointError("top10 mask key is invalid")
+    try:
+        anchor = int(parts[2])
+    except ValueError as exc:
+        raise StrongPointError("top10 mask anchor is invalid") from exc
+    if anchor not in ANCHORS:
+        raise StrongPointError("top10 mask anchor is outside the frozen analysis contract")
+    return parts[1], anchor, parts[3], parts[4]
+
+
+def _selection_metadata(mask: set[int], values: Mapping[int, float], metric: Mapping[str, Any]) -> dict[str, float | int]:
+    top_percent = metric.get("top_percent")
+    summary = top_percent.get("0.1") if isinstance(top_percent, Mapping) else None
+    realized_count = len(mask)
+    realized_fraction = realized_count / len(values) if values else 0.0
+    if isinstance(summary, Mapping):
+        if summary.get("realized_count") != realized_count or not math.isclose(
+            _finite(summary.get("realized_fraction"), name="top10 realized fraction", lo=0, hi=1),
+            realized_fraction,
+            rel_tol=0,
+            abs_tol=1e-12,
+        ):
+            raise StrongPointError("top10 mask and metric realized selection drifted")
+    return {
+        "eligible_count": len(values),
+        "realized_count": realized_count,
+        "realized_fraction": realized_fraction,
+    }
+
+
+def _mask_comparison(
+    before: set[int], after: set[int], before_meta: Mapping[str, object], after_meta: Mapping[str, object]
+) -> dict[str, float | int | None]:
+    def selection(meta: Mapping[str, object], mask: set[int]) -> tuple[int, float]:
+        eligible = meta.get("eligible_count")
+        if isinstance(eligible, bool) or not isinstance(eligible, int) or eligible < 1:
+            raise StrongPointError("top10 eligible selection count is invalid")
+        count = meta.get("realized_count")
+        if isinstance(count, bool) or not isinstance(count, int) or count != len(mask) or count > eligible:
+            raise StrongPointError("top10 realized selection count is invalid")
+        fraction = _finite(meta.get("realized_fraction"), name="top10 realized selection fraction", lo=0, hi=1)
+        if not math.isclose(fraction, count / eligible, rel_tol=0, abs_tol=1e-12):
+            raise StrongPointError("top10 realized selection fraction is invalid")
+        return count, fraction
+
+    before_count, before_fraction = selection(before_meta, before)
+    after_count, after_fraction = selection(after_meta, after)
+    union = before | after
+    shared = before & after
+    return {
+        "jaccard": len(shared) / len(union) if union else None,
+        "retention": len(shared) / len(before) if before else None,
+        "entry": len(after - before),
+        "exit": len(before - after),
+        "from_realized_count": before_count,
+        "from_realized_fraction": before_fraction,
+        "to_realized_count": after_count,
+        "to_realized_fraction": after_fraction,
+    }
+
+
+def _predictor_mask_stability(report: Mapping[str, Any]) -> list[dict[str, Any]]:
+    masks, metadata = report.get("_formula_masks"), report.get("_top_mask_metadata")
+    if not isinstance(masks, Mapping) or not isinstance(metadata, Mapping):
+        raise StrongPointError("predictor mask stability inputs are incomplete")
+    indexed: dict[tuple[str, str, str], dict[int, tuple[set[int], Mapping[str, object]]]] = {}
+    for key, raw_mask in masks.items():
+        if not isinstance(key, str) or not key.startswith("top10:"):
+            continue
+        candidate, anchor, stratum, score = _top_mask_key(key)
+        if not isinstance(raw_mask, set) or not isinstance(metadata.get(key), Mapping):
+            raise StrongPointError("top10 predictor mask internal contract drifted")
+        group = indexed.setdefault((candidate, stratum, score), {})
+        if anchor in group:
+            raise StrongPointError("top10 predictor masks duplicate an anchor")
+        group[anchor] = (raw_mask, metadata[key])
+    rows: list[dict[str, Any]] = []
+    for (candidate, stratum, score), by_anchor in sorted(indexed.items()):
+        if tuple(sorted(by_anchor)) != ANCHORS:
+            raise StrongPointError("top10 predictor masks omit a frozen consecutive anchor")
+        for left, right in zip(ANCHORS, ANCHORS[1:]):
+            before, before_meta = by_anchor[left]
+            after, after_meta = by_anchor[right]
+            rows.append(
+                {
+                    "candidate_id": candidate,
+                    "stratum": stratum,
+                    "score": score,
+                    "from_anchor": left,
+                    "to_anchor": right,
+                    **_mask_comparison(before, after, before_meta, after_meta),
+                }
+            )
+    return rows
+
+
+def _cross_seed_predictor_mask_stability(
+    left: Mapping[str, Any], right: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    left_masks, right_masks = left.get("_formula_masks"), right.get("_formula_masks")
+    left_meta, right_meta = left.get("_top_mask_metadata"), right.get("_top_mask_metadata")
+    if not isinstance(left_masks, Mapping) or not isinstance(right_masks, Mapping):
+        raise StrongPointError("cross-seed predictor mask stability inputs are incomplete")
+    if not isinstance(left_meta, Mapping) or not isinstance(right_meta, Mapping):
+        raise StrongPointError("cross-seed predictor mask stability inputs are incomplete")
+    shared_candidates = {
+        key.removeprefix("future_failure:")
+        for key in set(left_masks) & set(right_masks)
+        if isinstance(key, str) and key.startswith("future_failure:")
+    }
+    rows: list[dict[str, Any]] = []
+    for key in sorted(set(left_masks) & set(right_masks)):
+        if not isinstance(key, str) or not key.startswith("top10:"):
+            continue
+        candidate, anchor, stratum, score = _top_mask_key(key)
+        if candidate not in shared_candidates:
+            continue
+        before, after = left_masks[key], right_masks[key]
+        before_meta, after_meta = left_meta.get(key), right_meta.get(key)
+        if not isinstance(before, set) or not isinstance(after, set) or not isinstance(before_meta, Mapping) or not isinstance(after_meta, Mapping):
+            raise StrongPointError("cross-seed top10 predictor mask contract drifted")
+        rows.append(
+            {
+                "candidate_id": candidate,
+                "anchor_epoch": anchor,
+                "stratum": stratum,
+                "score": score,
+                **_mask_comparison(before, after, before_meta, after_meta),
+            }
+        )
+    return rows
+
+
 def analyze_strong_run(
     *,
     label: str,
@@ -509,6 +647,7 @@ def analyze_strong_run(
     online_scores = {anchor: _online_scores(online, anchor) for anchor in anchors}
     rows: list[dict[str, Any]] = []
     masks: dict[str, set[int]] = {}
+    top_mask_metadata: dict[str, dict[str, float | int]] = {}
     reports: list[dict[str, Any]] = []
     for candidate in candidates:
         candidate_id = f"d{candidate['delta_pp']:g}_k{candidate['window_size']}_{candidate['threshold']}"
@@ -536,7 +675,9 @@ def analyze_strong_run(
                 metrics: dict[str, Any] = {}
                 for name, values in _conditional({**online_scores[anchor], **strong[anchor]}, eligible).items():
                     metrics[name] = _metric(values, {item: targets[item] for item in eligible})
-                    masks[f"top10:{candidate_id}:{anchor}:{stratum}:{name}"] = _top_mask(values)
+                    mask_key = f"top10:{candidate_id}:{anchor}:{stratum}:{name}"
+                    masks[mask_key] = _top_mask(values)
+                    top_mask_metadata[mask_key] = _selection_metadata(masks[mask_key], values, metrics[name])
                     rows.append(
                         {
                             "run": label,
@@ -563,6 +704,7 @@ def analyze_strong_run(
         "candidates": reports,
         "_point_rows": rows,
         "_formula_masks": masks,
+        "_top_mask_metadata": top_mask_metadata,
     }
 
 
@@ -598,6 +740,8 @@ def write_strong_point_report(
         else None
         for key in shared
     }
+    within_run_stability = {label: _predictor_mask_stability(report) for label, report in reports.items()}
+    cross_seed_stability = _cross_seed_predictor_mask_stability(left, right)
     points = write_sample_parquet(
         [row for report in reports.values() for row in report.get("_point_rows", [])], paths["points"]
     )
@@ -613,6 +757,10 @@ def write_strong_point_report(
             for label, report in reports.items()
         },
         "formula_level_cross_seed_jaccard": jaccard,
+        "predictor_mask_stability": {
+            "within_run_consecutive_anchor": within_run_stability,
+            "cross_seed_top10": cross_seed_stability,
+        },
         "points_sha256": sha256_file(points),
     }
     paths["report"].write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")

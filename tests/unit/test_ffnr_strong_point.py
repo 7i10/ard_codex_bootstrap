@@ -278,9 +278,9 @@ def test_id_class_join_temporal_leakage_metrics_and_nonoverwrite(tmp_path: Path,
         **left,
         "label": "L4",
         "_formula_masks": {
+            **left["_formula_masks"],
             shared: left["_formula_masks"][shared],
             "future_failure:l4_only": {19},
-            "top10:not_a_shared_ground_truth": {7},
         },
     }
     config = tmp_path / "config.yaml"
@@ -292,6 +292,12 @@ def test_id_class_join_temporal_leakage_metrics_and_nonoverwrite(tmp_path: Path,
     payload = json.loads(paths["report"].read_text())
     assert payload["formula_level_cross_seed_jaccard"] == {shared: 1.0}
     assert payload["analysis_provenance"] == provenance
+    within = payload["predictor_mask_stability"]["within_run_consecutive_anchor"]["L2"]
+    assert within and {item["from_anchor"] for item in within} == {39, 59}
+    assert all("from_realized_fraction" in item and "to_realized_count" in item for item in within)
+    cross_seed = payload["predictor_mask_stability"]["cross_seed_top10"]
+    assert cross_seed and {item["candidate_id"] for item in cross_seed} == {shared.removeprefix("future_failure:")}
+    assert all(item["jaccard"] == 1.0 and item["entry"] == item["exit"] == 0 for item in cross_seed)
     with pytest.raises(StrongPointError, match="overwrite"):
         write_strong_point_report(output_dir=output, reports={"L2": left, "L4": right}, config_path=config)
 
