@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ from ard.analysis.ffnr_strong_replay import (
     StrongReplayError,
     build_checkpoint_inventory_document,
     checkpoint_cache_identity,
+    deterministic_replay_backend,
     load_cached_checkpoint,
     load_checkpoint_inventory_document,
     parse_replay_config,
@@ -24,11 +26,13 @@ from ard.analysis.ffnr_strong_replay import (
     select_explicit_checkpoints,
     selection_attack_from_training,
     source_provenance,
+    validate_epoch_universes,
     validate_selected_checkpoint_bytes,
     write_checkpoint_cache,
     write_checkpoint_inventory,
     write_outputs,
 )
+from ard.analysis.rslad_signal_replay import portable_cifar10_train_identity
 from ard.analysis.signal_audit import sha256_file
 from ard.analysis.teacher_risk_replay import build_replay_loader
 from ard.config import load_config
@@ -119,69 +123,73 @@ def main(argv: list[str] | None = None) -> int:
     )
     selected = select_explicit_checkpoints(inventory, run_id=launch["run_id"], epochs=requested_epochs)
     validate_selected_checkpoint_bytes(selected)
-    resolved_hash = config_digest(yaml.safe_load(resolved_path.read_text(encoding="utf-8")))
+    saved_resolved = yaml.safe_load(resolved_path.read_text(encoding="utf-8"))
+    if not isinstance(saved_resolved, dict):
+        raise StrongReplayError("saved resolved training config must be a mapping")
+    resolved_hash = config_digest(saved_resolved)
     if any(item.config_hash != resolved_hash for item in selected):
         raise StrongReplayError("selected checkpoint config hash does not match saved resolved config")
     if training_config.teacher is None:
         raise StrongReplayError("strong replay requires a registered teacher")
-    teacher = build_teacher(training_config.teacher, tier=training_config.tier).to(device)
-    if any(parameter.requires_grad for parameter in teacher.parameters()):
-        raise StrongReplayError("built teacher is not frozen")
-    loader = build_replay_loader(training_config, batch_size=launch["replay_batch_size"])
-    runtime: dict[str, Any] = {"device": str(device), "torch": torch.__version__, "cuda": torch.version.cuda}
-    if device.type == "cuda":
-        index = torch.cuda.current_device() if device.index is None else device.index
-        runtime.update(
-            {
-                "cuda_device_index": index,
-                "cuda_device_name": torch.cuda.get_device_name(index),
-                "cuda_device_capability": list(torch.cuda.get_device_capability(index)),
-            }
-        )
-    dataset_identity = {
-        "dataset": training_config.dataset.model_dump(mode="json"),
-        "validation_fraction": training_config.training.validation_fraction,
-        "split_seed": training_config.seeds.split,
-    }
-    teacher_metadata = teacher.metadata.model_dump(mode="json")
-    cache_dir = output_dir / "checkpoint-cache"
-    results = []
-    identities = []
-    for checkpoint in selected:
-        identity = checkpoint_cache_identity(
-            checkpoint=checkpoint,
-            attack=attack,
-            seed=launch["attack_seed"],
-            replay_batch_size=launch["replay_batch_size"],
-            expected_sample_count=launch["train_expected_count"],
-            teacher_metadata=teacher_metadata,
-            dataset_identity=dataset_identity,
-            runtime=runtime,
-            provenance=provenance,
-        )
-        # Cache identity is emitted in lineage even though this fresh-output CLI
-        # intentionally does not reuse stale cache files from another run.
-        identities.append(identity)
-        cached = load_cached_checkpoint(cache_dir=cache_dir, identity=identity)
-        results.append(
-            cached
-            if cached is not None
-            else write_checkpoint_cache(
-                cache_dir=cache_dir,
-                identity=identity,
-                result=replay_checkpoint_rows(
-                    checkpoint=checkpoint,
-                    training_config=training_config,
-                    teacher=teacher,
-                    loader=loader,
-                    device=device,
-                    attack_seed_base=launch["attack_seed"],
-                ),
+    dataset_identity = portable_cifar10_train_identity(saved_resolved, expected_count=launch["train_expected_count"])
+    with deterministic_replay_backend() as effective_backend:
+        runtime: dict[str, Any] = {
+            "device": str(device),
+            "torch": torch.__version__,
+            "cuda": torch.version.cuda,
+            "deterministic_backend": asdict(effective_backend),
+        }
+        if device.type == "cuda":
+            index = torch.cuda.current_device() if device.index is None else device.index
+            runtime.update(
+                {
+                    "cuda_device_index": index,
+                    "cuda_device_name": torch.cuda.get_device_name(index),
+                    "cuda_device_capability": list(torch.cuda.get_device_capability(index)),
+                }
             )
-        )
+        teacher = build_teacher(training_config.teacher, tier=training_config.tier).to(device)
+        if any(parameter.requires_grad for parameter in teacher.parameters()):
+            raise StrongReplayError("built teacher is not frozen")
+        loader = build_replay_loader(training_config, batch_size=launch["replay_batch_size"])
+        teacher_metadata = teacher.metadata.model_dump(mode="json")
+        cache_dir = output_dir / "checkpoint-cache"
+        results = []
+        identities = []
+        for checkpoint in selected:
+            identity = checkpoint_cache_identity(
+                checkpoint=checkpoint,
+                attack=attack,
+                seed=launch["attack_seed"],
+                replay_batch_size=launch["replay_batch_size"],
+                expected_sample_count=launch["train_expected_count"],
+                teacher_metadata=teacher_metadata,
+                dataset_identity=dataset_identity,
+                runtime=runtime,
+                provenance=provenance,
+            )
+            identities.append(identity)
+            cached = load_cached_checkpoint(cache_dir=cache_dir, identity=identity)
+            results.append(
+                cached
+                if cached is not None
+                else write_checkpoint_cache(
+                    cache_dir=cache_dir,
+                    identity=identity,
+                    result=replay_checkpoint_rows(
+                        checkpoint=checkpoint,
+                        training_config=training_config,
+                        teacher=teacher,
+                        loader=loader,
+                        device=device,
+                        attack_seed_base=launch["attack_seed"],
+                    ),
+                )
+            )
     expected_count = launch["train_expected_count"]
     if any(len(result.rows) != expected_count for result in results):
         raise StrongReplayError("replay row count does not match expected train partition count")
+    stable_universe = validate_epoch_universes(results, expected_count=expected_count)
     lineage = {
         "contract": CONTRACT_ID,
         "schema_version": 1,
@@ -191,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
         "mode": "one_checkpoint_smoke" if len(requested_epochs) == 1 else "multi_epoch_replay",
         "manifest": str(manifest_path),
         "manifest_sha256": sha256_file(manifest_path),
+        "checkpoint_inventory": str(inventory_path),
+        "checkpoint_inventory_sha256": sha256_file(inventory_path),
         "saved_resolved_config": str(resolved_path),
         "saved_resolved_config_sha256": sha256_file(resolved_path),
         "saved_resolved_config_mapping_sha256": resolved_hash,
@@ -204,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
         "seed_formula": SEED_FORMULA,
         "replay_batch_size": launch["replay_batch_size"],
         "train_expected_count": expected_count,
+        "stable_id_class_universe": stable_universe,
         "runtime": runtime,
         "teacher": teacher_metadata,
         "dataset_identity": dataset_identity,

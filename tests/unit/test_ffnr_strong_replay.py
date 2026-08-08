@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +16,7 @@ from ard.analysis.ffnr_strong_replay import (
     StrongReplayResult,
     build_checkpoint_inventory_document,
     classification_primitives,
+    deterministic_replay_backend,
     jensen_shannon,
     load_cached_checkpoint,
     load_checkpoint_inventory_document,
@@ -21,6 +24,7 @@ from ard.analysis.ffnr_strong_replay import (
     replay_checkpoint_rows,
     select_explicit_checkpoints,
     selection_attack_from_training,
+    stable_id_class_universe,
     write_checkpoint_cache,
     write_checkpoint_inventory,
 )
@@ -118,7 +122,9 @@ def test_reused_inventory_does_not_rehash_unselected_checkpoint_bytes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     manifest = tmp_path / "manifest.json"
-    manifest.write_text(json.dumps({"run_id": "run", "config_hash": "a" * 64, "git": {"sha": "b" * 40}}))
+    manifest.write_text(
+        json.dumps({"run_id": "run", "config_hash": "a" * 64, "git": {"sha": "b" * 40}, "status": "completed"})
+    )
     selected_path, unselected_path = tmp_path / "selected.pt", tmp_path / "unselected.pt"
     selected_path.write_bytes(b"selected")
     unselected_path.write_bytes(b"unselected")
@@ -144,6 +150,53 @@ def test_reused_inventory_does_not_rehash_unselected_checkpoint_bytes(
     loaded = load_checkpoint_inventory_document(path=inventory_path, manifest_path=manifest, run_id="run")
     assert loaded == (selected, unselected)
     assert calls == [manifest]
+
+
+def test_deterministic_backend_is_effective_then_restores_prior_flags() -> None:
+    previous = (
+        torch.are_deterministic_algorithms_enabled(),
+        torch.backends.cudnn.benchmark,
+        torch.backends.cudnn.deterministic,
+        torch.backends.cuda.matmul.allow_tf32,
+        torch.backends.cudnn.allow_tf32,
+    )
+    with deterministic_replay_backend() as flags:
+        assert flags.deterministic_algorithms
+        assert not flags.cudnn_benchmark and flags.cudnn_deterministic
+        assert not flags.cuda_matmul_allow_tf32 and not flags.cudnn_allow_tf32
+        assert torch.are_deterministic_algorithms_enabled()
+        assert not torch.backends.cudnn.benchmark and torch.backends.cudnn.deterministic
+        assert not torch.backends.cuda.matmul.allow_tf32 and not torch.backends.cudnn.allow_tf32
+    assert previous == (
+        torch.are_deterministic_algorithms_enabled(),
+        torch.backends.cudnn.benchmark,
+        torch.backends.cudnn.deterministic,
+        torch.backends.cuda.matmul.allow_tf32,
+        torch.backends.cudnn.allow_tf32,
+    )
+
+
+def test_nontrivial_symmetric_js_matches_closed_form_and_is_bounded() -> None:
+    first = torch.tensor([[1.0, 0.0], [0.5, 0.5]])
+    second = torch.tensor([[0.5, 0.5], [1.0, 0.0]])
+    expected = 0.75 * math.log(4.0 / 3.0)
+    assert jensen_shannon(first, second).tolist() == pytest.approx([expected, expected], abs=1e-7)
+    assert torch.all(jensen_shannon(first, second) <= math.log(2.0))
+
+
+def test_stable_universe_rejects_changed_class_with_same_row_count(monkeypatch: pytest.MonkeyPatch) -> None:
+    rows = [
+        {"namespace": "train", "sample_id": 903, "class_id": 1},
+        {"namespace": "train", "sample_id": 17, "class_id": 2},
+    ]
+    pairs = [{"sample_id": 17, "class_id": 2}, {"sample_id": 903, "class_id": 1}]
+    digest = hashlib.sha256(ffnr_strong_replay.canonical_json(pairs)).hexdigest()
+    monkeypatch.setattr(ffnr_strong_replay, "EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256", digest)
+    assert stable_id_class_universe(rows, expected_count=2)["sha256"] == digest
+    changed = [dict(row) for row in rows]
+    changed[1]["class_id"] = 3
+    with pytest.raises(StrongReplayError, match="universe hash drift"):
+        stable_id_class_universe(changed, expected_count=2)
 
 
 def test_cache_requires_exact_identity_and_preserves_strong_schema(tmp_path: Path) -> None:

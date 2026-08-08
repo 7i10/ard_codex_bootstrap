@@ -11,7 +11,8 @@ import hashlib
 import json
 import math
 import subprocess
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,7 @@ class StrongReplayError(SignalAuditError):
 STRONG_REPLAY_SCHEMA_VERSION = 1
 CONTRACT_ID = "ffnr_strong_replay_ce_pgd20_v1"
 SEED_FORMULA = "attack_seed=base_seed+1000003*batch_index"
+EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256 = "9a1a7929e47196ca4cb49a7c2bea5029170ecdb1c18f9f38c05ea14d9913bf60"
 OBSERVATION_COLUMNS = (
     "namespace",
     "sample_id",
@@ -71,6 +73,42 @@ class StrongReplayResult:
     attack_seed_base: int
     max_abs_delta: float
     rows: tuple[dict[str, Any], ...]
+
+
+@dataclass(frozen=True)
+class DeterministicBackendFlags:
+    deterministic_algorithms: bool
+    cudnn_benchmark: bool
+    cudnn_deterministic: bool
+    cuda_matmul_allow_tf32: bool
+    cudnn_allow_tf32: bool
+
+
+@contextmanager
+def deterministic_replay_backend() -> Iterator[DeterministicBackendFlags]:
+    """Enforce FP32-deterministic backend settings for the full replay scope."""
+    previous = DeterministicBackendFlags(
+        deterministic_algorithms=torch.are_deterministic_algorithms_enabled(),
+        cudnn_benchmark=torch.backends.cudnn.benchmark,
+        cudnn_deterministic=torch.backends.cudnn.deterministic,
+        cuda_matmul_allow_tf32=torch.backends.cuda.matmul.allow_tf32,
+        cudnn_allow_tf32=torch.backends.cudnn.allow_tf32,
+    )
+    previous_warn_only = torch.is_deterministic_algorithms_warn_only_enabled()
+    effective = DeterministicBackendFlags(True, False, True, False, False)
+    try:
+        torch.use_deterministic_algorithms(True)
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
+        yield effective
+    finally:
+        torch.use_deterministic_algorithms(previous.deterministic_algorithms, warn_only=previous_warn_only)
+        torch.backends.cudnn.benchmark = previous.cudnn_benchmark
+        torch.backends.cudnn.deterministic = previous.cudnn_deterministic
+        torch.backends.cuda.matmul.allow_tf32 = previous.cuda_matmul_allow_tf32
+        torch.backends.cudnn.allow_tf32 = previous.cudnn_allow_tf32
 
 
 def _sha256_mapping(value: Mapping[str, Any]) -> str:
@@ -148,6 +186,12 @@ def select_explicit_checkpoints(
 
 def build_checkpoint_inventory_document(*, manifest_path: Path, run_id: str) -> dict[str, Any]:
     """Scan/hash a complete run bundle once and freeze every periodic-last checkpoint."""
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise StrongReplayError("full run-bundle manifest is unreadable") from exc
+    if not isinstance(manifest, Mapping) or manifest.get("status") != "completed":
+        raise StrongReplayError("full run-bundle manifest must be completed before strong replay")
     inventory = inventory_run_bundle(manifest_path)
     selected = [item for item in inventory if item.run_id == run_id and item.periodic_last]
     if not selected:
@@ -207,9 +251,11 @@ def load_checkpoint_inventory_document(
         raise StrongReplayError("checkpoint inventory schema is invalid")
     if document["schema_version"] != 1 or document["contract"] != CONTRACT_ID or document["run_id"] != run_id:
         raise StrongReplayError("checkpoint inventory contract/run ID mismatch")
+    if document["manifest"] != str(manifest_path.resolve()):
+        raise StrongReplayError("checkpoint inventory manifest path mismatch")
     if document["manifest_sha256"] != sha256_file(manifest_path):
         raise StrongReplayError("checkpoint inventory manifest hash drift")
-    if not isinstance(manifest, Mapping) or manifest.get("run_id") != run_id:
+    if not isinstance(manifest, Mapping) or manifest.get("run_id") != run_id or manifest.get("status") != "completed":
         raise StrongReplayError("checkpoint inventory manifest run ID mismatch")
     manifest_git = manifest.get("git")
     if (
@@ -234,7 +280,12 @@ def load_checkpoint_inventory_document(
             item = CheckpointInventory(**raw)
         except TypeError as exc:
             raise StrongReplayError("checkpoint inventory checkpoint schema is invalid") from exc
-        if item.run_id != run_id or not item.periodic_last or item.config_hash != document["config_hash"]:
+        if (
+            item.run_id != run_id
+            or not item.periodic_last
+            or item.config_hash != document["config_hash"]
+            or item.scientific_git_sha != document["scientific_git_sha"]
+        ):
             raise StrongReplayError("checkpoint inventory checkpoint lineage mismatch")
         checkpoints.append(item)
     return tuple(checkpoints)
@@ -245,6 +296,48 @@ def validate_selected_checkpoint_bytes(checkpoints: Sequence[CheckpointInventory
     for item in checkpoints:
         if sha256_file(Path(item.path)) != item.sha256:
             raise StrongReplayError("selected checkpoint bytes drifted from hash-bound inventory")
+
+
+def stable_id_class_universe(rows: Sequence[Mapping[str, Any]], *, expected_count: int) -> dict[str, Any]:
+    """Validate the exact sparse source-ID/class universe for one replay epoch."""
+    if len(rows) != expected_count:
+        raise StrongReplayError("strong replay stable universe row count mismatch")
+    pairs: list[dict[str, int]] = []
+    sample_ids: set[int] = set()
+    for row in rows:
+        sample_id, class_id = row.get("sample_id"), row.get("class_id")
+        if (
+            isinstance(sample_id, bool)
+            or not isinstance(sample_id, int)
+            or isinstance(class_id, bool)
+            or not isinstance(class_id, int)
+            or row.get("namespace") != "train"
+            or sample_id in sample_ids
+        ):
+            raise StrongReplayError("strong replay stable-ID/class universe is invalid")
+        sample_ids.add(sample_id)
+        pairs.append({"sample_id": sample_id, "class_id": class_id})
+    pairs.sort(key=lambda pair: pair["sample_id"])
+    digest = hashlib.sha256(canonical_json(pairs)).hexdigest()
+    if digest != EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256:
+        raise StrongReplayError("strong replay stable-ID/class universe hash drift")
+    return {"count": expected_count, "sha256": digest}
+
+
+def validate_epoch_universes(results: Sequence[StrongReplayResult], *, expected_count: int) -> dict[str, Any]:
+    """Require every selected epoch to expose precisely the same stable source universe."""
+    reference: tuple[tuple[int, int], ...] | None = None
+    identity: dict[str, Any] | None = None
+    for result in results:
+        current = stable_id_class_universe(result.rows, expected_count=expected_count)
+        pairs = tuple(sorted((int(row["sample_id"]), int(row["class_id"])) for row in result.rows))
+        if reference is not None and pairs != reference:
+            raise StrongReplayError("strong replay stable-ID/class universe changed across epochs")
+        reference = pairs
+        identity = current
+    if identity is None:
+        raise StrongReplayError("strong replay requires at least one epoch result")
+    return identity
 
 
 def classification_primitives(logits: torch.Tensor, labels: torch.Tensor) -> dict[str, torch.Tensor]:
