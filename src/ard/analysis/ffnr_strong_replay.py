@@ -498,7 +498,7 @@ def load_cached_checkpoint(*, cache_dir: Path, identity: Mapping[str, Any]) -> S
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise StrongReplayError("strong replay cache metadata is unreadable") from exc
-    if not isinstance(metadata, Mapping) or metadata.get("identity") != dict(identity):
+    if not isinstance(metadata, Mapping) or canonical_json(metadata.get("identity")) != canonical_json(identity):
         raise StrongReplayError("strong replay cache identity mismatch")
     expected_payload_hash = _require_sha256(metadata.get("payload_sha256"), name="cached payload_sha256")
     if sha256_file(payload_path) != expected_payload_hash:
@@ -507,7 +507,7 @@ def load_cached_checkpoint(*, cache_dir: Path, identity: Mapping[str, Any]) -> S
         payload = torch.load(payload_path, map_location="cpu", weights_only=False)
     except Exception as exc:  # torch deserialization exposes several exception classes
         raise StrongReplayError("strong replay cache is unreadable") from exc
-    if not isinstance(payload, Mapping) or payload.get("identity") != dict(identity):
+    if not isinstance(payload, Mapping) or canonical_json(payload.get("identity")) != canonical_json(identity):
         raise StrongReplayError("strong replay cache payload identity mismatch")
     result = payload.get("result")
     if not isinstance(result, Mapping):

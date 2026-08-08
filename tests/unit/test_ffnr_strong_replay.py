@@ -148,7 +148,9 @@ def test_reused_inventory_does_not_rehash_unselected_checkpoint_bytes(
 
 def test_cache_requires_exact_identity_and_preserves_strong_schema(tmp_path: Path) -> None:
     identity = {
-        "checkpoint": {"sha256": "4" * 64, "epoch": 189},
+        # JSON round-trips tuple aliases to a list; semantic cache identity
+        # must survive that representation change.
+        "checkpoint": {"sha256": "4" * 64, "epoch": 189, "aliases": ("last",)},
         "contract": "fixture",
         "expected_sample_count": 1,
         "attack_seed_base": 7,
