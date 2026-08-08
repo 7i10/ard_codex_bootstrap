@@ -1,6 +1,6 @@
 # FF/current-wrong future-failure forecasting status
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
 The formal development report was regenerated from complete, unique validation
 epochs `0..199` for all four runs.  Each history is bound to its completed
@@ -121,25 +121,84 @@ deduplicated GT rows.  The full run took 7 minutes 41 seconds on CPU and peaked
 at 6.20 GiB RSS.  Report SHA-256 is
 `98a2a2ea4a7c17c55ea604b676e7e58be60c35c9fe2e00a09f2ba9d99ac6faa2`.
 
-## Next decision and GPU work
+## Primary CE-PGD20 result
+
+The authorized Chen-only strong replay is complete.  It used the saved
+selection/evaluation attack exactly: pixel-space Linf CE-PGD20, epsilon
+`8/255`, step size `2/255`, random start, and student/teacher eval mode.  The
+replay ran from clean commit `e5cb442` with deterministic CUDA algorithms,
+TF32 disabled, and an identical 45,000-sample sparse-ID/class universe on both
+hosts.  The epoch-39 smoke and full L2 replay were exactly equal row for row.
+
+Under CE-PGD20, the admissible future-failure definitions contain
+`11,113--12,363` samples for L2 and `11,421--12,348` for L4.  The six common
+three-checkpoint formulas have cross-seed positive-mask Jaccard
+`0.848--0.858`, substantially above the KL-PGD10 sensitivity result
+`0.557--0.615`.  Majority and two-thirds are mathematically equivalent for a
+three-checkpoint window; `all` remains a distinct persistent-plateau endpoint.
+No endpoint was selected from predictor performance.
+
+For current-correct samples, the main point-estimate AUROC ranges are:
+
+| Run / anchor | Online margin EMA | Strong current logit margin | Teacher signed wrong-class dominance |
+| --- | ---: | ---: | ---: |
+| L2 / 39 | `.920--.925` | `.937--.945` | `.992--.993` |
+| L2 / 59 | `.930--.935` | `.935--.940` | `.992--.993` |
+| L2 / 79 | `.929--.933` | `.924--.931` | `.991--.993` |
+| L4 / 39 | `.917--.918` | `.927--.931` | `.992--.994` |
+| L4 / 59 | `.929--.929` | `.924--.928` | `.991--.992` |
+| L4 / 79 | `.930--.932` | `.934--.935` | `.992--.993` |
+
+Teacher signed wrong-class dominance is
+`max_{c != y} p_T(c | x_adv) - p_T(y | x_adv)`.  Unlike the rejected
+entropy/overconfidence risk, it does not penalize a teacher for being confidently
+correct: correct examples have a negative signed value, and larger values mean
+higher risk.  Its very high association is a new Chen/ERT development result, not
+evidence that downweighting those samples improves training.  It also requires
+a strong student attack and teacher forward, whereas online margin EMA is
+already available from training state.
+
+High AUROC does not imply a stable intervention set.  Within-run consecutive
+anchor top-10% Jaccard is only `.196--.203` for teacher signed dominance,
+`.071--.076` for strong logit margin, and `.096--.108` for online margin EMA.
+Across the two seeds it is approximately `.187--.191`, `.070--.077`, and
+`.093--.096`, respectively.  These masks are conditioned on the changing
+online-current-correct population, so the values mix eligibility transitions
+with score-rank movement.
+
+Formal output (ignored cache):
+
+```text
+.cache/analysis/ffnr-strong-point-6327fd7-v1/
+  ffnr-strong-point-report.json
+  ffnr-strong-points.parquet
+```
+
+The clean analysis commit is `6327fd7`; report SHA-256 is
+`cf32dcce02c21617bd7c3322dfa699eec5e2ae11b220ef428b6b99342e68c797`.
+The report records path and SHA-256 for every feature, outcome, online-state,
+validation, lineage, and checkpoint-inventory input, plus each selected
+checkpoint hash and the exact attack identity.
+The CPU point analysis took 2 minutes 7 seconds and 1.86 GiB peak RSS.  No
+bootstrap, official test, AutoAttack, intervention, or new training was run.
+
+## Next decision
 
 The complete histories split the GPU decision by teacher:
 
 - Bartoldson remains blocked: CE-PGD20 on the current inventory cannot create
   the missing same-stage checkpoint before epoch 104.
-- Chen can proceed without selecting one GT formula: replaying the union
-  `179,184,189,194,199` for L2 and `189,194,199` for L4 supports every currently
-  admissible formula under one frozen strong-attack observation panel.
+- Chen strong replay and point estimates are complete.  Before bootstrap or
+  intervention, choose the endpoint semantics independently of AUROC:
+  three-checkpoint majority for general plateau failure, or `all` for
+  persistent plateau failure.  The other can remain a sensitivity endpoint.
+- The teacher signed-dominance result should next be checked on an IRT
+  trajectory.  The current Bartoldson inventory cannot support the centred
+  plateau contract, so this requires either denser checkpointing around the
+  first LR boundary or a separately preregistered prospective outcome.
+- Any later intervention must compare selector utility against a matched
+  random control.  Prediction alone, even AUROC near `.99`, does not establish
+  treatment benefit.
 
-The Chen GPU path is:
-
-1. freeze one union schema for strong GT and missing L/T/S/D primitives;
-2. run one real-checkpoint public-CLI smoke through Parquet, lineage, sparse-ID
-   join, and report creation;
-3. measure time and teacher-forward overhead;
-4. replay independent feature/outcome jobs longest-processing-time-first;
-5. compute point estimates before any preregistered bootstrap.
-
-No intervention, new training seed, official test, or AutoAttack follows from
-this development result.  The strong replay is a train-sample analysis under
-the already frozen selection/evaluation CE-PGD20 threat model.
+No intervention, new training seed, official test, or AutoAttack follows
+automatically from this development result.

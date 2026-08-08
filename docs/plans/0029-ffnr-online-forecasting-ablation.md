@@ -277,3 +277,22 @@ one-checkpoint smoke.
   and no bootstrap was launched.  Chen-only CE-PGD20 replay is now authorized
   for the union of admissible window epochs, while Bartoldson replay remains
   blocked by missing same-stage checkpoints rather than GPU availability.
+- 2026-08-09: committed and pushed deterministic strong-replay fixes at
+  `e5cb442`.  A real L2 epoch-39 smoke passed and matched the corresponding
+  full-replay epoch exactly.  L2 feature/outcome ran concurrently on Hamster;
+  L4 feature/outcome ran concurrently on Ferret.  All four outputs have the
+  exact CE-PGD20 identity, clean source SHA, deterministic backend flags, and
+  the same 45,000-sample sparse-ID/class hash.
+- 2026-08-09: generated the initial point report from clean commit `ca11a4e` in
+  2m07s with 1.86 GiB peak RSS.  Strong-GT cross-seed Jaccard is
+  `0.848--0.858`.  Teacher adversarial wrong-confidence has FF AUROC
+  `0.991--0.994`, online margin EMA `0.917--0.935`, but top-10 masks are much
+  less stable (`~0.19` and `~0.09` cross-seed respectively).  No predictor or
+  GT was selected, and no bootstrap, intervention, official test, or AA ran.
+- 2026-08-09: scientific review found one P1 report-lineage omission and one
+  P2 signal-naming ambiguity.  Commit `6327fd7` now binds all eight analysis
+  inputs, both checkpoint inventories, selected checkpoint hashes, and the
+  exact CE-PGD20 identity.  The signal is named signed teacher wrong-class
+  dominance, with its formula and larger-is-higher-risk direction embedded in
+  the report.  The regenerated report SHA is
+  `cf32dcce02c21617bd7c3322dfa699eec5e2ae11b220ef428b6b99342e68c797`.
