@@ -43,6 +43,15 @@ def test_render_html_embeds_only_public_rows_and_manifest_hash(tmp_path: Path) -
         render_html(manifest, output)
 
 
+def test_render_standalone_embeds_image_data(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path)
+    output = tmp_path / "standalone.html"
+    render_html(manifest, output, embed_images=True)
+    text = output.read_text(encoding="utf-8")
+    assert "data:image/png;base64,UE5H" in text
+    assert 'imageSrc":"images/one.png' not in text
+
+
 def test_render_rejects_diagnostic_row_fields(tmp_path: Path) -> None:
     manifest = _manifest(
         tmp_path,

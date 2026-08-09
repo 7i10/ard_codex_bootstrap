@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -85,25 +86,37 @@ def load_panel(manifest_path: Path) -> tuple[dict[str, Any], str]:
     return raw, _sha256(manifest_path)
 
 
-def _html_data(manifest: dict[str, Any], manifest_sha256: str, output_path: Path, manifest_path: Path) -> list[dict[str, Any]]:
+def _html_data(
+    manifest: dict[str, Any],
+    manifest_sha256: str,
+    output_path: Path,
+    manifest_path: Path,
+    *,
+    embed_images: bool,
+) -> list[dict[str, Any]]:
     root = manifest_path.parent.resolve()
     output_root = output_path.parent.resolve()
     data: list[dict[str, Any]] = []
     for row in manifest["rows"]:
         image = (root / row["image_path"]).resolve()
+        image_src = (
+            f"data:image/png;base64,{base64.b64encode(image.read_bytes()).decode('ascii')}"
+            if embed_images
+            else os.path.relpath(image, output_root)
+        )
         data.append(
             {
                 "panelIndex": row["panel_index"],
                 "sampleId": row["sample_id"],
                 "classId": row["class_id"],
                 "runLabel": row["run_label"],
-                "imageSrc": os.path.relpath(image, output_root),
+                "imageSrc": image_src,
             }
         )
     return data
 
 
-def render_html(manifest_path: Path, output_path: Path, *, force: bool = False) -> str:
+def render_html(manifest_path: Path, output_path: Path, *, force: bool = False, embed_images: bool = False) -> str:
     """Create an atomic HTML reviewer and return the manifest SHA-256."""
     manifest_path = manifest_path.resolve()
     output_path = output_path.resolve()
@@ -111,7 +124,7 @@ def render_html(manifest_path: Path, output_path: Path, *, force: bool = False) 
     if output_path.exists() and not force:
         raise ReviewPanelError("refusing to overwrite an existing reviewer; use --force")
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    rows = _html_data(manifest, manifest_sha256, output_path, manifest_path)
+    rows = _html_data(manifest, manifest_sha256, output_path, manifest_path, embed_images=embed_images)
     embedded = json.dumps({"manifestSha256": manifest_sha256, "rows": rows}, ensure_ascii=False, separators=(",", ":"))
     # JSON is placed in a script data block; prevent a row string from ending it.
     embedded = embedded.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
@@ -264,8 +277,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--force", action="store_true", help="overwrite an existing HTML reviewer")
+    parser.add_argument("--embed-images", action="store_true", help="embed PNGs as data URIs for a standalone file")
     args = parser.parse_args(argv)
-    manifest_sha256 = render_html(args.manifest, args.output, force=args.force)
+    manifest_sha256 = render_html(args.manifest, args.output, force=args.force, embed_images=args.embed_images)
     print(f"manifest_sha256={manifest_sha256}")
     print(f"review_html={args.output.resolve()}")
     return 0

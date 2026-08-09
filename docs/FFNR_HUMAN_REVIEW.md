@@ -3,20 +3,24 @@
 ## 起動
 
 Formal panelからHTMLを生成します。既存HTMLを再生成する場合だけ`--force`
-を付けてください。HTML、画像、manifestは同じartifactディレクトリに置くと、
-画像の相対パスがそのまま解決されます。
+を付けてください。
+
+リモート環境から1ファイルだけ持ち出して確認する場合は、`--embed-images`
+を使います。PNGをHTMLへ埋め込むため、ローカルで`file://`として開けます。
 
 ```bash
 PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python \
   scripts/render_ffnr_review.py \
   --manifest .cache/analysis/ffnr-strong-diagnostics-6a90011-v1/ffnr-strong-blinded-candidates.json \
-  --output .cache/analysis/ffnr-strong-diagnostics-6a90011-v1/ffnr-human-review.html
+  --output .cache/analysis/ffnr-strong-diagnostics-6a90011-v1/ffnr-human-review-standalone.html \
+  --embed-images
 ```
 
 生成済みHTMLは次です。
 
 ```text
 .cache/analysis/ffnr-strong-diagnostics-6a90011-v1/ffnr-human-review.html
+.cache/analysis/ffnr-strong-diagnostics-6a90011-v1/ffnr-human-review-standalone.html
 ```
 
 ブラウザで直接開くか、GUIのないサーバーではartifact directoryをHTTP経由で
