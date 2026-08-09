@@ -22,6 +22,7 @@
 
 - [x] Add strict factorial attack identities and configs.
 - [x] Add public CLI and unit tests for loss/step separation and strict config.
+- [x] Add CPU point-report and causal-pilot subgroup analysis scripts.
 - [ ] Commit/push the implementation so replay provenance is immutable.
 - [ ] Run one real sparse-ID checkpoint smoke through the public CLI; verify
   schema, lineage, stable-ID/class join, and non-overwrite output.
@@ -30,7 +31,7 @@
   failure-frequency correlation with attack identity in every row.
 - [ ] Audit Bartoldson L1/L3 checkpoint inventory and continuation feasibility;
   do not retrain unless the audit fails and a separate approval is needed.
-- [ ] Compute Route A/B subgroup rescue/harm, class spillover, and fixed-seed
+- [x] Compute Route A/B subgroup rescue/harm, class spillover, and fixed-seed
   sample-level bootstrap CIs from the existing causal-pilot tables.
 - [ ] Update results docs with explicit exploratory/confirmatory boundaries,
   artifact hashes, and any blocked inputs.

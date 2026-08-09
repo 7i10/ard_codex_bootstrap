@@ -9,6 +9,7 @@
 - [FFNR next evidence status](FFNR_NEXT_EVIDENCE_STATUS.md): chance-adjusted GT、cross-seed Teacher情報、Teacher-correct subset、IRT gate
 - [FFNR causal pilot status](FFNR_CAUSAL_PILOT_STATUS.md): epoch-79 parent、selection masks、係数dry-run、pilot gate
 - [FFNR causal pilot results](FFNR_CAUSAL_PILOT_RESULTS.md): Chen ERT two-seed five-arm rescue/harm and endpoint validation
+- [FFNR causal pilot subgroups](FFNR_CAUSAL_PILOT_SUBGROUPS.md): teacher/student strata and class-stratified selected-vs-random bootstrap
 - [Seed-0 signal audit](SIGNAL_AUDIT.md): Student/Joint signalの探索的関連、周期checkpoint、正式判定の境界
 - [Reproduction status](REPRODUCTION_STATUS.md): 実装済み機能、実行済み検証、未実行の重い実験、実際のCLI手順
 - [Research decisions](RESEARCH_DECISIONS.md): 今回の研究・実装で固定した方針
