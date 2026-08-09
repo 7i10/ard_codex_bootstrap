@@ -1478,9 +1478,8 @@ global robust generalization
 - [ ] Part C is blocked: no existing Bartoldson CE-PGD20 replay for the frozen
   `[104,109,114]` development sensitivity was found.  No IRT endpoint is
   inferred from a different attack or silently reconstructed.
-- [ ] Parts D--J (loss dry-run, epoch-79 randomized mechanism pilot, component
-  ablation, deployable selector, and long-horizon training) remain closed until
-  the evidence gate and coefficient dry-run are reviewed against this report.
+- [ ] Parts D--E (component ablation, deployable selector, and long-horizon
+  training) remain closed pending interpretation of the causal pilot.
 
 - [x] 2026-08-09: Retrieved the existing Chen L2/L4 epoch-79 W&B `last:v15`
   parent artifacts without downloading the multi-GB run bundle.  Parent hashes,
@@ -1492,8 +1491,15 @@ global robust generalization
 - [x] 2026-08-09: Completed one fixed-batch GPU loss/gradient scale dry-run per
   parent.  Conservative candidates are Route A `(KD=0.5, CE=0.25)` and Route B
   `(KD=1.0, CE=0.25)`.  This is not a performance result.
-- [ ] Route A/B runtime arm schema and selected-only adversarial CE branch are
-  not yet implemented; no causal training pilot has been launched under an
-  incorrect legacy arm contract.
+- [x] 2026-08-09: Implemented and tested the causal five-arm schema and
+  selected-only adversarial CE branch.  A CLI coefficient-wiring defect and a
+  W&B run-ID collision were fixed before the current launch; failed attempts
+  are not included as results.
+- [x] 2026-08-09: Completed the Chen ERT two-seed epoch-79 -> 84 causal pilot
+  (`C79/RA/RAR/RB/RBR` for L2 and L4) using Hamster and Ferret.  Endpoint
+  validation and selected-sample rescue/harm are in
+  `docs/FFNR_CAUSAL_PILOT_RESULTS.md`.
+- [ ] The short pilot does not yet pass a global-Best confirmation gate;
+  official test, AutoAttack, and long-horizon intervention remain unlaunched.
 
 Canonical CPU result: `docs/experiments/ffnr_next_evidence_v1.json`.
