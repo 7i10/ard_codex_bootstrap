@@ -300,10 +300,13 @@ def _validate_allowed_delta(*, parent: ExperimentConfig, arm: ExperimentConfig) 
     for key in ("output_dir", "tracking", "intervention"):
         parent_runtime.pop(key, None)
         arm_runtime.pop(key, None)
+    causal = arm.intervention is not None and arm.intervention.arm in {"C79", "RA", "RAR", "RB", "RBR"}
+    if causal:
+        parent_runtime["training"].pop("epochs", None)
+        arm_runtime["training"].pop("epochs", None)
     if parent_runtime != arm_runtime:
         raise InterventionForkError("arm changes fields outside the registered intervention/tracking/output whitelist")
     if arm.training.epochs != parent.training.epochs:
-        causal = arm.intervention is not None and arm.intervention.arm in {"C79", "RA", "RAR", "RB", "RBR"}
         if not causal or arm.training.epochs not in {84, 89, 94}:
             raise InterventionForkError(
                 "common-state fork cannot alter continuation epochs outside the registered FFNR horizons"
