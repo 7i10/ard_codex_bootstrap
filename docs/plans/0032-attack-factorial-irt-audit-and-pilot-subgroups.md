@@ -23,17 +23,17 @@
 - [x] Add strict factorial attack identities and configs.
 - [x] Add public CLI and unit tests for loss/step separation and strict config.
 - [x] Add CPU point-report and causal-pilot subgroup analysis scripts.
-- [ ] Commit/push the implementation so replay provenance is immutable.
-- [ ] Run one real sparse-ID checkpoint smoke through the public CLI; verify
+- [x] Commit/push the implementation so replay provenance is immutable.
+- [x] Run one real sparse-ID checkpoint smoke through the public CLI; verify
   schema, lineage, stable-ID/class join, and non-overwrite output.
-- [ ] Run CE/KL × PGD10/20 replay for Chen L2/L4, reusing exact CE20 cells.
-- [ ] Produce prevalence, Jaccard, chance-adjusted Jaccard, Cohen κ, and
+- [x] Run CE/KL × PGD10/20 replay for Chen L2/L4, reusing exact CE20 cells.
+- [x] Produce prevalence, Jaccard, chance-adjusted Jaccard, Cohen κ, and
   failure-frequency correlation with attack identity in every row.
 - [x] Audit available Bartoldson L1 checkpoint inventory and continuation
   feasibility; L3/seed-2 remains blocked and no retraining was launched.
 - [x] Compute Route A/B subgroup rescue/harm, class spillover, and fixed-seed
   sample-level bootstrap CIs from the existing causal-pilot tables.
-- [ ] Update results docs with explicit exploratory/confirmatory boundaries,
+- [x] Update results docs with explicit exploratory/confirmatory boundaries,
   artifact hashes, and any blocked inputs.
 
 ## Risks and completion criteria

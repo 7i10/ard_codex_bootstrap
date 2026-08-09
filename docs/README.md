@@ -11,6 +11,7 @@
 - [FFNR causal pilot results](FFNR_CAUSAL_PILOT_RESULTS.md): Chen ERT two-seed five-arm rescue/harm and endpoint validation
 - [FFNR causal pilot subgroups](FFNR_CAUSAL_PILOT_SUBGROUPS.md): teacher/student strata and class-stratified selected-vs-random bootstrap
 - [Bartoldson dense audit](FFNR_BART_DENSE_AUDIT.md): existing state completeness and blocked L3 recovery decision
+- [FFNR CE/KL attack factorial](FFNR_ATTACK_FACTORIAL_RESULTS.md): Chen L2/L4 CE/KL × PGD10/20 failure-mask agreement
 - [Seed-0 signal audit](SIGNAL_AUDIT.md): Student/Joint signalの探索的関連、周期checkpoint、正式判定の境界
 - [Reproduction status](REPRODUCTION_STATUS.md): 実装済み機能、実行済み検証、未実行の重い実験、実際のCLI手順
 - [Research decisions](RESEARCH_DECISIONS.md): 今回の研究・実装で固定した方針
