@@ -15,6 +15,7 @@ from ard.analysis.ffnr_strong_diagnostics import (
     _class_stratified_folds,
     _cross_seed_tables,
     _dense_non_recovery,
+    _dense_nr_subtype_tables,
     _fit_empirical_rank,
     _fold_rank_vectors,
     _merge_dense_chunks,
@@ -152,6 +153,59 @@ def test_cross_seed_overlap_only_uses_shared_taxonomy_keys() -> None:
     assert "e39:online:oscillating" in tables["D4"]
     assert "e39:online:other" not in tables["D4"]
     assert tables["D5"]["e39:persistent_wrong"]["jaccard"] == 1.0
+
+
+def test_dense_nr_subtype_tables_are_a_complete_strong_current_wrong_partition() -> None:
+    taxonomy = {10: "persistent_wrong", 11: "recovered_relapsed", 12: "recovered_stable"}
+    raw = {
+        item: {
+            "student_clean_probability_margin": 0.4,
+            "student_adversarial_probability_margin": -0.2,
+            "student_clean_logit_margin": 1.0,
+            "student_adversarial_logit_margin": -0.5,
+            "student_adversarial_ce": 2.0,
+            "student_clean_to_adversarial_probability_margin_delta": -0.6,
+            "student_clean_to_adversarial_logit_margin_delta": -1.5,
+            "student_clean_correct": True,
+            "student_robust_correct": False,
+            "student_clean_to_adversarial_prediction_flip": True,
+        }
+        for item in taxonomy
+    }
+    strong = {item: {"class_id": item % 10, "teacher_js": 0.1} for item in taxonomy}
+    teacher = {
+        item: {
+            "correct": False,
+            "true_probability": 0.1,
+            "max_wrong_probability": 0.8,
+            "dominance": 0.7,
+            "entropy": 0.6,
+        }
+        for item in taxonomy
+    }
+    clean_teacher = {
+        item: {
+            "correct": True,
+            "true_probability": 0.8,
+            "max_wrong_probability": 0.1,
+            "dominance": -0.7,
+            "entropy": 0.5,
+        }
+        for item in taxonomy
+    }
+    outcome = {epoch: {item: {"correct": item != 10} for item in taxonomy} for epoch in (189, 194, 199)}
+    tables = _dense_nr_subtype_tables(
+        taxonomy,
+        online_current_wrong={10, 12},
+        raw_rows=raw,
+        strong_rows=strong,
+        outcome=outcome,
+        teacher=teacher,
+        clean_teacher=clean_teacher,
+    )
+    assert tuple(tables) == ("persistent_wrong", "recovered_relapsed", "recovered_stable")
+    assert sum(table["count"] for table in tables.values()) == len(taxonomy)
+    assert tables["persistent_wrong"]["online_current_wrong_overlap"] == {"count": 1, "fraction": 1.0}
 
 
 def test_blinded_renderer_emits_only_stable_id_label_and_image_path(

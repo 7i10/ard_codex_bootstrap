@@ -386,6 +386,82 @@ def _taxonomy_distributions(
     return summary
 
 
+def _dense_nr_subtype_tables(
+    taxonomy: Mapping[int, str],
+    *,
+    online_current_wrong: set[int],
+    raw_rows: Mapping[int, Mapping[str, Any]],
+    strong_rows: Mapping[int, Mapping[str, Any]],
+    outcome: Mapping[int, Mapping[int, Mapping[str, Any]]],
+    teacher: Mapping[int, Mapping[str, float | bool]],
+    clean_teacher: Mapping[int, Mapping[str, float | bool]],
+) -> dict[str, Any]:
+    """D5 table over the dense strong-domain NR partition only."""
+    expected = ("persistent_wrong", "recovered_relapsed", "recovered_stable")
+    if set(taxonomy.values()) - set(expected):
+        raise StrongDiagnosticsError("dense NR taxonomy contains an unknown subtype")
+    outcome_epochs = tuple(sorted(outcome))[-3:]
+    if len(outcome_epochs) != 3:
+        raise StrongDiagnosticsError("D5 plateau table requires exactly three outcome epochs")
+    tables: dict[str, Any] = {}
+    for kind in expected:
+        members = sorted(item for item, value in taxonomy.items() if value == kind)
+        measures = {item: _student_measures(raw_rows[item]) for item in members}
+        failures = {
+            item: sum(not bool(outcome[epoch][item]["correct"]) for epoch in outcome_epochs)
+            for item in members
+        }
+        tables[kind] = {
+            "count": len(members),
+            "class_counts": dict(Counter(int(strong_rows[item]["class_id"]) for item in members)),
+            "online_current_wrong_overlap": {
+                "count": len(set(members) & online_current_wrong),
+                "fraction": len(set(members) & online_current_wrong) / len(members) if members else None,
+            },
+            "student": {
+                "clean_wrong": sum(not bool(measures[item]["clean_correct"]) for item in members),
+                "clean_correct_strong_wrong": sum(bool(measures[item]["clean_correct"]) and not bool(measures[item]["robust_correct"]) for item in members),
+                "clean_probability_margin": _quantiles([float(measures[item]["clean_probability_margin"]) for item in members]),
+                "adversarial_probability_margin": _quantiles([float(measures[item]["adversarial_probability_margin"]) for item in members]),
+                "clean_logit_margin": _quantiles([float(measures[item]["clean_logit_margin"]) for item in members]),
+                "adversarial_logit_margin": _quantiles([float(measures[item]["adversarial_logit_margin"]) for item in members]),
+                "adversarial_ce": _quantiles([float(measures[item]["adversarial_ce"]) for item in members]),
+                "probability_margin_drop": _quantiles([float(measures[item]["probability_margin_drop"]) for item in members]),
+                "logit_margin_drop": _quantiles([float(measures[item]["logit_margin_drop"]) for item in members]),
+                "prediction_flip": sum(bool(measures[item]["prediction_flip"]) for item in members),
+            },
+            "teacher": {
+                "clean": {
+                    "correct": sum(bool(clean_teacher[item]["correct"]) for item in members),
+                    "wrong": sum(not bool(clean_teacher[item]["correct"]) for item in members),
+                    "true_probability": _quantiles([float(clean_teacher[item]["true_probability"]) for item in members]),
+                    "max_wrong_probability": _quantiles([float(clean_teacher[item]["max_wrong_probability"]) for item in members]),
+                    "signed_dominance": _quantiles([float(clean_teacher[item]["dominance"]) for item in members]),
+                    "entropy": _quantiles([float(clean_teacher[item]["entropy"]) for item in members]),
+                },
+                "adversarial": {
+                    "correct": sum(bool(teacher[item]["correct"]) for item in members),
+                    "wrong": sum(not bool(teacher[item]["correct"]) for item in members),
+                    "true_probability": _quantiles([float(teacher[item]["true_probability"]) for item in members]),
+                    "max_wrong_probability": _quantiles([float(teacher[item]["max_wrong_probability"]) for item in members]),
+                    "signed_dominance": _quantiles([float(teacher[item]["dominance"]) for item in members]),
+                    "entropy": _quantiles([float(teacher[item]["entropy"]) for item in members]),
+                },
+                "clean_adversarial_js": _quantiles([float(strong_rows[item]["teacher_js"]) for item in members]),
+                "correctness_flip": sum(bool(teacher[item]["correct"]) != bool(clean_teacher[item]["correct"]) for item in members),
+            },
+            "plateau_pattern_counts": {
+                "all_wrong": sum(failures[item] == 3 for item in members),
+                "majority_wrong_mixed": sum(failures[item] == 2 for item in members),
+                "majority_correct_mixed": sum(failures[item] == 1 for item in members),
+                "all_correct": sum(failures[item] == 0 for item in members),
+            },
+        }
+    if sum(int(table["count"]) for table in tables.values()) != len(taxonomy):
+        raise StrongDiagnosticsError("dense NR subtype partition count drifted")
+    return tables
+
+
 def _set_overlap(left: set[int], right: set[int]) -> dict[str, int | float | None]:
     union = left | right
     return {
@@ -576,6 +652,15 @@ def analyze_run(*, label: str, feature_observations: Path, feature_lineage: Path
             },
             "dense_strong_domain_non_recovery": dict(nr),
             "dense_non_recovery_class_counts": {kind: dict(Counter(int(feature[anchor][item]["class_id"]) for item, value in nr_taxonomy.items() if value == kind)) for kind in sorted(set(nr_taxonomy.values()))},
+            "dense_strong_domain_non_recovery_subtypes": _dense_nr_subtype_tables(
+                nr_taxonomy,
+                online_current_wrong=eligible_cw,
+                raw_rows=raw_feature[anchor],
+                strong_rows=feature[anchor],
+                outcome=outcome,
+                teacher=teacher,
+                clean_teacher=clean_teacher,
+            ),
         }
         if anchor == 79:
             blind_rows = _blinded_candidate_rows(
