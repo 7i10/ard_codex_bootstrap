@@ -232,7 +232,7 @@ def build(args: argparse.Namespace) -> None:
     create_intervention_forks(
         parent_checkpoint=args.parent,
         parent_resolved_config=args.parent_config,
-        parent_manifest=args.parent_manifest,
+        parent_manifest=args.lineage_root / args.label / "parent-manifest.json",
         arm_config_paths=config_paths,
         root=Path.cwd(),
         git_state_collector=lambda _: {"sha": args.git_sha, "dirty": False},
