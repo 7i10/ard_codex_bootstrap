@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import ard.cli.ffnr_state_mechanism as state_cli
 from ard.analysis.ffnr_state_mechanism import (
     FFNRStateMechanismError,
     _endpoint,
@@ -80,3 +81,32 @@ def test_cross_seed_models_keep_response_terms_out_of_exact_dependence() -> None
     ]
     assert rows[-1]["fields"] == ["mS_adv", "mT_adv"]
     assert "delta_auroc_vs_M0" in rows[-1]
+
+
+def test_intermediate_payload_tampering_is_rejected(tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("frozen\n", encoding="utf-8")
+    inputs = {}
+    for name in (
+        "feature_observations",
+        "feature_lineage",
+        "outcome_observations",
+        "outcome_lineage",
+        "online_states",
+        "online_lineage",
+    ):
+        path = tmp_path / name
+        path.write_bytes(name.encode())
+        inputs[name] = path
+    monkeypatch.setattr(state_cli, "_tracked_clean_provenance", lambda: {"git": {"sha": "test", "dirty": False}})
+    report = {
+        "contract": "ffnr_state_mechanism_v1",
+        "label": "L2",
+        "input_identity": {"input_sha256": {name: state_cli.sha256_file(path) for name, path in inputs.items()}},
+    }
+    bound = state_cli._bind_intermediate(report, config_path=config_path)
+    config = {"runs": {"L2": inputs}}
+    state_cli._validate_intermediate(bound, label="L2", config=config, config_path=config_path)
+    bound["input_identity"]["tampered"] = True
+    with pytest.raises(FFNRStateMechanismError, match="payload hash drifted"):
+        state_cli._validate_intermediate(bound, label="L2", config=config, config_path=config_path)

@@ -36,6 +36,22 @@ ANCHORS = (39, 59, 79)
 TERMINAL_EPOCHS = (189, 194, 199)
 ENDPOINTS = {"majority": 2, "all": 3}
 QUANTILES = (0.10, 0.20, 0.25, 1.0 / 3.0)
+EXPECTED_ONLINE_ATTACK = {
+    "epsilon": "8/255",
+    "epsilon_value": 8.0 / 255.0,
+    "input_domain": "pixel_0_1",
+    "kl_target": "teacher_clean",
+    "loss": "kl",
+    "norm": "linf",
+    "random_start": True,
+    "step_size": "2/255",
+    "step_size_value": 2.0 / 255.0,
+    "steps": 10,
+    "student_mode": "eval",
+    "teacher_mode": "eval",
+    "temperature": 1.0,
+    "temperature_squared": True,
+}
 
 _FEATURE_COLUMNS = {
     "namespace",
@@ -554,6 +570,8 @@ def analyze_run(
         if feature_meta.get(key) != outcome_meta.get(key):
             raise FFNRStateMechanismError("feature/outcome replay lineage identity drifted")
     online, online_meta = _online_panel(online_states, online_lineage, expected_count)
+    if online_meta.get("attack_identity") != EXPECTED_ONLINE_ATTACK:
+        raise FFNRStateMechanismError("online state attack identity is not the frozen KL-PGD10 contract")
     for key in ("run_id", "config_hash", "teacher", "dataset_identity"):
         replay_value = (
             feature_meta.get("saved_resolved_config_mapping_sha256") if key == "config_hash" else feature_meta.get(key)

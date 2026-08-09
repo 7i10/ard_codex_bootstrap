@@ -19,8 +19,11 @@ import yaml
 from ard.analysis.ffnr_state_mechanism import (
     CONTRACT,
     FFNRStateMechanismError,
+    _tracked_clean_provenance,
     analyze_run,
+    canonical_json,
     cross_seed_models,
+    sha256_file,
     write_outputs,
 )
 from ard.analysis.ffnr_strong_replay import EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256
@@ -85,6 +88,45 @@ def load_config(path: Path) -> dict[str, Any]:
     return parsed
 
 
+def _bind_intermediate(report: dict[str, Any], *, config_path: Path) -> dict[str, Any]:
+    body = dict(report)
+    binding = {
+        "config_sha256": sha256_file(config_path),
+        "analysis_provenance": _tracked_clean_provenance(),
+    }
+    binding["report_sha256"] = __import__("hashlib").sha256(canonical_json(body)).hexdigest()
+    body["_intermediate_binding"] = binding
+    return body
+
+
+def _validate_intermediate(
+    report: Mapping[str, Any], *, label: str, config: Mapping[str, Any], config_path: Path
+) -> dict[str, Any]:
+    if report.get("contract") != CONTRACT or report.get("label") != label:
+        raise FFNRStateMechanismError("intermediate report contract/label drifted")
+    binding = report.get("_intermediate_binding")
+    if not isinstance(binding, Mapping):
+        raise FFNRStateMechanismError("intermediate report is not hash-bound")
+    if (
+        binding.get("config_sha256") != sha256_file(config_path)
+        or binding.get("analysis_provenance") != _tracked_clean_provenance()
+    ):
+        raise FFNRStateMechanismError("intermediate source/config provenance drifted")
+    body = dict(report)
+    body.pop("_intermediate_binding", None)
+    expected_digest = __import__("hashlib").sha256(canonical_json(body)).hexdigest()
+    if binding.get("report_sha256") != expected_digest:
+        raise FFNRStateMechanismError("intermediate report payload hash drifted")
+    identity = report.get("input_identity")
+    if not isinstance(identity, Mapping) or not isinstance(identity.get("input_sha256"), Mapping):
+        raise FFNRStateMechanismError("intermediate input identity is incomplete")
+    run_config = config["runs"][label]
+    for name, path in run_config.items():
+        if identity["input_sha256"].get(name) != sha256_file(path):
+            raise FFNRStateMechanismError(f"intermediate input hash drifted: {label}.{name}")
+    return body
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path)
@@ -100,8 +142,18 @@ def main(argv: list[str] | None = None) -> int:
         if not args.l2_report or not args.l4_report:
             raise FFNRStateMechanismError("merge-only requires both single-run reports")
         reports = {
-            "L2": json.loads(args.l2_report.resolve().read_text(encoding="utf-8")),
-            "L4": json.loads(args.l4_report.resolve().read_text(encoding="utf-8")),
+            "L2": _validate_intermediate(
+                json.loads(args.l2_report.resolve().read_text(encoding="utf-8")),
+                label="L2",
+                config=config,
+                config_path=config_path,
+            ),
+            "L4": _validate_intermediate(
+                json.loads(args.l4_report.resolve().read_text(encoding="utf-8")),
+                label="L4",
+                config=config,
+                config_path=config_path,
+            ),
         }
         models = cross_seed_models(reports)
         paths = write_outputs(
@@ -123,6 +175,7 @@ def main(argv: list[str] | None = None) -> int:
         if output_dir.exists():
             raise FFNRStateMechanismError("refusing to overwrite a single-run intermediate directory")
         output_dir.mkdir(parents=True, exist_ok=False)
+        report = _bind_intermediate(report, config_path=config_path)
         (output_dir / "single-report.json").write_text(json.dumps(report, sort_keys=True) + "\n", encoding="utf-8")
         print(output_dir / "single-report.json")
         return 0
