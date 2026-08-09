@@ -30,8 +30,8 @@ mT_adv` です。保存された correctness と margin 符号の不一致は fa
 にしました。clean correctness は3-stateへ混ぜず、別flagとして保持しています。
 
 再現用正本は [machine-readable report](experiments/ffnr_state_and_teacher_mechanism_v1.json)
-（SHA-256 `ae14eedfef17b662fec1902b9e7d6359256fa92c09890b180372c154f3a47f9b`）です。
-解析 source SHA は `8a0098f6a6bcf705f80e418e23551659415b8cfd`、dirty=false です。
+（SHA-256 `805182a36796317c5a556554db9f11384330772f7c1c5c54ed41e4cd654536ae`）です。
+解析 source SHA は `7ac7d1ba5bb52be241867a2b4938675fb4d42f44`、dirty=false です。
 
 ## 連続 risk surface
 
