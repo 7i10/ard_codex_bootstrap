@@ -81,6 +81,8 @@ def test_oof_folds_are_exactly_class_stratified_and_heldout_values_do_not_fit_tr
     )
     assert train_vectors == mutated_train_vectors
     first = _oof_scores(ids, labels, features, classes)
+    labels_with_extra = {**labels, 99_999: 1}
+    assert _oof_scores(ids, labels_with_extra, features, classes) == first
     assert set(first) == {"M", "M+D", "H", "H+D", "M+H", "M+H+D"}
     assert first["M+D"]["folds"] == 5
 

@@ -304,6 +304,9 @@ def _blinded_candidate_rows(
 def _oof_scores(ids: Sequence[int], labels: Mapping[int, int], features: Mapping[str, Mapping[int, float]], classes: Mapping[int, int]) -> dict[str, Any]:
     """Five-fold class-stratified OOF logistic comparison using fold-local empirical ranks."""
     specs = {"M": ("M",), "M+D": ("M", "D"), "H": ("H",), "H+D": ("H", "D"), "M+H": ("M", "H"), "M+H+D": ("M", "H", "D")}
+    if not ids or len(set(ids)) != len(ids) or any(item not in labels or labels[item] not in {0, 1} for item in ids):
+        raise StrongDiagnosticsError("D3 OOF labels must cover every requested eligible ID")
+    subset_labels = {item: int(labels[item]) for item in ids}
     result: dict[str, Any] = {}
     assignment = _class_stratified_folds(ids, classes)
     for name, columns in specs.items():
@@ -311,20 +314,20 @@ def _oof_scores(ids: Sequence[int], labels: Mapping[int, int], features: Mapping
         for fold in range(5):
             train = [item for item in ids if assignment[item] != fold]
             test = [item for item in ids if assignment[item] == fold]
-            if not train or not test or len({labels[item] for item in train}) < 2:
+            if not train or not test or len({subset_labels[item] for item in train}) < 2:
                 continue
             train_vectors, test_vectors = _fold_rank_vectors(train=train, test=test, columns=columns, features=features)
             try:
-                probabilities = _vectorized_logistic_predict(train_vectors, [labels[item] for item in train], test_vectors)
+                probabilities = _vectorized_logistic_predict(train_vectors, [subset_labels[item] for item in train], test_vectors)
             except Exception as exc:
                 raise StrongDiagnosticsError("D3 fold-local OOF logistic fit failed") from exc
             prediction.update(dict(zip(test, probabilities, strict=True)))
         if set(prediction) != set(ids):
             raise StrongDiagnosticsError("class-stratified OOF folds lack complete coverage")
         rank = deterministic_midranks(prediction)
-        metric = _metric(rank, labels)
-        logloss = -sum(labels[item] * math.log(max(prediction[item], 1e-12)) + (1 - labels[item]) * math.log(max(1 - prediction[item], 1e-12)) for item in ids) / len(ids)
-        brier = sum((prediction[item] - labels[item]) ** 2 for item in ids) / len(ids)
+        metric = _metric(rank, subset_labels)
+        logloss = -sum(subset_labels[item] * math.log(max(prediction[item], 1e-12)) + (1 - subset_labels[item]) * math.log(max(1 - prediction[item], 1e-12)) for item in ids) / len(ids)
+        brier = sum((prediction[item] - subset_labels[item]) ** 2 for item in ids) / len(ids)
         result[name] = {"folds": 5, "auroc": metric["auroc"], "auprc": metric["auprc"], "logloss": logloss, "brier": brier}
     for base, expanded in (("M", "M+D"), ("H", "H+D"), ("M+H", "M+H+D")):
         result[expanded]["delta_vs_" + base] = {key: result[expanded][key] - result[base][key] for key in ("auroc", "auprc", "logloss", "brier") if result[expanded][key] is not None and result[base][key] is not None}
