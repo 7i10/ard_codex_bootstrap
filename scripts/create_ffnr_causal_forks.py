@@ -63,8 +63,6 @@ def _mask(
         "reference_selected_count": None,
         "reference_selected_class_counts": None,
         "reference_history_selector_spec_sha256": None,
-        "route": None,
-        "anchor_robust_correct": None,
     }
     payload: dict[str, Any] = {
         "schema_version": 1,
