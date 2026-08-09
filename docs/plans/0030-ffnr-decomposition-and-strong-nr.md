@@ -4,7 +4,7 @@
 
 - Owner: main thread (integration), Terra (single implementation owner)
 - Branch / base SHA: `master` / `8716cd5`
-- Current milestone: D3-D5 implementation
+- Current milestone: complete
 - Last updated: 2026-08-09
 
 ## Purpose
@@ -61,66 +61,66 @@ consolidated scientific review.
 
 ## D3: teacher-signal decomposition
 
-- [ ] Report teacher-adversarial correct/wrong counts and future-failure rates,
+- [x] Report teacher-adversarial correct/wrong counts and future-failure rates,
   Wilson intervals, risk difference, and risk ratio.
-- [ ] Report signed teacher dominance distributions by teacher state/outcome.
-- [ ] Report Spearman correlation with strong Student logit-margin risk and
+- [x] Report signed teacher dominance distributions by teacher state/outcome.
+- [x] Report Spearman correlation with strong Student logit-margin risk and
   online Student history.
-- [ ] Run deterministic class-stratified stable-ID five-fold OOF logistic
+- [x] Run deterministic class-stratified stable-ID five-fold OOF logistic
   comparisons: `M` vs `M+D`, `H` vs `H+D`, and `M+H` vs `M+H+D`.
-- [ ] Fit transforms on training folds only and report AUROC, AUPRC, log-loss,
+- [x] Fit transforms on training folds only and report AUROC, AUPRC, log-loss,
   Brier, and paired deltas per run/anchor/endpoint.
 
 ## D4: FF snapshot taxonomy
 
-- [ ] Build disjoint online-snapshot classes from correctness available by the
+- [x] Build disjoint online-snapshot classes from correctness available by the
   anchor: oscillating (at least two flips), transient-correct (final correct
   suffix one), stable-then-future-failure (final correct suffix at least two),
   and other/insufficient.  Epoch 39 is necessarily insufficient.
-- [ ] Repeat separately in the strong-feature snapshot domain.  Never combine
+- [x] Repeat separately in the strong-feature snapshot domain.  Never combine
   online and replay correctness into one transition sequence.
-- [ ] Report C/C, C/W, W/C, W/W eligibility transitions, subtype counts,
+- [x] Report C/C, C/W, W/C, W/W eligibility transitions, subtype counts,
   teacher/student distributions, cross-seed overlap, and online-vs-strong
   current-state discordance.
 
 ## D5: strong current-wrong and NR
 
-- [ ] Report clean difficulty, robustness-specific attackability, strong-domain
+- [x] Report clean difficulty, robustness-specific attackability, strong-domain
   disagreement, Student clean-to-adversarial response, teacher clean/adv state,
   JS/entropy/dominance, and plateau pattern.
-- [ ] Generate a deterministic class-balanced blinded candidate-ID/image panel
+- [x] Generate a deterministic class-balanced blinded candidate-ID/image panel
   for persistent-clean-wrong plus teacher-wrong cases and matched controls.
   Human image/label-quality annotation remains external to logits.
-- [ ] Replay only missing CE-PGD20 epochs `39..199` every five epochs.  Split L2
+- [x] Replay only missing CE-PGD20 epochs `39..199` every five epochs.  Split L2
   across two Hamster GPUs and L4 across three Ferret GPUs; reuse existing
   feature/outcome epochs and their hashes.
-- [ ] Merge chunks fail-closed on attack, source, run/config, checkpoint,
+- [x] Merge chunks fail-closed on attack, source, run/config, checkpoint,
   stable-ID/class, and epoch coverage.
-- [ ] In the dense strong domain only, classify current-wrong samples as
+- [x] In the dense strong domain only, classify current-wrong samples as
   persistent-wrong, recovered-stable, or recovered-relapsed.  Do not interpolate
   between five-epoch observations.
 
 ## Verification and stopping rules
 
-- [ ] Focused unit tests cover sparse joins, probability algebra, fold-local
+- [x] Focused unit tests cover sparse joins, probability algebra, fold-local
   transforms, deterministic folds, FF partition completeness, online/strong
   domain separation, current-wrong and dense-NR partitions, lineage hashes,
   and blinded-panel leakage.
-- [ ] One real missing-epoch replay is validated before the five-job launch only
+- [x] One real missing-epoch replay is validated before the five-job launch only
   if the execution path differs from the already passed `e5cb442` replay.  A
   config-only epoch subset does not require a ceremonial repeat smoke.
-- [ ] Compute point estimates before any bootstrap.  No intervention, new
+- [x] Compute point estimates before any bootstrap.  No intervention, new
   training, official test, or AutoAttack is authorized by this milestone.
-- [ ] Run one consolidated scientific review after code, replay outputs, and
+- [x] Run one consolidated scientific review after code, replay outputs, and
   report are stable; re-review only a P0/P1 fix delta.
 
 ## Milestones and commit boundaries
 
 - [x] M0 — analysis/config/test implementation; focused CPU verification.
   Planned commit: `Implement FFNR decomposition diagnostics`.
-- [ ] M1 — five-way dense replay, hash-verified collection, point report.
+- [x] M1 — five-way dense replay, hash-verified collection, point report.
   Outputs remain ignored cache artifacts; no stochastic result is committed.
-- [ ] M2 — consolidated scientific review and result documentation.
+- [x] M2 — consolidated scientific review and result documentation.
   Planned commit: `Document FFNR decomposition results`.
 
 Rollback is the last pushed immutable commit.  Replay jobs run only from the
@@ -170,3 +170,20 @@ pushed M0 SHA, so reverting analysis code cannot mutate completed checkpoints.
 - 2026-08-09: pushed execution SHA `44f5811`; launched L2 chunks on Hamster
   GPUs 0/1 and L4 chunks on Ferret GPUs 0/1/2.  All five jobs reported live
   processes; Hamster utilization confirmed that replay kernels were active.
+- 2026-08-09: all five dense replay chunks completed and were hash-verified;
+  no checkpoint was recomputed after collection.  The first formal CPU report
+  completed from `eb6aa98` and established the D3/D4/D5 point estimates.
+- 2026-08-09: the consolidated scientific review found no P0 and five
+  analysis-contract P1s.  Actual replay bytes were consistent, so the fix is
+  limited to fail-closed lineage/class checks, explicit common-terminal epochs,
+  blinded-panel eligibility/order, and teacher flip naming; GPU rerun is not
+  required.
+- 2026-08-09: regenerated the formal report from tracked-clean `6a90011` after
+  normalizing only the execution-specific CUDA device ordinal.  Report SHA-256
+  is `cfdd3f66174562815b7550ee1d7cd7d02752eaaa160d45426c872e8c12eec269`;
+  the bounded blind panel contains 200 role-free PNG rows.
+- 2026-08-09: fix-delta scientific review approved with no remaining P0/P1.
+  It independently verified endpoint epochs, dense lineage, per-ID class joins,
+  blind target/order, teacher flip semantics, formal source SHA, and artifact
+  hashes.  Milestone closed without new training, official test, AutoAttack, or
+  a GPU replay rerun.
