@@ -61,8 +61,10 @@ def _read(path: Path, *, expected_epochs: tuple[int, ...]) -> pd.DataFrame:
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"{path} missing columns: {sorted(missing)}")
-    if tuple(sorted(frame["epoch"].unique())) != expected_epochs:
-        raise ValueError(f"{path} epoch coverage is not exactly {expected_epochs}")
+    available = set(int(epoch) for epoch in frame["epoch"].unique())
+    if not set(expected_epochs).issubset(available):
+        raise ValueError(f"{path} is missing one of required epochs {expected_epochs}")
+    frame = frame[frame["epoch"].isin(expected_epochs)].copy()
     if frame["sample_id"].duplicated().any():
         # A sample occurs once per epoch, but never twice in one epoch.
         if frame.duplicated(["sample_id", "epoch"]).any():
@@ -73,7 +75,7 @@ def _read(path: Path, *, expected_epochs: tuple[int, ...]) -> pd.DataFrame:
 def _condition_paths(root: Path, seed: str, condition: str) -> Path:
     if condition == "ce_pgd20":
         return root / f"{seed}-ce20.parquet"
-    return root / seed / condition / "strong-observations.parquet"
+    return root / seed.lower() / condition / "strong-observations.parquet"
 
 
 def _condition_frame(root: Path, seed: str, condition: str, existing_ce20: Path | None) -> pd.DataFrame:
