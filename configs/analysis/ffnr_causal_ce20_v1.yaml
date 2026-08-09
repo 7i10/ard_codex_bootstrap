@@ -1,0 +1,57 @@
+schema_version: 1
+contract: ffnr_causal_ce20_v1
+expected_count: 45000
+stable_id_class_universe_sha256: 9a1a7929e47196ca4cb49a7c2bea5029170ecdb1c18f9f38c05ea14d9913bf60
+checkpoint_inventory: ../../.cache/analysis/ffnr-causal-ce20-checkpoints-wandb/inventory.json
+horizons: [84, 89, 94]
+replay_batch_size: 128
+attack_seed: 20260810
+replay_device_type: cuda
+bootstrap:
+  replicates: 2000
+  seed: 20260810
+  strata: class_id
+s2_overlay: null
+runs:
+  L2:
+    C79: &l2_c79
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L2/C79/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/C79/resolved_config.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L2/C79/epoch-metrics.parquet
+    RA: &l2_ra
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L2/RA/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/RA/resolved_config.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L2/RA/epoch-metrics.parquet
+    RAR: &l2_rar
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L2/RAR/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/RAR/resolved_config.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L2/RAR/epoch-metrics.parquet
+    RB: &l2_rb
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L2/RB/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/RB/resolved_config.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L2/RB/epoch-metrics.parquet
+    RBR: &l2_rbr
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L2/RBR/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/RBR/resolved_config.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L2/RBR/epoch-metrics.parquet
+  L4:
+    C79: &l4_c79
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/C79/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/C79.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/C79/epoch-metrics.parquet
+    RA: &l4_ra
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/RA/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/RA.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/RA/epoch-metrics.parquet
+    RAR: &l4_rar
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/RAR/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/RAR.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/RAR/epoch-metrics.parquet
+    RB: &l4_rb
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/RB/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/RB.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/RB/epoch-metrics.parquet
+    RBR: &l4_rbr
+      manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/RBR/manifest.json
+      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/RBR.yaml
+      validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/RBR/epoch-metrics.parquet
