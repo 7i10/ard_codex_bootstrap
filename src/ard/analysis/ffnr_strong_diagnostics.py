@@ -41,6 +41,7 @@ CONTRACT = "ffnr_strong_diagnostics_v1"
 ANCHORS = (39, 59, 79)
 PRIMARY_ENDPOINT = "majority"
 SECONDARY_ENDPOINT = "all"
+COMMON_TERMINAL_EPOCHS = (189, 194, 199)
 MAX_BLIND_PAIRS_PER_CLASS = 5
 
 
@@ -98,6 +99,7 @@ def _teacher(row: Mapping[str, Any], *, clean: bool = False) -> dict[str, float 
     prediction = maxima[0]
     wrong = max(value for index, value in enumerate(values) if index != label)
     return {
+        "prediction": prediction,
         "correct": prediction == label,
         "true_probability": values[label],
         "max_wrong_probability": wrong,
@@ -126,11 +128,31 @@ def _raw_strong_panel(
 
 
 def _endpoint(outcome: Mapping[int, Mapping[int, Mapping[str, Any]]], endpoint: str) -> dict[int, int]:
-    epochs = tuple(sorted(outcome))[-3:]
-    if len(epochs) != 3 or endpoint not in {PRIMARY_ENDPOINT, SECONDARY_ENDPOINT}:
-        raise StrongDiagnosticsError("endpoint requires exactly three frozen plateau checkpoints")
+    if not set(COMMON_TERMINAL_EPOCHS).issubset(outcome) or endpoint not in {PRIMARY_ENDPOINT, SECONDARY_ENDPOINT}:
+        raise StrongDiagnosticsError("endpoint requires the frozen common terminal CE-PGD20 epochs")
     required = 2 if endpoint == PRIMARY_ENDPOINT else 3
-    return {sample_id: int(sum(not bool(outcome[epoch][sample_id]["correct"]) for epoch in epochs) >= required) for sample_id in outcome[epochs[0]]}
+    return {
+        sample_id: int(sum(not bool(outcome[epoch][sample_id]["correct"]) for epoch in COMMON_TERMINAL_EPOCHS) >= required)
+        for sample_id in outcome[COMMON_TERMINAL_EPOCHS[0]]
+    }
+
+
+def _validate_online_strong_class_join(
+    feature: Mapping[int, Mapping[int, Mapping[str, Any]]],
+    outcome: Mapping[int, Mapping[int, Mapping[str, Any]]],
+    online: Mapping[int, Mapping[int, Mapping[str, Any]]],
+) -> set[int]:
+    ids = set(feature[39])
+    outcome_anchor = next(iter(outcome))
+    if ids != set(outcome[outcome_anchor]) or ids != set(online[39]):
+        raise StrongDiagnosticsError("sparse panel stable-ID join drifted")
+    if any(
+        int(feature[39][item]["class_id"]) != int(outcome[outcome_anchor][item]["class_id"])
+        or int(feature[39][item]["class_id"]) != int(online[39][item]["class_id"])
+        for item in ids
+    ):
+        raise StrongDiagnosticsError("online/strong stable-ID class join drifted")
+    return ids
 
 
 def _snapshot_taxonomy(sequence: Sequence[bool]) -> str:
@@ -163,20 +185,114 @@ def _dense_non_recovery(sequence: Sequence[bool]) -> str:
 def _merge_dense_chunks(
     chunks: Sequence[Mapping[str, Path]], *, reference: Mapping[str, Any], expected_count: int, expected_universe_sha256: str
 ) -> dict[int, dict[int, dict[str, Any]]]:
+    reference_identity = _validated_replay_identity(reference)
     merged: dict[int, dict[int, dict[str, Any]]] = {}
     for chunk in chunks:
         observations, lineage_path = chunk.get("observations"), chunk.get("lineage")
         if not isinstance(observations, Path) or not isinstance(lineage_path, Path):
             raise StrongDiagnosticsError("dense chunk paths are invalid")
         meta = _strong_lineage(path=lineage_path, observations=observations, role="feature", expected_count=expected_count, expected_universe_sha256=expected_universe_sha256)
-        for key in ("run_id", "teacher", "dataset_identity", "attack_identity", "saved_resolved_config_mapping_sha256", "manifest_sha256"):
-            if meta.get(key) != reference.get(key):
-                raise StrongDiagnosticsError("dense chunk lineage drifted from sparse feature replay")
+        if _validated_replay_identity(meta) != reference_identity:
+            raise StrongDiagnosticsError("dense chunk lineage drifted from sparse feature replay")
         panel = _strong_panel(_read_parquet(observations), epochs=meta["requested_epochs"], expected_count=expected_count, expected_universe_sha256=expected_universe_sha256)
         if set(merged) & set(panel):
             raise StrongDiagnosticsError("dense chunks overlap an epoch")
         merged.update(panel)
     return merged
+
+
+def _validated_replay_identity(meta: Mapping[str, Any]) -> dict[str, Any]:
+    """Check the actual per-checkpoint replay/cache lineage before merging chunks."""
+    epochs = meta.get("requested_epochs")
+    checkpoints, caches, results = meta.get("checkpoints"), meta.get("checkpoint_cache_identities"), meta.get("results")
+    if (
+        not isinstance(epochs, list)
+        or tuple(epochs) != tuple(sorted(set(epochs)))
+        or any(not isinstance(epoch, int) or isinstance(epoch, bool) for epoch in epochs)
+        or not isinstance(checkpoints, list)
+        or not isinstance(caches, list)
+        or not isinstance(results, list)
+        or not len(epochs) == len(checkpoints) == len(caches) == len(results)
+    ):
+        raise StrongDiagnosticsError("strong replay checkpoint lineage is incomplete")
+    source = meta.get("analysis_provenance")
+    inventory_path, inventory_sha = meta.get("checkpoint_inventory"), meta.get("checkpoint_inventory_sha256")
+    if (
+        not isinstance(source, Mapping)
+        or not isinstance(source.get("source_sha256"), str)
+        or not isinstance(inventory_path, str)
+        or not isinstance(inventory_sha, str)
+        or len(inventory_sha) != 64
+    ):
+        raise StrongDiagnosticsError("strong replay source/inventory lineage is incomplete")
+    expected_epochs = set(epochs)
+    top_by_epoch: dict[int, Mapping[str, Any]] = {}
+    result_by_epoch: dict[int, Mapping[str, Any]] = {}
+    cache_by_epoch: dict[int, Mapping[str, Any]] = {}
+    for checkpoint in checkpoints:
+        if not isinstance(checkpoint, Mapping) or not isinstance(checkpoint.get("epoch"), int):
+            raise StrongDiagnosticsError("strong replay checkpoint entry is invalid")
+        epoch = int(checkpoint["epoch"])
+        if epoch not in expected_epochs or epoch in top_by_epoch or not isinstance(checkpoint.get("path"), str) or not isinstance(checkpoint.get("sha256"), str):
+            raise StrongDiagnosticsError("strong replay checkpoint selection drifted")
+        top_by_epoch[epoch] = checkpoint
+    for result in results:
+        if not isinstance(result, Mapping) or not isinstance(result.get("epoch"), int):
+            raise StrongDiagnosticsError("strong replay result entry is invalid")
+        epoch = int(result["epoch"])
+        if epoch not in expected_epochs or epoch in result_by_epoch or result.get("checkpoint_sha256") != top_by_epoch[epoch].get("sha256"):
+            raise StrongDiagnosticsError("strong replay result/checkpoint binding drifted")
+        result_by_epoch[epoch] = result
+    for cache in caches:
+        checkpoint = cache.get("checkpoint") if isinstance(cache, Mapping) else None
+        if not isinstance(cache, Mapping) or not isinstance(checkpoint, Mapping) or not isinstance(checkpoint.get("epoch"), int):
+            raise StrongDiagnosticsError("strong replay cache identity is invalid")
+        epoch = int(checkpoint["epoch"])
+        if epoch not in expected_epochs or epoch in cache_by_epoch:
+            raise StrongDiagnosticsError("strong replay cache checkpoint epoch drifted")
+        top = top_by_epoch[epoch]
+        if any(checkpoint.get(key) != top.get(key) for key in ("epoch", "path", "sha256")):
+            raise StrongDiagnosticsError("strong replay cache checkpoint bytes drifted")
+        if (
+            checkpoint.get("run_id") != meta.get("run_id")
+            or checkpoint.get("config_hash") != meta.get("saved_resolved_config_mapping_sha256")
+            or not isinstance(checkpoint.get("scientific_git_sha"), str)
+            or cache.get("contract") != meta.get("contract")
+            or not isinstance(cache.get("analysis_provenance"), Mapping)
+            or cache["analysis_provenance"].get("source_sha256") != source.get("source_sha256")
+            or cache.get("attack_identity") != meta.get("attack_identity")
+            or cache.get("attack_identity_sha256") != meta.get("attack_identity_sha256")
+            or cache.get("dataset") != meta.get("dataset_identity")
+            or cache.get("teacher") != meta.get("teacher")
+            or cache.get("runtime") != meta.get("runtime")
+            or cache.get("replay_batch_size") != meta.get("replay_batch_size")
+            or cache.get("attack_seed_base") != meta.get("attack_seed_base")
+            or cache.get("seed_formula") != meta.get("seed_formula")
+        ):
+            raise StrongDiagnosticsError("strong replay cache identity drifted")
+        cache_by_epoch[epoch] = cache
+    if set(top_by_epoch) != expected_epochs or set(result_by_epoch) != expected_epochs or set(cache_by_epoch) != expected_epochs:
+        raise StrongDiagnosticsError("strong replay selected checkpoint coverage drifted")
+    scientific_shas = {str(cache["checkpoint"]["scientific_git_sha"]) for cache in cache_by_epoch.values()}
+    if len(scientific_shas) != 1:
+        raise StrongDiagnosticsError("strong replay selected checkpoints disagree on scientific Git SHA")
+    return {
+        "run_id": meta.get("run_id"),
+        "teacher": meta.get("teacher"),
+        "dataset_identity": meta.get("dataset_identity"),
+        "attack_identity": meta.get("attack_identity"),
+        "attack_identity_sha256": meta.get("attack_identity_sha256"),
+        "attack_seed_base": meta.get("attack_seed_base"),
+        "seed_formula": meta.get("seed_formula"),
+        "runtime": meta.get("runtime"),
+        "replay_batch_size": meta.get("replay_batch_size"),
+        "saved_resolved_config_mapping_sha256": meta.get("saved_resolved_config_mapping_sha256"),
+        "manifest_sha256": meta.get("manifest_sha256"),
+        "checkpoint_inventory_name": Path(inventory_path).name,
+        "checkpoint_inventory_sha256": inventory_sha,
+        "source_sha256": source["source_sha256"],
+        "scientific_git_sha": next(iter(scientific_shas)),
+    }
 
 
 def _class_stratified_folds(ids: Sequence[int], classes: Mapping[int, int], *, folds: int = 5) -> dict[int, int]:
@@ -274,9 +390,14 @@ def _blinded_candidate_rows(
     taxonomy: Mapping[int, str],
     classes: Mapping[int, int],
     teacher: Mapping[int, Mapping[str, float | bool]],
+    student_clean_correct: Mapping[int, bool],
 ) -> list[dict[str, int | str]]:
     """Make deterministic class-matched blind target/control pairs from dense taxonomy only."""
-    target = {item for item, kind in taxonomy.items() if kind == "persistent_wrong" and not bool(teacher[item]["correct"])}
+    target = {
+        item
+        for item, kind in taxonomy.items()
+        if kind == "persistent_wrong" and not bool(student_clean_correct[item]) and not bool(teacher[item]["correct"])
+    }
     controls = {item for item, kind in taxonomy.items() if kind != "persistent_wrong"}
     selected: list[dict[str, int | str]] = []
     for class_id in range(10):
@@ -456,6 +577,7 @@ def _dense_nr_subtype_tables(
                     "entropy": _quantiles([float(teacher[item]["entropy"]) for item in members]),
                 },
                 "clean_adversarial_js": _quantiles([float(strong_rows[item]["teacher_js"]) for item in members]),
+                "prediction_flip": sum(int(teacher[item]["prediction"]) != int(clean_teacher[item]["prediction"]) for item in members),
                 "correctness_flip": sum(bool(teacher[item]["correct"]) != bool(clean_teacher[item]["correct"]) for item in members),
             },
             "plateau_pattern_counts": {
@@ -535,9 +657,7 @@ def analyze_run(*, label: str, feature_observations: Path, feature_lineage: Path
     required_dense_epochs = tuple(range(39, 200, 5))
     if tuple(sorted(dense)) != required_dense_epochs:
         raise StrongDiagnosticsError("dense CE-PGD20 epoch coverage is incomplete")
-    ids = set(feature[39])
-    if ids != set(outcome[next(iter(outcome))]) or ids != set(online[39]):
-        raise StrongDiagnosticsError("sparse panel stable-ID join drifted")
+    ids = _validate_online_strong_class_join(feature, outcome, online)
     endpoints = {name: _endpoint(outcome, name) for name in (PRIMARY_ENDPOINT, SECONDARY_ENDPOINT)}
     d3: dict[str, Any] = {}
     d4: dict[str, Any] = {}
@@ -574,12 +694,17 @@ def analyze_run(*, label: str, feature_observations: Path, feature_lineage: Path
                 for outcome in (0, 1)
             }
             d3[key] = {
+                "endpoint": {
+                    "kind": "common_terminal_ce_pgd20",
+                    "epochs": list(COMMON_TERMINAL_EPOCHS),
+                    "required_wrong": 2 if endpoint == PRIMARY_ENDPOINT else 3,
+                },
                 "eligibility": {"FF": len(eligible_ff), "current_wrong": len(eligible_cw)},
                 "teacher_failure_rates": rates,
                 "signed_dominance": {"teacher_correct": _quantiles([float(teacher[item]["dominance"]) for item in correct]), "teacher_wrong": _quantiles([float(teacher[item]["dominance"]) for item in wrong]), "teacher_correctness_x_outcome": d_strata},
                 "spearman": {"D_vs_logit_margin_risk": _spearman(features["D"], features["M"]), "D_vs_online_margin_ema_risk": _spearman(features["D"], features["H"]), "D_vs_online_correctness_frequency_risk": _spearman(features["D"], {item: float(online[anchor][item]["frequency_risk"]) for item in eligible_ff})},
                 "strong_margin_deciles": deciles,
-                "teacher_clean_adv_response": {"js": _quantiles([float(feature[anchor][item]["teacher_js"]) for item in eligible_ff]), "dominance_delta": _quantiles([float(teacher[item]["dominance"] - clean_teacher[item]["dominance"]) for item in eligible_ff]), "correctness_flip": sum(bool(teacher[item]["correct"]) != bool(clean_teacher[item]["correct"]) for item in eligible_ff)},
+                "teacher_clean_adv_response": {"js": _quantiles([float(feature[anchor][item]["teacher_js"]) for item in eligible_ff]), "dominance_delta": _quantiles([float(teacher[item]["dominance"] - clean_teacher[item]["dominance"]) for item in eligible_ff]), "prediction_flip": sum(int(teacher[item]["prediction"]) != int(clean_teacher[item]["prediction"]) for item in eligible_ff), "correctness_flip": sum(bool(teacher[item]["correct"]) != bool(clean_teacher[item]["correct"]) for item in eligible_ff)},
                 "oof": _oof_scores(sorted(eligible_ff), target, features, {item: int(feature[anchor][item]["class_id"]) for item in eligible_ff}),
             }
         ff_primary = {item for item in eligible_ff if endpoints[PRIMARY_ENDPOINT][item]}
@@ -637,7 +762,7 @@ def analyze_run(*, label: str, feature_observations: Path, feature_lineage: Path
                 bool(online[anchor][item]["current_correct"]) != bool(feature[anchor][item]["correct"])
                 for item in eligible_cw
             ),
-            "teacher": {"clean_correct": sum(bool(clean_teacher[item]["correct"]) for item in eligible_cw), "adversarial_correct": sum(bool(teacher[item]["correct"]) for item in eligible_cw), "clean_true_probability": _quantiles([float(clean_teacher[item]["true_probability"]) for item in eligible_cw]), "adversarial_true_probability": _quantiles([float(teacher[item]["true_probability"]) for item in eligible_cw]), "clean_max_wrong_probability": _quantiles([float(clean_teacher[item]["max_wrong_probability"]) for item in eligible_cw]), "adversarial_max_wrong_probability": _quantiles([float(teacher[item]["max_wrong_probability"]) for item in eligible_cw]), "clean_signed_dominance": _quantiles([float(clean_teacher[item]["dominance"]) for item in eligible_cw]), "adversarial_signed_dominance": _quantiles([float(teacher[item]["dominance"]) for item in eligible_cw]), "clean_entropy": _quantiles([float(clean_teacher[item]["entropy"]) for item in eligible_cw]), "adversarial_entropy": _quantiles([float(teacher[item]["entropy"]) for item in eligible_cw]), "clean_adversarial_js": _quantiles([float(feature[anchor][item]["teacher_js"]) for item in eligible_cw]), "prediction_flip": sum(bool(teacher[item]["correct"]) != bool(clean_teacher[item]["correct"]) for item in eligible_cw)},
+            "teacher": {"clean_correct": sum(bool(clean_teacher[item]["correct"]) for item in eligible_cw), "adversarial_correct": sum(bool(teacher[item]["correct"]) for item in eligible_cw), "clean_true_probability": _quantiles([float(clean_teacher[item]["true_probability"]) for item in eligible_cw]), "adversarial_true_probability": _quantiles([float(teacher[item]["true_probability"]) for item in eligible_cw]), "clean_max_wrong_probability": _quantiles([float(clean_teacher[item]["max_wrong_probability"]) for item in eligible_cw]), "adversarial_max_wrong_probability": _quantiles([float(teacher[item]["max_wrong_probability"]) for item in eligible_cw]), "clean_signed_dominance": _quantiles([float(clean_teacher[item]["dominance"]) for item in eligible_cw]), "adversarial_signed_dominance": _quantiles([float(teacher[item]["dominance"]) for item in eligible_cw]), "clean_entropy": _quantiles([float(clean_teacher[item]["entropy"]) for item in eligible_cw]), "adversarial_entropy": _quantiles([float(teacher[item]["entropy"]) for item in eligible_cw]), "clean_adversarial_js": _quantiles([float(feature[anchor][item]["teacher_js"]) for item in eligible_cw]), "prediction_flip": sum(int(teacher[item]["prediction"]) != int(clean_teacher[item]["prediction"]) for item in eligible_cw), "correctness_flip": sum(bool(teacher[item]["correct"]) != bool(clean_teacher[item]["correct"]) for item in eligible_cw)},
             "plateau_patterns": {
                 "counts": {name: patterns[failures] for failures, name in pattern_names.items()},
                 "by_pattern": {
@@ -676,8 +801,9 @@ def analyze_run(*, label: str, feature_observations: Path, feature_lineage: Path
                 taxonomy=nr_taxonomy,
                 classes={item: int(feature[anchor][item]["class_id"]) for item in strong_current_wrong},
                 teacher=teacher,
+                student_clean_correct={item: bool(_student_measures(raw_feature[anchor][item])["clean_correct"]) for item in strong_current_wrong},
             )
-    return {"schema_version": 1, "contract": CONTRACT, "diagnostic_only": True, "no_intervention_or_official_test": True, "label": label, "input_identity": {**identity, "stable_id_class_universe_sha256": expected_universe_sha256, "files": {name: _file_identity(path) for name, path in {"feature_observations": feature_observations, "feature_lineage": feature_lineage, "outcome_observations": outcome_observations, "outcome_lineage": outcome_lineage, "online_states": online_states, "online_lineage": online_lineage, "validation_history": validation_history, "validation_manifest": validation_manifest}.items()}}, "D3_teacher_decomposition": d3, "D4_snapshot_taxonomy": d4, "D5_current_wrong": d5, "dense_chunks_declared": [{name: _file_identity(path) for name, path in chunk.items()} for chunk in dense_chunks], "_d4_taxonomies": d4_taxonomies, "_d5_taxonomies": d5_taxonomies, "_blinded_candidate_rows": blind_rows}
+    return {"schema_version": 1, "contract": CONTRACT, "diagnostic_only": True, "no_intervention_or_official_test": True, "label": label, "input_identity": {**identity, "stable_id_class_universe_sha256": expected_universe_sha256, "files": {name: _file_identity(path) for name, path in {"feature_observations": feature_observations, "feature_lineage": feature_lineage, "outcome_observations": outcome_observations, "outcome_lineage": outcome_lineage, "online_states": online_states, "online_lineage": online_lineage, "validation_history": validation_history, "validation_manifest": validation_manifest}.items()}}, "D3_feature_definitions": {"M": "negative strong student adversarial logit margin", "H": "online margin-EMA risk", "D": "teacher signed wrong-class dominance (max non-true probability minus true-class probability)"}, "D3_teacher_decomposition": d3, "D4_snapshot_taxonomy": d4, "D5_current_wrong": d5, "dense_chunks_declared": [{name: _file_identity(path) for name, path in chunk.items()} for chunk in dense_chunks], "_d4_taxonomies": d4_taxonomies, "_d5_taxonomies": d5_taxonomies, "_blinded_candidate_rows": blind_rows}
 
 
 def _cross_seed_tables(reports: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
@@ -690,12 +816,16 @@ def _cross_seed_tables(reports: Mapping[str, Mapping[str, Any]]) -> dict[str, An
         for domain in ("online", "strong"):
             left_kinds = left["_d4_taxonomies"][key][domain]
             right_kinds = right["_d4_taxonomies"][key][domain]
-            for kind in sorted(set(left_kinds) & set(right_kinds)):
-                tables["D4"][f"e{anchor}:{domain}:{kind}"] = _set_overlap(left_kinds[kind], right_kinds[kind])
+            for kind in sorted(set(left_kinds) | set(right_kinds)):
+                tables["D4"][f"e{anchor}:{domain}:{kind}"] = _set_overlap(
+                    left_kinds.get(kind, set()), right_kinds.get(kind, set())
+                )
         left_kinds = left["_d5_taxonomies"][key]
         right_kinds = right["_d5_taxonomies"][key]
-        for kind in sorted(set(left_kinds) & set(right_kinds)):
-            tables["D5"][f"e{anchor}:{kind}"] = _set_overlap(left_kinds[kind], right_kinds[kind])
+        for kind in sorted(set(left_kinds) | set(right_kinds)):
+            tables["D5"][f"e{anchor}:{kind}"] = _set_overlap(
+                left_kinds.get(kind, set()), right_kinds.get(kind, set())
+            )
     return tables
 
 

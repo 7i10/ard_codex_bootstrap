@@ -17,6 +17,7 @@ from ard.analysis.ffnr_strong_diagnostics import (
     _cross_seed_tables,
     _dense_non_recovery,
     _dense_nr_subtype_tables,
+    _endpoint,
     _fit_empirical_rank,
     _fold_rank_vectors,
     _merge_dense_chunks,
@@ -25,6 +26,8 @@ from ard.analysis.ffnr_strong_diagnostics import (
     _snapshot_taxonomy,
     _teacher,
     _tracked_clean_provenance,
+    _validate_online_strong_class_join,
+    _validated_replay_identity,
     _vectorized_logistic_predict,
     _wilson,
 )
@@ -44,6 +47,11 @@ def _teacher_row() -> dict[str, object]:
 def test_teacher_probability_algebra_and_explicit_argmax_tie_rejection() -> None:
     teacher = _teacher(_teacher_row())
     assert teacher["correct"] is False and teacher["dominance"] == pytest.approx(0.5)
+    different_wrong_prediction = _teacher_row()
+    different_wrong_prediction["teacher_clean_probabilities"] = [0.05, 0.2, 0.05, 0.7, 0, 0, 0, 0, 0, 0]
+    clean_teacher = _teacher(different_wrong_prediction, clean=True)
+    assert teacher["correct"] is clean_teacher["correct"] is False
+    assert teacher["prediction"] != clean_teacher["prediction"]
     tied = _teacher_row()
     tied["teacher_adversarial_probabilities"] = [0.4, 0.4, 0.2, 0, 0, 0, 0, 0, 0, 0]
     with pytest.raises(StrongDiagnosticsError, match="argmax tie"):
@@ -102,6 +110,7 @@ def test_dense_merge_rejects_overlap_and_blind_rows_do_not_leak_selection_causes
     }
     panel = {39: {10: {"class_id": 2}, 13: {"class_id": 2}}}
     monkeypatch.setattr(diagnostics, "_strong_lineage", lambda **_: {**reference, "requested_epochs": [39]})
+    monkeypatch.setattr(diagnostics, "_validated_replay_identity", lambda _: {"same": True})
     monkeypatch.setattr(diagnostics, "_read_parquet", lambda _: [])
     monkeypatch.setattr(diagnostics, "_strong_panel", lambda *_args, **_kwargs: panel)
     chunks = (
@@ -127,6 +136,12 @@ def test_dense_merge_rejects_overlap_and_blind_rows_do_not_leak_selection_causes
             **{item: {"correct": False} for item in range(30, 38)},
             **{item: {"correct": True} for item in range(40, 48)},
         },
+        student_clean_correct={
+            **{item: False for item in range(10, 18)},
+            **{item: True for item in range(21, 23)},
+            **{item: False for item in range(30, 38)},
+            **{item: True for item in range(40, 48)},
+        },
     )
     assert rows and all(set(row) == {"sample_id", "class_id"} for row in rows)
     assert rows == sorted(
@@ -137,6 +152,56 @@ def test_dense_merge_rejects_overlap_and_blind_rows_do_not_leak_selection_causes
     )
     assert len(rows) == 14  # class 2: 2 pairs; class 3: capped at 5 pairs.
     assert {row["class_id"] for row in rows} == {2, 3}
+
+
+def test_dense_replay_identity_rejects_cache_source_drift() -> None:
+    checkpoint = {
+        "epoch": 39,
+        "path": "/bundle/39.pt",
+        "sha256": "a" * 64,
+        "run_id": "run",
+        "config_hash": "c" * 64,
+        "scientific_git_sha": "d" * 40,
+    }
+    meta = {
+        "contract": "ffnr_strong_replay_ce_pgd20_v1",
+        "requested_epochs": [39],
+        "checkpoints": [{key: checkpoint[key] for key in ("epoch", "path", "sha256")}],
+        "checkpoint_cache_identities": [
+            {
+                "checkpoint": checkpoint,
+                "contract": "ffnr_strong_replay_ce_pgd20_v1",
+                "analysis_provenance": {"source_sha256": "e" * 64},
+                "attack_identity": {"loss": "ce"},
+                "attack_identity_sha256": "f" * 64,
+                "dataset": {"name": "cifar10"},
+                "teacher": {"registry_id": "teacher"},
+                "runtime": {"deterministic_backend": {}},
+                "replay_batch_size": 128,
+                "attack_seed_base": 7,
+                "seed_formula": "formula",
+            }
+        ],
+        "results": [{"epoch": 39, "checkpoint_sha256": "a" * 64}],
+        "analysis_provenance": {"source_sha256": "e" * 64},
+        "checkpoint_inventory": "/cache/inventory.json",
+        "checkpoint_inventory_sha256": "0" * 64,
+        "run_id": "run",
+        "saved_resolved_config_mapping_sha256": "c" * 64,
+        "attack_identity": {"loss": "ce"},
+        "attack_identity_sha256": "f" * 64,
+        "dataset_identity": {"name": "cifar10"},
+        "teacher": {"registry_id": "teacher"},
+        "runtime": {"deterministic_backend": {}},
+        "replay_batch_size": 128,
+        "attack_seed_base": 7,
+        "seed_formula": "formula",
+        "manifest_sha256": "1" * 64,
+    }
+    assert _validated_replay_identity(meta)["scientific_git_sha"] == "d" * 40
+    meta["checkpoint_cache_identities"][0]["analysis_provenance"] = {"source_sha256": "2" * 64}
+    with pytest.raises(StrongDiagnosticsError, match="cache identity"):
+        _validated_replay_identity(meta)
 
 
 def test_cross_seed_overlap_only_uses_shared_taxonomy_keys() -> None:
@@ -158,7 +223,7 @@ def test_cross_seed_overlap_only_uses_shared_taxonomy_keys() -> None:
     )
     assert tables["available"] is True
     assert "e39:online:oscillating" in tables["D4"]
-    assert "e39:online:other" not in tables["D4"]
+    assert tables["D4"]["e39:online:other"]["right_count"] == 0
     assert tables["D5"]["e39:persistent_wrong"]["jaccard"] == 1.0
 
 
@@ -182,6 +247,7 @@ def test_dense_nr_subtype_tables_are_a_complete_strong_current_wrong_partition()
     strong = {item: {"class_id": item % 10, "teacher_js": 0.1} for item in taxonomy}
     teacher = {
         item: {
+            "prediction": 2,
             "correct": False,
             "true_probability": 0.1,
             "max_wrong_probability": 0.8,
@@ -192,6 +258,7 @@ def test_dense_nr_subtype_tables_are_a_complete_strong_current_wrong_partition()
     }
     clean_teacher = {
         item: {
+            "prediction": 1,
             "correct": True,
             "true_probability": 0.8,
             "max_wrong_probability": 0.1,
@@ -259,6 +326,24 @@ def test_blinded_renderer_emits_only_stable_id_label_and_image_path(
 
 def test_wilson_contract() -> None:
     assert _wilson(5, 10)["rate"] == 0.5
+
+
+def test_common_terminal_endpoint_requires_exact_ce_pgd20_window() -> None:
+    panel = {epoch: {7: {"correct": epoch != 194}} for epoch in (189, 194, 199)}
+    assert _endpoint(panel, "majority") == {7: 0}
+    assert _endpoint(panel, "all") == {7: 0}
+    with pytest.raises(StrongDiagnosticsError, match="common terminal"):
+        _endpoint({189: {7: {"correct": True}}, 194: {7: {"correct": False}}}, "majority")
+
+
+def test_online_strong_join_rejects_class_drift_with_same_stable_ids() -> None:
+    feature = {39: {7: {"class_id": 1}}}
+    outcome = {189: {7: {"class_id": 1}}}
+    online = {39: {7: {"class_id": 1}}}
+    assert _validate_online_strong_class_join(feature, outcome, online) == {7}
+    online[39][7]["class_id"] = 2
+    with pytest.raises(StrongDiagnosticsError, match="class join"):
+        _validate_online_strong_class_join(feature, outcome, online)
 
 
 def test_vectorized_oof_logistic_matches_repository_fixed_fit() -> None:
