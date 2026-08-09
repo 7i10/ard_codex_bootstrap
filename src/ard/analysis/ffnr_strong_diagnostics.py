@@ -284,7 +284,7 @@ def _validated_replay_identity(meta: Mapping[str, Any]) -> dict[str, Any]:
         "attack_identity_sha256": meta.get("attack_identity_sha256"),
         "attack_seed_base": meta.get("attack_seed_base"),
         "seed_formula": meta.get("seed_formula"),
-        "runtime": meta.get("runtime"),
+        "runtime": _execution_independent_runtime(meta.get("runtime")),
         "replay_batch_size": meta.get("replay_batch_size"),
         "saved_resolved_config_mapping_sha256": meta.get("saved_resolved_config_mapping_sha256"),
         "manifest_sha256": meta.get("manifest_sha256"),
@@ -293,6 +293,15 @@ def _validated_replay_identity(meta: Mapping[str, Any]) -> dict[str, Any]:
         "source_sha256": source["source_sha256"],
         "scientific_git_sha": next(iter(scientific_shas)),
     }
+
+
+def _execution_independent_runtime(value: object) -> dict[str, Any]:
+    """Keep deterministic/runtime-version identity while allowing independent GPU chunk placement."""
+    if not isinstance(value, Mapping):
+        raise StrongDiagnosticsError("strong replay runtime identity is invalid")
+    # Device ordinal is an execution placement, not a scientific replay input.
+    # Keep CUDA/Torch versions, GPU capability/name, and deterministic backend.
+    return {str(key): item for key, item in value.items() if key not in {"device", "cuda_device_index"}}
 
 
 def _class_stratified_folds(ids: Sequence[int], classes: Mapping[int, int], *, folds: int = 5) -> dict[int, int]:

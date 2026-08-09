@@ -198,7 +198,11 @@ def test_dense_replay_identity_rejects_cache_source_drift() -> None:
         "seed_formula": "formula",
         "manifest_sha256": "1" * 64,
     }
-    assert _validated_replay_identity(meta)["scientific_git_sha"] == "d" * 40
+    reference_identity = _validated_replay_identity(meta)
+    assert reference_identity["scientific_git_sha"] == "d" * 40
+    meta["runtime"] = {"device": "cuda:1", "cuda_device_index": 1, "deterministic_backend": {}}
+    meta["checkpoint_cache_identities"][0]["runtime"] = dict(meta["runtime"])
+    assert _validated_replay_identity(meta) == reference_identity
     meta["checkpoint_cache_identities"][0]["analysis_provenance"] = {"source_sha256": "2" * 64}
     with pytest.raises(StrongDiagnosticsError, match="cache identity"):
         _validated_replay_identity(meta)
