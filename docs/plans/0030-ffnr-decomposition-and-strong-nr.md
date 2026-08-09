@@ -167,3 +167,6 @@ pushed M0 SHA, so reverting analysis code cannot mutate completed checkpoints.
   fold-local class-stratified OOF, same-domain dense NR, and bounded blinded
   CIFAR panel.  Focused verification: diagnostics `8 passed`, Ruff passed,
   mypy passed; L2/L4 missing-epoch sets are exact (25/27).
+- 2026-08-09: pushed execution SHA `44f5811`; launched L2 chunks on Hamster
+  GPUs 0/1 and L4 chunks on Ferret GPUs 0/1/2.  All five jobs reported live
+  processes; Hamster utilization confirmed that replay kernels were active.
