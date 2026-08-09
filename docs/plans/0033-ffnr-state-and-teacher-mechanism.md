@@ -59,3 +59,5 @@ threshold. Cross-seed fit/evaluation is required for predictive comparisons.
 | Date | Action | Result |
 |---|---|---|
 | 2026-08-09 | Repo reconciliation and attachment review | Started from `1db6554`; existing Chen CE-PGD20 and route artifacts available; IRT exact endpoint unavailable. |
+| 2026-08-10 | CPU implementation and focused verification | Added tracked-clean CLI/config/tests. Initial all-in-one run hit the worker memory cap; column-pruned single-run processes and a separate merge completed the same point analysis without changing the scientific contract. |
+| 2026-08-10 | Chen L2/L4 point analysis | Report written under ignored `.cache/analysis/ffnr-state-mechanism-v1/`; machine-readable copy recorded under `docs/experiments/ffnr_state_and_teacher_mechanism_v1.json`. No bootstrap, GPU replay, training, official test, or AA. |
