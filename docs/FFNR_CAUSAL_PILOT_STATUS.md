@@ -44,3 +44,14 @@ dry-runだけからは、Route A `KD=0.5, CE=0.25`、Route B `KD=1.0, CE=0.25`�
 Route A/B専用のhash-bound arm schema、selected-only adversarial CE branch、epoch79 common-parent forkを実装した。旧C/HS/RS/HD/RD armは変更していない。Route Bはq=5%をprimary候補として固定し、q=10%は感度候補として保存した。
 
 focused contract test後に、両seedの5-arm screen（C79/RA/RAR/RB/RBR、epoch79→84）を作成し、fork checkpointのresume/lineageを検証してからGPUを起動する。既存のstrong diagnostic cacheは分析の参考に残すが、current clean SHAで再生成されていないものを新規因果結果とは主張しない。
+
+## Horizon-94 continuation (completed)
+
+The same five arms from the same epoch-79 parents were continued to
+`training.epochs=94` for both seeds without changing masks, q, coefficients,
+or treatment. All ten arms reached metric epoch 93 (the zero-based horizon-94
+endpoint) and wrote final sample-state Parquets. Validation trajectory and
+training-state diagnostic results are documented in
+`docs/FFNR_CAUSAL_HORIZON_EXTENSION_RESULTS.md`. The sample-state contrasts
+are explicitly not treated as the preregistered CE-PGD20 causal endpoint;
+that endpoint still requires a common eval-mode replay.

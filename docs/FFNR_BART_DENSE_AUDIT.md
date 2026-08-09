@@ -19,16 +19,24 @@ resume would change the experiment identity.
 
 ## Missing state and decision
 
-No local Bartoldson L3/seed-2 run bundle or model checkpoint was found. The
-current evidence therefore supports:
+The seed-2 control run was subsequently recovered from the single identified
+W&B artifact `run-bundle-bart-h3-c-s2-20260802-v1:v0`; no retraining was
+needed. The recovered bundle contains complete-state checkpoints at epochs
+104, 109, and 114. CE-PGD20 replay was run for both seed 1 and seed 2 with
+the same attack identity and stable-ID contract. The replay outputs are kept
+under the ignored `.cache/analysis/ffnr-strong-replay/` tree and are bound by
+their `lineage.json` files.
+
+The current evidence therefore supports:
 
 1. use the existing seed-1 periodic artifacts for offline diagnostics;
 2. do not launch a 200-epoch retrain in this phase;
 3. only attempt epoch-99→115 continuation after an explicit, immutable
    resume-parity harness is available; and
-4. treat the IRT CE-PGD20 factorial cell as blocked until a complete L3
-   checkpoint inventory is recovered or a new dense-save run is approved.
+4. treat the IRT CE-PGD20 replay as an offline diagnostic, not as a new
+   training result; no dense-save retraining was launched.
 
 The CE/KL factorial currently executed in this phase is Chen L2/L4 only, as
 specified. Bartoldson remains a follow-up audit rather than an unplanned new
-training campaign.
+training campaign. The replay comparison is documented in
+`docs/FFNR_BART_CE_PGD20_REPLAY.md`.
