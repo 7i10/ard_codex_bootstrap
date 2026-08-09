@@ -854,7 +854,9 @@ def main(argv: list[str] | None = None) -> int:
             ),
             adversarial_kd_multiplier=(
                 config.intervention.adversarial_kd_multiplier
-                if config.intervention is not None and config.intervention.kind == "adversarial_kd_downweight"
+                if config.intervention is not None
+                and config.intervention.kind
+                in {"adversarial_kd_downweight", "route_a_ce_anchor", "route_b_ce_anchor"}
                 else None
             ),
             adversarial_ce_coefficient=(
