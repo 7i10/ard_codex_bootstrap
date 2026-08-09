@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sys
 import types
 from pathlib import Path
@@ -128,6 +129,12 @@ def test_dense_merge_rejects_overlap_and_blind_rows_do_not_leak_selection_causes
         },
     )
     assert rows and all(set(row) == {"sample_id", "class_id"} for row in rows)
+    assert rows == sorted(
+        rows,
+        key=lambda row: hashlib.sha256(
+            f"ffnr-blind-order-v2:L2:{row['class_id']}:{row['sample_id']}".encode()
+        ).digest(),
+    )
     assert len(rows) == 14  # class 2: 2 pairs; class 3: capped at 5 pairs.
     assert {row["class_id"] for row in rows} == {2, 3}
 

@@ -298,7 +298,15 @@ def _blinded_candidate_rows(
             )
     if not selected:
         raise StrongDiagnosticsError("dense persistent-wrong teacher-wrong blind panel is empty")
-    return selected
+    # Pair construction must not leak target/control membership through row order.
+    # The public manifest contains neither role, so order it with a separate,
+    # role-independent stable-ID hash after the class-matched sample is fixed.
+    return sorted(
+        selected,
+        key=lambda row: hashlib.sha256(
+            f"ffnr-blind-order-v2:{label}:{row['class_id']}:{row['sample_id']}".encode()
+        ).digest(),
+    )
 
 
 def _oof_scores(ids: Sequence[int], labels: Mapping[int, int], features: Mapping[str, Mapping[int, float]], classes: Mapping[int, int]) -> dict[str, Any]:
