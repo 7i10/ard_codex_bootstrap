@@ -406,9 +406,17 @@ def replay_checkpoint_rows(
     loader: Iterable[Any],
     device: torch.device,
     attack_seed_base: int,
+    attack_config: AttackConfig | None = None,
 ) -> StrongReplayResult:
-    """Replay one immutable checkpoint under CE-PGD20 and emit frozen primitives."""
-    attack_config = selection_attack_from_training(training_config)
+    """Replay one immutable checkpoint under a frozen attack and emit primitives.
+
+    The default remains the primary CE-PGD20 contract.  ``attack_config`` is
+    explicit so the preregistered CE/KL x PGD10/20 factorial can reuse the same
+    hash-bound replay machinery without weakening the primary contract.
+    """
+    attack_config = selection_attack_from_training(training_config) if attack_config is None else attack_config
+    if attack_config.trace_step_losses:
+        raise StrongReplayError("factorial replay does not allow attack trace collection")
     if any(parameter.requires_grad for parameter in teacher.parameters()):
         raise StrongReplayError("strong replay requires frozen teacher parameters")
     student, _ = load_historical_student(

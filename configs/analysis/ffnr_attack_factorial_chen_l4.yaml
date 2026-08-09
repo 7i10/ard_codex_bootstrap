@@ -1,0 +1,11 @@
+schema_version: 1
+contract: ffnr_attack_factorial_v1
+run_id: chen-rslad-observed-s2-confirm-v2
+manifest: ../../outputs/scientific/chen-rslad-observed-s2-confirm-v2/run-bundle/manifest.json
+checkpoint_inventory: ../../.cache/analysis/ffnr-strong-replay/l4-checkpoint-inventory.json
+epochs: [189, 194, 199]
+train_expected_count: 45000
+replay_batch_size: 128
+attack_seed: 20260808
+replay_device_type: cuda
+output_root: ../../.cache/analysis/ffnr-attack-factorial/l4
