@@ -33,6 +33,15 @@ mT_adv` です。保存された correctness と margin 符号の不一致は fa
 （SHA-256 `805182a36796317c5a556554db9f11384330772f7c1c5c54ed41e4cd654536ae`）です。
 解析 source SHA は `01d3792ee8f10684a6cd7ee393a2d75afaecd8fa`、dirty=false です。
 
+再実行はworkerのメモリ上限を越えないよう、L2/L4を別processで作成してから
+hash-bound mergeを行います。
+
+```bash
+PYTHONPATH=src python -m ard.cli.ffnr_state_mechanism --config configs/analysis/ffnr_state_mechanism_v1.yaml --output-dir .cache/analysis/ffnr-state-single-l2 --single-run L2
+PYTHONPATH=src python -m ard.cli.ffnr_state_mechanism --config configs/analysis/ffnr_state_mechanism_v1.yaml --output-dir .cache/analysis/ffnr-state-single-l4 --single-run L4
+PYTHONPATH=src python -m ard.cli.ffnr_state_mechanism --config configs/analysis/ffnr_state_mechanism_v1.yaml --output-dir .cache/analysis/ffnr-state-mechanism-v1 --merge-only --l2-report .cache/analysis/ffnr-state-single-l2/single-report.json --l4-report .cache/analysis/ffnr-state-single-l4/single-report.json
+```
+
 ## 連続 risk surface
 
 current-correct cohort内で、Student/Teacher marginの低い側をriskとして固定
