@@ -10,6 +10,7 @@
 - [FFNR causal pilot status](FFNR_CAUSAL_PILOT_STATUS.md): epoch-79 parent、selection masks、係数dry-run、pilot gate
 - [FFNR causal pilot results](FFNR_CAUSAL_PILOT_RESULTS.md): Chen ERT two-seed five-arm rescue/harm and endpoint validation
 - [FFNR causal pilot subgroups](FFNR_CAUSAL_PILOT_SUBGROUPS.md): teacher/student strata and class-stratified selected-vs-random bootstrap
+- [FFNR causal horizon CE-PGD20 results](FFNR_CAUSAL_HORIZON_CE20_RESULTS.md): fixed-mask L2/L4 horizons 84/89/94 under a common eval-mode endpoint
 - [Bartoldson dense audit](FFNR_BART_DENSE_AUDIT.md): existing state completeness and blocked L3 recovery decision
 - [FFNR CE/KL attack factorial](FFNR_ATTACK_FACTORIAL_RESULTS.md): Chen L2/L4 CE/KL × PGD10/20 failure-mask agreement
 - [FFNR state and Teacher mechanism](FFNR_STATE_AND_TEACHER_MECHANISM.md): Chen 3-state candidates, margin risk surfaces, and Teacher clean/response decomposition
