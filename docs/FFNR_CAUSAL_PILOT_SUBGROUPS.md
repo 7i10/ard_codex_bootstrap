@@ -41,8 +41,10 @@ effect.
 ## Teacher/student subgroup decomposition
 
 The JSON report partitions each selected/random arm by teacher clean/adversarial
-correctness, student clean correctness, and quartile of the parent robust-margin
-EMA. This directly separates:
+correctness, student clean correctness, quartile of the parent robust-margin
+EMA, and quartile of the teacher clean-to-adversarial margin response. It also
+records class-wise treatment effects and robust-margin EMA changes. This
+directly separates:
 
 - teacher clean-correct / adversarial-wrong samples, where adversarial KD may be
   unsafe;

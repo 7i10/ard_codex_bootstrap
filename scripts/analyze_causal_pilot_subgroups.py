@@ -56,6 +56,8 @@ def _subgroup(frame: pd.DataFrame) -> pd.Series:
     student_clean = frame["clean_correct"].astype(bool)
     margin = frame["student_robust_margin_ema"].astype(float)
     margin_bin = pd.qcut(margin.rank(method="first"), 4, labels=["q0", "q1", "q2", "q3"])
+    response = frame["teacher_clean_to_adversarial_margin_response"].astype(float)
+    response_bin = pd.qcut(response.rank(method="first"), 4, labels=["r0", "r1", "r2", "r3"])
     return (
         pd.Series(
             np.select(
@@ -72,6 +74,7 @@ def _subgroup(frame: pd.DataFrame) -> pd.Series:
             sep=";",
         )
         .str.cat(pd.Series(margin_bin.astype(str), index=frame.index), sep=";")
+        .str.cat(pd.Series(response_bin.astype(str), index=frame.index), sep=";")
     )
 
 
@@ -115,6 +118,9 @@ def analyze(root: Path, *, human_review: Path | None = None) -> dict[str, Any]:
                             "clean_correct_base": "clean_correct",
                             "robust_correct_base": "robust_correct",
                             "student_robust_margin_ema_base": "student_robust_margin_ema",
+                            "teacher_clean_to_adversarial_margin_response_base": (
+                                "teacher_clean_to_adversarial_margin_response"
+                            ),
                         }
                     )
                 )
@@ -142,6 +148,15 @@ def analyze(root: Path, *, human_review: Path | None = None) -> dict[str, Any]:
                         "human_review": common["human_review"].value_counts(dropna=True).to_dict()
                         if human is not None
                         else {},
+                        "class_effects": common.groupby("true_label_base", observed=True)["effect"]
+                        .agg(["count", "mean"])
+                        .reset_index()
+                        .to_dict(orient="records"),
+                        "robust_margin_ema_delta": float(
+                            (
+                                common["student_robust_margin_ema_treatment"] - common["student_robust_margin_ema_base"]
+                            ).mean()
+                        ),
                     }
                 )
             # Bootstrap from the per-sample paired effects, recomputed below.
