@@ -166,6 +166,11 @@ def _finite(value: object, name: str, *, lo: float = -math.inf, hi: float = math
     return value
 
 
+def _validate_online_attack(online_meta: Mapping[str, Any]) -> None:
+    if online_meta.get("attack_identity") != EXPECTED_ONLINE_ATTACK:
+        raise FFNRStateMechanismError("online state attack identity is not the frozen KL-PGD10 contract")
+
+
 def _probability_margin(value: object, label: int, name: str) -> tuple[float, bool]:
     if not isinstance(value, list) or len(value) != 10:
         raise FFNRStateMechanismError(f"{name} probabilities must have ten entries")
@@ -570,8 +575,7 @@ def analyze_run(
         if feature_meta.get(key) != outcome_meta.get(key):
             raise FFNRStateMechanismError("feature/outcome replay lineage identity drifted")
     online, online_meta = _online_panel(online_states, online_lineage, expected_count)
-    if online_meta.get("attack_identity") != EXPECTED_ONLINE_ATTACK:
-        raise FFNRStateMechanismError("online state attack identity is not the frozen KL-PGD10 contract")
+    _validate_online_attack(online_meta)
     for key in ("run_id", "config_hash", "teacher", "dataset_identity"):
         replay_value = (
             feature_meta.get("saved_resolved_config_mapping_sha256") if key == "config_hash" else feature_meta.get(key)

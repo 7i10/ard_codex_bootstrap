@@ -4,6 +4,7 @@ import pytest
 
 import ard.cli.ffnr_state_mechanism as state_cli
 from ard.analysis.ffnr_state_mechanism import (
+    EXPECTED_ONLINE_ATTACK,
     FFNRStateMechanismError,
     _endpoint,
     _margin_rows,
@@ -12,6 +13,7 @@ from ard.analysis.ffnr_state_mechanism import (
     _state_summaries,
     _surface,
     _threshold_tables,
+    _validate_online_attack,
 )
 
 pytestmark = pytest.mark.unit
@@ -110,3 +112,11 @@ def test_intermediate_payload_tampering_is_rejected(tmp_path, monkeypatch) -> No
     bound["input_identity"]["tampered"] = True
     with pytest.raises(FFNRStateMechanismError, match="payload hash drifted"):
         state_cli._validate_intermediate(bound, label="L2", config=config, config_path=config_path)
+
+
+def test_online_attack_identity_is_frozen() -> None:
+    _validate_online_attack({"attack_identity": dict(EXPECTED_ONLINE_ATTACK)})
+    mutated = dict(EXPECTED_ONLINE_ATTACK)
+    mutated["steps"] = 20
+    with pytest.raises(FFNRStateMechanismError, match="KL-PGD10"):
+        _validate_online_attack({"attack_identity": mutated})
