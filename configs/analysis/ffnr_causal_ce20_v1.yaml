@@ -37,21 +37,21 @@ runs:
   L4:
     C79: &l4_c79
       manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/C79/manifest.json
-      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/C79.yaml
+      resolved_config: ../../.cache/analysis/ffnr-causal-ce20-configs/L4/C79/resolved_config.yaml
       validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/C79/epoch-metrics.parquet
     RA: &l4_ra
       manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/RA/manifest.json
-      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/RA.yaml
+      resolved_config: ../../.cache/analysis/ffnr-causal-ce20-configs/L4/RA/resolved_config.yaml
       validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/RA/epoch-metrics.parquet
     RAR: &l4_rar
       manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/RAR/manifest.json
-      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/RAR.yaml
+      resolved_config: ../../.cache/analysis/ffnr-causal-ce20-configs/L4/RAR/resolved_config.yaml
       validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/RAR/epoch-metrics.parquet
     RB: &l4_rb
       manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/RB/manifest.json
-      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/RB.yaml
+      resolved_config: ../../.cache/analysis/ffnr-causal-ce20-configs/L4/RB/resolved_config.yaml
       validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/RB/epoch-metrics.parquet
     RBR: &l4_rbr
       manifest: ../../.cache/analysis/ffnr-causal-ce20-manifests/L4/RBR/manifest.json
-      resolved_config: ../../.cache/analysis/ffnr-causal-pilot-configs-e79-94/L4/RBR.yaml
+      resolved_config: ../../.cache/analysis/ffnr-causal-ce20-configs/L4/RBR/resolved_config.yaml
       validation_metrics: ../../.cache/analysis/ffnr-causal-ce20-validation/L4/RBR/epoch-metrics.parquet
