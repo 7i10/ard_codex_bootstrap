@@ -6,6 +6,7 @@
 - [FFNR human image review](FFNR_HUMAN_REVIEW.md): role-blind CIFAR panelのHTMLレビューと分類基準
 - [FFNR human review results](FFNR_HUMAN_REVIEW_RESULTS.md): 200枚の人手判定結果と研究上の扱い
 - [FFNR human review analysis](FFNR_HUMAN_REVIEW_ANALYSIS.md): クラス別誤り率、教師混同行列、panel条件付き分析
+- [FFNR next evidence status](FFNR_NEXT_EVIDENCE_STATUS.md): chance-adjusted GT、cross-seed Teacher情報、Teacher-correct subset、IRT gate
 - [Seed-0 signal audit](SIGNAL_AUDIT.md): Student/Joint signalの探索的関連、周期checkpoint、正式判定の境界
 - [Reproduction status](REPRODUCTION_STATUS.md): 実装済み機能、実行済み検証、未実行の重い実験、実際のCLI手順
 - [Research decisions](RESEARCH_DECISIONS.md): 今回の研究・実装で固定した方針
