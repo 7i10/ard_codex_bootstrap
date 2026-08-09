@@ -3,7 +3,7 @@
 ## 入力整合性
 
 - 対象manifest SHA-256: `8d1f21bec9dae9c4d750693374f6b0fd0f752db512491e87e10ac227608a8a02`
-- 人手判定JSON SHA-256: `c5b5feec28fd9c3b591288b44e59ef8dca6cb903864961e70d9939f12dbe9bf5`
+- 受領した人手判定JSON SHA-256: `c5b5feec28fd9c3b591288b44e59ef8dca6cb903864961e70d9939f12dbe9bf5`
 - 判定件数: `200/200`
 - `clear_match`: `175` (`87.5%`)
 - `ambiguous`: `25` (`12.5%`)
@@ -12,11 +12,20 @@
 - confidence: high `199`、medium `1`、low `0`
 
 manifest SHAが一致しているため、別panelの判定結果を誤って結合していません。
-判定JSONのローカル保存先は、ignored cache内の次です。
+判定JSONの追跡対象となる正本は次です。
+
+```text
+docs/experiments/ffnr_human_review_v1.json
+```
+
+同じ内容の作業用コピーは ignored cache 内にもあります。
 
 ```text
 .cache/analysis/ffnr-strong-diagnostics-6a90011-v1/human-review-result.json
 ```
+
+追跡対象の正本JSON（末尾改行を含む）のSHA-256は
+`9b5fb68e16ba089123ca1092373c94cce3b2590a5063a7a24787ffa554cf80bd` です。
 
 ## run別の分布
 

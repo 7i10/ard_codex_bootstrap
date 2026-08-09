@@ -1,0 +1,1101 @@
+{
+  "schema_version": 1,
+  "contract": "ffnr_human_review_v1",
+  "manifest_sha256": "8d1f21bec9dae9c4d750693374f6b0fd0f752db512491e87e10ac227608a8a02",
+  "exported_at": "2026-08-09T08:24:24.263Z",
+  "rows": {
+    "1": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:25:44.338Z",
+      "confidence": "high"
+    },
+    "2": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:21:49.980Z",
+      "confidence": "high"
+    },
+    "3": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:21:55.746Z",
+      "confidence": "high",
+      "notes": "トラックであるとは思うが、積荷部分がないためトラック特有の特徴に欠ける"
+    },
+    "4": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:22:10.954Z",
+      "confidence": "high",
+      "notes": "少し難しい"
+    },
+    "5": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:27:31.788Z",
+      "confidence": "high"
+    },
+    "6": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:28:03.438Z",
+      "confidence": "high",
+      "notes": "ただし車体の一部しか見えないので難易度は高いかも"
+    },
+    "7": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:28:08.371Z",
+      "confidence": "high"
+    },
+    "8": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:28:13.303Z",
+      "confidence": "high"
+    },
+    "9": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:28:18.236Z",
+      "confidence": "high"
+    },
+    "10": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:28:22.454Z",
+      "confidence": "high"
+    },
+    "11": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:22:46.652Z",
+      "confidence": "high",
+      "notes": "鳥が小さく映るので難しいか？"
+    },
+    "12": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:29:26.304Z",
+      "confidence": "high"
+    },
+    "13": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:23:02.422Z",
+      "confidence": "high",
+      "notes": "カエルが小さく映るので難しいか？"
+    },
+    "14": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:30:24.171Z",
+      "confidence": "high"
+    },
+    "15": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:30:53.313Z",
+      "confidence": "high",
+      "notes": "明確な誤りとは言えないが人の目にも正しいか判定不能"
+    },
+    "16": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:30:58.205Z",
+      "confidence": "high"
+    },
+    "17": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:31:04.254Z",
+      "confidence": "high"
+    },
+    "18": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:23:27.261Z",
+      "confidence": "high",
+      "notes": "少し難しい"
+    },
+    "19": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:31:44.875Z",
+      "confidence": "high"
+    },
+    "20": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:23:40.411Z",
+      "confidence": "high",
+      "notes": "犬のアップであり、構図的に猫と間違える可能性も高そうか？",
+      "proposed_class": "3"
+    },
+    "21": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:23:46.306Z",
+      "confidence": "high",
+      "proposed_class": "7",
+      "notes": "背景や色的に馬と間違えそう"
+    },
+    "22": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:34:11.024Z",
+      "confidence": "high",
+      "notes": "一般的な鳥ではなく、ダチョウなので難易度は高いか？"
+    },
+    "23": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:34:17.622Z",
+      "confidence": "high"
+    },
+    "24": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:34:57.504Z",
+      "confidence": "high",
+      "proposed_class": "8",
+      "notes": "人の目でも判別が難しい"
+    },
+    "25": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:35:23.266Z",
+      "confidence": "high",
+      "proposed_class": "5",
+      "notes": "犬か鹿と間違えそう"
+    },
+    "26": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:35:31.305Z",
+      "confidence": "high"
+    },
+    "27": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:35:40.456Z",
+      "confidence": "high"
+    },
+    "28": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:35:46.739Z",
+      "confidence": "high"
+    },
+    "29": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:35:53.672Z",
+      "confidence": "high"
+    },
+    "30": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:35:58.589Z",
+      "confidence": "high"
+    },
+    "31": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:36:02.623Z",
+      "confidence": "high"
+    },
+    "32": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:36:58.695Z",
+      "confidence": "high",
+      "notes": "この画像は2次元のイラストであり他のものとは違う難しさがあるか？"
+    },
+    "33": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:37:05.023Z",
+      "confidence": "high"
+    },
+    "34": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:37:27.430Z",
+      "confidence": "medium",
+      "notes": "人の目でも判別が難しい"
+    },
+    "35": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:24:03.837Z",
+      "confidence": "high",
+      "proposed_class": "2",
+      "notes": "構図的に鳥と間違えそう"
+    },
+    "36": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:37:57.090Z",
+      "confidence": "high"
+    },
+    "37": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:38:25.523Z",
+      "confidence": "high",
+      "notes": "人の目でも難しい"
+    },
+    "38": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:24:16.826Z",
+      "confidence": "high",
+      "notes": "トラックが荷台をあげている（ダンプアップ）している瞬間であり難しいか？"
+    },
+    "39": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:39:30.391Z",
+      "confidence": "high"
+    },
+    "40": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:39:34.790Z",
+      "confidence": "high"
+    },
+    "41": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:39:38.906Z",
+      "confidence": "high"
+    },
+    "42": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:39:46.674Z",
+      "confidence": "high"
+    },
+    "43": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:40:06.437Z",
+      "confidence": "high",
+      "notes": "正面からの飛行機で難しいのかも"
+    },
+    "44": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:40:55.415Z",
+      "confidence": "high",
+      "notes": "船なのに周囲に海の情報(青)がないため難しいのかも"
+    },
+    "45": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:41:20.686Z",
+      "confidence": "high",
+      "notes": "人の目でも判別が難しい",
+      "proposed_class": "7"
+    },
+    "46": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:41:24.574Z",
+      "confidence": "high"
+    },
+    "47": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:41:38.757Z",
+      "confidence": "high"
+    },
+    "48": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:41:49.925Z",
+      "confidence": "high"
+    },
+    "49": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:42:12.982Z",
+      "confidence": "high",
+      "notes": "これは鹿なのか？\n人の目でも難しい"
+    },
+    "50": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:42:29.588Z",
+      "confidence": "high",
+      "notes": "構図が難しいかも"
+    },
+    "51": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:42:43.170Z",
+      "confidence": "high",
+      "proposed_class": "3"
+    },
+    "52": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:42:47.141Z",
+      "confidence": "high"
+    },
+    "53": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:43:15.541Z",
+      "confidence": "high",
+      "notes": "周りに海の情報(青)が少なく難しいかも",
+      "proposed_class": "9"
+    },
+    "54": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:43:21.625Z",
+      "confidence": "high"
+    },
+    "55": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:43:36.548Z",
+      "confidence": "high",
+      "notes": "少し難しそう"
+    },
+    "56": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:43:40.590Z",
+      "confidence": "high"
+    },
+    "57": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:44:23.769Z",
+      "confidence": "high",
+      "proposed_class": "1",
+      "notes": "人の目でも判別が難しい\n空ではなく地上にあるので、自動車とかトラックと間違えそう"
+    },
+    "58": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:44:28.758Z",
+      "confidence": "high"
+    },
+    "59": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:44:32.492Z",
+      "confidence": "high"
+    },
+    "60": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:44:37.125Z",
+      "confidence": "high"
+    },
+    "61": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:44:42.691Z",
+      "confidence": "high"
+    },
+    "62": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:44:47.091Z",
+      "confidence": "high"
+    },
+    "63": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:44:51.541Z",
+      "confidence": "high"
+    },
+    "64": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:44:55.325Z",
+      "confidence": "high"
+    },
+    "65": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:44:58.908Z",
+      "confidence": "high"
+    },
+    "66": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:45:02.758Z",
+      "confidence": "high"
+    },
+    "67": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:45:06.774Z",
+      "confidence": "high"
+    },
+    "68": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:45:25.386Z",
+      "confidence": "high",
+      "notes": "人の目でも難しい"
+    },
+    "69": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:45:31.191Z",
+      "confidence": "high"
+    },
+    "70": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:45:34.842Z",
+      "confidence": "high"
+    },
+    "71": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:45:44.083Z",
+      "confidence": "high",
+      "proposed_class": "5"
+    },
+    "72": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:45:56.016Z",
+      "confidence": "high",
+      "notes": "少し難しい"
+    },
+    "73": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:46:00.392Z",
+      "confidence": "high"
+    },
+    "74": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:46:07.849Z",
+      "confidence": "high",
+      "proposed_class": "5"
+    },
+    "75": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:46:10.326Z",
+      "confidence": "high"
+    },
+    "76": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:46:30.830Z",
+      "confidence": "high",
+      "proposed_class": "1",
+      "notes": "積荷がないパターンで難しいか？"
+    },
+    "77": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:46:35.474Z",
+      "confidence": "high"
+    },
+    "78": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:47:18.125Z",
+      "confidence": "high",
+      "proposed_class": "2",
+      "notes": "構図的にバードに見える、人の目でも難しい"
+    },
+    "79": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:47:23.142Z",
+      "confidence": "high"
+    },
+    "80": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:47:26.559Z",
+      "confidence": "high"
+    },
+    "81": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:47:30.342Z",
+      "confidence": "high"
+    },
+    "82": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:47:36.376Z",
+      "confidence": "high"
+    },
+    "83": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:47:54.402Z",
+      "confidence": "high",
+      "proposed_class": "3",
+      "notes": "低画質で難しい"
+    },
+    "84": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:48:01.559Z",
+      "confidence": "high"
+    },
+    "85": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:48:06.158Z",
+      "confidence": "high"
+    },
+    "86": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:48:32.815Z",
+      "confidence": "high",
+      "proposed_class": "3",
+      "notes": "犬が寝転んでおり構図的に難しいか？"
+    },
+    "87": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:48:40.109Z",
+      "confidence": "high"
+    },
+    "88": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:49:04.612Z",
+      "confidence": "high",
+      "proposed_class": "5",
+      "notes": "少し難しい、犬と紛らわしいはず"
+    },
+    "89": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:49:18.124Z",
+      "confidence": "high",
+      "notes": "人の目でも難しい"
+    },
+    "90": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:49:37.366Z",
+      "confidence": "high",
+      "notes": "人の目でも難しい"
+    },
+    "91": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:49:48.336Z",
+      "confidence": "high",
+      "proposed_class": "5"
+    },
+    "92": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:49:55.559Z",
+      "confidence": "high"
+    },
+    "93": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:50:11.795Z",
+      "confidence": "high",
+      "notes": "犬と猫が紛らわしいか",
+      "proposed_class": "3"
+    },
+    "94": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:50:18.459Z",
+      "confidence": "high"
+    },
+    "95": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:50:22.010Z",
+      "confidence": "high"
+    },
+    "96": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:50:42.154Z",
+      "confidence": "high",
+      "notes": "周りに海の情報(青)が少なく難しいか？"
+    },
+    "97": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:50:45.893Z",
+      "confidence": "high"
+    },
+    "98": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:50:49.608Z",
+      "confidence": "high"
+    },
+    "99": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:50:53.509Z",
+      "confidence": "high"
+    },
+    "100": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:50:56.626Z",
+      "confidence": "high"
+    },
+    "101": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:51:32.729Z",
+      "confidence": "high",
+      "notes": "犬だとは思うが典型的な犬ではなさそうなので難しそう"
+    },
+    "102": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:51:40.577Z",
+      "confidence": "high"
+    },
+    "103": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:51:44.160Z",
+      "confidence": "high"
+    },
+    "104": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:51:49.310Z",
+      "confidence": "high"
+    },
+    "105": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:52:04.110Z",
+      "confidence": "high",
+      "notes": "人の目でも難しい"
+    },
+    "106": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:52:09.626Z",
+      "confidence": "high"
+    },
+    "107": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:52:34.097Z",
+      "confidence": "high",
+      "notes": "服を来ている犬であり少し難しいのか？"
+    },
+    "108": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:52:39.526Z",
+      "confidence": "high"
+    },
+    "109": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:53:05.727Z",
+      "confidence": "high",
+      "notes": "トラックではあるが、荷台部分が写っていないため難しそう",
+      "proposed_class": "1"
+    },
+    "110": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:53:09.976Z",
+      "confidence": "high"
+    },
+    "111": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:53:28.666Z",
+      "confidence": "high",
+      "notes": "人の目でも判別できない"
+    },
+    "112": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:53:32.328Z",
+      "confidence": "high"
+    },
+    "113": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:53:38.060Z",
+      "confidence": "high"
+    },
+    "114": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:53:42.676Z",
+      "confidence": "high"
+    },
+    "115": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:54:08.214Z",
+      "confidence": "high",
+      "notes": "ダチョウ系の鳥の判別に苦戦しているのが伺える"
+    },
+    "116": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:54:22.126Z",
+      "confidence": "high"
+    },
+    "117": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:54:28.793Z",
+      "confidence": "high"
+    },
+    "118": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:54:43.838Z",
+      "confidence": "high",
+      "notes": "構図的に少し難しそう"
+    },
+    "119": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:54:47.310Z",
+      "confidence": "high"
+    },
+    "120": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:55:08.534Z",
+      "confidence": "high",
+      "notes": "周りに海の情報が少ないと難しそう"
+    },
+    "121": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:55:22.143Z",
+      "confidence": "high"
+    },
+    "122": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:55:26.895Z",
+      "confidence": "high"
+    },
+    "123": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:55:31.344Z",
+      "confidence": "high"
+    },
+    "124": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:55:56.344Z",
+      "confidence": "high",
+      "notes": "人の目でもこれがトラックか自動車かわからない",
+      "proposed_class": "1"
+    },
+    "125": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:55:59.828Z",
+      "confidence": "high"
+    },
+    "126": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:56:04.893Z",
+      "confidence": "high"
+    },
+    "127": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:56:12.894Z",
+      "confidence": "high"
+    },
+    "128": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:56:19.427Z",
+      "confidence": "high"
+    },
+    "129": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:56:23.293Z",
+      "confidence": "high"
+    },
+    "130": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:57:00.972Z",
+      "confidence": "high",
+      "notes": "鳥との判別が難しい",
+      "proposed_class": "2"
+    },
+    "131": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:57:11.777Z",
+      "confidence": "high"
+    },
+    "132": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:57:16.261Z",
+      "confidence": "high"
+    },
+    "133": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:57:42.382Z",
+      "confidence": "high",
+      "notes": "カエルの映りが小さいので難しそう"
+    },
+    "134": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:57:49.595Z",
+      "confidence": "high"
+    },
+    "135": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:57:53.794Z",
+      "confidence": "high"
+    },
+    "136": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:58:00.761Z",
+      "confidence": "high"
+    },
+    "137": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:58:04.694Z",
+      "confidence": "high"
+    },
+    "138": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:58:09.327Z",
+      "confidence": "high"
+    },
+    "139": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:58:35.367Z",
+      "confidence": "high",
+      "proposed_class": "5",
+      "notes": "映りが小さいので難しそう"
+    },
+    "140": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:58:39.745Z",
+      "confidence": "high"
+    },
+    "141": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:58:45.112Z",
+      "confidence": "high"
+    },
+    "142": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:58:52.611Z",
+      "confidence": "high"
+    },
+    "143": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:58:57.095Z",
+      "confidence": "high"
+    },
+    "144": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:59:01.445Z",
+      "confidence": "high"
+    },
+    "145": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:59:05.645Z",
+      "confidence": "high"
+    },
+    "146": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:59:09.361Z",
+      "confidence": "high"
+    },
+    "147": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:59:14.112Z",
+      "confidence": "high"
+    },
+    "148": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:59:20.928Z",
+      "confidence": "high"
+    },
+    "149": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:59:27.962Z",
+      "confidence": "high"
+    },
+    "150": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:59:32.045Z",
+      "confidence": "high"
+    },
+    "151": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T07:59:35.596Z",
+      "confidence": "high"
+    },
+    "152": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T07:59:51.029Z",
+      "confidence": "high",
+      "notes": "人の目でも判別できない"
+    },
+    "153": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:00:14.169Z",
+      "confidence": "high",
+      "proposed_class": "1",
+      "notes": "自動車かトラックかが難しい"
+    },
+    "154": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T08:00:27.754Z",
+      "confidence": "high",
+      "notes": "人の目でも判別できない"
+    },
+    "155": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:00:33.662Z",
+      "confidence": "high"
+    },
+    "156": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T08:00:55.602Z",
+      "confidence": "high",
+      "notes": "人の目でも判別できない"
+    },
+    "157": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:02.562Z",
+      "confidence": "high"
+    },
+    "158": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:06.279Z",
+      "confidence": "high"
+    },
+    "159": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:10.680Z",
+      "confidence": "high"
+    },
+    "160": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:14.545Z",
+      "confidence": "high"
+    },
+    "161": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:19.180Z",
+      "confidence": "high"
+    },
+    "162": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:23.762Z",
+      "confidence": "high"
+    },
+    "163": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:27.863Z",
+      "confidence": "high"
+    },
+    "164": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:30.896Z",
+      "confidence": "high"
+    },
+    "165": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:34.929Z",
+      "confidence": "high"
+    },
+    "166": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:01:39.845Z",
+      "confidence": "high"
+    },
+    "167": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T08:01:55.740Z",
+      "confidence": "high",
+      "notes": "人の目でも判別できない"
+    },
+    "168": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:02:14.079Z",
+      "confidence": "high"
+    },
+    "169": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:02:33.807Z",
+      "confidence": "high",
+      "notes": "ただし変な色のカエル（紫）なので難しいのか？"
+    },
+    "170": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:03:03.615Z",
+      "confidence": "high",
+      "notes": "珍しい色の車（緑）なのでカエルなどと間違えるのか？",
+      "proposed_class": "6"
+    },
+    "171": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T08:03:26.032Z",
+      "confidence": "high",
+      "notes": "人の目でも判別できない"
+    },
+    "172": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:03:29.446Z",
+      "confidence": "high"
+    },
+    "173": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:03:33.412Z",
+      "confidence": "high"
+    },
+    "174": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:03:37.163Z",
+      "confidence": "high"
+    },
+    "175": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:03:41.879Z",
+      "confidence": "high"
+    },
+    "176": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:03:45.729Z",
+      "confidence": "high"
+    },
+    "177": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:03:50.079Z",
+      "confidence": "high"
+    },
+    "178": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:10:02.835Z",
+      "confidence": "high"
+    },
+    "179": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:10:07.565Z",
+      "confidence": "high"
+    },
+    "180": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:10:14.248Z",
+      "confidence": "high"
+    },
+    "181": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:10:23.282Z",
+      "confidence": "high"
+    },
+    "182": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:11:14.379Z",
+      "confidence": "high"
+    },
+    "183": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:11:31.622Z",
+      "confidence": "high",
+      "notes": "周りに海の情報が少ないため難しそう"
+    },
+    "184": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:11:50.516Z",
+      "confidence": "high",
+      "proposed_class": "6"
+    },
+    "185": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T08:13:01.784Z",
+      "confidence": "high",
+      "proposed_class": "5",
+      "notes": "犬か猫か人間でも判別が難しい"
+    },
+    "186": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:13:21.589Z",
+      "confidence": "high",
+      "proposed_class": "3",
+      "notes": "少し猫にも見える"
+    },
+    "187": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:14:22.299Z",
+      "confidence": "high",
+      "notes": "明確だがニワトリであり、一般的な鳥とは違う特徴が目立つかもしれない"
+    },
+    "188": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:15:19.953Z",
+      "confidence": "high",
+      "proposed_class": "5",
+      "notes": "犬か猫かの判別が難しい"
+    },
+    "189": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:15:23.778Z",
+      "confidence": "high"
+    },
+    "190": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:15:29.260Z",
+      "confidence": "high"
+    },
+    "191": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T08:15:57.300Z",
+      "confidence": "high",
+      "notes": "構図的に人の目でも判別が難しい"
+    },
+    "192": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:16:04.096Z",
+      "confidence": "high"
+    },
+    "193": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:16:08.210Z",
+      "confidence": "high"
+    },
+    "194": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:19:08.279Z",
+      "confidence": "high"
+    },
+    "195": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:19:13.946Z",
+      "confidence": "high"
+    },
+    "196": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:19:17.779Z",
+      "confidence": "high"
+    },
+    "197": {
+      "classification": "ambiguous",
+      "updated_at": "2026-08-09T08:19:51.021Z",
+      "confidence": "high",
+      "proposed_class": "5",
+      "notes": "犬か猫か人の目にも判別が難しい"
+    },
+    "198": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:19:57.763Z",
+      "confidence": "high"
+    },
+    "199": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:20:02.446Z",
+      "confidence": "high"
+    },
+    "200": {
+      "classification": "clear_match",
+      "updated_at": "2026-08-09T08:20:50.364Z",
+      "confidence": "high",
+      "notes": "片側の角が折れているのか見えないので少し難しい"
+    }
+  }
+}
