@@ -267,6 +267,7 @@ def _load_mask(raw: Mapping[str, Any], *, arm: str) -> set[int]:
         "selected_class_counts",
         "selected_count",
         "selected_ids",
+        "selected_ids_sha256",
     }
     if set(value) != required or value.get("schema_version") != 1 or value.get("namespace") != "train":
         raise CausalCE20Error(f"{arm} fixed mask schema drifted")
@@ -281,8 +282,11 @@ def _load_mask(raw: Mapping[str, Any], *, arm: str) -> set[int]:
     if any(isinstance(item, bool) or not isinstance(item, int) for item in ids) or ids != sorted(set(ids)):
         raise CausalCE20Error(f"{arm} fixed mask IDs are invalid")
     selected = set(ids)
-    if spec.get("selected_count") != len(selected) or spec.get("selected_ids_sha256") != selected_ids_sha256(
-        tuple(ids)
+    ids_sha = selected_ids_sha256(tuple(ids))
+    if (
+        spec.get("selected_count") != len(selected)
+        or spec.get("selected_ids_sha256") != ids_sha
+        or value.get("selected_ids_sha256") != ids_sha
     ):
         raise CausalCE20Error(f"{arm} fixed mask count/ID digest drifted")
     return selected
