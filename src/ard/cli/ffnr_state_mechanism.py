@@ -89,7 +89,9 @@ def load_config(path: Path) -> dict[str, Any]:
 
 
 def _bind_intermediate(report: dict[str, Any], *, config_path: Path) -> dict[str, Any]:
-    body = dict(report)
+    # Hash the JSON-normalized representation because integer sample-ID keys
+    # become strings on disk; merge must verify exactly the bytes' semantics.
+    body = json.loads(json.dumps(report, sort_keys=True))
     binding = {
         "config_sha256": sha256_file(config_path),
         "analysis_provenance": _tracked_clean_provenance(),
