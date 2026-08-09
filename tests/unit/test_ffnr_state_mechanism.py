@@ -58,8 +58,10 @@ def test_cross_seed_models_keep_response_terms_out_of_exact_dependence() -> None
             item: {
                 "mS_adv": offset + (item - 10) / 20,
                 "mT_adv": offset + (item - 9) / 25,
+                "mT_clean": offset + (item - 8) / 24,
                 "DeltaS": item / 30,
                 "DeltaT": item / 40,
+                "online_margin_risk": item / 50,
             }
             for item in range(20)
         }
@@ -68,6 +70,13 @@ def test_cross_seed_models_keep_response_terms_out_of_exact_dependence() -> None
     fit, fit_target = records(0.0)
     evaluate, evaluate_target = records(0.1)
     rows = _model_rows("L2", "L4", fit, evaluate, fit_target, evaluate_target)
-    assert [row["model"] for row in rows] == ["M0", "M1", "M2", "M3", "M4"]
-    assert rows[-1]["fields"] == ["mS_adv", "mT_adv", "DeltaS", "DeltaT"]
-    assert "delta_auroc_vs_M3" in rows[-1]
+    assert [row["model"] for row in rows] == [
+        "M0",
+        "M0_history",
+        "M1_student_plus_teacher_clean",
+        "M2_student_plus_teacher_response",
+        "M3_student_plus_both_teacher_parts",
+        "M4_student_plus_teacher_adv",
+    ]
+    assert rows[-1]["fields"] == ["mS_adv", "mT_adv"]
+    assert "delta_auroc_vs_M0" in rows[-1]

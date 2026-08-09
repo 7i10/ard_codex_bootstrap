@@ -5,7 +5,11 @@
 from __future__ import annotations
 
 import argparse
-import multiprocessing as mp
+import json
+import os
+import subprocess
+import sys
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -85,26 +89,51 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--single-run", choices=("L2", "L4"), help="write one compact intermediate report")
     args = parser.parse_args(argv)
     config_path = args.config.resolve()
     config = load_config(config_path)
+    if args.single_run:
+        report = analyze_run(
+            label=args.single_run,
+            expected_count=config["expected_count"],
+            expected_universe_sha256=config["stable_id_class_universe_sha256"],
+            **config["runs"][args.single_run],
+        )
+        output_dir = args.output_dir.resolve()
+        if output_dir.exists():
+            raise FFNRStateMechanismError("refusing to overwrite a single-run intermediate directory")
+        output_dir.mkdir(parents=True, exist_ok=False)
+        (output_dir / "single-report.json").write_text(json.dumps(report, sort_keys=True) + "\n", encoding="utf-8")
+        print(output_dir / "single-report.json")
+        return 0
     # Each replay bundle peaks near the host's 2-GiB worker limit.  Analyze
-    # seeds in short-lived child processes so L2 and L4 are never resident at
-    # the same time; this changes no rows or estimator and keeps the point
-    # analysis deterministic.
-    ctx = mp.get_context("spawn")
-    reports: dict[str, Any] = {}
-    for label in ("L2", "L4"):
-        with ctx.Pool(processes=1) as pool:
-            reports[label] = pool.apply(
-                analyze_run,
-                kwds={
-                    "label": label,
-                    "expected_count": config["expected_count"],
-                    "expected_universe_sha256": config["stable_id_class_universe_sha256"],
-                    **config["runs"][label],
-                },
+    # seeds in separate interpreter processes so their Arrow buffers are fully
+    # released before the next seed starts.  This changes no rows or estimator.
+    root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory(prefix="ffnr-state-mechanism-") as temp:
+        intermediate: dict[str, Path] = {}
+        for label in ("L2", "L4"):
+            child_dir = Path(temp) / label
+            env = dict(os.environ)
+            env["PYTHONPATH"] = str(root) + os.pathsep + env.get("PYTHONPATH", "")
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "ard.cli.ffnr_state_mechanism",
+                    "--config",
+                    str(config_path),
+                    "--output-dir",
+                    str(child_dir),
+                    "--single-run",
+                    label,
+                ],
+                check=True,
+                env=env,
             )
+            intermediate[label] = child_dir / "single-report.json"
+        reports = {label: json.loads(intermediate[label].read_text(encoding="utf-8")) for label in ("L2", "L4")}
     models = cross_seed_models(reports)
     paths = write_outputs(
         output_dir=args.output_dir.resolve(), reports=reports, cross_seed_models=models, config_path=config_path

@@ -20,12 +20,11 @@ from typing import Any
 from ard.analysis.ffnr_strong_point import (
     StrongPointError,
     _online_panel,
-    _read_parquet,
     _strong_lineage,
 )
 from ard.analysis.ffnr_strong_replay import EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256
 from ard.analysis.rslad_signal_replay import repository_root_from_source
-from ard.analysis.signal_audit import _fit_logistic, _predict_logistic, binary_metrics, canonical_json, sha256_file
+from ard.analysis.signal_audit import binary_metrics, canonical_json, sha256_file
 
 
 class FFNRStateMechanismError(StrongPointError):
@@ -37,6 +36,109 @@ ANCHORS = (39, 59, 79)
 TERMINAL_EPOCHS = (189, 194, 199)
 ENDPOINTS = {"majority": 2, "all": 3}
 QUANTILES = (0.10, 0.20, 0.25, 1.0 / 3.0)
+
+_FEATURE_COLUMNS = {
+    "namespace",
+    "sample_id",
+    "class_id",
+    "epoch",
+    "student_robust_correct",
+    "student_adversarial_probability_margin",
+    "student_clean_probability_margin",
+    "student_clean_correct",
+    "student_clean_to_adversarial_probability_margin_delta",
+    "teacher_clean_probabilities",
+    "teacher_adversarial_probabilities",
+}
+_OUTCOME_COLUMNS = {"namespace", "sample_id", "class_id", "epoch", "student_robust_correct"}
+
+
+def _fit_logistic_fast(features: Sequence[Sequence[float]], targets: Sequence[int]) -> tuple[Any, Any, Any]:
+    """Vectorized fixed-iteration logistic fit for the cross-seed point table."""
+    try:
+        import numpy as np
+    except Exception as exc:  # pragma: no cover - dependency contract
+        raise FFNRStateMechanismError("numpy is required for cross-seed mechanism models") from exc
+    x = np.asarray(features, dtype=np.float64)
+    y = np.asarray(targets, dtype=np.float64)
+    if x.ndim != 2 or len(x) != len(y) or len(np.unique(y)) != 2:
+        raise FFNRStateMechanismError("cross-seed fit requires a two-class matrix")
+    means = x.mean(axis=0)
+    scales = np.maximum(x.std(axis=0), 1e-12)
+    z = (x - means) / scales
+    design = np.concatenate([np.ones((len(z), 1)), z], axis=1)
+    weights = np.zeros(design.shape[1], dtype=np.float64)
+    for _ in range(120):
+        logits = np.clip(design @ weights, -35.0, 35.0)
+        probabilities = 1.0 / (1.0 + np.exp(-logits))
+        gradient = design.T @ (probabilities - y) / len(y)
+        gradient[1:] += 0.001 * weights[1:]
+        weights -= 0.15 * gradient
+    return weights, means, scales
+
+
+def _predict_logistic_fast(fit: tuple[Any, Any, Any], features: Sequence[Sequence[float]]) -> list[float]:
+    import numpy as np
+
+    weights, means, scales = fit
+    x = (np.asarray(features, dtype=np.float64) - means) / scales
+    logits = np.clip(weights[0] + x @ weights[1:], -35.0, 35.0)
+    return (1.0 / (1.0 + np.exp(-logits))).tolist()
+
+
+def _read_compact_observations(
+    path: Path, *, epochs: Sequence[int], expected_count: int, feature: bool
+) -> dict[int, dict[int, dict[str, Any]]]:
+    """Read only the columns/epochs needed by this analysis.
+
+    The generic strong-point reader materializes every row as a Python mapping
+    and is correct for its point report, but two such panels exceed the small
+    worker memory limit.  This reader preserves the same schema/ID checks while
+    retaining only compact per-epoch records and discarding Arrow buffers.
+    """
+    try:
+        import pyarrow.parquet as pq
+    except Exception as exc:  # pragma: no cover - dependency contract
+        raise FFNRStateMechanismError("pyarrow is required for state mechanism analysis") from exc
+    columns = sorted(_FEATURE_COLUMNS if feature else _OUTCOME_COLUMNS)
+    try:
+        table = pq.read_table(path, columns=columns)
+    except Exception as exc:
+        raise FFNRStateMechanismError(f"state mechanism Parquet is unreadable: {path}") from exc
+    if set(table.column_names) != set(columns):
+        raise FFNRStateMechanismError("state mechanism Parquet schema drifted")
+    values = {name: table[name].to_pylist() for name in columns}
+    result: dict[int, dict[int, dict[str, Any]]] = {int(epoch): {} for epoch in epochs}
+    for index, epoch_value in enumerate(values["epoch"]):
+        if epoch_value not in result:
+            continue
+        if values["namespace"][index] != "train":
+            raise FFNRStateMechanismError("state mechanism namespace drifted")
+        sample_id = values["sample_id"][index]
+        class_id = values["class_id"][index]
+        if (
+            not isinstance(sample_id, int)
+            or isinstance(sample_id, bool)
+            or not isinstance(class_id, int)
+            or isinstance(class_id, bool)
+        ):
+            raise FFNRStateMechanismError("state mechanism stable-ID/class type drifted")
+        if sample_id in result[int(epoch_value)]:
+            raise FFNRStateMechanismError("state mechanism duplicate stable ID")
+        row = {name: values[name][index] for name in columns if name not in {"namespace", "epoch"}}
+        result[int(epoch_value)][sample_id] = row
+    if any(len(result[int(epoch)]) != expected_count for epoch in epochs):
+        raise FFNRStateMechanismError("state mechanism lacks exact epoch coverage")
+    reference = result[int(epochs[0])]
+    pairs = [{"sample_id": item, "class_id": reference[item]["class_id"]} for item in sorted(reference)]
+    if hashlib.sha256(canonical_json(pairs)).hexdigest() != EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256:
+        raise FFNRStateMechanismError("state mechanism stable-ID/class universe drifted")
+    for epoch in epochs:
+        if set(result[int(epoch)]) != set(reference) or any(
+            result[int(epoch)][item]["class_id"] != reference[item]["class_id"] for item in reference
+        ):
+            raise FFNRStateMechanismError("state mechanism stable-ID/class universe changed across epochs")
+    return result
 
 
 def _finite(value: object, name: str, *, lo: float = -math.inf, hi: float = math.inf) -> float:
@@ -311,6 +413,64 @@ def _threshold_tables(rows: Mapping[int, Mapping[str, Any]], target: Mapping[int
     return result
 
 
+def _state_threshold_candidates(
+    rows: Mapping[int, Mapping[str, Any]], target: Mapping[int, int]
+) -> list[dict[str, Any]]:
+    """Report preregistered quantile thresholds without selecting one."""
+    result: list[dict[str, Any]] = []
+    for measure in ("mS_adv", "mT_adv"):
+        positive = sorted(float(row[measure]) for row in rows.values() if float(row[measure]) > 0)
+        for fraction in QUANTILES:
+            if not positive:
+                continue
+            index = min(len(positive) - 1, max(0, math.ceil(fraction * len(positive)) - 1))
+            tau = positive[index]
+            states = {
+                "safe_correct": [item for item, row in rows.items() if float(row[measure]) > tau],
+                "fragile_correct": [item for item, row in rows.items() if 0 < float(row[measure]) <= tau],
+                "wrong": [item for item, row in rows.items() if float(row[measure]) <= 0],
+            }
+            result.append(
+                {
+                    "measure": measure,
+                    "fragile_positive_fraction": fraction,
+                    "tau": tau,
+                    "states": {name: _rate_summary(ids, target) for name, ids in states.items()},
+                }
+            )
+    return result
+
+
+def _candidate_thresholds(rows: Mapping[int, Mapping[str, Any]], measure: str) -> list[tuple[float, float]]:
+    positive = sorted(float(row[measure]) for row in rows.values() if float(row[measure]) > 0)
+    if not positive:
+        return []
+    result = []
+    for fraction in QUANTILES:
+        index = min(len(positive) - 1, max(0, math.ceil(fraction * len(positive)) - 1))
+        result.append((fraction, positive[index]))
+    return result
+
+
+def _state_grid(
+    rows: Mapping[int, Mapping[str, Any]], target: Mapping[int, int], tau_s: float, tau_t: float
+) -> list[dict[str, Any]]:
+    cells: dict[tuple[str, str], list[int]] = {}
+
+    def classify(value: float, tau: float) -> str:
+        return "wrong" if value <= 0 else "fragile_correct" if value <= tau else "safe_correct"
+
+    for item, row in rows.items():
+        cells.setdefault((classify(float(row["mS_adv"]), tau_s), classify(float(row["mT_adv"]), tau_t)), []).append(
+            item
+        )
+    return [
+        {"student_state": student, "teacher_state": teacher, **_rate_summary(cells.get((student, teacher), []), target)}
+        for student in ("safe_correct", "fragile_correct", "wrong")
+        for teacher in ("safe_correct", "fragile_correct", "wrong")
+    ]
+
+
 def _teacher_decomposition(rows: Mapping[int, Mapping[str, Any]], target: Mapping[int, int]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for clean in (False, True):
@@ -351,13 +511,14 @@ def _model_rows(
     eval_target: Mapping[int, int],
 ) -> list[dict[str, Any]]:
     columns = {
-        "M0": (),
-        "M1": ("mS_adv",),
-        "M2": ("mT_adv",),
-        "M3": ("mS_adv", "mT_adv"),
-        # Clean margins are not included with their respective deltas: that
-        # would be exactly linearly dependent.  M4 tests response increments.
-        "M4": ("mS_adv", "mT_adv", "DeltaS", "DeltaT"),
+        # M0 is the strong current Student state.  M0_history is retained as
+        # the deployable online-history reference, without using future labels.
+        "M0": ("mS_adv",),
+        "M0_history": ("online_margin_risk",),
+        "M1_student_plus_teacher_clean": ("mS_adv", "mT_clean"),
+        "M2_student_plus_teacher_response": ("mS_adv", "DeltaT"),
+        "M3_student_plus_both_teacher_parts": ("mS_adv", "mT_clean", "DeltaT"),
+        "M4_student_plus_teacher_adv": ("mS_adv", "mT_adv"),
     }
     if set(fit) != set(fit_target) or set(evaluate) != set(eval_target):
         raise FFNRStateMechanismError("cross-seed model IDs and targets differ")
@@ -368,11 +529,11 @@ def _model_rows(
             scores = [probability] * len(evaluate)
         else:
             train_ids, eval_ids = sorted(fit), sorted(evaluate)
-            fitted = _fit_logistic(
+            fitted = _fit_logistic_fast(
                 [[float(fit[item][field]) for field in fields] for item in train_ids],
                 [fit_target[item] for item in train_ids],
             )
-            scores = _predict_logistic(
+            scores = _predict_logistic_fast(
                 fitted, [[float(evaluate[item][field]) for field in fields] for item in eval_ids]
             )
         eval_ids = sorted(evaluate)
@@ -476,26 +637,22 @@ def analyze_run(
         )
         if replay_value != online_meta.get(key):
             raise FFNRStateMechanismError("replay/online lineage identity drifted")
-    # Keep raw complete records because strict point-panel helpers intentionally
-    # discard the clean teacher and Student probability primitives needed here.
-    feature_rows = _read_parquet(feature_observations)
-    feature_reference = _reference_panel(
-        feature_rows,
+    # Use a column-pruned reader: feature rows retain only the two teacher
+    # probability vectors needed to derive margins, while terminal outcomes
+    # retain only correctness.  This avoids the multi-gigabyte Python row
+    # materialization used by the generic replay point reader.
+    feature = _read_compact_observations(
+        feature_observations,
         epochs=ANCHORS,
         expected_count=expected_count,
-        expected_universe_sha256=expected_universe_sha256,
+        feature=True,
     )
-    feature = _raw_panel(feature_rows, epochs=ANCHORS, reference=feature_reference)
-    del feature_rows, feature_reference
-    outcome_rows = _read_parquet(outcome_observations)
-    outcome_reference = _reference_panel(
-        outcome_rows,
+    outcome = _read_compact_observations(
+        outcome_observations,
         epochs=outcome_meta["requested_epochs"],
         expected_count=expected_count,
-        expected_universe_sha256=expected_universe_sha256,
+        feature=False,
     )
-    outcome = _compact_outcome(outcome_rows, epochs=outcome_meta["requested_epochs"], reference=outcome_reference)
-    del outcome_rows, outcome_reference
     ids = set(feature[ANCHORS[0]])
     if (
         any(set(feature[anchor]) != ids or set(online[anchor]) != ids for anchor in ANCHORS)
@@ -517,6 +674,14 @@ def analyze_run(
         if not eligible:
             raise FFNRStateMechanismError("online-current-correct FF cohort is empty")
         analyses[str(anchor)] = {}
+        compact_rows = {
+            item: {
+                **rows[item],
+                "online_margin_risk": float(online[anchor][item]["margin_risk"]),
+                "online_frequency_risk": float(online[anchor][item]["frequency_risk"]),
+            }
+            for item in eligible
+        }
         for endpoint, target in endpoints.items():
             cohort_target = {item: target[item] for item in eligible}
             delta_values = sorted(float(row["DeltaS"]) for row in eligible.values())
@@ -529,10 +694,22 @@ def analyze_run(
                 "risk_curves": _risk_curves(eligible, cohort_target),
                 "student_teacher_surface": _surface(eligible, cohort_target),
                 "threshold_candidates": _threshold_tables(eligible, cohort_target),
+                "state_threshold_candidates": _state_threshold_candidates(eligible, cohort_target),
+                "state_grids": [
+                    {
+                        "student_fraction": sf,
+                        "teacher_fraction": tf,
+                        "cells": _state_grid(eligible, cohort_target, st, tt),
+                    }
+                    for sf, st in _candidate_thresholds(eligible, "mS_adv")
+                    for tf, tt in _candidate_thresholds(eligible, "mT_adv")
+                ],
                 "state_summaries": _state_summaries(eligible, cohort_target, median),
                 "teacher_conditional_decomposition": _teacher_decomposition(eligible, cohort_target),
             }
-            cross_seed.setdefault(str(anchor), {"rows": eligible, "targets": {}})["targets"][endpoint] = cohort_target
+            cross_seed.setdefault(str(anchor), {"rows": compact_rows, "targets": {}})["targets"][endpoint] = (
+                cohort_target
+            )
     # Only the compact scalar FF rows and targets are needed by cross-seed
     # fitting.  Release the decoded replay probability vectors before L4 loads.
     del feature, outcome, online, endpoints
