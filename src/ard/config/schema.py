@@ -592,6 +592,10 @@ class InterventionMaskProvenanceConfig(StrictModel):
         "class_state_count_matched_random_epoch39_v2",
         "prescriptive_v3_online_history",
         "prescriptive_v3_matched_random",
+        "ffnr_route_a_strong_ce_pgd20",
+        "ffnr_route_a_matched_random",
+        "ffnr_route_b_strong_ce_pgd20",
+        "ffnr_route_b_matched_random",
     ]
     approved_selector_spec_sha256: str | None = None
     selector_spec_path: Path | None = None
@@ -687,6 +691,31 @@ class InterventionMaskProvenanceConfig(StrictModel):
                 )
             ):
                 raise ValueError("online-history mask provenance cannot carry random-mask fields")
+        elif self.source in {
+            "ffnr_route_a_strong_ce_pgd20",
+            "ffnr_route_a_matched_random",
+            "ffnr_route_b_strong_ce_pgd20",
+            "ffnr_route_b_matched_random",
+        }:
+            if any(
+                value is not None
+                for value in (
+                    self.approved_selector_spec_sha256,
+                    self.selector_spec_path,
+                    self.route,
+                    self.anchor_robust_correct,
+                    self.reference_history_mask_sha256,
+                    self.reference_selected_count,
+                    self.reference_selected_class_counts,
+                    self.reference_history_selector_spec_sha256,
+                )
+            ):
+                raise ValueError("FFNR causal mask provenance must not carry legacy selector fields")
+            if self.source.endswith("matched_random"):
+                if self.random_seed is None or self.generator is None or self.generator_version is None:
+                    raise ValueError("FFNR matched-random provenance requires generator metadata")
+            elif any(value is not None for value in (self.random_seed, self.generator, self.generator_version)):
+                raise ValueError("FFNR selected provenance must not carry random generator metadata")
         else:
             if (
                 self.approved_selector_spec_sha256 is not None
@@ -763,15 +792,18 @@ class InterventionMaskConfig(StrictModel):
 class InterventionConfig(StrictModel):
     """Registered immutable intervention arms; legacy H3 and epoch-39 v2 are disjoint."""
 
-    arm: Literal["C", "HS", "RS", "HD", "RD", "PF_TA", "PF_R", "NR_TA", "NR_R"]
+    arm: Literal["C", "HS", "RS", "HD", "RD", "PF_TA", "PF_R", "NR_TA", "NR_R", "C79", "RA", "RAR", "RB", "RBR"]
     selector: Literal[
-        "none", "student_history", "class_matched_random", "online_history", "class_state_count_matched_random"
+        "none", "student_history", "class_matched_random", "online_history", "class_state_count_matched_random",
+        "route_a_strong", "route_a_matched_random", "route_b_strong", "route_b_matched_random"
     ]
     kind: Literal[
         "ordinary_rslad",
         "uniform_target_softening",
         "adversarial_kd_downweight",
         "teacher_target_true_label_mix",
+        "route_a_ce_anchor",
+        "route_b_ce_anchor",
     ]
     parent: InterventionParentConfig
     mask: InterventionMaskConfig | None = None
@@ -779,6 +811,7 @@ class InterventionConfig(StrictModel):
     selector_bundle_sha256: str | None = None
     uniform_target_softening_rho: float = Field(default=0.5, ge=0, le=1)
     adversarial_kd_multiplier: float = Field(default=0.5, ge=0, le=1)
+    adversarial_ce_coefficient: float = Field(default=0.0, ge=0)
 
     @model_validator(mode="after")
     def validate_registered_arm(self) -> InterventionConfig:
@@ -795,10 +828,26 @@ class InterventionConfig(StrictModel):
             "NR_TA": ("online_history", "teacher_target_true_label_mix", True, "non_recovery", False),
             "NR_R": ("class_state_count_matched_random", "teacher_target_true_label_mix", True, "non_recovery", False),
         }
+        causal = {
+            "C79": ("none", "ordinary_rslad", False, None, 0.0, 0.0),
+            "RA": ("route_a_strong", "route_a_ce_anchor", True, "ffnr_route_a_strong_ce_pgd20", 0.5, 0.25),
+            "RAR": ("route_a_matched_random", "route_a_ce_anchor", True, "ffnr_route_a_matched_random", 0.5, 0.25),
+            "RB": ("route_b_strong", "route_b_ce_anchor", True, "ffnr_route_b_strong_ce_pgd20", 1.0, 0.25),
+            "RBR": ("route_b_matched_random", "route_b_ce_anchor", True, "ffnr_route_b_matched_random", 1.0, 0.25),
+        }
         if self.arm in legacy:
             expected = legacy[self.arm]
             if self.parent.epoch != 99:
                 raise ValueError("legacy intervention arms require the epoch-99 parent contract")
+        elif self.arm in causal:
+            selector, kind, has_mask, source, kd_multiplier, ce_coefficient = causal[self.arm]
+            expected = (selector, kind, has_mask)
+            if self.parent.epoch != 79:
+                raise ValueError("FFNR causal arms require the epoch-79 parent contract")
+            if self.adversarial_kd_multiplier != kd_multiplier or self.adversarial_ce_coefficient != ce_coefficient:
+                raise ValueError("FFNR causal arm treatment coefficients are frozen by the preregistered pilot")
+            if self.mask is not None and self.mask.provenance.source != source:
+                raise ValueError("FFNR causal mask provenance source does not match its registered arm")
         else:
             selector, kind, has_mask, route, anchor_correct = v2[self.arm]
             expected = (selector, kind, has_mask)
@@ -818,6 +867,8 @@ class InterventionConfig(StrictModel):
             raise ValueError("intervention arm must use its registered selector, treatment, and mask presence")
         if self.arm in legacy and (self.uniform_target_softening_rho != 0.5 or self.adversarial_kd_multiplier != 0.5):
             raise ValueError("the registered intervention screen fixes both treatment strengths at 0.5")
+        if self.arm in legacy and self.adversarial_ce_coefficient != 0.0:
+            raise ValueError("legacy intervention arms must not carry adversarial CE")
         if self.arm in legacy and (self.selector_bundle_path is not None or self.selector_bundle_sha256 is not None):
             raise ValueError("legacy intervention arms must not carry history-routing v2 selector bundles")
         if self.mask is not None:
@@ -839,6 +890,8 @@ class InterventionConfig(StrictModel):
                 and provenance.source != "class_state_count_matched_random_epoch39_v2"
             ):
                 raise ValueError("v2 random-selected arms require class/state/count-matched provenance")
+            if self.arm in causal and provenance.source != causal[self.arm][3]:
+                raise ValueError("FFNR causal arms require the registered route provenance")
         return self
 
 

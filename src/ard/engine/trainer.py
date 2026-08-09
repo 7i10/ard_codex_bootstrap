@@ -149,6 +149,7 @@ class Trainer:
         anchor_model: nn.Module | None = None,
         prescriptive_v3_route: str | None = None,
         adversarial_kd_multiplier: float | None = None,
+        adversarial_ce_coefficient: float | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
         frozen_risk_lookup: FrozenRiskLookup | None = None,
@@ -187,8 +188,14 @@ class Trainer:
             raise ValueError("an intervention mask requires exactly one registered treatment")
         if intervention_mask is None and adversarial_kd_multiplier is not None:
             raise ValueError("an adversarial KD intervention multiplier requires a fixed intervention mask")
+        if intervention_mask is None and adversarial_ce_coefficient is not None:
+            raise ValueError("an adversarial CE intervention coefficient requires a fixed intervention mask")
         if adversarial_kd_multiplier is not None and not 0.0 <= adversarial_kd_multiplier <= 1.0:
             raise ValueError("adversarial KD intervention multiplier must be in [0, 1]")
+        if adversarial_ce_coefficient is not None and not torch.isfinite(torch.as_tensor(adversarial_ce_coefficient)):
+            raise ValueError("adversarial CE intervention coefficient must be finite")
+        if adversarial_ce_coefficient is not None and adversarial_ce_coefficient < 0:
+            raise ValueError("adversarial CE intervention coefficient must be non-negative")
         self.intervention_mask = intervention_mask
         if prescriptive_v3_route not in {None, "pf_retention", "nr_prefix"}:
             raise ValueError("prescriptive route must be pf_retention or nr_prefix")
@@ -210,6 +217,7 @@ class Trainer:
             # state updates should a future call site bypass that helper.
             self.anchor_model.eval()
         self.adversarial_kd_multiplier = adversarial_kd_multiplier
+        self.adversarial_ce_coefficient = adversarial_ce_coefficient
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
         if policy_warmup_epochs < 0:
@@ -589,6 +597,13 @@ class Trainer:
                 terms = terms.scale_adversarial_kd(
                     multiplier,
                     coefficient=float(getattr(self.objective, "ADVERSARIAL_COEFFICIENT", 1.0)),
+                )
+            if intervention_risk is not None and self.adversarial_ce_coefficient is not None:
+                terms = terms.add_adversarial_ce(
+                    batch.labels,
+                    logits,
+                    intervention_risk,
+                    coefficient=float(self.adversarial_ce_coefficient),
                 )
             if self.diagnostics is not None:
                 with suspend_ddp_buffer_broadcasts(self.model), _evaluation_mode(self.model), torch.no_grad():

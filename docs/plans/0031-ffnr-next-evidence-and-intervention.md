@@ -1,5 +1,7 @@
 # FF/NR 次段階エビデンス回収・介入検証計画
 
+実行ログ: 2026-08-09 にepoch79親のmask準備、loss-scale dry-run、FFNR causal arm/runtime（C79/RA/RAR/RB/RBR）を実装。focused contract test後にGPU pilotを開始する。Route B primaryはq=5%に固定し、q=10%は感度候補として未実行。
+
 ## 0. 目的
 
 この計画の目的は、Chen ERTで確認されたFF/NRの構造とTeacher responseの強い予測信号をもとに、残っている科学的な未確認事項を回収し、その後に小規模な因果介入を行うことである。
@@ -1479,5 +1481,19 @@ global robust generalization
 - [ ] Parts D--J (loss dry-run, epoch-79 randomized mechanism pilot, component
   ablation, deployable selector, and long-horizon training) remain closed until
   the evidence gate and coefficient dry-run are reviewed against this report.
+
+- [x] 2026-08-09: Retrieved the existing Chen L2/L4 epoch-79 W&B `last:v15`
+  parent artifacts without downloading the multi-GB run bundle.  Parent hashes,
+  optimizer/scheduler/RNG/sample-state payloads, and scheduler milestones were
+  checked.
+- [x] 2026-08-09: Generated selection-time-only Route A/B masks and matched
+  random controls for both Chen seeds.  Fixed q candidates are 5% and 10%;
+  no future endpoint or test data was read by the selector command.
+- [x] 2026-08-09: Completed one fixed-batch GPU loss/gradient scale dry-run per
+  parent.  Conservative candidates are Route A `(KD=0.5, CE=0.25)` and Route B
+  `(KD=1.0, CE=0.25)`.  This is not a performance result.
+- [ ] Route A/B runtime arm schema and selected-only adversarial CE branch are
+  not yet implemented; no causal training pilot has been launched under an
+  incorrect legacy arm contract.
 
 Canonical CPU result: `docs/experiments/ffnr_next_evidence_v1.json`.

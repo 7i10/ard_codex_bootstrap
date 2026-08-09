@@ -174,8 +174,21 @@ def _validate_completed_screen(
         expected_arm = config.prescriptive_v3.arm
     else:
         v2 = config.intervention is not None and config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}
-        expected_kind = "history_routing_v2_intervention_v1" if v2 else "common_state_intervention_v1"
-        expected_arms = {"PF_TA", "PF_R", "NR_TA", "NR_R"} if v2 else {"C", "HS", "RS", "HD", "RD"}
+        causal = config.intervention is not None and config.intervention.arm in {"C79", "RA", "RAR", "RB", "RBR"}
+        expected_kind = (
+            "history_routing_v2_intervention_v1"
+            if v2
+            else "ffnr_causal_intervention_v1"
+            if causal
+            else "common_state_intervention_v1"
+        )
+        expected_arms = (
+            {"PF_TA", "PF_R", "NR_TA", "NR_R"}
+            if v2
+            else {"C79", "RA", "RAR", "RB", "RBR"}
+            if causal
+            else {"C", "HS", "RS", "HD", "RD"}
+        )
         expected_arm = config.intervention.arm if config.intervention is not None else None
     if manifest.get("kind") != expected_kind or not isinstance(arms, list) or len(arms) != len(expected_arms):
         raise ValueError("completed intervention screen has the wrong registered kind or arm count")
@@ -260,8 +273,15 @@ def _validate_intervention_resume(path: Path | None, config: ExperimentConfig, *
         raise ValueError("intervention arms require a registered common-state fork lineage")
     parent = config.intervention.parent
     v2 = config.intervention.arm in {"PF_TA", "PF_R", "NR_TA", "NR_R"}
+    causal = config.intervention.arm in {"C79", "RA", "RAR", "RB", "RBR"}
     expected = {
-        "kind": "history_routing_v2_intervention_v1" if v2 else "common_state_intervention_v1",
+        "kind": (
+            "history_routing_v2_intervention_v1"
+            if v2
+            else "ffnr_causal_intervention_v1"
+            if causal
+            else "common_state_intervention_v1"
+        ),
         "arm": config.intervention.arm,
         "parent_checkpoint_sha256": parent.checkpoint_sha256,
         "parent_raw_config_sha256": parent.raw_config_sha256,
@@ -835,6 +855,12 @@ def main(argv: list[str] | None = None) -> int:
             adversarial_kd_multiplier=(
                 config.intervention.adversarial_kd_multiplier
                 if config.intervention is not None and config.intervention.kind == "adversarial_kd_downweight"
+                else None
+            ),
+            adversarial_ce_coefficient=(
+                config.intervention.adversarial_ce_coefficient
+                if config.intervention is not None
+                and config.intervention.kind in {"route_a_ce_anchor", "route_b_ce_anchor"}
                 else None
             ),
             policy_warmup_epochs=(

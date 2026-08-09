@@ -109,6 +109,10 @@ def load_fixed_intervention_mask(
         "class_state_count_matched_random_epoch39_v2",
         "prescriptive_v3_online_history",
         "prescriptive_v3_matched_random",
+        "ffnr_route_a_strong_ce_pgd20",
+        "ffnr_route_a_matched_random",
+        "ffnr_route_b_strong_ce_pgd20",
+        "ffnr_route_b_matched_random",
     }:
         raise FixedMaskError("intervention mask provenance source is forbidden or unknown")
     return FixedInterventionMask(

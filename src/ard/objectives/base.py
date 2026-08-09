@@ -61,6 +61,30 @@ class ObjectiveTerms:
             clean_kd=self.clean_kd,
         )
 
+    def add_adversarial_ce(
+        self,
+        labels: torch.Tensor,
+        logits: torch.Tensor,
+        multiplier: torch.Tensor,
+        *,
+        coefficient: float,
+    ) -> ObjectiveTerms:
+        """Add a selected-sample hard-label CE branch to the unreduced hard term."""
+        if coefficient < 0 or not torch.isfinite(torch.as_tensor(coefficient, device=logits.device)):
+            raise ValueError("adversarial CE coefficient must be finite and non-negative")
+        ce = torch.nn.functional.cross_entropy(logits, labels, reduction="none")
+        if ce.shape != self.hard.shape or multiplier.shape != self.hard.shape:
+            raise ValueError("adversarial CE logits do not match the unreduced objective batch")
+        if not torch.isfinite(multiplier).all() or bool((multiplier < 0).any()):
+            raise ValueError("adversarial CE multiplier must be finite and non-negative")
+        return ObjectiveTerms(
+            hard=self.hard + coefficient * multiplier * ce,
+            kd=self.kd,
+            regularization=self.regularization,
+            adversarial_kd=self.adversarial_kd,
+            clean_kd=self.clean_kd,
+        )
+
 
 class DistillationObjective(ABC):
     requires_clean_student_logits = False

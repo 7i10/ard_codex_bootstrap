@@ -166,8 +166,9 @@ def _validate_parent(
         or source.training.epochs != 200
         or source.training.per_rank_batch_size != 128
         or source.training.global_batch_size != 128
+        or parent.epoch not in {79, 99}
     ):
-        raise InterventionForkError("parent must retain the controlled CIFAR-10 45k/128 epoch-99 protocol identity")
+        raise InterventionForkError("parent must retain the controlled CIFAR-10 45k/128 protocol identity")
     if source.teacher is None or source.teacher.checkpoint_sha256 != parent.teacher_checkpoint_sha256:
         raise InterventionForkError("parent teacher SHA does not match the bound arm lineage")
     manifest_git = _require_mapping(parent_manifest.get("git"), name="parent manifest git")
@@ -188,7 +189,7 @@ def _validate_parent(
         or payload.get("world_size") != parent.world_size
         or payload.get("config_hash") != raw_hash
     ):
-        raise InterventionForkError("parent checkpoint is not the exact epoch-99 single-world-size bound state")
+        raise InterventionForkError("parent checkpoint is not the exact bound single-world-size state")
     if parent_manifest.get("run_id") != payload.get("tracker_run_id"):
         raise InterventionForkError("parent manifest run ID does not match the checkpoint tracker identity")
     attestation_path = parent.artifact_attestation
@@ -233,16 +234,17 @@ def _validate_parent(
         rng[key] is None for key in ("python", "torch_cpu", "torch_cuda", "numpy")
     ):
         raise InterventionForkError("parent checkpoint RNG state is incomplete")
-    if payload.get("sampler_epoch") != [99] or payload["sampler_state"][0] != {
-        "epoch": 99,
+    if payload.get("sampler_epoch") != [parent.epoch] or payload["sampler_state"][0] != {
+        "epoch": parent.epoch,
         "seed": source.seeds.data_order,
         "rank": 0,
         "world_size": 1,
         "shuffle": True,
     }:
-        raise InterventionForkError("parent sampler state does not prove the epoch-99 single-rank training identity")
-    if payload.get("global_step") != 35_200:
-        raise InterventionForkError("parent global step is not 45000/128 times 100 epochs")
+        raise InterventionForkError("parent sampler state does not prove the bound single-rank training identity")
+    expected_steps = (parent.epoch + 1) * 352
+    if payload.get("global_step") != expected_steps:
+        raise InterventionForkError("parent global step is inconsistent with the bound epoch")
     for key in ("model", "optimizer", "selection_metadata"):
         _require_mapping(payload.get(key), name=f"parent checkpoint {key}")
     sample_state = _require_mapping(payload.get("sample_state"), name="parent checkpoint sample_state")
@@ -275,12 +277,12 @@ def _validate_parent(
         or len(store.records) != parent.sample_state_records
         or not all(
             record.history_statistics_complete
-            and record.seen == 100
+            and record.seen == parent.epoch + 1
             and all(getattr(record, field) is not None for field in required_observation_fields)
             for record in store.records.values()
         )
     ):
-        raise InterventionForkError("parent format-v3 sample state is incomplete for the full 45k train partition")
+        raise InterventionForkError("parent format-v3 sample state is incomplete for the full train partition")
     train_labels: dict[int, int] = {}
     for sample_id, record in store.records.items():
         if record.true_label is None:  # guarded above; retain an explicit type/runtime fence.
@@ -301,7 +303,11 @@ def _validate_allowed_delta(*, parent: ExperimentConfig, arm: ExperimentConfig) 
     if parent_runtime != arm_runtime:
         raise InterventionForkError("arm changes fields outside the registered intervention/tracking/output whitelist")
     if arm.training.epochs != parent.training.epochs:
-        raise InterventionForkError("common-state fork cannot alter continuation epochs")
+        causal = arm.intervention is not None and arm.intervention.arm in {"C79", "RA", "RAR", "RB", "RBR"}
+        if not causal or arm.training.epochs not in {84, 89, 94}:
+            raise InterventionForkError(
+                "common-state fork cannot alter continuation epochs outside the registered FFNR horizons"
+            )
 
 
 def _validate_mask(arm: ExperimentConfig, *, train_labels: Mapping[int, int] | None = None) -> None:
@@ -387,8 +393,24 @@ def _validate_screen(arms: Sequence[ExperimentConfig]) -> dict[str, ExperimentCo
     by_name: dict[str, ExperimentConfig] = {
         str(_intervention(arm).arm): arm for arm in arms if arm.intervention is not None
     }
-    if set(by_name) != {"C", "HS", "RS", "HD", "RD"} or len(by_name) != len(arms):
-        raise InterventionForkError("fork requires exactly the registered C/HS/RS/HD/RD arms once")
+    causal_names = {"C79", "RA", "RAR", "RB", "RBR"}
+    legacy_names = {"C", "HS", "RS", "HD", "RD"}
+    if (set(by_name) != legacy_names and set(by_name) != causal_names) or len(by_name) != len(arms):
+        raise InterventionForkError("fork requires exactly one registered five-arm screen")
+    if set(by_name) == causal_names:
+        for selected_name, random_name in (("RA", "RAR"), ("RB", "RBR")):
+            selected = _intervention(by_name[selected_name])
+            random = _intervention(by_name[random_name])
+            assert selected.mask is not None and random.mask is not None
+            if (
+                selected.mask.selected_count != random.mask.selected_count
+                or selected.mask.selected_class_counts != random.mask.selected_class_counts
+            ):
+                raise InterventionForkError(f"{selected_name} and {random_name} must share the exact selected budget")
+        common_parent = _intervention(by_name["C79"]).parent
+        if any(_intervention(arm).parent != common_parent for arm in by_name.values()):
+            raise InterventionForkError("all FFNR causal arms must bind the exact same parent lineage")
+        return by_name
     for first, second in (("HS", "HD"), ("RS", "RD")):
         left, right = _intervention(by_name[first]), _intervention(by_name[second])
         assert left.mask is not None and right.mask is not None
@@ -478,7 +500,8 @@ def create_intervention_forks(
         parent_manifest_path=parent_manifest,
         arm=by_name["C"],
     )
-    _validate_selector_bundle(by_name, train_labels=train_labels)
+    if set(by_name) == {"C", "HS", "RS", "HD", "RD"}:
+        _validate_selector_bundle(by_name, train_labels=train_labels)
     output_dirs = [arm.output_dir.resolve() for arm in by_name.values()]
     if len(set(output_dirs)) != len(output_dirs):
         raise InterventionForkError("intervention arms cannot share an output directory")
@@ -509,9 +532,12 @@ def create_intervention_forks(
             raise InterventionForkError("child arm run IDs must be unique and cannot reuse the parent run ID")
         child_run_ids.add(child_run_id)
         planned[name] = (arm, child_hash, child_run_id)
+    causal = set(by_name) == {"C79", "RA", "RAR", "RB", "RBR"}
+    screen_kind = "ffnr_causal_intervention_v1" if causal else "common_state_intervention_v1"
+    parent_epoch = _intervention(next(iter(by_name.values()))).parent.epoch
     screen_identity = {
         "schema_version": 1,
-        "kind": "common_state_intervention_v1",
+        "kind": screen_kind,
         "parent_checkpoint_sha256": sha256_file(parent_checkpoint),
         "parent_run_id": parent_run_id,
         "fork_git_sha": fork_git,
@@ -540,14 +566,14 @@ def create_intervention_forks(
                 _require_mapping(payload["selection_metadata"], name="selection_metadata")
             )
             child["fork_lineage"] = {
-                "kind": "common_state_intervention_v1",
+                "kind": screen_kind,
                 "screen_id": screen_id,
                 "arm": name,
                 "child_tracker_run_id": child_run_id,
                 "parent_checkpoint_sha256": parent_sha,
                 "parent_raw_config_sha256": _intervention(arm).parent.raw_config_sha256,
                 "parent_git_sha": _intervention(arm).parent.git_sha,
-                "parent_epoch": 99,
+                "parent_epoch": parent_epoch,
                 "parent_world_size": 1,
                 "parent_teacher_checkpoint_sha256": _intervention(arm).parent.teacher_checkpoint_sha256,
                 "parent_sample_state_records": 45000,
