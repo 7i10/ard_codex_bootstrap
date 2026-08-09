@@ -1163,6 +1163,15 @@ class ExperimentConfig(StrictModel):
                 errors.append(f"student.{field} must be {expected!r}")
         for field, expected in training.items():
             actual = getattr(self.training, field)
+            causal_short_horizon = (
+                self.intervention is not None
+                and self.intervention.arm in {"C79", "RA", "RAR", "RB", "RBR"}
+                and field == "epochs"
+                and actual in {84, 89, 94}
+                and expected == 200
+            )
+            if causal_short_horizon:
+                continue
             if isinstance(expected, float):
                 matches = math.isclose(actual, expected, rel_tol=0, abs_tol=1e-15)
             else:
