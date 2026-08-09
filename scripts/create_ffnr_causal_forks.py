@@ -189,8 +189,9 @@ def build(args: argparse.Namespace) -> None:
     for arm, mask_name in names.items():
         child_raw = copy.deepcopy(raw)
         child_raw["output_dir"] = str((args.screen_root / arm).resolve())
-        child_raw["tracking"]["run_id"] = f"ffnr-causal-{args.label.lower()}-{arm.lower()}-e79-84"
-        child_raw["tracking"]["name"] = f"ffnr-causal-{args.label}-{arm}-epoch79-84"
+        suffix = f"-{args.run_suffix}" if args.run_suffix else ""
+        child_raw["tracking"]["run_id"] = f"ffnr-causal-{args.label.lower()}-{arm.lower()}-e79-84{suffix}"
+        child_raw["tracking"]["name"] = f"ffnr-causal-{args.label}-{arm}-epoch79-84{suffix}"
         child_raw["tracking"]["group"] = f"ffnr-causal-{args.label}-epoch79-84"
         child_raw["training"]["epochs"] = 84
         intervention: dict[str, Any] = {
@@ -249,6 +250,7 @@ def main() -> int:
     parser.add_argument("--config-root", type=Path, required=True)
     parser.add_argument("--screen-root", type=Path, required=True)
     parser.add_argument("--git-sha", required=True)
+    parser.add_argument("--run-suffix", default=None, help="Explicit suffix for a new W&B run lineage")
     args = parser.parse_args()
     build(args)
     return 0
