@@ -41,6 +41,11 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
+        ("scripts/analyze_ffnr_human_review.py",),
+        ("tests/unit/test_analyze_ffnr_human_review.py",),
+        ("T0", "T1"),
+    ),
+    (
         (
             "src/ard/config/teacher_audit.py",
             "src/ard/evaluation/teacher_audit.py",

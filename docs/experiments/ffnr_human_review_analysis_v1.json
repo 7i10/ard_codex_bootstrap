@@ -1,0 +1,1767 @@
+{
+  "class_names": [
+    "airplane",
+    "automobile",
+    "bird",
+    "cat",
+    "deer",
+    "dog",
+    "frog",
+    "horse",
+    "ship",
+    "truck"
+  ],
+  "contract": "ffnr_human_review_analysis_v1",
+  "epoch": 199,
+  "manifest_sha256": "8d1f21bec9dae9c4d750693374f6b0fd0f752db512491e87e10ac227608a8a02",
+  "panel": {
+    "by_class": {
+      "0": {
+        "ambiguous": 4,
+        "ambiguous_rate": 0.2,
+        "class_id": 0,
+        "class_name": "airplane",
+        "clear_easy": 12,
+        "clear_hard": 4,
+        "count": 20,
+        "student_clean_error": 8,
+        "student_clean_error_rate": 0.4,
+        "student_robust_error": 12,
+        "student_robust_error_rate": 0.6,
+        "teacher_adv_error": 11,
+        "teacher_adv_error_rate": 0.55,
+        "teacher_clean_error": 7,
+        "teacher_clean_error_rate": 0.35
+      },
+      "1": {
+        "ambiguous": 0,
+        "ambiguous_rate": 0.0,
+        "class_id": 1,
+        "class_name": "automobile",
+        "clear_easy": 18,
+        "clear_hard": 2,
+        "count": 20,
+        "student_clean_error": 9,
+        "student_clean_error_rate": 0.45,
+        "student_robust_error": 12,
+        "student_robust_error_rate": 0.6,
+        "teacher_adv_error": 10,
+        "teacher_adv_error_rate": 0.5,
+        "teacher_clean_error": 9,
+        "teacher_clean_error_rate": 0.45
+      },
+      "2": {
+        "ambiguous": 1,
+        "ambiguous_rate": 0.05,
+        "class_id": 2,
+        "class_name": "bird",
+        "clear_easy": 15,
+        "clear_hard": 4,
+        "count": 20,
+        "student_clean_error": 6,
+        "student_clean_error_rate": 0.3,
+        "student_robust_error": 11,
+        "student_robust_error_rate": 0.55,
+        "teacher_adv_error": 10,
+        "teacher_adv_error_rate": 0.5,
+        "teacher_clean_error": 6,
+        "teacher_clean_error_rate": 0.3
+      },
+      "3": {
+        "ambiguous": 4,
+        "ambiguous_rate": 0.2,
+        "class_id": 3,
+        "class_name": "cat",
+        "clear_easy": 13,
+        "clear_hard": 3,
+        "count": 20,
+        "student_clean_error": 7,
+        "student_clean_error_rate": 0.35,
+        "student_robust_error": 13,
+        "student_robust_error_rate": 0.65,
+        "teacher_adv_error": 11,
+        "teacher_adv_error_rate": 0.55,
+        "teacher_clean_error": 6,
+        "teacher_clean_error_rate": 0.3
+      },
+      "4": {
+        "ambiguous": 7,
+        "ambiguous_rate": 0.35,
+        "class_id": 4,
+        "class_name": "deer",
+        "clear_easy": 10,
+        "clear_hard": 3,
+        "count": 20,
+        "student_clean_error": 7,
+        "student_clean_error_rate": 0.35,
+        "student_robust_error": 13,
+        "student_robust_error_rate": 0.65,
+        "teacher_adv_error": 10,
+        "teacher_adv_error_rate": 0.5,
+        "teacher_clean_error": 7,
+        "teacher_clean_error_rate": 0.35
+      },
+      "5": {
+        "ambiguous": 1,
+        "ambiguous_rate": 0.05,
+        "class_id": 5,
+        "class_name": "dog",
+        "clear_easy": 15,
+        "clear_hard": 4,
+        "count": 20,
+        "student_clean_error": 7,
+        "student_clean_error_rate": 0.35,
+        "student_robust_error": 12,
+        "student_robust_error_rate": 0.6,
+        "teacher_adv_error": 11,
+        "teacher_adv_error_rate": 0.55,
+        "teacher_clean_error": 4,
+        "teacher_clean_error_rate": 0.2
+      },
+      "6": {
+        "ambiguous": 3,
+        "ambiguous_rate": 0.15,
+        "class_id": 6,
+        "class_name": "frog",
+        "clear_easy": 10,
+        "clear_hard": 7,
+        "count": 20,
+        "student_clean_error": 5,
+        "student_clean_error_rate": 0.25,
+        "student_robust_error": 13,
+        "student_robust_error_rate": 0.65,
+        "teacher_adv_error": 13,
+        "teacher_adv_error_rate": 0.65,
+        "teacher_clean_error": 4,
+        "teacher_clean_error_rate": 0.2
+      },
+      "7": {
+        "ambiguous": 1,
+        "ambiguous_rate": 0.05,
+        "class_id": 7,
+        "class_name": "horse",
+        "clear_easy": 18,
+        "clear_hard": 1,
+        "count": 20,
+        "student_clean_error": 5,
+        "student_clean_error_rate": 0.25,
+        "student_robust_error": 12,
+        "student_robust_error_rate": 0.6,
+        "teacher_adv_error": 12,
+        "teacher_adv_error_rate": 0.6,
+        "teacher_clean_error": 3,
+        "teacher_clean_error_rate": 0.15
+      },
+      "8": {
+        "ambiguous": 2,
+        "ambiguous_rate": 0.1,
+        "class_id": 8,
+        "class_name": "ship",
+        "clear_easy": 14,
+        "clear_hard": 4,
+        "count": 20,
+        "student_clean_error": 4,
+        "student_clean_error_rate": 0.2,
+        "student_robust_error": 11,
+        "student_robust_error_rate": 0.55,
+        "teacher_adv_error": 10,
+        "teacher_adv_error_rate": 0.5,
+        "teacher_clean_error": 4,
+        "teacher_clean_error_rate": 0.2
+      },
+      "9": {
+        "ambiguous": 2,
+        "ambiguous_rate": 0.1,
+        "class_id": 9,
+        "class_name": "truck",
+        "clear_easy": 11,
+        "clear_hard": 7,
+        "count": 20,
+        "student_clean_error": 7,
+        "student_clean_error_rate": 0.35,
+        "student_robust_error": 11,
+        "student_robust_error_rate": 0.55,
+        "teacher_adv_error": 10,
+        "teacher_adv_error_rate": 0.5,
+        "teacher_clean_error": 7,
+        "teacher_clean_error_rate": 0.35
+      }
+    },
+    "count": 200,
+    "groups": {
+      "ambiguous": {
+        "count": 25,
+        "student_clean_error": 9,
+        "student_clean_error_rate": 0.36,
+        "student_robust_error": 16,
+        "student_robust_error_rate": 0.64,
+        "teacher_adv_error": 14,
+        "teacher_adv_error_rate": 0.56,
+        "teacher_clean_error": 8,
+        "teacher_clean_error_rate": 0.32
+      },
+      "clear_easy": {
+        "count": 136,
+        "student_clean_error": 39,
+        "student_clean_error_rate": 0.2867647058823529,
+        "student_robust_error": 80,
+        "student_robust_error_rate": 0.5882352941176471,
+        "teacher_adv_error": 71,
+        "teacher_adv_error_rate": 0.5220588235294118,
+        "teacher_clean_error": 32,
+        "teacher_clean_error_rate": 0.23529411764705882
+      },
+      "clear_hard": {
+        "count": 39,
+        "student_clean_error": 17,
+        "student_clean_error_rate": 0.4358974358974359,
+        "student_robust_error": 24,
+        "student_robust_error_rate": 0.6153846153846154,
+        "teacher_adv_error": 23,
+        "teacher_adv_error_rate": 0.5897435897435898,
+        "teacher_clean_error": 17,
+        "teacher_clean_error_rate": 0.4358974358974359
+      }
+    }
+  },
+  "review_sha256": "9b5fb68e16ba089123ca1092373c94cce3b2590a5063a7a24787ffa554cf80bd",
+  "runs": {
+    "L2": {
+      "available_epochs": [
+        179,
+        184,
+        189,
+        194,
+        199
+      ],
+      "full": {
+        "class_stats": {
+          "0": {
+            "class_id": 0,
+            "class_name": "airplane",
+            "count": 4500,
+            "student_clean_accuracy": 0.9451111111111111,
+            "student_clean_correct": 4253,
+            "student_clean_error_rate": 0.05488888888888889,
+            "student_robust_accuracy": 0.7911111111111111,
+            "student_robust_correct": 3560,
+            "student_robust_error_rate": 0.2088888888888889,
+            "teacher_adv_accuracy": 0.8522222222222222,
+            "teacher_adv_correct": 3835,
+            "teacher_adv_error_rate": 0.14777777777777779,
+            "teacher_clean_accuracy": 0.954,
+            "teacher_clean_correct": 4293,
+            "teacher_clean_error_rate": 0.046
+          },
+          "1": {
+            "class_id": 1,
+            "class_name": "automobile",
+            "count": 4500,
+            "student_clean_accuracy": 0.9693333333333334,
+            "student_clean_correct": 4362,
+            "student_clean_error_rate": 0.030666666666666665,
+            "student_robust_accuracy": 0.8704444444444445,
+            "student_robust_correct": 3917,
+            "student_robust_error_rate": 0.12955555555555556,
+            "teacher_adv_accuracy": 0.9224444444444444,
+            "teacher_adv_correct": 4151,
+            "teacher_adv_error_rate": 0.07755555555555556,
+            "teacher_clean_accuracy": 0.9746666666666667,
+            "teacher_clean_correct": 4386,
+            "teacher_clean_error_rate": 0.025333333333333333
+          },
+          "2": {
+            "class_id": 2,
+            "class_name": "bird",
+            "count": 4500,
+            "student_clean_accuracy": 0.8313333333333334,
+            "student_clean_correct": 3741,
+            "student_clean_error_rate": 0.16866666666666666,
+            "student_robust_accuracy": 0.5484444444444444,
+            "student_robust_correct": 2468,
+            "student_robust_error_rate": 0.45155555555555554,
+            "teacher_adv_accuracy": 0.6608888888888889,
+            "teacher_adv_correct": 2974,
+            "teacher_adv_error_rate": 0.3391111111111111,
+            "teacher_clean_accuracy": 0.8653333333333333,
+            "teacher_clean_correct": 3894,
+            "teacher_clean_error_rate": 0.13466666666666666
+          },
+          "3": {
+            "class_id": 3,
+            "class_name": "cat",
+            "count": 4500,
+            "student_clean_accuracy": 0.8384444444444444,
+            "student_clean_correct": 3773,
+            "student_clean_error_rate": 0.16155555555555556,
+            "student_robust_accuracy": 0.5513333333333333,
+            "student_robust_correct": 2481,
+            "student_robust_error_rate": 0.44866666666666666,
+            "teacher_adv_accuracy": 0.6517777777777778,
+            "teacher_adv_correct": 2933,
+            "teacher_adv_error_rate": 0.3482222222222222,
+            "teacher_clean_accuracy": 0.8562222222222222,
+            "teacher_clean_correct": 3853,
+            "teacher_clean_error_rate": 0.14377777777777778
+          },
+          "4": {
+            "class_id": 4,
+            "class_name": "deer",
+            "count": 4500,
+            "student_clean_accuracy": 0.9068888888888889,
+            "student_clean_correct": 4081,
+            "student_clean_error_rate": 0.09311111111111112,
+            "student_robust_accuracy": 0.5971111111111111,
+            "student_robust_correct": 2687,
+            "student_robust_error_rate": 0.4028888888888889,
+            "teacher_adv_accuracy": 0.7482222222222222,
+            "teacher_adv_correct": 3367,
+            "teacher_adv_error_rate": 0.25177777777777777,
+            "teacher_clean_accuracy": 0.9331111111111111,
+            "teacher_clean_correct": 4199,
+            "teacher_clean_error_rate": 0.06688888888888889
+          },
+          "5": {
+            "class_id": 5,
+            "class_name": "dog",
+            "count": 4500,
+            "student_clean_accuracy": 0.8266666666666667,
+            "student_clean_correct": 3720,
+            "student_clean_error_rate": 0.17333333333333334,
+            "student_robust_accuracy": 0.6028888888888889,
+            "student_robust_correct": 2713,
+            "student_robust_error_rate": 0.39711111111111114,
+            "teacher_adv_accuracy": 0.6864444444444444,
+            "teacher_adv_correct": 3089,
+            "teacher_adv_error_rate": 0.31355555555555553,
+            "teacher_clean_accuracy": 0.854,
+            "teacher_clean_correct": 3843,
+            "teacher_clean_error_rate": 0.146
+          },
+          "6": {
+            "class_id": 6,
+            "class_name": "frog",
+            "count": 4500,
+            "student_clean_accuracy": 0.9411111111111111,
+            "student_clean_correct": 4235,
+            "student_clean_error_rate": 0.058888888888888886,
+            "student_robust_accuracy": 0.7548888888888889,
+            "student_robust_correct": 3397,
+            "student_robust_error_rate": 0.2451111111111111,
+            "teacher_adv_accuracy": 0.8335555555555556,
+            "teacher_adv_correct": 3751,
+            "teacher_adv_error_rate": 0.16644444444444445,
+            "teacher_clean_accuracy": 0.9544444444444444,
+            "teacher_clean_correct": 4295,
+            "teacher_clean_error_rate": 0.04555555555555556
+          },
+          "7": {
+            "class_id": 7,
+            "class_name": "horse",
+            "count": 4500,
+            "student_clean_accuracy": 0.942,
+            "student_clean_correct": 4239,
+            "student_clean_error_rate": 0.058,
+            "student_robust_accuracy": 0.8226666666666667,
+            "student_robust_correct": 3702,
+            "student_robust_error_rate": 0.17733333333333334,
+            "teacher_adv_accuracy": 0.8706666666666667,
+            "teacher_adv_correct": 3918,
+            "teacher_adv_error_rate": 0.12933333333333333,
+            "teacher_clean_accuracy": 0.9464444444444444,
+            "teacher_clean_correct": 4259,
+            "teacher_clean_error_rate": 0.05355555555555556
+          },
+          "8": {
+            "class_id": 8,
+            "class_name": "ship",
+            "count": 4500,
+            "student_clean_accuracy": 0.9804444444444445,
+            "student_clean_correct": 4412,
+            "student_clean_error_rate": 0.019555555555555555,
+            "student_robust_accuracy": 0.8846666666666667,
+            "student_robust_correct": 3981,
+            "student_robust_error_rate": 0.11533333333333333,
+            "teacher_adv_accuracy": 0.9304444444444444,
+            "teacher_adv_correct": 4187,
+            "teacher_adv_error_rate": 0.06955555555555555,
+            "teacher_clean_accuracy": 0.9813333333333333,
+            "teacher_clean_correct": 4416,
+            "teacher_clean_error_rate": 0.018666666666666668
+          },
+          "9": {
+            "class_id": 9,
+            "class_name": "truck",
+            "count": 4500,
+            "student_clean_accuracy": 0.9531111111111111,
+            "student_clean_correct": 4289,
+            "student_clean_error_rate": 0.04688888888888889,
+            "student_robust_accuracy": 0.8364444444444444,
+            "student_robust_correct": 3764,
+            "student_robust_error_rate": 0.16355555555555557,
+            "teacher_adv_accuracy": 0.8717777777777778,
+            "teacher_adv_correct": 3923,
+            "teacher_adv_error_rate": 0.1282222222222222,
+            "teacher_clean_accuracy": 0.9522222222222222,
+            "teacher_clean_correct": 4285,
+            "teacher_clean_error_rate": 0.04777777777777778
+          }
+        },
+        "count": 45000,
+        "teacher_adv_confusion": [
+          [
+            3835,
+            16,
+            55,
+            32,
+            68,
+            18,
+            50,
+            12,
+            348,
+            66
+          ],
+          [
+            14,
+            4151,
+            5,
+            16,
+            15,
+            10,
+            39,
+            3,
+            107,
+            140
+          ],
+          [
+            154,
+            10,
+            2974,
+            204,
+            485,
+            113,
+            416,
+            49,
+            68,
+            27
+          ],
+          [
+            57,
+            17,
+            146,
+            2933,
+            327,
+            407,
+            417,
+            67,
+            69,
+            60
+          ],
+          [
+            37,
+            7,
+            146,
+            198,
+            3367,
+            92,
+            415,
+            155,
+            64,
+            19
+          ],
+          [
+            24,
+            16,
+            110,
+            471,
+            285,
+            3089,
+            287,
+            136,
+            52,
+            30
+          ],
+          [
+            24,
+            14,
+            116,
+            158,
+            292,
+            61,
+            3751,
+            22,
+            36,
+            26
+          ],
+          [
+            22,
+            3,
+            33,
+            101,
+            233,
+            76,
+            70,
+            3918,
+            22,
+            22
+          ],
+          [
+            86,
+            38,
+            28,
+            22,
+            32,
+            12,
+            31,
+            8,
+            4187,
+            56
+          ],
+          [
+            62,
+            180,
+            13,
+            62,
+            18,
+            27,
+            53,
+            17,
+            145,
+            3923
+          ]
+        ],
+        "teacher_clean_confusion": [
+          [
+            4293,
+            1,
+            27,
+            8,
+            30,
+            4,
+            13,
+            3,
+            106,
+            15
+          ],
+          [
+            3,
+            4386,
+            4,
+            7,
+            5,
+            3,
+            15,
+            1,
+            45,
+            31
+          ],
+          [
+            101,
+            3,
+            3894,
+            81,
+            160,
+            56,
+            153,
+            16,
+            26,
+            10
+          ],
+          [
+            22,
+            7,
+            62,
+            3853,
+            156,
+            148,
+            187,
+            20,
+            31,
+            14
+          ],
+          [
+            13,
+            3,
+            27,
+            71,
+            4199,
+            31,
+            81,
+            53,
+            19,
+            3
+          ],
+          [
+            9,
+            4,
+            48,
+            247,
+            136,
+            3843,
+            105,
+            79,
+            21,
+            8
+          ],
+          [
+            8,
+            1,
+            48,
+            52,
+            61,
+            17,
+            4295,
+            3,
+            12,
+            3
+          ],
+          [
+            8,
+            0,
+            16,
+            46,
+            109,
+            28,
+            22,
+            4259,
+            6,
+            6
+          ],
+          [
+            18,
+            10,
+            11,
+            6,
+            13,
+            7,
+            8,
+            0,
+            4416,
+            11
+          ],
+          [
+            22,
+            70,
+            7,
+            27,
+            8,
+            11,
+            7,
+            4,
+            59,
+            4285
+          ]
+        ],
+        "top_teacher_adv_errors": [
+          {
+            "count": 485,
+            "predicted_class": "deer",
+            "true_class": "bird"
+          },
+          {
+            "count": 471,
+            "predicted_class": "cat",
+            "true_class": "dog"
+          },
+          {
+            "count": 417,
+            "predicted_class": "frog",
+            "true_class": "cat"
+          },
+          {
+            "count": 416,
+            "predicted_class": "frog",
+            "true_class": "bird"
+          },
+          {
+            "count": 415,
+            "predicted_class": "frog",
+            "true_class": "deer"
+          },
+          {
+            "count": 407,
+            "predicted_class": "dog",
+            "true_class": "cat"
+          },
+          {
+            "count": 348,
+            "predicted_class": "ship",
+            "true_class": "airplane"
+          },
+          {
+            "count": 327,
+            "predicted_class": "deer",
+            "true_class": "cat"
+          },
+          {
+            "count": 292,
+            "predicted_class": "deer",
+            "true_class": "frog"
+          },
+          {
+            "count": 287,
+            "predicted_class": "frog",
+            "true_class": "dog"
+          },
+          {
+            "count": 285,
+            "predicted_class": "deer",
+            "true_class": "dog"
+          },
+          {
+            "count": 233,
+            "predicted_class": "deer",
+            "true_class": "horse"
+          },
+          {
+            "count": 204,
+            "predicted_class": "cat",
+            "true_class": "bird"
+          },
+          {
+            "count": 198,
+            "predicted_class": "cat",
+            "true_class": "deer"
+          },
+          {
+            "count": 180,
+            "predicted_class": "automobile",
+            "true_class": "truck"
+          }
+        ],
+        "top_teacher_clean_errors": [
+          {
+            "count": 247,
+            "predicted_class": "cat",
+            "true_class": "dog"
+          },
+          {
+            "count": 187,
+            "predicted_class": "frog",
+            "true_class": "cat"
+          },
+          {
+            "count": 160,
+            "predicted_class": "deer",
+            "true_class": "bird"
+          },
+          {
+            "count": 156,
+            "predicted_class": "deer",
+            "true_class": "cat"
+          },
+          {
+            "count": 153,
+            "predicted_class": "frog",
+            "true_class": "bird"
+          },
+          {
+            "count": 148,
+            "predicted_class": "dog",
+            "true_class": "cat"
+          },
+          {
+            "count": 136,
+            "predicted_class": "deer",
+            "true_class": "dog"
+          },
+          {
+            "count": 109,
+            "predicted_class": "deer",
+            "true_class": "horse"
+          },
+          {
+            "count": 106,
+            "predicted_class": "ship",
+            "true_class": "airplane"
+          },
+          {
+            "count": 105,
+            "predicted_class": "frog",
+            "true_class": "dog"
+          },
+          {
+            "count": 101,
+            "predicted_class": "airplane",
+            "true_class": "bird"
+          },
+          {
+            "count": 81,
+            "predicted_class": "cat",
+            "true_class": "bird"
+          },
+          {
+            "count": 81,
+            "predicted_class": "frog",
+            "true_class": "deer"
+          },
+          {
+            "count": 79,
+            "predicted_class": "horse",
+            "true_class": "dog"
+          },
+          {
+            "count": 71,
+            "predicted_class": "cat",
+            "true_class": "deer"
+          }
+        ]
+      },
+      "observation_path": ".cache/analysis/ffnr-strong-replay/l2-outcome-e5cb442/strong-observations.parquet",
+      "observation_sha256": "f88f5e083d311b85fc58b35ab11a7108cdda661a90db34eea5930729bd49d34b",
+      "panel": {
+        "count": 100,
+        "student_clean_error": 35,
+        "student_clean_error_rate": 0.35,
+        "student_robust_error": 61,
+        "student_robust_error_rate": 0.61,
+        "teacher_adv_error": 54,
+        "teacher_adv_error_rate": 0.54,
+        "teacher_clean_error": 32,
+        "teacher_clean_error_rate": 0.32
+      },
+      "panel_by_class": {
+        "0": {
+          "ambiguous": 3,
+          "ambiguous_rate": 0.3,
+          "class_id": 0,
+          "class_name": "airplane",
+          "clear_easy": 4,
+          "clear_hard": 3,
+          "count": 10,
+          "student_clean_error": 5,
+          "student_clean_error_rate": 0.5,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 5,
+          "teacher_clean_error_rate": 0.5
+        },
+        "1": {
+          "ambiguous": 0,
+          "ambiguous_rate": 0.0,
+          "class_id": 1,
+          "class_name": "automobile",
+          "clear_easy": 9,
+          "clear_hard": 1,
+          "count": 10,
+          "student_clean_error": 5,
+          "student_clean_error_rate": 0.5,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 5,
+          "teacher_clean_error_rate": 0.5
+        },
+        "2": {
+          "ambiguous": 1,
+          "ambiguous_rate": 0.1,
+          "class_id": 2,
+          "class_name": "bird",
+          "clear_easy": 7,
+          "clear_hard": 2,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 3,
+          "teacher_clean_error_rate": 0.3
+        },
+        "3": {
+          "ambiguous": 1,
+          "ambiguous_rate": 0.1,
+          "class_id": 3,
+          "class_name": "cat",
+          "clear_easy": 7,
+          "clear_hard": 2,
+          "count": 10,
+          "student_clean_error": 4,
+          "student_clean_error_rate": 0.4,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 3,
+          "teacher_clean_error_rate": 0.3
+        },
+        "4": {
+          "ambiguous": 4,
+          "ambiguous_rate": 0.4,
+          "class_id": 4,
+          "class_name": "deer",
+          "clear_easy": 4,
+          "clear_hard": 2,
+          "count": 10,
+          "student_clean_error": 4,
+          "student_clean_error_rate": 0.4,
+          "student_robust_error": 7,
+          "student_robust_error_rate": 0.7,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 4,
+          "teacher_clean_error_rate": 0.4
+        },
+        "5": {
+          "ambiguous": 0,
+          "ambiguous_rate": 0.0,
+          "class_id": 5,
+          "class_name": "dog",
+          "clear_easy": 7,
+          "clear_hard": 3,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 2,
+          "teacher_clean_error_rate": 0.2
+        },
+        "6": {
+          "ambiguous": 1,
+          "ambiguous_rate": 0.1,
+          "class_id": 6,
+          "class_name": "frog",
+          "clear_easy": 5,
+          "clear_hard": 4,
+          "count": 10,
+          "student_clean_error": 2,
+          "student_clean_error_rate": 0.2,
+          "student_robust_error": 7,
+          "student_robust_error_rate": 0.7,
+          "teacher_adv_error": 7,
+          "teacher_adv_error_rate": 0.7,
+          "teacher_clean_error": 2,
+          "teacher_clean_error_rate": 0.2
+        },
+        "7": {
+          "ambiguous": 1,
+          "ambiguous_rate": 0.1,
+          "class_id": 7,
+          "class_name": "horse",
+          "clear_easy": 8,
+          "clear_hard": 1,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 7,
+          "teacher_adv_error_rate": 0.7,
+          "teacher_clean_error": 2,
+          "teacher_clean_error_rate": 0.2
+        },
+        "8": {
+          "ambiguous": 1,
+          "ambiguous_rate": 0.1,
+          "class_id": 8,
+          "class_name": "ship",
+          "clear_easy": 7,
+          "clear_hard": 2,
+          "count": 10,
+          "student_clean_error": 2,
+          "student_clean_error_rate": 0.2,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 2,
+          "teacher_clean_error_rate": 0.2
+        },
+        "9": {
+          "ambiguous": 0,
+          "ambiguous_rate": 0.0,
+          "class_id": 9,
+          "class_name": "truck",
+          "clear_easy": 6,
+          "clear_hard": 4,
+          "count": 10,
+          "student_clean_error": 4,
+          "student_clean_error_rate": 0.4,
+          "student_robust_error": 5,
+          "student_robust_error_rate": 0.5,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 4,
+          "teacher_clean_error_rate": 0.4
+        }
+      }
+    },
+    "L4": {
+      "available_epochs": [
+        189,
+        194,
+        199
+      ],
+      "full": {
+        "class_stats": {
+          "0": {
+            "class_id": 0,
+            "class_name": "airplane",
+            "count": 4500,
+            "student_clean_accuracy": 0.9524444444444444,
+            "student_clean_correct": 4286,
+            "student_clean_error_rate": 0.04755555555555555,
+            "student_robust_accuracy": 0.8111111111111111,
+            "student_robust_correct": 3650,
+            "student_robust_error_rate": 0.18888888888888888,
+            "teacher_adv_accuracy": 0.8524444444444444,
+            "teacher_adv_correct": 3836,
+            "teacher_adv_error_rate": 0.14755555555555555,
+            "teacher_clean_accuracy": 0.954,
+            "teacher_clean_correct": 4293,
+            "teacher_clean_error_rate": 0.046
+          },
+          "1": {
+            "class_id": 1,
+            "class_name": "automobile",
+            "count": 4500,
+            "student_clean_accuracy": 0.9724444444444444,
+            "student_clean_correct": 4376,
+            "student_clean_error_rate": 0.027555555555555555,
+            "student_robust_accuracy": 0.8817777777777778,
+            "student_robust_correct": 3968,
+            "student_robust_error_rate": 0.11822222222222223,
+            "teacher_adv_accuracy": 0.9242222222222222,
+            "teacher_adv_correct": 4159,
+            "teacher_adv_error_rate": 0.07577777777777778,
+            "teacher_clean_accuracy": 0.9746666666666667,
+            "teacher_clean_correct": 4386,
+            "teacher_clean_error_rate": 0.025333333333333333
+          },
+          "2": {
+            "class_id": 2,
+            "class_name": "bird",
+            "count": 4500,
+            "student_clean_accuracy": 0.8237777777777778,
+            "student_clean_correct": 3707,
+            "student_clean_error_rate": 0.17622222222222222,
+            "student_robust_accuracy": 0.5477777777777778,
+            "student_robust_correct": 2465,
+            "student_robust_error_rate": 0.45222222222222225,
+            "teacher_adv_accuracy": 0.662,
+            "teacher_adv_correct": 2979,
+            "teacher_adv_error_rate": 0.338,
+            "teacher_clean_accuracy": 0.8653333333333333,
+            "teacher_clean_correct": 3894,
+            "teacher_clean_error_rate": 0.13466666666666666
+          },
+          "3": {
+            "class_id": 3,
+            "class_name": "cat",
+            "count": 4500,
+            "student_clean_accuracy": 0.8311111111111111,
+            "student_clean_correct": 3740,
+            "student_clean_error_rate": 0.1688888888888889,
+            "student_robust_accuracy": 0.5417777777777778,
+            "student_robust_correct": 2438,
+            "student_robust_error_rate": 0.4582222222222222,
+            "teacher_adv_accuracy": 0.6488888888888888,
+            "teacher_adv_correct": 2920,
+            "teacher_adv_error_rate": 0.3511111111111111,
+            "teacher_clean_accuracy": 0.8562222222222222,
+            "teacher_clean_correct": 3853,
+            "teacher_clean_error_rate": 0.14377777777777778
+          },
+          "4": {
+            "class_id": 4,
+            "class_name": "deer",
+            "count": 4500,
+            "student_clean_accuracy": 0.9113333333333333,
+            "student_clean_correct": 4101,
+            "student_clean_error_rate": 0.08866666666666667,
+            "student_robust_accuracy": 0.6011111111111112,
+            "student_robust_correct": 2705,
+            "student_robust_error_rate": 0.3988888888888889,
+            "teacher_adv_accuracy": 0.7468888888888889,
+            "teacher_adv_correct": 3361,
+            "teacher_adv_error_rate": 0.2531111111111111,
+            "teacher_clean_accuracy": 0.9331111111111111,
+            "teacher_clean_correct": 4199,
+            "teacher_clean_error_rate": 0.06688888888888889
+          },
+          "5": {
+            "class_id": 5,
+            "class_name": "dog",
+            "count": 4500,
+            "student_clean_accuracy": 0.8275555555555556,
+            "student_clean_correct": 3724,
+            "student_clean_error_rate": 0.17244444444444446,
+            "student_robust_accuracy": 0.5973333333333334,
+            "student_robust_correct": 2688,
+            "student_robust_error_rate": 0.4026666666666667,
+            "teacher_adv_accuracy": 0.6837777777777778,
+            "teacher_adv_correct": 3077,
+            "teacher_adv_error_rate": 0.31622222222222224,
+            "teacher_clean_accuracy": 0.854,
+            "teacher_clean_correct": 3843,
+            "teacher_clean_error_rate": 0.146
+          },
+          "6": {
+            "class_id": 6,
+            "class_name": "frog",
+            "count": 4500,
+            "student_clean_accuracy": 0.9466666666666667,
+            "student_clean_correct": 4260,
+            "student_clean_error_rate": 0.05333333333333334,
+            "student_robust_accuracy": 0.7711111111111111,
+            "student_robust_correct": 3470,
+            "student_robust_error_rate": 0.2288888888888889,
+            "teacher_adv_accuracy": 0.8344444444444444,
+            "teacher_adv_correct": 3755,
+            "teacher_adv_error_rate": 0.16555555555555557,
+            "teacher_clean_accuracy": 0.9544444444444444,
+            "teacher_clean_correct": 4295,
+            "teacher_clean_error_rate": 0.04555555555555556
+          },
+          "7": {
+            "class_id": 7,
+            "class_name": "horse",
+            "count": 4500,
+            "student_clean_accuracy": 0.9395555555555556,
+            "student_clean_correct": 4228,
+            "student_clean_error_rate": 0.060444444444444446,
+            "student_robust_accuracy": 0.8184444444444444,
+            "student_robust_correct": 3683,
+            "student_robust_error_rate": 0.18155555555555555,
+            "teacher_adv_accuracy": 0.8722222222222222,
+            "teacher_adv_correct": 3925,
+            "teacher_adv_error_rate": 0.12777777777777777,
+            "teacher_clean_accuracy": 0.9464444444444444,
+            "teacher_clean_correct": 4259,
+            "teacher_clean_error_rate": 0.05355555555555556
+          },
+          "8": {
+            "class_id": 8,
+            "class_name": "ship",
+            "count": 4500,
+            "student_clean_accuracy": 0.9775555555555555,
+            "student_clean_correct": 4399,
+            "student_clean_error_rate": 0.022444444444444444,
+            "student_robust_accuracy": 0.8722222222222222,
+            "student_robust_correct": 3925,
+            "student_robust_error_rate": 0.12777777777777777,
+            "teacher_adv_accuracy": 0.9295555555555556,
+            "teacher_adv_correct": 4183,
+            "teacher_adv_error_rate": 0.07044444444444445,
+            "teacher_clean_accuracy": 0.9813333333333333,
+            "teacher_clean_correct": 4416,
+            "teacher_clean_error_rate": 0.018666666666666668
+          },
+          "9": {
+            "class_id": 9,
+            "class_name": "truck",
+            "count": 4500,
+            "student_clean_accuracy": 0.9471111111111111,
+            "student_clean_correct": 4262,
+            "student_clean_error_rate": 0.05288888888888889,
+            "student_robust_accuracy": 0.8177777777777778,
+            "student_robust_correct": 3680,
+            "student_robust_error_rate": 0.18222222222222223,
+            "teacher_adv_accuracy": 0.8688888888888889,
+            "teacher_adv_correct": 3910,
+            "teacher_adv_error_rate": 0.13111111111111112,
+            "teacher_clean_accuracy": 0.9522222222222222,
+            "teacher_clean_correct": 4285,
+            "teacher_clean_error_rate": 0.04777777777777778
+          }
+        },
+        "count": 45000,
+        "teacher_adv_confusion": [
+          [
+            3836,
+            16,
+            49,
+            37,
+            67,
+            14,
+            55,
+            13,
+            353,
+            60
+          ],
+          [
+            14,
+            4159,
+            6,
+            15,
+            14,
+            11,
+            40,
+            3,
+            104,
+            134
+          ],
+          [
+            159,
+            8,
+            2979,
+            197,
+            481,
+            123,
+            417,
+            48,
+            62,
+            26
+          ],
+          [
+            53,
+            16,
+            149,
+            2920,
+            321,
+            411,
+            439,
+            65,
+            68,
+            58
+          ],
+          [
+            41,
+            7,
+            135,
+            195,
+            3361,
+            91,
+            435,
+            158,
+            64,
+            13
+          ],
+          [
+            25,
+            14,
+            107,
+            490,
+            270,
+            3077,
+            298,
+            136,
+            49,
+            34
+          ],
+          [
+            23,
+            11,
+            118,
+            157,
+            297,
+            57,
+            3755,
+            21,
+            36,
+            25
+          ],
+          [
+            24,
+            4,
+            34,
+            103,
+            236,
+            69,
+            72,
+            3925,
+            18,
+            15
+          ],
+          [
+            93,
+            40,
+            26,
+            20,
+            36,
+            16,
+            27,
+            7,
+            4183,
+            52
+          ],
+          [
+            64,
+            175,
+            14,
+            67,
+            21,
+            24,
+            54,
+            18,
+            153,
+            3910
+          ]
+        ],
+        "teacher_clean_confusion": [
+          [
+            4293,
+            1,
+            27,
+            8,
+            30,
+            4,
+            13,
+            3,
+            106,
+            15
+          ],
+          [
+            3,
+            4386,
+            4,
+            7,
+            5,
+            3,
+            15,
+            1,
+            45,
+            31
+          ],
+          [
+            101,
+            3,
+            3894,
+            81,
+            160,
+            56,
+            153,
+            16,
+            26,
+            10
+          ],
+          [
+            22,
+            7,
+            62,
+            3853,
+            156,
+            148,
+            187,
+            20,
+            31,
+            14
+          ],
+          [
+            13,
+            3,
+            27,
+            71,
+            4199,
+            31,
+            81,
+            53,
+            19,
+            3
+          ],
+          [
+            9,
+            4,
+            48,
+            247,
+            136,
+            3843,
+            105,
+            79,
+            21,
+            8
+          ],
+          [
+            8,
+            1,
+            48,
+            52,
+            61,
+            17,
+            4295,
+            3,
+            12,
+            3
+          ],
+          [
+            8,
+            0,
+            16,
+            46,
+            109,
+            28,
+            22,
+            4259,
+            6,
+            6
+          ],
+          [
+            18,
+            10,
+            11,
+            6,
+            13,
+            7,
+            8,
+            0,
+            4416,
+            11
+          ],
+          [
+            22,
+            70,
+            7,
+            27,
+            8,
+            11,
+            7,
+            4,
+            59,
+            4285
+          ]
+        ],
+        "top_teacher_adv_errors": [
+          {
+            "count": 490,
+            "predicted_class": "cat",
+            "true_class": "dog"
+          },
+          {
+            "count": 481,
+            "predicted_class": "deer",
+            "true_class": "bird"
+          },
+          {
+            "count": 439,
+            "predicted_class": "frog",
+            "true_class": "cat"
+          },
+          {
+            "count": 435,
+            "predicted_class": "frog",
+            "true_class": "deer"
+          },
+          {
+            "count": 417,
+            "predicted_class": "frog",
+            "true_class": "bird"
+          },
+          {
+            "count": 411,
+            "predicted_class": "dog",
+            "true_class": "cat"
+          },
+          {
+            "count": 353,
+            "predicted_class": "ship",
+            "true_class": "airplane"
+          },
+          {
+            "count": 321,
+            "predicted_class": "deer",
+            "true_class": "cat"
+          },
+          {
+            "count": 298,
+            "predicted_class": "frog",
+            "true_class": "dog"
+          },
+          {
+            "count": 297,
+            "predicted_class": "deer",
+            "true_class": "frog"
+          },
+          {
+            "count": 270,
+            "predicted_class": "deer",
+            "true_class": "dog"
+          },
+          {
+            "count": 236,
+            "predicted_class": "deer",
+            "true_class": "horse"
+          },
+          {
+            "count": 197,
+            "predicted_class": "cat",
+            "true_class": "bird"
+          },
+          {
+            "count": 195,
+            "predicted_class": "cat",
+            "true_class": "deer"
+          },
+          {
+            "count": 175,
+            "predicted_class": "automobile",
+            "true_class": "truck"
+          }
+        ],
+        "top_teacher_clean_errors": [
+          {
+            "count": 247,
+            "predicted_class": "cat",
+            "true_class": "dog"
+          },
+          {
+            "count": 187,
+            "predicted_class": "frog",
+            "true_class": "cat"
+          },
+          {
+            "count": 160,
+            "predicted_class": "deer",
+            "true_class": "bird"
+          },
+          {
+            "count": 156,
+            "predicted_class": "deer",
+            "true_class": "cat"
+          },
+          {
+            "count": 153,
+            "predicted_class": "frog",
+            "true_class": "bird"
+          },
+          {
+            "count": 148,
+            "predicted_class": "dog",
+            "true_class": "cat"
+          },
+          {
+            "count": 136,
+            "predicted_class": "deer",
+            "true_class": "dog"
+          },
+          {
+            "count": 109,
+            "predicted_class": "deer",
+            "true_class": "horse"
+          },
+          {
+            "count": 106,
+            "predicted_class": "ship",
+            "true_class": "airplane"
+          },
+          {
+            "count": 105,
+            "predicted_class": "frog",
+            "true_class": "dog"
+          },
+          {
+            "count": 101,
+            "predicted_class": "airplane",
+            "true_class": "bird"
+          },
+          {
+            "count": 81,
+            "predicted_class": "cat",
+            "true_class": "bird"
+          },
+          {
+            "count": 81,
+            "predicted_class": "frog",
+            "true_class": "deer"
+          },
+          {
+            "count": 79,
+            "predicted_class": "horse",
+            "true_class": "dog"
+          },
+          {
+            "count": 71,
+            "predicted_class": "cat",
+            "true_class": "deer"
+          }
+        ]
+      },
+      "observation_path": ".cache/analysis/ffnr-strong-replay/l4-outcome-e5cb442/strong-observations.parquet",
+      "observation_sha256": "336e77c67e3825e1ef3a5f24e4a95e52cf86b89c8b13e94607ea28fee5948104",
+      "panel": {
+        "count": 100,
+        "student_clean_error": 30,
+        "student_clean_error_rate": 0.3,
+        "student_robust_error": 59,
+        "student_robust_error_rate": 0.59,
+        "teacher_adv_error": 54,
+        "teacher_adv_error_rate": 0.54,
+        "teacher_clean_error": 25,
+        "teacher_clean_error_rate": 0.25
+      },
+      "panel_by_class": {
+        "0": {
+          "ambiguous": 1,
+          "ambiguous_rate": 0.1,
+          "class_id": 0,
+          "class_name": "airplane",
+          "clear_easy": 8,
+          "clear_hard": 1,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 6,
+          "teacher_adv_error_rate": 0.6,
+          "teacher_clean_error": 2,
+          "teacher_clean_error_rate": 0.2
+        },
+        "1": {
+          "ambiguous": 0,
+          "ambiguous_rate": 0.0,
+          "class_id": 1,
+          "class_name": "automobile",
+          "clear_easy": 9,
+          "clear_hard": 1,
+          "count": 10,
+          "student_clean_error": 4,
+          "student_clean_error_rate": 0.4,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 4,
+          "teacher_clean_error_rate": 0.4
+        },
+        "2": {
+          "ambiguous": 0,
+          "ambiguous_rate": 0.0,
+          "class_id": 2,
+          "class_name": "bird",
+          "clear_easy": 8,
+          "clear_hard": 2,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 5,
+          "student_robust_error_rate": 0.5,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 3,
+          "teacher_clean_error_rate": 0.3
+        },
+        "3": {
+          "ambiguous": 3,
+          "ambiguous_rate": 0.3,
+          "class_id": 3,
+          "class_name": "cat",
+          "clear_easy": 6,
+          "clear_hard": 1,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 7,
+          "student_robust_error_rate": 0.7,
+          "teacher_adv_error": 6,
+          "teacher_adv_error_rate": 0.6,
+          "teacher_clean_error": 3,
+          "teacher_clean_error_rate": 0.3
+        },
+        "4": {
+          "ambiguous": 3,
+          "ambiguous_rate": 0.3,
+          "class_id": 4,
+          "class_name": "deer",
+          "clear_easy": 6,
+          "clear_hard": 1,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 3,
+          "teacher_clean_error_rate": 0.3
+        },
+        "5": {
+          "ambiguous": 1,
+          "ambiguous_rate": 0.1,
+          "class_id": 5,
+          "class_name": "dog",
+          "clear_easy": 8,
+          "clear_hard": 1,
+          "count": 10,
+          "student_clean_error": 4,
+          "student_clean_error_rate": 0.4,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 6,
+          "teacher_adv_error_rate": 0.6,
+          "teacher_clean_error": 2,
+          "teacher_clean_error_rate": 0.2
+        },
+        "6": {
+          "ambiguous": 2,
+          "ambiguous_rate": 0.2,
+          "class_id": 6,
+          "class_name": "frog",
+          "clear_easy": 5,
+          "clear_hard": 3,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 6,
+          "teacher_adv_error_rate": 0.6,
+          "teacher_clean_error": 2,
+          "teacher_clean_error_rate": 0.2
+        },
+        "7": {
+          "ambiguous": 0,
+          "ambiguous_rate": 0.0,
+          "class_id": 7,
+          "class_name": "horse",
+          "clear_easy": 10,
+          "clear_hard": 0,
+          "count": 10,
+          "student_clean_error": 2,
+          "student_clean_error_rate": 0.2,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 1,
+          "teacher_clean_error_rate": 0.1
+        },
+        "8": {
+          "ambiguous": 1,
+          "ambiguous_rate": 0.1,
+          "class_id": 8,
+          "class_name": "ship",
+          "clear_easy": 7,
+          "clear_hard": 2,
+          "count": 10,
+          "student_clean_error": 2,
+          "student_clean_error_rate": 0.2,
+          "student_robust_error": 5,
+          "student_robust_error_rate": 0.5,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 2,
+          "teacher_clean_error_rate": 0.2
+        },
+        "9": {
+          "ambiguous": 2,
+          "ambiguous_rate": 0.2,
+          "class_id": 9,
+          "class_name": "truck",
+          "clear_easy": 5,
+          "clear_hard": 3,
+          "count": 10,
+          "student_clean_error": 3,
+          "student_clean_error_rate": 0.3,
+          "student_robust_error": 6,
+          "student_robust_error_rate": 0.6,
+          "teacher_adv_error": 5,
+          "teacher_adv_error_rate": 0.5,
+          "teacher_clean_error": 3,
+          "teacher_clean_error_rate": 0.3
+        }
+      }
+    }
+  },
+  "source_files": {
+    "manifest": ".cache/analysis/ffnr-strong-diagnostics-6a90011-v1/ffnr-strong-blinded-candidates.json",
+    "review": "docs/experiments/ffnr_human_review_v1.json"
+  },
+  "student_predicted_class_available": false
+}

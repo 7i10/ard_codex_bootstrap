@@ -65,3 +65,6 @@ dog/catやautomobile/truckのような近接クラスの混同可能性を表し
 - その比較を見る前に、介入routeやデータ除外を決めない。`possible_label_error`が0件でも、画像難度への介入効果は別途検証が必要である。
 
 判定手順とカテゴリ定義は[FFNR_HUMAN_REVIEW.md](FFNR_HUMAN_REVIEW.md)に固定しています。
+
+クラス別誤り率・教師混同行列との結合分析は
+[FFNR_HUMAN_REVIEW_ANALYSIS.md](FFNR_HUMAN_REVIEW_ANALYSIS.md) を参照してください。
