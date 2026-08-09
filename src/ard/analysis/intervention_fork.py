@@ -493,12 +493,13 @@ def create_intervention_forks(
     manifest = _load_json_mapping(parent_manifest, name="parent manifest")
     arms = probe_arms
     by_name = _validate_screen(arms)
+    parent_arm_name = "C79" if set(by_name) == {"C79", "RA", "RAR", "RB", "RBR"} else "C"
     payload, train_labels, parent_artifact = _validate_parent(
         checkpoint=parent_checkpoint,
         parent_raw_config=parent_raw,
         parent_manifest=manifest,
         parent_manifest_path=parent_manifest,
-        arm=by_name["C"],
+        arm=by_name[parent_arm_name],
     )
     if set(by_name) == {"C", "HS", "RS", "HD", "RD"}:
         _validate_selector_bundle(by_name, train_labels=train_labels)
