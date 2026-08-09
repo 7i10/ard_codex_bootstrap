@@ -524,7 +524,7 @@ def _model_rows(
         raise FFNRStateMechanismError("cross-seed model IDs and targets differ")
     output: list[dict[str, Any]] = []
     for name, fields in columns.items():
-        if name == "M0":
+        if not fields:
             probability = sum(fit_target.values()) / len(fit_target)
             scores = [probability] * len(evaluate)
         else:
