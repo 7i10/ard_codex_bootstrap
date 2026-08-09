@@ -90,9 +90,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--single-run", choices=("L2", "L4"), help="write one compact intermediate report")
+    parser.add_argument("--merge-only", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--l2-report", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--l4-report", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     config_path = args.config.resolve()
     config = load_config(config_path)
+    if args.merge_only:
+        if not args.l2_report or not args.l4_report:
+            raise FFNRStateMechanismError("merge-only requires both single-run reports")
+        reports = {
+            "L2": json.loads(args.l2_report.resolve().read_text(encoding="utf-8")),
+            "L4": json.loads(args.l4_report.resolve().read_text(encoding="utf-8")),
+        }
+        models = cross_seed_models(reports)
+        paths = write_outputs(
+            output_dir=args.output_dir.resolve(),
+            reports=reports,
+            cross_seed_models=models,
+            config_path=config_path,
+        )
+        print("\n".join(f"{name}={path}" for name, path in sorted(paths.items())))
+        return 0
     if args.single_run:
         report = analyze_run(
             label=args.single_run,
@@ -133,12 +152,26 @@ def main(argv: list[str] | None = None) -> int:
                 env=env,
             )
             intermediate[label] = child_dir / "single-report.json"
-        reports = {label: json.loads(intermediate[label].read_text(encoding="utf-8")) for label in ("L2", "L4")}
-    models = cross_seed_models(reports)
-    paths = write_outputs(
-        output_dir=args.output_dir.resolve(), reports=reports, cross_seed_models=models, config_path=config_path
-    )
-    print("\n".join(f"{name}={path}" for name, path in sorted(paths.items())))
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(root) + os.pathsep + env.get("PYTHONPATH", "")
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "ard.cli.ffnr_state_mechanism",
+                "--config",
+                str(config_path),
+                "--output-dir",
+                str(args.output_dir.resolve()),
+                "--merge-only",
+                "--l2-report",
+                str(intermediate["L2"]),
+                "--l4-report",
+                str(intermediate["L4"]),
+            ],
+            check=True,
+            env=env,
+        )
     return 0
 
 
