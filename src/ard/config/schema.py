@@ -829,7 +829,7 @@ class InterventionConfig(StrictModel):
             "NR_R": ("class_state_count_matched_random", "teacher_target_true_label_mix", True, "non_recovery", False),
         }
         causal = {
-            "C79": ("none", "ordinary_rslad", False, None, 0.0, 0.0),
+            "C79": ("none", "ordinary_rslad", False, None, 0.5, 0.0),
             "RA": ("route_a_strong", "route_a_ce_anchor", True, "ffnr_route_a_strong_ce_pgd20", 0.5, 0.25),
             "RAR": ("route_a_matched_random", "route_a_ce_anchor", True, "ffnr_route_a_matched_random", 0.5, 0.25),
             "RB": ("route_b_strong", "route_b_ce_anchor", True, "ffnr_route_b_strong_ce_pgd20", 1.0, 0.25),
