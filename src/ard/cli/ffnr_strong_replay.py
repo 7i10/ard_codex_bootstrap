@@ -35,8 +35,7 @@ from ard.analysis.ffnr_strong_replay import (
 from ard.analysis.rslad_signal_replay import portable_cifar10_train_identity
 from ard.analysis.signal_audit import sha256_file
 from ard.analysis.teacher_risk_replay import build_replay_loader
-from ard.config import load_config
-from ard.engine.checkpoint import config_digest
+from ard.config.loader import load_resolved_config_for_evaluation
 from ard.models import build_teacher
 
 
@@ -115,7 +114,11 @@ def main(argv: list[str] | None = None) -> int:
         raise StrongReplayError("strong replay output directory already exists; refusing to overwrite")
     manifest_path = _configured_path(config_path.parent, launch["manifest"], name="manifest")
     resolved_path = manifest_path.parent / "resolved_config.yaml"
-    training_config = load_config(resolved_path)
+    # Historical logging-only runs are valid replay sources but are no longer
+    # accepted by the strict training loader.  Migrate only the in-memory
+    # evaluation view; retain the untouched YAML hash for checkpoint identity.
+    resolved_view = load_resolved_config_for_evaluation(resolved_path)
+    training_config = resolved_view.config
     attack = selection_attack_from_training(training_config)
     provenance = source_provenance()
     inventory = load_checkpoint_inventory_document(
@@ -126,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     saved_resolved = yaml.safe_load(resolved_path.read_text(encoding="utf-8"))
     if not isinstance(saved_resolved, dict):
         raise StrongReplayError("saved resolved training config must be a mapping")
-    resolved_hash = config_digest(saved_resolved)
+    resolved_hash = resolved_view.raw_config_hash
     if any(item.config_hash != resolved_hash for item in selected):
         raise StrongReplayError("selected checkpoint config hash does not match saved resolved config")
     if training_config.teacher is None:
@@ -204,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         "saved_resolved_config": str(resolved_path),
         "saved_resolved_config_sha256": sha256_file(resolved_path),
         "saved_resolved_config_mapping_sha256": resolved_hash,
+        "resolved_config_migration": resolved_view.migration,
         "checkpoints": [
             {"epoch": item.epoch, "sha256": item.sha256, "path": item.path, "artifact_name": item.artifact_name}
             for item in selected
