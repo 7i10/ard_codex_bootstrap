@@ -153,7 +153,7 @@ def build(args: argparse.Namespace) -> None:
         raise ValueError("parent must be an epoch-79 checkpoint")
     parent = _prepare_parent(args, payload, raw, args.parent_manifest)
     masks_root = args.mask_root / args.label
-    masks_manifest = json.loads((masks_root / "manifest.json").read_text(encoding="utf-8"))
+    masks_manifest = json.loads((args.mask_root / "manifest.json").read_text(encoding="utf-8"))
     run_masks = masks_manifest["runs"][args.label]
     store = SampleStateStore(ema_decay=float(raw["method"]["student_ema_decay"]))
     store.load_state_dict(payload["sample_state"])
