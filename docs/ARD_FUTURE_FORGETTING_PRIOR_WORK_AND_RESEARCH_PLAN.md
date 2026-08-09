@@ -1,7 +1,7 @@
 # ARDにおける将来Robust Forgetting予測の先行研究と今後の研究方針
 
-**作成日:** 2026-07-31
-**対象:** Adversarial Robustness Distillation（ARD）における、学生の学習履歴、将来のrobust forgetting、教師信号、sample-wise intervention
+**作成日:** 2026-07-31  
+**対象:** Adversarial Robustness Distillation（ARD）における、学生の学習履歴、将来のrobust forgetting、教師信号、sample-wise intervention  
 **位置付け:** 先行研究で既に示されていること、今回の実験で新たに得られたこと、今後提案する研究を明確に分離する。
 
 ---
@@ -22,7 +22,7 @@
 
 したがって、今後の研究は次の順序で進める。
 
-\[
+$$
 \boxed{
 \text{予測信号の妥当性}
 \;\rightarrow\;
@@ -30,7 +30,7 @@
 \;\rightarrow\;
 \text{介入方法の妥当性}
 }
-\]
+$$
 
 研究の中心は、単一の新しいweight式を提案することではない。
 
@@ -48,18 +48,18 @@
 
 例:
 
-\[
+$$
 m_i^{(t)}
 =
 p_{S_t}(y_i\mid x_{i,\mathrm{adv}}^{(t)})
 -
 \max_{c\neq y_i}
 p_{S_t}(c\mid x_{i,\mathrm{adv}}^{(t)})
-\]
+$$
 
-- \(m_i^{(t)}>0\): 正解クラスが最大
-- \(m_i^{(t)}\approx0\): 境界付近
-- \(m_i^{(t)}<0\): 誤分類
+- $m_i^{(t)}>0$: 正解クラスが最大
+- $m_i^{(t)}\approx0$: 境界付近
+- $m_i^{(t)}<0$: 誤分類
 
 これは現在時点の状態であり、将来も学習不能であることを意味しない。
 
@@ -69,7 +69,7 @@ p_{S_t}(c\mid x_{i,\mathrm{adv}}^{(t)})
 
 例:
 
-\[
+$$
 s_i
 =
 \frac{1}{T}
@@ -77,13 +77,13 @@ s_i
 \mathbf 1[
 S_t(x_{i,\mathrm{adv}}^{(t)})=y_i
 ]
-\]
+$$
 
 ## 1.3 Robust forgetting
 
 一度敵対的条件で正解できたサンプルが、後のcheckpointで誤分類へ戻ることである。
 
-\[
+$$
 F_i^{(t)}
 =
 \mathbf 1[
@@ -91,7 +91,7 @@ S_{t-1}(x_{i,\mathrm{adv}})=y_i
 \land
 S_t(x_{i,\mathrm{adv}})\neq y_i
 ]
-\]
+$$
 
 本研究の主要なprospective outcomeは、ある履歴時点以後にforgetting eventを起こすかである。
 
@@ -107,13 +107,13 @@ S_t(x_{i,\mathrm{adv}})\neq y_i
 
 重要な区別は次である。
 
-\[
+$$
 \boxed{
 \text{将来忘却されやすい}
 \neq
 \text{学習から除外すべき}
 }
-\]
+$$
 
 予測精度と介入効果は別の研究問題である。
 
@@ -199,17 +199,17 @@ Tonevaらは、通常の教師あり学習で、訓練サンプルが正解か�
 
 これらは主として、
 
-\[
+$$
 \text{現在難しいか}
-\]
+$$
 
 を利用する。
 
 本研究が対象とするのは、
 
-\[
+$$
 \text{現在までの履歴から、将来forgettingするか}
-\]
+$$
 
 である。
 
@@ -365,13 +365,13 @@ SAAD-Cでは、敵対的蒸留に使いにくいサンプルをclean distillatio
 
 したがって、
 
-\[
+$$
 \boxed{
 \text{将来忘れそう}
 \Rightarrow
 \text{何をすべきか}
 }
-\]
+$$
 
 は未解決である。
 
@@ -389,30 +389,30 @@ epoch 99のsignalからepoch 199までのsubsequent forgettingを予測した。
 
 比較したモデルは以下である。
 
-\[
+$$
 \begin{aligned}
 \text{Teacher-only}&:\quad[c_i]\\
 \text{Student-only}&:\quad[u_i]\\
 \text{Main effects}&:\quad[u_i,c_i]\\
 \text{Main+product}&:\quad[u_i,c_i,u_ic_i]
 \end{aligned}
-\]
+$$
 
 ここで、
 
-\[
+$$
 u_i
 =
 \frac{1-\operatorname{EMA}(m_i)}{2}
-\]
+$$
 
 は学生のhistorical robust-margin risk、
 
-\[
+$$
 c_i
 =
 1-\frac{H_T(x_i^{adv})}{\log C}
-\]
+$$
 
 はteacher low-entropy riskである。
 
@@ -427,11 +427,11 @@ c_i
 
 ### 現時点の解釈
 
-\[
+$$
 \boxed{
 \text{future forgettingの予測情報の大部分はstudent historyにある}
 }
-\]
+$$
 
 teacher entropyは、student historyを既に知った後では、forgetting順位予測へほとんど情報を追加しない。
 
@@ -441,11 +441,11 @@ teacher entropyは、student historyを既に知った後では、forgetting順�
 
 現行Jointは、
 
-\[
+$$
 r_i=u_ic_i,
 \qquad
 \rho_i=0.5r_i
-\]
+$$
 
 としてteacher targetをuniformへsoftenした。
 
@@ -460,12 +460,12 @@ r_i=u_ic_i,
 
 したがって、以下は支持されない。
 
-\[
+$$
 \boxed{
 u_ic_i
 \text{をそのままuniform softening強度へ使う}
 }
-\]
+$$
 
 ---
 
@@ -502,7 +502,7 @@ u_ic_i
 
 ### 構成
 
-\[
+$$
 \boxed{
 \text{Predict}
 \rightarrow
@@ -510,7 +510,7 @@ u_ic_i
 \rightarrow
 \text{Route supervision}
 }
-\]
+$$
 
 #### Predict
 
@@ -563,7 +563,7 @@ u_ic_i
 
 ### 必須比較
 
-\[
+$$
 [c_i]
 \quad
 [u_i]
@@ -571,7 +571,7 @@ u_ic_i
 [u_i,c_i]
 \quad
 [u_i,c_i,u_ic_i]
-\]
+$$
 
 指標:
 
@@ -624,14 +624,14 @@ RSLAD由来のpre-intervention maskを固定する。
 
 1. offline oracle
 2. class-matched random × 3以上
-3. same-\(\rho\) permutation
+3. same-$\rho$ permutation
 4. no intervention
 
 全armで以下を揃える。
 
 - sample数
 - class分布
-- \(\rho\) multiset
+- $\rho$ multiset
 - optimizer
 - attack
 - schedule
@@ -662,7 +662,7 @@ oracleまたは固定student-risk maskを使い、介入だけを比較する。
 | Temperature | teacher temperature上昇 |
 | True-label anchor | teacher targetをground truth側へ補正 |
 | Clean-only | adversarial KDを止めclean KDを保持 |
-| Attack easing | \(\epsilon\)またはstep数を一時的に低下 |
+| Attack easing | $\epsilon$またはstep数を一時的に低下 |
 | Exclusion | adversarial updateから除外 |
 
 ### 目的
@@ -689,7 +689,7 @@ student-high-riskサンプルに限定して、teacher stateを判断する。
 | high risk | correctだが無反応 | temperature / clean-onlyを比較 |
 | high risk | wrong-confidence | KD downweightまたはtrue-label anchor |
 
-teacher entropy単独や\(u_ic_i\)の積を主routerにしない。
+teacher entropy単独や$u_ic_i$の積を主routerにしない。
 
 ---
 
@@ -740,7 +740,7 @@ teacher entropy単独や\(u_ic_i\)の積を主routerにしない。
 - future forgettingは予測できる
 - しかしsample-wise制御ではrobust accuracyを改善できない
 
-→ analysis/benchmark paperとして成立可能。
+→ analysis/benchmark paperとして成立可能。  
 「predictability does not imply training utility」というnegative resultが中心になる。
 
 ## 結果D: logging-only・複数seedでSignalも再現しない
@@ -758,7 +758,7 @@ teacher entropy単独や\(u_ic_i\)の積を主routerにしない。
 - robustly unlearnable setをオンラインで正確に特定した
 - student riskが因果的にforgettingを起こす
 - teacher entropyが不要である
-- \(u_ic_i\)の積が有害教師信号を表す
+- $u_ic_i$の積が有害教師信号を表す
 - future forgetting sampleは除外すべき
 - seed 0のsample-level bootstrapがtraining-seed uncertaintyを表す
 - 現行JointがRSLAD/SAADを改善した
@@ -819,7 +819,7 @@ teacher entropy単独や\(u_ic_i\)の積を主routerにしない。
 1. Toneva, M. et al. **An Empirical Study of Example Forgetting during Deep Neural Network Learning.** ICLR 2019. arXiv:1812.05159.
 2. Dong, C., Liu, L., Shang, J. **Data Quality Matters for Adversarial Training: An Empirical Study.** 2021. arXiv:2102.07437.
 3. Rice, L., Wong, E., Kolter, J. Z. **Overfitting in Adversarially Robust Deep Learning.** ICML 2020.
-4. Wang, Y. et al. **Improving Adversarial Robustness Requires Revisiting Misclassified Examples.** ICLR 2020.
+4. Wang, Y. et al. **Improving Adversarial Robustness Requires Revisiting Misclassified Examples.** ICLR 2020.  
 5. Zhang, J. et al. **Geometry-Aware Instance-Reweighted Adversarial Training.** ICLR 2021.
 6. Liu, F. et al. **Probabilistic Margins for Instance Reweighting in Adversarial Training.** arXiv:2106.07904.
 7. Zhang, J. et al. **Attacks Which Do Not Kill Training Make Adversarial Learning Stronger.** ICML 2020.
@@ -853,7 +853,7 @@ teacher entropy単独や\(u_ic_i\)の積を主routerにしない。
 
 したがって、次の主軸が最も妥当である。
 
-\[
+$$
 \boxed{
 \text{Student historyでforgettingを予測する}
 +
@@ -861,6 +861,6 @@ teacher entropy単独や\(u_ic_i\)の積を主routerにしない。
 +
 \text{教師情報はroute選択へ限定する}
 }
-\]
+$$
 
 この順序なら、最終的な介入が失敗しても、予測研究とnegative resultが独立した成果として残る。

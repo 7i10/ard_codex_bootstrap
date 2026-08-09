@@ -1,7 +1,7 @@
 # Adversarial Robustness Distillation（ARD）の研究課題整理と独立提案
 
-**更新日:** 2026年7月31日
-**対象:** 敵対的訓練（Adversarial Training; AT）とKnowledge Distillation（KD）を組み合わせたAdversarial Robustness Distillation（ARD）
+**更新日:** 2026年7月31日  
+**対象:** 敵対的訓練（Adversarial Training; AT）とKnowledge Distillation（KD）を組み合わせたAdversarial Robustness Distillation（ARD）  
 **目的:** これまでの議論と提示された要約を、重要点を落とさず補足・整理し、各研究課題に対する独立した研究提案を示す。
 
 > 本稿では、各提案をいったん独立した研究テーマとして扱う。将来的に複数提案を統合する可能性はあるが、現段階では統合システムとしての整合性や卒論全体の構成は考慮しない。
@@ -32,7 +32,7 @@
 
 ARDは、概念的には次の組合せである。
 
-\[
+$$
 \boxed{
 \mathrm{ARD}
 =
@@ -40,11 +40,11 @@ ARDは、概念的には次の組合せである。
 \times
 \mathrm{Knowledge\ Distillation}
 }
-\]
+$$
 
 通常のATは、学生モデル自身に対する敵対的サンプルを生成し、正解ラベルに分類するよう学習する。
 
-\[
+$$
 \min_{\theta}
 \mathbb{E}_{(x,y)}
 \left[
@@ -52,37 +52,37 @@ ARDは、概念的には次の組合せである。
 \mathcal{L}_{\mathrm{CE}}
 \left(S_{\theta}(x+\delta),y\right)
 \right]
-\]
+$$
 
 ARDでは、このAT損失に、教師モデルの出力・特徴・局所応答などを模倣する蒸留損失を加える。
 
-\[
+$$
 \mathcal{L}_{\mathrm{ARD}}
 =
 \mathcal{L}_{\mathrm{AT}}
 +
 \lambda_{\mathrm{KD}}
 \mathcal{L}_{\mathrm{KD}}
-\]
+$$
 
 したがって、ARDは単に「教師モデルを圧縮するKD」ではない。多くのARDでは学生自身への敵対的サンプル生成を残すため、**ARDはATを教師信号によって誘導・正則化する枠組み**と捉えるのが正確である。
 
 ## 1.2 soft labelとは何か
 
-教師のlogitを \(z_T(x)\)、temperatureを \(\tau\) とすると、soft labelは次で表される。
+教師のlogitを $z_T(x)$、temperatureを $\tau$ とすると、soft labelは次で表される。
 
-\[
+$$
 p_{T,k}^{(\tau)}(x)
 =
 \frac{\exp(z_{T,k}(x)/\tau)}
 {\sum_j \exp(z_{T,j}(x)/\tau)}
-\]
+$$
 
 例えば、犬画像に対して、
 
-\[
+$$
 (\text{犬}:0.80,\ \text{猫}:0.10,\ \text{狼}:0.06,\ \text{船}:0.001,\ldots)
-\]
+$$
 
 のような分布である。これは必ずしも校正された真の確率ではなく、教師が持つ**クラス間の相対的なlogit構造**を表す。
 
@@ -90,11 +90,11 @@ p_{T,k}^{(\tau)}(x)
 
 label smoothingは、one-hot labelを平滑化する。
 
-\[
+$$
 q_y=1-\varepsilon,
 \qquad
 q_{k\neq y}=\frac{\varepsilon}{C-1}
-\]
+$$
 
 label smoothingとsoft-label distillationの共通点は、正解クラスへ過剰に確信することを抑え、最適化を滑らかにする点である。
 
@@ -110,11 +110,11 @@ label smoothingとsoft-label distillationの共通点は、正解クラスへ過
 
 したがって、ARDの利点は、
 
-\[
+$$
 \text{soft targetによる一般的な正則化}
 +
 \text{robust teacher固有の入力依存情報}
-\]
+$$
 
 に分けて考えるべきである。
 
@@ -126,13 +126,13 @@ label smoothingとsoft-label distillationの共通点は、正解クラスへ過
 
 通常のATにおけるone-hot labelは、基本的に「正解クラスを最大にせよ」としか教えない。一方、教師soft labelは全クラスの相対関係を制約する。
 
-\[
+$$
 D_{\mathrm{KL}}
 \left(
 p_T(x)
 \|p_S(x_{\mathrm{adv}})
 \right)
-\]
+$$
 
 を用いると、学生は正解クラスだけでなく、競合クラスとの相対関係も模倣する。これにより、学生が探索する解空間を、教師が獲得した頑健な関数の近傍へ誘導できる可能性がある。
 
@@ -148,13 +148,13 @@ p_T(x)
 
 したがって、観測される性能不足は、
 
-\[
+$$
 \text{表現能力不足}
 +
 \text{最適化困難性}
 +
 \text{学習設計の不整合}
-\]
+$$
 
 の複合結果である。ARDは教師信号によって、学生の限られた自由度をより有効な頑健解へ割り当てることを狙う。
 
@@ -190,12 +190,12 @@ KDIGAはImageNetでResNetとViTを含む頑健性転写を評価している。�
 
 従来の直感は、
 
-\[
+$$
 A_{\mathrm{rob}}(T_1)>A_{\mathrm{rob}}(T_2)
 \Rightarrow
 A_{\mathrm{rob}}(S\leftarrow T_1)>
 A_{\mathrm{rob}}(S\leftarrow T_2)
-\]
+$$
 
 である。しかし、現実にはこの単調関係は成立しない。教師を強くしても学生性能が飽和し、さらに強い教師で学生性能が低下する場合がある。
 
@@ -203,9 +203,9 @@ A_{\mathrm{rob}}(S\leftarrow T_2)
 
 教師がこの集合に対して、
 
-\[
+$$
 p_T(y\mid x)\approx1
-\]
+$$
 
 のような高確信度監督を与えると、学生は教師が利用する頑健特徴を表現できないまま、その教師出力へ合わせようとする。その結果、サンプル固有ノイズや非一般化特徴を記憶し、
 
@@ -221,17 +221,17 @@ p_T(y\mid x)\approx1
 
 学生への攻撃を、
 
-\[
+$$
 x_{\mathrm{adv}}^S=x+\delta_S
-\]
+$$
 
 とする。これは学生の決定境界・勾配に最適化されているため、教師にはほとんど影響しない場合がある。
 
 学生は完全に崩れているのに、教師がclean時とほぼ同じ極端な出力を返すと、教師soft labelは学生の困難さを表さない。
 
-\[
+$$
 T(x)\approx T(x_{\mathrm{adv}}^S)
-\]
+$$
 
 学生にとって困難なサンプルでこの無反応・過信が起きると、実現困難な教師信号を強制し、robust overfittingを促す可能性がある。
 
@@ -241,26 +241,26 @@ T(x)\approx T(x_{\mathrm{adv}}^S)
 
 すなわち、教師は、
 
-\[
+$$
 T(x_{\mathrm{adv}}^S)=y
-\]
+$$
 
 を維持しつつ、
 
-\[
+$$
 m_T(x_{\mathrm{adv}}^S)<m_T(x)
-\]
+$$
 
 となることが望ましい。教師は**label-robustかつdifficulty-sensitive**であるべきである。
 
 ## 3.3 現在の中心的な未解決問題
 
-\[
+$$
 \boxed{
 \text{教師が持つ頑健性のうち、学生が学習・一般化できる部分だけを、
 どのサンプルで、どの時点に、どの形式で転写するか}
 }
-\]
+$$
 
 この問題を以下の7課題に分ける。
 
@@ -286,15 +286,15 @@ m_T(x_{\mathrm{adv}}^S)<m_T(x)
 
 Transferable Adversarial Sample（TAS）は、学生生成攻撃が教師にも教師自身への攻撃と類似した応答を引き起こすかを測る。
 
-教師clean出力を \(T(x)\)、学生攻撃時出力を \(T(x+\delta_S)\)、教師自身への攻撃時出力を \(T(x+\delta_T)\) とすると、概念的には、
+教師clean出力を $T(x)$、学生攻撃時出力を $T(x+\delta_S)$、教師自身への攻撃時出力を $T(x+\delta_T)$ とすると、概念的には、
 
-\[
+$$
 \mathrm{KL}
 \left(T(x+\delta_S)\|T(x)\right)
 \geq
 \mathrm{KL}
 \left(T(x+\delta_S)\|T(x+\delta_T)\right)
-\]
+$$
 
 ならTASと判定する。
 
@@ -306,21 +306,21 @@ TASはサンプルごとに定義できる。データセット全体で集約�
 
 - 教師が正解しているかを見ていない。
 - 教師と学生が同じ誤クラスへ崩れる場合も高TASになり得る。
-- 教師自身への攻撃 \(\delta_T\) が弱ければ基準が不正確になる。
+- 教師自身への攻撃 $\delta_T$ が弱ければ基準が不正確になる。
 - 攻撃が教師へ転移することと、その教師信号が学生に有益であることは同じではない。
 - 高TASは、教師と学生が有害な脆弱性を共有していることを示す場合もある。
 - 正確なTASには学生攻撃だけでなく教師攻撃も必要であり、計算量が増える。
 
 したがって、raw TAS ratioだけでなく、少なくとも、
 
-\[
+$$
 \begin{aligned}
 r_{\mathrm{correct\text{-}TAS}}
 &=\Pr[\mathrm{TAS}\land T(x_{\mathrm{adv}}^S)=y],\\
 r_{\mathrm{wrong\text{-}TAS}}
 &=\Pr[\mathrm{TAS}\land T(x_{\mathrm{adv}}^S)\neq y]
 \end{aligned}
-\]
+$$
 
 を分離して見るべきである。
 
@@ -328,9 +328,9 @@ r_{\mathrm{wrong\text{-}TAS}}
 
 正確なTASには教師自身への攻撃が必要である。SAADは追加計算を避けるため、
 
-\[
+$$
 H(T(x+\delta_S))
-\]
+$$
 
 をTASの代理量として用い、サンプルごとに蒸留weightを調整する。
 
@@ -338,23 +338,23 @@ SAADでは、蒸留結果の悪い教師は学生生成PGD入力上で低entropy
 
 ただし、
 
-\[
+$$
 \boxed{\text{高entropy}\neq\text{良い教師}}
-\]
+$$
 
 である。誤分類して迷っている教師や、一様分布を出す無知な教師も高entropyになり得る。
 
 ## 4.5 Unlearnable-Entropy
 
-Unlearnable-Entropyは、対象学生にとって頑健に学習しにくいproxy set \(\mathcal S_U\) 上で、教師がどの程度過信しているかを見る。
+Unlearnable-Entropyは、対象学生にとって頑健に学習しにくいproxy set $\mathcal S_U$ 上で、教師がどの程度過信しているかを見る。
 
-\[
+$$
 Q_{\mathrm{UE}}(T)
 =
 \frac{1}{|\mathcal S_U|}
 \sum_{i\in\mathcal S_U}
 H(T(x_{i,\mathrm{adv}}))
-\]
+$$
 
 この指標は教師ランキングに用いられる。学生が学習困難なサンプルで教師が低entropy・高確信度を出すと、学生のノイズ記憶を促進するという仮説に基づく。
 
@@ -365,7 +365,7 @@ H(T(x_{i,\mathrm{adv}}))
 - proxy unlearnable setがreference studentに依存する。
 - 実際の学生とreference studentが異なると集合がずれる。
 - checkpointによってlearnable/unlearnableが変化する。
-- 攻撃強度、\(\epsilon\)、学生容量に依存する。
+- 攻撃強度、$\epsilon$、学生容量に依存する。
 - binary集合では境界サンプルを表現しにくい。
 - seed・訓練法によって判定が変わる。
 - ImageNet規模でのproxy構築コストと安定性が十分検証されていない。
@@ -384,7 +384,7 @@ H(T(x_{i,\mathrm{adv}}))
 
 良い教師は、次を同時に満たす。
 
-\[
+$$
 \boxed{
 \text{教師単体の健全性}
 +
@@ -394,13 +394,13 @@ H(T(x_{i,\mathrm{adv}}))
 +
 \text{unlearnable集合上の非過信}
 }
-\]
+$$
 
 ### 手順
 
 #### 1. 教師候補の足切り
 
-同一のnormalization、解像度、\(\epsilon\)、攻撃条件で、
+同一のnormalization、解像度、$\epsilon$、攻撃条件で、
 
 - clean accuracy
 - PGD accuracy
@@ -411,23 +411,23 @@ H(T(x_{i,\mathrm{adv}}))
 
 #### 2. reference studentを固定
 
-対象学生と同じarchitectureを短期間ATし、reference checkpoint \(S_{\mathrm{ref}}\) を作る。
+対象学生と同じarchitectureを短期間ATし、reference checkpoint $S_{\mathrm{ref}}$ を作る。
 
 #### 3. 学生攻撃上の教師適合性を測る
 
-\[
+$$
 A_{T\leftarrow S}
 =
 \Pr[T(x_{\mathrm{adv}}^{S_{\mathrm{ref}}})=y]
-\]
+$$
 
 に加え、安全margin率、correct-TAS、wrong-TAS、teacher entropyを測る。
 
-\[
+$$
 C_{\mathrm{safe}}
 =
 \Pr[m_T(x_{\mathrm{adv}}^S)>m_{\min}]
-\]
+$$
 
 #### 4. proxy unlearnable set上の挙動
 
@@ -475,16 +475,16 @@ C_{\mathrm{safe}}
 
 少なくとも次を分ける必要がある。
 
-1. **現在の脆弱性**
+1. **現在の脆弱性**  
    現checkpointで攻撃が成功するか。
 
-2. **学習安定性**
+2. **学習安定性**  
    学習中に敵対的条件で何度、どの程度安定して正解したか。
 
-3. **将来のrobust learnability**
+3. **将来のrobust learnability**  
    十分な訓練後に、対象学生と脅威モデルで頑健に学習できるか。
 
-4. **training utility**
+4. **training utility**  
    そのサンプルを現在の更新に用いることがvalidation robustnessを改善するか。
 
 **learnabilityとutilityは同じではない。** 学習可能でも既に十分学習済みなら追加更新の価値は小さい。現在は難しくても、教師やcurriculumにより高いutilityを持つ可能性がある。
@@ -493,13 +493,13 @@ C_{\mathrm{safe}}
 
 現時点で最も直接的なのは、複数の訓練法・seed・peak checkpointでのrobust correctnessを集約する方法である。
 
-\[
+$$
 L_i^*
 =
 \frac{1}{M}
 \sum_{m=1}^{M}
 \mathbf 1[S_m(x_{i,\mathrm{adv}})=y_i]
-\]
+$$
 
 2026年の研究では、CIFARで6種類の訓練パラダイム×10 seedの60モデルを用い、全モデル正解をlearnable、全モデル誤分類をunlearnableとする厳密集合を構築した。
 
@@ -509,13 +509,13 @@ L_i^*
 
 各サンプルが敵対的条件で正解したepochの割合を、learning stabilityとする。
 
-\[
+$$
 s_i
 =
 \frac{1}{T}
 \sum_{t=1}^{T}
 \mathbf 1[S_t(x_{i,\mathrm{adv}})=y_i]
-\]
+$$
 
 Data Quality Matters for Adversarial Trainingでは、learning stabilityのサンプル順位がseed、訓練期間、PGD-AT、TRADES、MART、architecture間で比較的一貫することが報告されている。
 
@@ -548,9 +548,9 @@ MAILは、true-class probabilityと最大誤クラスprobabilityとの差によ�
 
 marginはATで十分研究されているが、基本的には、
 
-\[
+$$
 \text{現在の境界までの近さ}
-\]
+$$
 
 を測る。現在marginが負でも、後で学習できる可能性がある。したがって、単一時点のmarginだけでは将来的learnabilityは分からない。
 
@@ -564,7 +564,7 @@ marginはATで十分研究されているが、基本的には、
 
 などのtrajectoryは補助指標になり得る。
 
-## 5.5 restart、勾配、EMA、複数\(\epsilon\)
+## 5.5 restart、勾配、EMA、複数$\epsilon$
 
 | 候補 | 主に測るもの | 将来learnabilityへの位置づけ |
 |---|---|---|
@@ -572,7 +572,7 @@ marginはATで十分研究されているが、基本的には、
 | 勾配ノルム | 現在の更新強度・損失感度 | 有益な難例とノイズを分離できない |
 | 勾配方向安定性 | 更新方向・模倣整合性 | 高コストで未確立 |
 | EMA学生との一致 | temporal stability | 両方誤る場合があるため正解条件が必要 |
-| 複数\(\epsilon\)での正解 | 現在のrobust radius形状 | 有望だが複数attackが必要 |
+| 複数$\epsilon$での正解 | 現在のrobust radius形状 | 有望だが複数attackが必要 |
 | teacher–student feature alignment | 模倣可能性・表現差 | architecture依存、learnabilityとは未確立 |
 
 > **現状、将来のrobust learnabilityを学習初期に最も簡単・正確に表現する指標は確立されていない。これはARDだけでなくAT全般の研究課題である。**
@@ -604,15 +604,15 @@ marginはATで十分研究されているが、基本的には、
 
 から、
 
-\[
+$$
 L_i^*
 =
 \frac{1}{M}
 \sum_{m=1}^{M}
 \mathbf 1[S_m(x_i^{\mathrm{adv}})=y_i]
-\]
+$$
 
-を作る。全正解・全誤りのbinary集合だけでなく、\(L_i^*\in[0,1]\) の連続値を用いる。
+を作る。全正解・全誤りのbinary集合だけでなく、$L_i^*\in[0,1]$ の連続値を用いる。
 
 ### Step 2：安価な早期指標を比較
 
@@ -623,24 +623,24 @@ L_i^*
 - correctnessの上昇傾向
 - longest correct streak
 - adversarial marginの平均・傾き・分散
-- 複数\(\epsilon\)での正解パターン
+- 複数$\epsilon$での正解パターン
 - EMAモデルとの**正解一致**
 
 を計算する。
 
 ### Step 3：予測性能を評価
 
-\[
+$$
 \operatorname{AUROC}
 \left(q_i,\mathbf 1[L_i^*\leq\tau]\right)
-\]
+$$
 
 に加え、
 
 - Spearman相関
 - calibration error
 - architecture間転移
-- \(\epsilon\)間転移
+- $\epsilon$間転移
 - seed間安定性
 - 計算コスト
 
@@ -662,7 +662,7 @@ proxyがunlearnable sampleを当てても、それを重み付けに使って性
 
 - 除外
 - AT lossを弱める
-- \(\epsilon_i\)を下げる
+- $\epsilon_i$を下げる
 - attack step数を減らす
 - KD weightを下げる
 - teacher temperatureを上げる
@@ -690,17 +690,17 @@ RSLADに代表されるrobust soft labelは、現在もARDの基盤である。
 
 しかし、
 
-\[
+$$
 p_T(x)\approx p_S(x)
-\]
+$$
 
 でも、
 
-\[
+$$
 p_T(x+\delta)\not\approx p_S(x+\delta)
-\]
+$$
 
-となり得る。点 \(x\) で出力が一致しても、その周辺での入力勾配、境界位置、曲率、特徴変化は一致しない。
+となり得る。点 $x$ で出力が一致しても、その周辺での入力勾配、境界位置、曲率、特徴変化は一致しない。
 
 > **robust soft labelは必要な基盤だが、それだけでは不十分である。**
 
@@ -710,23 +710,23 @@ KDIGAはKnowledge Distillation with Input Gradient Alignmentの略である。
 
 教師と学生の入力勾配を、
 
-\[
+$$
 \nabla_x\mathcal L_T(x,y)
 \approx
 \nabla_x\mathcal L_S(x,y)
-\]
+$$
 
 とする。
 
 局所一次近似、
 
-\[
+$$
 \mathcal L(x+\delta)
 \approx
 \mathcal L(x)
 +
 \nabla_x\mathcal L(x)^\top\delta
-\]
+$$
 
 を考えると、教師と学生の入力勾配が近ければ、小さな摂動に対する局所応答も近づく。
 
@@ -740,13 +740,13 @@ KDIGAはKnowledge Distillation with Input Gradient Alignmentの略である。
 
 ただし、
 
-\[
+$$
 \nabla_\theta
 \left\|
 \nabla_x\mathcal L_S-
 \nabla_x\mathcal L_T
 \right\|^2
-\]
+$$
 
 を最適化するには、パラメータ更新時に入力勾配をさらに微分する二階微分相当の処理が必要となり、計算・メモリコストが高い。
 
@@ -760,13 +760,13 @@ IGDMはTaylor近似を利用し、教師の入力勾配方向へ移動した点�
 
 厳密な境界距離は、
 
-\[
+$$
 d_T(x)
 =
 \min_{\delta}\|\delta\|
 \quad
 \text{s.t. }T(x+\delta)\neq y
-\]
+$$
 
 である。しかし、深層ネットワークで各サンプルの最小摂動を正確に求めることは高コストである。
 
@@ -784,17 +784,17 @@ DARWINのような経路ベース手法は、cleanと最終敵対点だけでな
 
 ## 6.5 境界の法線方向
 
-クラス対 \((y,k)\) のlogit差を、
+クラス対 $(y,k)$ のlogit差を、
 
-\[
+$$
 F_{y,k}(x)=z_y(x)-z_k(x)
-\]
+$$
 
-とすると、境界 \(F_{y,k}(x)=0\) の局所法線は、
+とすると、境界 $F_{y,k}(x)=0$ の局所法線は、
 
-\[
+$$
 \nabla_xF_{y,k}(x)
-\]
+$$
 
 である。
 
@@ -802,7 +802,7 @@ F_{y,k}(x)=z_y(x)-z_k(x)
 
 - 正解と最大競合クラス
 - 攻撃先クラス
-- teacher top-\(K\)
+- teacher top-$K$
 
 へ限定する必要がある。
 
@@ -810,32 +810,32 @@ F_{y,k}(x)=z_y(x)-z_k(x)
 
 クラス間marginを、
 
-\[
+$$
 m(x)=z_y(x)-\max_{k\neq y}z_k(x)
-\]
+$$
 
 とする。soft labelにも相対関係は含まれるが、正解と最大競合クラスのmarginを明示的に整合させることで、重要な境界を強く拘束できる。
 
 ただし、点上のmarginが同じでも、
 
-\[
+$$
 \nabla_xm_T(x)
 eq\nabla_xm_S(x)
-\]
+$$
 
 なら周辺挙動は異なる。
 
 ## 6.7 clean/adv間の特徴変化
 
-教師と学生の特徴を \(h_T,h_S\) とすると、
+教師と学生の特徴を $h_T,h_S$ とすると、
 
-\[
+$$
 \Delta h_T=h_T(x_{\mathrm{adv}})-h_T(x)
-\]
+$$
 
-\[
+$$
 \Delta h_S=h_S(x_{\mathrm{adv}})-h_S(x)
-\]
+$$
 
 を整合させることで、攻撃によってどの特徴が維持・変化するかを移せる可能性がある。
 
@@ -859,7 +859,7 @@ STARSHIPは、sample-wiseなlogit・特徴一致だけでなく、
 
 二次近似は、
 
-\[
+$$
 f(x+\delta)
 \approx
 f(x)
@@ -867,7 +867,7 @@ f(x)
 \nabla_xf(x)^\top\delta
 +
 \frac12\delta^\top H_xf(x)\delta
-\]
+$$
 
 である。Hessian全体の蒸留は入力次元が大きく現実的でない。
 
@@ -883,7 +883,7 @@ f(x)
 
 現時点で最も妥当な階層は、
 
-\[
+$$
 \boxed{
 \text{robust soft label}
 +
@@ -891,19 +891,19 @@ f(x)
 +
 \text{必要に応じて分布レベル統計}
 }
-\]
+$$
 
 である。
 
 例として、
 
-\[
+$$
 \text{RSLAD}
 +
 \text{IGDM}
 +
 \text{STARSHIP型統計}
-\]
+$$
 
 は理にかなう。しかし、損失項を単純に全部加えると勾配競合、容量不足、ハイパーパラメータ増加、計算量増加が生じる。
 
@@ -919,7 +919,7 @@ full gradient/Hessian matchingを避けながら、学生が実際に弱い攻�
 
 ### 仮説
 
-学生攻撃方向 \(\delta_S\) 上で教師と学生のmargin軌跡を合わせれば、
+学生攻撃方向 $\delta_S$ 上で教師と学生のmargin軌跡を合わせれば、
 
 - 境界までの近さ
 - 局所一次応答
@@ -930,62 +930,62 @@ full gradient/Hessian matchingを避けながら、学生が実際に弱い攻�
 
 ### 使用点
 
-\[
+$$
 x_0=x,
 \qquad
 x_{1/2}=x+\frac12\delta_S,
 \qquad
 x_1=x+\delta_S
-\]
+$$
 
 とする。追加PGDは生成しない。
 
 ### 競合クラスの固定
 
-教師と学生で最大競合クラスが頻繁に入れ替わる問題を避けるため、教師clean時の最大競合クラス \(k^*\) またはteacher top-\(K\)を固定する。
+教師と学生で最大競合クラスが頻繁に入れ替わる問題を避けるため、教師clean時の最大競合クラス $k^*$ またはteacher top-$K$を固定する。
 
-\[
+$$
 m_M(x;k^*)=z^M_y(x)-z^M_{k^*}(x)
-\]
+$$
 
 ### 損失
 
 点上のmargin整合：
 
-\[
+$$
 \mathcal L_{\mathrm{point}}
 =
 \sum_{a\in\{0,1/2,1\}}
 \left|
 \tilde m_S(x_a)-\tilde m_T(x_a)
 \right|
-\]
+$$
 
 一次応答整合：
 
-\[
+$$
 r_M
 =
 \frac{m_M(x_1)-m_M(x_0)}{\|\delta_S\|+\varepsilon}
-\]
+$$
 
-\[
+$$
 \mathcal L_{\mathrm{slope}}=|r_S-r_T|
-\]
+$$
 
 有限差分曲率：
 
-\[
+$$
 c_M=m_M(x_1)-2m_M(x_{1/2})+m_M(x_0)
-\]
+$$
 
-\[
+$$
 \mathcal L_{\mathrm{curve}}=|c_S-c_T|
-\]
+$$
 
 全体：
 
-\[
+$$
 \mathcal L
 =
 \mathcal L_{\mathrm{AT/RSLAD}}
@@ -993,7 +993,7 @@ c_M=m_M(x_1)-2m_M(x_{1/2})+m_M(x_0)
 \lambda_r\mathcal L_{\mathrm{slope}}
 +
 \lambda_c\mathcal L_{\mathrm{curve}}
-\]
+$$
 
 ### 検証
 
@@ -1056,13 +1056,13 @@ c_M=m_M(x_1)-2m_M(x_{1/2})+m_M(x_0)
 
 studentのsoft labelをpeerへ渡し、peerのsoft labelをstudentへ戻すと、
 
-\[
+$$
 \text{学生の一時的誤り}
 \rightarrow
 \text{peer}
 \rightarrow
 \text{学生}
-\]
+$$
 
 という閉ループができる可能性がある。
 
@@ -1078,15 +1078,15 @@ studentのsoft labelをpeerへ渡し、peerのsoft labelをstudentへ戻すと�
 
 ことである。
 
-\[
+$$
 \bar\phi_t
 =
 \mu\bar\phi_{t-1}
 +
 (1-\mu)\phi_t
-\]
+$$
 
-とすると、現在stepのpeer変動はEMA教師へ \(1-\mu\) しか反映されない。偶発的な予測変動を学生へ直ちに戻しにくくなる。
+とすると、現在stepのpeer変動はEMA教師へ $1-\mu$ しか反映されない。偶発的な予測変動を学生へ直ちに戻しにくくなる。
 
 ただし、誤りが長期間継続すればEMAも追従する。遅延しすぎると、教師が現在学生の弱点とずれる。
 
@@ -1102,19 +1102,19 @@ PeerAiDのCIFAR-100報告では、蒸留段階がRSLADの26.21時間に対して
 
 ### 概要
 
-学生 \(S\)、学生より小さいpeer \(P\)、peerのEMAモデル \(\bar P\) を同時学習する。事前学習済みrobust teacherは使わない。
+学生 $S$、学生より小さいpeer $P$、peerのEMAモデル $\bar P$ を同時学習する。事前学習済みrobust teacherは使わない。
 
 ### 学習手順
 
-1. 学生 \(S\) に対して敵対的サンプル \(x_{\mathrm{adv}}^S\) を1回だけ生成する。
-2. peer \(P\) は学生攻撃をground truthで分類するよう学習する。
-3. 学生は現在peerではなく、EMA peer \(\bar P\) から一方向に学ぶ。
+1. 学生 $S$ に対して敵対的サンプル $x_{\mathrm{adv}}^S$ を1回だけ生成する。
+2. peer $P$ は学生攻撃をground truthで分類するよう学習する。
+3. 学生は現在peerではなく、EMA peer $\bar P$ から一方向に学ぶ。
 4. student soft labelをpeerへ戻さない。
 5. peerはwarm-up後、4–8 iterationに1回だけ更新する。
 
 ### peer損失
 
-\[
+$$
 \mathcal L_P
 =
 \mathrm{CE}(P(x_{\mathrm{adv}}^S),y)
@@ -1125,13 +1125,13 @@ D_{\mathrm{KL}}
 \bar P(x)
 \|P(x_{\mathrm{adv}}^S)
 \right)
-\]
+$$
 
 学生のsoft labelをpeerへ渡さないため、学生誤りの逆流を抑える。
 
 ### student損失
 
-\[
+$$
 \mathcal L_S
 =
 \mathcal L_{\mathrm{AT}}
@@ -1142,13 +1142,13 @@ D_{\mathrm{KL}}
 \operatorname{stopgrad}(\bar P(x_{\mathrm{adv}}^S))
 \|S(x_{\mathrm{adv}}^S)
 \right)
-\]
+$$
 
 ### なぜ効くと考えるか
 
 #### 1. 学生が失敗する場所を直接peerが学ぶ
 
-固定教師は現在学生の弱点へ適応しない。一方peerは \(x_{\mathrm{adv}}^S\) を正解するよう学ぶため、学生がまさに失敗する局所領域で教師信号を作れる。
+固定教師は現在学生の弱点へ適応しない。一方peerは $x_{\mathrm{adv}}^S$ を正解するよう学ぶため、学生がまさに失敗する局所領域で教師信号を作れる。
 
 #### 2. 誤り循環を弱める
 
@@ -1170,7 +1170,7 @@ peer専用PGDを作らず、student attackを再利用する。
 
 現在学生攻撃上のconditional utility：
 
-\[
+$$
 U_{\mathrm{current}}
 =
 \Pr[
@@ -1178,11 +1178,11 @@ U_{\mathrm{current}}
 \mid
 S_t(x_{\mathrm{adv}}^{S_t})\neq y
 ]
-\]
+$$
 
-未知attack source \(E\) 上のutility：
+未知attack source $E$ 上のutility：
 
-\[
+$$
 U_{\mathrm{cross}}
 =
 \Pr[
@@ -1190,15 +1190,15 @@ U_{\mathrm{cross}}
 \mid
 S_t(x_{\mathrm{adv}}^{E})\neq y
 ]
-\]
+$$
 
 共適応gap：
 
-\[
+$$
 G_{\mathrm{coadapt}}
 =
 U_{\mathrm{current}}-U_{\mathrm{cross}}
-\]
+$$
 
 を測る。
 
@@ -1227,13 +1227,13 @@ U_{\mathrm{current}}-U_{\mathrm{cross}}
 
 ### 1. 教師が正解しているか
 
-\[
+$$
 c_i
 =
 \mathbf 1[
 \arg\max T(x_{i,\mathrm{adv}}^S)=y_i
 ]
-\]
+$$
 
 教師が誤分類していれば、そのsoft labelはground-truth CEと逆向きの勾配を与え得る。
 
@@ -1241,9 +1241,9 @@ c_i
 
 特に学生が長期間学習できないサンプルで、
 
-\[
+$$
 p_T(y\mid x_{\mathrm{adv}}^S)\approx1
-\]
+$$
 
 なら、学生へ実現不能な目標を強制する可能性がある。
 
@@ -1257,7 +1257,7 @@ p_T(y\mid x_{\mathrm{adv}}^S)\approx1
 
 ### 4. 学生が誤る場所で教師が正解するか
 
-\[
+$$
 U_{\mathrm{cond}}
 =
 \Pr[
@@ -1265,7 +1265,7 @@ T(x_{\mathrm{adv}})=y
 \mid
 S(x_{\mathrm{adv}})\neq y
 ]
-\]
+$$
 
 全体accuracyより、学生の失敗を補完できるかが重要である。
 
@@ -1285,31 +1285,31 @@ S(x_{\mathrm{adv}})\neq y
 
 望ましい状態は、
 
-\[
+$$
 S(x_{\mathrm{adv}}^S)\neq y,
 \qquad
 T(x_{\mathrm{adv}}^S)=y
-\]
+$$
 
 かつ、
 
-\[
+$$
 T(x_{\mathrm{adv}}^S)\neq T(x)
-\]
+$$
 
 である。
 
 例：
 
-\[
+$$
 T(x)=(0.95,0.04,0.01)
-\]
+$$
 
 から、
 
-\[
+$$
 T(x_{\mathrm{adv}}^S)=(0.60,0.30,0.10)
-\]
+$$
 
 へ変化するが正解クラスは維持する。
 
@@ -1317,12 +1317,12 @@ T(x_{\mathrm{adv}}^S)=(0.60,0.30,0.10)
 
 ## 8.4 正解条件付きentropy
 
-\[
+$$
 h_i^+
 =
 \mathbf 1[T(x_{\mathrm{adv}}^S)=y]
 \frac{H(T(x_{\mathrm{adv}}^S))}{\log C}
-\]
+$$
 
 とすれば、誤分類時の高entropyを除外できる。
 
@@ -1330,18 +1330,18 @@ h_i^+
 
 ## 8.5 clean–adversarial変化量
 
-\[
+$$
 D_{\mathrm{JS}}
 \left(T(x),T(x_{\mathrm{adv}}^S)\right)
-\]
+$$
 
 またはmargin低下量、
 
-\[
+$$
 \Delta m_T
 =
 m_T(x)-m_T(x_{\mathrm{adv}}^S)
-\]
+$$
 
 を用いる。
 
@@ -1355,16 +1355,16 @@ m_T(x)-m_T(x_{\mathrm{adv}}^S)
 
 非正解クラスだけを再正規化して、
 
-\[
+$$
 q_k(x)=\frac{p_k(x)}{1-p_y(x)},\qquad k\neq y
-\]
+$$
 
 とする。
 
-\[
+$$
 H_{\mathrm{wrong}}(q)
 =-\sum_{k\neq y}q_k\log q_k
-\]
+$$
 
 は、非正解確率が一つの競合クラスへ集中しているか、複数へ分散しているかを測る。
 
@@ -1376,7 +1376,7 @@ H_{\mathrm{wrong}}(q)
 
 したがって、教師信頼性には、
 
-\[
+$$
 \boxed{
 \text{教師の正解維持}
 +
@@ -1384,11 +1384,11 @@ H_{\mathrm{wrong}}(q)
 +
 D_{\mathrm{JS}}(q_{\mathrm{clean}},q_{\mathrm{adv}})
 }
-\]
+$$
 
 の方が直接的である。
 
-DKDは正解クラス関連知識と非正解クラス間知識を分離する考え方を示しているが、**\(H_{\mathrm{wrong}}\) がARD教師信頼性の最良指標と確立されたわけではない。**
+DKDは正解クラス関連知識と非正解クラス間知識を分離する考え方を示しているが、**$H_{\mathrm{wrong}}$ がARD教師信頼性の最良指標と確立されたわけではない。**
 
 ---
 
@@ -1400,11 +1400,11 @@ entropyまたはTAS単独ではなく、教師が正解を維持しながら学�
 
 ### 1. 正解・safety gate
 
-\[
+$$
 c_i
 =
 \mathbf 1[m_T(x_{i,\mathrm{adv}}^S)>m_{\min}]
-\]
+$$
 
 誤分類または境界ぎりぎりならKDを停止し、ground-truth ATへ戻す。
 
@@ -1412,28 +1412,28 @@ c_i
 
 既存学生攻撃から、adversarial correctness EMAを更新する。
 
-\[
+$$
 s_i(t)
 =
 \rho s_i(t-1)
 +
 (1-\rho)
 \mathbf 1[S_t(x_{i,\mathrm{adv}})=y_i]
-\]
+$$
 
-\[
+$$
 d_i(t)=1-s_i(t)
-\]
+$$
 
 とする。
 
 ### 3. 教師応答量
 
-\[
+$$
 r_i
 =
 \frac{m_T(x_i)-m_T(x_{i,\mathrm{adv}}^S)}{|m_T(x_i)|+\varepsilon}
-\]
+$$
 
 またはJS divergenceを使う。
 
@@ -1441,13 +1441,13 @@ r_i
 
 学生が容易なら教師は高確信度のままでもよい。学生が困難なら教師に一定のmargin低下・分布変化を期待する。
 
-\[
+$$
 r_i^*=g(d_i)
-\]
+$$
 
 とし、
 
-\[
+$$
 w_i
 =
 c_i
@@ -1455,13 +1455,13 @@ c_i
 \left(
 -\frac{|r_i-r_i^*|}{\tau_r}
 \right)
-\]
+$$
 
 でKD weightを決める。
 
 ### 5. 学生損失
 
-\[
+$$
 \mathcal L_i
 =
 \mathcal L_{\mathrm{AT},i}
@@ -1472,7 +1472,7 @@ D_{\mathrm{KL}}
 p_T(x_{i,\mathrm{adv}}^S)
 \|p_S(x_{i,\mathrm{adv}}^S)
 \right)
-\]
+$$
 
 ### 比較対象
 
@@ -1501,25 +1501,25 @@ p_T(x_{i,\mathrm{adv}}^S)
 
 ### best checkpointとlast checkpointの差
 
-\[
+$$
 D_{\mathrm{RO}}
 =
 \max_t A_{\mathrm{rob,val}}(t)
 -
 A_{\mathrm{rob,val}}(T)
-\]
+$$
 
 これは最も直接的な事後指標である。
 
 ### robust train–validation gap
 
-\[
+$$
 G_t
 =
 A_{\mathrm{rob,train\text{-}eval}}(t)
 -
 A_{\mathrm{rob,val}}(t)
-\]
+$$
 
 trainとvalidationは同じ評価攻撃で測る必要がある。訓練中に生成した攻撃上のtrain accuracyをそのまま使うと、inner maximizationへの適合度を測るだけになる可能性がある。
 
@@ -1533,9 +1533,9 @@ trainとvalidationは同じ評価攻撃で測る必要がある。訓練中に�
 
 を分ける。
 
-peak checkpoint \(t^*\) から現在時点へのforgotten rateを、
+peak checkpoint $t^*$ から現在時点へのforgotten rateを、
 
-\[
+$$
 R_{\mathrm{forget}}(t)
 =
 \Pr[
@@ -1543,7 +1543,7 @@ S_{t^*}(x_{\mathrm{adv}})=y
 \land
 S_t(x_{\mathrm{adv}})\neq y
 ]
-\]
+$$
 
 とする。
 
@@ -1560,25 +1560,25 @@ S_t(x_{\mathrm{adv}})\neq y
 
 ### 蒸留損失の時間変化
 
-\[
+$$
 L_{\mathrm{KD,train}}\downarrow
-\]
+$$
 
 なのに、
 
-\[
+$$
 A_{\mathrm{rob,val}}\downarrow
-\]
+$$
 
 なら、教師模倣が進んでもrobust generalizationに寄与していない。
 
 特に、
 
-\[
+$$
 L_{\mathrm{KD}}^{U}\downarrow
 \quad\text{かつ}\quad
 G_t\uparrow
-\]
+$$
 
 なら、unlearnableサンプル上の教師信号を記憶している可能性がある。
 
@@ -1586,14 +1586,14 @@ G_t\uparrow
 
 STARSHIPは、clean特徴とadversarial特徴のvariance gapが大きいほどrobust performanceが低い傾向を示している。
 
-\[
+$$
 G_{\mathrm{feat}}
 =
 \left\|
 \Sigma_{\mathrm{adv}}-
 \Sigma_{\mathrm{clean}}
 \right\|_F
-\]
+$$
 
 ただし、これはrobust overfittingの標準的オンライン検出指標ではなく、表現上の原因診断である。
 
@@ -1615,7 +1615,7 @@ robust overfittingの問題点は、
 
 - best時点でもrobust generalization gapが大きい。
 - best epochを知るためにvalidation attackが必要。
-- 攻撃lossや\(\epsilon\)によってbest epochが異なり得る。
+- 攻撃lossや$\epsilon$によってbest epochが異なり得る。
 - 後半の重いAT計算が無駄になる。
 - seed・schedule・checkpoint選択への依存が大きい。
 - 学習目的とrobust generalizationの不一致を解決していない。
@@ -1736,38 +1736,38 @@ MR²（Margin Regularization）は、
 
 ### 1. adversarial feature spread
 
-学生の中間特徴を \(h_S\) とし、クラス \(c\) について、
+学生の中間特徴を $h_S$ とし、クラス $c$ について、
 
-\[
+$$
 V_c^{\mathrm{adv}}
 =
 \mathbb E_{y=c}
 \left[
 \|h_S(x_{\mathrm{adv}})-\mu_c^{\mathrm{adv}}\|^2
 \right]
-\]
+$$
 
 をEMAで記録する。
 
 ### 2. clean–adversarial feature drift
 
-\[
+$$
 D_c
 =
 \mathbb E_{y=c}
 \left[
 \|h_S(x_{\mathrm{adv}})-h_S(x)\|^2
 \right]
-\]
+$$
 
 を測る。
 
-- \(V_c^{\mathrm{adv}}\) が大きい：敵対的特徴がクラス内で広く散る。
-- \(D_c\) が大きい：攻撃によってclean表現から大きく移動する。
+- $V_c^{\mathrm{adv}}$ が大きい：敵対的特徴がクラス内で広く散る。
+- $D_c$ が大きい：攻撃によってclean表現から大きく移動する。
 
 ### 3. クラス別robust margin
 
-\[
+$$
 r_c
 =
 \operatorname{Norm}
@@ -1778,25 +1778,25 @@ r_c
 -
 \gamma M_c^{\mathrm{adv}}
 \right)
-\]
+$$
 
-\[
+$$
 \Gamma_c
 =
 \Gamma_0(1+\lambda r_c)
-\]
+$$
 
 とし、hard classへ大きなmarginを課す。
 
 ### 4. adversarial特徴をcompactにする
 
-\[
+$$
 \mathcal L_{\mathrm{compact}}
 =
 \frac1B
 \sum_i
 \|h_S(x_{i,\mathrm{adv}})-\mu_{y_i}^{\mathrm{adv}}\|^2
-\]
+$$
 
 を加える。
 
@@ -1804,25 +1804,25 @@ r_c
 
 教師またはpeerが、そのクラスの学生攻撃を正しく分類する場合に限り、KD weightまたはtemperatureを調整する。
 
-\[
+$$
 \lambda_{\mathrm{KD},i}
 =
 \lambda_0
 \mathbf 1[T(x_{i,\mathrm{adv}})=y_i]
 q_{g(y_i)}
-\]
+$$
 
 hard classだから無条件にKDを強めると、教師のhard-class誤りを増幅する可能性がある。
 
 ### 6. 1000クラスでの階層的縮約
 
-\[
+$$
 \tilde V_c
 =
 \frac{n_c}{n_c+\kappa}V_c
 +
 \frac{\kappa}{n_c+\kappa}V_{g(c)}
-\]
+$$
 
 とし、クラス統計を、
 
@@ -1848,7 +1848,7 @@ raw worst classだけでなく、
 
 ### 検証順序
 
-1. robust hard classで \(V_c^{\mathrm{adv}}\)、\(D_c\) が大きいか。
+1. robust hard classで $V_c^{\mathrm{adv}}$、$D_c$ が大きいか。
 2. class-wise robust accuracyとの相関があるか。
 3. clean MR²よりadversarial統計が必要か。
 4. 単純class reweightingより平均性能を保てるか。
@@ -1978,7 +1978,7 @@ peer・教師・攻撃sourceを扱う研究では、**訓練に直接使って�
 - AUROC/AUPRC
 - Spearman相関
 - calibration error
-- architecture/\(\epsilon\)/seed転移
+- architecture/$\epsilon$/seed転移
 
 ### robust overfitting研究
 
