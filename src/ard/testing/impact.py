@@ -26,6 +26,17 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/ffnr_strong_diagnostics.py",
+            "src/ard/cli/ffnr_strong_diagnostics.py",
+            "configs/analysis/ffnr_strong_diagnostics_v1.yaml",
+            "configs/analysis/ffnr_strong_replay_chen_l2_dense.yaml",
+            "configs/analysis/ffnr_strong_replay_chen_l4_dense.yaml",
+        ),
+        ("tests/unit/test_ffnr_strong_diagnostics.py",),
+        ("T0", "T1", "T2"),
+    ),
+    (
+        (
             "src/ard/config/teacher_audit.py",
             "src/ard/evaluation/teacher_audit.py",
             "src/ard/cli/audit_teacher.py",

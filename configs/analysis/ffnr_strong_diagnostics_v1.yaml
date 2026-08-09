@@ -1,0 +1,29 @@
+schema_version: 1
+contract: ffnr_strong_diagnostics_v1
+cifar10_train_root: /home/shunsukenaito/workspace-local/datasets/ard/torchvision
+runs:
+  L2:
+    feature_observations: ../../.cache/analysis/ffnr-strong-replay/l2-feature-e5cb442/strong-observations.parquet
+    feature_lineage: ../../.cache/analysis/ffnr-strong-replay/l2-feature-e5cb442/lineage.json
+    outcome_observations: ../../.cache/analysis/ffnr-strong-replay/l2-outcome-e5cb442/strong-observations.parquet
+    outcome_lineage: ../../.cache/analysis/ffnr-strong-replay/l2-outcome-e5cb442/lineage.json
+    online_states: ../../.cache/analysis/h5-online-cd56b72/L2/online-anchor-states.parquet
+    online_lineage: ../../.cache/analysis/h5-online-cd56b72/L2/lineage.json
+    validation_history: ../../outputs/scientific/chen-rslad-observed-s1-confirm-v2/run-bundle/metrics.jsonl
+    validation_manifest: ../../outputs/scientific/chen-rslad-observed-s1-confirm-v2/run-bundle/manifest.json
+    dense_chunks:
+      - {observations: ../../.cache/analysis/ffnr-strong-dense/l2-chunk-1/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-strong-dense/l2-chunk-1/lineage.json}
+      - {observations: ../../.cache/analysis/ffnr-strong-dense/l2-chunk-2/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-strong-dense/l2-chunk-2/lineage.json}
+  L4:
+    feature_observations: ../../.cache/analysis/ffnr-strong-replay/l4-feature-e5cb442/strong-observations.parquet
+    feature_lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-feature-e5cb442/outputs/l4-feature-e5cb442/lineage.json
+    outcome_observations: ../../.cache/analysis/ffnr-strong-replay/l4-outcome-e5cb442/strong-observations.parquet
+    outcome_lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-outcome-e5cb442/outputs/l4-outcome-e5cb442/lineage.json
+    online_states: ../../.cache/analysis/h5-online-cd56b72/L4/online-anchor-states.parquet
+    online_lineage: ../../.cache/analysis/h5-online-cd56b72/L4/lineage.json
+    validation_history: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/chen-rslad-observed-s2-confirm-v2/outputs/scientific/chen-rslad-observed-s2-confirm-v2/run-bundle/metrics.jsonl
+    validation_manifest: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/chen-rslad-observed-s2-confirm-v2/outputs/scientific/chen-rslad-observed-s2-confirm-v2/run-bundle/manifest.json
+    dense_chunks:
+      - {observations: ../../.cache/analysis/ffnr-strong-dense/l4-chunk-1/strong-observations.parquet, lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-dense-chunk-1/lineage.json}
+      - {observations: ../../.cache/analysis/ffnr-strong-dense/l4-chunk-2/strong-observations.parquet, lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-dense-chunk-2/lineage.json}
+      - {observations: ../../.cache/analysis/ffnr-strong-dense/l4-chunk-3/strong-observations.parquet, lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-dense-chunk-3/lineage.json}
