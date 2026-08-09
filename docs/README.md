@@ -4,6 +4,7 @@
 - [History-routing v2 results](HISTORY_ROUTING_V2_RESULTS.md): exact online historyを用いたBest-oriented介入の2-seed結果とDevelopment No-Go判定
 - [FF/current-wrong forecasting status](FFNR_FORECASTING_STATUS.md): plateau GTの実現可能性、L/T/S/D CPU ablation、GPU follow-up境界
 - [FFNR human image review](FFNR_HUMAN_REVIEW.md): role-blind CIFAR panelのHTMLレビューと分類基準
+- [FFNR human review results](FFNR_HUMAN_REVIEW_RESULTS.md): 200枚の人手判定結果と研究上の扱い
 - [Seed-0 signal audit](SIGNAL_AUDIT.md): Student/Joint signalの探索的関連、周期checkpoint、正式判定の境界
 - [Reproduction status](REPRODUCTION_STATUS.md): 実装済み機能、実行済み検証、未実行の重い実験、実際のCLI手順
 - [Research decisions](RESEARCH_DECISIONS.md): 今回の研究・実装で固定した方針
