@@ -29,8 +29,8 @@
 - [ ] Run CE/KL × PGD10/20 replay for Chen L2/L4, reusing exact CE20 cells.
 - [ ] Produce prevalence, Jaccard, chance-adjusted Jaccard, Cohen κ, and
   failure-frequency correlation with attack identity in every row.
-- [ ] Audit Bartoldson L1/L3 checkpoint inventory and continuation feasibility;
-  do not retrain unless the audit fails and a separate approval is needed.
+- [x] Audit available Bartoldson L1 checkpoint inventory and continuation
+  feasibility; L3/seed-2 remains blocked and no retraining was launched.
 - [x] Compute Route A/B subgroup rescue/harm, class spillover, and fixed-seed
   sample-level bootstrap CIs from the existing causal-pilot tables.
 - [ ] Update results docs with explicit exploratory/confirmatory boundaries,
