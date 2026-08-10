@@ -41,6 +41,11 @@ agreementはL2 `.809/.803/.790`、L4 `.807/.798/.799`だった。
 hard classificationは完全一致ではない。特にrouting stateをそのまま置換する前に、
 online側での校正と誤差許容を検証する必要がある。
 
+状態混同行列（machine report `ce20_vs_online.state_confusion`）も保存した。これは
+CE20 oracleのS1/S2/S3とKL10 onlineのS1/S2/S3を同一sample IDで集計したもので、
+online stateをoracle stateへ置換したとは解釈しない。Top-Kの各行には予測対象との
+Jaccardも併記し、固定qのmask比較とGT-count比較を分離した。
+
 Teacherのonline forward primitiveは保存されていないため、online T1/T2/T3や
 S×Tのonline一致率は算出していない。strong replayのTeacher stateをonline Student
 stateと併記したセルは、Teacherがonline観測されたという意味ではない。
@@ -105,11 +110,11 @@ blockedとした。39/59/79を1-epoch列として補間していない。
 PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python \
   -m ard.cli.ert_online_routing_proxy \
   --config configs/analysis/ert_online_routing_proxy_v1.yaml \
-  --output-dir .cache/analysis/ert-online-routing-proxy-v1-final7
+  --output-dir .cache/analysis/ert-online-routing-proxy-v1-final9
 ```
 
-生成時のsource SHAは `b6de0b7d521c569bfdee04f4052881ca4ce0e990`。
-report SHAは `b3172b71cdbf1230623588bde119cbce0e807b41a57d2bf3d6984c29d131907b`、
-lineage SHAは `5c72f01959aba11ced2fc08dc6fb7188dcc73693dfbd35ecfbefafa51f94702f`。
-完全なmachine reportは同じcache directoryにあり、入力ファイルのSHAと欠落factorial
-artifactもlineageへ記録されている。
+生成時のsource SHAは `6001f5d31a57a97f51e395cd2cfa5b49a598a38d`。
+report SHAは `e2aaf3f7684fe86951aa8798c0d2d0e02a1977096bbf4584a2a347b7116a9e6a`、
+lineage SHAは `d0dcfbc7b3737fd941ba35b27c5a60332abb43fbb7b4a283369d9129b04c0e34`。
+完全なmachine reportは同じcache directoryにあり、入力ファイルのSHA、factorial条件の
+attack/run/epoch/seed identity、欠落factorial artifactもlineageへ記録されている。

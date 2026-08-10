@@ -66,5 +66,12 @@ route, coefficient, or intervention.
   separate GT-count selection row.
 - [x] One-epoch delayed routing and online Teacher primitives are explicitly
   blocked because the artifacts do not exist.
+- [x] Factorial inputs are fail-closed on run ID, terminal epochs, attack
+  identity/hash, seed, expected count, boolean correctness, and stable-ID/class
+  coverage.
+- [x] Oracle/online state confusion and per-selection Top-K Jaccard are in the
+  final report. State aggregation is O(N), avoiding a quadratic 45k-sample path.
+- [x] Final report regenerated from tracked-clean source `6001f5d` at
+  `ert-online-routing-proxy-v1-final9`; no new replay or training was started.
 - [ ] Any CE-vs-KL training pilot requires a new preregistered plan and is not
   automatically launched by this diagnostic.
