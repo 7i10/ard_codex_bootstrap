@@ -47,14 +47,47 @@ def test_frozen_majority_topk_and_transitions(monkeypatch: pytest.MonkeyPatch) -
     report = proxy.diagnose(feature=feature, outcome=outcome, online=online)
     assert report["target"] == "majority_future_failure_over_189_194_199"
     assert report["anchors"]["79"]["top_k"]["teacher_signed_dominance"][0]["k"] == 1
+    gt_row = report["anchors"]["79"]["top_k"]["teacher_signed_dominance"][-1]
+    assert gt_row["selection"] == "gt_count"
+    assert "jaccard" in gt_row
     assert report["state_definition"]["S2"] == "robust_correct fragile q10"
     strong_cells = report["anchors"]["79"]["state_cells"]["strong_oracle"]
     assert any(row["student_state"] == "S2" for row in strong_cells)
     assert any(row["student_state"] == "S3" for row in strong_cells)
     assert report["one_epoch_delayed"]["available"] is False
     assert report["transitions"]
+    assert report["anchors"]["79"]["ce20_vs_online"]["state_confusion"]
 
 
 def test_proxy_rejects_missing_terminal_epoch() -> None:
     with pytest.raises(proxy.ERTOnlineRoutingProxyError, match="terminal"):
         proxy._future_failure({189: {}, 194: {}})
+
+
+def test_factorial_lineage_rejects_identity_drift() -> None:
+    condition = "ce_pgd10"
+    attack = proxy.factorial_attack(condition)
+    metadata = {
+        "condition": condition,
+        "run_id": "run",
+        "requested_epochs": list(proxy.TERMINAL_EPOCHS),
+        "attack_seed_base": proxy.FACTORIAL_ATTACK_SEED,
+        "train_expected_count": 45_000,
+        "attack_identity": attack.identity(),
+        "attack_identity_sha256": attack.identity_sha256(),
+    }
+    proxy._validate_factorial_lineage(metadata, condition=condition, expected_count=45_000, expected_run_id="run")
+    with pytest.raises(proxy.ERTOnlineRoutingProxyError, match="factorial condition lineage"):
+        proxy._validate_factorial_lineage(
+            {**metadata, "run_id": "other"},
+            condition=condition,
+            expected_count=45_000,
+            expected_run_id="run",
+        )
+    with pytest.raises(proxy.ERTOnlineRoutingProxyError, match="factorial condition lineage"):
+        proxy._validate_factorial_lineage(
+            {**metadata, "attack_seed_base": proxy.FACTORIAL_ATTACK_SEED + 1},
+            condition=condition,
+            expected_count=45_000,
+            expected_run_id="run",
+        )

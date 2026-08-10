@@ -105,11 +105,11 @@ blockedとした。39/59/79を1-epoch列として補間していない。
 PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python \
   -m ard.cli.ert_online_routing_proxy \
   --config configs/analysis/ert_online_routing_proxy_v1.yaml \
-  --output-dir .cache/analysis/ert-online-routing-proxy-v1-final6
+  --output-dir .cache/analysis/ert-online-routing-proxy-v1-final7
 ```
 
-生成時のsource SHAは `46371dfb9ce1d2f0aee76415dd3e140f73137a06`。
-report SHAは `77b7bc9dc0f7165fb5df8cb8be0639d11328b446052be6d92021f7e980bf7b17`、
-lineage SHAは `c865a48d9f127e18bb1f804ea659f469f02eed86a1fe5c49f4bb9d5ed01ddc50`。
+生成時のsource SHAは `b6de0b7d521c569bfdee04f4052881ca4ce0e990`。
+report SHAは `b3172b71cdbf1230623588bde119cbce0e807b41a57d2bf3d6984c29d131907b`、
+lineage SHAは `5c72f01959aba11ced2fc08dc6fb7188dcc73693dfbd35ecfbefafa51f94702f`。
 完全なmachine reportは同じcache directoryにあり、入力ファイルのSHAと欠落factorial
 artifactもlineageへ記録されている。

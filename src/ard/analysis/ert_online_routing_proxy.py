@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from ard.analysis.ffnr_attack_factorial import CONDITIONS
+from ard.analysis.ffnr_attack_factorial import CONDITIONS, factorial_attack
 from ard.analysis.ffnr_forecasting import _online_panel, equal_rank_score
 from ard.analysis.ffnr_state_mechanism import _margin_rows, _read_compact_observations, _strong_lineage
 from ard.analysis.ffnr_strong_replay import EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256
@@ -25,6 +25,7 @@ LABELS = ("L2", "L4")
 ANCHORS = (39, 59, 79)
 TERMINAL_EPOCHS = (189, 194, 199)
 TOP_FRACTIONS = (0.01, 0.05, 0.10, 0.20)
+FACTORIAL_ATTACK_SEED = 20260808
 
 
 class ERTOnlineRoutingProxyError(ValueError):
@@ -184,6 +185,7 @@ def _top_metrics(score: Mapping[int, float], target: Mapping[int, int]) -> list[
                 "precision": hits / count,
                 "recall": hits / positives if positives else None,
                 "lift": (hits / count) / (positives / len(ordered)) if positives else None,
+                "jaccard": hits / (count + positives - hits) if count + positives - hits else None,
             }
         )
     count = positives
@@ -198,6 +200,7 @@ def _top_metrics(score: Mapping[int, float], target: Mapping[int, int]) -> list[
             "precision": hits / count if count else None,
             "recall": hits / positives if positives else None,
             "lift": (hits / count) / (positives / len(ordered)) if count and positives else None,
+            "jaccard": hits / (count + positives - hits) if count + positives - hits else None,
         }
     )
     return result
@@ -385,7 +388,18 @@ def diagnose(
                     )
                     / max(1, sum(not bool(margins[item]["student_robust_correct"]) for item in target))
                 ),
-                "agreement": _agreement(scores["strong_student_margin_risk"], scores["online_margin_ema_risk"]),
+                "agreement": _agreement(
+                    {item: scores["strong_student_margin_risk"][item] for item in eligible_target},
+                    {item: scores["online_margin_ema_risk"][item] for item in eligible_target},
+                ),
+                "state_confusion": {
+                    f"oracle_{strong_student[item]}__online_{online_student[item]}": sum(
+                        strong_student[sample] == strong_student[item]
+                        and online_student[sample] == online_student[item]
+                        for sample in target
+                    )
+                    for item in sorted(target)
+                },
             },
             "state_cells": {
                 "strong_oracle": _state_cells(strong_student, teacher_state, target),
@@ -480,7 +494,11 @@ def diagnose(
 
 
 def _factorial_summary(
-    paths: Mapping[str, Mapping[str, Path] | None], expected_count: int, oracle_target: Mapping[int, int]
+    paths: Mapping[str, Mapping[str, Path] | None],
+    expected_count: int,
+    oracle_target: Mapping[int, int],
+    *,
+    expected_run_id: str,
 ) -> dict[str, Any]:
     summary: dict[str, Any] = {"available": False, "conditions": {}}
     condition_targets: dict[str, dict[int, int]] = {}
@@ -498,8 +516,9 @@ def _factorial_summary(
             observations
         ):
             raise ERTOnlineRoutingProxyError("factorial lineage hash/contract drifted")
-        if meta.get("condition") != condition:
-            raise ERTOnlineRoutingProxyError("factorial condition lineage drifted")
+        _validate_factorial_lineage(
+            meta, condition=condition, expected_count=expected_count, expected_run_id=expected_run_id
+        )
         try:
             import pyarrow.parquet as pq
 
@@ -517,7 +536,9 @@ def _factorial_summary(
             item, epoch, class_id = row.get("sample_id"), row.get("epoch"), row.get("class_id")
             if not isinstance(item, int) or epoch not in by_epoch or item in by_epoch[epoch]:
                 raise ERTOnlineRoutingProxyError("factorial terminal ID/epoch drifted")
-            by_epoch[epoch][item] = bool(row.get("student_robust_correct"))
+            if not isinstance(row.get("student_robust_correct"), bool):
+                raise ERTOnlineRoutingProxyError("factorial correctness must be boolean")
+            by_epoch[epoch][item] = row["student_robust_correct"]
             if item in classes and classes[item] != class_id:
                 raise ERTOnlineRoutingProxyError("factorial stable-ID/class drifted")
             classes[item] = class_id
@@ -555,6 +576,22 @@ def _factorial_summary(
         for right in available[index + 1 :]
     }
     return summary
+
+
+def _validate_factorial_lineage(
+    meta: Mapping[str, Any], *, condition: str, expected_count: int, expected_run_id: str
+) -> None:
+    expected_attack = factorial_attack(condition)
+    if (
+        meta.get("condition") != condition
+        or meta.get("run_id") != expected_run_id
+        or meta.get("requested_epochs") != list(TERMINAL_EPOCHS)
+        or meta.get("attack_seed_base") != FACTORIAL_ATTACK_SEED
+        or meta.get("train_expected_count") != expected_count
+        or meta.get("attack_identity") != expected_attack.identity()
+        or meta.get("attack_identity_sha256") != expected_attack.identity_sha256()
+    ):
+        raise ERTOnlineRoutingProxyError("factorial condition lineage drifted")
 
 
 def run_proxy(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
@@ -605,7 +642,10 @@ def run_proxy(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
         reports[label] = {
             **diagnose(feature=feature, outcome=outcome, online=online),
             "factorial": _factorial_summary(
-                config["runs"][label]["factorial"], config["expected_count"], _future_failure(outcome)
+                config["runs"][label]["factorial"],
+                config["expected_count"],
+                _future_failure(outcome),
+                expected_run_id=feature_meta["run_id"],
             ),
         }
         inputs[label] = {
