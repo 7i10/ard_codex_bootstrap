@@ -1,6 +1,6 @@
 # 0035 — ERT state-conditioned mechanism pilot
 
-Status: `planned / CPU overlay first`
+Status: `M0 source fix complete / clean output regeneration pending`
 Date: 2026-08-11
 
 ## Objective
@@ -71,10 +71,13 @@ to the shared C79 control, not additional stochastic replicas.
 - Build one hash-bound anchor-79 state table per seed from registered replay and
   online-state inputs. Emit 10% primary/20% secondary masks and a fixed mask
   manifest; never overwrite the immutable CE20 endpoint reports.
-- Join the existing CE20 horizons 84/89/94 without new training. Report state
-  S/T overlays, old Route-B cohorts, clean flags, `DeltaT`, `mT_adv`, and
-  treatment-control rescue/harm/net/margin/clean-harm. Overlay is exploratory;
-  it cannot launch an arm.
+- Join the existing CE20 horizons 84/89/94 without new training. Report the
+  complete anchor S1/S2/S3 partition and the registered pilot S3×T1/T2/T3
+  endpoint cohorts, plus old Route-B cohorts, clean flags, `DeltaT`, `mT_adv`,
+  and treatment-control rescue/harm/net/margin/clean-harm. S1/S2 endpoint
+  effects are not part of this old-arm overlay because those masks were not
+  registered for the endpoint bundles. The overlay is exploratory; it cannot
+  launch an arm.
 - One real-data smoke must invoke the public CLI, validate Parquet schema,
   stable-ID/class join, lineage/hash bindings, and non-overwriting output.
 
@@ -141,3 +144,17 @@ pass. Stage A is complete only after all registered L2/L4 arms have either a
 completed +5 checkpoint or an explicit fail-closed reason. No paper-level claim
 is made until a preregistered confirmation and saved-checkpoint official
 evaluation are separately approved.
+
+## Progress ledger
+
+- [x] Origin/master and existing CE20/state artifacts reconciled.
+- [x] Exact L2/L4 epoch-79 parent files, checkpoint hashes, and fork lineage
+  verified.
+- [x] Public CPU state-overlay CLI, fixed 10/20% masks, and CE20 joins
+  implemented and tested.
+- [ ] Real-data overlay output regenerated from the final tracked-clean source
+  after endpoint parent-binding fixes; the previous output remains exploratory
+  and is not reused as final evidence.
+- [ ] Freeze and implement the numeric moderate KD temperature and exact clean
+  CE/Clean-KD equations before any Stage-A GPU launch.
+- [ ] Canary and 12 unique treatment arms per seed.

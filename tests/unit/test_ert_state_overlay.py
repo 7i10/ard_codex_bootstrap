@@ -169,3 +169,42 @@ def test_non_overwrite_is_checked_before_source_provenance(tmp_path: Path) -> No
     output.mkdir()
     with pytest.raises(overlay.ERTStateOverlayError, match="overwrite"):
         overlay.run_overlay(config_path=config, output_dir=output)
+
+
+def test_endpoint_fork_identity_rejects_child_or_epoch_drift() -> None:
+    fork = {
+        "child_tracker_run_id": "child-run",
+        "child_config_sha256": "c" * 64,
+        "parent_git_sha": "a" * 40,
+    }
+
+    def meta() -> dict[str, object]:
+        return {
+            "endpoint_epoch": 84,
+            "arms": {
+                arm: {
+                    "checkpoint": {
+                        "run_id": "child-run" if arm == "C79" else f"{arm}-run",
+                        "config_hash": "c" * 64 if arm == "C79" else "d" * 64,
+                        "epoch": 84,
+                        "scientific_git_sha": "a" * 40,
+                        "sha256": "e" * 64,
+                    }
+                }
+                for arm in overlay.ARMS
+            },
+        }
+
+    overlay._validate_endpoint_fork_identity(meta=meta(), parent_fork=fork, horizon=84)
+    changed_run = meta()
+    changed_run["arms"]["C79"]["checkpoint"]["run_id"] = "other"  # type: ignore[index]
+    with pytest.raises(overlay.ERTStateOverlayError, match="child run/config"):
+        overlay._validate_endpoint_fork_identity(meta=changed_run, parent_fork=fork, horizon=84)
+    changed_config = meta()
+    changed_config["arms"]["C79"]["checkpoint"]["config_hash"] = "f" * 64  # type: ignore[index]
+    with pytest.raises(overlay.ERTStateOverlayError, match="child run/config"):
+        overlay._validate_endpoint_fork_identity(meta=changed_config, parent_fork=fork, horizon=84)
+    changed_epoch = meta()
+    changed_epoch["endpoint_epoch"] = 83
+    with pytest.raises(overlay.ERTStateOverlayError, match="registered horizon"):
+        overlay._validate_endpoint_fork_identity(meta=changed_epoch, parent_fork=fork, horizon=84)

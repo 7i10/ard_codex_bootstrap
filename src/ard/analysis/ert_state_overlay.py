@@ -19,7 +19,13 @@ from typing import Any
 
 import yaml
 
-from ard.analysis.ffnr_causal_ce20 import ARMS, ENDPOINT_COLUMNS, HORIZONS, ce_pgd20_attack_identity
+from ard.analysis.ffnr_causal_ce20 import (
+    ARMS,
+    ENDPOINT_COLUMNS,
+    HORIZON_TO_CHECKPOINT_EPOCH,
+    HORIZONS,
+    ce_pgd20_attack_identity,
+)
 from ard.analysis.ffnr_state_mechanism import (
     EXPECTED_ONLINE_ATTACK,
     _margin_rows,
@@ -233,6 +239,14 @@ def build_state_bundle(
         or parent_fork.get("parent_sample_state_records") != expected_count
     ):
         raise ERTStateOverlayError("C79 parent checkpoint/config/sample-state lineage drifted")
+    teacher = feature_meta.get("teacher")
+    if isinstance(teacher, Mapping) and teacher.get("checkpoint_sha256") is not None:
+        if parent_fork.get("parent_teacher_checkpoint_sha256") != teacher.get("checkpoint_sha256"):
+            raise ERTStateOverlayError("C79 parent teacher checkpoint lineage drifted")
+    if feature_meta.get("scientific_git_sha") is not None and parent_fork.get("parent_git_sha") != feature_meta.get(
+        "scientific_git_sha"
+    ):
+        raise ERTStateOverlayError("C79 parent Git lineage drifted")
     feature = _read_compact_observations(
         feature_observations, epochs=(ANCHOR,), expected_count=expected_count, feature=True
     )
@@ -365,10 +379,47 @@ def build_state_bundle(
     }
 
 
+def _validate_endpoint_fork_identity(*, meta: Mapping[str, Any], parent_fork: Mapping[str, Any], horizon: int) -> None:
+    """Bind a CE20 C79 endpoint to its registered child fork identity."""
+    if meta.get("endpoint_epoch") != HORIZON_TO_CHECKPOINT_EPOCH[horizon]:
+        raise ERTStateOverlayError("CE20 endpoint epoch does not match its registered horizon")
+    required_fork = {"child_tracker_run_id", "child_config_sha256", "parent_git_sha"}
+    if any(not isinstance(parent_fork.get(name), str) or not parent_fork[name] for name in required_fork):
+        raise ERTStateOverlayError("fork lineage lacks child run/config/parent Git identity")
+    arms = meta.get("arms")
+    if not isinstance(arms, Mapping) or set(arms) != set(ARMS):
+        raise ERTStateOverlayError("CE20 endpoint lineage arms drifted")
+    endpoint_epoch = meta["endpoint_epoch"]
+    for arm in ARMS:
+        entry = arms.get(arm)
+        checkpoint = entry.get("checkpoint") if isinstance(entry, Mapping) else None
+        if not isinstance(checkpoint, Mapping) or checkpoint.get("epoch") != endpoint_epoch:
+            raise ERTStateOverlayError("CE20 endpoint checkpoint epoch drifted")
+        if checkpoint.get("scientific_git_sha") != parent_fork["parent_git_sha"]:
+            raise ERTStateOverlayError("CE20 endpoint checkpoint parent Git drifted")
+        if not isinstance(checkpoint.get("sha256"), str) or len(checkpoint["sha256"]) != 64:
+            raise ERTStateOverlayError("CE20 endpoint checkpoint identity is incomplete")
+    control = arms["C79"].get("checkpoint")
+    assert isinstance(control, Mapping)
+    if (
+        control.get("run_id") != parent_fork["child_tracker_run_id"]
+        or control.get("config_hash") != parent_fork["child_config_sha256"]
+    ):
+        raise ERTStateOverlayError("CE20 C79 endpoint child run/config lineage drifted")
+
+
 def _endpoint_rows(
-    *, label: str, horizon: int, observations: Path, lineage: Path, report: Path, expected_count: int
+    *,
+    label: str,
+    horizon: int,
+    observations: Path,
+    lineage: Path,
+    report: Path,
+    parent_fork_lineage: Path,
+    expected_count: int,
 ) -> dict[str, dict[int, dict[str, Any]]]:
     meta, summary = _json(lineage, name="CE20 lineage"), _json(report, name="CE20 report")
+    parent_fork = _json(parent_fork_lineage, name="C79 parent fork lineage")
     attack = ce_pgd20_attack_identity()
     if (
         meta.get("contract") != "ffnr_causal_ce20_v1"
@@ -381,6 +432,7 @@ def _endpoint_rows(
         raise ERTStateOverlayError("CE20 endpoint lineage/attack binding drifted")
     if summary.get("label") != label or summary.get("horizon") != horizon:
         raise ERTStateOverlayError("CE20 endpoint report identity drifted")
+    _validate_endpoint_fork_identity(meta=meta, parent_fork=parent_fork, horizon=horizon)
     try:
         import pyarrow.parquet as pq
 
@@ -394,6 +446,7 @@ def _endpoint_rows(
         if (
             row.get("label") != label
             or row.get("horizon") != horizon
+            or row.get("epoch") != meta["endpoint_epoch"]
             or row.get("namespace") != "train"
             or row.get("arm") not in result
         ):
@@ -545,6 +598,7 @@ def run_overlay(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
                     label=label,
                     horizon=horizon,
                     expected_count=config["expected_count"],
+                    parent_fork_lineage=source["parent_fork_lineage"],
                     **config["runs"][label]["endpoints"][horizon],
                 )
                 for horizon in HORIZONS
