@@ -525,7 +525,17 @@ def run_proxy(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
         inputs[label] = {
             "source": {name: sha256_file(path) for name, path in source.items()},
             "factorial": {
-                condition: None if paths is None else {name: sha256_file(path) for name, path in paths.items()}
+                condition: (
+                    None
+                    if paths is None
+                    else {
+                        "available": all(path.is_file() for path in paths.values()),
+                        "paths": {
+                            name: {"path": str(path), "sha256": sha256_file(path) if path.is_file() else None}
+                            for name, path in paths.items()
+                        },
+                    }
+                )
                 for condition, paths in config["runs"][label]["factorial"].items()
             },
         }
