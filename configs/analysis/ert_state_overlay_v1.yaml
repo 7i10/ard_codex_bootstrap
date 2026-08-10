@@ -1,0 +1,29 @@
+schema_version: 1
+contract: ert_state_overlay_v1
+expected_count: 45000
+stable_id_class_universe_sha256: 9a1a7929e47196ca4cb49a7c2bea5029170ecdb1c18f9f38c05ea14d9913bf60
+anchor: 79
+quantiles: [0.10, 0.20]
+runs:
+  L2:
+    anchor_state:
+      feature_observations: ../../.cache/analysis/ffnr-strong-replay/l2-feature-e5cb442/strong-observations.parquet
+      feature_lineage: ../../.cache/analysis/ffnr-strong-replay/l2-feature-e5cb442/lineage.json
+      online_states: ../../.cache/analysis/h5-online-cd56b72/L2/online-anchor-states.parquet
+      online_lineage: ../../.cache/analysis/h5-online-cd56b72/L2/lineage.json
+      parent_fork_lineage: ../../.cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/C79/fork-lineage.json
+    endpoints:
+      '84': {observations: ../../.cache/analysis/ffnr-causal-ce20-results/smoke-L2-h84/causal-ce20-observations.parquet, lineage: ../../.cache/analysis/ffnr-causal-ce20-results/smoke-L2-h84/lineage.json, report: ../../.cache/analysis/ffnr-causal-ce20-results/smoke-L2-h84/report.json}
+      '89': {observations: ../../.cache/analysis/ffnr-causal-ce20-results/L2-h89/causal-ce20-observations.parquet, lineage: ../../.cache/analysis/ffnr-causal-ce20-results/L2-h89/lineage.json, report: ../../.cache/analysis/ffnr-causal-ce20-results/L2-h89/report.json}
+      '94': {observations: ../../.cache/analysis/ffnr-causal-ce20-results/L2-h94/causal-ce20-observations.parquet, lineage: ../../.cache/analysis/ffnr-causal-ce20-results/L2-h94/lineage.json, report: ../../.cache/analysis/ffnr-causal-ce20-results/L2-h94/report.json}
+  L4:
+    anchor_state:
+      feature_observations: ../../.cache/analysis/ffnr-strong-replay/l4-feature-e5cb442/strong-observations.parquet
+      feature_lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-feature-e5cb442/outputs/l4-feature-e5cb442/lineage.json
+      online_states: ../../.cache/analysis/h5-online-cd56b72/L4/online-anchor-states.parquet
+      online_lineage: ../../.cache/analysis/h5-online-cd56b72/L4/lineage.json
+      parent_fork_lineage: ../../.cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/fork-lineage.json
+    endpoints:
+      '84': {observations: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h84/causal-ce20-observations.parquet, lineage: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h84/lineage.json, report: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h84/report.json}
+      '89': {observations: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h89/causal-ce20-observations.parquet, lineage: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h89/lineage.json, report: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h89/report.json}
+      '94': {observations: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h94/causal-ce20-observations.parquet, lineage: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h94/lineage.json, report: ../../.cache/analysis/ffnr-causal-ce20-results/L4-h94/report.json}

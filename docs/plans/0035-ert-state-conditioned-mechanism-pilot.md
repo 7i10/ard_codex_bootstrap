@@ -1,4 +1,4 @@
-# 0035 — ERT state-conditioned mechanism pilot v2
+# 0035 — ERT state-conditioned mechanism pilot
 
 Status: `planned / CPU overlay first`
 Date: 2026-08-11
@@ -7,6 +7,8 @@ Date: 2026-08-11
 
 Test whether the Chen ERT epoch-79 state decomposition identifies a useful
 training component without extending the failed Route A/Route B intervention.
+This is the second mechanism-design iteration after the closed Route A/B pilot;
+it is not a new model/schema version.
 The primary goal is a best-validation robust-accuracy improvement, with rescue,
 harm, clean harm, and probability-margin change as mechanism diagnostics.
 

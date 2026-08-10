@@ -16,6 +16,15 @@ class ImpactSelection:
 RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     (
         (
+            "src/ard/analysis/ert_state_overlay.py",
+            "src/ard/cli/ert_state_overlay.py",
+            "configs/analysis/ert_state_overlay_v1.yaml",
+        ),
+        ("tests/unit/test_ert_state_overlay.py",),
+        ("T0", "T1"),
+    ),
+    (
+        (
             "src/ard/campaign/",
             "scripts/campaign/",
             "configs/campaigns/",
