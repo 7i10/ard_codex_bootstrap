@@ -219,7 +219,9 @@ def run_stage_a_arm(
     if output_dir.exists():
         raise StageARuntimeError(f"Stage A output already exists: {output_dir}")
     output_dir.mkdir(parents=True)
-    run_id = f"ert-stage-a-{config.seeds.model_init}-{treatment.arm}"
+    # Include the immutable source revision so a prior canary or interrupted
+    # launch can never collide with a new production arm using the same label.
+    run_id = f"ert-stage-a-{config.seeds.model_init}-{treatment.arm}-{source_sha[:7]}"
     tracked_config = config.model_copy(
         update={
             "output_dir": output_dir,
