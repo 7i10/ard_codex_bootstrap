@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "contract": "ert_online_routing_proxy_v2",
+  "status": "complete_cpu_diagnostic_no_training",
+  "source_git_sha": "bd6255d159f5da49e36bc80a791c8dd599723bbb",
+  "config": "configs/analysis/ert_online_routing_proxy_v2.yaml",
+  "cache_report": ".cache/analysis/ert-online-routing-proxy-v2-final10/ert-online-routing-proxy-report.json",
+  "cache_report_sha256": "7ad950bea59a61a474487730468f62530fed3964d7760f0f6990ff25eff4808f",
+  "cache_lineage": ".cache/analysis/ert-online-routing-proxy-v2-final10/lineage.json",
+  "cache_lineage_sha256": "6a393ffe01b991c8a25a13b7d7bc078ada1c88cd8045494e0ca6de6b75ee68ed",
+  "historical_v1": ".cache/analysis/ert-online-routing-proxy-v1-final9",
+  "runs": ["L2", "L4"],
+  "anchors": [39, 59, 79],
+  "terminal_epochs": [189, 194, 199],
+  "one_epoch_delayed": {
+    "available": false,
+    "reason": "per_epoch_online_state_not_saved"
+  },
+  "teacher_online_primitives": {
+    "available": false,
+    "reason": "online_artifacts_contain_student_state_only"
+  },
+  "training_started": false,
+  "official_test_started": false,
+  "autoattack_started": false
+}

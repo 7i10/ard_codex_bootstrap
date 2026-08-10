@@ -134,3 +134,53 @@ official test, or AutoAttack.
 Stage A remains blocked. This pass does not choose KD temperature, clean-CE or
 clean-KD coefficients, a threshold, a route, or a new training arm.
 
+## Resolution
+
+Corrective commit: `bd6255d` (`Correct ERT routing scientific contracts`).
+
+- Online attack validation now reuses `_validate_online_attack()` and rejects
+  CE-PGD10, KL-PGD20, epsilon, target, and temperature mutations. Focused tests
+  cover all five mutations.
+- The proxy is now contract v2. Hybrid cells are named
+  `online_student__ce20_teacher` and transitions are named
+  `online_student` or `ce20_oracle_student`. Per-state support, precision,
+  recall, and F1 are additive diagnostics.
+- Quantile metadata now says `highest-margin-risk q10`; numeric state values are
+  unchanged.
+- Overlay effects retain legacy cohort-level fields and add explicit
+  `control_clean_correct_count`, conditional clean-harm rate, and analogous
+  robust rescue/harm denominators.
+- Proxy and overlay now write through sibling staging directories and rename
+  atomically. Focused failure tests confirm partial directories are removed.
+- The historical `ert_state_overlay_v1` partition and artifacts were not
+  rewritten. Its legacy semantics are explicitly documented; canonical state
+  semantics remain in the proxy v2 contract.
+- The current checkout was checked for configured CE-PGD20 factorial raw
+  Parquets on Hamster and the available Ferret result directory; neither L2 nor
+  L4 CE-PGD20 raw path exists. The unavailable status is retained.
+- Equal-rank composite population was not changed: its intended global versus
+  conditional population is not preregistered and requires a human decision.
+
+## Verification and artifact comparison
+
+- `pytest -q tests/unit/test_ert_online_routing_proxy.py
+  tests/unit/test_ert_state_overlay.py tests/unit/test_ffnr_state_mechanism.py`:
+  `18 passed`.
+- `scripts/verify.py --changed`: selected proxy/overlay/verify-gate tests;
+  `9 + 5 + 33 = 47 passed`.
+- Ruff passed for all changed Python files. Targeted mypy reported only the
+  pre-existing errors in autoattack/signal_audit/teacher_risk_replay/causal
+  CE20; no errors originated in the changed routing modules.
+- v2 CPU proxy CLI completed from clean `bd6255d` in
+  `.cache/analysis/ert-online-routing-proxy-v2-final10/`.
+- Corrective overlay CLI completed from the same clean revision in
+  `.cache/analysis/ert-state-overlay-v1-review/`.
+- Proxy legacy numeric fields (Top-K, cohorts, correlations, confusion counts,
+  transitions, and factorial summary) are byte/value-equivalent after mapping
+  only the renamed fields. Overlay state-table Parquet bytes and selected mask
+  IDs are unchanged; legacy effect fields are equal. New differences are
+  additive denominator fields and provenance/output schema.
+
+Stage A remains blocked: there is no unresolved confirmed P1 in this review,
+but treatment formulas and the equal-rank population decision are still not
+frozen.

@@ -116,4 +116,7 @@ PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python \
 
 旧 `ert-online-routing-proxy-v1-final9` はhistorical artifactとして保持し、上書きしない。
 v2はhybrid stateの命名、state別metrics、online attack validator、atomic outputを
-含む新schemaである。v2のreport/lineage hashは生成後にmachine manifestへ固定する。
+含む新schemaである。v2 source SHAは
+`bd6255d159f5da49e36bc80a791c8dd599723bbb`、report SHAは
+`7ad950bea59a61a474487730468f62530fed3964d7760f0f6990ff25eff4808f`、lineage SHAは
+`6a393ffe01b991c8a25a13b7d7bc078ada1c88cd8045494e0ca6de6b75ee68ed` である。

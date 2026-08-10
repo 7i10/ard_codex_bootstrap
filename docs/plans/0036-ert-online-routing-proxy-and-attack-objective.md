@@ -73,5 +73,11 @@ route, coefficient, or intervention.
   final report. State aggregation is O(N), avoiding a quadratic 45k-sample path.
 - [x] Final report regenerated from tracked-clean source `6001f5d` at
   `ert-online-routing-proxy-v1-final9`; no new replay or training was started.
+- [x] Contract review corrective pass completed at `bd6255d`: v2 hybrid-state
+  naming, canonical online attack validation, state metrics, explicit harm
+  denominators, and atomic output staging were added without rewriting v1.
+- [x] v2 report regenerated at
+  `ert-online-routing-proxy-v2-final10`; legacy v1 numeric fields were compared
+  after semantic key mapping and remained unchanged.
 - [ ] Any CE-vs-KL training pilot requires a new preregistered plan and is not
   automatically launched by this diagnostic.
