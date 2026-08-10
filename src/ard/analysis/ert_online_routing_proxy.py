@@ -461,8 +461,11 @@ def diagnose(
     }
 
 
-def _factorial_summary(paths: Mapping[str, Mapping[str, Path] | None], expected_count: int) -> dict[str, Any]:
+def _factorial_summary(
+    paths: Mapping[str, Mapping[str, Path] | None], expected_count: int, oracle_target: Mapping[int, int]
+) -> dict[str, Any]:
     summary: dict[str, Any] = {"available": False, "conditions": {}}
+    condition_targets: dict[str, dict[int, int]] = {}
     for condition in CONDITIONS:
         configured = paths[condition]
         if configured is None:
@@ -477,6 +480,8 @@ def _factorial_summary(paths: Mapping[str, Mapping[str, Path] | None], expected_
             observations
         ):
             raise ERTOnlineRoutingProxyError("factorial lineage hash/contract drifted")
+        if meta.get("condition") != condition:
+            raise ERTOnlineRoutingProxyError("factorial condition lineage drifted")
         try:
             import pyarrow.parquet as pq
 
@@ -488,12 +493,49 @@ def _factorial_summary(paths: Mapping[str, Mapping[str, Path] | None], expected_
         terminal = [row for row in rows if row.get("epoch") in TERMINAL_EPOCHS]
         if len(terminal) != expected_count * len(TERMINAL_EPOCHS):
             raise ERTOnlineRoutingProxyError("factorial terminal coverage drifted")
+        by_epoch = {epoch: {} for epoch in TERMINAL_EPOCHS}
+        classes: dict[int, int] = {}
+        for row in terminal:
+            item, epoch, class_id = row.get("sample_id"), row.get("epoch"), row.get("class_id")
+            if not isinstance(item, int) or epoch not in by_epoch or item in by_epoch[epoch]:
+                raise ERTOnlineRoutingProxyError("factorial terminal ID/epoch drifted")
+            by_epoch[epoch][item] = bool(row.get("student_robust_correct"))
+            if item in classes and classes[item] != class_id:
+                raise ERTOnlineRoutingProxyError("factorial stable-ID/class drifted")
+            classes[item] = class_id
+        if set(classes) != set(oracle_target) or any(set(by_epoch[epoch]) != set(oracle_target) for epoch in TERMINAL_EPOCHS):
+            raise ERTOnlineRoutingProxyError("factorial terminal stable-ID universe drifted")
+        condition_targets[condition] = {
+            item: int(sum(not by_epoch[epoch][item] for epoch in TERMINAL_EPOCHS) >= 2) for item in oracle_target
+        }
+        target = condition_targets[condition]
+        intersection = sum(target[item] and oracle_target[item] for item in target)
+        union = sum(target[item] or oracle_target[item] for item in target)
         summary["available"] = True
         summary["conditions"][condition] = {
             "available": True,
             "row_count": len(terminal),
+            "future_failure_count": sum(target.values()),
+            "future_failure_rate": sum(target.values()) / len(target),
+            "agreement_with_ce20_oracle": {
+                "intersection": intersection,
+                "jaccard": intersection / union if union else 1.0,
+                "oracle_jaccard_denominator": sum(oracle_target.values()),
+            },
             "lineage_sha256": sha256_file(lineage),
         }
+    available = sorted(condition_targets)
+    summary["pairwise_jaccard"] = {
+        f"{left}__{right}": (
+            sum(condition_targets[left][item] and condition_targets[right][item] for item in oracle_target)
+            / max(
+                1,
+                sum(condition_targets[left][item] or condition_targets[right][item] for item in oracle_target),
+            )
+        )
+        for index, left in enumerate(available)
+        for right in available[index + 1 :]
+    }
     return summary
 
 
@@ -544,7 +586,9 @@ def run_proxy(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
             raise ERTOnlineRoutingProxyError("replay/online lineage identity drifted")
         reports[label] = {
             **diagnose(feature=feature, outcome=outcome, online=online),
-            "factorial": _factorial_summary(config["runs"][label]["factorial"], config["expected_count"]),
+            "factorial": _factorial_summary(
+                config["runs"][label]["factorial"], config["expected_count"], _future_failure(outcome)
+            ),
         }
         inputs[label] = {
             "source": {name: sha256_file(path) for name, path in source.items()},
