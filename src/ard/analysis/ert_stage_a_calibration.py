@@ -156,7 +156,7 @@ def _gradient_vector(model: nn.Module, *, head_only: bool = False) -> torch.Tens
 
 def _measure_gradient(model: nn.Module, values: torch.Tensor) -> tuple[float, float, torch.Tensor]:
     model.zero_grad(set_to_none=True)
-    values.mean().backward()
+    values.mean().backward(retain_graph=True)
     vector = _gradient_vector(model)
     head = _gradient_vector(model, head_only=True)
     return float(vector.norm().item()), float(head.norm().item()), vector
