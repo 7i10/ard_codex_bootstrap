@@ -183,16 +183,19 @@ class Trainer:
         if self._records_teacher_response and self.teacher is None:
             raise ValueError("teacher-response observation requires a frozen teacher")
         self.target_policy = target_policy
-        if (
-            intervention_mask is not None
-            and prescriptive_v3_route != "nr_prefix"
-            and (target_policy is None) == (adversarial_kd_multiplier is None)
-        ):
-            raise ValueError("an intervention mask requires exactly one registered treatment")
-        if intervention_mask is None and adversarial_kd_multiplier is not None:
-            raise ValueError("an adversarial KD intervention multiplier requires a fixed intervention mask")
-        if intervention_mask is None and adversarial_ce_coefficient is not None:
-            raise ValueError("an adversarial CE intervention coefficient requires a fixed intervention mask")
+        has_treatment = any(
+            value is not None
+            for value in (
+                target_policy,
+                adversarial_kd_multiplier,
+                adversarial_ce_coefficient,
+                clean_wrong_mode,
+            )
+        )
+        if intervention_mask is not None and prescriptive_v3_route != "nr_prefix" and not has_treatment:
+            raise ValueError("an intervention mask requires at least one registered treatment")
+        if intervention_mask is None and has_treatment:
+            raise ValueError("a registered treatment requires a fixed intervention mask")
         if adversarial_kd_multiplier is not None and not 0.0 <= adversarial_kd_multiplier <= 1.0:
             raise ValueError("adversarial KD intervention multiplier must be in [0, 1]")
         if adversarial_ce_coefficient is not None and not torch.isfinite(torch.as_tensor(adversarial_ce_coefficient)):

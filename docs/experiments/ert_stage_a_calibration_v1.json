@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "contract": "ert_stage_a_calibration_v1",
+  "status": "complete_no_update",
+  "source_git_sha": "fd96003a519336f8d32278f3b69e9acf5e7666f6",
+  "tau": 2.0,
+  "alpha_soft": 1.2522921562194824,
+  "beta_advce_weak": 0.07095924764871597,
+  "beta_advce_moderate": 0.14191849529743195,
+  "beta_cleance_weak": 0.07825280725955963,
+  "calibration": {
+    "device": "cuda",
+    "batch_size": 64,
+    "max_per_cohort": 512,
+    "cohort_count_per_run": {
+      "s3_t1": 8,
+      "s3_t2": 8,
+      "s3_t3": 8,
+      "clean_wrong": 8
+    },
+    "measurement_count": 64,
+    "achieved_median_ratio": {
+      "soft_adv_kd": 0.995537166394949,
+      "weak_advce": 0.2493764095421119,
+      "moderate_advce": 0.4987528190842238,
+      "weak_cleance": 0.2490293861744225
+    },
+    "advce_cosine_median": 0.7657734453678131
+  },
+  "inputs": {
+    "L2": {
+      "checkpoint_epoch": 79,
+      "checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+      "mask_sha256": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
+      "config_hash": "20abffc4c904db95d86fac2b7d9eb85bae98869f3a0633ab9993ea2a089afbfe",
+      "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+    },
+    "L4": {
+      "checkpoint_epoch": 79,
+      "checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+      "mask_sha256": "fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6",
+      "config_hash": "f5c64f153784564a44a7e483e2677ad28cdab2c74e8e4b807cb47ac9f3584d5e",
+      "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+    }
+  },
+  "full_artifact": {
+    "path": ".cache/analysis/ert-stage-a-calibration-v1.json",
+    "sha256": "0e3b98b4e1cfcc7727786fd23da57a82903fa2c8b95a16b6e12ca1425d34da16",
+    "sha256_sidecar": ".cache/analysis/ert-stage-a-calibration-v1.json.sha256"
+  },
+  "training_started": false,
+  "stage_b_started": false,
+  "official_test_started": false,
+  "autoattack_started": false
+}

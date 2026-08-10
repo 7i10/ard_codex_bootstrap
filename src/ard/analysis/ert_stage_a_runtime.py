@@ -1,0 +1,368 @@
+"""Fixed-anchor ERT Stage A continuation runtime.
+
+This module deliberately avoids the historical intervention-screen arm names.
+It consumes an immutable epoch-79 parent and one explicit Stage A treatment
+specification, then delegates the actual update path to the shared Trainer.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import torch
+import yaml
+from torch.optim import SGD
+from torch.utils.data import DataLoader
+
+from ard.attacks import LinfPGD
+from ard.config import load_config
+from ard.data import EpochShuffleSampler, build_train_validation_views, collate_indexed
+from ard.engine import Trainer, get_rank, get_world_size
+from ard.engine.checkpoint import load_checkpoint
+from ard.models import build_student, build_teacher
+from ard.objectives import RSLADObjective
+from ard.policies import FixedInterventionMask, RSLADBaselinePolicy
+from ard.schedules import build_scheduler
+from ard.state import SampleStateStore
+from ard.targets import TeacherOnlyTemperatureTargetPolicy
+from ard.tracking.adapter import ExperimentTracker, collect_git_state, create_tracker
+
+
+class StageARuntimeError(RuntimeError):
+    """Raised when a Stage A parent or treatment contract is invalid."""
+
+
+@dataclass(frozen=True)
+class StageATreatment:
+    arm: str
+    mask_key: str | None
+    kind: str
+    beta_advce: float | None = None
+    advkd_multiplier: float | None = None
+    beta_cleance: float | None = None
+    clean_wrong_mode: str | None = None
+    tau: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"baseline", "advce", "soft_advkd", "advkd_advce", "clean_wrong"}:
+            raise StageARuntimeError(f"unknown Stage A treatment kind: {self.kind}")
+        if self.kind == "clean_wrong" and self.clean_wrong_mode not in {
+            "clean_ce_only",
+            "teacher_clean_gate",
+            "clean_kd",
+        }:
+            raise StageARuntimeError("clean-wrong treatment requires an explicit mode")
+        if self.kind in {"advce", "advkd_advce"} and (
+            self.beta_advce is None or self.beta_advce < 0
+        ):
+            raise StageARuntimeError("AdvCE treatments require a non-negative frozen coefficient")
+        if self.kind == "soft_advkd" and self.tau != 2.0:
+            raise StageARuntimeError("Stage A softening requires the frozen tau=2.0")
+        if self.kind == "clean_wrong" and (self.beta_cleance is None or self.beta_cleance < 0):
+            raise StageARuntimeError("clean-wrong treatments require a non-negative frozen coefficient")
+        if self.kind == "advkd_advce" and (
+            self.advkd_multiplier is None or not 0.0 <= self.advkd_multiplier <= 1.0
+        ):
+            raise StageARuntimeError("AdvKD/AdvCE treatments require an AdvKD multiplier in [0, 1]")
+        if self.kind == "baseline" and any(
+            value is not None
+            for value in (
+                self.beta_advce,
+                self.advkd_multiplier,
+                self.beta_cleance,
+                self.clean_wrong_mode,
+                self.tau,
+            )
+        ):
+            raise StageARuntimeError("baseline treatment cannot carry treatment coefficients")
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise StageARuntimeError(f"expected JSON object: {path}")
+    return value
+
+
+def _mask_from_overlay(path: Path, key: str) -> FixedInterventionMask:
+    payload = _load_json(path)
+    masks = payload.get("masks")
+    if payload.get("anchor_epoch") != 79 or not isinstance(masks, dict):
+        raise StageARuntimeError("Stage A mask artifact is not an epoch-79 overlay bundle")
+    raw = masks.get(key)
+    if not isinstance(raw, dict) or not isinstance(raw.get("selected_ids"), list):
+        raise StageARuntimeError(f"Stage A mask key is missing: {key}")
+    ids = [item for item in raw["selected_ids"] if isinstance(item, int) and not isinstance(item, bool)]
+    if len(ids) != len(raw["selected_ids"]) or len(set(ids)) != len(ids):
+        raise StageARuntimeError("Stage A mask contains invalid or duplicate stable IDs")
+    digest = hashlib.sha256(json.dumps(sorted(ids), separators=(",", ":")).encode()).hexdigest()
+    counts = {int(name): int(value) for name, value in raw.get("selected_class_counts", {}).items()}
+    return FixedInterventionMask(frozenset(ids), digest, counts)
+
+
+def _arm_hash(parent_hash: str, treatment: StageATreatment, source_sha: str) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            {"parent_config_hash": parent_hash, "treatment": treatment.__dict__, "source_git_sha": source_sha},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+
+
+def run_stage_a_arm(
+    *,
+    parent_config_path: Path,
+    parent_checkpoint: Path,
+    mask_path: Path | None,
+    output_dir: Path,
+    treatment: StageATreatment,
+    calibration: dict[str, Any],
+    device: torch.device,
+    end_epoch: int,
+) -> dict[str, Any]:
+    config = load_config(parent_config_path)
+    if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
+        raise StageARuntimeError("Stage A parent is not the observed RSLAD KL-PGD10 run")
+    if config.method.attack.kl_target != "teacher_clean":
+        raise StageARuntimeError("Stage A parent attack target is not teacher_clean")
+    if (
+        config.method.selection_attack is None
+        or config.method.selection_attack.loss != "ce"
+        or config.method.selection_attack.steps != 20
+    ):
+        raise StageARuntimeError("Stage A parent selection attack is not CE-PGD20")
+    payload = torch.load(parent_checkpoint, map_location="cpu", weights_only=False)
+    if not isinstance(payload, dict) or payload.get("epoch") != 79 or payload.get("epoch_boundary") != "end":
+        raise StageARuntimeError("Stage A requires an exact epoch-79 end-boundary parent")
+    parent_hash = payload.get("config_hash")
+    if not isinstance(parent_hash, str) or len(parent_hash) != 64:
+        raise StageARuntimeError("parent checkpoint lacks a valid config hash")
+    if end_epoch <= 79:
+        raise StageARuntimeError("Stage A endpoint must be after epoch 79")
+    if calibration.get("tau") != 2.0:
+        raise StageARuntimeError("Stage A calibration tau is not frozen at 2.0")
+    source_state = collect_git_state(Path.cwd())
+    source_sha = source_state.get("sha")
+    if source_state.get("dirty") is not False or not isinstance(source_sha, str):
+        raise StageARuntimeError("Stage A runtime requires a clean Git tree")
+    arm_hash = _arm_hash(parent_hash, treatment, source_sha)
+    train_dataset, validation_dataset = build_train_validation_views(
+        config.dataset,
+        validation_fraction=config.training.validation_fraction,
+        split_seed=config.seeds.split,
+        augmentation_seed=config.seeds.augmentation,
+    )
+    sampler = EpochShuffleSampler(
+        len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
+    )
+    validation_sampler = EpochShuffleSampler(
+        len(validation_dataset),
+        seed=config.seeds.data_order,
+        rank=get_rank(),
+        world_size=get_world_size(),
+        shuffle=False,
+    )
+    loader = DataLoader(
+        train_dataset,
+        batch_size=config.training.per_rank_batch_size,
+        sampler=sampler,
+        num_workers=config.training.num_workers,
+        collate_fn=collate_indexed,
+    )
+    validation_loader = DataLoader(
+        validation_dataset,
+        batch_size=config.training.per_rank_batch_size,
+        sampler=validation_sampler,
+        num_workers=config.training.num_workers,
+        collate_fn=collate_indexed,
+    )
+    student = build_student(config.student, tier=config.tier).to(device)
+    teacher = build_teacher(config.teacher, tier=config.tier).to(device) if config.teacher is not None else None
+    if teacher is None:
+        raise StageARuntimeError("Stage A requires a frozen Teacher")
+    teacher.eval()
+    for parameter in teacher.parameters():
+        parameter.requires_grad_(False)
+        parameter.grad = None
+    optimizer = SGD(
+        student.parameters(),
+        lr=config.optimizer.learning_rate,
+        momentum=config.optimizer.momentum,
+        weight_decay=config.optimizer.weight_decay,
+        nesterov=config.optimizer.nesterov,
+    )
+    scheduler = build_scheduler(optimizer, config.scheduler)
+    sample_store = SampleStateStore(ema_decay=config.method.student_ema_decay)
+    mask = None
+    if treatment.mask_key is not None:
+        if mask_path is None:
+            raise StageARuntimeError("selected Stage A treatment requires a mask path")
+        mask = _mask_from_overlay(mask_path, treatment.mask_key)
+    target_policy = (
+        TeacherOnlyTemperatureTargetPolicy(target_temperature=treatment.tau, baseline_temperature=1.0)
+        if treatment.kind == "soft_advkd"
+        else None
+    )
+    objective = RSLADObjective(
+        temperature=config.method.temperature,
+        temperature_squared=config.method.temperature_squared,
+    )
+    if output_dir.exists():
+        raise StageARuntimeError(f"Stage A output already exists: {output_dir}")
+    output_dir.mkdir(parents=True)
+    run_id = f"ert-stage-a-{config.seeds.model_init}-{treatment.arm}"
+    tracked_config = config.model_copy(
+        update={
+            "output_dir": output_dir,
+            "tracking": config.tracking.model_copy(
+                update={
+                    "run_id": run_id,
+                    "name": f"ert-stage-a-{config.seeds.model_init}-{treatment.arm}",
+                    "group": f"ert-stage-a-{config.teacher.registry_id or 'teacherless'}",
+                }
+            ),
+            "tracker_run_id": run_id,
+        }
+    )
+    trainer = Trainer(
+        model=student,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        scaler=None,
+        attack=LinfPGD(config.method.attack),
+        selection_attack=LinfPGD(config.method.selection_attack),
+        objective=objective,
+        policy=RSLADBaselinePolicy(),
+        device=device,
+        output_dir=output_dir,
+        config_hash=arm_hash,
+        seed=config.seeds.train_attack,
+        evaluation_attack_seed=config.seeds.evaluation_attack,
+        tracker_run_id=run_id,
+        teacher=teacher,
+        sample_store=sample_store,
+        target_policy=target_policy,
+        intervention_mask=mask,
+        adversarial_kd_multiplier=treatment.advkd_multiplier,
+        adversarial_ce_coefficient=treatment.beta_advce,
+        clean_ce_coefficient=treatment.beta_cleance,
+        clean_wrong_mode=treatment.clean_wrong_mode,
+        clean_wrong_attack_skip=treatment.kind == "clean_wrong",
+        observation_profile="teacher_response",
+    )
+    # Restore the complete epoch-79 optimizer/scheduler/RNG/sampler/sample
+    # state under the parent identity, then switch only the child output hash.
+    state = load_checkpoint(
+        parent_checkpoint,
+        model=student,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        scaler=None,
+        sampler=sampler,
+        expected_config_hash=parent_hash,
+        device=device,
+    )
+    trainer.global_step = state.global_step
+    trainer.best_metric = float("-inf")
+    trainer.selection_metadata = dict(state.selection_metadata)
+    trainer.selection_metadata["scope"] = "stage_a_post_parent"
+    trainer.selection_metadata["selected_epoch"] = None
+    trainer.tracker_run_id = run_id
+    trainer.sample_state = state.sample_state
+    sample_store.load_state_dict(state.sample_state)
+    trainer.fork_lineage = {
+        "kind": "ert_stage_a_treatment_v1",
+        "arm": treatment.arm,
+        "parent_checkpoint_sha256": _sha256(parent_checkpoint),
+        "parent_config_hash": parent_hash,
+        "parent_epoch": 79,
+        "child_config_hash": arm_hash,
+        "calibration_sha256": calibration.get("artifact_sha256"),
+        "source_git_sha": source_sha,
+    }
+    (output_dir / "resolved_config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "parent_config": str(parent_config_path.resolve()),
+                "parent_checkpoint": str(parent_checkpoint.resolve()),
+                "parent_config_hash": parent_hash,
+                "treatment": treatment.__dict__,
+                "calibration": calibration,
+                "child_config_hash": arm_hash,
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    tracker: ExperimentTracker | None = None
+    try:
+        tracker = create_tracker(
+            config=tracked_config,
+            output_dir=output_dir,
+            config_hash=arm_hash,
+            root=Path.cwd(),
+            job_type="train",
+            run_id=run_id,
+            training_seed=config.seeds.model_init,
+            evaluation_seed=config.seeds.evaluation_attack,
+        )
+        tracker.attach_resolved_config(output_dir / "resolved_config.yaml")
+    except Exception:
+        if tracker is not None:
+            tracker.finish(status="failed")
+        raise
+    metrics_path = output_dir / "epoch-metrics.jsonl"
+
+    def record(metrics: dict[str, float], improved: bool) -> None:
+        row = {"epoch": trainer.current_epoch, "global_step": trainer.global_step, **metrics, "improved": improved}
+        with metrics_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+        tracker.log_metrics(row, step=trainer.global_step)
+
+    trainer.fork_lineage = {
+        **trainer.fork_lineage,
+        "child_tracker_run_id": run_id,
+    }
+    tracker.attach_fork_lineage(trainer.fork_lineage)
+
+    try:
+        trainer.fit(loader, validation_loader=validation_loader, epochs=end_epoch, start_epoch=80, on_epoch_end=record)
+        tracker.set_summary(
+            {
+                "best_metric": trainer.best_metric,
+                "best_epoch": trainer.selection_metadata.get("selected_epoch"),
+                "last_pgd_accuracy": trainer.selection_metadata.get("last_pgd_accuracy"),
+                "last_clean_accuracy": trainer.selection_metadata.get("last_clean_accuracy"),
+                "stage": "stage_a",
+                "arm": treatment.arm,
+            }
+        )
+        tracker.log_artifact(
+            output_dir / "last.pt", name=f"model-{run_id}-last", artifact_type="model", aliases=("last",)
+        )
+        tracker.log_artifact(
+            output_dir / "best.pt", name=f"model-{run_id}-best", artifact_type="model", aliases=("best",)
+        )
+        tracker.prepare_finish()
+        tracker.finish()
+    except Exception:
+        tracker.finish(status="failed")
+        raise
+    return {
+        "arm": treatment.arm,
+        "seed": config.seeds.model_init,
+        "output_dir": str(output_dir.resolve()),
+        "config_hash": arm_hash,
+        "parent_checkpoint_sha256": _sha256(parent_checkpoint),
+        "last_checkpoint_sha256": _sha256(output_dir / "last.pt"),
+        "best_checkpoint_sha256": _sha256(output_dir / "best.pt"),
+    }
