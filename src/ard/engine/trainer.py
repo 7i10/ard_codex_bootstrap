@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 
 from ard.attacks import AttackGenerator, AttackRequest
 from ard.data import IndexedBatch
-from ard.objectives import DistillationObjective
+from ard.objectives import DistillationObjective, ObjectiveTerms
 from ard.policies import (
     FixedInterventionMask,
     PolicyContext,
@@ -150,6 +150,9 @@ class Trainer:
         prescriptive_v3_route: str | None = None,
         adversarial_kd_multiplier: float | None = None,
         adversarial_ce_coefficient: float | None = None,
+        clean_ce_coefficient: float | None = None,
+        clean_wrong_mode: str | None = None,
+        clean_wrong_attack_skip: bool = False,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
         frozen_risk_lookup: FrozenRiskLookup | None = None,
@@ -196,6 +199,14 @@ class Trainer:
             raise ValueError("adversarial CE intervention coefficient must be finite")
         if adversarial_ce_coefficient is not None and adversarial_ce_coefficient < 0:
             raise ValueError("adversarial CE intervention coefficient must be non-negative")
+        if clean_ce_coefficient is not None and (
+            not torch.isfinite(torch.as_tensor(clean_ce_coefficient)) or clean_ce_coefficient < 0
+        ):
+            raise ValueError("clean CE coefficient must be finite and non-negative")
+        if clean_wrong_mode not in {None, "clean_ce_only", "teacher_clean_gate", "clean_kd"}:
+            raise ValueError("unknown clean-wrong treatment mode")
+        if clean_wrong_attack_skip and clean_wrong_mode is None:
+            raise ValueError("clean-wrong attack skipping requires a clean-wrong treatment mode")
         self.intervention_mask = intervention_mask
         if prescriptive_v3_route not in {None, "pf_retention", "nr_prefix"}:
             raise ValueError("prescriptive route must be pf_retention or nr_prefix")
@@ -218,6 +229,9 @@ class Trainer:
             self.anchor_model.eval()
         self.adversarial_kd_multiplier = adversarial_kd_multiplier
         self.adversarial_ce_coefficient = adversarial_ce_coefficient
+        self.clean_ce_coefficient = clean_ce_coefficient
+        self.clean_wrong_mode = clean_wrong_mode
+        self.clean_wrong_attack_skip = clean_wrong_attack_skip
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
         if policy_warmup_epochs < 0:
@@ -470,23 +484,71 @@ class Trainer:
                 ):
                     teacher_clean_logits = self.teacher(batch.images.float()).detach().float()
                 teacher_clean_forward_calls = 1.0
-            attack_result = self.attack.generate(
-                AttackRequest(
-                    inputs=batch.images,
-                    labels=batch.labels,
-                    student=self.model,
-                    teacher=self.teacher,
-                    target_logits=teacher_clean_logits,
-                    generator=self._attack_generator(),
-                    capture_step=5
-                    if self.prescriptive_v3_route == "nr_prefix" and self._prescriptive_active()
-                    else None,
-                )
-            )
             valid_mask = mask.to(dtype=torch.bool)
-            adversarial = attack_result.adversarial
+            intervention_risk = None
+            if self.intervention_mask is not None:
+                intervention_risk = self.intervention_mask.values(
+                    batch.sample_ids,
+                    device=batch.images.device,
+                    dtype=batch.images.dtype,
+                ) * valid_mask.to(dtype=batch.images.dtype)
+            treatment_risk = intervention_risk
+            if (
+                treatment_risk is not None
+                and self.prescriptive_v3_route is not None
+                and not self._prescriptive_active()
+            ):
+                treatment_risk = torch.zeros_like(treatment_risk)
+            skip_selected = (
+                self.clean_wrong_attack_skip
+                and treatment_risk is not None
+                and bool((treatment_risk > 0).any())
+            )
+            if skip_selected:
+                if treatment_risk is None:
+                    raise RuntimeError("clean-wrong attack skip lost its intervention mask")
+                attack_indices = torch.nonzero(treatment_risk <= 0, as_tuple=False).flatten()
+                adversarial = batch.images.clone()
+                if attack_indices.numel() > 0:
+                    subset_target = (
+                        None
+                        if teacher_clean_logits is None
+                        else teacher_clean_logits.index_select(0, attack_indices)
+                    )
+                    attack_result = self.attack.generate(
+                        AttackRequest(
+                            inputs=batch.images.index_select(0, attack_indices),
+                            labels=batch.labels.index_select(0, attack_indices),
+                            student=self.model,
+                            teacher=self.teacher,
+                            target_logits=subset_target,
+                            generator=self._attack_generator(),
+                        )
+                    )
+                    adversarial.index_copy_(0, attack_indices, attack_result.adversarial)
+                else:
+                    attack_result = None
+            else:
+                attack_result = self.attack.generate(
+                    AttackRequest(
+                        inputs=batch.images,
+                        labels=batch.labels,
+                        student=self.model,
+                        teacher=self.teacher,
+                        target_logits=teacher_clean_logits,
+                        generator=self._attack_generator(),
+                        capture_step=5
+                        if self.prescriptive_v3_route == "nr_prefix" and self._prescriptive_active()
+                        else None,
+                    )
+                )
+                adversarial = attack_result.adversarial
             if self.prescriptive_v3_route == "nr_prefix" and self._prescriptive_active():
-                if attack_result.captured_adversarial is None or self.intervention_mask is None:
+                if (
+                    attack_result is None
+                    or attack_result.captured_adversarial is None
+                    or self.intervention_mask is None
+                ):
                     raise RuntimeError("NR prefix treatment did not capture the existing PGD-10 step-5 state")
                 selected = (
                     self.intervention_mask.values(batch.sample_ids, device=adversarial.device, dtype=torch.bool)
@@ -556,16 +618,6 @@ class Trainer:
                 valid_mask=valid_mask,
                 student_signals=student_signals,
             )
-            intervention_risk = None
-            if self.intervention_mask is not None:
-                intervention_risk = self.intervention_mask.values(
-                    batch.sample_ids,
-                    device=logits.device,
-                    dtype=logits.dtype,
-                ) * valid_mask.to(device=logits.device, dtype=logits.dtype)
-            treatment_risk = intervention_risk
-            if treatment_risk is not None and not self._prescriptive_active():
-                treatment_risk = torch.zeros_like(treatment_risk)
             if self.target_policy is not None:
                 if teacher_clean_logits is None:
                     raise ValueError("teacher target policy requires clean teacher logits")
@@ -574,7 +626,11 @@ class Trainer:
                 target_output = self.target_policy(
                     teacher_logits=teacher_clean_logits,
                     risk=weights.joint_risk if treatment_risk is None else treatment_risk,
-                    temperature=getattr(self.objective, "temperature", 1.0),
+                    temperature=getattr(
+                        self.target_policy,
+                        "target_temperature",
+                        getattr(self.objective, "temperature", 1.0),
+                    ),
                     labels=batch.labels if getattr(self.target_policy, "requires_labels", False) else None,
                     **(
                         {
@@ -592,6 +648,29 @@ class Trainer:
             terms = self.objective(**objective_inputs)
             if weights is not None:
                 terms = terms.apply_policy(weights)
+            if treatment_risk is not None and self.clean_wrong_mode is not None:
+                if clean_student_logits is None or teacher_clean_logits is None or terms.clean_kd is None:
+                    raise ValueError("clean-wrong treatment requires clean Student/Teacher logits and clean KD")
+                selected = treatment_risk > 0
+                clean_ce = torch.nn.functional.cross_entropy(clean_student_logits, batch.labels, reduction="none")
+                if self.clean_wrong_mode == "clean_ce_only":
+                    replacement_kd = torch.zeros_like(terms.clean_kd)
+                elif self.clean_wrong_mode == "teacher_clean_gate":
+                    replacement_kd = terms.clean_kd * teacher_clean_logits.detach().argmax(dim=1).eq(batch.labels)
+                else:
+                    replacement_kd = terms.clean_kd
+                clean_coefficient = 1.0 if self.clean_ce_coefficient is None else self.clean_ce_coefficient
+                terms = ObjectiveTerms(
+                    hard=torch.where(selected, clean_coefficient * clean_ce, terms.hard),
+                    kd=torch.where(selected, replacement_kd, terms.kd),
+                    regularization=terms.regularization,
+                    adversarial_kd=(
+                        torch.where(selected, torch.zeros_like(terms.adversarial_kd), terms.adversarial_kd)
+                        if terms.adversarial_kd is not None
+                        else None
+                    ),
+                    clean_kd=torch.where(selected, replacement_kd, terms.clean_kd),
+                )
             if intervention_risk is not None and self.adversarial_kd_multiplier is not None:
                 multiplier = 1.0 - (1.0 - self.adversarial_kd_multiplier) * intervention_risk
                 terms = terms.scale_adversarial_kd(

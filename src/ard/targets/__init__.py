@@ -3,6 +3,7 @@
 from .teacher import (
     AnchoredTeacherTargetPolicy,
     IdentityTeacherTargetPolicy,
+    TeacherOnlyTemperatureTargetPolicy,
     TeacherTargetOutput,
     TeacherTargetPolicy,
     TrueLabelMixTeacherTargetPolicy,
@@ -13,6 +14,7 @@ __all__ = [
     "AnchoredTeacherTargetPolicy",
     "IdentityTeacherTargetPolicy",
     "TeacherTargetOutput",
+    "TeacherOnlyTemperatureTargetPolicy",
     "TeacherTargetPolicy",
     "TrueLabelMixTeacherTargetPolicy",
     "UniformSofteningTeacherTargetPolicy",

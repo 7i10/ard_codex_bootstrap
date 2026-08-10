@@ -11,7 +11,11 @@ from ard.analysis.history_early import _mid as h5_early_midrank
 from ard.analysis.history_routing_v2 import Q, _random_ids, _route_selection
 from ard.cli.train import _attach_history_routing_v2_input_artifacts
 from ard.objectives import RSLADObjective
-from ard.targets import TrueLabelMixTeacherTargetPolicy, UniformSofteningTeacherTargetPolicy
+from ard.targets import (
+    TeacherOnlyTemperatureTargetPolicy,
+    TrueLabelMixTeacherTargetPolicy,
+    UniformSofteningTeacherTargetPolicy,
+)
 from ard.tracking import LocalTracker, TrackingError
 
 
@@ -63,6 +67,19 @@ def test_uniform_target_does_not_implicitly_consume_labels() -> None:
         assert "does not consume labels" in str(exc)
     else:  # pragma: no cover - assertion with a useful failure instead of a silent compatibility drift.
         raise AssertionError("uniform target policy unexpectedly consumed labels")
+
+
+def test_teacher_only_temperature_changes_selected_targets_without_student_temperature_or_teacher_grad() -> None:
+    teacher = torch.tensor([[4.0, 0.0, -1.0], [1.0, 0.0, -1.0]], requires_grad=True)
+    risk = torch.tensor([1.0, 0.0], requires_grad=True)
+    policy = TeacherOnlyTemperatureTargetPolicy(target_temperature=2.0, baseline_temperature=1.0)
+    output = policy(teacher_logits=teacher, risk=risk, temperature=1.0)
+    expected = torch.softmax(teacher.detach(), dim=1)
+    softened = torch.softmax(teacher.detach() / 2.0, dim=1)
+    torch.testing.assert_close(output.probabilities[0], softened[0], rtol=0, atol=0)
+    torch.testing.assert_close(output.probabilities[1], expected[1], rtol=0, atol=0)
+    assert output.probabilities.argmax(dim=1).tolist() == expected.argmax(dim=1).tolist()
+    assert teacher.grad is None and risk.grad is None
 
 
 def _state(*, correct: bool) -> dict[str, object]:

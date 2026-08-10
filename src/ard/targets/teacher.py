@@ -92,6 +92,47 @@ class UniformSofteningTeacherTargetPolicy(TeacherTargetPolicy):
         return TeacherTargetOutput(probabilities=probabilities, rho=rho)
 
 
+class TeacherOnlyTemperatureTargetPolicy(TeacherTargetPolicy):
+    """Apply a separate temperature to selected Teacher targets only.
+
+    Unlike uniform target softening, this policy changes only the detached
+    Teacher distribution.  Samples with ``risk=0`` retain the baseline target
+    temperature; selected samples use ``target_temperature``.  The Student
+    objective temperature and the attack target are owned by their callers and
+    are intentionally not changed here.
+    """
+
+    def __init__(self, *, target_temperature: float, baseline_temperature: float = 1.0) -> None:
+        if target_temperature <= 0 or baseline_temperature <= 0:
+            raise ValueError("teacher target temperatures must be positive")
+        self.target_temperature = float(target_temperature)
+        self.baseline_temperature = float(baseline_temperature)
+
+    def __call__(
+        self,
+        *,
+        teacher_logits: torch.Tensor,
+        risk: torch.Tensor,
+        temperature: float,
+        labels: torch.Tensor | None = None,
+    ) -> TeacherTargetOutput:
+        if labels is not None:
+            raise ValueError("teacher-only temperature policy does not consume labels")
+        if teacher_logits.ndim != 2 or teacher_logits.shape[1] < 2:
+            raise ValueError("teacher logits must be [batch, class] with at least two classes")
+        if risk.ndim != 1 or risk.shape[0] != teacher_logits.shape[0]:
+            raise ValueError("teacher target risk must be a batch-aligned vector")
+        with torch.no_grad():
+            logits = teacher_logits.detach().float()
+            selected = risk.detach().clamp(0.0, 1.0)
+            if not torch.isfinite(logits).all() or not torch.isfinite(selected).all():
+                raise FloatingPointError("teacher-only temperature inputs must be finite")
+            baseline = F.softmax(logits / self.baseline_temperature, dim=1)
+            softened = F.softmax(logits / self.target_temperature, dim=1)
+            probabilities = ((1.0 - selected[:, None]) * baseline + selected[:, None] * softened).detach()
+        return TeacherTargetOutput(probabilities=probabilities, rho=selected.detach())
+
+
 class IdentityTeacherTargetPolicy(UniformSofteningTeacherTargetPolicy):
     """Explicit identity target transform for branch-parity tests and future IDs."""
 
