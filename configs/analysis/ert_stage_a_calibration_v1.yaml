@@ -6,7 +6,7 @@ max_per_cohort: 512
 runs:
   L2:
     parent_config: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/C79/resolved_config.yaml
-    checkpoint: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/C79/last.pt
+    checkpoint: .cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s1-confirm-v2/last.pt
     mask: .cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L2.json
   L4:
     parent_config: /home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/resolved_config.yaml
