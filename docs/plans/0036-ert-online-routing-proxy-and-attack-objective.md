@@ -1,6 +1,6 @@
 # 0036 — ERT online routing proxy and attack-objective diagnostics
 
-Status: `planned / CPU diagnostics first`
+Status: `CPU diagnostics complete / training pilot not started`
 Date: 2026-08-11
 
 ## Objective
@@ -53,3 +53,18 @@ route, coefficient, or intervention.
 - Focused unit tests and `scripts/verify.py --changed` once after the delta.
 - Any missing online teacher-forward or one-epoch data is reported as
   unavailable, never reconstructed from a different attack or snapshot.
+
+## Progress ledger
+
+- [x] Origin/local branch reconciled; local commits after `origin/master` were
+  retained and no remote experiment was assumed complete without local files.
+- [x] Existing CE20/online/factorial inputs were checked; no new replay was
+  launched.
+- [x] Public CPU CLI and fail-closed unit tests implemented.
+- [x] Real L2/L4 report completed from tracked-clean source `baee7da`.
+- [x] Top-K was corrected to the anchor current-correct cohort and includes a
+  separate GT-count selection row.
+- [x] One-epoch delayed routing and online Teacher primitives are explicitly
+  blocked because the artifacts do not exist.
+- [ ] Any CE-vs-KL training pilot requires a new preregistered plan and is not
+  automatically launched by this diagnostic.
