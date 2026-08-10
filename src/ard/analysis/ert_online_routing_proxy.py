@@ -458,6 +458,24 @@ def diagnose(
         "anchors": anchors,
         "transitions": transition_rows,
         "one_epoch_delayed": {"available": False, "reason": "no registered one-epoch-delayed replay/state artifact"},
+        "threshold_calibration": {
+            "absolute_transfer": {
+                "available": False,
+                "reason": "CE20 and KL10 margin domains have no frozen absolute-threshold mapping",
+            },
+            "quantile_transfer": {
+                "available": True,
+                "rule": "online current-correct lower-risk q10 fragile state with stable-ID ties",
+            },
+            "cross_seed_calibrated": {
+                "available": False,
+                "reason": "fit objective and threshold loss were not preregistered for this read-only diagnostic",
+            },
+        },
+        "cost_accounting": {
+            "available": False,
+            "reason": "all observations were reused; no comparable new replay wall-clock was measured",
+        },
     }
 
 
