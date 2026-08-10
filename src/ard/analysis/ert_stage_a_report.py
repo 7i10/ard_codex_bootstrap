@@ -170,6 +170,9 @@ def build_report(*, endpoint_root: Path, mask_paths: dict[str, Path], output: Pa
         report["seeds"][seed] = seed_result
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    report["output_sha256"] = _sha256(output)
-    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return report
+    # A file cannot contain its own SHA-256 without a recursive fixed point.
+    # Keep the JSON payload immutable and publish the actual file digest in a
+    # sidecar; the CLI also returns that digest for manifests/logs.
+    output_sha256 = _sha256(output)
+    output.with_name(output.name + ".sha256").write_text(output_sha256 + "\n", encoding="ascii")
+    return {**report, "output_sha256": output_sha256}
