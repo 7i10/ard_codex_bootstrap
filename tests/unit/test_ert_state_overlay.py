@@ -156,9 +156,14 @@ def test_overlay_effect_reports_rescue_harm_margin_and_clean_harm() -> None:
     assert effect["rescue_count"] == 1
     assert effect["harm_count"] == 0
     assert effect["clean_harm_count"] == 0
+    assert effect["clean_harm_rate_over_cohort"] == 0
+    assert effect["control_clean_correct_count"] == 1
+    assert effect["clean_harm_rate_given_control_clean_correct"] == 0
     random_effect = report["horizons"]["84"]["old_route_b_random"]["effects"]["RB"]
     assert random_effect["harm_count"] == 1
     assert random_effect["clean_harm_count"] == 1
+    assert random_effect["clean_harm_rate_over_cohort"] == 1.0
+    assert random_effect["clean_harm_rate_given_control_clean_correct"] == 1.0
     assert "mean_mT_adv" in report["horizons"]["84"]["s3_t1_q10"]["anchor"]
 
 
@@ -169,6 +174,31 @@ def test_non_overwrite_is_checked_before_source_provenance(tmp_path: Path) -> No
     output.mkdir()
     with pytest.raises(overlay.ERTStateOverlayError, match="overwrite"):
         overlay.run_overlay(config_path=config, output_dir=output)
+
+
+def test_overlay_partial_output_is_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = {name: tmp_path / f"missing-{name}" for name in (
+        "feature_observations",
+        "feature_lineage",
+        "online_states",
+        "online_lineage",
+        "parent_fork_lineage",
+    )}
+    monkeypatch.setattr(overlay, "_tracked_clean_provenance", lambda: {})
+    monkeypatch.setattr(
+        overlay,
+        "load_config",
+        lambda _path: {
+            "expected_count": 1,
+            "runs": {"L2": {"anchor_state": source}, "L4": {"anchor_state": source}},
+        },
+    )
+    monkeypatch.setattr(overlay, "build_state_bundle", lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    output = tmp_path / "overlay-output"
+    with pytest.raises(RuntimeError, match="boom"):
+        overlay.run_overlay(config_path=tmp_path / "config.yaml", output_dir=output)
+    assert not output.exists()
+    assert not list(tmp_path.glob(".overlay-output.tmp-*"))
 
 
 def test_endpoint_fork_identity_rejects_child_or_epoch_drift() -> None:

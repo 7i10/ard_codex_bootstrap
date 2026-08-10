@@ -32,9 +32,13 @@ final implementation rejects endpoint-to-parent child-run/config/epoch drift.
 
 ## Anchor populations
 
+This `ert_state_overlay_v1` artifact is a historical pilot contract, not the
+canonical routing-state contract used by the later online proxy. In v1,
 `S3` is the pilot treatment state: student clean-correct and adversarial-wrong.
 For completeness, the state table also partitions the student universe into
 `S1` (adversarial-correct), `S2` (clean-wrong and adversarial-wrong), and `S3`.
+The canonical diagnostic contract uses `S1=safe correct`, `S2=fragile correct`,
+and `S3=wrong`; v1 masks are not silently reinterpreted as canonical masks.
 Teacher `T1` is adversarial-correct outside the fixed lower positive-margin
 quantile, `T2` is the fixed lower positive-margin quantile, and `T3` is
 adversarial-wrong. Teacher clean correctness remains a separate modifier.
@@ -73,7 +77,9 @@ is 9.67%, 8.28%, and 7.68% at h84/89/94; L4 S3×T3 is 7.00%, 9.71%, and
 14.12%). This confirms why the old Route-B result cannot be promoted directly
 to a new route. Rescue/harm and probability-margin deltas are retained in the
 machine report for all arms/cohorts, including old Route A and clean-wrong
-strata.
+strata. The legacy `clean_harm_rate` is over the reported cohort; corrected
+overlay outputs additionally record `control_clean_correct_count` and
+`clean_harm_rate_given_control_clean_correct` without changing the legacy value.
 
 ## Lineage and artifacts
 

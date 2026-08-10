@@ -40,7 +40,11 @@ rule, coefficient, or arm will be selected from an endpoint after it is seen.
 
 ## Frozen state definitions and arms
 
-`S3` is student clean-correct and strong adversarial-wrong at anchor 79.
+`ert_state_overlay_v1` retains the historical pilot partition: `S3` is student
+clean-correct and strong adversarial-wrong at anchor 79, while its legacy S1/S2
+labels are not the canonical routing S1/S2/S3 labels. The later online proxy
+uses canonical `S1=safe correct`, `S2=fragile correct`, `S3=wrong`; no v1 mask is
+silently migrated.
 Teacher state is computed independently: `T1` safe/correct, `T2` fragile/correct,
 and `T3` adversarial-wrong; teacher clean-correct/wrong is retained as a
 modifier. Persistence is descriptive only and does not create a dynamic route.

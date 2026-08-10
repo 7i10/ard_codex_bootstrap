@@ -6,6 +6,12 @@ The fixed endpoint is epochs `189, 194, 199`; rows are robust failures under
 the named replay attack on the same 45,000-sample train/validation panel.
 No bootstrap was preregistered for this diagnostic.
 
+Reproducibility note: the summary below is an archived historical report.
+The current checkout does not contain the hash-bound raw CE-PGD20 Parquet
+artifacts at the configured L2/L4 factorial paths, so this summary must not be
+treated as a reusable input for a new analysis. The current online-routing
+proxy reports those cells as unavailable and does not silently recreate them.
+
 ## Frozen attack matrix
 
 All cells use pixel-space `[0, 1]`, `L_inf`, `epsilon=8/255`,

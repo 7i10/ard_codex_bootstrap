@@ -19,6 +19,7 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
             "src/ard/analysis/ert_online_routing_proxy.py",
             "src/ard/cli/ert_online_routing_proxy.py",
             "configs/analysis/ert_online_routing_proxy_v1.yaml",
+            "configs/analysis/ert_online_routing_proxy_v2.yaml",
         ),
         ("tests/unit/test_ert_online_routing_proxy.py",),
         ("T0", "T1"),

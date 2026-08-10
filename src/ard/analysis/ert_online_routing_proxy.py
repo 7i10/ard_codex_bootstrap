@@ -7,7 +7,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import shutil
 import subprocess
+import tempfile
 from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path
@@ -17,11 +19,17 @@ import yaml
 
 from ard.analysis.ffnr_attack_factorial import CONDITIONS, factorial_attack
 from ard.analysis.ffnr_forecasting import _online_panel, equal_rank_score
-from ard.analysis.ffnr_state_mechanism import _margin_rows, _read_compact_observations, _strong_lineage
+from ard.analysis.ffnr_state_mechanism import (
+    FFNRStateMechanismError,
+    _margin_rows,
+    _read_compact_observations,
+    _strong_lineage,
+    _validate_online_attack,
+)
 from ard.analysis.ffnr_strong_replay import EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256
 from ard.analysis.signal_audit import canonical_json, sha256_file
 
-CONTRACT = "ert_online_routing_proxy_v1"
+CONTRACT = "ert_online_routing_proxy_v2"
 LABELS = ("L2", "L4")
 ANCHORS = (39, 59, 79)
 TERMINAL_EPOCHS = (189, 194, 199)
@@ -31,6 +39,26 @@ FACTORIAL_ATTACK_SEED = 20260808
 
 class ERTOnlineRoutingProxyError(ValueError):
     pass
+
+
+def _staging_dir(output_dir: Path) -> Path:
+    if output_dir.exists():
+        raise ERTOnlineRoutingProxyError("refusing to overwrite proxy output directory")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.tmp-", dir=output_dir.parent))
+
+
+def _finalize_staging(staging: Path, output_dir: Path) -> None:
+    if output_dir.exists():
+        raise ERTOnlineRoutingProxyError("proxy output directory appeared during analysis")
+    staging.rename(output_dir)
+
+
+def _validate_proxy_online_attack(meta: Mapping[str, Any]) -> None:
+    try:
+        _validate_online_attack(meta)
+    except FFNRStateMechanismError as exc:
+        raise ERTOnlineRoutingProxyError("online state attack identity is not frozen KL-PGD10") from exc
 
 
 def _json(path: Path, name: str) -> dict[str, Any]:
@@ -97,7 +125,7 @@ def load_config(path: Path) -> dict[str, Any]:
     if (
         not isinstance(raw, Mapping)
         or set(raw) != required
-        or raw.get("schema_version") != 1
+        or raw.get("schema_version") != 2
         or raw.get("contract") != CONTRACT
     ):
         raise ERTOnlineRoutingProxyError("proxy config schema/contract drifted")
@@ -295,6 +323,35 @@ def _state_cells(
     return result
 
 
+def _state_metrics(
+    oracle: Mapping[int, str], online: Mapping[int, str]
+) -> dict[str, dict[str, float | int | None]]:
+    if set(oracle) != set(online):
+        raise ERTOnlineRoutingProxyError("state metric stable-ID coverage drifted")
+    states = ("S1", "S2", "S3")
+    result: dict[str, dict[str, float | int | None]] = {}
+    for state in states:
+        true_count = sum(oracle[item] == state for item in oracle)
+        predicted_count = sum(online[item] == state for item in online)
+        true_positive = sum(oracle[item] == state and online[item] == state for item in oracle)
+        precision = true_positive / predicted_count if predicted_count else None
+        recall = true_positive / true_count if true_count else None
+        f1 = (
+            2.0 * precision * recall / (precision + recall)
+            if precision is not None and recall is not None and precision + recall
+            else None
+        )
+        result[state] = {
+            "oracle_support": true_count,
+            "online_support": predicted_count,
+            "true_positive": true_positive,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+        }
+    return result
+
+
 def diagnose(
     *,
     feature: Mapping[int, Mapping[int, Mapping[str, Any]]],
@@ -343,6 +400,7 @@ def diagnose(
             "strong_oracle": {item: (strong_student[item], teacher_state[item]) for item in target},
             "online": {item: (online_student[item], teacher_state[item]) for item in target},
         }
+        state_confusion = Counter((strong_student[item], online_student[item]) for item in target)
         anchors[str(epoch)] = {
             "top_k": {
                 name: _top_metrics({item: score[item] for item in eligible_target}, eligible_target)
@@ -394,15 +452,14 @@ def diagnose(
                     {item: scores["online_margin_ema_risk"][item] for item in eligible_target},
                 ),
                 "state_confusion": {
-                    f"oracle_{oracle_state}__online_{online_state}": count
-                    for (oracle_state, online_state), count in sorted(
-                        Counter((strong_student[item], online_student[item]) for item in target).items()
-                    )
+                    f"ce20_oracle_{oracle_state}__online_{online_state}": count
+                    for (oracle_state, online_state), count in sorted(state_confusion.items())
                 },
+                "state_metrics": _state_metrics(strong_student, online_student),
             },
             "state_cells": {
-                "strong_oracle": _state_cells(strong_student, teacher_state, target),
-                "online": _state_cells(online_student, teacher_state, target),
+                "ce20_oracle_student__ce20_teacher": _state_cells(strong_student, teacher_state, target),
+                "online_student__ce20_teacher": _state_cells(online_student, teacher_state, target),
             },
             "s1_teacher_diagnostic": {
                 teacher_state_name: {
@@ -446,7 +503,7 @@ def diagnose(
                 ids = [item for item in target if current[item] == source_state and following[item] == target_state]
                 transition_rows.append(
                     {
-                        "source": source_name,
+                        "source": "ce20_oracle_student" if source_name == "strong_oracle" else "online_student",
                         "from_epoch": start,
                         "to_epoch": end,
                         "from_student_state": source_state[0],
@@ -467,6 +524,8 @@ def diagnose(
             "T1": "teacher_adv_correct and not fragile q10",
             "T2": "teacher_adv_correct fragile q10",
             "T3": "teacher_adv_wrong",
+            "teacher_observation": "ce20_pgd20_strong_replay",
+            "online_student_observation": "kl_pgd10_inclusive_sample_state",
         },
         "anchors": anchors,
         "transitions": transition_rows,
@@ -476,9 +535,9 @@ def diagnose(
                 "available": False,
                 "reason": "CE20 and KL10 margin domains have no frozen absolute-threshold mapping",
             },
-            "quantile_transfer": {
-                "available": True,
-                "rule": "online current-correct lower-risk q10 fragile state with stable-ID ties",
+        "quantile_transfer": {
+            "available": True,
+            "rule": "online current-correct highest-margin-risk q10 fragile state with stable-ID ties",
             },
             "cross_seed_calibrated": {
                 "available": False,
@@ -597,100 +656,119 @@ def run_proxy(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
     if output_dir.exists():
         raise ERTOnlineRoutingProxyError("refusing to overwrite proxy output directory")
     config, provenance = load_config(config_path), _provenance()
-    output_dir.mkdir(parents=True, exist_ok=False)
+    staging = _staging_dir(output_dir)
     reports, inputs = {}, {}
-    for label in LABELS:
-        source = config["runs"][label]["source"]
-        feature_meta = _strong_lineage(
-            path=source["feature_lineage"],
-            observations=source["feature_observations"],
-            role="feature",
-            expected_count=config["expected_count"],
-            expected_universe_sha256=EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256,
-        )
-        outcome_meta = _strong_lineage(
-            path=source["outcome_lineage"],
-            observations=source["outcome_observations"],
-            role="outcome",
-            expected_count=config["expected_count"],
-            expected_universe_sha256=EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256,
-        )
-        for key in ("run_id", "teacher", "dataset_identity", "saved_resolved_config_mapping_sha256"):
-            if feature_meta.get(key) != outcome_meta.get(key):
-                raise ERTOnlineRoutingProxyError("feature/outcome lineage identity drifted")
-        feature = _read_compact_observations(
-            source["feature_observations"], epochs=ANCHORS, expected_count=config["expected_count"], feature=True
-        )
-        outcome = _read_compact_observations(
-            source["outcome_observations"],
-            epochs=TERMINAL_EPOCHS,
-            expected_count=config["expected_count"],
-            feature=False,
-        )
-        online, online_meta = _online_panel(source["online_states"], source["online_lineage"], config["expected_count"])
-        if any(
-            feature_meta.get(key)
-            != (
-                online_meta.get("config_hash")
-                if key == "saved_resolved_config_mapping_sha256"
-                else online_meta.get(key)
+    try:
+        for label in LABELS:
+            source = config["runs"][label]["source"]
+            feature_meta = _strong_lineage(
+                path=source["feature_lineage"],
+                observations=source["feature_observations"],
+                role="feature",
+                expected_count=config["expected_count"],
+                expected_universe_sha256=EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256,
             )
-            for key in ("run_id", "teacher", "dataset_identity", "saved_resolved_config_mapping_sha256")
-        ):
-            raise ERTOnlineRoutingProxyError("replay/online lineage identity drifted")
-        reports[label] = {
-            **diagnose(feature=feature, outcome=outcome, online=online),
-            "factorial": _factorial_summary(
-                config["runs"][label]["factorial"],
-                config["expected_count"],
-                _future_failure(outcome),
-                expected_run_id=feature_meta["run_id"],
-            ),
-        }
-        inputs[label] = {
-            "source": {name: sha256_file(path) for name, path in source.items()},
-            "factorial": {
-                condition: (
-                    None
-                    if paths is None
-                    else {
-                        "available": all(path.is_file() for path in paths.values()),
-                        "paths": {
-                            name: {"path": str(path), "sha256": sha256_file(path) if path.is_file() else None}
-                            for name, path in paths.items()
-                        },
-                    }
+            outcome_meta = _strong_lineage(
+                path=source["outcome_lineage"],
+                observations=source["outcome_observations"],
+                role="outcome",
+                expected_count=config["expected_count"],
+                expected_universe_sha256=EXPECTED_STABLE_ID_CLASS_UNIVERSE_SHA256,
+            )
+            for key in ("run_id", "teacher", "dataset_identity", "saved_resolved_config_mapping_sha256"):
+                if feature_meta.get(key) != outcome_meta.get(key):
+                    raise ERTOnlineRoutingProxyError("feature/outcome lineage identity drifted")
+            feature = _read_compact_observations(
+                source["feature_observations"],
+                epochs=ANCHORS,
+                expected_count=config["expected_count"],
+                feature=True,
+            )
+            outcome = _read_compact_observations(
+                source["outcome_observations"],
+                epochs=TERMINAL_EPOCHS,
+                expected_count=config["expected_count"],
+                feature=False,
+            )
+            online, online_meta = _online_panel(
+                source["online_states"], source["online_lineage"], config["expected_count"]
+            )
+            _validate_proxy_online_attack(online_meta)
+            if any(
+                feature_meta.get(key)
+                != (
+                    online_meta.get("config_hash")
+                    if key == "saved_resolved_config_mapping_sha256"
+                    else online_meta.get(key)
                 )
-                for condition, paths in config["runs"][label]["factorial"].items()
-            },
-        }
-    report = output_dir / "ert-online-routing-proxy-report.json"
-    report.write_text(
-        json.dumps(
-            {"schema_version": 1, "contract": CONTRACT, "analysis_provenance": provenance, "reports": reports},
-            sort_keys=True,
-            indent=2,
-            allow_nan=False,
+                for key in ("run_id", "teacher", "dataset_identity", "saved_resolved_config_mapping_sha256")
+            ):
+                raise ERTOnlineRoutingProxyError("replay/online lineage identity drifted")
+            reports[label] = {
+                **diagnose(feature=feature, outcome=outcome, online=online),
+                "factorial": _factorial_summary(
+                    config["runs"][label]["factorial"],
+                    config["expected_count"],
+                    _future_failure(outcome),
+                    expected_run_id=feature_meta["run_id"],
+                ),
+            }
+            inputs[label] = {
+                "source": {name: sha256_file(path) for name, path in source.items()},
+                "factorial": {
+                    condition: (
+                        None
+                        if paths is None
+                        else {
+                            "available": all(path.is_file() for path in paths.values()),
+                            "paths": {
+                                name: {
+                                    "path": str(path),
+                                    "sha256": sha256_file(path) if path.is_file() else None,
+                                }
+                                for name, path in paths.items()
+                            },
+                        }
+                    )
+                    for condition, paths in config["runs"][label]["factorial"].items()
+                },
+            }
+        report = staging / "ert-online-routing-proxy-report.json"
+        report.write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "contract": CONTRACT,
+                    "analysis_provenance": provenance,
+                    "reports": reports,
+                },
+                sort_keys=True,
+                indent=2,
+                allow_nan=False,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
-    lineage = output_dir / "lineage.json"
-    lineage.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "contract": CONTRACT,
-                "config_sha256": sha256_file(config_path),
-                "analysis_provenance": provenance,
-                "inputs": inputs,
-                "report_sha256": sha256_file(report),
-            },
-            sort_keys=True,
-            indent=2,
-            allow_nan=False,
+        lineage = staging / "lineage.json"
+        lineage.write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "contract": CONTRACT,
+                    "config_sha256": sha256_file(config_path),
+                    "analysis_provenance": provenance,
+                    "inputs": inputs,
+                    "report_sha256": sha256_file(report),
+                },
+                sort_keys=True,
+                indent=2,
+                allow_nan=False,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
-    return {"report": report, "lineage": lineage}
+        _finalize_staging(staging, output_dir)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return {"report": output_dir / report.name, "lineage": output_dir / lineage.name}

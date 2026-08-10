@@ -12,7 +12,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import shutil
 import subprocess
+import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -70,6 +72,19 @@ STATE_COLUMNS = (
 
 class ERTStateOverlayError(ValueError):
     """Raised when state or endpoint provenance cannot be established."""
+
+
+def _staging_dir(output_dir: Path) -> Path:
+    if output_dir.exists():
+        raise ERTStateOverlayError("refusing to overwrite an overlay output directory")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.tmp-", dir=output_dir.parent))
+
+
+def _finalize_staging(staging: Path, output_dir: Path) -> None:
+    if output_dir.exists():
+        raise ERTStateOverlayError("overlay output directory appeared during analysis")
+    staging.rename(output_dir)
 
 
 def _json(path: Path, *, name: str) -> dict[str, Any]:
@@ -512,6 +527,29 @@ def effect(
         "clean_accuracy_delta": _mean(clean),
         "clean_harm_count": sum(clean_harm),
         "clean_harm_rate": _mean([float(x) for x in clean_harm]),
+        "clean_harm_rate_over_cohort": _mean([float(x) for x in clean_harm]),
+        "control_clean_correct_count": sum(bool(control[item]["student_clean_correct"]) for item in ids),
+        "clean_harm_rate_given_control_clean_correct": (
+            sum(clean_harm)
+            / sum(bool(control[item]["student_clean_correct"]) for item in ids)
+            if sum(bool(control[item]["student_clean_correct"]) for item in ids)
+            else None
+        ),
+        "control_robust_correct_count": sum(bool(control[item]["student_robust_correct"]) for item in ids),
+        "rescue_rate_over_cohort": _mean([float(x) for x in rescue]),
+        "harm_rate_over_cohort": _mean([float(x) for x in harm]),
+        "rescue_rate_given_control_robust_wrong": (
+            sum(rescue)
+            / sum(not bool(control[item]["student_robust_correct"]) for item in ids)
+            if sum(not bool(control[item]["student_robust_correct"]) for item in ids)
+            else None
+        ),
+        "harm_rate_given_control_robust_correct": (
+            sum(harm)
+            / sum(bool(control[item]["student_robust_correct"]) for item in ids)
+            if sum(bool(control[item]["student_robust_correct"]) for item in ids)
+            else None
+        ),
         "clean_margin_delta": _mean(
             [
                 float(treatment[item]["student_clean_probability_margin"])
@@ -582,16 +620,16 @@ def run_overlay(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
         raise ERTStateOverlayError("refusing to overwrite an overlay output directory")
     config = load_config(config_path)
     provenance = _tracked_clean_provenance()
+    staging = _staging_dir(output_dir)
     bundles, state_paths, mask_paths, all_reports, inputs = {}, {}, {}, {}, {}
-    output_dir.mkdir(parents=True, exist_ok=False)
     try:
         for label in LABELS:
             source = config["runs"][label]["anchor_state"]
             states, mask = build_state_bundle(label=label, expected_count=config["expected_count"], **source)
-            state_path = write_sample_parquet(states, output_dir / f"anchor79-state-table-{label}.parquet")
+            state_path = write_sample_parquet(states, staging / f"anchor79-state-table-{label}.parquet")
             mask["state_table_sha256"] = sha256_file(state_path)
             mask["analysis_provenance"] = provenance
-            mask_path = output_dir / f"anchor79-fixed-masks-{label}.json"
+            mask_path = staging / f"anchor79-fixed-masks-{label}.json"
             mask_path.write_text(json.dumps(mask, sort_keys=True, indent=2, allow_nan=False) + "\n", encoding="utf-8")
             endpoints = {
                 horizon: _endpoint_rows(
@@ -612,7 +650,7 @@ def run_overlay(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
                     for h in HORIZONS
                 },
             }
-        report_path = output_dir / "ert-state-overlay-report.json"
+        report_path = staging / "ert-state-overlay-report.json"
         report_path.write_text(
             json.dumps(
                 {
@@ -629,7 +667,7 @@ def run_overlay(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
             + "\n",
             encoding="utf-8",
         )
-        lineage_path = output_dir / "lineage.json"
+        lineage_path = staging / "lineage.json"
         lineage_path.write_text(
             json.dumps(
                 {
@@ -649,12 +687,13 @@ def run_overlay(*, config_path: Path, output_dir: Path) -> dict[str, Path]:
             + "\n",
             encoding="utf-8",
         )
+        _finalize_staging(staging, output_dir)
     except Exception:
-        # A partial analysis directory must never be mistaken for a complete report.
+        shutil.rmtree(staging, ignore_errors=True)
         raise
     return {
-        **{f"state_table_{label}": path for label, path in state_paths.items()},
-        **{f"fixed_masks_{label}": path for label, path in mask_paths.items()},
-        "report": report_path,
-        "lineage": lineage_path,
+        **{f"state_table_{label}": output_dir / path.name for label, path in state_paths.items()},
+        **{f"fixed_masks_{label}": output_dir / path.name for label, path in mask_paths.items()},
+        "report": output_dir / report_path.name,
+        "lineage": output_dir / lineage_path.name,
     }

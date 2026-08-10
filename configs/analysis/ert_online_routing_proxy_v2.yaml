@@ -1,0 +1,34 @@
+schema_version: 2
+contract: ert_online_routing_proxy_v2
+expected_count: 45000
+stable_id_class_universe_sha256: 9a1a7929e47196ca4cb49a7c2bea5029170ecdb1c18f9f38c05ea14d9913bf60
+anchors: [39, 59, 79]
+terminal_epochs: [189, 194, 199]
+top_fractions: [0.01, 0.05, 0.10, 0.20]
+runs:
+  L2:
+    source:
+      feature_observations: ../../.cache/analysis/ffnr-strong-replay/l2-feature-e5cb442/strong-observations.parquet
+      feature_lineage: ../../.cache/analysis/ffnr-strong-replay/l2-feature-e5cb442/lineage.json
+      outcome_observations: ../../.cache/analysis/ffnr-strong-replay/l2-outcome-e5cb442/strong-observations.parquet
+      outcome_lineage: ../../.cache/analysis/ffnr-strong-replay/l2-outcome-e5cb442/lineage.json
+      online_states: ../../.cache/analysis/h5-online-cd56b72/L2/online-anchor-states.parquet
+      online_lineage: ../../.cache/analysis/h5-online-cd56b72/L2/lineage.json
+    factorial:
+      ce_pgd10: {observations: ../../.cache/analysis/ffnr-attack-factorial/l2/ce_pgd10/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-attack-factorial/l2/ce_pgd10/lineage.json}
+      ce_pgd20: null
+      kl_pgd10: {observations: ../../.cache/analysis/ffnr-attack-factorial/l2/kl_pgd10/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-attack-factorial/l2/kl_pgd10/lineage.json}
+      kl_pgd20: {observations: ../../.cache/analysis/ffnr-attack-factorial/l2/kl_pgd20/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-attack-factorial/l2/kl_pgd20/lineage.json}
+  L4:
+    source:
+      feature_observations: ../../.cache/analysis/ffnr-strong-replay/l4-feature-e5cb442/strong-observations.parquet
+      feature_lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-feature-e5cb442/outputs/l4-feature-e5cb442/lineage.json
+      outcome_observations: ../../.cache/analysis/ffnr-strong-replay/l4-outcome-e5cb442/strong-observations.parquet
+      outcome_lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-outcome-e5cb442/outputs/l4-outcome-e5cb442/lineage.json
+      online_states: ../../.cache/analysis/h5-online-cd56b72/L4/online-anchor-states.parquet
+      online_lineage: ../../.cache/analysis/h5-online-cd56b72/L4/lineage.json
+    factorial:
+      ce_pgd10: {observations: ../../.cache/analysis/ffnr-attack-factorial/l4/ce_pgd10/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-attack-factorial/l4/ce_pgd10/lineage.json}
+      ce_pgd20: {observations: ../../.cache/analysis/ffnr-attack-factorial/l4/ce_pgd20/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-attack-factorial/l4/ce_pgd20/lineage.json}
+      kl_pgd10: {observations: ../../.cache/analysis/ffnr-attack-factorial/l4/kl_pgd10/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-attack-factorial/l4/kl_pgd10/lineage.json}
+      kl_pgd20: {observations: ../../.cache/analysis/ffnr-attack-factorial/l4/kl_pgd20/strong-observations.parquet, lineage: ../../.cache/analysis/ffnr-attack-factorial/l4/kl_pgd20/lineage.json}
