@@ -29,7 +29,7 @@ def test_stage_a_masks_require_registered_anchor_and_explicit_cohorts(tmp_path: 
         ),
         encoding="utf-8",
     )
-    assert _state_masks(path) == {"s3_t1": {0, 2}, "s3_t2": {1}, "s3_t3": {3}, "student_clean_wrong": {4}}
+    assert _state_masks(path) == {"s3_t1": {0, 2}, "s3_t2": {1}, "s3_t3": {3}, "clean_wrong": {4}}
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload["anchor_epoch"] = 80

@@ -98,7 +98,7 @@ def _state_masks(path: Path) -> dict[str, set[int]]:
         ids = [item for item in record["selected_ids"] if isinstance(item, int) and not isinstance(item, bool)]
         if len(ids) != len(record["selected_ids"]) or len(set(ids)) != len(ids):
             raise StageACalibrationError(f"mask {name} has invalid or duplicate IDs")
-        result[name.removesuffix("_q10")] = set(ids)
+        result["clean_wrong" if name == "student_clean_wrong" else name.removesuffix("_q10")] = set(ids)
     return result
 
 
