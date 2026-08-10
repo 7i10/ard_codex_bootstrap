@@ -1,6 +1,6 @@
 # 0035 — ERT state-conditioned mechanism pilot
 
-Status: `M0 source fix complete / clean output regeneration pending`
+Status: `M0 complete / Stage A blocked on explicit treatment formulas`
 Date: 2026-08-11
 
 ## Objective
@@ -152,9 +152,9 @@ evaluation are separately approved.
   verified.
 - [x] Public CPU state-overlay CLI, fixed 10/20% masks, and CE20 joins
   implemented and tested.
-- [ ] Real-data overlay output regenerated from the final tracked-clean source
-  after endpoint parent-binding fixes; the previous output remains exploratory
-  and is not reused as final evidence.
+- [x] Real-data overlay output regenerated from final tracked-clean commit
+  `5bc0a1b` after endpoint parent-binding fixes; final hashes are recorded in
+  `docs/ERT_STATE_CONDITIONED_MECHANISM_RESULTS.md`.
 - [ ] Freeze and implement the numeric moderate KD temperature and exact clean
   CE/Clean-KD equations before any Stage-A GPU launch.
 - [ ] Canary and 12 unique treatment arms per seed.

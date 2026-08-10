@@ -1,7 +1,7 @@
 # ERT state-conditioned mechanism pilot — M0 overlay
 
 更新日: 2026-08-11  
-Status: `M0 CPU overlay recorded; final clean regeneration pending; Stage A GPU training not started`
+Status: `M0 complete; Stage A GPU training not started`
 
 ## What was executed
 
@@ -17,7 +17,7 @@ test/AutoAttack.
 - Endpoint attack: pixel `[0,1]`, Linf `8/255`, step `2/255`, 20-step random-start
   hard-label CE, eval mode
 
-The initial public command was run from tracked-clean commit `36d9acd`:
+The final public command was run from tracked-clean commit `5bc0a1b`:
 
 ```bash
 PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python \
@@ -27,11 +27,8 @@ PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python \
 ```
 
 It completed successfully and wrote two 45,000-row Parquet state tables, two
-fixed-mask JSON files, the overlay report, and a hash-bound lineage file. A
-later scientific review found that endpoint-to-parent child-run/config binding
-was not fail-closed; the implementation now rejects that drift, so these
-pre-fix output hashes are retained only as exploratory provenance. They will
-be replaced after a clean-source regeneration.
+fixed-mask JSON files, the overlay report, and a hash-bound lineage file. The
+final implementation rejects endpoint-to-parent child-run/config/epoch drift.
 
 ## Anchor populations
 
@@ -86,16 +83,16 @@ state/replay inputs. Parent checkpoint hashes are:
 - L2: `ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c`
 - L4: `9b51bca767871ada6c80c75ad92997f9b7f246c0c1e35f3edad35d4e787a4a9c`
 
-Output hashes:
+Final output hashes (generated from `5bc0a1b`):
 
 | artifact | SHA-256 |
 |---|---|
 | L2 state table | `8200a9a429ff98576c1dfc138fae7bd85cf695aa002e24bd505bc160f5d251da` |
 | L4 state table | `808c6cca72490379005ef6d7533ee81fffbec4163422d5dbac4d92a1809e7c` |
-| L2 mask | `73152e263bfd613d1880c9b27a3d15aa567e61537681c012cea248b375868184` |
-| L4 mask | `ad3eb7830ca52ad8ee25c842f53e646eaf49805301b1adea526760ffca9e041b` |
-| report | `b87fc82bed9a3449b35b2ac9a16005e74e32186f2fc2d5b741ce5cf169dbd4d4` |
-| lineage | `e0e393f48fb154626e2d453a99c306bb00329295de15d88e558b62f86ee47dcd` |
+| L2 mask | `af6d150b709a7c1ad55f40d2a822888b8f126ca0ad20a4039573bb674d1eb656` |
+| L4 mask | `49fb0a3b9a5ccb0176e90bdfe183bbac1dab2e1a02e7104ebc78dbd5e61d1031` |
+| report | `267fec3d8d249f61a64a729bd3a7363f5c9277bf8a3542b320f36ec60965fea4` |
+| lineage | `f8c68d7d92c034d4382905489685e6c300c865d75851498e71bf46e2a38228c5` |
 
 Machine output is intentionally ignored by Git at
 `.cache/analysis/ert-state-overlay-v1/`.
