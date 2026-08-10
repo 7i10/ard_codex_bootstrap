@@ -186,6 +186,20 @@ def _top_metrics(score: Mapping[int, float], target: Mapping[int, int]) -> list[
                 "lift": (hits / count) / (positives / len(ordered)) if positives else None,
             }
         )
+    count = positives
+    selected = ordered[:count]
+    hits = sum(target[item] for item in selected)
+    result.append(
+        {
+            "selection": "gt_count",
+            "fraction": None,
+            "k": count,
+            "ff_count": hits,
+            "precision": hits / count if count else None,
+            "recall": hits / positives if positives else None,
+            "lift": (hits / count) / (positives / len(ordered)) if count and positives else None,
+        }
+    )
     return result
 
 
@@ -319,12 +333,22 @@ def diagnose(
             lower_is_fragile=False,
         )
         teacher_state = _teacher_states_q10(margins)
+        oracle_correct = {item: bool(row["student_robust_correct"]) for item, row in margins.items()}
+        eligible_target = {item: target[item] for item in target if oracle_correct[item]}
         states[epoch] = {
             "strong_oracle": {item: (strong_student[item], teacher_state[item]) for item in target},
             "online": {item: (online_student[item], teacher_state[item]) for item in target},
         }
         anchors[str(epoch)] = {
-            "top_k": {name: _top_metrics(score, target) for name, score in scores.items()},
+            "top_k": {
+                name: _top_metrics({item: score[item] for item in eligible_target}, eligible_target)
+                for name, score in scores.items()
+            },
+            "eligibility": {
+                "cohort": "strong_ce_pgd20_anchor_current_robust_correct",
+                "n": len(eligible_target),
+                "ff_count": sum(eligible_target.values()),
+            },
             "ce20_vs_online": {
                 "pearson": {
                     "strong_student_vs_online_margin": _pearson(
