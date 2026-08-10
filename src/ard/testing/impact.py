@@ -34,6 +34,16 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1", "T2", "T3"),
     ),
     (
+        ("src/ard/analysis/ert_stage_a_report.py", "src/ard/cli/ert_stage_a_report.py"),
+        ("tests/unit/test_ert_stage_a_report.py",),
+        ("T0", "T1"),
+    ),
+    (
+        ("src/ard/analysis/ert_stage_a_endpoint.py", "src/ard/cli/ert_stage_a_endpoint.py"),
+        ("tests/unit/test_ert_stage_a_endpoint.py",),
+        ("T0", "T1", "T2", "T3"),
+    ),
+    (
         (
             "src/ard/analysis/ert_online_routing_proxy.py",
             "src/ard/cli/ert_online_routing_proxy.py",
