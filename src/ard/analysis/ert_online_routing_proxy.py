@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import subprocess
+from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -393,12 +394,10 @@ def diagnose(
                     {item: scores["online_margin_ema_risk"][item] for item in eligible_target},
                 ),
                 "state_confusion": {
-                    f"oracle_{strong_student[item]}__online_{online_student[item]}": sum(
-                        strong_student[sample] == strong_student[item]
-                        and online_student[sample] == online_student[item]
-                        for sample in target
+                    f"oracle_{oracle_state}__online_{online_state}": count
+                    for (oracle_state, online_state), count in sorted(
+                        Counter((strong_student[item], online_student[item]) for item in target).items()
                     )
-                    for item in sorted(target)
                 },
             },
             "state_cells": {
