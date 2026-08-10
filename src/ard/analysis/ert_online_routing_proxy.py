@@ -171,7 +171,7 @@ def _top_metrics(score: Mapping[int, float], target: Mapping[int, int]) -> list[
         raise ERTOnlineRoutingProxyError("Top-K score/target coverage drifted")
     ordered = sorted(score, key=lambda item: (-float(score[item]), item))
     positives = sum(target.values())
-    result = []
+    result: list[dict[str, Any]] = []
     for fraction in TOP_FRACTIONS:
         count = max(1, math.ceil(fraction * len(ordered)))
         selected = ordered[:count]
@@ -493,7 +493,7 @@ def _factorial_summary(
         terminal = [row for row in rows if row.get("epoch") in TERMINAL_EPOCHS]
         if len(terminal) != expected_count * len(TERMINAL_EPOCHS):
             raise ERTOnlineRoutingProxyError("factorial terminal coverage drifted")
-        by_epoch = {epoch: {} for epoch in TERMINAL_EPOCHS}
+        by_epoch: dict[int, dict[int, bool]] = {epoch: {} for epoch in TERMINAL_EPOCHS}
         classes: dict[int, int] = {}
         for row in terminal:
             item, epoch, class_id = row.get("sample_id"), row.get("epoch"), row.get("class_id")
