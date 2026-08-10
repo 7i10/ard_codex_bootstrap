@@ -402,10 +402,10 @@ def calibrate(*, config_path: Path, output: Path, device: str = "cuda") -> dict[
             ),
         },
         "provenance": {"git": collect_git_state(root)},
-        "artifact_sha256": None,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n", encoding="utf-8")
-    result["artifact_sha256"] = _sha256(output)
-    output.write_text(json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    artifact_sha = _sha256(output)
+    output.with_name(output.name + ".sha256").write_text(artifact_sha + "\n", encoding="utf-8")
+    result["artifact_sha256"] = artifact_sha
     return result
