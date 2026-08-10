@@ -145,7 +145,7 @@ def _gradient_vector(model: nn.Module, *, head_only: bool = False) -> torch.Tens
     values: list[torch.Tensor] = []
     for name, parameter in model.named_parameters():
         if parameter.grad is None or (
-            head_only and not any(token in name.lower() for token in ("fc", "classifier", "head"))
+            head_only and not any(token in name.lower() for token in ("fc", "classifier", "head", "linear"))
         ):
             continue
         values.append(parameter.grad.detach().float().reshape(-1))
