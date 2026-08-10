@@ -1,6 +1,6 @@
 # 0037 — ERT Stage A treatment calibration and canary
 
-Status: planned, implementation not started
+Status: complete through Stage A endpoint/report; Stage B not started
 Date: 2026-08-11
 
 ## Objective
@@ -36,21 +36,21 @@ test, AutoAttack, and new seeds are explicitly out of scope.
 
 ## Execution gates
 
-- [ ] Audit RSLAD formula and call chain; write exact equation and resolved
+- [x] Audit RSLAD formula and call chain; write exact equation and resolved
   attack identity.
-- [ ] Verify L2/L4 epoch-79 parent, teacher/checkpoint SHA, stable-ID masks,
+- [x] Verify L2/L4 epoch-79 parent, teacher/checkpoint SHA, stable-ID masks,
   and that Stage A does not consume the equal-rank composite.
-- [ ] Implement no-update gradient calibration and immutable machine artifact.
-- [ ] Run calibration on deterministic class-stratified L2/L4 cohorts; freeze
+- [x] Implement no-update gradient calibration and immutable machine artifact.
+- [x] Run calibration on deterministic class-stratified L2/L4 cohorts; freeze
   `tau`, `alpha_soft`, weak/moderate AdvCE, and weak CleanCE once.
-- [ ] Implement treatment runtime with full-batch mean, teacher frozen, and
+- [x] Implement treatment runtime with full-batch mean, teacher frozen, and
   Clean-Wrong attack subset skip.
-- [ ] Add formula, gradient, mask, attack, no-future-information, and
+- [x] Add formula, gradient, mask, attack, no-future-information, and
   calibration mutation tests.
-- [ ] Run `scripts/verify.py --changed` and a clean engineering canary.
-- [ ] Run exactly L2/L4 +5 epoch Stage A arms from immutable epoch-79 parents.
-- [ ] Evaluate every arm with common eval-mode CE-PGD20 and write results.
-- [ ] Stop after report; do not promote a winner automatically.
+- [x] Run `scripts/verify.py --changed` and a clean engineering canary.
+- [x] Run exactly L2/L4 +5 epoch Stage A arms from immutable epoch-79 parents.
+- [x] Evaluate every arm with common eval-mode CE-PGD20 and write results.
+- [x] Stop after report; do not promote a winner automatically.
 
 ## Scientific stop conditions
 
@@ -69,3 +69,24 @@ equal-rank dependency.
 
 No production run or official test is authorized by this plan until the
 calibration and canary gates are complete.
+
+## Completion record (2026-08-11)
+
+- Calibration was frozen before training: `tau=2.0`,
+  `alpha_soft=1.2522921562194824`, weak/moderate AdvCE
+  `0.07095924764871597` / `0.14191849529743195`, and weak CleanCE
+  `0.07825280725955963`.
+- The two exact epoch-79 parents were continued for epochs 80--84. All 26
+  arms (13 per seed, including one common `C79` control per seed) reached a
+  final checkpoint and completed the common endpoint evaluator.
+- Endpoint evaluation used independent eval-mode CE-PGD20 on the 45,000
+  training samples: pixel `[0,1]`, Linf, epsilon `8/255`, step `2/255`, 20
+  steps, random start. No official test or AutoAttack was run.
+- The paired report is
+  `docs/experiments/ert_stage_a_results_v1.json` with sidecar SHA
+  `97a5fa9a9fabc2b62cd801a1143774eb223beae0f25d0c23d4b9c357bba77243`.
+- Teacher-response modifier analysis is in
+  `docs/experiments/ert_stage_a_modifiers_v1.json` with sidecar SHA
+  `2928d47daf328f4965f7f5b6dff209c7aecd0cc1f67d6dd917775e8470163edb`.
+- No treatment is promoted automatically. Stage B, dynamic routing, extra
+  seeds, official test, and AutoAttack remain stopped pending human review.

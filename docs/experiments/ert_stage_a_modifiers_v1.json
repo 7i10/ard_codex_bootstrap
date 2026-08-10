@@ -1,0 +1,1394 @@
+{
+  "contract": "ert_stage_a_modifier_report_v1",
+  "endpoint_report_sha256": "97a5fa9a9fabc2b62cd801a1143774eb223beae0f25d0c23d4b9c357bba77243",
+  "inputs": {
+    "L2": {
+      "mask": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1/anchor79-fixed-masks-L2.json",
+      "mask_sha256": "73152e263bfd613d1880c9b27a3d15aa567e61537681c012cea248b375868184",
+      "state_table": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1/anchor79-state-table-L2.parquet",
+      "state_table_sha256": "8200a9a429ff98576c1dfc138fae7bd85cf695aa002e24bd505bc160f5d251da"
+    },
+    "L4": {
+      "mask": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1/anchor79-fixed-masks-L4.json",
+      "mask_sha256": "ad3eb7830ca52ad8ee25c842f53e646eaf49805301b1adea526760ffca9e041b",
+      "state_table": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1/anchor79-state-table-L4.parquet",
+      "state_table_sha256": "808c6cca72490379005ef6dcb7533ee81fffbec4163422d5dbac4d92a1809e7c"
+    }
+  },
+  "schema_version": 1,
+  "seeds": {
+    "L2": {
+      "T1": {
+        "arms": {
+          "ST1M": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.009984956893246211,
+                "clean_accuracy_delta": -0.02456778889899909,
+                "count": 3297,
+                "harm_rate": 0.08158932362754019,
+                "net_rescue_rate": -0.00030330603579011223,
+                "rescue_rate": 0.08128601759175008,
+                "robust_accuracy_delta": -0.00030330603579011223
+              },
+              "low": {
+                "adversarial_margin_delta": -0.015812484468378633,
+                "clean_accuracy_delta": -0.029733009708737865,
+                "count": 3296,
+                "harm_rate": 0.08950242718446602,
+                "net_rescue_rate": -0.02821601941747573,
+                "rescue_rate": 0.06128640776699029,
+                "robust_accuracy_delta": -0.02821601941747573
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.01698640895356397,
+                "clean_accuracy_delta": -0.0245752427184466,
+                "count": 3296,
+                "harm_rate": 0.08677184466019418,
+                "net_rescue_rate": -0.020024271844660196,
+                "rescue_rate": 0.06674757281553398,
+                "robust_accuracy_delta": -0.020024271844660196
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.004957614209495026,
+                "clean_accuracy_delta": -0.010009099181073703,
+                "count": 3297,
+                "harm_rate": 0.0915984228086139,
+                "net_rescue_rate": -0.013952077646345162,
+                "rescue_rate": 0.07764634516226873,
+                "robust_accuracy_delta": -0.013952077646345162
+              },
+              "low": {
+                "adversarial_margin_delta": -0.021083126149764195,
+                "clean_accuracy_delta": -0.03822815533980582,
+                "count": 3296,
+                "harm_rate": 0.07281553398058252,
+                "net_rescue_rate": -0.011225728155339806,
+                "rescue_rate": 0.06158980582524272,
+                "robust_accuracy_delta": -0.011225728155339806
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.016744635241938012,
+                "clean_accuracy_delta": -0.030643203883495146,
+                "count": 3296,
+                "harm_rate": 0.09344660194174757,
+                "net_rescue_rate": -0.023361650485436893,
+                "rescue_rate": 0.07008495145631068,
+                "robust_accuracy_delta": -0.023361650485436893
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.014260851005739263,
+                "clean_accuracy_delta": -0.026291839417534633,
+                "count": 9889,
+                "harm_rate": 0.08595409040347861,
+                "net_rescue_rate": -0.016179593487713622,
+                "rescue_rate": 0.069774496915765,
+                "robust_accuracy_delta": -0.016179593487713622
+              }
+            }
+          },
+          "ST1S": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.006135204035765046,
+                "clean_accuracy_delta": -0.03427358204428268,
+                "count": 3297,
+                "harm_rate": 0.10706703063390961,
+                "net_rescue_rate": -0.034880194115862906,
+                "rescue_rate": 0.07218683651804671,
+                "robust_accuracy_delta": -0.034880194115862906
+              },
+              "low": {
+                "adversarial_margin_delta": -0.010898959877204548,
+                "clean_accuracy_delta": -0.03731796116504854,
+                "count": 3296,
+                "harm_rate": 0.10315533980582524,
+                "net_rescue_rate": -0.03246359223300971,
+                "rescue_rate": 0.07069174757281553,
+                "robust_accuracy_delta": -0.03246359223300971
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.007881910216913205,
+                "clean_accuracy_delta": -0.04095873786407767,
+                "count": 3296,
+                "harm_rate": 0.10649271844660194,
+                "net_rescue_rate": -0.03610436893203883,
+                "rescue_rate": 0.0703883495145631,
+                "robust_accuracy_delta": -0.03610436893203883
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.019981069174505633,
+                "clean_accuracy_delta": -0.008795875037913254,
+                "count": 3297,
+                "harm_rate": 0.12860175917500757,
+                "net_rescue_rate": -0.05580831058538065,
+                "rescue_rate": 0.07279344858962693,
+                "robust_accuracy_delta": -0.05580831058538065
+              },
+              "low": {
+                "adversarial_margin_delta": 0.0007984017460489446,
+                "clean_accuracy_delta": -0.05552184466019418,
+                "count": 3296,
+                "harm_rate": 0.08222087378640777,
+                "net_rescue_rate": -0.009101941747572815,
+                "rescue_rate": 0.07311893203883495,
+                "robust_accuracy_delta": -0.009101941747572815
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.0057292058928281936,
+                "clean_accuracy_delta": -0.04824029126213592,
+                "count": 3296,
+                "harm_rate": 0.10588592233009708,
+                "net_rescue_rate": -0.03853155339805825,
+                "rescue_rate": 0.06735436893203883,
+                "robust_accuracy_delta": -0.03853155339805825
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.008305138591983969,
+                "clean_accuracy_delta": -0.03751643239963596,
+                "count": 9889,
+                "harm_rate": 0.10557184750733138,
+                "net_rescue_rate": -0.034482758620689655,
+                "rescue_rate": 0.07108908888664173,
+                "robust_accuracy_delta": -0.034482758620689655
+              }
+            }
+          },
+          "ST1W": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": 0.01577689299800015,
+                "clean_accuracy_delta": -0.006672732787382469,
+                "count": 3297,
+                "harm_rate": 0.06157112526539278,
+                "net_rescue_rate": 0.034576888080072796,
+                "rescue_rate": 0.09614801334546558,
+                "robust_accuracy_delta": 0.034576888080072796
+              },
+              "low": {
+                "adversarial_margin_delta": 0.021805863251041585,
+                "clean_accuracy_delta": 0.0045509708737864075,
+                "count": 3296,
+                "harm_rate": 0.053094660194174755,
+                "net_rescue_rate": 0.05430825242718446,
+                "rescue_rate": 0.10740291262135922,
+                "robust_accuracy_delta": 0.05430825242718446
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.01641595702464647,
+                "clean_accuracy_delta": -0.0009101941747572816,
+                "count": 3296,
+                "harm_rate": 0.05946601941747573,
+                "net_rescue_rate": 0.04338592233009709,
+                "rescue_rate": 0.10285194174757281,
+                "robust_accuracy_delta": 0.04338592233009709
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": 0.029174252519706612,
+                "clean_accuracy_delta": 0.015771913861085837,
+                "count": 3297,
+                "harm_rate": 0.06248104337276312,
+                "net_rescue_rate": 0.05853806490749166,
+                "rescue_rate": 0.12101910828025478,
+                "robust_accuracy_delta": 0.05853806490749166
+              },
+              "low": {
+                "adversarial_margin_delta": 0.010224662388864797,
+                "clean_accuracy_delta": -0.016686893203883495,
+                "count": 3296,
+                "harm_rate": 0.050060679611650484,
+                "net_rescue_rate": 0.03549757281553398,
+                "rescue_rate": 0.08555825242718447,
+                "robust_accuracy_delta": 0.03549757281553398
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.014595733632252198,
+                "clean_accuracy_delta": -0.00212378640776699,
+                "count": 3296,
+                "harm_rate": 0.06158980582524272,
+                "net_rescue_rate": 0.03822815533980582,
+                "rescue_rate": 0.09981796116504854,
+                "robust_accuracy_delta": 0.03822815533980582
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": 0.017999346328554384,
+                "clean_accuracy_delta": -0.0010112245929821014,
+                "count": 9889,
+                "harm_rate": 0.05804429163717262,
+                "net_rescue_rate": 0.044089392254019616,
+                "rescue_rate": 0.10213368389119223,
+                "robust_accuracy_delta": 0.044089392254019616
+              }
+            }
+          }
+        },
+        "count": 9889,
+        "teacher_clean_correct_count": 9889
+      },
+      "T2": {
+        "arms": {
+          "ST2M": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": 0.0029894365992360903,
+                "clean_accuracy_delta": -0.03467406380027739,
+                "count": 721,
+                "harm_rate": 0.03744798890429958,
+                "net_rescue_rate": 0.052704576976421634,
+                "rescue_rate": 0.09015256588072122,
+                "robust_accuracy_delta": 0.052704576976421634
+              },
+              "low": {
+                "adversarial_margin_delta": -0.006734576407406065,
+                "clean_accuracy_delta": -0.02638888888888889,
+                "count": 720,
+                "harm_rate": 0.029166666666666667,
+                "net_rescue_rate": 0.020833333333333332,
+                "rescue_rate": 0.05,
+                "robust_accuracy_delta": 0.020833333333333332
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.004008653848825976,
+                "clean_accuracy_delta": -0.0027739251040221915,
+                "count": 721,
+                "harm_rate": 0.0319001386962552,
+                "net_rescue_rate": 0.036061026352288486,
+                "rescue_rate": 0.06796116504854369,
+                "robust_accuracy_delta": 0.036061026352288486
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": 0.0014788011055382876,
+                "clean_accuracy_delta": -0.03467406380027739,
+                "count": 721,
+                "harm_rate": 0.044382801664355064,
+                "net_rescue_rate": 0.049930651872399444,
+                "rescue_rate": 0.09431345353675451,
+                "robust_accuracy_delta": 0.049930651872399444
+              },
+              "low": {
+                "adversarial_margin_delta": -0.005803633688224686,
+                "clean_accuracy_delta": -0.006944444444444444,
+                "count": 720,
+                "harm_rate": 0.02361111111111111,
+                "net_rescue_rate": 0.018055555555555554,
+                "rescue_rate": 0.041666666666666664,
+                "robust_accuracy_delta": 0.018055555555555554
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.00342766989161998,
+                "clean_accuracy_delta": -0.022191400832177532,
+                "count": 721,
+                "harm_rate": 0.030513176144244106,
+                "net_rescue_rate": 0.04160887656033287,
+                "rescue_rate": 0.07212205270457697,
+                "robust_accuracy_delta": 0.04160887656033287
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.0025826783766358346,
+                "clean_accuracy_delta": -0.02127659574468085,
+                "count": 2162,
+                "harm_rate": 0.03283996299722479,
+                "net_rescue_rate": 0.03654024051803885,
+                "rescue_rate": 0.06938020351526364,
+                "robust_accuracy_delta": 0.03654024051803885
+              }
+            }
+          },
+          "ST2S": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.005224861462966083,
+                "clean_accuracy_delta": -0.10263522884882108,
+                "count": 721,
+                "harm_rate": 0.06241331484049931,
+                "net_rescue_rate": -0.024965325936199722,
+                "rescue_rate": 0.03744798890429958,
+                "robust_accuracy_delta": -0.024965325936199722
+              },
+              "low": {
+                "adversarial_margin_delta": 0.008699309794853132,
+                "clean_accuracy_delta": -0.04861111111111111,
+                "count": 720,
+                "harm_rate": 0.034722222222222224,
+                "net_rescue_rate": 0.008333333333333333,
+                "rescue_rate": 0.043055555555555555,
+                "robust_accuracy_delta": 0.008333333333333333
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.004341783288778445,
+                "clean_accuracy_delta": -0.04576976421636616,
+                "count": 721,
+                "harm_rate": 0.04854368932038835,
+                "net_rescue_rate": -0.0027739251040221915,
+                "rescue_rate": 0.04576976421636616,
+                "robust_accuracy_delta": -0.0027739251040221915
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.0030491873725277375,
+                "clean_accuracy_delta": -0.08460471567267684,
+                "count": 721,
+                "harm_rate": 0.06934812760055478,
+                "net_rescue_rate": -0.022191400832177532,
+                "rescue_rate": 0.047156726768377254,
+                "robust_accuracy_delta": -0.022191400832177532
+              },
+              "low": {
+                "adversarial_margin_delta": 0.00834928961056802,
+                "clean_accuracy_delta": -0.05416666666666667,
+                "count": 720,
+                "harm_rate": 0.030555555555555555,
+                "net_rescue_rate": 0.008333333333333333,
+                "rescue_rate": 0.03888888888888889,
+                "robust_accuracy_delta": 0.008333333333333333
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.0025156439177371594,
+                "clean_accuracy_delta": -0.05825242718446602,
+                "count": 721,
+                "harm_rate": 0.04576976421636616,
+                "net_rescue_rate": -0.005547850208044383,
+                "rescue_rate": 0.04022191400832178,
+                "robust_accuracy_delta": -0.005547850208044383
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": 0.0026025919004185787,
+                "clean_accuracy_delta": -0.06567992599444958,
+                "count": 2162,
+                "harm_rate": 0.04856614246068455,
+                "net_rescue_rate": -0.0064754856614246065,
+                "rescue_rate": 0.04209065679925995,
+                "robust_accuracy_delta": -0.0064754856614246065
+              }
+            }
+          },
+          "ST2W": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.003123551431459461,
+                "clean_accuracy_delta": -0.011095700416088766,
+                "count": 721,
+                "harm_rate": 0.04854368932038835,
+                "net_rescue_rate": -0.011095700416088766,
+                "rescue_rate": 0.03744798890429958,
+                "robust_accuracy_delta": -0.011095700416088766
+              },
+              "low": {
+                "adversarial_margin_delta": 0.008202071487903594,
+                "clean_accuracy_delta": -0.013888888888888888,
+                "count": 720,
+                "harm_rate": 0.02361111111111111,
+                "net_rescue_rate": 0.015277777777777777,
+                "rescue_rate": 0.03888888888888889,
+                "robust_accuracy_delta": 0.015277777777777777
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.005337959437033009,
+                "clean_accuracy_delta": 0.006934812760055479,
+                "count": 721,
+                "harm_rate": 0.036061026352288486,
+                "net_rescue_rate": -0.005547850208044383,
+                "rescue_rate": 0.030513176144244106,
+                "robust_accuracy_delta": -0.005547850208044383
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": 0.0019126960416111305,
+                "clean_accuracy_delta": 0.005547850208044383,
+                "count": 721,
+                "harm_rate": 0.052704576976421634,
+                "net_rescue_rate": -0.018030513176144243,
+                "rescue_rate": 0.03467406380027739,
+                "robust_accuracy_delta": -0.018030513176144243
+              },
+              "low": {
+                "adversarial_margin_delta": 0.008735021203756332,
+                "clean_accuracy_delta": -0.019444444444444445,
+                "count": 720,
+                "harm_rate": 0.020833333333333332,
+                "net_rescue_rate": 0.013888888888888888,
+                "rescue_rate": 0.034722222222222224,
+                "robust_accuracy_delta": 0.013888888888888888
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.00023049857059232736,
+                "clean_accuracy_delta": -0.004160887656033287,
+                "count": 721,
+                "harm_rate": 0.03467406380027739,
+                "net_rescue_rate": 0.0027739251040221915,
+                "rescue_rate": 0.03744798890429958,
+                "robust_accuracy_delta": 0.0027739251040221915
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": 0.0034699720829366866,
+                "clean_accuracy_delta": -0.006012950971322849,
+                "count": 2162,
+                "harm_rate": 0.036077705827937095,
+                "net_rescue_rate": -0.00046253469010175765,
+                "rescue_rate": 0.035615171137835334,
+                "robust_accuracy_delta": -0.00046253469010175765
+              }
+            }
+          }
+        },
+        "count": 2162,
+        "teacher_clean_correct_count": 2162
+      },
+      "T3": {
+        "arms": {
+          "ST3K0": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.01722215849850046,
+                "clean_accuracy_delta": -0.06030150753768844,
+                "count": 597,
+                "harm_rate": 0.018425460636515914,
+                "net_rescue_rate": 0.0,
+                "rescue_rate": 0.018425460636515914,
+                "robust_accuracy_delta": 0.0
+              },
+              "low": {
+                "adversarial_margin_delta": -0.007229163480185022,
+                "clean_accuracy_delta": -0.016778523489932886,
+                "count": 596,
+                "harm_rate": 0.013422818791946308,
+                "net_rescue_rate": -0.0050335570469798654,
+                "rescue_rate": 0.008389261744966443,
+                "robust_accuracy_delta": -0.0050335570469798654
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.008990777796836354,
+                "clean_accuracy_delta": -0.048576214405360134,
+                "count": 597,
+                "harm_rate": 0.010050251256281407,
+                "net_rescue_rate": 0.01507537688442211,
+                "rescue_rate": 0.02512562814070352,
+                "robust_accuracy_delta": 0.01507537688442211
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.010950230898170215,
+                "clean_accuracy_delta": -0.038525963149078725,
+                "count": 597,
+                "harm_rate": 0.018425460636515914,
+                "net_rescue_rate": 0.010050251256281407,
+                "rescue_rate": 0.02847571189279732,
+                "robust_accuracy_delta": 0.010050251256281407
+              },
+              "low": {
+                "adversarial_margin_delta": -0.009244257259188883,
+                "clean_accuracy_delta": -0.030201342281879196,
+                "count": 596,
+                "harm_rate": 0.008389261744966443,
+                "net_rescue_rate": -0.0016778523489932886,
+                "rescue_rate": 0.006711409395973154,
+                "robust_accuracy_delta": -0.0016778523489932886
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.013250986984626732,
+                "clean_accuracy_delta": -0.05695142378559464,
+                "count": 597,
+                "harm_rate": 0.01507537688442211,
+                "net_rescue_rate": 0.0016750418760469012,
+                "rescue_rate": 0.01675041876046901,
+                "robust_accuracy_delta": 0.0016750418760469012
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.010743905510231806,
+                "clean_accuracy_delta": -0.04044803982576229,
+                "count": 1607,
+                "harm_rate": 0.014934660858743,
+                "net_rescue_rate": 0.0043559427504667085,
+                "rescue_rate": 0.019290603609209707,
+                "robust_accuracy_delta": 0.0043559427504667085
+              },
+              "wrong": {
+                "adversarial_margin_delta": -0.014711739057725897,
+                "clean_accuracy_delta": -0.0546448087431694,
+                "count": 183,
+                "harm_rate": 0.00546448087431694,
+                "net_rescue_rate": -0.00546448087431694,
+                "rescue_rate": 0.0,
+                "robust_accuracy_delta": -0.00546448087431694
+              }
+            }
+          },
+          "ST3K05": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.0043457432508069264,
+                "clean_accuracy_delta": 0.006700167504187605,
+                "count": 597,
+                "harm_rate": 0.018425460636515914,
+                "net_rescue_rate": -0.005025125628140704,
+                "rescue_rate": 0.01340033500837521,
+                "robust_accuracy_delta": -0.005025125628140704
+              },
+              "low": {
+                "adversarial_margin_delta": -0.0040132701146922654,
+                "clean_accuracy_delta": 0.010067114093959731,
+                "count": 596,
+                "harm_rate": 0.015100671140939598,
+                "net_rescue_rate": -0.0050335570469798654,
+                "rescue_rate": 0.010067114093959731,
+                "robust_accuracy_delta": -0.0050335570469798654
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.001580533145660132,
+                "clean_accuracy_delta": 0.03685092127303183,
+                "count": 597,
+                "harm_rate": 0.008375209380234505,
+                "net_rescue_rate": 0.0016750418760469012,
+                "rescue_rate": 0.010050251256281407,
+                "robust_accuracy_delta": 0.0016750418760469012
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.0016142834396018855,
+                "clean_accuracy_delta": 0.020100502512562814,
+                "count": 597,
+                "harm_rate": 0.01675041876046901,
+                "net_rescue_rate": 0.0,
+                "rescue_rate": 0.01675041876046901,
+                "robust_accuracy_delta": 0.0
+              },
+              "low": {
+                "adversarial_margin_delta": -0.0010187278482937973,
+                "clean_accuracy_delta": 0.020134228187919462,
+                "count": 596,
+                "harm_rate": 0.010067114093959731,
+                "net_rescue_rate": -0.0016778523489932886,
+                "rescue_rate": 0.008389261744966443,
+                "robust_accuracy_delta": -0.0016778523489932886
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.007301519239567832,
+                "clean_accuracy_delta": 0.01340033500837521,
+                "count": 597,
+                "harm_rate": 0.01507537688442211,
+                "net_rescue_rate": -0.006700167504187605,
+                "rescue_rate": 0.008375209380234505,
+                "robust_accuracy_delta": -0.006700167504187605
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.0027920955510412453,
+                "clean_accuracy_delta": 0.019912881144990666,
+                "count": 1607,
+                "harm_rate": 0.01431238332296204,
+                "net_rescue_rate": -0.002489110143123833,
+                "rescue_rate": 0.011823273179838207,
+                "robust_accuracy_delta": -0.002489110143123833
+              },
+              "wrong": {
+                "adversarial_margin_delta": -0.007885237412700237,
+                "clean_accuracy_delta": 0.0,
+                "count": 183,
+                "harm_rate": 0.01092896174863388,
+                "net_rescue_rate": -0.00546448087431694,
+                "rescue_rate": 0.00546448087431694,
+                "robust_accuracy_delta": -0.00546448087431694
+              }
+            }
+          },
+          "ST3K1": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": 0.012411190212471801,
+                "clean_accuracy_delta": -0.03685092127303183,
+                "count": 597,
+                "harm_rate": 0.01507537688442211,
+                "net_rescue_rate": 0.0033500837520938024,
+                "rescue_rate": 0.018425460636515914,
+                "robust_accuracy_delta": 0.0033500837520938024
+              },
+              "low": {
+                "adversarial_margin_delta": 0.0009941596712842084,
+                "clean_accuracy_delta": -0.03523489932885906,
+                "count": 596,
+                "harm_rate": 0.013422818791946308,
+                "net_rescue_rate": 0.0016778523489932886,
+                "rescue_rate": 0.015100671140939598,
+                "robust_accuracy_delta": 0.0016778523489932886
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.004192958213076919,
+                "clean_accuracy_delta": -0.03685092127303183,
+                "count": 597,
+                "harm_rate": 0.006700167504187605,
+                "net_rescue_rate": 0.018425460636515914,
+                "rescue_rate": 0.02512562814070352,
+                "robust_accuracy_delta": 0.018425460636515914
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": 0.00843974453720016,
+                "clean_accuracy_delta": -0.04187604690117253,
+                "count": 597,
+                "harm_rate": 0.01340033500837521,
+                "net_rescue_rate": 0.023450586264656615,
+                "rescue_rate": 0.03685092127303183,
+                "robust_accuracy_delta": 0.023450586264656615
+              },
+              "low": {
+                "adversarial_margin_delta": 0.0045529903981509625,
+                "clean_accuracy_delta": -0.018456375838926176,
+                "count": 596,
+                "harm_rate": 0.008389261744966443,
+                "net_rescue_rate": 0.0016778523489932886,
+                "rescue_rate": 0.010067114093959731,
+                "robust_accuracy_delta": 0.0016778523489932886
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.004611534351979069,
+                "clean_accuracy_delta": -0.048576214405360134,
+                "count": 597,
+                "harm_rate": 0.01340033500837521,
+                "net_rescue_rate": -0.0016750418760469012,
+                "rescue_rate": 0.011725293132328308,
+                "robust_accuracy_delta": -0.0016750418760469012
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": 0.00624570282965472,
+                "clean_accuracy_delta": -0.03609209707529558,
+                "count": 1607,
+                "harm_rate": 0.011823273179838207,
+                "net_rescue_rate": 0.008711885500933417,
+                "rescue_rate": 0.020535158680771624,
+                "robust_accuracy_delta": 0.008711885500933417
+              },
+              "wrong": {
+                "adversarial_margin_delta": 0.002559296868212236,
+                "clean_accuracy_delta": -0.03825136612021858,
+                "count": 183,
+                "harm_rate": 0.01092896174863388,
+                "net_rescue_rate": 0.0,
+                "rescue_rate": 0.01092896174863388,
+                "robust_accuracy_delta": 0.0
+              }
+            }
+          }
+        },
+        "count": 1790,
+        "teacher_clean_correct_count": 1607
+      }
+    },
+    "L4": {
+      "T1": {
+        "arms": {
+          "ST1M": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": 0.002501406536589362,
+                "clean_accuracy_delta": 0.021133525456292025,
+                "count": 3123,
+                "harm_rate": 0.0771693884085815,
+                "net_rescue_rate": 0.011527377521613832,
+                "rescue_rate": 0.08869676593019532,
+                "robust_accuracy_delta": 0.011527377521613832
+              },
+              "low": {
+                "adversarial_margin_delta": 0.002082586691766729,
+                "clean_accuracy_delta": 0.022101217168481742,
+                "count": 3122,
+                "harm_rate": 0.08712363869314542,
+                "net_rescue_rate": -0.0016015374759769379,
+                "rescue_rate": 0.08552210121716848,
+                "robust_accuracy_delta": -0.0016015374759769379
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.0031769323713535915,
+                "clean_accuracy_delta": 0.030419468459814282,
+                "count": 3123,
+                "harm_rate": 0.07524815882164586,
+                "net_rescue_rate": 0.002881844380403458,
+                "rescue_rate": 0.07813000320204931,
+                "robust_accuracy_delta": 0.002881844380403458
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": 0.007825172273367596,
+                "clean_accuracy_delta": 0.004803073967339097,
+                "count": 3123,
+                "harm_rate": 0.0909382004482869,
+                "net_rescue_rate": 0.008325328210054436,
+                "rescue_rate": 0.09926352865834134,
+                "robust_accuracy_delta": 0.008325328210054436
+              },
+              "low": {
+                "adversarial_margin_delta": -0.0003467839471351482,
+                "clean_accuracy_delta": 0.046444586803331196,
+                "count": 3122,
+                "harm_rate": 0.06310057655349136,
+                "net_rescue_rate": 0.003523382447149263,
+                "rescue_rate": 0.06662395900064061,
+                "robust_accuracy_delta": 0.003523382447149263
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.0002817593770190534,
+                "clean_accuracy_delta": 0.022414345180915785,
+                "count": 3123,
+                "harm_rate": 0.08549471661863593,
+                "net_rescue_rate": 0.0009606147934678194,
+                "rescue_rate": 0.08645533141210375,
+                "robust_accuracy_delta": 0.0009606147934678194
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": 0.002587029041545855,
+                "clean_accuracy_delta": 0.024551665243381725,
+                "count": 9368,
+                "harm_rate": 0.0798462852263023,
+                "net_rescue_rate": 0.004269854824935952,
+                "rescue_rate": 0.08411614005123826,
+                "robust_accuracy_delta": 0.004269854824935952
+              }
+            }
+          },
+          "ST1S": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.0070195783846965405,
+                "clean_accuracy_delta": 0.01504963176432917,
+                "count": 3123,
+                "harm_rate": 0.11847582452769773,
+                "net_rescue_rate": -0.03650336215177714,
+                "rescue_rate": 0.08197246237592058,
+                "robust_accuracy_delta": -0.03650336215177714
+              },
+              "low": {
+                "adversarial_margin_delta": -0.018213622878179726,
+                "clean_accuracy_delta": -0.007367072389493914,
+                "count": 3122,
+                "harm_rate": 0.1364509929532351,
+                "net_rescue_rate": -0.05541319666880205,
+                "rescue_rate": 0.08103779628443306,
+                "robust_accuracy_delta": -0.05541319666880205
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.008960616247912763,
+                "clean_accuracy_delta": 0.008005123278898496,
+                "count": 3123,
+                "harm_rate": 0.1335254562920269,
+                "net_rescue_rate": -0.04130643611911623,
+                "rescue_rate": 0.09221902017291066,
+                "robust_accuracy_delta": -0.04130643611911623
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.034790004431495214,
+                "clean_accuracy_delta": -0.01601024655779699,
+                "count": 3123,
+                "harm_rate": 0.1690682036503362,
+                "net_rescue_rate": -0.08261287223823247,
+                "rescue_rate": 0.08645533141210375,
+                "robust_accuracy_delta": -0.08261287223823247
+              },
+              "low": {
+                "adversarial_margin_delta": 0.007529635431005128,
+                "clean_accuracy_delta": 0.029788597053171044,
+                "count": 3122,
+                "harm_rate": 0.08712363869314542,
+                "net_rescue_rate": -0.009609224855861628,
+                "rescue_rate": 0.07751441383728379,
+                "robust_accuracy_delta": -0.009609224855861628
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.006925205392044323,
+                "clean_accuracy_delta": 0.0019212295869356388,
+                "count": 3123,
+                "harm_rate": 0.13224463656740315,
+                "net_rescue_rate": -0.04098623118796029,
+                "rescue_rate": 0.09125840537944284,
+                "robust_accuracy_delta": -0.04098623118796029
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.011397211620763873,
+                "clean_accuracy_delta": 0.0052305721605465415,
+                "count": 9368,
+                "harm_rate": 0.12948334756618274,
+                "net_rescue_rate": -0.0444064901793339,
+                "rescue_rate": 0.08507685738684885,
+                "robust_accuracy_delta": -0.0444064901793339
+              }
+            }
+          },
+          "ST1W": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": 0.0036959069406150282,
+                "clean_accuracy_delta": -0.010566762728146013,
+                "count": 3123,
+                "harm_rate": 0.07140569964777457,
+                "net_rescue_rate": 0.008645533141210375,
+                "rescue_rate": 0.08005123278898495,
+                "robust_accuracy_delta": 0.008645533141210375
+              },
+              "low": {
+                "adversarial_margin_delta": 0.005811893965268578,
+                "clean_accuracy_delta": 0.006085842408712364,
+                "count": 3122,
+                "harm_rate": 0.07078795643818066,
+                "net_rescue_rate": 0.03267136450992953,
+                "rescue_rate": 0.10345932094811018,
+                "robust_accuracy_delta": 0.03267136450992953
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.006041606517793122,
+                "clean_accuracy_delta": 0.001601024655779699,
+                "count": 3123,
+                "harm_rate": 0.06372078130003202,
+                "net_rescue_rate": 0.024975984630163303,
+                "rescue_rate": 0.08869676593019532,
+                "robust_accuracy_delta": 0.024975984630163303
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": 0.00726185568939063,
+                "clean_accuracy_delta": -0.005763688760806916,
+                "count": 3123,
+                "harm_rate": 0.08197246237592058,
+                "net_rescue_rate": 0.025616394492475183,
+                "rescue_rate": 0.10758885686839577,
+                "robust_accuracy_delta": 0.025616394492475183
+              },
+              "low": {
+                "adversarial_margin_delta": 0.003660343463301735,
+                "clean_accuracy_delta": 0.008648302370275465,
+                "count": 3122,
+                "harm_rate": 0.05477258167841127,
+                "net_rescue_rate": 0.017616912235746317,
+                "rescue_rate": 0.0723894939141576,
+                "robust_accuracy_delta": 0.017616912235746317
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.0046265193339040025,
+                "clean_accuracy_delta": -0.005763688760806916,
+                "count": 3123,
+                "harm_rate": 0.069164265129683,
+                "net_rescue_rate": 0.023054755043227664,
+                "rescue_rate": 0.09221902017291066,
+                "robust_accuracy_delta": 0.023054755043227664
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": 0.005183068690240943,
+                "clean_accuracy_delta": -0.0009607173356105893,
+                "count": 9368,
+                "harm_rate": 0.06863791631084543,
+                "net_rescue_rate": 0.022096498719043553,
+                "rescue_rate": 0.09073441502988898,
+                "robust_accuracy_delta": 0.022096498719043553
+              }
+            }
+          }
+        },
+        "count": 9368,
+        "teacher_clean_correct_count": 9368
+      },
+      "T2": {
+        "arms": {
+          "ST2M": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": 0.0038474472069807172,
+                "clean_accuracy_delta": 0.03927068723702665,
+                "count": 713,
+                "harm_rate": 0.047685834502103785,
+                "net_rescue_rate": -0.009817671809256662,
+                "rescue_rate": 0.037868162692847124,
+                "robust_accuracy_delta": -0.009817671809256662
+              },
+              "low": {
+                "adversarial_margin_delta": 0.01313270523809315,
+                "clean_accuracy_delta": 0.023876404494382022,
+                "count": 712,
+                "harm_rate": 0.02949438202247191,
+                "net_rescue_rate": 0.021067415730337078,
+                "rescue_rate": 0.05056179775280899,
+                "robust_accuracy_delta": 0.021067415730337078
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.00623164103375578,
+                "clean_accuracy_delta": 0.037868162692847124,
+                "count": 713,
+                "harm_rate": 0.04488078541374474,
+                "net_rescue_rate": -0.001402524544179523,
+                "rescue_rate": 0.043478260869565216,
+                "robust_accuracy_delta": -0.001402524544179523
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": 0.0028743815685388584,
+                "clean_accuracy_delta": 0.037868162692847124,
+                "count": 713,
+                "harm_rate": 0.04207573632538569,
+                "net_rescue_rate": -0.002805049088359046,
+                "rescue_rate": 0.03927068723702665,
+                "robust_accuracy_delta": -0.002805049088359046
+              },
+              "low": {
+                "adversarial_margin_delta": 0.011407005851774404,
+                "clean_accuracy_delta": 0.028089887640449437,
+                "count": 712,
+                "harm_rate": 0.02949438202247191,
+                "net_rescue_rate": 0.012640449438202247,
+                "rescue_rate": 0.042134831460674156,
+                "robust_accuracy_delta": 0.012640449438202247
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.0089279857227712,
+                "clean_accuracy_delta": 0.03506311360448808,
+                "count": 713,
+                "harm_rate": 0.05049088359046283,
+                "net_rescue_rate": 0.0,
+                "rescue_rate": 0.05049088359046283,
+                "robust_accuracy_delta": 0.0
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": 0.0077347409004525,
+                "clean_accuracy_delta": 0.03367633302151544,
+                "count": 2138,
+                "harm_rate": 0.04069223573433115,
+                "net_rescue_rate": 0.003274087932647334,
+                "rescue_rate": 0.04396632366697849,
+                "robust_accuracy_delta": 0.003274087932647334
+              }
+            }
+          },
+          "ST2S": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.009549200231781515,
+                "clean_accuracy_delta": 0.04067321178120617,
+                "count": 713,
+                "harm_rate": 0.05750350631136045,
+                "net_rescue_rate": -0.015427769985974754,
+                "rescue_rate": 0.04207573632538569,
+                "robust_accuracy_delta": -0.015427769985974754
+              },
+              "low": {
+                "adversarial_margin_delta": 0.0040501312279466834,
+                "clean_accuracy_delta": 0.01544943820224719,
+                "count": 712,
+                "harm_rate": 0.037921348314606744,
+                "net_rescue_rate": -0.011235955056179775,
+                "rescue_rate": 0.026685393258426966,
+                "robust_accuracy_delta": -0.011235955056179775
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.0004104295795127687,
+                "clean_accuracy_delta": 0.015427769985974754,
+                "count": 713,
+                "harm_rate": 0.047685834502103785,
+                "net_rescue_rate": -0.019635343618513323,
+                "rescue_rate": 0.028050490883590462,
+                "robust_accuracy_delta": -0.019635343618513323
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.010052343822629053,
+                "clean_accuracy_delta": 0.025245441795231416,
+                "count": 713,
+                "harm_rate": 0.05750350631136045,
+                "net_rescue_rate": -0.008415147265077139,
+                "rescue_rate": 0.04908835904628331,
+                "robust_accuracy_delta": -0.008415147265077139
+              },
+              "low": {
+                "adversarial_margin_delta": 0.0027401653442824824,
+                "clean_accuracy_delta": 0.018258426966292134,
+                "count": 712,
+                "harm_rate": 0.032303370786516857,
+                "net_rescue_rate": -0.011235955056179775,
+                "rescue_rate": 0.021067415730337078,
+                "robust_accuracy_delta": -0.011235955056179775
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.0014008426356950949,
+                "clean_accuracy_delta": 0.028050490883590462,
+                "count": 713,
+                "harm_rate": 0.05329593267882188,
+                "net_rescue_rate": -0.02664796633941094,
+                "rescue_rate": 0.02664796633941094,
+                "robust_accuracy_delta": -0.02664796633941094
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.0019726485599414335,
+                "clean_accuracy_delta": 0.023854069223573433,
+                "count": 2138,
+                "harm_rate": 0.047708138447146865,
+                "net_rescue_rate": -0.015434985968194575,
+                "rescue_rate": 0.032273152478952294,
+                "robust_accuracy_delta": -0.015434985968194575
+              }
+            }
+          },
+          "ST2W": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": 0.0026794030092040086,
+                "clean_accuracy_delta": 0.04207573632538569,
+                "count": 713,
+                "harm_rate": 0.04067321178120617,
+                "net_rescue_rate": -0.0070126227208976155,
+                "rescue_rate": 0.033660589060308554,
+                "robust_accuracy_delta": -0.0070126227208976155
+              },
+              "low": {
+                "adversarial_margin_delta": 0.011976851453858146,
+                "clean_accuracy_delta": 0.07162921348314606,
+                "count": 712,
+                "harm_rate": 0.023876404494382022,
+                "net_rescue_rate": 0.004213483146067416,
+                "rescue_rate": 0.028089887640449437,
+                "robust_accuracy_delta": 0.004213483146067416
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.007610341494832433,
+                "clean_accuracy_delta": 0.06311360448807854,
+                "count": 713,
+                "harm_rate": 0.04067321178120617,
+                "net_rescue_rate": -0.005610098176718092,
+                "rescue_rate": 0.03506311360448808,
+                "robust_accuracy_delta": -0.005610098176718092
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": 0.0016351082528122344,
+                "clean_accuracy_delta": 0.0364656381486676,
+                "count": 713,
+                "harm_rate": 0.043478260869565216,
+                "net_rescue_rate": -0.001402524544179523,
+                "rescue_rate": 0.04207573632538569,
+                "robust_accuracy_delta": -0.001402524544179523
+              },
+              "low": {
+                "adversarial_margin_delta": 0.00916383604864391,
+                "clean_accuracy_delta": 0.07162921348314606,
+                "count": 712,
+                "harm_rate": 0.021067415730337078,
+                "net_rescue_rate": 0.004213483146067416,
+                "rescue_rate": 0.025280898876404494,
+                "robust_accuracy_delta": 0.004213483146067416
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.011463706333289475,
+                "clean_accuracy_delta": 0.06872370266479663,
+                "count": 713,
+                "harm_rate": 0.04067321178120617,
+                "net_rescue_rate": -0.011220196353436185,
+                "rescue_rate": 0.029453015427769985,
+                "robust_accuracy_delta": -0.011220196353436185
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": 0.007420068319235258,
+                "clean_accuracy_delta": 0.05893358278765201,
+                "count": 2138,
+                "harm_rate": 0.035079513564078575,
+                "net_rescue_rate": -0.002806361085126286,
+                "rescue_rate": 0.032273152478952294,
+                "robust_accuracy_delta": -0.002806361085126286
+              }
+            }
+          }
+        },
+        "count": 2138,
+        "teacher_clean_correct_count": 2138
+      },
+      "T3": {
+        "arms": {
+          "ST3K0": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.017904631301836314,
+                "clean_accuracy_delta": 0.025380710659898477,
+                "count": 591,
+                "harm_rate": 0.032148900169204735,
+                "net_rescue_rate": -0.015228426395939087,
+                "rescue_rate": 0.01692047377326565,
+                "robust_accuracy_delta": -0.015228426395939087
+              },
+              "low": {
+                "adversarial_margin_delta": 0.0024531160118216174,
+                "clean_accuracy_delta": 0.05593220338983051,
+                "count": 590,
+                "harm_rate": 0.011864406779661017,
+                "net_rescue_rate": -0.005084745762711864,
+                "rescue_rate": 0.006779661016949152,
+                "robust_accuracy_delta": -0.005084745762711864
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.0021746769042338353,
+                "clean_accuracy_delta": 0.0576271186440678,
+                "count": 590,
+                "harm_rate": 0.030508474576271188,
+                "net_rescue_rate": -0.023728813559322035,
+                "rescue_rate": 0.006779661016949152,
+                "robust_accuracy_delta": -0.023728813559322035
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.012280692379486742,
+                "clean_accuracy_delta": 0.03722504230118443,
+                "count": 591,
+                "harm_rate": 0.043993231810490696,
+                "net_rescue_rate": -0.025380710659898477,
+                "rescue_rate": 0.018612521150592216,
+                "robust_accuracy_delta": -0.025380710659898477
+              },
+              "low": {
+                "adversarial_margin_delta": -0.00455625687362784,
+                "clean_accuracy_delta": 0.030508474576271188,
+                "count": 590,
+                "harm_rate": 0.00847457627118644,
+                "net_rescue_rate": -0.003389830508474576,
+                "rescue_rate": 0.005084745762711864,
+                "robust_accuracy_delta": -0.003389830508474576
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.0007987750410023382,
+                "clean_accuracy_delta": 0.0711864406779661,
+                "count": 590,
+                "harm_rate": 0.022033898305084745,
+                "net_rescue_rate": -0.015254237288135594,
+                "rescue_rate": 0.006779661016949152,
+                "robust_accuracy_delta": -0.015254237288135594
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.0055919535751638005,
+                "clean_accuracy_delta": 0.05128205128205128,
+                "count": 1599,
+                "harm_rate": 0.027517198248905566,
+                "net_rescue_rate": -0.016885553470919325,
+                "rescue_rate": 0.010631644777986242,
+                "robust_accuracy_delta": -0.016885553470919325
+              },
+              "wrong": {
+                "adversarial_margin_delta": -0.008580373600125313,
+                "clean_accuracy_delta": 0.0,
+                "count": 172,
+                "harm_rate": 0.0,
+                "net_rescue_rate": 0.005813953488372093,
+                "rescue_rate": 0.005813953488372093,
+                "robust_accuracy_delta": 0.005813953488372093
+              }
+            }
+          },
+          "ST3K05": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.010454337583782307,
+                "clean_accuracy_delta": 0.077834179357022,
+                "count": 591,
+                "harm_rate": 0.030456852791878174,
+                "net_rescue_rate": -0.015228426395939087,
+                "rescue_rate": 0.015228426395939087,
+                "robust_accuracy_delta": -0.015228426395939087
+              },
+              "low": {
+                "adversarial_margin_delta": 0.004257869821483806,
+                "clean_accuracy_delta": 0.08644067796610169,
+                "count": 590,
+                "harm_rate": 0.013559322033898305,
+                "net_rescue_rate": -0.006779661016949152,
+                "rescue_rate": 0.006779661016949152,
+                "robust_accuracy_delta": -0.006779661016949152
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.002229709178209305,
+                "clean_accuracy_delta": 0.07796610169491526,
+                "count": 590,
+                "harm_rate": 0.025423728813559324,
+                "net_rescue_rate": -0.022033898305084745,
+                "rescue_rate": 0.003389830508474576,
+                "robust_accuracy_delta": -0.022033898305084745
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.006791735411497139,
+                "clean_accuracy_delta": 0.09306260575296109,
+                "count": 591,
+                "harm_rate": 0.038917089678511,
+                "net_rescue_rate": -0.025380710659898477,
+                "rescue_rate": 0.01353637901861252,
+                "robust_accuracy_delta": -0.025380710659898477
+              },
+              "low": {
+                "adversarial_margin_delta": -0.001201333029795501,
+                "clean_accuracy_delta": 0.059322033898305086,
+                "count": 590,
+                "harm_rate": 0.010169491525423728,
+                "net_rescue_rate": -0.005084745762711864,
+                "rescue_rate": 0.005084745762711864,
+                "robust_accuracy_delta": -0.005084745762711864
+              },
+              "middle": {
+                "adversarial_margin_delta": -0.00043931629950717344,
+                "clean_accuracy_delta": 0.08983050847457627,
+                "count": 590,
+                "harm_rate": 0.020338983050847456,
+                "net_rescue_rate": -0.013559322033898305,
+                "rescue_rate": 0.006779661016949152,
+                "robust_accuracy_delta": -0.013559322033898305
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.0030825754966565862,
+                "clean_accuracy_delta": 0.0906816760475297,
+                "count": 1599,
+                "harm_rate": 0.02564102564102564,
+                "net_rescue_rate": -0.016260162601626018,
+                "rescue_rate": 0.009380863039399626,
+                "robust_accuracy_delta": -0.016260162601626018
+              },
+              "wrong": {
+                "adversarial_margin_delta": -0.00030732856586922045,
+                "clean_accuracy_delta": -0.011627906976744186,
+                "count": 172,
+                "harm_rate": 0.0,
+                "net_rescue_rate": 0.0,
+                "rescue_rate": 0.0,
+                "robust_accuracy_delta": 0.0
+              }
+            }
+          },
+          "ST3K1": {
+            "DeltaT": {
+              "high": {
+                "adversarial_margin_delta": -0.00715512769728546,
+                "clean_accuracy_delta": 0.03722504230118443,
+                "count": 591,
+                "harm_rate": 0.023688663282571912,
+                "net_rescue_rate": -0.00676818950930626,
+                "rescue_rate": 0.01692047377326565,
+                "robust_accuracy_delta": -0.00676818950930626
+              },
+              "low": {
+                "adversarial_margin_delta": 0.0006883999048653295,
+                "clean_accuracy_delta": 0.022033898305084745,
+                "count": 590,
+                "harm_rate": 0.011864406779661017,
+                "net_rescue_rate": -0.010169491525423728,
+                "rescue_rate": 0.001694915254237288,
+                "robust_accuracy_delta": -0.010169491525423728
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.0010480458074707095,
+                "clean_accuracy_delta": 0.0288135593220339,
+                "count": 590,
+                "harm_rate": 0.022033898305084745,
+                "net_rescue_rate": -0.005084745762711864,
+                "rescue_rate": 0.01694915254237288,
+                "robust_accuracy_delta": -0.005084745762711864
+              }
+            },
+            "mT_clean": {
+              "high": {
+                "adversarial_margin_delta": -0.0019046736978839093,
+                "clean_accuracy_delta": 0.05583756345177665,
+                "count": 591,
+                "harm_rate": 0.0338409475465313,
+                "net_rescue_rate": -0.011844331641285956,
+                "rescue_rate": 0.021996615905245348,
+                "robust_accuracy_delta": -0.011844331641285956
+              },
+              "low": {
+                "adversarial_margin_delta": -0.004861292887037083,
+                "clean_accuracy_delta": 0.005084745762711864,
+                "count": 590,
+                "harm_rate": 0.00847457627118644,
+                "net_rescue_rate": -0.003389830508474576,
+                "rescue_rate": 0.005084745762711864,
+                "robust_accuracy_delta": -0.003389830508474576
+              },
+              "middle": {
+                "adversarial_margin_delta": 0.0013383855253963147,
+                "clean_accuracy_delta": 0.02711864406779661,
+                "count": 590,
+                "harm_rate": 0.015254237288135594,
+                "net_rescue_rate": -0.006779661016949152,
+                "rescue_rate": 0.00847457627118644,
+                "robust_accuracy_delta": -0.006779661016949152
+              }
+            },
+            "teacher_clean_correct": {
+              "correct": {
+                "adversarial_margin_delta": -0.00127797735956328,
+                "clean_accuracy_delta": 0.03314571607254534,
+                "count": 1599,
+                "harm_rate": 0.021263289555972485,
+                "net_rescue_rate": -0.009380863039399626,
+                "rescue_rate": 0.011882426516572859,
+                "robust_accuracy_delta": -0.009380863039399626
+              },
+              "wrong": {
+                "adversarial_margin_delta": -0.006748207563231158,
+                "clean_accuracy_delta": -0.005813953488372093,
+                "count": 172,
+                "harm_rate": 0.0,
+                "net_rescue_rate": 0.011627906976744186,
+                "rescue_rate": 0.011627906976744186,
+                "robust_accuracy_delta": 0.011627906976744186
+              }
+            }
+          }
+        },
+        "count": 1771,
+        "teacher_clean_correct_count": 1599
+      }
+    }
+  },
+  "source_git_sha": "09dbc03bd7404846604e4d2187a92374efc48933"
+}

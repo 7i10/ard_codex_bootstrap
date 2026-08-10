@@ -1,0 +1,1632 @@
+{
+  "contract": "ert_stage_a_treatment_report_v1",
+  "endpoint_attack": {
+    "identity": {
+      "epsilon": "8/255",
+      "epsilon_value": 0.03137254901960784,
+      "input_domain": "pixel_0_1",
+      "kl_target": null,
+      "loss": "ce",
+      "norm": "linf",
+      "random_start": true,
+      "step_size": "2/255",
+      "step_size_value": 0.00784313725490196,
+      "steps": 20,
+      "student_mode": "eval",
+      "teacher_mode": "eval",
+      "temperature": 1.0,
+      "temperature_squared": true
+    },
+    "identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
+  },
+  "inputs": {
+    "L2/C79": {
+      "checkpoint_sha256": "48cc1458d7a1745d04b46c5303bf9001189d51251eda7c5b552f560c7dc5e520",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/C79/endpoint.json",
+      "endpoint_json_sha256": "4c04e2b6485c0134fffd561bf46c486ceb0ed6f368e691a489b63642525722ed",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/C79/endpoint-sample-stats.parquet",
+      "rows_sha256": "249a2b2dbb09d289c64abf62f672683b9cb8f7c0e87067e73cdf9d4018a4c84c",
+      "train_arm": "C79"
+    },
+    "L2/CW1": {
+      "checkpoint_sha256": "cbc6b56ce9d87900619acae7b5b711c44759202a16829ef054bb351672e6bdb1",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/CW1/endpoint.json",
+      "endpoint_json_sha256": "0899d140705806a894d5b5801f362b1050cfa473eb9444bc595eb9040f7ff398",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/CW1/endpoint-sample-stats.parquet",
+      "rows_sha256": "d5d2c13adf6c2ac165b394383616cddd22dac757581a200dc54dd9798e978907",
+      "train_arm": "CW1"
+    },
+    "L2/CW2": {
+      "checkpoint_sha256": "d27f09f140a0c851fd11840b5d35388b79d4597b68f1d4c3fd040fd4e59e47d7",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/CW2/endpoint.json",
+      "endpoint_json_sha256": "4c0bf9ea443ef142658efc0864cdeafc69901fb5413318e411a6c092e4e1b755",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/CW2/endpoint-sample-stats.parquet",
+      "rows_sha256": "a870771d3ac2798fb90d30004862fa26659fde1bbc968e40b990717852f57c02",
+      "train_arm": "CW2"
+    },
+    "L2/CW3": {
+      "checkpoint_sha256": "cc255b731a6fee3194bc9360b908201acabff7b55e9998d01a75e696b21e6b93",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/CW3/endpoint.json",
+      "endpoint_json_sha256": "2cf19eeee92debd4eb8a4325afda0f0803e4ae977381dd79fe83ac63133f3e6c",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/CW3/endpoint-sample-stats.parquet",
+      "rows_sha256": "9727596c59d82faa93cf0c9b0bdc6597e639db7cc189ece6fd27b178783ec916",
+      "train_arm": "CW3"
+    },
+    "L2/ST1M": {
+      "checkpoint_sha256": "20a70219d0ea3ee348e9bcbd5c1527b8b716387aec6c8a9cc11d3dae3e82e0f5",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST1M/endpoint.json",
+      "endpoint_json_sha256": "bfb341962549cc0ff27bbea9be3e8676346bbcc746347b6af7a360cf9d01aefb",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST1M/endpoint-sample-stats.parquet",
+      "rows_sha256": "3fd7e9a9c4d85621cbeb129db94055b107e59adf0be2ff90f7eee4ebad9db802",
+      "train_arm": "ST1M"
+    },
+    "L2/ST1S": {
+      "checkpoint_sha256": "6940b31536bedd859c9a3a2b1bc423a3284c5b9ea426d966c26e52da63adf345",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST1S/endpoint.json",
+      "endpoint_json_sha256": "b0ca21cb33540dbeef4f22b49263523393d9f1a2a34eb249e17b1006ef9eeac0",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST1S/endpoint-sample-stats.parquet",
+      "rows_sha256": "32c40e303d8878d7bccc5cb28ebb9fe898ca4ea0f1dca91aabd3e9b963b4d050",
+      "train_arm": "ST1S"
+    },
+    "L2/ST1W": {
+      "checkpoint_sha256": "4ecd4fa7fa91265d60f345bc5fdab436cbb4be5ba7350df11fd1b153bd48db16",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST1W/endpoint.json",
+      "endpoint_json_sha256": "0a3ce7c016295bed98c08c77ecbbd12adea1e8dd8955a37e14d86f4809a996ee",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST1W/endpoint-sample-stats.parquet",
+      "rows_sha256": "fb3f300c9d3552a06c09698024f66e0cc9a9ef58beaba13c6239dc6c21a7eb53",
+      "train_arm": "ST1W-rerun"
+    },
+    "L2/ST2M": {
+      "checkpoint_sha256": "3c3a45b8325e68aadf981a2dec79b185b928be01fbceec2aee6bd3a8aea26566",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST2M/endpoint.json",
+      "endpoint_json_sha256": "a78d0465311a51e998b45e0e6737cb50cbd08f08a6d6ef857ea4b033494a7b4b",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST2M/endpoint-sample-stats.parquet",
+      "rows_sha256": "29270424c2a6bc19e7feaf8d43a1ee125605c62a9745d66f9af4b82a43b3ea27",
+      "train_arm": "ST2M"
+    },
+    "L2/ST2S": {
+      "checkpoint_sha256": "51700a5ad80e6018f6af3d5d6c3d36667a74614910240b0cd7b45da0bb38b5b6",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST2S/endpoint.json",
+      "endpoint_json_sha256": "dee85874685db30e7128f3f52b3367f8869311528205d7ac7fb9814a08440dd6",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST2S/endpoint-sample-stats.parquet",
+      "rows_sha256": "38ef59dfba05dada3268bf900d63c10ea391ff01ea5ac7b1a9e80fd0ee7215b0",
+      "train_arm": "ST2S-rerun"
+    },
+    "L2/ST2W": {
+      "checkpoint_sha256": "e6f5ed72532899b1ecb0c7f17fe8b5e64611e86d32dd2c9de837f6054c2e2089",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST2W/endpoint.json",
+      "endpoint_json_sha256": "1c0a62c362f490a2e875ab96f58c0a2d4c6b221fafcccb53c468a0c33372873f",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST2W/endpoint-sample-stats.parquet",
+      "rows_sha256": "cbd8f177b927610d633fbbf662f0d589a37a679f5e0d55b89ad6f046d572a031",
+      "train_arm": "ST2W"
+    },
+    "L2/ST3K0": {
+      "checkpoint_sha256": "3f6df381117f53c828acfd69ee3ad75b94036b9cb68045d4205df6ce51c9d74c",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST3K0/endpoint.json",
+      "endpoint_json_sha256": "1c2c452d59a630302c6d48f425d0ece9c169c9a58d1e03cc71ae0353e52c6778",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST3K0/endpoint-sample-stats.parquet",
+      "rows_sha256": "3d7471fe7ee85b2d05e7320b70424fa19ca467c9efe0ed003440f919ee4afe21",
+      "train_arm": "ST3K0"
+    },
+    "L2/ST3K05": {
+      "checkpoint_sha256": "6fa0205bf7ce8420dc0e5be82636abff6e6789acdf5b5b2908b8a65acef086c6",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST3K05/endpoint.json",
+      "endpoint_json_sha256": "f01f638c284b503d8e66ee0ffb973aafebcf5c1975bc9e2defdd4dac9965ee4a",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST3K05/endpoint-sample-stats.parquet",
+      "rows_sha256": "a162fae63ee1482578c52ce039d58d39bce4ea61c59b8f84aeec0eec9060887a",
+      "train_arm": "ST3K05"
+    },
+    "L2/ST3K1": {
+      "checkpoint_sha256": "68beb05004843a7775a5c33209c5c506e259bca0188c0527de9a51715ed56800",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST3K1/endpoint.json",
+      "endpoint_json_sha256": "85342768eba3351a71d089877308177d4511d688aae2fd7f61ff71a168b09ee0",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L2/ST3K1/endpoint-sample-stats.parquet",
+      "rows_sha256": "39e545f4023d2fd656a360e4b72f2e58a62ce8cc2282a3d9a34e0f3b5ed96e88",
+      "train_arm": "ST3K1"
+    },
+    "L4/C79": {
+      "checkpoint_sha256": "c4413ec87d6a20c693817eaf6a51776033630d6c222af833f09ae34cf693fa8a",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/C79/endpoint.json",
+      "endpoint_json_sha256": "e2671cb0df8a2519e2d82f18c2f89589e2a826eb704b529717a80548d171cba5",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/C79/endpoint-sample-stats.parquet",
+      "rows_sha256": "b460160b613963aa3bc454c1e75f63b5d9eb2e46dc712a693a2b7fec280f87d0",
+      "train_arm": "C79"
+    },
+    "L4/CW1": {
+      "checkpoint_sha256": "8cc2f852e565fcc940347a374f0d43a750c2445278cb0ad03ac19efdba36d123",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/CW1/endpoint.json",
+      "endpoint_json_sha256": "0e2b13584bc20c797b049ac33dd0a2f2025fd8a6b45e8b3d53b7e670c3368468",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/CW1/endpoint-sample-stats.parquet",
+      "rows_sha256": "a9ecb392129394ce5eb1573aa9cee27df3dfc7ee5c4ea0d43b3fb589989aaf67",
+      "train_arm": "CW1"
+    },
+    "L4/CW2": {
+      "checkpoint_sha256": "e08c902eb78277507e06c9b649766e74fbbfb90e2dad36e07a381652755f67af",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/CW2/endpoint.json",
+      "endpoint_json_sha256": "f6cb5a005986e9a0a44ddf7040f120f5b7cf240b73ab93201d959df041443e13",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/CW2/endpoint-sample-stats.parquet",
+      "rows_sha256": "9baab0bc44a28b40416d313cf30c08a27e4e172a7e9f58e75bce34897e7ebbda",
+      "train_arm": "CW2"
+    },
+    "L4/CW3": {
+      "checkpoint_sha256": "7a8dbe9397b21d8f35a7ade16f8ad8f3c942636e0779b09f09dbfdb7e220eb3b",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/CW3/endpoint.json",
+      "endpoint_json_sha256": "4d926403ce6155f2b16b9691fca45758899e0f5d23f1fd1ceac596d87b141292",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/CW3/endpoint-sample-stats.parquet",
+      "rows_sha256": "bf7e30ec4fadab5f7276e98fcc391ae644c21c42fd951cccadee2246c3ab16a5",
+      "train_arm": "CW3"
+    },
+    "L4/ST1M": {
+      "checkpoint_sha256": "93a6734255b9a35f7d17386f9b0cfb9d6a5fd351180d9c93581aa51fb6fa0079",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST1M/endpoint.json",
+      "endpoint_json_sha256": "1bab18f0b74371fdde5f1fe11cfffb49a5741b2b28dc4648f821504ce223e5e8",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST1M/endpoint-sample-stats.parquet",
+      "rows_sha256": "388844b85e4bafb1c47be838ad7ecc7c453c4fe81d9ee7a91a1d0e90377778ed",
+      "train_arm": "ST1M"
+    },
+    "L4/ST1S": {
+      "checkpoint_sha256": "160903d14d63bfa680c49b4cd6697d4678ad0daf097b5f8d4f7e919b3293bd2d",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST1S/endpoint.json",
+      "endpoint_json_sha256": "cae896755707cbf73463597ca058ea1cc72eb4e89303f521aa4b96d437ffb4f8",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST1S/endpoint-sample-stats.parquet",
+      "rows_sha256": "43fb83e06ab05d57d6300a3a553ec9d804cb3abb49a20a651f54f8136ac69a7b",
+      "train_arm": "ST1S"
+    },
+    "L4/ST1W": {
+      "checkpoint_sha256": "6a52647b9c8acd4c00aecaaff9c9d90e8b451f453406018a354b374502c58380",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST1W/endpoint.json",
+      "endpoint_json_sha256": "80b5a3e68791b8ae447c699ab79f63bb80e26f6e7990e45d2e9367f8abc09e2d",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST1W/endpoint-sample-stats.parquet",
+      "rows_sha256": "c4214bdebabfb82a8e0b05947ee5f9c27c426eba830cf4d73d4337ab1fda9f94",
+      "train_arm": "ST1W"
+    },
+    "L4/ST2M": {
+      "checkpoint_sha256": "37900ecba0fb55b0d823a84e4a74542ab7e500b9739e71d62a8096db68d40ec5",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST2M/endpoint.json",
+      "endpoint_json_sha256": "f93cf3777eb47306d83e599bd2d034b84d45a46b16d62e6b632d5250084b9695",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST2M/endpoint-sample-stats.parquet",
+      "rows_sha256": "e207255b7d68252527d3034a720bf7de97a7189ac6058686d0d3b47fcf93f0f0",
+      "train_arm": "ST2M"
+    },
+    "L4/ST2S": {
+      "checkpoint_sha256": "32937e315acac681839ea3402f33fe56942b99a0cf7b667048a1c277435ef8bf",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST2S/endpoint.json",
+      "endpoint_json_sha256": "9478a05ebaa1be8bc62aecb538ac9347d7bf6d5e163c8def572289bf04ab64b3",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST2S/endpoint-sample-stats.parquet",
+      "rows_sha256": "b10ed185cf0881ef2d471510ad70a670c62bf2722aee6e267b9a10440a55025f",
+      "train_arm": "ST2S"
+    },
+    "L4/ST2W": {
+      "checkpoint_sha256": "344b119d618a1e35a59d93b50832b2bccffa40385c0479b61ea49b2d3c822e85",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST2W/endpoint.json",
+      "endpoint_json_sha256": "8b8672414d35a0807d137ee9bea577a251305ae197c42da62207e7c918e3aa8c",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST2W/endpoint-sample-stats.parquet",
+      "rows_sha256": "6d2b0b0874b44f43b6a314c4a5434651e21055f5b99af06dd6fb79cec11caff8",
+      "train_arm": "ST2W"
+    },
+    "L4/ST3K0": {
+      "checkpoint_sha256": "88f76644a060b751354851b79a1a3cf2b9ac338265cab1783508804e7cd63fa9",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST3K0/endpoint.json",
+      "endpoint_json_sha256": "69926c7292eec340d964d20b2be3fa17167052bee4e6d1aa8b266400a86486c7",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST3K0/endpoint-sample-stats.parquet",
+      "rows_sha256": "36a106e9c658bb48d8e317764719c3dc01686234d2a1b976e7c4350981721e0f",
+      "train_arm": "ST3K0"
+    },
+    "L4/ST3K05": {
+      "checkpoint_sha256": "479c81ed9021d7267f2139fb6c7c2981fccc063711823dac7d7032c73ea75a87",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST3K05/endpoint.json",
+      "endpoint_json_sha256": "6564ad1327390613ca6f3e97bdecc9acd957aab8b497d1b3733ba22ac43312a8",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST3K05/endpoint-sample-stats.parquet",
+      "rows_sha256": "c06a23f44a657df839250ec1dea65ec4fbe539ecdae602569480bcf765808ccf",
+      "train_arm": "ST3K05"
+    },
+    "L4/ST3K1": {
+      "checkpoint_sha256": "8ffb40b3e6433c9897d7376fc4e0ee8ead9da6c7d06a367672f67d5878e1867d",
+      "endpoint_json": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST3K1/endpoint.json",
+      "endpoint_json_sha256": "31cd118f3621792318072939a7462206de5e437e2c20012faea8a0602fca14c1",
+      "rows": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-stage-a-endpoint/L4/ST3K1/endpoint-sample-stats.parquet",
+      "rows_sha256": "600c0d78c251400c7cde8df7476a7e0a389fa02b097a6a379daec897245f8a65",
+      "train_arm": "ST3K1"
+    }
+  },
+  "schema_version": 1,
+  "seeds": {
+    "L2": {
+      "arms": {
+        "C79": {
+          "overall": {
+            "adversarial_probability_margin": 0.058503530098994574,
+            "clean_accuracy": 0.7865333333333333,
+            "clean_probability_margin": 0.23523422967311408,
+            "count": 45000,
+            "robust_accuracy": 0.49706666666666666
+          },
+          "selected": null
+        },
+        "CW1": {
+          "mask_key": "student_clean_wrong",
+          "nonselected_paired": {
+            "adversarial_margin_delta": -0.005475612379532504,
+            "clean_accuracy_delta": -0.006267696621491602,
+            "clean_harm_count": 1009,
+            "clean_margin_delta": 0.011118017353131188,
+            "clean_rescue_count": 781,
+            "control_clean_accuracy": 0.91186738873464,
+            "control_robust_accuracy": 0.6071693652582676,
+            "count": 36377,
+            "harm_count": 2357,
+            "harm_rate": 0.06479368831954258,
+            "net_rescue_count": -651,
+            "net_rescue_rate": -0.017895923248206283,
+            "rescue_count": 1706,
+            "rescue_rate": 0.046897765071336285,
+            "robust_accuracy_delta": -0.017895923248206283,
+            "treatment_clean_accuracy": 0.9055996921131484,
+            "treatment_robust_accuracy": 0.5892734420100613
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.04812477671868271,
+            "clean_accuracy": 0.7794444444444445,
+            "clean_probability_margin": 0.241602199485898,
+            "count": 45000,
+            "robust_accuracy": 0.481
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.031063150943265665,
+              "clean_accuracy_delta": -0.010553171749971007,
+              "clean_harm_count": 555,
+              "clean_margin_delta": -0.01367058746139121,
+              "clean_rescue_count": 464,
+              "control_clean_accuracy": 0.25779890989214893,
+              "control_robust_accuracy": 0.032587266612547836,
+              "count": 8623,
+              "harm_count": 150,
+              "harm_rate": 0.01739533804940276,
+              "net_rescue_count": -72,
+              "net_rescue_rate": -0.008349762263713326,
+              "rescue_count": 78,
+              "rescue_rate": 0.009045575785689436,
+              "robust_accuracy_delta": -0.008349762263713326,
+              "treatment_clean_accuracy": 0.2472457381421779,
+              "treatment_robust_accuracy": 0.024237504348834513
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.2228747771394705,
+              "clean_accuracy": 0.2472457381421779,
+              "clean_probability_margin": -0.08631369567112346,
+              "count": 8623,
+              "robust_accuracy": 0.024237504348834513
+            }
+          }
+        },
+        "CW2": {
+          "mask_key": "student_clean_wrong",
+          "nonselected_paired": {
+            "adversarial_margin_delta": -0.0011293825252537127,
+            "clean_accuracy_delta": 0.007779640981939138,
+            "clean_harm_count": 818,
+            "clean_margin_delta": 0.0218802307439184,
+            "clean_rescue_count": 1101,
+            "control_clean_accuracy": 0.91186738873464,
+            "control_robust_accuracy": 0.6071693652582676,
+            "count": 36377,
+            "harm_count": 2517,
+            "harm_rate": 0.06919207191357177,
+            "net_rescue_count": -499,
+            "net_rescue_rate": -0.01371745883387855,
+            "rescue_count": 2018,
+            "rescue_rate": 0.05547461307969321,
+            "robust_accuracy_delta": -0.01371745883387855,
+            "treatment_clean_accuracy": 0.9196470297165792,
+            "treatment_robust_accuracy": 0.593451906424389
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.05390309100101391,
+            "clean_accuracy": 0.8040666666666667,
+            "clean_probability_margin": 0.255511784845425,
+            "count": 45000,
+            "robust_accuracy": 0.48617777777777776
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.019243443266609685,
+              "clean_accuracy_delta": 0.058680273686651976,
+              "clean_harm_count": 361,
+              "clean_margin_delta": 0.013516505738428901,
+              "clean_rescue_count": 867,
+              "control_clean_accuracy": 0.25779890989214893,
+              "control_robust_accuracy": 0.032587266612547836,
+              "count": 8623,
+              "harm_count": 117,
+              "harm_rate": 0.013568363678534152,
+              "net_rescue_count": 9,
+              "net_rescue_rate": 0.0010437202829641657,
+              "rescue_count": 126,
+              "rescue_rate": 0.014612083961498318,
+              "robust_accuracy_delta": 0.0010437202829641657,
+              "treatment_clean_accuracy": 0.3164791835788009,
+              "treatment_robust_accuracy": 0.033630986895512
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.2110550694628145,
+              "clean_accuracy": 0.3164791835788009,
+              "clean_probability_margin": -0.05912660247130335,
+              "count": 8623,
+              "robust_accuracy": 0.033630986895512
+            }
+          }
+        },
+        "CW3": {
+          "mask_key": "student_clean_wrong",
+          "nonselected_paired": {
+            "adversarial_margin_delta": -0.011871521704929744,
+            "clean_accuracy_delta": -0.011325837754625175,
+            "clean_harm_count": 1232,
+            "clean_margin_delta": 0.006575129567162765,
+            "clean_rescue_count": 820,
+            "control_clean_accuracy": 0.91186738873464,
+            "control_robust_accuracy": 0.6071693652582676,
+            "count": 36377,
+            "harm_count": 2798,
+            "harm_rate": 0.07691673310058554,
+            "net_rescue_count": -1184,
+            "net_rescue_rate": -0.03254803859581604,
+            "rescue_count": 1614,
+            "rescue_rate": 0.0443686945047695,
+            "robust_accuracy_delta": -0.03254803859581604,
+            "treatment_clean_accuracy": 0.9005415509800149,
+            "treatment_robust_accuracy": 0.5746213266624516
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.04581423341251082,
+            "clean_accuracy": 0.7878,
+            "clean_probability_margin": 0.24249741003397438,
+            "count": 45000,
+            "robust_accuracy": 0.4718
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.01613916338067258,
+              "clean_accuracy_delta": 0.054389423634465965,
+              "clean_harm_count": 341,
+              "clean_margin_delta": 0.010165792412621286,
+              "clean_rescue_count": 810,
+              "control_clean_accuracy": 0.25779890989214893,
+              "control_robust_accuracy": 0.032587266612547836,
+              "count": 8623,
+              "harm_count": 109,
+              "harm_rate": 0.012640612315899339,
+              "net_rescue_count": 47,
+              "net_rescue_rate": 0.0054505392554795315,
+              "rescue_count": 156,
+              "rescue_rate": 0.01809115157137887,
+              "robust_accuracy_delta": 0.0054505392554795315,
+              "treatment_clean_accuracy": 0.31218833352661485,
+              "treatment_robust_accuracy": 0.038037805868027366
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.2079507895768774,
+              "clean_accuracy": 0.31218833352661485,
+              "clean_probability_margin": -0.062477315797110966,
+              "count": 8623,
+              "robust_accuracy": 0.038037805868027366
+            }
+          }
+        },
+        "ST1M": {
+          "mask_key": "s3_t1_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": -0.014660095078909646,
+            "clean_accuracy_delta": -0.004471533137763094,
+            "clean_harm_count": 1139,
+            "clean_margin_delta": -0.0021189382778664893,
+            "clean_rescue_count": 982,
+            "control_clean_accuracy": 0.7602460767280909,
+            "control_robust_accuracy": 0.5377801828486799,
+            "count": 35111,
+            "harm_count": 1857,
+            "harm_rate": 0.05288940787787303,
+            "net_rescue_count": -893,
+            "net_rescue_rate": -0.025433624789951866,
+            "rescue_count": 964,
+            "rescue_rate": 0.027455783087921164,
+            "robust_accuracy_delta": -0.025433624789951866,
+            "treatment_clean_accuracy": 0.7557745435903278,
+            "treatment_robust_accuracy": 0.5123465580587281
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.04393117112318675,
+            "clean_accuracy": 0.7772666666666667,
+            "clean_probability_margin": 0.23447976647665103,
+            "count": 45000,
+            "robust_accuracy": 0.4736666666666667
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.014260851005739263,
+              "clean_accuracy_delta": -0.026291839417534633,
+              "clean_harm_count": 561,
+              "clean_margin_delta": 0.004090120136852344,
+              "clean_rescue_count": 301,
+              "control_clean_accuracy": 0.8798665183537263,
+              "control_robust_accuracy": 0.35251289311356054,
+              "count": 9889,
+              "harm_count": 850,
+              "harm_rate": 0.08595409040347861,
+              "net_rescue_count": -160,
+              "net_rescue_rate": -0.016179593487713622,
+              "rescue_count": 690,
+              "rescue_rate": 0.069774496915765,
+              "robust_accuracy_delta": -0.016179593487713622,
+              "treatment_clean_accuracy": 0.8535746789361918,
+              "treatment_robust_accuracy": 0.3363332996258469
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.05742512166421736,
+              "clean_accuracy": 0.8535746789361918,
+              "clean_probability_margin": 0.1751534652067745,
+              "count": 9889,
+              "robust_accuracy": 0.3363332996258469
+            }
+          }
+        },
+        "ST1S": {
+          "mask_key": "s3_t1_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": -0.002064042121833169,
+            "clean_accuracy_delta": -0.014354475805303182,
+            "clean_harm_count": 1400,
+            "clean_margin_delta": -0.012455021551649756,
+            "clean_rescue_count": 896,
+            "control_clean_accuracy": 0.7602460767280909,
+            "control_robust_accuracy": 0.5377801828486799,
+            "count": 35111,
+            "harm_count": 1563,
+            "harm_rate": 0.04451596365811284,
+            "net_rescue_count": -131,
+            "net_rescue_rate": -0.003731024465267295,
+            "rescue_count": 1432,
+            "rescue_rate": 0.040784939192845544,
+            "robust_accuracy_delta": -0.003731024465267295,
+            "treatment_clean_accuracy": 0.7458916009227877,
+            "treatment_robust_accuracy": 0.5340491583834126
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.0550679723550876,
+            "clean_accuracy": 0.7670888888888889,
+            "clean_probability_margin": 0.219855827544464,
+            "count": 45000,
+            "robust_accuracy": 0.4865777777777778
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.008305138591983969,
+              "clean_accuracy_delta": -0.03751643239963596,
+              "clean_harm_count": 684,
+              "clean_margin_delta": -0.02575789605513997,
+              "clean_rescue_count": 313,
+              "control_clean_accuracy": 0.8798665183537263,
+              "control_robust_accuracy": 0.35251289311356054,
+              "count": 9889,
+              "harm_count": 1044,
+              "harm_rate": 0.10557184750733138,
+              "net_rescue_count": -341,
+              "net_rescue_rate": -0.034482758620689655,
+              "rescue_count": 703,
+              "rescue_rate": 0.07108908888664173,
+              "robust_accuracy_delta": -0.034482758620689655,
+              "treatment_clean_accuracy": 0.8423500859540904,
+              "treatment_robust_accuracy": 0.3180301344928709
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.05146940925046206,
+              "clean_accuracy": 0.8423500859540904,
+              "clean_probability_margin": 0.14530544901478218,
+              "count": 9889,
+              "robust_accuracy": 0.3180301344928709
+            }
+          }
+        },
+        "ST1W": {
+          "mask_key": "s3_t1_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.0038674469541839255,
+            "clean_accuracy_delta": -0.00811711429466549,
+            "clean_harm_count": 1142,
+            "clean_margin_delta": -0.001760091083110752,
+            "clean_rescue_count": 857,
+            "control_clean_accuracy": 0.7602460767280909,
+            "control_robust_accuracy": 0.5377801828486799,
+            "count": 35111,
+            "harm_count": 1238,
+            "harm_rate": 0.035259605251915356,
+            "net_rescue_count": 120,
+            "net_rescue_rate": 0.0034177323345959956,
+            "rescue_count": 1358,
+            "rescue_rate": 0.03867733758651135,
+            "robust_accuracy_delta": 0.0034177323345959956,
+            "treatment_clean_accuracy": 0.7521289624334254,
+            "treatment_robust_accuracy": 0.5411979151832759
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.06547654045124848,
+            "clean_accuracy": 0.7799777777777778,
+            "clean_probability_margin": 0.23534140481882626,
+            "count": 45000,
+            "robust_accuracy": 0.5094222222222222
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": 0.017999346328554384,
+              "clean_accuracy_delta": -0.0010112245929821014,
+              "clean_harm_count": 382,
+              "clean_margin_delta": 0.006736923811927292,
+              "clean_rescue_count": 372,
+              "control_clean_accuracy": 0.8798665183537263,
+              "control_robust_accuracy": 0.35251289311356054,
+              "count": 9889,
+              "harm_count": 574,
+              "harm_rate": 0.05804429163717262,
+              "net_rescue_count": 436,
+              "net_rescue_rate": 0.044089392254019616,
+              "rescue_count": 1010,
+              "rescue_rate": 0.10213368389119223,
+              "robust_accuracy_delta": 0.044089392254019616,
+              "treatment_clean_accuracy": 0.8788552937607442,
+              "treatment_robust_accuracy": 0.39660228536758013
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.025164924329923708,
+              "clean_accuracy": 0.8788552937607442,
+              "clean_probability_margin": 0.17780026888184944,
+              "count": 9889,
+              "robust_accuracy": 0.39660228536758013
+            }
+          }
+        },
+        "ST2M": {
+          "mask_key": "s3_t2_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": -0.005397476279025675,
+            "clean_accuracy_delta": -0.006933096783229843,
+            "clean_harm_count": 1382,
+            "clean_margin_delta": -0.0020926846778717267,
+            "clean_rescue_count": 1085,
+            "control_clean_accuracy": 0.7907698772118212,
+            "control_robust_accuracy": 0.5178579765628647,
+            "count": 42838,
+            "harm_count": 2199,
+            "harm_rate": 0.05133292870815631,
+            "net_rescue_count": -603,
+            "net_rescue_rate": -0.014076287408375741,
+            "rescue_count": 1596,
+            "rescue_rate": 0.03725664129978057,
+            "robust_accuracy_delta": -0.014076287408375741,
+            "treatment_clean_accuracy": 0.7838367804285914,
+            "treatment_robust_accuracy": 0.503781689154489
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.05324128922141261,
+            "clean_accuracy": 0.7789111111111111,
+            "clean_probability_margin": 0.23329125868876774,
+            "count": 45000,
+            "robust_accuracy": 0.4854222222222222
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.0025826783766358346,
+              "clean_accuracy_delta": -0.02127659574468085,
+              "clean_harm_count": 174,
+              "clean_margin_delta": 0.0010234652798722784,
+              "clean_rescue_count": 128,
+              "control_clean_accuracy": 0.7025901942645698,
+              "control_robust_accuracy": 0.0851063829787234,
+              "count": 2162,
+              "harm_count": 71,
+              "harm_rate": 0.03283996299722479,
+              "net_rescue_count": 79,
+              "net_rescue_rate": 0.03654024051803885,
+              "rescue_count": 150,
+              "rescue_rate": 0.06938020351526364,
+              "robust_accuracy_delta": 0.03654024051803885,
+              "treatment_clean_accuracy": 0.681313598519889,
+              "treatment_robust_accuracy": 0.12164662349676225
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.11424339250433126,
+              "clean_accuracy": 0.681313598519889,
+              "clean_probability_margin": 0.046418875245641054,
+              "count": 2162,
+              "robust_accuracy": 0.12164662349676225
+            }
+          }
+        },
+        "ST2S": {
+          "mask_key": "s3_t2_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.003283324855564077,
+            "clean_accuracy_delta": -0.008543816237919603,
+            "clean_harm_count": 1622,
+            "clean_margin_delta": -0.007458442323022187,
+            "clean_rescue_count": 1256,
+            "control_clean_accuracy": 0.7907698772118212,
+            "control_robust_accuracy": 0.5178579765628647,
+            "count": 42838,
+            "harm_count": 2178,
+            "harm_rate": 0.050842709743685516,
+            "net_rescue_count": 115,
+            "net_rescue_rate": 0.0026845324244829357,
+            "rescue_count": 2293,
+            "rescue_rate": 0.05352724216816845,
+            "robust_accuracy_delta": 0.0026845324244829357,
+            "treatment_clean_accuracy": 0.7822260609739017,
+            "treatment_robust_accuracy": 0.5205425089873477
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.06175414951791366,
+            "clean_accuracy": 0.7752444444444444,
+            "clean_probability_margin": 0.22728592292583652,
+            "count": 45000,
+            "robust_accuracy": 0.4993111111111111
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": 0.0026025919004185787,
+              "clean_accuracy_delta": -0.06567992599444958,
+              "clean_harm_count": 300,
+              "clean_margin_delta": -0.01765451035794012,
+              "clean_rescue_count": 158,
+              "control_clean_accuracy": 0.7025901942645698,
+              "control_robust_accuracy": 0.0851063829787234,
+              "count": 2162,
+              "harm_count": 105,
+              "harm_rate": 0.04856614246068455,
+              "net_rescue_count": -14,
+              "net_rescue_rate": -0.0064754856614246065,
+              "rescue_count": 91,
+              "rescue_rate": 0.04209065679925995,
+              "robust_accuracy_delta": -0.0064754856614246065,
+              "treatment_clean_accuracy": 0.6369102682701202,
+              "treatment_robust_accuracy": 0.0786308973172988
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.10905812222727684,
+              "clean_accuracy": 0.6369102682701202,
+              "clean_probability_margin": 0.027740899607828655,
+              "count": 2162,
+              "robust_accuracy": 0.0786308973172988
+            }
+          }
+        },
+        "ST2W": {
+          "mask_key": "s3_t2_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.005924377649552215,
+            "clean_accuracy_delta": 0.0031047201083150475,
+            "clean_harm_count": 1186,
+            "clean_margin_delta": 0.0047753788141235536,
+            "clean_rescue_count": 1319,
+            "control_clean_accuracy": 0.7907698772118212,
+            "control_robust_accuracy": 0.5178579765628647,
+            "count": 42838,
+            "harm_count": 1907,
+            "harm_rate": 0.04451655072599094,
+            "net_rescue_count": 348,
+            "net_rescue_rate": 0.008123628554087492,
+            "rescue_count": 2255,
+            "rescue_rate": 0.052640179280078435,
+            "robust_accuracy_delta": 0.008123628554087492,
+            "treatment_clean_accuracy": 0.7938745973201363,
+            "treatment_robust_accuracy": 0.5259816051169522
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.0643099871966574,
+            "clean_accuracy": 0.7892,
+            "clean_probability_margin": 0.23964928904390997,
+            "count": 45000,
+            "robust_accuracy": 0.5047777777777778
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": 0.0034699720829366866,
+              "clean_accuracy_delta": -0.006012950971322849,
+              "clean_harm_count": 193,
+              "clean_margin_delta": -0.0027243320784504825,
+              "clean_rescue_count": 180,
+              "control_clean_accuracy": 0.7025901942645698,
+              "control_robust_accuracy": 0.0851063829787234,
+              "count": 2162,
+              "harm_count": 78,
+              "harm_rate": 0.036077705827937095,
+              "net_rescue_count": -1,
+              "net_rescue_rate": -0.00046253469010175765,
+              "rescue_count": 77,
+              "rescue_rate": 0.035615171137835334,
+              "robust_accuracy_delta": -0.00046253469010175765,
+              "treatment_clean_accuracy": 0.696577243293247,
+              "treatment_robust_accuracy": 0.08464384828862165
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.10819074204475873,
+              "clean_accuracy": 0.696577243293247,
+              "clean_probability_margin": 0.04267107788731829,
+              "count": 2162,
+              "robust_accuracy": 0.08464384828862165
+            }
+          }
+        },
+        "ST3K0": {
+          "mask_key": "s3_t3_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.00021048239868731722,
+            "clean_accuracy_delta": -0.005947697292293451,
+            "clean_harm_count": 1409,
+            "clean_margin_delta": 0.0008314200557787312,
+            "clean_rescue_count": 1152,
+            "control_clean_accuracy": 0.7997917148808146,
+            "control_robust_accuracy": 0.5165239527887063,
+            "count": 43210,
+            "harm_count": 2207,
+            "harm_rate": 0.051076139782457765,
+            "net_rescue_count": -61,
+            "net_rescue_rate": -0.0014117102522564222,
+            "rescue_count": 2146,
+            "rescue_rate": 0.049664429530201344,
+            "robust_accuracy_delta": -0.0014117102522564222,
+            "treatment_clean_accuracy": 0.7938440175885212,
+            "treatment_robust_accuracy": 0.5151122425364499
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.058262135433322856,
+            "clean_accuracy": 0.7791555555555556,
+            "clean_probability_margin": 0.23560235875066785,
+            "count": 45000,
+            "robust_accuracy": 0.4958444444444444
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.011149555532126453,
+              "clean_accuracy_delta": -0.04189944134078212,
+              "clean_harm_count": 232,
+              "clean_margin_delta": -0.010815559843731993,
+              "clean_rescue_count": 157,
+              "control_clean_accuracy": 0.4664804469273743,
+              "control_robust_accuracy": 0.027374301675977653,
+              "count": 1790,
+              "harm_count": 25,
+              "harm_rate": 0.013966480446927373,
+              "net_rescue_count": 6,
+              "net_rescue_rate": 0.0033519553072625698,
+              "rescue_count": 31,
+              "rescue_rate": 0.017318435754189943,
+              "robust_accuracy_delta": 0.0033519553072625698,
+              "treatment_clean_accuracy": 0.4245810055865922,
+              "treatment_robust_accuracy": 0.030726256983240222
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.1748358462193159,
+              "clean_accuracy": 0.4245810055865922,
+              "clean_probability_margin": -0.01288605349023915,
+              "count": 1790,
+              "robust_accuracy": 0.030726256983240222
+            }
+          }
+        },
+        "ST3K05": {
+          "mask_key": "s3_t3_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.00915882030199783,
+            "clean_accuracy_delta": 0.004582272622078222,
+            "clean_harm_count": 1079,
+            "clean_margin_delta": 0.007679054687638935,
+            "clean_rescue_count": 1277,
+            "control_clean_accuracy": 0.7997917148808146,
+            "control_robust_accuracy": 0.5165239527887063,
+            "count": 43210,
+            "harm_count": 1761,
+            "harm_rate": 0.04075445498727146,
+            "net_rescue_count": 536,
+            "net_rescue_rate": 0.012404535987040038,
+            "rescue_count": 2297,
+            "rescue_rate": 0.0531589909743115,
+            "robust_accuracy_delta": 0.012404535987040038,
+            "treatment_clean_accuracy": 0.8043739875028928,
+            "treatment_robust_accuracy": 0.5289284887757464
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.06716625741571187,
+            "clean_accuracy": 0.7916444444444445,
+            "clean_probability_margin": 0.24265648299405973,
+            "count": 45000,
+            "robust_accuracy": 0.5088666666666667
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.0033127910598030304,
+              "clean_accuracy_delta": 0.017877094972067038,
+              "clean_harm_count": 150,
+              "clean_margin_delta": 0.0012231544076397433,
+              "clean_rescue_count": 182,
+              "control_clean_accuracy": 0.4664804469273743,
+              "control_robust_accuracy": 0.027374301675977653,
+              "count": 1790,
+              "harm_count": 25,
+              "harm_rate": 0.013966480446927373,
+              "net_rescue_count": -5,
+              "net_rescue_rate": -0.002793296089385475,
+              "rescue_count": 20,
+              "rescue_rate": 0.0111731843575419,
+              "robust_accuracy_delta": -0.002793296089385475,
+              "treatment_clean_accuracy": 0.48435754189944136,
+              "treatment_robust_accuracy": 0.024581005586592177
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.16699908174699246,
+              "clean_accuracy": 0.48435754189944136,
+              "clean_probability_margin": -0.0008473392388674134,
+              "count": 1790,
+              "robust_accuracy": 0.024581005586592177
+            }
+          }
+        },
+        "ST3K1": {
+          "mask_key": "s3_t3_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.0003492040360064949,
+            "clean_accuracy_delta": -0.004767414950242999,
+            "clean_harm_count": 1374,
+            "clean_margin_delta": -0.01077556057891976,
+            "clean_rescue_count": 1168,
+            "control_clean_accuracy": 0.7997917148808146,
+            "control_robust_accuracy": 0.5165239527887063,
+            "count": 43210,
+            "harm_count": 2027,
+            "harm_rate": 0.04691043739875029,
+            "net_rescue_count": 211,
+            "net_rescue_rate": 0.004883128905345984,
+            "rescue_count": 2238,
+            "rescue_rate": 0.051793566304096275,
+            "robust_accuracy_delta": 0.004883128905345984,
+            "treatment_clean_accuracy": 0.7950242999305717,
+            "treatment_robust_accuracy": 0.5214070816940523
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.05907229236943854,
+            "clean_accuracy": 0.7805111111111112,
+            "clean_probability_margin": 0.22465968544714982,
+            "count": 45000,
+            "robust_accuracy": 0.5020666666666667
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": 0.005868824454825684,
+              "clean_accuracy_delta": -0.036312849162011177,
+              "clean_harm_count": 220,
+              "clean_margin_delta": -0.005722076845402158,
+              "clean_rescue_count": 155,
+              "control_clean_accuracy": 0.4664804469273743,
+              "control_robust_accuracy": 0.027374301675977653,
+              "count": 1790,
+              "harm_count": 21,
+              "harm_rate": 0.011731843575418994,
+              "net_rescue_count": 14,
+              "net_rescue_rate": 0.00782122905027933,
+              "rescue_count": 35,
+              "rescue_rate": 0.019553072625698324,
+              "robust_accuracy_delta": 0.00782122905027933,
+              "treatment_clean_accuracy": 0.4301675977653631,
+              "treatment_robust_accuracy": 0.03519553072625698
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.15781746623236373,
+              "clean_accuracy": 0.4301675977653631,
+              "clean_probability_margin": -0.007792570491909315,
+              "count": 1790,
+              "robust_accuracy": 0.03519553072625698
+            }
+          }
+        }
+      }
+    },
+    "L4": {
+      "arms": {
+        "C79": {
+          "overall": {
+            "adversarial_probability_margin": 0.049409739753769506,
+            "clean_accuracy": 0.7858222222222222,
+            "clean_probability_margin": 0.2259394644210736,
+            "count": 45000,
+            "robust_accuracy": 0.4925111111111111
+          },
+          "selected": null
+        },
+        "CW1": {
+          "mask_key": "student_clean_wrong",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.006067239881305338,
+            "clean_accuracy_delta": 0.012085932085932087,
+            "clean_harm_count": 882,
+            "clean_margin_delta": 0.025068613251339456,
+            "clean_rescue_count": 1318,
+            "control_clean_accuracy": 0.9122661122661123,
+            "control_robust_accuracy": 0.6053222453222453,
+            "count": 36075,
+            "harm_count": 2575,
+            "harm_rate": 0.07137907137907137,
+            "net_rescue_count": 27,
+            "net_rescue_rate": 0.0007484407484407485,
+            "rescue_count": 2602,
+            "rescue_rate": 0.07212751212751213,
+            "robust_accuracy_delta": 0.0007484407484407485,
+            "treatment_clean_accuracy": 0.9243520443520443,
+            "treatment_robust_accuracy": 0.606070686070686
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.044966399578584566,
+            "clean_accuracy": 0.7893555555555556,
+            "clean_probability_margin": 0.24180990702476765,
+            "count": 45000,
+            "robust_accuracy": 0.48995555555555553
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.04692728141192295,
+              "clean_accuracy_delta": -0.031036414565826332,
+              "clean_harm_count": 831,
+              "clean_margin_delta": -0.02130871774519191,
+              "clean_rescue_count": 554,
+              "control_clean_accuracy": 0.27473389355742295,
+              "control_robust_accuracy": 0.036526610644257704,
+              "count": 8925,
+              "harm_count": 226,
+              "harm_rate": 0.025322128851540615,
+              "net_rescue_count": -142,
+              "net_rescue_rate": -0.015910364145658263,
+              "rescue_count": 84,
+              "rescue_rate": 0.009411764705882352,
+              "robust_accuracy_delta": -0.015910364145658263,
+              "treatment_clean_accuracy": 0.24369747899159663,
+              "treatment_robust_accuracy": 0.02061624649859944
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.22993164972430852,
+              "clean_accuracy": 0.24369747899159663,
+              "clean_probability_margin": -0.08331151921876004,
+              "count": 8925,
+              "robust_accuracy": 0.02061624649859944
+            }
+          }
+        },
+        "CW2": {
+          "mask_key": "student_clean_wrong",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.014661206207751236,
+            "clean_accuracy_delta": 0.022674982674982674,
+            "clean_harm_count": 731,
+            "clean_margin_delta": 0.03405322035566768,
+            "clean_rescue_count": 1549,
+            "control_clean_accuracy": 0.9122661122661123,
+            "control_robust_accuracy": 0.6053222453222453,
+            "count": 36075,
+            "harm_count": 2778,
+            "harm_rate": 0.077006237006237,
+            "net_rescue_count": 199,
+            "net_rescue_rate": 0.005516285516285516,
+            "rescue_count": 2977,
+            "rescue_rate": 0.08252252252252253,
+            "robust_accuracy_delta": 0.005516285516285516,
+            "treatment_clean_accuracy": 0.9349410949410949,
+            "treatment_robust_accuracy": 0.6108385308385308
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.054313004803988665,
+            "clean_accuracy": 0.8095333333333333,
+            "clean_probability_margin": 0.25346262729300395,
+            "count": 45000,
+            "robust_accuracy": 0.4949777777777778
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.034538497107536516,
+              "clean_accuracy_delta": 0.027899159663865546,
+              "clean_harm_count": 651,
+              "clean_margin_delta": 0.0011285607737987315,
+              "clean_rescue_count": 900,
+              "control_clean_accuracy": 0.27473389355742295,
+              "control_robust_accuracy": 0.036526610644257704,
+              "count": 8925,
+              "harm_count": 215,
+              "harm_rate": 0.024089635854341738,
+              "net_rescue_count": -88,
+              "net_rescue_rate": -0.009859943977591037,
+              "rescue_count": 127,
+              "rescue_rate": 0.0142296918767507,
+              "robust_accuracy_delta": -0.009859943977591037,
+              "treatment_clean_accuracy": 0.30263305322128853,
+              "treatment_robust_accuracy": 0.02666666666666667
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.2175428654199221,
+              "clean_accuracy": 0.30263305322128853,
+              "clean_probability_margin": -0.060874240699769405,
+              "count": 8925,
+              "robust_accuracy": 0.02666666666666667
+            }
+          }
+        },
+        "CW3": {
+          "mask_key": "student_clean_wrong",
+          "nonselected_paired": {
+            "adversarial_margin_delta": -0.001753381635898199,
+            "clean_accuracy_delta": 0.019404019404019403,
+            "clean_harm_count": 573,
+            "clean_margin_delta": 0.022161531002671868,
+            "clean_rescue_count": 1273,
+            "control_clean_accuracy": 0.9122661122661123,
+            "control_robust_accuracy": 0.6053222453222453,
+            "count": 36075,
+            "harm_count": 2469,
+            "harm_rate": 0.06844074844074845,
+            "net_rescue_count": -373,
+            "net_rescue_rate": -0.01033957033957034,
+            "rescue_count": 2096,
+            "rescue_rate": 0.058101178101178104,
+            "robust_accuracy_delta": -0.01033957033957034,
+            "treatment_clean_accuracy": 0.9316701316701317,
+            "treatment_robust_accuracy": 0.594982674982675
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.04296463542017672,
+            "clean_accuracy": 0.8110444444444445,
+            "clean_probability_margin": 0.24612060599211188,
+            "count": 45000,
+            "robust_accuracy": 0.48302222222222224
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.02540912633015662,
+              "clean_accuracy_delta": 0.04873949579831933,
+              "clean_harm_count": 415,
+              "clean_margin_delta": 0.012176374204519416,
+              "clean_rescue_count": 850,
+              "control_clean_accuracy": 0.27473389355742295,
+              "control_robust_accuracy": 0.036526610644257704,
+              "count": 8925,
+              "harm_count": 163,
+              "harm_rate": 0.018263305322128852,
+              "net_rescue_count": -54,
+              "net_rescue_rate": -0.006050420168067227,
+              "rescue_count": 109,
+              "rescue_rate": 0.012212885154061624,
+              "robust_accuracy_delta": -0.006050420168067227,
+              "treatment_clean_accuracy": 0.3234733893557423,
+              "treatment_robust_accuracy": 0.030476190476190476
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.2084134946425422,
+              "clean_accuracy": 0.3234733893557423,
+              "clean_probability_margin": -0.04982642726904872,
+              "count": 8925,
+              "robust_accuracy": 0.030476190476190476
+            }
+          }
+        },
+        "ST1M": {
+          "mask_key": "s3_t1_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.006281927115479204,
+            "clean_accuracy_delta": 0.008784238886394253,
+            "clean_harm_count": 885,
+            "clean_margin_delta": 0.013766501318633249,
+            "clean_rescue_count": 1198,
+            "control_clean_accuracy": 0.7599910193084868,
+            "control_robust_accuracy": 0.526829815895824,
+            "count": 35632,
+            "harm_count": 1382,
+            "harm_rate": 0.03878536147283341,
+            "net_rescue_count": 154,
+            "net_rescue_rate": 0.004321957790749888,
+            "rescue_count": 1536,
+            "rescue_rate": 0.0431073192635833,
+            "robust_accuracy_delta": 0.004321957790749888,
+            "treatment_clean_accuracy": 0.768775258194881,
+            "treatment_robust_accuracy": 0.5311517736865738
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.054922471199101874,
+            "clean_accuracy": 0.7978888888888889,
+            "clean_probability_margin": 0.24088603372342057,
+            "count": 45000,
+            "robust_accuracy": 0.4968222222222222
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": 0.002587029041545855,
+              "clean_accuracy_delta": 0.024551665243381725,
+              "clean_harm_count": 264,
+              "clean_margin_delta": 0.019435060164397288,
+              "clean_rescue_count": 494,
+              "control_clean_accuracy": 0.8840734415029889,
+              "control_robust_accuracy": 0.3619769427839453,
+              "count": 9368,
+              "harm_count": 748,
+              "harm_rate": 0.0798462852263023,
+              "net_rescue_count": 40,
+              "net_rescue_rate": 0.004269854824935952,
+              "rescue_count": 788,
+              "rescue_rate": 0.08411614005123826,
+              "robust_accuracy_delta": 0.004269854824935952,
+              "treatment_clean_accuracy": 0.9086251067463706,
+              "treatment_robust_accuracy": 0.3662467976088813
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.028231570812898198,
+              "clean_accuracy": 0.9086251067463706,
+              "clean_probability_margin": 0.1932447597584874,
+              "count": 9368,
+              "robust_accuracy": 0.3662467976088813
+            }
+          }
+        },
+        "ST1S": {
+          "mask_key": "s3_t1_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.019065414859399325,
+            "clean_accuracy_delta": 0.004321957790749888,
+            "clean_harm_count": 1158,
+            "clean_margin_delta": 0.007454858368934271,
+            "clean_rescue_count": 1312,
+            "control_clean_accuracy": 0.7599910193084868,
+            "control_robust_accuracy": 0.526829815895824,
+            "count": 35632,
+            "harm_count": 1253,
+            "harm_rate": 0.0351650202065559,
+            "net_rescue_count": 1008,
+            "net_rescue_rate": 0.02828917826672654,
+            "rescue_count": 2261,
+            "rescue_rate": 0.06345419847328244,
+            "robust_accuracy_delta": 0.02828917826672654,
+            "treatment_clean_accuracy": 0.7643129770992366,
+            "treatment_robust_accuracy": 0.5551189941625505
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.06213351272725397,
+            "clean_accuracy": 0.7903333333333333,
+            "clean_probability_margin": 0.2281316223702497,
+            "count": 45000,
+            "robust_accuracy": 0.5056666666666667
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.011397211620763873,
+              "clean_accuracy_delta": 0.0052305721605465415,
+              "clean_harm_count": 455,
+              "clean_margin_delta": -0.01782497925799973,
+              "clean_rescue_count": 504,
+              "control_clean_accuracy": 0.8840734415029889,
+              "control_robust_accuracy": 0.3619769427839453,
+              "count": 9368,
+              "harm_count": 1213,
+              "harm_rate": 0.12948334756618274,
+              "net_rescue_count": -416,
+              "net_rescue_rate": -0.0444064901793339,
+              "rescue_count": 797,
+              "rescue_rate": 0.08507685738684885,
+              "robust_accuracy_delta": -0.0444064901793339,
+              "treatment_clean_accuracy": 0.8893040136635354,
+              "treatment_robust_accuracy": 0.3175704526046114
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.04221581147520793,
+              "clean_accuracy": 0.8893040136635354,
+              "clean_probability_margin": 0.1559847203360904,
+              "count": 9368,
+              "robust_accuracy": 0.3175704526046114
+            }
+          }
+        },
+        "ST1W": {
+          "mask_key": "s3_t1_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 9.192842768516089e-05,
+            "clean_accuracy_delta": -0.004462281095644364,
+            "clean_harm_count": 1051,
+            "clean_margin_delta": -0.005091321919544976,
+            "clean_rescue_count": 892,
+            "control_clean_accuracy": 0.7599910193084868,
+            "control_robust_accuracy": 0.526829815895824,
+            "count": 35632,
+            "harm_count": 1405,
+            "harm_rate": 0.039430848675348004,
+            "net_rescue_count": -14,
+            "net_rescue_rate": -0.0003929052537045352,
+            "rescue_count": 1391,
+            "rescue_rate": 0.03903794342164347,
+            "robust_accuracy_delta": -0.0003929052537045352,
+            "treatment_clean_accuracy": 0.7555287382128424,
+            "treatment_robust_accuracy": 0.5264369106421194
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.0505615304476685,
+            "clean_accuracy": 0.7820888888888888,
+            "clean_probability_margin": 0.22168764624181722,
+            "count": 45000,
+            "robust_accuracy": 0.4968
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": 0.005183068690240943,
+              "clean_accuracy_delta": -0.0009607173356105893,
+              "clean_harm_count": 349,
+              "clean_margin_delta": -0.0010586929365190862,
+              "clean_rescue_count": 340,
+              "control_clean_accuracy": 0.8840734415029889,
+              "control_robust_accuracy": 0.3619769427839453,
+              "count": 9368,
+              "harm_count": 643,
+              "harm_rate": 0.06863791631084543,
+              "net_rescue_count": 207,
+              "net_rescue_rate": 0.022096498719043553,
+              "rescue_count": 850,
+              "rescue_rate": 0.09073441502988898,
+              "robust_accuracy_delta": 0.022096498719043553,
+              "treatment_clean_accuracy": 0.8831127241673783,
+              "treatment_robust_accuracy": 0.3840734415029889
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.02563553116420311,
+              "clean_accuracy": 0.8831127241673783,
+              "clean_probability_margin": 0.17275100665757104,
+              "count": 9368,
+              "robust_accuracy": 0.3840734415029889
+            }
+          }
+        },
+        "ST2M": {
+          "mask_key": "s3_t2_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.00917096703196088,
+            "clean_accuracy_delta": 0.005482711959311278,
+            "clean_harm_count": 1138,
+            "clean_margin_delta": 0.008889506749819566,
+            "clean_rescue_count": 1373,
+            "control_clean_accuracy": 0.7919602445056227,
+            "control_robust_accuracy": 0.512901871121273,
+            "count": 42862,
+            "harm_count": 1953,
+            "harm_rate": 0.04556483598525501,
+            "net_rescue_count": 473,
+            "net_rescue_rate": 0.011035415986188232,
+            "rescue_count": 2426,
+            "rescue_rate": 0.056600251971443236,
+            "robust_accuracy_delta": 0.011035415986188232,
+            "treatment_clean_accuracy": 0.797442956464934,
+            "treatment_robust_accuracy": 0.5239372871074611
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.05851247008641561,
+            "clean_accuracy": 0.7926444444444445,
+            "clean_probability_margin": 0.23483511241161162,
+            "count": 45000,
+            "robust_accuracy": 0.5031777777777777
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": 0.0077347409004525,
+              "clean_accuracy_delta": 0.03367633302151544,
+              "clean_harm_count": 140,
+              "clean_margin_delta": 0.009018765792069422,
+              "clean_rescue_count": 212,
+              "control_clean_accuracy": 0.6627689429373246,
+              "control_robust_accuracy": 0.08372310570626754,
+              "count": 2138,
+              "harm_count": 87,
+              "harm_rate": 0.04069223573433115,
+              "net_rescue_count": 7,
+              "net_rescue_rate": 0.003274087932647334,
+              "rescue_count": 94,
+              "rescue_rate": 0.04396632366697849,
+              "robust_accuracy_delta": 0.003274087932647334,
+              "treatment_clean_accuracy": 0.69644527595884,
+              "treatment_robust_accuracy": 0.08699719363891488
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.10546248013082234,
+              "clean_accuracy": 0.69644527595884,
+              "clean_probability_margin": 0.05039171713175229,
+              "count": 2138,
+              "robust_accuracy": 0.08699719363891488
+            }
+          }
+        },
+        "ST2S": {
+          "mask_key": "s3_t2_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.010582083766753894,
+            "clean_accuracy_delta": 0.004152862675563436,
+            "clean_harm_count": 1132,
+            "clean_margin_delta": 0.009864966826196435,
+            "clean_rescue_count": 1310,
+            "control_clean_accuracy": 0.7919602445056227,
+            "control_robust_accuracy": 0.512901871121273,
+            "count": 42862,
+            "harm_count": 1977,
+            "harm_rate": 0.046124772525780414,
+            "net_rescue_count": 583,
+            "net_rescue_rate": 0.01360179179692968,
+            "rescue_count": 2560,
+            "rescue_rate": 0.05972656432271009,
+            "robust_accuracy_delta": 0.01360179179692968,
+            "treatment_clean_accuracy": 0.7961131071811861,
+            "treatment_robust_accuracy": 0.5265036629182026
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.05939533423797952,
+            "clean_accuracy": 0.7909111111111111,
+            "clean_probability_margin": 0.2354949168806275,
+            "count": 45000,
+            "robust_accuracy": 0.5047333333333334
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.0019726485599414335,
+              "clean_accuracy_delta": 0.023854069223573433,
+              "clean_harm_count": 163,
+              "clean_margin_delta": 0.0033503987724475487,
+              "clean_rescue_count": 214,
+              "control_clean_accuracy": 0.6627689429373246,
+              "control_robust_accuracy": 0.08372310570626754,
+              "count": 2138,
+              "harm_count": 102,
+              "harm_rate": 0.047708138447146865,
+              "net_rescue_count": -33,
+              "net_rescue_rate": -0.015434985968194575,
+              "rescue_count": 69,
+              "rescue_rate": 0.032273152478952294,
+              "robust_accuracy_delta": -0.015434985968194575,
+              "treatment_clean_accuracy": 0.686623012160898,
+              "treatment_robust_accuracy": 0.06828811973807297
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.11516986959121626,
+              "clean_accuracy": 0.686623012160898,
+              "clean_probability_margin": 0.04472335011213042,
+              "count": 2138,
+              "robust_accuracy": 0.06828811973807297
+            }
+          }
+        },
+        "ST2W": {
+          "mask_key": "s3_t2_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.007928409879494135,
+            "clean_accuracy_delta": 0.007092529513321824,
+            "clean_harm_count": 995,
+            "clean_margin_delta": 0.007061757911108794,
+            "clean_rescue_count": 1299,
+            "control_clean_accuracy": 0.7919602445056227,
+            "control_robust_accuracy": 0.512901871121273,
+            "count": 42862,
+            "harm_count": 1805,
+            "harm_rate": 0.04211189398534833,
+            "net_rescue_count": 508,
+            "net_rescue_rate": 0.011851990107787784,
+            "rescue_count": 2313,
+            "rescue_rate": 0.053963884093136114,
+            "robust_accuracy_delta": 0.011851990107787784,
+            "treatment_clean_accuracy": 0.7990527740189445,
+            "treatment_robust_accuracy": 0.5247538612290608
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.05731399776091178,
+            "clean_accuracy": 0.7953777777777777,
+            "clean_probability_margin": 0.23319977089183197,
+            "count": 45000,
+            "robust_accuracy": 0.5036666666666667
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": 0.007420068319235258,
+              "clean_accuracy_delta": 0.05893358278765201,
+              "clean_harm_count": 106,
+              "clean_margin_delta": 0.011240750045922452,
+              "clean_rescue_count": 232,
+              "control_clean_accuracy": 0.6627689429373246,
+              "control_robust_accuracy": 0.08372310570626754,
+              "count": 2138,
+              "harm_count": 75,
+              "harm_rate": 0.035079513564078575,
+              "net_rescue_count": -6,
+              "net_rescue_rate": -0.002806361085126286,
+              "rescue_count": 69,
+              "rescue_rate": 0.032273152478952294,
+              "robust_accuracy_delta": -0.002806361085126286,
+              "treatment_clean_accuracy": 0.7217025257249766,
+              "treatment_robust_accuracy": 0.08091674462114125
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.10577715271203958,
+              "clean_accuracy": 0.7217025257249766,
+              "clean_probability_margin": 0.052613701385605324,
+              "count": 2138,
+              "robust_accuracy": 0.08091674462114125
+            }
+          }
+        },
+        "ST3K0": {
+          "mask_key": "s3_t3_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.014125306058346119,
+            "clean_accuracy_delta": 0.011381248698790165,
+            "clean_harm_count": 1025,
+            "clean_margin_delta": 0.019329862908118663,
+            "clean_rescue_count": 1517,
+            "control_clean_accuracy": 0.7997871799023804,
+            "control_robust_accuracy": 0.5113928150084434,
+            "count": 43229,
+            "harm_count": 1942,
+            "harm_rate": 0.04492354669319207,
+            "net_rescue_count": 743,
+            "net_rescue_rate": 0.017187536144717665,
+            "rescue_count": 2685,
+            "rescue_rate": 0.06211108283790974,
+            "robust_accuracy_delta": 0.017187536144717665,
+            "treatment_clean_accuracy": 0.8111684286011706,
+            "treatment_robust_accuracy": 0.528580351153161
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.06274763969977697,
+            "clean_accuracy": 0.7985777777777778,
+            "clean_probability_margin": 0.24488588815298346,
+            "count": 45000,
+            "robust_accuracy": 0.5084444444444445
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.005882189737949447,
+              "clean_accuracy_delta": 0.04630152456239413,
+              "clean_harm_count": 120,
+              "clean_margin_delta": 0.009586913766731724,
+              "clean_rescue_count": 202,
+              "control_clean_accuracy": 0.4449463579898362,
+              "control_robust_accuracy": 0.03162055335968379,
+              "count": 1771,
+              "harm_count": 44,
+              "harm_rate": 0.024844720496894408,
+              "net_rescue_count": -26,
+              "net_rescue_rate": -0.014680971202710334,
+              "rescue_count": 18,
+              "rescue_rate": 0.010163749294184076,
+              "robust_accuracy_delta": -0.014680971202710334,
+              "treatment_clean_accuracy": 0.4912478825522304,
+              "treatment_robust_accuracy": 0.01693958215697346
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.1624195483202385,
+              "clean_accuracy": 0.4912478825522304,
+              "clean_probability_margin": 0.008217340308956208,
+              "count": 1771,
+              "robust_accuracy": 0.01693958215697346
+            }
+          }
+        },
+        "ST3K05": {
+          "mask_key": "s3_t3_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.01238408541696066,
+            "clean_accuracy_delta": 0.01600777256008698,
+            "clean_harm_count": 885,
+            "clean_margin_delta": 0.017140912425268745,
+            "clean_rescue_count": 1577,
+            "control_clean_accuracy": 0.7997871799023804,
+            "control_robust_accuracy": 0.5113928150084434,
+            "count": 43229,
+            "harm_count": 1947,
+            "harm_rate": 0.04503920978972449,
+            "net_rescue_count": 639,
+            "net_rescue_rate": 0.014781743736843322,
+            "rescue_count": 2586,
+            "rescue_rate": 0.05982095352656781,
+            "robust_accuracy_delta": 0.014781743736843322,
+            "treatment_clean_accuracy": 0.8157949524624674,
+            "treatment_robust_accuracy": 0.5261745587452867
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.06119573374837637,
+            "clean_accuracy": 0.8043777777777777,
+            "clean_probability_margin": 0.24304672302057345,
+            "count": 45000,
+            "robust_accuracy": 0.5061333333333333
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.002813042762554143,
+              "clean_accuracy_delta": 0.08074534161490683,
+              "clean_harm_count": 103,
+              "clean_margin_delta": 0.01628578980550599,
+              "clean_rescue_count": 246,
+              "control_clean_accuracy": 0.4449463579898362,
+              "control_robust_accuracy": 0.03162055335968379,
+              "count": 1771,
+              "harm_count": 41,
+              "harm_rate": 0.023150762281197064,
+              "net_rescue_count": -26,
+              "net_rescue_rate": -0.014680971202710334,
+              "rescue_count": 15,
+              "rescue_rate": 0.00846979107848673,
+              "robust_accuracy_delta": -0.014680971202710334,
+              "treatment_clean_accuracy": 0.525691699604743,
+              "treatment_robust_accuracy": 0.01693958215697346
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.15935040134484318,
+              "clean_accuracy": 0.525691699604743,
+              "clean_probability_margin": 0.014916216347730476,
+              "count": 1771,
+              "robust_accuracy": 0.01693958215697346
+            }
+          }
+        },
+        "ST3K1": {
+          "mask_key": "s3_t3_q10",
+          "nonselected_paired": {
+            "adversarial_margin_delta": 0.010752715668134426,
+            "clean_accuracy_delta": 0.010409678687917832,
+            "clean_harm_count": 949,
+            "clean_margin_delta": 0.014268403656934285,
+            "clean_rescue_count": 1399,
+            "control_clean_accuracy": 0.7997871799023804,
+            "control_robust_accuracy": 0.5113928150084434,
+            "count": 43229,
+            "harm_count": 1789,
+            "harm_rate": 0.04138425593930001,
+            "net_rescue_count": 609,
+            "net_rescue_rate": 0.0140877651576488,
+            "rescue_count": 2398,
+            "rescue_rate": 0.055472021096948806,
+            "robust_accuracy_delta": 0.0140877651576488,
+            "treatment_clean_accuracy": 0.8101968585902982,
+            "treatment_robust_accuracy": 0.5254805801660922
+          },
+          "overall": {
+            "adversarial_probability_margin": 0.0596680723786354,
+            "clean_accuracy": 0.7969777777777778,
+            "clean_probability_margin": 0.2399638752780027,
+            "count": 45000,
+            "robust_accuracy": 0.5057555555555555
+          },
+          "selected": {
+            "paired": {
+              "adversarial_margin_delta": -0.0018092475995581275,
+              "clean_accuracy_delta": 0.029361942405420668,
+              "clean_harm_count": 127,
+              "clean_margin_delta": 0.008068699534837302,
+              "clean_rescue_count": 179,
+              "control_clean_accuracy": 0.4449463579898362,
+              "control_robust_accuracy": 0.03162055335968379,
+              "count": 1771,
+              "harm_count": 34,
+              "harm_rate": 0.019198193111236588,
+              "net_rescue_count": -13,
+              "net_rescue_rate": -0.007340485601355167,
+              "rescue_count": 21,
+              "rescue_rate": 0.011857707509881422,
+              "robust_accuracy_delta": -0.007340485601355167,
+              "treatment_clean_accuracy": 0.4743083003952569,
+              "treatment_robust_accuracy": 0.024280067758328628
+            },
+            "treatment": {
+              "adversarial_probability_margin": -0.15834660618184718,
+              "clean_accuracy": 0.4743083003952569,
+              "clean_probability_margin": 0.006699126077061787,
+              "count": 1771,
+              "robust_accuracy": 0.024280067758328628
+            }
+          }
+        }
+      }
+    }
+  },
+  "source_git_sha": "48094b2e8746aeafd4d32982c9819f2e58d72fe1"
+}
