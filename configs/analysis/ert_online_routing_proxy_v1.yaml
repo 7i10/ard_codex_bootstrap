@@ -24,7 +24,7 @@ runs:
       feature_observations: ../../.cache/analysis/ffnr-strong-replay/l4-feature-e5cb442/strong-observations.parquet
       feature_lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-feature-e5cb442/outputs/l4-feature-e5cb442/lineage.json
       outcome_observations: ../../.cache/analysis/ffnr-strong-replay/l4-outcome-e5cb442/strong-observations.parquet
-      outcome_lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-outcome-e5cb442/lineage.json
+      outcome_lineage: /home/islab/workspace-local/shunsuke.naito/ferret-results/ard_codex_bootstrap/ffnr-l4-outcome-e5cb442/outputs/l4-outcome-e5cb442/lineage.json
       online_states: ../../.cache/analysis/h5-online-cd56b72/L4/online-anchor-states.parquet
       online_lineage: ../../.cache/analysis/h5-online-cd56b72/L4/lineage.json
     factorial:
