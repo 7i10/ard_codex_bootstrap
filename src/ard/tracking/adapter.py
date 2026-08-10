@@ -255,7 +255,7 @@ def canonical_run_name(config: ExperimentConfig, *, git_sha: str | None) -> str 
     teacher_identity = (
         "none" if teacher is None else "-".join(part for part in (teacher.registry_id, teacher.architecture) if part)
     )
-    return "-".join(
+    canonical = "-".join(
         (
             config.dataset.name,
             config.student.architecture,
@@ -265,6 +265,12 @@ def canonical_run_name(config: ExperimentConfig, *, git_sha: str | None) -> str 
             (git_sha or "unborn")[:7],
         )
     )
+    # A fixed-parent intervention may supply a short human-readable arm name
+    # while retaining the canonical dataset/model/teacher/method/seed/SHA
+    # identity.  This keeps production run names unambiguous without letting
+    # arbitrary names replace the scientific identity.
+    suffix = config.tracking.name
+    return canonical if not suffix else f"{canonical}-{suffix}"
 
 
 def validate_training_execution(value: Mapping[str, object]) -> dict[str, int | str]:
