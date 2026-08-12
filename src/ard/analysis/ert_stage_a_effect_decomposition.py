@@ -358,6 +358,8 @@ def build_effect_report(
                 "validation_endpoint_sha256": _sha256(val_path),
                 "train_endpoint_json_sha256": _sha256(train_dir / "endpoint.json"),
                 "validation_endpoint_json_sha256": _sha256(val_dir / "endpoint.json"),
+                "train_endpoint_source_git_sha": train_json.get("source_git_sha"),
+                "validation_endpoint_source_git_sha": val_json.get("source_git_sha"),
                 "manifest": manifests[arm],
                 "train_arm": train_arm,
             }
