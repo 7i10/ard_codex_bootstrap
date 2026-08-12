@@ -87,7 +87,7 @@ def evaluate_endpoint(
     loader = DataLoader(
         selected_dataset,
         batch_size=config.training.per_rank_batch_size,
-        sampler=EpochShuffleSampler(len(train_dataset), seed=0, rank=0, world_size=1, shuffle=False),
+        sampler=EpochShuffleSampler(len(selected_dataset), seed=0, rank=0, world_size=1, shuffle=False),
         num_workers=config.training.num_workers,
         collate_fn=collate_indexed,
     )
