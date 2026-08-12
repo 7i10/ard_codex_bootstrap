@@ -17,6 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--expected-epoch", type=int, default=84)
+    parser.add_argument("--split", choices=("train", "validation"), default="train")
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     args = parser.parse_args(argv)
     result = evaluate_endpoint(
@@ -25,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output,
         device=torch.device(args.device),
         expected_epoch=args.expected_epoch,
+        split=args.split,
     )
     print(json.dumps(result, sort_keys=True))
     return 0

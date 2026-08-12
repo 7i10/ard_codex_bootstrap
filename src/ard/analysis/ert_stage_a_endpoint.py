@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import torch
 from torch.utils.data import DataLoader
@@ -23,6 +23,9 @@ class StageAEndpointError(RuntimeError):
     """The independent Stage A endpoint contract is not satisfied."""
 
 
+EndpointSplit = Literal["train", "validation"]
+
+
 def _probability_margin(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
     probabilities = torch.softmax(logits.float(), dim=1)
     true_probability = probabilities.gather(1, labels[:, None]).squeeze(1)
@@ -31,8 +34,34 @@ def _probability_margin(logits: torch.Tensor, labels: torch.Tensor) -> torch.Ten
     return true_probability - wrong.max(dim=1).values
 
 
+def split_identity(dataset: Any, *, split: EndpointSplit) -> dict[str, Any]:
+    """Return a deterministic identity for a source-indexed train/validation view."""
+    indices = [int(item) for item in dataset.indices]
+    targets = getattr(dataset.dataset.dataset, "targets", None)
+    if not isinstance(targets, (list, tuple)) or len(targets) <= max(indices, default=-1):
+        raise StageAEndpointError("split view does not expose the expected source labels")
+    labels = [int(targets[item]) for item in indices]
+    class_counts: dict[str, int] = {}
+    for label in labels:
+        class_counts[str(label)] = class_counts.get(str(label), 0) + 1
+    payload = {"split": split, "sample_ids": indices, "labels": labels, "class_counts": class_counts}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return {
+        "name": split,
+        "count": len(indices),
+        "class_counts": class_counts,
+        "sample_id_label_sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+
+
 def evaluate_endpoint(
-    *, config_path: Path, checkpoint: Path, output_dir: Path, device: torch.device, expected_epoch: int = 84
+    *,
+    config_path: Path,
+    checkpoint: Path,
+    output_dir: Path,
+    device: torch.device,
+    expected_epoch: int = 84,
+    split: EndpointSplit = "train",
 ) -> dict[str, Any]:
     config = load_config(config_path)
     attack_config = config.method.selection_attack
@@ -47,14 +76,16 @@ def evaluate_endpoint(
     source = collect_git_state(Path.cwd())
     if source.get("dirty") is not False or not isinstance(source.get("sha"), str):
         raise StageAEndpointError("endpoint evaluation requires a clean source tree")
-    train_dataset, _ = build_train_validation_views(
+    train_dataset, validation_dataset = build_train_validation_views(
         config.dataset,
         validation_fraction=config.training.validation_fraction,
         split_seed=config.seeds.split,
         augmentation_seed=config.seeds.augmentation,
     )
+    selected_dataset = train_dataset if split == "train" else validation_dataset
+    identity = split_identity(selected_dataset, split=split)
     loader = DataLoader(
-        train_dataset,
+        selected_dataset,
         batch_size=config.training.per_rank_batch_size,
         sampler=EpochShuffleSampler(len(train_dataset), seed=0, rank=0, world_size=1, shuffle=False),
         num_workers=config.training.num_workers,
@@ -109,6 +140,8 @@ def evaluate_endpoint(
     result = {
         "schema_version": 1,
         "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "dataset_scope": split,
+        "split_identity": identity,
         "checkpoint": str(checkpoint.resolve()),
         "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
         "checkpoint_epoch": expected_epoch,
