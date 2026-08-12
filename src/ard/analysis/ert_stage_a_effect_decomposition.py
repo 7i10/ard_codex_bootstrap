@@ -123,7 +123,12 @@ def _attack_identity(metadata: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 
 def _validate_manifest(
-    *, manifest_path: Path, endpoint_metadata: dict[str, Any], expected_parent_sha: str, arm: str
+    *,
+    manifest_path: Path,
+    endpoint_metadata: dict[str, Any],
+    expected_parent_sha: str,
+    arm: str,
+    manifest_arm: str,
 ) -> dict[str, Any]:
     manifest = _json(manifest_path)
     fork = manifest.get("fork_lineage")
@@ -131,8 +136,7 @@ def _validate_manifest(
         raise EffectDecompositionError(f"missing epoch-79 parent lineage: {manifest_path}")
     if fork.get("parent_checkpoint_sha256") != expected_parent_sha:
         raise EffectDecompositionError(f"wrong parent checkpoint for {manifest_path}")
-    expected_manifest_arm = arm if arm not in {"ST1W", "ST2S"} else f"{arm}-rerun"
-    if fork.get("arm") != expected_manifest_arm:
+    if fork.get("arm") != manifest_arm:
         raise EffectDecompositionError(f"arm mismatch in manifest {manifest_path}")
     if endpoint_metadata.get("checkpoint_epoch") != 84:
         raise EffectDecompositionError(f"endpoint is not epoch 84: {arm}")
@@ -345,6 +349,7 @@ def build_effect_report(
                 endpoint_metadata=train_json,
                 expected_parent_sha=expected_parent[seed],
                 arm=arm,
+                manifest_arm=train_arm,
             )
             report["inputs"][f"{seed}/{arm}"] = {
                 "train_endpoint": str(train_path.resolve()),
