@@ -1,6 +1,6 @@
 # 0038 — ERT Stage A direct, spillover, and held-out decomposition
 
-Status: in progress
+Status: complete
 Date: 2026-08-13
 
 ## Objective
@@ -28,16 +28,16 @@ independent CE-PGD20 endpoint.
 ## Acceptance gates
 
 - [x] Reconcile HEAD and required Stage A artifacts.
-- [ ] Add explicit train/validation scope to the endpoint evaluator.
-- [ ] Test exact validation IDs, train/validation disjointness, and attack
+- [x] Add explicit train/validation scope to the endpoint evaluator.
+- [x] Test exact validation IDs, train/validation disjointness, and attack
   identity.
-- [ ] Run one real checkpoint validation smoke before the full queue.
-- [ ] Evaluate all 26 held-out checkpoints; fail closed on any partial output.
-- [ ] Compute direct/spillover from existing train endpoints and verify the
+- [x] Run one real checkpoint validation smoke before the full queue.
+- [x] Evaluate all 26 held-out checkpoints; fail closed on any partial output.
+- [x] Compute direct/spillover from existing train endpoints and verify the
   weighted identity for clean and robust accuracy.
-- [ ] Compute held-out clean/robust effects, class diagnostics, and fixed
+- [x] Compute held-out clean/robust effects, class diagnostics, and fixed
   class-stratified paired bootstrap confidence intervals.
-- [ ] Write the hash-bound JSON/Markdown report and stop without selecting a
+- [x] Write the hash-bound JSON/Markdown report and stop without selecting a
   new treatment.
 
 ## Provenance requirements
@@ -61,3 +61,19 @@ or failed weighted identity prevents report generation.
   clean improvement with held-out robust harm is not promotion evidence.
 
 No automatic winner selection follows the report.
+
+## Completion record (2026-08-13)
+
+- Validation CE-PGD20 completed for all 26 epoch-84 checkpoints on GPU0/GPU1;
+  each produced 5,000 rows and an explicit split identity.
+- The first real validation smoke exposed and fixed a sampler-size bug for a
+  validation subset. The corrected smoke then passed at L2/C79.
+- The report validated 45,000/5,000 train/validation disjointness, all stable
+  ID/class joins, arm-specific parent lineage, CE-PGD20 identity, and the
+  weighted direct/spillover identity for both clean and robust accuracy.
+- Class-stratified paired bootstrap used 2,000 replicates with fixed seed
+  `20260813`; no outcome was used to tune a route.
+- Outputs:
+  `docs/ERT_STAGE_A_EFFECT_DECOMPOSITION.md` and
+  `docs/experiments/ert_stage_a_effect_decomposition_v1.json`.
+- No new training or automatic follow-up was started.
