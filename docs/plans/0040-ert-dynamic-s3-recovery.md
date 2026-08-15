@@ -4,7 +4,7 @@
 
 - Owner: ARD lead
 - Base: `3ce3cbe` (ERT confirmatory T1/T2/T3 result)
-- Current milestone: M2 shared-prefix canary preparation
+- Current milestone: M4 report complete; no automatic follow-up
 - Date: 2026-08-15
 
 ## Objective
@@ -71,9 +71,9 @@ recovery/relapse rates.
 
 - [x] M0: reconcile repo, freeze config and plan.
 - [x] M1: implement router, capture/state Parquet, runtime wiring, and tests.
-- [ ] M2: focused verification, shared-prefix canary, and no-update sanity.
-- [ ] M3: six continuations and independent CE-PGD20 endpoints.
-- [ ] M4: transition/effect report, hashes, review, and one cohesive commit.
+- [x] M2: focused verification, shared-prefix canary, and no-update sanity.
+- [x] M3: six continuations and independent CE-PGD20 endpoints.
+- [x] M4: transition/effect report, hashes, review, and one cohesive commit.
 
 ## Risks and mitigations
 
@@ -109,9 +109,30 @@ recovery/relapse rates.
   parent SHA, parent config hash, and prefix child config hash; a cross-seed
   prefix is rejected before training. Sixteen focused tests and the changed
   gate pass.
+- 2026-08-15: The first real L2 shared-prefix capture completed at epoch 80
+  (9,786 selected IDs). FIXED and DYNAMIC resumed from that exact checkpoint
+  and both reached epochs 84/89/94 with exit code 0. The same procedure for L4
+  completed at epoch 80 and both children reached all three horizons with exit
+  code 0. The required DYNBASE controls then completed for both seeds.
+- 2026-08-15: All 36 independent CE-PGD20 endpoint jobs completed with exit
+  code 0. The first endpoint invocation was rejected by the schema-v1
+  analysis config before any output was written; rerunning with each seed's
+  schema-v2 parent config succeeded and preserved the frozen attack identity.
+- 2026-08-15: Dynamic report generated at
+  `.cache/analysis/ert-dynamic-s3-recovery-v1/dynamic-s3-report.json`.
+  Report SHA-256 is
+  `be23d725d6568ed65bacba4c02dd9631e2d509f067d7ce8870b90b9f07600cb4`.
+  The report is descriptive and does not select a winner or launch a follow-up.
 
 ## Completion record
 
-To be filled with exact source/config/parent/mask/attack/output hashes, test
-commands, canary result, six-run status, endpoint table, transition analysis,
-and the human decision boundary. No route will be promoted automatically.
+Completion details are recorded in
+`docs/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md` and the machine-readable summary
+`docs/experiments/ert_dynamic_s3_recovery_v1.json`. The source SHA was
+`95e72cd1a2a32caa21686ad76d318eab33e1807a`; config SHA was
+`39691b9559d6df20baf09c9c33b7f63b8c37dd3e2937309e2aa1899cd26b8660`; the
+endpoint attack identity SHA was
+`7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`.
+All endpoint rows were 45,000 train or 5,000 validation IDs with the same
+class-universe hashes. No route was promoted automatically; official test,
+AutoAttack, new seeds, and Stage-B continuation remain intentionally blocked.

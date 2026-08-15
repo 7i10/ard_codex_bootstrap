@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "contract": "ert_dynamic_s3_recovery_result_v1",
+  "status": "mixed_no_automatic_promotion",
+  "source_git_sha": "95e72cd1a2a32caa21686ad76d318eab33e1807a",
+  "config_sha256": "39691b9559d6df20baf09c9c33b7f63b8c37dd3e2937309e2aa1899cd26b8660",
+  "calibration_sha256": "0e3b98b4e1cfcc7727786fd23da57a82903fa2c8b95a16b6e12ca1425d34da16",
+  "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+  "report_path": ".cache/analysis/ert-dynamic-s3-recovery-v1/dynamic-s3-report.json",
+  "report_sha256": "be23d725d6568ed65bacba4c02dd9631e2d509f067d7ce8870b90b9f07600cb4",
+  "endpoint_jobs": 36,
+  "endpoint_rows": {
+    "train_per_job": 45000,
+    "validation_per_job": 5000,
+    "train_validation_disjoint": true
+  },
+  "training": {
+    "seeds": ["L2", "L4"],
+    "arms": ["DYNBASE", "S3FIX075", "S3DYN075"],
+    "horizons": [84, 89, 94],
+    "parent_epoch": 79,
+    "shared_capture_epoch": 80,
+    "end_epoch": 94,
+    "exit_codes": {
+      "L2_S3CAP075": 0,
+      "L2_S3FIX075": 0,
+      "L2_S3DYN075": 0,
+      "L2_DYNBASE": 0,
+      "L4_S3CAP075": 0,
+      "L4_S3FIX075": 0,
+      "L4_S3DYN075": 0,
+      "L4_DYNBASE": 0
+    }
+  },
+  "validation_robust_accuracy": {
+    "L2": {
+      "84": {"DYNBASE": 0.4760, "S3FIX075": 0.4734, "S3DYN075": 0.4512},
+      "89": {"DYNBASE": 0.4606, "S3FIX075": 0.4608, "S3DYN075": 0.4592},
+      "94": {"DYNBASE": 0.4446, "S3FIX075": 0.4628, "S3DYN075": 0.4412}
+    },
+    "L4": {
+      "84": {"DYNBASE": 0.4588, "S3FIX075": 0.4542, "S3DYN075": 0.4550},
+      "89": {"DYNBASE": 0.4736, "S3FIX075": 0.4520, "S3DYN075": 0.4734},
+      "94": {"DYNBASE": 0.4662, "S3FIX075": 0.4724, "S3DYN075": 0.4662}
+    }
+  },
+  "run_artifact_sha256": {
+    "L2_DYNBASE_last": "f363f337831c032c621ee955dafc577a4514b7355f58ac0317bb5b72b426d15d",
+    "L2_S3FIX075_last": "aef4a8f10f6d887cea83cce26c836d915389948e3ae950e9a22e45e850ad69c2",
+    "L2_S3DYN075_last": "e371e9d02a0c75aef25ff280b4402e11d171ca9ca5c80065cf7ecec5f9da7901",
+    "L4_DYNBASE_last": "21a5d4cef67623d533a45fda85ff15cfc611c70a082edc7ea88c5176b4717238",
+    "L4_S3FIX075_last": "b52fa1b93c9540801e446ba6f1685ad08440db28222526279dd58dfa8dfbd7af",
+    "L4_S3DYN075_last": "2d3e7ec5e84f531e6658e884a0d9d03c388b92607420f7e890c5b9abf0508bf6"
+  },
+  "prohibitions_respected": {
+    "official_test": false,
+    "autoattack": false,
+    "new_seed": false,
+    "stage_b": false,
+    "coefficient_retuning": false
+  }
+}
