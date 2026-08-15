@@ -37,6 +37,12 @@ ASYMMETRIC_RULES: tuple[str, ...] = (
     "Majority-5_exit-2-correct",
     "Majority-5_exit-3-correct",
 )
+MAJORITY3_PERSISTENCE_RULES: tuple[str, ...] = (
+    "Majority-3_exit-2-correct",
+    "Majority-3_exit-3-correct",
+    "Majority-3_min-dwell-2",
+    "Majority-3_min-dwell-3",
+)
 
 
 def _sha256(path: Path) -> str:
@@ -79,11 +85,11 @@ def rule_signal(wrong: np.ndarray, name: str) -> np.ndarray:
     raise HistoryReplayError(f"unknown history rule: {name}")
 
 
-def asymmetric_state(wrong: np.ndarray, *, exit_correct_visits: int) -> np.ndarray:
-    """Apply Majority-5 entry with a consecutive-correct exit state machine."""
+def _entry_exit_state(wrong: np.ndarray, *, entry_rule: str, exit_correct_visits: int) -> np.ndarray:
+    """Apply a history entry rule with a consecutive-correct exit."""
     if exit_correct_visits not in {2, 3}:
         raise HistoryReplayError("exit_correct_visits must be 2 or 3")
-    entry = rule_signal(wrong, "Majority-5")
+    entry = rule_signal(wrong, entry_rule)
     state = np.zeros_like(wrong, dtype=bool)
     for sample_index in range(wrong.shape[0]):
         active = False
@@ -100,6 +106,36 @@ def asymmetric_state(wrong: np.ndarray, *, exit_correct_visits: int) -> np.ndarr
                 if correct_streak >= exit_correct_visits:
                     active = False
                     correct_streak = 0
+            state[sample_index, epoch_index] = active
+    return state
+
+
+def asymmetric_state(wrong: np.ndarray, *, exit_correct_visits: int) -> np.ndarray:
+    """Apply Majority-5 entry with a consecutive-correct exit state machine."""
+    return _entry_exit_state(wrong, entry_rule="Majority-5", exit_correct_visits=exit_correct_visits)
+
+
+def minimum_dwell_state(wrong: np.ndarray, *, entry_rule: str, dwell_visits: int) -> np.ndarray:
+    """Keep an entered action active for at least ``dwell_visits`` visits."""
+    if dwell_visits not in {2, 3}:
+        raise HistoryReplayError("dwell_visits must be 2 or 3")
+    entry = rule_signal(wrong, entry_rule)
+    state = np.zeros_like(wrong, dtype=bool)
+    for sample_index in range(wrong.shape[0]):
+        active = False
+        age = 0
+        for epoch_index in range(wrong.shape[1]):
+            if not active:
+                if entry[sample_index, epoch_index]:
+                    active = True
+                    age = 1
+            elif age < dwell_visits:
+                age += 1
+            elif not entry[sample_index, epoch_index]:
+                active = False
+                age = 0
+            else:
+                age += 1
             state[sample_index, epoch_index] = active
     return state
 
@@ -289,6 +325,18 @@ def analyze_run(*, label: str, trajectory: dict[str, Any]) -> dict[str, Any]:
     rules: dict[str, np.ndarray] = {name: rule_signal(wrong, name) for name in RULES}
     rules[ASYMMETRIC_RULES[0]] = asymmetric_state(wrong, exit_correct_visits=2)
     rules[ASYMMETRIC_RULES[1]] = asymmetric_state(wrong, exit_correct_visits=3)
+    rules[MAJORITY3_PERSISTENCE_RULES[0]] = _entry_exit_state(
+        wrong, entry_rule="Majority-3", exit_correct_visits=2
+    )
+    rules[MAJORITY3_PERSISTENCE_RULES[1]] = _entry_exit_state(
+        wrong, entry_rule="Majority-3", exit_correct_visits=3
+    )
+    rules[MAJORITY3_PERSISTENCE_RULES[2]] = minimum_dwell_state(
+        wrong, entry_rule="Majority-3", dwell_visits=2
+    )
+    rules[MAJORITY3_PERSISTENCE_RULES[3]] = minimum_dwell_state(
+        wrong, entry_rule="Majority-3", dwell_visits=3
+    )
     return {
         "label": label,
         "trajectory": {
