@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "contract": "ert_s3_history_persistence_replay_v1",
+  "status": "offline_complete_no_training",
+  "source_git_sha": "5836f18",
+  "config_sha256": "8834d9bbfb6be3bc8835f88ec2f462e3713676de6758e78e4536443f7486bec9",
+  "report_path": ".cache/analysis/ert-s3-history-replay-v1/report-v3.json",
+  "report_sha256": "6546e32adf783d3d079e656596dcad44f4c419e564c3d1807add070f519e57f7",
+  "reference": "next 3 visits contain at least 2 adversarial-wrong visits; descriptive only",
+  "aggregate_l2_l4_mean": {
+    "Majority-3": {
+      "action_fraction": 0.264,
+      "action_switches": 85628,
+      "switch_reduction_vs_instant": 0.430,
+      "reentries": 13567,
+      "one_visit_reentry_rate": 0.126,
+      "persistent_capture": 0.694,
+      "transient_activation": 0.520,
+      "median_entry_delay": 2,
+      "median_active_duration": 4
+    },
+    "Majority-3_exit-2-correct": {
+      "action_fraction": 0.282,
+      "action_switches": 76738,
+      "switch_reduction_vs_instant": 0.490,
+      "reentries": 8011,
+      "one_visit_reentry_rate": 0.0,
+      "persistent_capture": 0.715,
+      "transient_activation": 0.524,
+      "median_entry_delay": 2,
+      "median_active_duration": 7
+    },
+    "Majority-3_exit-3-correct": {
+      "action_fraction": 0.320,
+      "action_switches": 66760,
+      "switch_reduction_vs_instant": 0.556,
+      "reentries": 3197,
+      "one_visit_reentry_rate": 0.0,
+      "persistent_capture": 0.754,
+      "transient_activation": 0.567,
+      "median_entry_delay": 2,
+      "median_active_duration": 13
+    },
+    "Majority-3_min-dwell-2": {
+      "action_fraction": 0.273,
+      "action_switches": 82126,
+      "switch_reduction_vs_instant": 0.454,
+      "reentries": 11559,
+      "one_visit_reentry_rate": 0.088,
+      "persistent_capture": 0.702,
+      "transient_activation": 0.520,
+      "median_entry_delay": 2,
+      "median_active_duration": 5
+    },
+    "Majority-3_min-dwell-3": {
+      "action_fraction": 0.283,
+      "action_switches": 80994,
+      "switch_reduction_vs_instant": 0.461,
+      "reentries": 11064,
+      "one_visit_reentry_rate": 0.104,
+      "persistent_capture": 0.712,
+      "transient_activation": 0.524,
+      "median_entry_delay": 2,
+      "median_active_duration": 5
+    }
+  },
+  "recommendation": {
+    "primary": "Majority-3_exit-2-correct",
+    "control": "Majority-3",
+    "secondary": "Majority-3_exit-3-correct",
+    "reason": "separates state smoothing from action persistence, removes one-visit re-entry, and remains balanced across L2/L4",
+    "automatic_training_started": false
+  },
+  "tests": {
+    "command": "pytest -q tests/unit/test_ert_s3_history_replay.py",
+    "result": "4 passed",
+    "ruff": "passed"
+  }
+}
