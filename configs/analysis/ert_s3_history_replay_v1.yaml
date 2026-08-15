@@ -1,0 +1,10 @@
+schema_version: 1
+contract: ert_s3_history_replay_v1
+description: Offline history-only replay of the saved Dynamic S3 KL-PGD10 trajectories.
+expected_count: 45000
+epochs: [80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94]
+runs:
+  L2:
+    trajectory: ../../.cache/analysis/ert-dynamic-s3-recovery-v1/L2/S3DYN075-r3/dynamic-state.parquet
+  L4:
+    trajectory: ../../.cache/analysis/ert-dynamic-s3-recovery-v1/L4/S3DYN075-r1/dynamic-state.parquet
