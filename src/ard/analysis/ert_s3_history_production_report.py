@@ -28,7 +28,7 @@ def _json(path: Path) -> dict[str, Any]:
     return value
 
 
-def _transition(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _transition(rows: list[dict[str, Any]], *, arm: str) -> dict[str, Any]:
     by_id: dict[int, list[dict[str, Any]]] = {}
     for row in rows:
         by_id.setdefault(int(row["sample_id"]), []).append(row)
@@ -41,7 +41,14 @@ def _transition(rows: list[dict[str, Any]]) -> dict[str, Any]:
         sequence.sort(key=lambda row: int(row["epoch"]))
         actions = [bool(row["action_active"]) for row in sequence]
         teacher = [bool(row["teacher_adv_correct"]) for row in sequence]
-        states = [bool(row.get("history_state_active", row["current_active"])) for row in sequence]
+        # BASE never acts, while INST075 uses the current-visit predicate as
+        # its student-side state.  History arms expose the persistent state.
+        if arm == "BASE":
+            states = [False for _ in sequence]
+        elif arm == "INST075":
+            states = [bool(row["current_active"]) for row in sequence]
+        else:
+            states = [bool(row["history_state_active"]) for row in sequence]
         had_active = False
         run = 0
         for index, active in enumerate(actions):
@@ -132,10 +139,20 @@ def build_report(*, config_path: Path, training_root: Path, endpoint_root: Path,
             if not state_path.is_file() or not manifest_path.is_file():
                 raise HistoryProductionReportError(f"missing training state artifact: {arm_dir}")
             rows = pq.read_table(state_path).to_pylist()
+            capture_path = arm_dir / "routing-capture-mask.json"
+            capture = _json(capture_path)
+            if capture.get("arm") != arm or not isinstance(capture.get("selected_ids"), list):
+                raise HistoryProductionReportError(f"invalid routing capture: {capture_path}")
             seed_result["arms"][arm] = {
                 "training_state": {"path": str(state_path.resolve()), "sha256": _sha256(state_path), "rows": len(rows)},
-                "transition": _transition(rows),
+                "transition": _transition(rows, arm=arm),
                 "manifest_sha256": _sha256(manifest_path),
+                "capture": {
+                    "path": str(capture_path.resolve()),
+                    "sha256": _sha256(capture_path),
+                    "selected_count": len(capture["selected_ids"]),
+                    "selected_ids_sha256": capture.get("selected_ids_sha256"),
+                },
             }
         for horizon in horizons:
             horizon_result: dict[str, Any] = {"arms": {}, "deltas_vs_base": {}}
