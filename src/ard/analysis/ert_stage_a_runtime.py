@@ -301,7 +301,16 @@ def run_stage_a_arm(
         raise StageARuntimeError("Stage A runtime requires a clean Git tree")
     if (dynamic_s3_arm is None) != (dynamic_s3_beta_advce is None):
         raise StageARuntimeError("dynamic S3 arm and frozen coefficient must be supplied together")
-    if dynamic_s3_arm not in {None, "baseline", "capture", "fixed", "dynamic"}:
+    if dynamic_s3_arm not in {
+        None,
+        "baseline",
+        "capture",
+        "fixed",
+        "dynamic",
+        "instant",
+        "majority3",
+        "majority3_exit2",
+    }:
         raise StageARuntimeError("unknown dynamic S3 arm")
     if dynamic_s3_beta_advce is not None and dynamic_s3_beta_advce != 0.075:
         raise StageARuntimeError("dynamic S3 recovery requires the frozen AdvCE coefficient 0.075")
@@ -493,7 +502,7 @@ def run_stage_a_arm(
         # deliberately ignores the decision, so it never receives AdvCE.
         adversarial_ce_coefficient=(
             dynamic_s3_beta_advce
-            if dynamic_s3_arm in {"capture", "fixed", "dynamic"}
+            if dynamic_s3_arm in {"capture", "fixed", "dynamic", "instant", "majority3", "majority3_exit2"}
             else treatment.beta_advce
         ),
         observation_profile="teacher_response",

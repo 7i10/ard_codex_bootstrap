@@ -27,7 +27,9 @@ class DynamicS3RoutingError(RuntimeError):
     """The fixed/dynamic same-step routing contract cannot be proven."""
 
 
-DynamicS3Arm = Literal["baseline", "capture", "fixed", "dynamic"]
+DynamicS3Arm = Literal[
+    "baseline", "capture", "fixed", "dynamic", "instant", "majority3", "majority3_exit2"
+]
 
 
 def _margin(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
@@ -105,7 +107,7 @@ class DynamicS3Router:
         output_dir: Path,
         capture_epoch: int = 80,
     ) -> None:
-        if arm not in {"baseline", "capture", "fixed", "dynamic"}:
+        if arm not in {"baseline", "capture", "fixed", "dynamic", "instant", "majority3", "majority3_exit2"}:
             raise DynamicS3RoutingError("dynamic S3 arm must be baseline, capture, fixed, or dynamic")
         if capture_epoch < 0 or not train_labels:
             raise DynamicS3RoutingError("routing requires a non-empty exact train ID/label universe")
@@ -115,6 +117,9 @@ class DynamicS3Router:
         self.capture_epoch = capture_epoch
         self._pending: list[dict[str, Any]] = []
         self._capture_actions: dict[int, bool] = {}
+        self._history: dict[int, list[bool]] = {}
+        self._history_active: dict[int, bool] = {}
+        self._correct_streak: dict[int, int] = {}
         self._state_paths: dict[int, Path] = {}
         self.epoch_statistics: dict[int, dict[str, int | float]] = {}
 
@@ -141,6 +146,9 @@ class DynamicS3Router:
             "train_ids_sha256": _digest_ids(list(self.train_labels)),
             "train_id_label_sha256": _digest_labels(self.train_labels),
             "capture_actions": {str(key): bool(value) for key, value in sorted(self._capture_actions.items())},
+            "history": {str(key): list(values) for key, values in sorted(self._history.items())},
+            "history_active": {str(key): bool(value) for key, value in sorted(self._history_active.items())},
+            "correct_streak": {str(key): int(value) for key, value in sorted(self._correct_streak.items())},
             "epoch_statistics": {str(key): value for key, value in sorted(self.epoch_statistics.items())},
             "state_paths": {
                 str(epoch): {"path": str(path.resolve()), "sha256": _sha256(path)}
@@ -165,6 +173,18 @@ class DynamicS3Router:
         if set(actions) != set(self.train_labels):
             raise DynamicS3RoutingError("dynamic routing checkpoint capture does not cover the exact train universe")
         self._capture_actions = actions
+        raw_history = value.get("history", {})
+        raw_active = value.get("history_active", {})
+        raw_streak = value.get("correct_streak", {})
+        if not isinstance(raw_history, dict) or not isinstance(raw_active, dict) or not isinstance(raw_streak, dict):
+            raise DynamicS3RoutingError("dynamic routing history state is malformed")
+        self._history = {
+            int(key): [bool(item) for item in values]
+            for key, values in raw_history.items()
+            if isinstance(values, list)
+        }
+        self._history_active = {int(key): bool(item) for key, item in raw_active.items()}
+        self._correct_streak = {int(key): int(item) for key, item in raw_streak.items()}
         raw_statistics = value.get("epoch_statistics", {})
         if not isinstance(raw_statistics, dict):
             raise DynamicS3RoutingError("dynamic routing checkpoint statistics are malformed")
@@ -278,10 +298,61 @@ class DynamicS3Router:
                 dtype=torch.bool,
                 device=sample_ids.device,
             ) & valid_mask
+        raw_s3 = (
+            student_clean_logits.detach().argmax(1).eq(labels)
+            & student_adversarial_logits.detach().argmax(1).ne(labels)
+            & valid_mask
+        )
+        clean_correct = student_clean_logits.detach().argmax(1).eq(labels)
+        adv_correct = student_adversarial_logits.detach().argmax(1).eq(labels)
+        raw_s3_values = raw_s3.detach().cpu().tolist()
+        clean_correct_values = clean_correct.detach().cpu().tolist()
+        adv_correct_values = adv_correct.detach().cpu().tolist()
+        history_state = torch.zeros_like(current)
+        exit_streak = torch.zeros_like(labels, dtype=torch.int64)
+        ids = [int(value) for value in sample_ids.detach().cpu().tolist()]
+        valid = [bool(value) for value in valid_mask.detach().cpu().tolist()]
+        for position, sample_id in enumerate(ids):
+            if not valid[position]:
+                continue
+            history = self._history.setdefault(sample_id, [])
+            history.append(bool(raw_s3_values[position]))
+            history[:] = history[-5:]
+            if self.arm in {"majority3", "majority3_exit2"}:
+                entry = len(history) >= 3 and sum(history[-3:]) >= 2
+                if self.arm == "majority3":
+                    active = entry
+                    streak = 0
+                else:
+                    active = self._history_active.get(sample_id, False)
+                    streak = self._correct_streak.get(sample_id, 0)
+                    if not active:
+                        active = entry
+                        streak = 0
+                    elif bool(clean_correct_values[position] and adv_correct_values[position]):
+                        streak += 1
+                        if streak >= 2:
+                            active = False
+                            streak = 0
+                    else:
+                        # Clean-wrong is not an exit-correct visit and resets
+                        # the consecutive-correct streak.
+                        streak = 0
+                self._history_active[sample_id] = active
+                self._correct_streak[sample_id] = streak
+                history_state[position] = active
+                exit_streak[position] = streak
         if self.arm == "baseline":
             action = torch.zeros_like(current)
         elif self.arm == "fixed" and epoch > self.capture_epoch:
             action = capture
+        elif self.arm in {"majority3", "majority3_exit2"}:
+            action = (
+                history_state
+                & clean_correct
+                & teacher_adversarial_logits.detach().argmax(1).eq(labels)
+                & valid_mask
+            )
         else:
             action = current
         student_clean_margin = _margin(student_clean_logits, labels)
@@ -300,6 +371,9 @@ class DynamicS3Router:
             "current_active": current,
             "action_active": action,
             "capture_action_if_available": capture,
+            "raw_s3_observation": raw_s3,
+            "history_state_active": history_state,
+            "exit_correct_streak": exit_streak,
         }
         cpu_values = {name: value.detach().cpu().tolist() for name, value in values.items()}
         classes = [int(value) for value in labels.detach().cpu().tolist()]
@@ -315,7 +389,13 @@ class DynamicS3Router:
                     "sample_id": sample_id,
                     "class_id": classes[position],
                     **{
-                        key: (float(values_at[position]) if key.startswith("m") else bool(values_at[position]))
+                    key: (
+                        float(values_at[position])
+                        if key.startswith("m")
+                        else int(values_at[position])
+                        if key == "exit_correct_streak"
+                        else bool(values_at[position])
+                    )
                         for key, values_at in cpu_values.items()
                     },
                     "DeltaS": float(cpu_values["mS_clean"][position] - cpu_values["mS_adv"][position]),
@@ -433,7 +513,10 @@ def run_dynamic_s3_arm(
     from ard.analysis.ert_stage_a_runtime import StageARuntimeError, StageATreatment, run_stage_a_arm
 
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or payload.get("contract") != "ert_dynamic_s3_recovery_v1":
+    if not isinstance(payload, dict) or payload.get("contract") not in {
+        "ert_dynamic_s3_recovery_v1",
+        "ert_s3_history_production_v1",
+    }:
         raise DynamicS3RoutingError("dynamic S3 config does not carry the frozen contract")
     runs = payload.get("runs")
     if not isinstance(runs, dict) or run_key not in runs or not isinstance(runs[run_key], dict):
@@ -443,6 +526,10 @@ def run_dynamic_s3_arm(
         "S3CAP075": "capture",
         "S3FIX075": "fixed",
         "S3DYN075": "dynamic",
+        "BASE": "baseline",
+        "INST075": "instant",
+        "M3_075": "majority3",
+        "M3E2_075": "majority3_exit2",
     }
     if arm not in dynamic_arms:
         raise DynamicS3RoutingError("dynamic S3 arm must be DYNBASE, S3CAP075, S3FIX075, or S3DYN075")

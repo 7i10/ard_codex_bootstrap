@@ -289,3 +289,44 @@ def test_reentry_counts_a_sample_that_is_active_on_its_initial_visit() -> None:
         "switches": 2,
         "short_cycle_reentries": 1,
     }
+
+
+def test_history_router_uses_clean_correct_s3_and_two_correct_exit(tmp_path: Path) -> None:
+    pytest.importorskip("pyarrow")
+    labels = {11: 0}
+    router = DynamicS3Router(arm="majority3_exit2", train_labels=labels, output_dir=tmp_path)
+    def observe_one(epoch: int, clean: list[int], adv: list[int]):
+        return router.observe(
+            epoch=epoch,
+            sample_ids=torch.tensor([11]),
+            labels=torch.tensor([0]),
+            valid_mask=torch.tensor([True]),
+            student_clean_logits=_logits(clean),
+            student_adversarial_logits=_logits(adv),
+            teacher_clean_logits=_logits([0]),
+            teacher_adversarial_logits=_logits([0]),
+        )
+    # Two clean-correct/adv-wrong visits enter at epoch 82.  Clean-wrong is
+    # not an exit-correct visit and resets the streak; two clean+adv-correct
+    # visits then exit the state.
+    for epoch, clean, adv in (
+        (80, [0], [1]),
+        (81, [0], [1]),
+        (82, [0], [0]),
+        (83, [1], [0]),
+        (84, [0], [0]),
+        (85, [0], [0]),
+    ):
+        decision = observe_one(epoch, clean, adv)
+        if epoch < 82:
+            assert decision.action_active.tolist() == [False]
+        if epoch == 82:
+            assert decision.action_active.tolist() == [True]
+        if epoch == 83:
+            assert decision.action_active.tolist() == [False]
+        if epoch == 84:
+            assert decision.action_active.tolist() == [True]
+        if epoch == 85:
+            assert decision.action_active.tolist() == [False]
+        router.flush_epoch(epoch)
+    assert router.capture_complete
