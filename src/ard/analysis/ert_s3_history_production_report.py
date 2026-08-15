@@ -103,6 +103,56 @@ def _endpoint(path: Path) -> dict[str, Any]:
     return metadata
 
 
+def _endpoint_rows(path: Path) -> dict[int, dict[str, Any]]:
+    import pyarrow.parquet as pq
+
+    rows = pq.read_table(path / "endpoint-sample-stats.parquet").to_pylist()
+    result: dict[int, dict[str, Any]] = {}
+    for row in rows:
+        sample_id = row.get("sample_id")
+        label = row.get("true_label")
+        if not isinstance(sample_id, int) or sample_id in result or not isinstance(label, int):
+            raise HistoryProductionReportError(f"invalid endpoint stable-ID table: {path}")
+        result[sample_id] = row
+    if not result:
+        raise HistoryProductionReportError(f"empty endpoint stable-ID table: {path}")
+    return result
+
+
+def _paired_metrics(
+    control: dict[int, dict[str, Any]], treatment: dict[int, dict[str, Any]], ids: list[int]
+) -> dict[str, Any]:
+    if not ids or not set(ids).issubset(control) or not set(ids).issubset(treatment):
+        raise HistoryProductionReportError("paired endpoint cohort is not contained in both universes")
+    robust = [int(treatment[i]["robust_correct"]) - int(control[i]["robust_correct"]) for i in ids]
+    clean = [int(treatment[i]["clean_correct"]) - int(control[i]["clean_correct"]) for i in ids]
+    adv_margin = [
+        float(treatment[i]["adversarial_probability_margin"])
+        - float(control[i]["adversarial_probability_margin"])
+        for i in ids
+    ]
+    clean_margin = [
+        float(treatment[i]["clean_probability_margin"]) - float(control[i]["clean_probability_margin"])
+        for i in ids
+    ]
+    rescue = sum(value == 1 for value in robust)
+    harm = sum(value == -1 for value in robust)
+    n = len(ids)
+    return {
+        "count": n,
+        "rescue_count": rescue,
+        "harm_count": harm,
+        "net_rescue_count": rescue - harm,
+        "rescue_rate": rescue / n,
+        "harm_rate": harm / n,
+        "net_rescue_rate": (rescue - harm) / n,
+        "robust_accuracy_delta": sum(robust) / n,
+        "clean_accuracy_delta": sum(clean) / n,
+        "adversarial_margin_delta": sum(adv_margin) / n,
+        "clean_margin_delta": sum(clean_margin) / n,
+    }
+
+
 def build_report(*, config_path: Path, training_root: Path, endpoint_root: Path, output: Path) -> dict[str, Any]:
     import pyarrow.parquet as pq
     import yaml
@@ -162,13 +212,16 @@ def build_report(*, config_path: Path, training_root: Path, endpoint_root: Path,
                     "selected_ids_sha256": capture.get("selected_ids_sha256"),
                 },
             }
+            seed_result["arms"][arm]["capture_ids"] = [int(x) for x in capture["selected_ids"]]
         for horizon in horizons:
             horizon_result: dict[str, Any] = {"arms": {}, "deltas_vs_base": {}}
-            base: dict[str, dict[str, Any]] = {}
+            base: dict[tuple[str, str], dict[str, Any]] = {}
+            rows: dict[tuple[str, str], dict[int, dict[str, Any]]] = {}
             for arm in arms:
                 for split in ("train", "validation"):
                     directory = endpoint_root / run_key / arm / f"epoch-{horizon}" / split
                     base[arm, split] = _endpoint(directory)
+                    rows[arm, split] = _endpoint_rows(directory)
                 horizon_result["arms"][arm] = {
                     "train_clean_accuracy": base[arm, "train"]["clean_accuracy"],
                     "train_robust_accuracy": base[arm, "train"]["robust_accuracy"],
@@ -188,7 +241,16 @@ def build_report(*, config_path: Path, training_root: Path, endpoint_root: Path,
                         arm_metrics["validation_robust_accuracy"] - base_metrics["validation_robust_accuracy"]
                     ),
                 }
+                selected_ids = seed_result["arms"][arm]["capture_ids"]
+                horizon_result.setdefault("paired_effects", {})[arm] = {
+                    "selected_train": _paired_metrics(rows["BASE", "train"], rows[arm, "train"], selected_ids),
+                    "validation_all": _paired_metrics(
+                        rows["BASE", "validation"], rows[arm, "validation"], sorted(rows["BASE", "validation"])
+                    ),
+                }
             seed_result["horizons"][str(horizon)] = horizon_result
+        for arm in arms:
+            seed_result["arms"][arm].pop("capture_ids", None)
         report["seeds"][run_key] = seed_result
     if output.exists():
         raise HistoryProductionReportError(f"refusing to overwrite {output}")
