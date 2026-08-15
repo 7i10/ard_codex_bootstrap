@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,13 @@ from ard.tracking.adapter import ExperimentTracker, collect_git_state, create_tr
 
 class StageARuntimeError(RuntimeError):
     """Raised when a Stage A parent or treatment contract is invalid."""
+
+
+def _validate_horizons(horizon_epochs: tuple[int, ...], end_epoch: int) -> None:
+    if not horizon_epochs or any(epoch <= 79 or epoch > end_epoch for epoch in horizon_epochs):
+        raise StageARuntimeError("horizon checkpoints must be after epoch 79 and no later than the endpoint")
+    if len(set(horizon_epochs)) != len(horizon_epochs):
+        raise StageARuntimeError("horizon checkpoints must be unique")
 
 
 @dataclass(frozen=True)
@@ -128,6 +136,8 @@ def run_stage_a_arm(
     calibration: dict[str, Any],
     device: torch.device,
     end_epoch: int,
+    horizon_epochs: tuple[int, ...] = (84,),
+    run_namespace: str = "stage-a",
 ) -> dict[str, Any]:
     config = load_config(parent_config_path)
     if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
@@ -148,6 +158,9 @@ def run_stage_a_arm(
         raise StageARuntimeError("parent checkpoint lacks a valid config hash")
     if end_epoch <= 79:
         raise StageARuntimeError("Stage A endpoint must be after epoch 79")
+    _validate_horizons(horizon_epochs, end_epoch)
+    if not run_namespace or any(char.isspace() for char in run_namespace):
+        raise StageARuntimeError("run namespace must be a non-empty token")
     if calibration.get("tau") != 2.0:
         raise StageARuntimeError("Stage A calibration tau is not frozen at 2.0")
     source_state = collect_git_state(Path.cwd())
@@ -221,15 +234,15 @@ def run_stage_a_arm(
     output_dir.mkdir(parents=True)
     # Include the immutable source revision so a prior canary or interrupted
     # launch can never collide with a new production arm using the same label.
-    run_id = f"ert-stage-a-{config.seeds.model_init}-{treatment.arm}-{source_sha[:7]}"
+    run_id = f"ert-{run_namespace}-{config.seeds.model_init}-{treatment.arm}-{source_sha[:7]}"
     tracked_config = config.model_copy(
         update={
             "output_dir": output_dir,
             "tracking": config.tracking.model_copy(
                 update={
                     "run_id": run_id,
-                    "name": f"ert-stage-a-{config.seeds.model_init}-{treatment.arm}",
-                    "group": f"ert-stage-a-{config.teacher.registry_id or 'teacherless'}",
+                    "name": f"ert-{run_namespace}-{config.seeds.model_init}-{treatment.arm}",
+                    "group": f"ert-{run_namespace}-{config.teacher.registry_id or 'teacherless'}",
                 }
             ),
             "tracker_run_id": run_id,
@@ -300,6 +313,8 @@ def run_stage_a_arm(
                 "treatment": treatment.__dict__,
                 "calibration": calibration,
                 "child_config_hash": arm_hash,
+                "run_namespace": run_namespace,
+                "horizon_epochs": list(horizon_epochs),
             },
             sort_keys=True,
         ),
@@ -323,12 +338,19 @@ def run_stage_a_arm(
             tracker.finish(status="failed")
         raise
     metrics_path = output_dir / "epoch-metrics.jsonl"
+    horizon_dir = output_dir / "checkpoints"
+    horizon_paths: dict[str, Path] = {}
 
     def record(metrics: dict[str, float], improved: bool) -> None:
         row = {"epoch": trainer.current_epoch, "global_step": trainer.global_step, **metrics, "improved": improved}
         with metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
         tracker.log_metrics(row, step=trainer.global_step)
+        if trainer.current_epoch in horizon_epochs:
+            horizon_dir.mkdir(exist_ok=True)
+            horizon_path = horizon_dir / f"epoch-{trainer.current_epoch}.pt"
+            shutil.copy2(output_dir / "last.pt", horizon_path)
+            horizon_paths[str(trainer.current_epoch)] = horizon_path
 
     trainer.fork_lineage = {
         **trainer.fork_lineage,
@@ -344,8 +366,9 @@ def run_stage_a_arm(
                 "best_epoch": trainer.selection_metadata.get("selected_epoch"),
                 "last_pgd_accuracy": trainer.selection_metadata.get("last_pgd_accuracy"),
                 "last_clean_accuracy": trainer.selection_metadata.get("last_clean_accuracy"),
-                "stage": "stage_a",
+                "stage": run_namespace,
                 "arm": treatment.arm,
+                "horizon_epochs": list(horizon_epochs),
             }
         )
         tracker.log_artifact(
@@ -354,6 +377,27 @@ def run_stage_a_arm(
         tracker.log_artifact(
             output_dir / "best.pt", name=f"model-{run_id}-best", artifact_type="model", aliases=("best",)
         )
+        horizon_manifest = {
+            str(epoch): {
+                "path": str(path.resolve()),
+                "sha256": _sha256(path),
+                "epoch": int(epoch),
+            }
+            for epoch, path in sorted(horizon_paths.items(), key=lambda item: int(item[0]))
+        }
+        if set(horizon_manifest) != {str(epoch) for epoch in horizon_epochs}:
+            missing = sorted(set(horizon_epochs) - {int(epoch) for epoch in horizon_manifest})
+            raise StageARuntimeError(f"Trainer did not produce requested horizon checkpoints: {missing}")
+        (output_dir / "horizon-checkpoints.json").write_text(
+            json.dumps(horizon_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        for epoch, path in sorted(horizon_paths.items(), key=lambda item: int(item[0])):
+            tracker.log_artifact(
+                path,
+                name=f"model-{run_id}-epoch-{epoch}",
+                artifact_type="model",
+                aliases=(f"epoch-{epoch}",),
+            )
         tracker.prepare_finish()
         tracker.finish()
     except Exception:
@@ -367,4 +411,8 @@ def run_stage_a_arm(
         "parent_checkpoint_sha256": _sha256(parent_checkpoint),
         "last_checkpoint_sha256": _sha256(output_dir / "last.pt"),
         "best_checkpoint_sha256": _sha256(output_dir / "best.pt"),
+        "horizon_checkpoints": {
+            epoch: {"path": str(path.resolve()), "sha256": _sha256(path)}
+            for epoch, path in sorted(horizon_paths.items(), key=lambda item: int(item[0]))
+        },
     }

@@ -30,6 +30,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clean-wrong-mode", choices=("clean_ce_only", "teacher_clean_gate", "clean_kd"))
     parser.add_argument("--tau", type=float)
     parser.add_argument("--epochs", type=int, default=85)
+    parser.add_argument(
+        "--horizon-epochs",
+        type=int,
+        nargs="+",
+        default=(84,),
+        help="Epochs for immutable post-epoch checkpoint copies (all must be <= --epochs).",
+    )
+    parser.add_argument("--run-namespace", default="stage-a")
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     return parser
 
@@ -61,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
         calibration=calibration,
         device=torch.device(args.device),
         end_epoch=args.epochs,
+        horizon_epochs=tuple(args.horizon_epochs),
+        run_namespace=args.run_namespace,
     )
     print(json.dumps(result, sort_keys=True))
     return 0

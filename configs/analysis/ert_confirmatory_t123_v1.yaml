@@ -1,0 +1,42 @@
+schema_version: 1
+contract: ert_confirmatory_t123_v1
+description: Fixed-anchor Chen ERT confirmatory T1/T2/T3 screen.
+parent_epoch: 79
+horizons: [84, 89, 94]
+training_attack:
+  loss: kl
+  target: teacher_clean
+  norm: linf
+  input_domain: pixel_0_1
+  epsilon: 8/255
+  step_size: 2/255
+  steps: 10
+  random_start: true
+endpoint_attack:
+  loss: ce
+  norm: linf
+  input_domain: pixel_0_1
+  epsilon: 8/255
+  step_size: 2/255
+  steps: 20
+  random_start: true
+coefficients:
+  beta_advce: 0.075
+  advkd_multiplier_t3: 0.5
+  tau: 1.0
+arms:
+  - C79CONF
+  - T1WCONF
+  - T2WCONF
+  - T3LP05CONF
+runs:
+  L2:
+    seed: 1
+    parent_config: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/C79/resolved_config.yaml
+    parent_checkpoint: .cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s1-confirm-v2/last.pt
+    mask: .cache/analysis/ert-state-overlay-v1/anchor79-fixed-masks-L2.json
+  L4:
+    seed: 2
+    parent_config: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/resolved_config.yaml
+    parent_checkpoint: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/last.pt
+    mask: .cache/analysis/ert-state-overlay-v1/anchor79-fixed-masks-L4.json
