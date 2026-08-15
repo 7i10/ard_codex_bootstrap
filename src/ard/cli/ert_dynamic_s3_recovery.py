@@ -12,16 +12,21 @@ from ard.analysis.ert_dynamic_s3_recovery import run_dynamic_s3_arm
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run one ERT dynamic S3 recovery arm from epoch-79.")
+    parser = argparse.ArgumentParser(description="Run one ERT dynamic S3 recovery arm from a verified parent.")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run", choices=("L2", "L4"), required=True)
-    parser.add_argument("--arm", choices=("DYNBASE", "S3FIX075", "S3DYN075"), required=True)
+    parser.add_argument("--arm", choices=("DYNBASE", "S3CAP075", "S3FIX075", "S3DYN075"), required=True)
     parser.add_argument("--calibration", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--peer-epoch80-state",
         type=Path,
-        help="Required for S3FIX075/S3DYN075: paired arm's epoch80-routing-state.json.",
+        help="Legacy independent-prefix gate; rejected for shared-prefix fixed/dynamic arms.",
+    )
+    parser.add_argument(
+        "--resume-checkpoint",
+        type=Path,
+        help="Required for S3FIX075/S3DYN075: exact S3CAP075 epoch-80 last.pt.",
     )
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     return parser
@@ -37,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
         calibration_path=args.calibration,
         device=torch.device(args.device),
         peer_epoch80_state=args.peer_epoch80_state,
+        resume_checkpoint=args.resume_checkpoint,
     )
     print(json.dumps(result, sort_keys=True))
     return 0

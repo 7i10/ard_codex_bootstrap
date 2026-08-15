@@ -27,7 +27,7 @@ class DynamicS3RoutingError(RuntimeError):
     """The fixed/dynamic same-step routing contract cannot be proven."""
 
 
-DynamicS3Arm = Literal["baseline", "fixed", "dynamic"]
+DynamicS3Arm = Literal["baseline", "capture", "fixed", "dynamic"]
 
 
 def _margin(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
@@ -105,8 +105,8 @@ class DynamicS3Router:
         output_dir: Path,
         capture_epoch: int = 80,
     ) -> None:
-        if arm not in {"baseline", "fixed", "dynamic"}:
-            raise DynamicS3RoutingError("dynamic S3 arm must be baseline, fixed, or dynamic")
+        if arm not in {"baseline", "capture", "fixed", "dynamic"}:
+            raise DynamicS3RoutingError("dynamic S3 arm must be baseline, capture, fixed, or dynamic")
         if capture_epoch < 0 or not train_labels:
             raise DynamicS3RoutingError("routing requires a non-empty exact train ID/label universe")
         self.arm = arm
@@ -177,6 +177,39 @@ class DynamicS3Router:
             for epoch, item in raw_paths.items()
             if isinstance(item, dict) and isinstance(item.get("path"), str) and isinstance(item.get("sha256"), str)
         }
+
+    def adopt_capture_state(self, value: dict[str, Any]) -> None:
+        """Adopt a common treated epoch-80 capture into a child arm.
+
+        Arm identity deliberately differs (`capture` -> `fixed`/`dynamic`),
+        but the exact train universe and immutable epoch-80 action map must
+        remain byte-for-byte equivalent.
+        """
+        if (
+            value.get("schema_version") != 1
+            or value.get("contract") != "ert_dynamic_s3_recovery_v1"
+            or value.get("capture_epoch") != self.capture_epoch
+            or value.get("train_ids_sha256") != _digest_ids(list(self.train_labels))
+            or value.get("train_id_label_sha256") != _digest_labels(self.train_labels)
+        ):
+            raise DynamicS3RoutingError("shared-prefix capture has incompatible lineage")
+        raw_actions = value.get("capture_actions")
+        if not isinstance(raw_actions, dict):
+            raise DynamicS3RoutingError("shared-prefix checkpoint lacks immutable capture actions")
+        actions = {int(key): bool(item) for key, item in raw_actions.items()}
+        if set(actions) != set(self.train_labels):
+            raise DynamicS3RoutingError("shared-prefix capture does not cover the exact train universe")
+        self._capture_actions = actions
+        raw_statistics = value.get("epoch_statistics", {})
+        if not isinstance(raw_statistics, dict):
+            raise DynamicS3RoutingError("shared-prefix epoch statistics are malformed")
+        self.epoch_statistics = {int(key): dict(item) for key, item in raw_statistics.items() if isinstance(item, dict)}
+
+    def register_existing_epoch_state(self, *, epoch: int, path: Path) -> None:
+        if epoch != self.capture_epoch or not path.is_file():
+            raise DynamicS3RoutingError("shared-prefix state artifact is missing or has the wrong epoch")
+        self._state_paths[epoch] = path
+        self._write_capture()
 
     def _capture_payload(self) -> dict[str, Any]:
         if not self.capture_complete:
@@ -389,6 +422,7 @@ def run_dynamic_s3_arm(
     calibration_path: Path,
     device: torch.device,
     peer_epoch80_state: Path | None = None,
+    resume_checkpoint: Path | None = None,
 ) -> dict[str, Any]:
     """Launch one immutable-parent dynamic-S3 arm through the shared trainer.
 
@@ -404,9 +438,14 @@ def run_dynamic_s3_arm(
     runs = payload.get("runs")
     if not isinstance(runs, dict) or run_key not in runs or not isinstance(runs[run_key], dict):
         raise DynamicS3RoutingError("dynamic S3 run key is missing")
-    dynamic_arms = {"DYNBASE": "baseline", "S3FIX075": "fixed", "S3DYN075": "dynamic"}
+    dynamic_arms = {
+        "DYNBASE": "baseline",
+        "S3CAP075": "capture",
+        "S3FIX075": "fixed",
+        "S3DYN075": "dynamic",
+    }
     if arm not in dynamic_arms:
-        raise DynamicS3RoutingError("dynamic S3 arm must be DYNBASE, S3FIX075, or S3DYN075")
+        raise DynamicS3RoutingError("dynamic S3 arm must be DYNBASE, S3CAP075, S3FIX075, or S3DYN075")
     calibration = json.loads(calibration_path.read_text(encoding="utf-8"))
     if not isinstance(calibration, dict):
         raise DynamicS3RoutingError("calibration artifact must be a JSON object")
@@ -426,23 +465,55 @@ def run_dynamic_s3_arm(
         or endpoint_contract != parent_config.method.selection_attack.identity()
     ):
         raise DynamicS3RoutingError("dynamic S3 endpoint attack contract does not exactly match the parent")
+    shared_prefix = payload.get("shared_prefix", {})
+    if not isinstance(shared_prefix, dict):
+        raise DynamicS3RoutingError("dynamic S3 config shared-prefix section is malformed")
+    if arm == "S3CAP075":
+        if resume_checkpoint is not None or peer_epoch80_state is not None:
+            raise DynamicS3RoutingError("capture-only prefix cannot resume or use an epoch-80 peer gate")
+        if shared_prefix.get("arm") != arm:
+            raise DynamicS3RoutingError("dynamic S3 config does not register the requested capture-only arm")
+        end_epoch = int(shared_prefix.get("end_epoch", -1))
+        horizons = tuple(int(epoch) for epoch in shared_prefix.get("horizons", ()))
+        parent_checkpoint = Path(run["parent_checkpoint"])
+        shared_prefix_checkpoint = None
+    elif arm in {"S3FIX075", "S3DYN075"}:
+        if resume_checkpoint is None:
+            raise DynamicS3RoutingError("fixed/dynamic S3 arms require --resume-checkpoint from S3CAP075")
+        if peer_epoch80_state is not None:
+            raise DynamicS3RoutingError("shared-prefix fixed/dynamic arms must not use independent epoch-80 peer gates")
+        end_epoch = int(payload["end_epoch"])
+        horizons = tuple(int(epoch) for epoch in payload["horizons"])
+        parent_checkpoint = resume_checkpoint
+        shared_prefix_checkpoint = resume_checkpoint
+    else:
+        if resume_checkpoint is not None:
+            raise DynamicS3RoutingError("DYNBASE must start from the immutable epoch-79 parent")
+        end_epoch = int(payload["end_epoch"])
+        horizons = tuple(int(epoch) for epoch in payload["horizons"])
+        parent_checkpoint = Path(run["parent_checkpoint"])
+        shared_prefix_checkpoint = None
     try:
         result = run_stage_a_arm(
             parent_config_path=Path(run["parent_config"]),
-            parent_checkpoint=Path(run["parent_checkpoint"]),
+            parent_checkpoint=parent_checkpoint,
             mask_path=None,
             output_dir=output_dir,
             treatment=StageATreatment(arm=arm, mask_key=None, kind="baseline"),
             calibration=calibration,
             device=device,
-            end_epoch=int(payload["end_epoch"]),
-            horizon_epochs=tuple(int(epoch) for epoch in payload["horizons"]),
+            end_epoch=end_epoch,
+            horizon_epochs=horizons,
             run_namespace="dynamic-s3-recovery",
             dynamic_s3_arm=dynamic_arms[arm],
             dynamic_s3_beta_advce=float(coefficients["beta_advce"]),
             dynamic_s3_attack_contract=training_contract,
             dynamic_s3_endpoint_contract=endpoint_contract,
             dynamic_s3_peer_epoch80_state=peer_epoch80_state,
+            dynamic_s3_shared_prefix_checkpoint=shared_prefix_checkpoint,
+            dynamic_s3_experiment_parent_checkpoint=(
+                Path(run["parent_checkpoint"]) if shared_prefix_checkpoint is not None else None
+            ),
         )
     except StageARuntimeError as exc:
         raise DynamicS3RoutingError(str(exc)) from exc
@@ -558,6 +629,12 @@ def _validate_endpoint_binding(
     ):
         raise DynamicS3RoutingError(f"endpoint metadata binding failed: {seed}/{arm}/epoch-{horizon}/{split}")
     fork = manifest.get("fork_lineage")
+    shared_prefix = fork.get("shared_prefix") is True if isinstance(fork, dict) else False
+    parent_lineage_matches = isinstance(fork, dict) and (
+        fork.get("experiment_parent_checkpoint_sha256") == expected_parent_sha256
+        if shared_prefix
+        else fork.get("parent_checkpoint_sha256") == expected_parent_sha256
+    )
     if (
         not isinstance(fork, dict)
         or fork.get("arm") != arm
@@ -565,7 +642,8 @@ def _validate_endpoint_binding(
         or fork["dynamic_s3"].get("arm") != dynamic_arm
         or manifest.get("config_hash") != fork.get("child_config_hash")
         or manifest.get("training_seed") != expected_training_seed
-        or fork.get("parent_checkpoint_sha256") != expected_parent_sha256
+        or not parent_lineage_matches
+        or (shared_prefix and not isinstance(fork.get("shared_prefix_checkpoint_sha256"), str))
         or not isinstance(manifest.get("git", {}).get("sha"), str)
     ):
         raise DynamicS3RoutingError(f"training manifest lineage failed: {seed}/{arm}")

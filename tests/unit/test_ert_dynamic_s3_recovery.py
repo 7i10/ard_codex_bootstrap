@@ -137,6 +137,34 @@ def test_capture_checkpoint_state_restores_without_recomputing_history(tmp_path:
     assert decision.action_active.tolist() == [True, False]
 
 
+def test_capture_only_state_can_be_adopted_by_a_child_with_its_own_lineage(tmp_path: Path) -> None:
+    """FIXED/DYNAMIC must fork one immutable capture-only epoch-80 action map."""
+    pytest.importorskip("pyarrow")
+    labels = {11: 0, 31: 0}
+    prefix = DynamicS3Router(arm="capture", train_labels=labels, output_dir=tmp_path / "prefix")
+    _observe(prefix, 80, clean=[0, 0], adversarial=[1, 0], teacher=[0, 0])
+    prefix.flush_epoch(80)
+    prefix_state = prefix.state_dict()
+    prefix_epoch_state = Path(prefix_state["state_paths"]["80"]["path"])
+
+    child = DynamicS3Router(arm="dynamic", train_labels=labels, output_dir=tmp_path / "child")
+    with pytest.raises(RuntimeError, match="incompatible lineage"):
+        child.load_state_dict(prefix_state)
+    child.adopt_capture_state(prefix_state)
+    child_epoch_state = child.output_dir / "dynamic-state" / "epoch-80.parquet"
+    child_epoch_state.parent.mkdir(parents=True)
+    child_epoch_state.write_bytes(prefix_epoch_state.read_bytes())
+    child.register_existing_epoch_state(epoch=80, path=child_epoch_state)
+    capture = yaml.safe_load((child.output_dir / "routing-capture-mask.json").read_text(encoding="utf-8"))
+    assert capture["arm"] == "dynamic"
+    assert capture["selected_ids"] == [11]
+    assert child.state_dict()["arm"] == "dynamic"
+    # The child starts at epoch 81 and uses its current, same-step predicate;
+    # it never recalculates the historical capture action.
+    decision = _observe(child, 81, clean=[0, 0], adversarial=[0, 1], teacher=[0, 0])
+    assert decision.action_active.tolist() == [False, True]
+
+
 def test_target_policy_only_rslad_does_not_require_a_fixed_mask(tmp_path: Path) -> None:
     """rslad_student/joint target shaping is policy-driven, not fixed-ID routing."""
     student = torch.nn.Linear(2, 2)

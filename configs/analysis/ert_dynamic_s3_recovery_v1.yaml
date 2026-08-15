@@ -46,6 +46,10 @@ routing:
   student_adv_correct_action: baseline
   hysteresis: false
 arms: [DYNBASE, S3FIX075, S3DYN075]
+shared_prefix:
+  arm: S3CAP075
+  end_epoch: 81
+  horizons: [80]
 runs:
   L2:
     seed: 1

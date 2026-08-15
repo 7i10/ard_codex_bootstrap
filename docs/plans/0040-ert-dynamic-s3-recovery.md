@@ -4,7 +4,7 @@
 
 - Owner: ARD lead
 - Base: `3ce3cbe` (ERT confirmatory T1/T2/T3 result)
-- Current milestone: M2 canary preparation
+- Current milestone: M2 shared-prefix canary preparation
 - Date: 2026-08-15
 
 ## Objective
@@ -71,7 +71,7 @@ recovery/relapse rates.
 
 - [x] M0: reconcile repo, freeze config and plan.
 - [x] M1: implement router, capture/state Parquet, runtime wiring, and tests.
-- [ ] M2: focused verification, no-update sanity, and real canary.
+- [ ] M2: focused verification, shared-prefix canary, and no-update sanity.
 - [ ] M3: six continuations and independent CE-PGD20 endpoints.
 - [ ] M4: transition/effect report, hashes, review, and one cohesive commit.
 
@@ -97,6 +97,13 @@ recovery/relapse rates.
   same-step/no-reattack/teacher-freeze/BN parity regression, and initial-active
   re-entry accounting. Focused tests and changed-path gate pass; scientific
   fix-delta review reports no P0/P1. No GPU run has started.
+- 2026-08-15: The first real L2 independent-prefix attempt reached epoch 80
+  and failed closed as designed: FIXED/DYNAMIC candidate counts were 9894 and
+  9796, with nonmatching model/RNG state. This demonstrated that separate
+  epoch-79-to-80 processes cannot establish parity under attack/data-order
+  randomness. The implementation now uses one `S3CAP075` epoch-80 capture
+  prefix and resumes both children from that exact checkpoint; the legacy
+  peer-gate launch is rejected.
 
 ## Completion record
 

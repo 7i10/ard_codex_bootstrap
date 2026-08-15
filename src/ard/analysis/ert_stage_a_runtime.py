@@ -218,6 +218,8 @@ def run_stage_a_arm(
     dynamic_s3_attack_contract: dict[str, object] | None = None,
     dynamic_s3_endpoint_contract: dict[str, object] | None = None,
     dynamic_s3_peer_epoch80_state: Path | None = None,
+    dynamic_s3_shared_prefix_checkpoint: Path | None = None,
+    dynamic_s3_experiment_parent_checkpoint: Path | None = None,
 ) -> dict[str, Any]:
     config = load_config(parent_config_path)
     if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
@@ -231,12 +233,40 @@ def run_stage_a_arm(
     ):
         raise StageARuntimeError("Stage A parent selection attack is not CE-PGD20")
     payload = torch.load(parent_checkpoint, map_location="cpu", weights_only=False)
-    if not isinstance(payload, dict) or payload.get("epoch") != 79 or payload.get("epoch_boundary") != "end":
-        raise StageARuntimeError("Stage A requires an exact epoch-79 end-boundary parent")
+    shared_prefix = dynamic_s3_shared_prefix_checkpoint is not None
+    if shared_prefix:
+        if dynamic_s3_shared_prefix_checkpoint.resolve() != parent_checkpoint.resolve():
+            raise StageARuntimeError("shared-prefix checkpoint must be the actual resume checkpoint")
+        if (
+            not isinstance(payload, dict)
+            or payload.get("epoch") != 80
+            or payload.get("epoch_boundary") != "end"
+        ):
+            raise StageARuntimeError("shared-prefix continuation requires an exact epoch-80 end-boundary checkpoint")
+        if dynamic_s3_arm not in {"fixed", "dynamic"}:
+            raise StageARuntimeError("only fixed/dynamic S3 arms may resume a shared capture prefix")
+        if dynamic_s3_experiment_parent_checkpoint is None:
+            raise StageARuntimeError("shared-prefix continuation requires the immutable epoch-79 experiment parent")
+        experiment_parent_payload = torch.load(
+            dynamic_s3_experiment_parent_checkpoint, map_location="cpu", weights_only=False
+        )
+        if (
+            not isinstance(experiment_parent_payload, dict)
+            or experiment_parent_payload.get("epoch") != 79
+            or experiment_parent_payload.get("epoch_boundary") != "end"
+        ):
+            raise StageARuntimeError("shared-prefix experiment parent must be an exact epoch-79 boundary")
+        start_epoch = 81
+        experiment_parent_sha256 = _sha256(dynamic_s3_experiment_parent_checkpoint)
+    else:
+        if not isinstance(payload, dict) or payload.get("epoch") != 79 or payload.get("epoch_boundary") != "end":
+            raise StageARuntimeError("Stage A requires an exact epoch-79 end-boundary parent")
+        start_epoch = 80
+        experiment_parent_sha256 = _sha256(parent_checkpoint)
     parent_hash = payload.get("config_hash")
     if not isinstance(parent_hash, str) or len(parent_hash) != 64:
         raise StageARuntimeError("parent checkpoint lacks a valid config hash")
-    if end_epoch <= 80:
+    if end_epoch <= start_epoch:
         raise StageARuntimeError("Stage A endpoint must leave at least one epoch after epoch 79")
     _validate_horizons(horizon_epochs, end_epoch)
     if not run_namespace or any(char.isspace() for char in run_namespace):
@@ -249,7 +279,7 @@ def run_stage_a_arm(
         raise StageARuntimeError("Stage A runtime requires a clean Git tree")
     if (dynamic_s3_arm is None) != (dynamic_s3_beta_advce is None):
         raise StageARuntimeError("dynamic S3 arm and frozen coefficient must be supplied together")
-    if dynamic_s3_arm not in {None, "baseline", "fixed", "dynamic"}:
+    if dynamic_s3_arm not in {None, "baseline", "capture", "fixed", "dynamic"}:
         raise StageARuntimeError("unknown dynamic S3 arm")
     if dynamic_s3_beta_advce is not None and dynamic_s3_beta_advce != 0.075:
         raise StageARuntimeError("dynamic S3 recovery requires the frozen AdvCE coefficient 0.075")
@@ -260,7 +290,11 @@ def run_stage_a_arm(
         _require_attack_identity(
             config.method.selection_attack.identity(), dynamic_s3_endpoint_contract, label="endpoint"
         )
-        if dynamic_s3_arm in {"fixed", "dynamic"} and dynamic_s3_peer_epoch80_state is None:
+        if (
+            dynamic_s3_arm in {"fixed", "dynamic"}
+            and not shared_prefix
+            and dynamic_s3_peer_epoch80_state is None
+        ):
             raise StageARuntimeError("fixed/dynamic S3 arms require a paired epoch-80 gate path")
     dynamic_s3_identity = (
         None
@@ -351,6 +385,44 @@ def run_stage_a_arm(
     if output_dir.exists():
         raise StageARuntimeError(f"Stage A output already exists: {output_dir}")
     output_dir.mkdir(parents=True)
+    shared_epoch80: dict[str, Any] | None = None
+    if shared_prefix:
+        if dynamic_s3_router is None:
+            raise StageARuntimeError("shared-prefix continuation requires a dynamic S3 router")
+        prefix_lineage = payload.get("fork_lineage")
+        if not isinstance(prefix_lineage, dict) or not isinstance(prefix_lineage.get("dynamic_s3_state"), dict):
+            raise StageARuntimeError("shared-prefix checkpoint lacks persisted dynamic S3 capture state")
+        prefix_identity = prefix_lineage.get("dynamic_s3")
+        if (
+            not isinstance(prefix_identity, dict)
+            or prefix_identity.get("arm") != "capture"
+            or prefix_identity.get("beta_advce") != 0.075
+        ):
+            raise StageARuntimeError("shared-prefix checkpoint does not attest the frozen treated capture arm")
+        prefix_dynamic = prefix_lineage["dynamic_s3_state"]
+        if prefix_dynamic.get("arm") != "capture":
+            raise StageARuntimeError("shared-prefix checkpoint was not produced by the capture-only arm")
+        dynamic_s3_router.adopt_capture_state(prefix_dynamic)
+        raw_state = prefix_dynamic.get("state_paths", {}).get("80")
+        if not isinstance(raw_state, dict) or not isinstance(raw_state.get("path"), str):
+            raise StageARuntimeError("shared-prefix checkpoint lacks its epoch-80 state artifact binding")
+        prefix_state_path = Path(raw_state["path"])
+        if not prefix_state_path.is_file() or raw_state.get("sha256") != _sha256(prefix_state_path):
+            raise StageARuntimeError("shared-prefix epoch-80 state artifact hash does not match checkpoint lineage")
+        child_state_path = output_dir / "dynamic-state" / "epoch-80.parquet"
+        child_state_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(prefix_state_path, child_state_path)
+        if _sha256(child_state_path) != raw_state["sha256"]:
+            raise StageARuntimeError("copied shared-prefix epoch-80 state artifact hash mismatch")
+        dynamic_s3_router.register_existing_epoch_state(epoch=80, path=child_state_path)
+        shared_epoch80 = {
+            "path": str(parent_checkpoint.resolve()),
+            "checkpoint_sha256": _sha256(parent_checkpoint),
+            "components": _epoch80_equivalence(payload),
+            "capture_path": str((output_dir / "routing-capture-mask.json").resolve()),
+            "shared_prefix": True,
+        }
+        _write_json_atomic(output_dir / "epoch80-routing-state.json", shared_epoch80)
     # Include the immutable source revision so a prior canary or interrupted
     # launch can never collide with a new production arm using the same label.
     run_id = f"ert-{run_namespace}-{config.seeds.model_init}-{treatment.arm}-{source_sha[:7]}"
@@ -394,7 +466,9 @@ def run_stage_a_arm(
         # The baseline diagnostic arm observes the exact same state but
         # deliberately ignores the decision, so it never receives AdvCE.
         adversarial_ce_coefficient=(
-            dynamic_s3_beta_advce if dynamic_s3_arm in {"fixed", "dynamic"} else treatment.beta_advce
+            dynamic_s3_beta_advce
+            if dynamic_s3_arm in {"capture", "fixed", "dynamic"}
+            else treatment.beta_advce
         ),
         observation_profile="teacher_response",
     )
@@ -423,7 +497,11 @@ def run_stage_a_arm(
         "arm": treatment.arm,
         "parent_checkpoint_sha256": _sha256(parent_checkpoint),
         "parent_config_hash": parent_hash,
-        "parent_epoch": 79,
+        "parent_epoch": int(payload["epoch"]),
+        "experiment_parent_checkpoint_sha256": experiment_parent_sha256,
+        "experiment_parent_epoch": 79,
+        "shared_prefix_checkpoint_sha256": _sha256(parent_checkpoint) if shared_prefix else None,
+        "shared_prefix": shared_prefix,
         "child_config_hash": arm_hash,
         "calibration_sha256": calibration.get("artifact_sha256"),
         "source_git_sha": source_sha,
@@ -435,6 +513,13 @@ def run_stage_a_arm(
                 "parent_config": str(parent_config_path.resolve()),
                 "parent_checkpoint": str(parent_checkpoint.resolve()),
                 "parent_config_hash": parent_hash,
+                "experiment_parent_checkpoint": (
+                    None
+                    if dynamic_s3_experiment_parent_checkpoint is None
+                    else str(dynamic_s3_experiment_parent_checkpoint.resolve())
+                ),
+                "experiment_parent_checkpoint_sha256": experiment_parent_sha256,
+                "shared_prefix": shared_prefix,
                 "treatment": treatment.__dict__,
                 "calibration": calibration,
                 "child_config_hash": arm_hash,
@@ -470,7 +555,7 @@ def run_stage_a_arm(
     metrics_path = output_dir / "epoch-metrics.jsonl"
     horizon_dir = output_dir / "checkpoints"
     horizon_paths: dict[str, Path] = {}
-    dynamic_epoch80: dict[str, Any] | None = None
+    dynamic_epoch80: dict[str, Any] | None = shared_epoch80
 
     def record(metrics: dict[str, float], improved: bool) -> None:
         nonlocal dynamic_epoch80
@@ -510,7 +595,13 @@ def run_stage_a_arm(
     tracker.attach_fork_lineage(trainer.fork_lineage)
 
     try:
-        trainer.fit(loader, validation_loader=validation_loader, epochs=end_epoch, start_epoch=80, on_epoch_end=record)
+        trainer.fit(
+            loader,
+            validation_loader=validation_loader,
+            epochs=end_epoch,
+            start_epoch=start_epoch,
+            on_epoch_end=record,
+        )
         dynamic_s3_artifacts = None if dynamic_s3_router is None else dynamic_s3_router.finalize()
         tracker.set_summary(
             {
