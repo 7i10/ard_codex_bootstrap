@@ -12,6 +12,7 @@ from ard.analysis.ert_stage_a_runtime import (
     _epoch80_equivalence,
     _epoch80_gate,
     _mask_from_overlay,
+    _validate_shared_prefix_lineage,
 )
 
 
@@ -95,3 +96,27 @@ def test_epoch80_gate_requires_full_state_parity_and_capture_identity(tmp_path: 
         peer_path=peer,
         timeout_seconds=0.01,
     )
+
+
+def test_shared_prefix_rejects_a_capture_from_another_seed_parent() -> None:
+    experiment_parent = {"config_hash": "a" * 64}
+    prefix = {
+        "config_hash": "b" * 64,
+        "fork_lineage": {
+            "parent_checkpoint_sha256": "c" * 64,
+            "parent_config_hash": "a" * 64,
+            "child_config_hash": "b" * 64,
+        },
+    }
+    lineage = _validate_shared_prefix_lineage(
+        prefix_payload=prefix,
+        experiment_parent_payload=experiment_parent,
+        experiment_parent_sha256="c" * 64,
+    )
+    assert lineage["parent_checkpoint_sha256"] == "c" * 64
+    with pytest.raises(StageARuntimeError, match="does not belong"):
+        _validate_shared_prefix_lineage(
+            prefix_payload=prefix,
+            experiment_parent_payload=experiment_parent,
+            experiment_parent_sha256="d" * 64,
+        )

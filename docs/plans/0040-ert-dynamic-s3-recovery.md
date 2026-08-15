@@ -104,6 +104,11 @@ recovery/relapse rates.
   randomness. The implementation now uses one `S3CAP075` epoch-80 capture
   prefix and resumes both children from that exact checkpoint; the legacy
   peer-gate launch is rejected.
+- 2026-08-15: Added fail-closed shared-prefix lineage validation. A child now
+  requires the prefix checkpoint to attest the exact requested seed's epoch-79
+  parent SHA, parent config hash, and prefix child config hash; a cross-seed
+  prefix is rejected before training. Sixteen focused tests and the changed
+  gate pass.
 
 ## Completion record
 

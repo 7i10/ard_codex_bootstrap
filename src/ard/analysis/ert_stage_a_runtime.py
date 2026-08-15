@@ -120,6 +120,28 @@ def _epoch80_equivalence(payload: dict[str, Any]) -> dict[str, str]:
     return {key: _state_component_sha256(payload[key]) for key in required}
 
 
+def _validate_shared_prefix_lineage(
+    *, prefix_payload: dict[str, Any], experiment_parent_payload: dict[str, Any], experiment_parent_sha256: str
+) -> dict[str, Any]:
+    """Prove that a capture-only checkpoint belongs to this exact epoch-79 run.
+
+    A matching router universe alone is insufficient: L2/L4 have the same
+    CIFAR split and stable IDs, so accepting a foreign seed would silently
+    compare different model trajectories.
+    """
+    prefix_lineage = prefix_payload.get("fork_lineage")
+    experiment_config_hash = experiment_parent_payload.get("config_hash")
+    if (
+        not isinstance(prefix_lineage, dict)
+        or not isinstance(experiment_config_hash, str)
+        or prefix_lineage.get("parent_checkpoint_sha256") != experiment_parent_sha256
+        or prefix_lineage.get("parent_config_hash") != experiment_config_hash
+        or prefix_lineage.get("child_config_hash") != prefix_payload.get("config_hash")
+    ):
+        raise StageARuntimeError("shared-prefix checkpoint does not belong to the requested epoch-79 parent")
+    return prefix_lineage
+
+
 def _require_attack_identity(actual: dict[str, object], expected: object, *, label: str) -> None:
     if not isinstance(expected, dict) or set(expected) != set(actual):
         raise StageARuntimeError(f"dynamic S3 {label} attack contract must contain the complete exact identity")
@@ -389,8 +411,12 @@ def run_stage_a_arm(
     if shared_prefix:
         if dynamic_s3_router is None:
             raise StageARuntimeError("shared-prefix continuation requires a dynamic S3 router")
-        prefix_lineage = payload.get("fork_lineage")
-        if not isinstance(prefix_lineage, dict) or not isinstance(prefix_lineage.get("dynamic_s3_state"), dict):
+        prefix_lineage = _validate_shared_prefix_lineage(
+            prefix_payload=payload,
+            experiment_parent_payload=experiment_parent_payload,
+            experiment_parent_sha256=experiment_parent_sha256,
+        )
+        if not isinstance(prefix_lineage.get("dynamic_s3_state"), dict):
             raise StageARuntimeError("shared-prefix checkpoint lacks persisted dynamic S3 capture state")
         prefix_identity = prefix_lineage.get("dynamic_s3")
         if (
