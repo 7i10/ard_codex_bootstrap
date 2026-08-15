@@ -46,7 +46,9 @@ def _transition(rows: list[dict[str, Any]], *, arm: str) -> dict[str, Any]:
         if arm == "BASE":
             states = [False for _ in sequence]
         elif arm == "INST075":
-            states = [bool(row["current_active"]) for row in sequence]
+            # `current_active` already includes the teacher gate.  Use the
+            # student-only S3 observation to attribute teacher-induced flips.
+            states = [bool(row["raw_s3_observation"]) for row in sequence]
         else:
             states = [bool(row["history_state_active"]) for row in sequence]
         had_active = False
