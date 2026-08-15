@@ -4,7 +4,7 @@
 
 - Owner: ARD lead
 - Branch / base SHA: `master` / `55d01a9`
-- Current milestone: M0 contract and runtime preparation
+- Current milestone: complete; fixed endpoint report recorded
 - Last updated: 2026-08-15
 
 ## Goal
@@ -58,14 +58,14 @@ validation data and write direct/spillover/held-out effect reports.
 
 ## Milestones
 
-- [ ] M0: add plan, frozen config, coefficient sanity CLI/artifact.
-- [ ] M1: extend runtime with horizon checkpoint copies and confirmatory IDs;
+- [x] M0: add plan, frozen config, coefficient sanity CLI/artifact.
+- [x] M1: extend runtime with horizon checkpoint copies and confirmatory IDs;
   add focused contract tests.
-- [ ] M2: run no-update sanity, clean-tree canary, then eight continuations.
-- [ ] M3: evaluate train/validation CE-PGD20 at 84/89/94 and generate the
+- [x] M2: run no-update sanity, clean-tree canary, then eight continuations.
+- [x] M3: evaluate train/validation CE-PGD20 at 84/89/94 and generate the
   fixed direct/spillover/held-out report with 2,000 class-stratified bootstrap
   replicates per preregistered comparison.
-- [ ] M4: update result docs with hashes, actual commands, and evidence summary;
+- [x] M4: update result docs with hashes, actual commands, and evidence summary;
   create one cohesive commit. Do not start another intervention.
 
 ## Test plan
@@ -92,8 +92,39 @@ validation data and write direct/spillover/held-out effect reports.
 
 - 2026-08-15: Reconciled `55d01a9`; exact parents, masks, calibration artifact,
   and endpoint evaluator located. No GPU continuation started yet.
+- 2026-08-15: Ran the no-update coefficient sanity check and a corrected
+  one-epoch T3 engineering canary. The first canary invocation was rejected
+  because an exclusive epoch bound would have produced zero continuation
+  epochs; the runtime now fails closed for that case, and the corrected canary
+  completed successfully.
+- 2026-08-15: Completed eight online W&B continuations (L2/L4 × four arms)
+  from the exact epoch-79 parents, saving epochs 84/89/94. Independent
+  train/validation CE-PGD20 endpoint evaluation produced all 24 endpoints per
+  seed. The fixed 2,000-replicate class-stratified report was generated.
 
 ## Completion report
 
-To be filled with exact commands, cached tests, trajectory and endpoint hashes,
-bootstrap status, and remaining scientific uncertainty.
+The machine-readable result is
+`docs/experiments/ert_confirmatory_t123_results_v1.json` with SHA-256
+`5967fa9d6ac03f004b76c89c08eeb719b58e080431256d631570cd9950e4ceae`.
+The no-update sanity artifact is
+`docs/experiments/ert_confirmatory_t123_calibration_sanity_v1.json` with
+SHA-256 `3bcf69110216ce992b6d3e3e25a3894cc8d6a2f66fe266311c1f166c17f57a5c`.
+The endpoint interpretation and limitations are in
+`docs/ERT_CONFIRMATORY_T123_RESULTS.md`.
+
+Executed verification and run commands:
+
+- `pytest -q tests/unit/test_ert_stage_a_runtime.py tests/unit/test_ert_confirmatory_calibration.py` — 6 passed.
+- `pytest -q tests/unit/test_ert_stage_a_runtime.py tests/unit/test_ert_confirmatory_calibration.py tests/unit/test_ert_confirmatory_report.py` — 8 passed.
+- Ruff on all affected Python files — passed.
+- `scripts/verify.py --changed` after the final documentation-only delta —
+  selected T0 and correctly reported no impacted tests.
+- The no-update calibration CLI completed before GPU continuation.
+- One corrected canary completed, followed by eight W&B-online continuations
+  and 48 independent endpoint jobs.
+
+The repository-wide mypy baseline still reports 15 pre-existing errors in
+`autoattack.py`, `signal_audit.py`, and `teacher_risk_replay.py`; no new
+confirmatory module error was introduced. Official test and AutoAttack were
+intentionally not run.

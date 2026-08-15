@@ -1,0 +1,2300 @@
+{
+  "arms": [
+    "C79CONF",
+    "T1WCONF",
+    "T2WCONF",
+    "T3LP05CONF"
+  ],
+  "attack": {
+    "identity": {
+      "epsilon": "8/255",
+      "epsilon_value": 0.03137254901960784,
+      "input_domain": "pixel_0_1",
+      "kl_target": null,
+      "loss": "ce",
+      "norm": "linf",
+      "random_start": true,
+      "step_size": "2/255",
+      "step_size_value": 0.00784313725490196,
+      "steps": 20,
+      "student_mode": "eval",
+      "teacher_mode": "eval",
+      "temperature": 1.0,
+      "temperature_squared": true
+    },
+    "identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
+  },
+  "bootstrap": {
+    "replicates": 2000,
+    "seed": 20260813,
+    "stratified_by": "true_label"
+  },
+  "calibration_sha256": "0e3b98b4e1cfcc7727786fd23da57a82903fa2c8b95a16b6e12ca1425d34da16",
+  "config_sha256": "63a550a1b298e70ec27fc7c537700bc3c9b6a3e9fed0769400a44f6345d806fe",
+  "contract": "ert_confirmatory_t123_effect_report_v1",
+  "horizons": [
+    84,
+    89,
+    94
+  ],
+  "inputs": {
+    "L2/C79CONF/epoch-84": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/checkpoints/epoch-84.pt",
+      "checkpoint_sha256": "39feaa4ad4890e9177e74ba2cf0adcdca7503fccf430bd027d51f99a630be9f1",
+      "manifest": {
+        "checkpoint_sha256": "39feaa4ad4890e9177e74ba2cf0adcdca7503fccf430bd027d51f99a630be9f1",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-C79CONF-5b707db",
+        "sha256": "47bd68552f169eb41b4cb100c942d300820edff312e935d9fda3ef6a3a19a068",
+        "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/C79CONF/epoch-84/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/C79CONF/epoch-84/validation"
+    },
+    "L2/C79CONF/epoch-89": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/checkpoints/epoch-89.pt",
+      "checkpoint_sha256": "b3c0bd9338c7a8e929fa3302994a9802cd9b60e88610a4f8cb72705d7ff8708a",
+      "manifest": {
+        "checkpoint_sha256": "b3c0bd9338c7a8e929fa3302994a9802cd9b60e88610a4f8cb72705d7ff8708a",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-C79CONF-5b707db",
+        "sha256": "47bd68552f169eb41b4cb100c942d300820edff312e935d9fda3ef6a3a19a068",
+        "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/C79CONF/epoch-89/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/C79CONF/epoch-89/validation"
+    },
+    "L2/C79CONF/epoch-94": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/checkpoints/epoch-94.pt",
+      "checkpoint_sha256": "50582439bd945fff147e962ec7f28fec91302216a13b64a27f389a74f532640c",
+      "manifest": {
+        "checkpoint_sha256": "50582439bd945fff147e962ec7f28fec91302216a13b64a27f389a74f532640c",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-C79CONF-5b707db",
+        "sha256": "47bd68552f169eb41b4cb100c942d300820edff312e935d9fda3ef6a3a19a068",
+        "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/C79CONF/epoch-94/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/C79CONF/epoch-94/validation"
+    },
+    "L2/T1WCONF/epoch-84": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/checkpoints/epoch-84.pt",
+      "checkpoint_sha256": "7626d354baca0a5a339d30cfc2294912b8b317cb9c0d4544061f5c0383711eb7",
+      "manifest": {
+        "checkpoint_sha256": "7626d354baca0a5a339d30cfc2294912b8b317cb9c0d4544061f5c0383711eb7",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T1WCONF-e071467",
+        "sha256": "46b55daeeb1dfc9b8cf2b2972aa043707fd0b28d156028ba67c3710871ff9d6d",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T1WCONF/epoch-84/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T1WCONF/epoch-84/validation"
+    },
+    "L2/T1WCONF/epoch-89": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/checkpoints/epoch-89.pt",
+      "checkpoint_sha256": "733e1973db125f106dd6488d3d670929ce674ec44cda5f6adaae92d4ad247f6e",
+      "manifest": {
+        "checkpoint_sha256": "733e1973db125f106dd6488d3d670929ce674ec44cda5f6adaae92d4ad247f6e",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T1WCONF-e071467",
+        "sha256": "46b55daeeb1dfc9b8cf2b2972aa043707fd0b28d156028ba67c3710871ff9d6d",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T1WCONF/epoch-89/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T1WCONF/epoch-89/validation"
+    },
+    "L2/T1WCONF/epoch-94": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/checkpoints/epoch-94.pt",
+      "checkpoint_sha256": "c5387593821d95c78b53047abb73a39cac45277fef183036c7f9f4482a67c079",
+      "manifest": {
+        "checkpoint_sha256": "c5387593821d95c78b53047abb73a39cac45277fef183036c7f9f4482a67c079",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T1WCONF-e071467",
+        "sha256": "46b55daeeb1dfc9b8cf2b2972aa043707fd0b28d156028ba67c3710871ff9d6d",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T1WCONF/epoch-94/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T1WCONF/epoch-94/validation"
+    },
+    "L2/T2WCONF/epoch-84": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/checkpoints/epoch-84.pt",
+      "checkpoint_sha256": "c4e0991e9a9164229d176a1b4e44ef7345fcfc3f9931e1c57242de1900481e20",
+      "manifest": {
+        "checkpoint_sha256": "c4e0991e9a9164229d176a1b4e44ef7345fcfc3f9931e1c57242de1900481e20",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T2WCONF-e071467",
+        "sha256": "ff6146ea975fd43c6b0f2e41620762c5d582a44d28a7b6414fe4f515d78ca2aa",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T2WCONF/epoch-84/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T2WCONF/epoch-84/validation"
+    },
+    "L2/T2WCONF/epoch-89": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/checkpoints/epoch-89.pt",
+      "checkpoint_sha256": "d76b07132a5b2386a2d935fcb25006491f757120fa8f264b3b3fba05c49d4476",
+      "manifest": {
+        "checkpoint_sha256": "d76b07132a5b2386a2d935fcb25006491f757120fa8f264b3b3fba05c49d4476",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T2WCONF-e071467",
+        "sha256": "ff6146ea975fd43c6b0f2e41620762c5d582a44d28a7b6414fe4f515d78ca2aa",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T2WCONF/epoch-89/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T2WCONF/epoch-89/validation"
+    },
+    "L2/T2WCONF/epoch-94": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/checkpoints/epoch-94.pt",
+      "checkpoint_sha256": "eef42bad235382bd7b205dfab339496ad83a7ecde142c4fdfeb0a6cae6bd169c",
+      "manifest": {
+        "checkpoint_sha256": "eef42bad235382bd7b205dfab339496ad83a7ecde142c4fdfeb0a6cae6bd169c",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T2WCONF-e071467",
+        "sha256": "ff6146ea975fd43c6b0f2e41620762c5d582a44d28a7b6414fe4f515d78ca2aa",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T2WCONF/epoch-94/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T2WCONF/epoch-94/validation"
+    },
+    "L2/T3LP05CONF/epoch-84": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/checkpoints/epoch-84.pt",
+      "checkpoint_sha256": "76926c33c94a8bcf38921131154d000c13efc3760ad1b7292daa312922652e2c",
+      "manifest": {
+        "checkpoint_sha256": "76926c33c94a8bcf38921131154d000c13efc3760ad1b7292daa312922652e2c",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T3LP05CONF-e071467",
+        "sha256": "e8881b4c4b4b946205023d247b68cd41ad78414d1ced1f34460ef38d5e4a0265",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T3LP05CONF/epoch-84/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T3LP05CONF/epoch-84/validation"
+    },
+    "L2/T3LP05CONF/epoch-89": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/checkpoints/epoch-89.pt",
+      "checkpoint_sha256": "9aa5afd73ab650a594cf44ab6caedd0bd28b1066213ff73c1c2b45dcdfa99041",
+      "manifest": {
+        "checkpoint_sha256": "9aa5afd73ab650a594cf44ab6caedd0bd28b1066213ff73c1c2b45dcdfa99041",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T3LP05CONF-e071467",
+        "sha256": "e8881b4c4b4b946205023d247b68cd41ad78414d1ced1f34460ef38d5e4a0265",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T3LP05CONF/epoch-89/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T3LP05CONF/epoch-89/validation"
+    },
+    "L2/T3LP05CONF/epoch-94": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/checkpoints/epoch-94.pt",
+      "checkpoint_sha256": "43957badf2a9b6023ac36f13484e5f8ef4f474009748fff0a1f0b38038db135c",
+      "manifest": {
+        "checkpoint_sha256": "43957badf2a9b6023ac36f13484e5f8ef4f474009748fff0a1f0b38038db135c",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-1-T3LP05CONF-e071467",
+        "sha256": "e8881b4c4b4b946205023d247b68cd41ad78414d1ced1f34460ef38d5e4a0265",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T3LP05CONF/epoch-94/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L2/T3LP05CONF/epoch-94/validation"
+    },
+    "L4/C79CONF/epoch-84": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/checkpoints/epoch-84.pt",
+      "checkpoint_sha256": "7f95b6808b7111c43cddfd9ff18bb3cfdb05885c3f08b750e5db4d44f9177a38",
+      "manifest": {
+        "checkpoint_sha256": "7f95b6808b7111c43cddfd9ff18bb3cfdb05885c3f08b750e5db4d44f9177a38",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-C79CONF-5b707db",
+        "sha256": "efb15bcbf00e3ed640535aa513a607cb7a9bc1c975761e34272f9f0f8638f3c5",
+        "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/C79CONF/epoch-84/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/C79CONF/epoch-84/validation"
+    },
+    "L4/C79CONF/epoch-89": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/checkpoints/epoch-89.pt",
+      "checkpoint_sha256": "969628da797b0a69fe2618bbb363713207b9cb3712f450bd88d776ec5c1b2fe6",
+      "manifest": {
+        "checkpoint_sha256": "969628da797b0a69fe2618bbb363713207b9cb3712f450bd88d776ec5c1b2fe6",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-C79CONF-5b707db",
+        "sha256": "efb15bcbf00e3ed640535aa513a607cb7a9bc1c975761e34272f9f0f8638f3c5",
+        "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/C79CONF/epoch-89/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/C79CONF/epoch-89/validation"
+    },
+    "L4/C79CONF/epoch-94": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/checkpoints/epoch-94.pt",
+      "checkpoint_sha256": "37f0741e04bc6c2490f0cdf7962ff6dcc1b933922360e8cb01471805c081ec6e",
+      "manifest": {
+        "checkpoint_sha256": "37f0741e04bc6c2490f0cdf7962ff6dcc1b933922360e8cb01471805c081ec6e",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-C79CONF-5b707db",
+        "sha256": "efb15bcbf00e3ed640535aa513a607cb7a9bc1c975761e34272f9f0f8638f3c5",
+        "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/C79CONF/epoch-94/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/C79CONF/epoch-94/validation"
+    },
+    "L4/T1WCONF/epoch-84": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/checkpoints/epoch-84.pt",
+      "checkpoint_sha256": "2d977841f535f3d7efa4aaf3f22fcbf50d6911d077c8f8a2d36c9759e8efa4bf",
+      "manifest": {
+        "checkpoint_sha256": "2d977841f535f3d7efa4aaf3f22fcbf50d6911d077c8f8a2d36c9759e8efa4bf",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T1WCONF-e071467",
+        "sha256": "e198fe651929bd16318bd54d8e6462b39cafce8a71d1e8d651e1bd2df7bfed46",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T1WCONF/epoch-84/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T1WCONF/epoch-84/validation"
+    },
+    "L4/T1WCONF/epoch-89": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/checkpoints/epoch-89.pt",
+      "checkpoint_sha256": "cec48d8de3f7049a60eeb31c7172718e5e6d9baecb6606ba8621f45b228fbfe5",
+      "manifest": {
+        "checkpoint_sha256": "cec48d8de3f7049a60eeb31c7172718e5e6d9baecb6606ba8621f45b228fbfe5",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T1WCONF-e071467",
+        "sha256": "e198fe651929bd16318bd54d8e6462b39cafce8a71d1e8d651e1bd2df7bfed46",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T1WCONF/epoch-89/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T1WCONF/epoch-89/validation"
+    },
+    "L4/T1WCONF/epoch-94": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/checkpoints/epoch-94.pt",
+      "checkpoint_sha256": "f41f1ff289f7f6f50eb0546d5492e402e2573bab6b05580289ee94d6e9bed9a3",
+      "manifest": {
+        "checkpoint_sha256": "f41f1ff289f7f6f50eb0546d5492e402e2573bab6b05580289ee94d6e9bed9a3",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T1WCONF-e071467",
+        "sha256": "e198fe651929bd16318bd54d8e6462b39cafce8a71d1e8d651e1bd2df7bfed46",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T1WCONF/epoch-94/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T1WCONF/epoch-94/validation"
+    },
+    "L4/T2WCONF/epoch-84": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/checkpoints/epoch-84.pt",
+      "checkpoint_sha256": "ed3b3a2df8634a926f1d13a90749c0f4d5c8dad0fbaa0f1ea0b5a7c39ce9f6d0",
+      "manifest": {
+        "checkpoint_sha256": "ed3b3a2df8634a926f1d13a90749c0f4d5c8dad0fbaa0f1ea0b5a7c39ce9f6d0",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T2WCONF-e071467",
+        "sha256": "1695a87b72fff29397da8c594f02de68a9938c39675e7ee0633cbd0c512c2977",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T2WCONF/epoch-84/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T2WCONF/epoch-84/validation"
+    },
+    "L4/T2WCONF/epoch-89": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/checkpoints/epoch-89.pt",
+      "checkpoint_sha256": "462f0cf83ad6405621d211b88b032b7333397aeff3f1300b13b8d36a86feed02",
+      "manifest": {
+        "checkpoint_sha256": "462f0cf83ad6405621d211b88b032b7333397aeff3f1300b13b8d36a86feed02",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T2WCONF-e071467",
+        "sha256": "1695a87b72fff29397da8c594f02de68a9938c39675e7ee0633cbd0c512c2977",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T2WCONF/epoch-89/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T2WCONF/epoch-89/validation"
+    },
+    "L4/T2WCONF/epoch-94": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/checkpoints/epoch-94.pt",
+      "checkpoint_sha256": "1dbc2590c11e8ed11ec66c1692a4bfe24b30deb79f706efb9604ae016cd1e0bd",
+      "manifest": {
+        "checkpoint_sha256": "1dbc2590c11e8ed11ec66c1692a4bfe24b30deb79f706efb9604ae016cd1e0bd",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T2WCONF-e071467",
+        "sha256": "1695a87b72fff29397da8c594f02de68a9938c39675e7ee0633cbd0c512c2977",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T2WCONF/epoch-94/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T2WCONF/epoch-94/validation"
+    },
+    "L4/T3LP05CONF/epoch-84": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/checkpoints/epoch-84.pt",
+      "checkpoint_sha256": "862ce0a18b976e52e7baf5e603e5c630ec5bfb1b34b81111718358472a695e9d",
+      "manifest": {
+        "checkpoint_sha256": "862ce0a18b976e52e7baf5e603e5c630ec5bfb1b34b81111718358472a695e9d",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T3LP05CONF-e071467",
+        "sha256": "fe7f27e3bcaddf651e18c693ca33192a9eb1f9f56d39bbacf2959ffc9f38cd43",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T3LP05CONF/epoch-84/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T3LP05CONF/epoch-84/validation"
+    },
+    "L4/T3LP05CONF/epoch-89": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/checkpoints/epoch-89.pt",
+      "checkpoint_sha256": "35ade8725cd321dc57f6a6a09e8267a96a54179df99684da044ad50b7ec3995c",
+      "manifest": {
+        "checkpoint_sha256": "35ade8725cd321dc57f6a6a09e8267a96a54179df99684da044ad50b7ec3995c",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T3LP05CONF-e071467",
+        "sha256": "fe7f27e3bcaddf651e18c693ca33192a9eb1f9f56d39bbacf2959ffc9f38cd43",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T3LP05CONF/epoch-89/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T3LP05CONF/epoch-89/validation"
+    },
+    "L4/T3LP05CONF/epoch-94": {
+      "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/checkpoints/epoch-94.pt",
+      "checkpoint_sha256": "df1889b7565660b02e41d66bf0d84e27876ea563fe8821f69c5a337bfd99b206",
+      "manifest": {
+        "checkpoint_sha256": "df1889b7565660b02e41d66bf0d84e27876ea563fe8821f69c5a337bfd99b206",
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/run-bundle/manifest.json",
+        "run_id": "ert-confirmatory-t123-2-T3LP05CONF-e071467",
+        "sha256": "fe7f27e3bcaddf651e18c693ca33192a9eb1f9f56d39bbacf2959ffc9f38cd43",
+        "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+      },
+      "train_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T3LP05CONF/epoch-94/train",
+      "validation_endpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123-endpoint/L4/T3LP05CONF/epoch-94/validation"
+    }
+  },
+  "schema_version": 1,
+  "seeds": {
+    "L2": {
+      "horizons": {
+        "84": {
+          "arms": {
+            "C79CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "39feaa4ad4890e9177e74ba2cf0adcdca7503fccf430bd027d51f99a630be9f1",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-C79CONF-5b707db",
+                "sha256": "47bd68552f169eb41b4cb100c942d300820edff312e935d9fda3ef6a3a19a068",
+                "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+              },
+              "direct": null,
+              "global_train": {
+                "clean_accuracy_delta": 0.0,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0
+              },
+              "heldout": {
+                "clean_accuracy_delta": 0.0,
+                "count": 5000,
+                "robust_accuracy_delta": 0.0
+              },
+              "nonselected_count": 45000,
+              "selected_count": 0,
+              "spillover": null
+            },
+            "T1WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "7626d354baca0a5a339d30cfc2294912b8b317cb9c0d4544061f5c0383711eb7",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T1WCONF-e071467",
+                "sha256": "46b55daeeb1dfc9b8cf2b2972aa043707fd0b28d156028ba67c3710871ff9d6d",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.00143145346562582,
+                "clean_accuracy_delta": -0.0034381636161391446,
+                "clean_accuracy_delta_ci95": [
+                  -0.008898776418242492,
+                  0.0018202042673677824
+                ],
+                "clean_margin_delta": -0.008088049381920127,
+                "count": 9889,
+                "harm_count": 714,
+                "harm_rate": 0.07220143593892203,
+                "net_rescue_count": 71,
+                "net_rescue_rate": 0.0071796946101729195,
+                "rescue_count": 785,
+                "rescue_rate": 0.07938113054909496,
+                "robust_accuracy_delta": 0.0071796946101729195,
+                "robust_accuracy_delta_ci95": [
+                  -0.0005081403579735058,
+                  0.0149661239761351
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.004377777777777778,
+                "control_clean_accuracy": 0.7898444444444445,
+                "control_robust_accuracy": 0.509,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0007555555555555555,
+                "treatment_clean_accuracy": 0.7854666666666666,
+                "treatment_robust_accuracy": 0.5097555555555555
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.0008821888655424118,
+                "clean_accuracy_delta": -0.0064,
+                "clean_accuracy_delta_ci95": [
+                  -0.013,
+                  0.0
+                ],
+                "clean_margin_delta": -0.006715288649499417,
+                "count": 5000,
+                "harm_count": 223,
+                "harm_rate": 0.0446,
+                "net_rescue_count": -7,
+                "net_rescue_rate": -0.0014,
+                "rescue_count": 216,
+                "rescue_rate": 0.0432,
+                "robust_accuracy_delta": -0.0014,
+                "robust_accuracy_delta_ci95": [
+                  -0.009205,
+                  0.0068
+                ]
+              },
+              "nonselected_count": 35111,
+              "selected_count": 9889,
+              "spillover": {
+                "adversarial_margin_delta": -0.004076955770336673,
+                "clean_accuracy_delta": -0.004642419754492894,
+                "clean_accuracy_delta_ci95": [
+                  -0.006864657799549999,
+                  -0.0023917006066474936
+                ],
+                "clean_margin_delta": -0.010055125371873242,
+                "count": 35111,
+                "harm_count": 1133,
+                "harm_rate": 0.032269089459143856,
+                "net_rescue_count": -37,
+                "net_rescue_rate": -0.0010538008031670987,
+                "rescue_count": 1096,
+                "rescue_rate": 0.03121528865597676,
+                "robust_accuracy_delta": -0.0010538008031670987,
+                "robust_accuracy_delta_ci95": [
+                  -0.0036740622596906952,
+                  0.001594941756144798
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T2WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "c4e0991e9a9164229d176a1b4e44ef7345fcfc3f9931e1c57242de1900481e20",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T2WCONF-e071467",
+                "sha256": "ff6146ea975fd43c6b0f2e41620762c5d582a44d28a7b6414fe4f515d78ca2aa",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": 0.0069273493005433204,
+                "clean_accuracy_delta": -0.061517113783533764,
+                "clean_accuracy_delta_ci95": [
+                  -0.0786308973172988,
+                  -0.044854301572618015
+                ],
+                "clean_margin_delta": -0.013313632137956275,
+                "count": 2162,
+                "harm_count": 67,
+                "harm_rate": 0.030989824236817762,
+                "net_rescue_count": 39,
+                "net_rescue_rate": 0.018038852913968548,
+                "rescue_count": 106,
+                "rescue_rate": 0.04902867715078631,
+                "robust_accuracy_delta": 0.018038852913968548,
+                "robust_accuracy_delta_ci95": [
+                  0.006938020351526364,
+                  0.029139685476410732
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.01308888888888889,
+                "control_clean_accuracy": 0.7898444444444445,
+                "control_robust_accuracy": 0.509,
+                "count": 45000,
+                "robust_accuracy_delta": -0.0010444444444444444,
+                "treatment_clean_accuracy": 0.7767555555555555,
+                "treatment_robust_accuracy": 0.5079555555555556
+              },
+              "heldout": {
+                "adversarial_margin_delta": 0.00019965075552463531,
+                "clean_accuracy_delta": -0.0142,
+                "clean_accuracy_delta_ci95": [
+                  -0.021404999999999997,
+                  -0.0074
+                ],
+                "clean_margin_delta": -0.012990265183150768,
+                "count": 5000,
+                "harm_count": 213,
+                "harm_rate": 0.0426,
+                "net_rescue_count": 16,
+                "net_rescue_rate": 0.0032,
+                "rescue_count": 229,
+                "rescue_rate": 0.0458,
+                "robust_accuracy_delta": 0.0032,
+                "robust_accuracy_delta_ci95": [
+                  -0.005,
+                  0.0114
+                ]
+              },
+              "nonselected_count": 42838,
+              "selected_count": 2162,
+              "spillover": {
+                "adversarial_margin_delta": -0.0036355195745023626,
+                "clean_accuracy_delta": -0.010644754657080162,
+                "clean_accuracy_delta_ci95": [
+                  -0.012746276670246044,
+                  -0.008520472477706709
+                ],
+                "clean_margin_delta": -0.014709365925352427,
+                "count": 42838,
+                "harm_count": 1923,
+                "harm_rate": 0.044890050889397265,
+                "net_rescue_count": -86,
+                "net_rescue_rate": -0.002007563378308978,
+                "rescue_count": 1837,
+                "rescue_rate": 0.04288248751108829,
+                "robust_accuracy_delta": -0.002007563378308978,
+                "robust_accuracy_delta_ci95": [
+                  -0.0047854708436434945,
+                  0.0009104066483029086
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T3LP05CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "76926c33c94a8bcf38921131154d000c13efc3760ad1b7292daa312922652e2c",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T3LP05CONF-e071467",
+                "sha256": "e8881b4c4b4b946205023d247b68cd41ad78414d1ced1f34460ef38d5e4a0265",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.0010473832071826446,
+                "clean_accuracy_delta": -0.013966480446927373,
+                "clean_accuracy_delta_ci95": [
+                  -0.03407821229050279,
+                  0.005041899441340706
+                ],
+                "clean_margin_delta": -0.0027192680321259204,
+                "count": 1790,
+                "harm_count": 27,
+                "harm_rate": 0.015083798882681564,
+                "net_rescue_count": 1,
+                "net_rescue_rate": 0.0005586592178770949,
+                "rescue_count": 28,
+                "rescue_rate": 0.01564245810055866,
+                "robust_accuracy_delta": 0.0005586592178770949,
+                "robust_accuracy_delta_ci95": [
+                  -0.00782122905027933,
+                  0.008938547486033519
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.010622222222222222,
+                "control_clean_accuracy": 0.7898444444444445,
+                "control_robust_accuracy": 0.509,
+                "count": 45000,
+                "robust_accuracy_delta": -0.004355555555555555,
+                "treatment_clean_accuracy": 0.7792222222222223,
+                "treatment_robust_accuracy": 0.5046444444444445
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.00047235179841518404,
+                "clean_accuracy_delta": -0.0092,
+                "clean_accuracy_delta_ci95": [
+                  -0.0162,
+                  -0.0024
+                ],
+                "clean_margin_delta": -0.005893637695908546,
+                "count": 5000,
+                "harm_count": 232,
+                "harm_rate": 0.0464,
+                "net_rescue_count": -11,
+                "net_rescue_rate": -0.0022,
+                "rescue_count": 221,
+                "rescue_rate": 0.0442,
+                "robust_accuracy_delta": -0.0022,
+                "robust_accuracy_delta_ci95": [
+                  -0.010605,
+                  0.0062
+                ]
+              },
+              "nonselected_count": 43210,
+              "selected_count": 1790,
+              "spillover": {
+                "adversarial_margin_delta": -0.00551494416974535,
+                "clean_accuracy_delta": -0.01048368433233048,
+                "clean_accuracy_delta_ci95": [
+                  -0.012774820643369591,
+                  -0.008238833603332562
+                ],
+                "clean_margin_delta": -0.009796857432279286,
+                "count": 43210,
+                "harm_count": 2098,
+                "harm_rate": 0.04855357556121268,
+                "net_rescue_count": -197,
+                "net_rescue_rate": -0.004559129831057626,
+                "rescue_count": 1901,
+                "rescue_rate": 0.043994445730155055,
+                "robust_accuracy_delta": -0.004559129831057626,
+                "robust_accuracy_delta_ci95": [
+                  -0.007451978708632261,
+                  -0.0017576949780143548
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            }
+          },
+          "train_identity": {
+            "class_counts": {
+              "0": 4500,
+              "1": 4500,
+              "2": 4500,
+              "3": 4500,
+              "4": 4500,
+              "5": 4500,
+              "6": 4500,
+              "7": 4500,
+              "8": 4500,
+              "9": 4500
+            },
+            "count": 45000,
+            "name": "train",
+            "sample_id_label_sha256": "083045ab272059eeae54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
+          },
+          "validation_identity": {
+            "class_counts": {
+              "0": 500,
+              "1": 500,
+              "2": 500,
+              "3": 500,
+              "4": 500,
+              "5": 500,
+              "6": 500,
+              "7": 500,
+              "8": 500,
+              "9": 500
+            },
+            "count": 5000,
+            "name": "validation",
+            "sample_id_label_sha256": "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+          }
+        },
+        "89": {
+          "arms": {
+            "C79CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "b3c0bd9338c7a8e929fa3302994a9802cd9b60e88610a4f8cb72705d7ff8708a",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-C79CONF-5b707db",
+                "sha256": "47bd68552f169eb41b4cb100c942d300820edff312e935d9fda3ef6a3a19a068",
+                "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+              },
+              "direct": null,
+              "global_train": {
+                "clean_accuracy_delta": 0.0,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0
+              },
+              "heldout": {
+                "clean_accuracy_delta": 0.0,
+                "count": 5000,
+                "robust_accuracy_delta": 0.0
+              },
+              "nonselected_count": 45000,
+              "selected_count": 0,
+              "spillover": null
+            },
+            "T1WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "733e1973db125f106dd6488d3d670929ce674ec44cda5f6adaae92d4ad247f6e",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T1WCONF-e071467",
+                "sha256": "46b55daeeb1dfc9b8cf2b2972aa043707fd0b28d156028ba67c3710871ff9d6d",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": 0.009344629307483468,
+                "clean_accuracy_delta": 0.004955000505612296,
+                "clean_accuracy_delta_ci95": [
+                  -0.00010112245929821013,
+                  0.010112245929821012
+                ],
+                "clean_margin_delta": -0.004735919204378094,
+                "count": 9889,
+                "harm_count": 810,
+                "harm_rate": 0.08190919203155021,
+                "net_rescue_count": 250,
+                "net_rescue_rate": 0.025280614824552534,
+                "rescue_count": 1060,
+                "rescue_rate": 0.10718980685610274,
+                "robust_accuracy_delta": 0.025280614824552534,
+                "robust_accuracy_delta_ci95": [
+                  0.016988573162099303,
+                  0.033577712609970646
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.006511111111111111,
+                "control_clean_accuracy": 0.8060444444444445,
+                "control_robust_accuracy": 0.4997111111111111,
+                "count": 45000,
+                "robust_accuracy_delta": 0.016266666666666665,
+                "treatment_clean_accuracy": 0.7995333333333333,
+                "treatment_robust_accuracy": 0.5159777777777778
+              },
+              "heldout": {
+                "adversarial_margin_delta": 0.006664963752031326,
+                "clean_accuracy_delta": -0.0112,
+                "clean_accuracy_delta_ci95": [
+                  -0.0186,
+                  -0.0038
+                ],
+                "clean_margin_delta": -0.006922166177630425,
+                "count": 5000,
+                "harm_count": 224,
+                "harm_rate": 0.0448,
+                "net_rescue_count": 45,
+                "net_rescue_rate": 0.009,
+                "rescue_count": 269,
+                "rescue_rate": 0.0538,
+                "robust_accuracy_delta": 0.009,
+                "robust_accuracy_delta_ci95": [
+                  0.0005950000000000003,
+                  0.0176
+                ]
+              },
+              "nonselected_count": 35111,
+              "selected_count": 9889,
+              "spillover": {
+                "adversarial_margin_delta": 0.004259459916903827,
+                "clean_accuracy_delta": -0.009740537153598587,
+                "clean_accuracy_delta_ci95": [
+                  -0.012303836404545585,
+                  -0.007205719005439891
+                ],
+                "clean_margin_delta": -0.006223557210673752,
+                "count": 35111,
+                "harm_count": 1133,
+                "harm_rate": 0.032269089459143856,
+                "net_rescue_count": 482,
+                "net_rescue_rate": 0.013727891543960582,
+                "rescue_count": 1615,
+                "rescue_rate": 0.04599698100310444,
+                "robust_accuracy_delta": 0.013727891543960582,
+                "robust_accuracy_delta_ci95": [
+                  0.010822819059553986,
+                  0.016632964028367177
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T2WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "d76b07132a5b2386a2d935fcb25006491f757120fa8f264b3b3fba05c49d4476",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T2WCONF-e071467",
+                "sha256": "ff6146ea975fd43c6b0f2e41620762c5d582a44d28a7b6414fe4f515d78ca2aa",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": 0.0060862692091941395,
+                "clean_accuracy_delta": -0.008788159111933395,
+                "clean_accuracy_delta_ci95": [
+                  -0.024525901942645697,
+                  0.0064754856614246065
+                ],
+                "clean_margin_delta": -0.0015675106967190258,
+                "count": 2162,
+                "harm_count": 80,
+                "harm_rate": 0.03700277520814061,
+                "net_rescue_count": 23,
+                "net_rescue_rate": 0.010638297872340425,
+                "rescue_count": 103,
+                "rescue_rate": 0.04764107308048104,
+                "robust_accuracy_delta": 0.010638297872340425,
+                "robust_accuracy_delta_ci95": [
+                  -0.0018501387604070306,
+                  0.02312673450508788
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.005,
+                "control_clean_accuracy": 0.8060444444444445,
+                "control_robust_accuracy": 0.4997111111111111,
+                "count": 45000,
+                "robust_accuracy_delta": 0.007222222222222222,
+                "treatment_clean_accuracy": 0.8010444444444444,
+                "treatment_robust_accuracy": 0.5069333333333333
+              },
+              "heldout": {
+                "adversarial_margin_delta": 0.001962561149895191,
+                "clean_accuracy_delta": -0.009,
+                "clean_accuracy_delta_ci95": [
+                  -0.0158,
+                  -0.0024
+                ],
+                "clean_margin_delta": -0.007939714376628399,
+                "count": 5000,
+                "harm_count": 226,
+                "harm_rate": 0.0452,
+                "net_rescue_count": -20,
+                "net_rescue_rate": -0.004,
+                "rescue_count": 206,
+                "rescue_rate": 0.0412,
+                "robust_accuracy_delta": -0.004,
+                "robust_accuracy_delta_ci95": [
+                  -0.0118,
+                  0.0042
+                ]
+              },
+              "nonselected_count": 42838,
+              "selected_count": 2162,
+              "spillover": {
+                "adversarial_margin_delta": 0.002433265841263528,
+                "clean_accuracy_delta": -0.004808814603856389,
+                "clean_accuracy_delta_ci95": [
+                  -0.006979784303655633,
+                  -0.002591157383631355
+                ],
+                "clean_margin_delta": -0.008032103036472268,
+                "count": 42838,
+                "harm_count": 1872,
+                "harm_rate": 0.043699519118539615,
+                "net_rescue_count": 302,
+                "net_rescue_rate": 0.007049815584294318,
+                "rescue_count": 2174,
+                "rescue_rate": 0.05074933470283393,
+                "robust_accuracy_delta": 0.007049815584294318,
+                "robust_accuracy_delta_ci95": [
+                  0.004107334609458891,
+                  0.00999171296512442
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T3LP05CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "9aa5afd73ab650a594cf44ab6caedd0bd28b1066213ff73c1c2b45dcdfa99041",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T3LP05CONF-e071467",
+                "sha256": "e8881b4c4b4b946205023d247b68cd41ad78414d1ced1f34460ef38d5e4a0265",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.006457771839542762,
+                "clean_accuracy_delta": -0.03240223463687151,
+                "clean_accuracy_delta_ci95": [
+                  -0.05196927374301676,
+                  -0.012849162011173185
+                ],
+                "clean_margin_delta": -0.007524541136938767,
+                "count": 1790,
+                "harm_count": 26,
+                "harm_rate": 0.01452513966480447,
+                "net_rescue_count": 2,
+                "net_rescue_rate": 0.0011173184357541898,
+                "rescue_count": 28,
+                "rescue_rate": 0.01564245810055866,
+                "robust_accuracy_delta": 0.0011173184357541898,
+                "robust_accuracy_delta_ci95": [
+                  -0.006717877094972066,
+                  0.009497206703910615
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.004111111111111111,
+                "control_clean_accuracy": 0.8060444444444445,
+                "control_robust_accuracy": 0.4997111111111111,
+                "count": 45000,
+                "robust_accuracy_delta": -0.0054444444444444445,
+                "treatment_clean_accuracy": 0.8019333333333334,
+                "treatment_robust_accuracy": 0.4942666666666667
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.003526454731822014,
+                "clean_accuracy_delta": -0.006,
+                "clean_accuracy_delta_ci95": [
+                  -0.0136,
+                  0.0014
+                ],
+                "clean_margin_delta": -0.005731470543146134,
+                "count": 5000,
+                "harm_count": 259,
+                "harm_rate": 0.0518,
+                "net_rescue_count": -71,
+                "net_rescue_rate": -0.0142,
+                "rescue_count": 188,
+                "rescue_rate": 0.0376,
+                "robust_accuracy_delta": -0.0142,
+                "robust_accuracy_delta_ci95": [
+                  -0.022205,
+                  -0.0062
+                ]
+              },
+              "nonselected_count": 43210,
+              "selected_count": 1790,
+              "spillover": {
+                "adversarial_margin_delta": -0.004202620334555997,
+                "clean_accuracy_delta": -0.0029391344596158297,
+                "clean_accuracy_delta_ci95": [
+                  -0.005091992594306874,
+                  -0.0008562832677620921
+                ],
+                "clean_margin_delta": -0.003944046728294002,
+                "count": 43210,
+                "harm_count": 2322,
+                "harm_rate": 0.05373756074982643,
+                "net_rescue_count": -247,
+                "net_rescue_rate": -0.00571626938208748,
+                "rescue_count": 2075,
+                "rescue_rate": 0.04802129136773895,
+                "robust_accuracy_delta": -0.00571626938208748,
+                "robust_accuracy_delta_ci95": [
+                  -0.008586554038417033,
+                  -0.0027534135616755413
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 8.673617379884035e-19
+              }
+            }
+          },
+          "train_identity": {
+            "class_counts": {
+              "0": 4500,
+              "1": 4500,
+              "2": 4500,
+              "3": 4500,
+              "4": 4500,
+              "5": 4500,
+              "6": 4500,
+              "7": 4500,
+              "8": 4500,
+              "9": 4500
+            },
+            "count": 45000,
+            "name": "train",
+            "sample_id_label_sha256": "083045ab272059eeae54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
+          },
+          "validation_identity": {
+            "class_counts": {
+              "0": 500,
+              "1": 500,
+              "2": 500,
+              "3": 500,
+              "4": 500,
+              "5": 500,
+              "6": 500,
+              "7": 500,
+              "8": 500,
+              "9": 500
+            },
+            "count": 5000,
+            "name": "validation",
+            "sample_id_label_sha256": "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+          }
+        },
+        "94": {
+          "arms": {
+            "C79CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "50582439bd945fff147e962ec7f28fec91302216a13b64a27f389a74f532640c",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/C79CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-C79CONF-5b707db",
+                "sha256": "47bd68552f169eb41b4cb100c942d300820edff312e935d9fda3ef6a3a19a068",
+                "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+              },
+              "direct": null,
+              "global_train": {
+                "clean_accuracy_delta": 0.0,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0
+              },
+              "heldout": {
+                "clean_accuracy_delta": 0.0,
+                "count": 5000,
+                "robust_accuracy_delta": 0.0
+              },
+              "nonselected_count": 45000,
+              "selected_count": 0,
+              "spillover": null
+            },
+            "T1WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "c5387593821d95c78b53047abb73a39cac45277fef183036c7f9f4482a67c079",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T1WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T1WCONF-e071467",
+                "sha256": "46b55daeeb1dfc9b8cf2b2972aa043707fd0b28d156028ba67c3710871ff9d6d",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": 0.018345781509953883,
+                "clean_accuracy_delta": 0.0020224491859642028,
+                "clean_accuracy_delta_ci95": [
+                  -0.0036404085347355648,
+                  0.007586712508848201
+                ],
+                "clean_margin_delta": 0.002512006465990173,
+                "count": 9889,
+                "harm_count": 629,
+                "harm_rate": 0.06360602689857417,
+                "net_rescue_count": 350,
+                "net_rescue_rate": 0.03539286075437355,
+                "rescue_count": 979,
+                "rescue_rate": 0.09899888765294772,
+                "robust_accuracy_delta": 0.03539286075437355,
+                "robust_accuracy_delta_ci95": [
+                  0.027404186469814944,
+                  0.043280412579633935
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.004088888888888889,
+                "control_clean_accuracy": 0.7828222222222222,
+                "control_robust_accuracy": 0.49577777777777776,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0032,
+                "treatment_clean_accuracy": 0.7787333333333334,
+                "treatment_robust_accuracy": 0.4989777777777778
+              },
+              "heldout": {
+                "adversarial_margin_delta": 0.0021263632565736773,
+                "clean_accuracy_delta": -0.006,
+                "clean_accuracy_delta_ci95": [
+                  -0.0136,
+                  0.0014
+                ],
+                "clean_margin_delta": -0.007153905498981476,
+                "count": 5000,
+                "harm_count": 228,
+                "harm_rate": 0.0456,
+                "net_rescue_count": -17,
+                "net_rescue_rate": -0.0034,
+                "rescue_count": 211,
+                "rescue_rate": 0.0422,
+                "robust_accuracy_delta": -0.0034,
+                "robust_accuracy_delta_ci95": [
+                  -0.0114,
+                  0.005
+                ]
+              },
+              "nonselected_count": 35111,
+              "selected_count": 9889,
+              "spillover": {
+                "adversarial_margin_delta": -0.00569882782734278,
+                "clean_accuracy_delta": -0.005810144968813193,
+                "clean_accuracy_delta_ci95": [
+                  -0.00823103870581869,
+                  -0.0033600581014496924
+                ],
+                "clean_margin_delta": -0.008134604711395902,
+                "count": 35111,
+                "harm_count": 1385,
+                "harm_rate": 0.03944632736179545,
+                "net_rescue_count": -206,
+                "net_rescue_rate": -0.005867107174389792,
+                "rescue_count": 1179,
+                "rescue_rate": 0.03357922018740565,
+                "robust_accuracy_delta": -0.005867107174389792,
+                "robust_accuracy_delta_ci95": [
+                  -0.008686736350431488,
+                  -0.003104440203924696
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T2WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "eef42bad235382bd7b205dfab339496ad83a7ecde142c4fdfeb0a6cae6bd169c",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T2WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T2WCONF-e071467",
+                "sha256": "ff6146ea975fd43c6b0f2e41620762c5d582a44d28a7b6414fe4f515d78ca2aa",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": 0.0015868591101604076,
+                "clean_accuracy_delta": 0.01341350601295097,
+                "clean_accuracy_delta_ci95": [
+                  -0.0037002775208140612,
+                  0.030064754856614247
+                ],
+                "clean_margin_delta": 0.009109492121638247,
+                "count": 2162,
+                "harm_count": 88,
+                "harm_rate": 0.04070305272895467,
+                "net_rescue_count": -16,
+                "net_rescue_rate": -0.0074005550416281225,
+                "rescue_count": 72,
+                "rescue_rate": 0.03330249768732655,
+                "robust_accuracy_delta": -0.0074005550416281225,
+                "robust_accuracy_delta_ci95": [
+                  -0.018501387604070305,
+                  0.004162812210915819
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": 0.00788888888888889,
+                "control_clean_accuracy": 0.7828222222222222,
+                "control_robust_accuracy": 0.49577777777777776,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0032222222222222222,
+                "treatment_clean_accuracy": 0.7907111111111111,
+                "treatment_robust_accuracy": 0.499
+              },
+              "heldout": {
+                "adversarial_margin_delta": 0.0026665096387267113,
+                "clean_accuracy_delta": 0.0054,
+                "clean_accuracy_delta_ci95": [
+                  -0.0014,
+                  0.012004999999999972
+                ],
+                "clean_margin_delta": 0.003595925848186016,
+                "count": 5000,
+                "harm_count": 245,
+                "harm_rate": 0.049,
+                "net_rescue_count": -27,
+                "net_rescue_rate": -0.0054,
+                "rescue_count": 218,
+                "rescue_rate": 0.0436,
+                "robust_accuracy_delta": -0.0054,
+                "robust_accuracy_delta_ci95": [
+                  -0.013604999999999999,
+                  0.0032
+                ]
+              },
+              "nonselected_count": 42838,
+              "selected_count": 2162,
+              "spillover": {
+                "adversarial_margin_delta": 0.0028827077537779216,
+                "clean_accuracy_delta": 0.0076100658294038,
+                "clean_accuracy_delta_ci95": [
+                  0.005415752369391662,
+                  0.009711004248564359
+                ],
+                "clean_margin_delta": 0.005865433776730377,
+                "count": 42838,
+                "harm_count": 1947,
+                "harm_rate": 0.045450301134506745,
+                "net_rescue_count": 161,
+                "net_rescue_rate": 0.00375834539427611,
+                "rescue_count": 2108,
+                "rescue_rate": 0.04920864652878286,
+                "robust_accuracy_delta": 0.00375834539427611,
+                "robust_accuracy_delta_ci95": [
+                  0.0008392081796535787,
+                  0.006793034221952472
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T3LP05CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "43957badf2a9b6023ac36f13484e5f8ef4f474009748fff0a1f0b38038db135c",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L2/T3LP05CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-1-T3LP05CONF-e071467",
+                "sha256": "e8881b4c4b4b946205023d247b68cd41ad78414d1ced1f34460ef38d5e4a0265",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.00820976602714821,
+                "clean_accuracy_delta": -0.0033519553072625698,
+                "clean_accuracy_delta_ci95": [
+                  -0.021787709497206705,
+                  0.016201117318435754
+                ],
+                "clean_margin_delta": -0.002912004883062906,
+                "count": 1790,
+                "harm_count": 35,
+                "harm_rate": 0.019553072625698324,
+                "net_rescue_count": 4,
+                "net_rescue_rate": 0.0022346368715083797,
+                "rescue_count": 39,
+                "rescue_rate": 0.021787709497206705,
+                "robust_accuracy_delta": 0.0022346368715083797,
+                "robust_accuracy_delta_ci95": [
+                  -0.006145251396648044,
+                  0.0111731843575419
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.0066,
+                "control_clean_accuracy": 0.7828222222222222,
+                "control_robust_accuracy": 0.49577777777777776,
+                "count": 45000,
+                "robust_accuracy_delta": -0.01828888888888889,
+                "treatment_clean_accuracy": 0.7762222222222223,
+                "treatment_robust_accuracy": 0.4774888888888889
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.011422627729177475,
+                "clean_accuracy_delta": -0.0062,
+                "clean_accuracy_delta_ci95": [
+                  -0.0134,
+                  0.001
+                ],
+                "clean_margin_delta": -0.007641802126169205,
+                "count": 5000,
+                "harm_count": 288,
+                "harm_rate": 0.0576,
+                "net_rescue_count": -90,
+                "net_rescue_rate": -0.018,
+                "rescue_count": 198,
+                "rescue_rate": 0.0396,
+                "robust_accuracy_delta": -0.018,
+                "robust_accuracy_delta_ci95": [
+                  -0.0266,
+                  -0.0088
+                ]
+              },
+              "nonselected_count": 43210,
+              "selected_count": 1790,
+              "spillover": {
+                "adversarial_margin_delta": -0.01280659483631461,
+                "clean_accuracy_delta": -0.006734552186993752,
+                "clean_accuracy_delta_ci95": [
+                  -0.008956260124971072,
+                  -0.004466558666975237
+                ],
+                "clean_margin_delta": -0.005590527938164597,
+                "count": 43210,
+                "harm_count": 2417,
+                "harm_rate": 0.05593612589678315,
+                "net_rescue_count": -827,
+                "net_rescue_rate": -0.01913908817403379,
+                "rescue_count": 1590,
+                "rescue_rate": 0.036797037722749365,
+                "robust_accuracy_delta": -0.01913908817403379,
+                "robust_accuracy_delta_ci95": [
+                  -0.02205623698218005,
+                  -0.01617623235362185
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            }
+          },
+          "train_identity": {
+            "class_counts": {
+              "0": 4500,
+              "1": 4500,
+              "2": 4500,
+              "3": 4500,
+              "4": 4500,
+              "5": 4500,
+              "6": 4500,
+              "7": 4500,
+              "8": 4500,
+              "9": 4500
+            },
+            "count": 45000,
+            "name": "train",
+            "sample_id_label_sha256": "083045ab272059eeae54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
+          },
+          "validation_identity": {
+            "class_counts": {
+              "0": 500,
+              "1": 500,
+              "2": 500,
+              "3": 500,
+              "4": 500,
+              "5": 500,
+              "6": 500,
+              "7": 500,
+              "8": 500,
+              "9": 500
+            },
+            "count": 5000,
+            "name": "validation",
+            "sample_id_label_sha256": "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+          }
+        }
+      },
+      "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c"
+    },
+    "L4": {
+      "horizons": {
+        "84": {
+          "arms": {
+            "C79CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "7f95b6808b7111c43cddfd9ff18bb3cfdb05885c3f08b750e5db4d44f9177a38",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-C79CONF-5b707db",
+                "sha256": "efb15bcbf00e3ed640535aa513a607cb7a9bc1c975761e34272f9f0f8638f3c5",
+                "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+              },
+              "direct": null,
+              "global_train": {
+                "clean_accuracy_delta": 0.0,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0
+              },
+              "heldout": {
+                "clean_accuracy_delta": 0.0,
+                "count": 5000,
+                "robust_accuracy_delta": 0.0
+              },
+              "nonselected_count": 45000,
+              "selected_count": 0,
+              "spillover": null
+            },
+            "T1WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "2d977841f535f3d7efa4aaf3f22fcbf50d6911d077c8f8a2d36c9759e8efa4bf",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T1WCONF-e071467",
+                "sha256": "e198fe651929bd16318bd54d8e6462b39cafce8a71d1e8d651e1bd2df7bfed46",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": 0.0066072807840551195,
+                "clean_accuracy_delta": 0.008646456020495304,
+                "clean_accuracy_delta_ci95": [
+                  0.0037361229718189583,
+                  0.013877028181041844
+                ],
+                "clean_margin_delta": 0.003084607306234761,
+                "count": 9368,
+                "harm_count": 764,
+                "harm_rate": 0.08155422715627669,
+                "net_rescue_count": 84,
+                "net_rescue_rate": 0.008966695132365499,
+                "rescue_count": 848,
+                "rescue_rate": 0.09052092228864218,
+                "robust_accuracy_delta": 0.008966695132365499,
+                "robust_accuracy_delta_ci95": [
+                  0.0004269854824935952,
+                  0.017079419299743808
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": 0.0035555555555555557,
+                "control_clean_accuracy": 0.8007333333333333,
+                "control_robust_accuracy": 0.5112888888888889,
+                "count": 45000,
+                "robust_accuracy_delta": -0.0025555555555555557,
+                "treatment_clean_accuracy": 0.8042888888888889,
+                "treatment_robust_accuracy": 0.5087333333333334
+              },
+              "heldout": {
+                "adversarial_margin_delta": 0.0003432501554489136,
+                "clean_accuracy_delta": 0.005,
+                "clean_accuracy_delta_ci95": [
+                  -0.0016049999999999999,
+                  0.012404999999999972
+                ],
+                "clean_margin_delta": -0.0006493261933326721,
+                "count": 5000,
+                "harm_count": 225,
+                "harm_rate": 0.045,
+                "net_rescue_count": -2,
+                "net_rescue_rate": -0.0004,
+                "rescue_count": 223,
+                "rescue_rate": 0.0446,
+                "robust_accuracy_delta": -0.0004,
+                "robust_accuracy_delta_ci95": [
+                  -0.0084,
+                  0.008
+                ]
+              },
+              "nonselected_count": 35632,
+              "selected_count": 9368,
+              "spillover": {
+                "adversarial_margin_delta": -0.002118114011088695,
+                "clean_accuracy_delta": 0.0022171082173327345,
+                "clean_accuracy_delta_ci95": [
+                  -0.00011296026044005384,
+                  0.004686798383475527
+                ],
+                "clean_margin_delta": -0.0012861653567732157,
+                "count": 35632,
+                "harm_count": 1424,
+                "harm_rate": 0.039964077233947015,
+                "net_rescue_count": -199,
+                "net_rescue_rate": -0.005584867534800179,
+                "rescue_count": 1225,
+                "rescue_rate": 0.03437920969914683,
+                "robust_accuracy_delta": -0.005584867534800179,
+                "robust_accuracy_delta_ci95": [
+                  -0.008559721598563089,
+                  -0.0027503367759317467
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T2WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "ed3b3a2df8634a926f1d13a90749c0f4d5c8dad0fbaa0f1ea0b5a7c39ce9f6d0",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T2WCONF-e071467",
+                "sha256": "1695a87b72fff29397da8c594f02de68a9938c39675e7ee0633cbd0c512c2977",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": 0.006768618148409172,
+                "clean_accuracy_delta": 0.02432179607109448,
+                "clean_accuracy_delta_ci95": [
+                  0.007951356407857811,
+                  0.042095416276894296
+                ],
+                "clean_margin_delta": 0.004407617490881509,
+                "count": 2138,
+                "harm_count": 65,
+                "harm_rate": 0.0304022450888681,
+                "net_rescue_count": 30,
+                "net_rescue_rate": 0.01403180542563143,
+                "rescue_count": 95,
+                "rescue_rate": 0.04443405051449953,
+                "robust_accuracy_delta": 0.01403180542563143,
+                "robust_accuracy_delta_ci95": [
+                  0.002806361085126286,
+                  0.026192703461178673
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.0010222222222222223,
+                "control_clean_accuracy": 0.8007333333333333,
+                "control_robust_accuracy": 0.5112888888888889,
+                "count": 45000,
+                "robust_accuracy_delta": -0.0038666666666666667,
+                "treatment_clean_accuracy": 0.7997111111111112,
+                "treatment_robust_accuracy": 0.5074222222222222
+              },
+              "heldout": {
+                "adversarial_margin_delta": 0.00569107669442892,
+                "clean_accuracy_delta": 0.0038,
+                "clean_accuracy_delta_ci95": [
+                  -0.003,
+                  0.011004999999999971
+                ],
+                "clean_margin_delta": 0.007108515018224716,
+                "count": 5000,
+                "harm_count": 210,
+                "harm_rate": 0.042,
+                "net_rescue_count": -9,
+                "net_rescue_rate": -0.0018,
+                "rescue_count": 201,
+                "rescue_rate": 0.0402,
+                "robust_accuracy_delta": -0.0018,
+                "robust_accuracy_delta_ci95": [
+                  -0.0098,
+                  0.006
+                ]
+              },
+              "nonselected_count": 42862,
+              "selected_count": 2138,
+              "spillover": {
+                "adversarial_margin_delta": 0.0035814450721120285,
+                "clean_accuracy_delta": -0.002286407540478746,
+                "clean_accuracy_delta_ci95": [
+                  -0.00443283094582614,
+                  -0.00016331482431991041
+                ],
+                "clean_margin_delta": 0.004543836305511464,
+                "count": 42862,
+                "harm_count": 2066,
+                "harm_rate": 0.04820120386356213,
+                "net_rescue_count": -204,
+                "net_rescue_rate": -0.004759460594465961,
+                "rescue_count": 1862,
+                "rescue_rate": 0.04344174326909617,
+                "robust_accuracy_delta": -0.004759460594465961,
+                "robust_accuracy_delta_ci95": [
+                  -0.007676380010265504,
+                  -0.001981942046568062
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 4.336808689942018e-19
+              }
+            },
+            "T3LP05CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "862ce0a18b976e52e7baf5e603e5c630ec5bfb1b34b81111718358472a695e9d",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T3LP05CONF-e071467",
+                "sha256": "fe7f27e3bcaddf651e18c693ca33192a9eb1f9f56d39bbacf2959ffc9f38cd43",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.000646811607596162,
+                "clean_accuracy_delta": 0.032185206098249576,
+                "clean_accuracy_delta_ci95": [
+                  0.012987012987012988,
+                  0.05194805194805195
+                ],
+                "clean_margin_delta": 0.0031671772765143992,
+                "count": 1771,
+                "harm_count": 23,
+                "harm_rate": 0.012987012987012988,
+                "net_rescue_count": -4,
+                "net_rescue_rate": -0.002258610954263128,
+                "rescue_count": 19,
+                "rescue_rate": 0.010728402032749858,
+                "robust_accuracy_delta": -0.002258610954263128,
+                "robust_accuracy_delta_ci95": [
+                  -0.009599096555618294,
+                  0.005081874647092038
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": 0.0004,
+                "control_clean_accuracy": 0.8007333333333333,
+                "control_robust_accuracy": 0.5112888888888889,
+                "count": 45000,
+                "robust_accuracy_delta": -0.0022222222222222222,
+                "treatment_clean_accuracy": 0.8011333333333334,
+                "treatment_robust_accuracy": 0.5090666666666667
+              },
+              "heldout": {
+                "adversarial_margin_delta": 0.0038855192616581917,
+                "clean_accuracy_delta": 0.0018,
+                "clean_accuracy_delta_ci95": [
+                  -0.005,
+                  0.0086
+                ],
+                "clean_margin_delta": 0.009234361715614797,
+                "count": 5000,
+                "harm_count": 232,
+                "harm_rate": 0.0464,
+                "net_rescue_count": -5,
+                "net_rescue_rate": -0.001,
+                "rescue_count": 227,
+                "rescue_rate": 0.0454,
+                "robust_accuracy_delta": -0.001,
+                "robust_accuracy_delta_ci95": [
+                  -0.010005,
+                  0.007004999999999973
+                ]
+              },
+              "nonselected_count": 43229,
+              "selected_count": 1771,
+              "spillover": {
+                "adversarial_margin_delta": 0.002596227850678556,
+                "clean_accuracy_delta": -0.0009021721529528789,
+                "clean_accuracy_delta_ci95": [
+                  -0.0030072405098429296,
+                  0.0012728723773392828
+                ],
+                "clean_margin_delta": 0.007419921356941891,
+                "count": 43229,
+                "harm_count": 2098,
+                "harm_rate": 0.048532235305003585,
+                "net_rescue_count": -96,
+                "net_rescue_rate": -0.002220731453422471,
+                "rescue_count": 2002,
+                "rescue_rate": 0.046311503851581115,
+                "robust_accuracy_delta": -0.002220731453422471,
+                "robust_accuracy_delta_ci95": [
+                  -0.0049503805315875915,
+                  0.000647713340581554
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            }
+          },
+          "train_identity": {
+            "class_counts": {
+              "0": 4500,
+              "1": 4500,
+              "2": 4500,
+              "3": 4500,
+              "4": 4500,
+              "5": 4500,
+              "6": 4500,
+              "7": 4500,
+              "8": 4500,
+              "9": 4500
+            },
+            "count": 45000,
+            "name": "train",
+            "sample_id_label_sha256": "083045ab272059eeae54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
+          },
+          "validation_identity": {
+            "class_counts": {
+              "0": 500,
+              "1": 500,
+              "2": 500,
+              "3": 500,
+              "4": 500,
+              "5": 500,
+              "6": 500,
+              "7": 500,
+              "8": 500,
+              "9": 500
+            },
+            "count": 5000,
+            "name": "validation",
+            "sample_id_label_sha256": "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+          }
+        },
+        "89": {
+          "arms": {
+            "C79CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "969628da797b0a69fe2618bbb363713207b9cb3712f450bd88d776ec5c1b2fe6",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-C79CONF-5b707db",
+                "sha256": "efb15bcbf00e3ed640535aa513a607cb7a9bc1c975761e34272f9f0f8638f3c5",
+                "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+              },
+              "direct": null,
+              "global_train": {
+                "clean_accuracy_delta": 0.0,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0
+              },
+              "heldout": {
+                "clean_accuracy_delta": 0.0,
+                "count": 5000,
+                "robust_accuracy_delta": 0.0
+              },
+              "nonselected_count": 45000,
+              "selected_count": 0,
+              "spillover": null
+            },
+            "T1WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "cec48d8de3f7049a60eeb31c7172718e5e6d9baecb6606ba8621f45b228fbfe5",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T1WCONF-e071467",
+                "sha256": "e198fe651929bd16318bd54d8e6462b39cafce8a71d1e8d651e1bd2df7bfed46",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": 0.0007243744311591787,
+                "clean_accuracy_delta": -0.008859948761742101,
+                "clean_accuracy_delta_ci95": [
+                  -0.01398644321093083,
+                  -0.003842869342442357
+                ],
+                "clean_margin_delta": 0.00396890924602467,
+                "count": 9368,
+                "harm_count": 800,
+                "harm_rate": 0.08539709649871904,
+                "net_rescue_count": 64,
+                "net_rescue_rate": 0.006831767719897523,
+                "rescue_count": 864,
+                "rescue_rate": 0.09222886421861656,
+                "robust_accuracy_delta": 0.006831767719897523,
+                "robust_accuracy_delta_ci95": [
+                  -0.0016011955593509821,
+                  0.015264730999146029
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.006688888888888889,
+                "control_clean_accuracy": 0.7950444444444444,
+                "control_robust_accuracy": 0.5182,
+                "count": 45000,
+                "robust_accuracy_delta": -0.006511111111111111,
+                "treatment_clean_accuracy": 0.7883555555555556,
+                "treatment_robust_accuracy": 0.5116888888888889
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.004168547041714191,
+                "clean_accuracy_delta": 0.0032,
+                "clean_accuracy_delta_ci95": [
+                  -0.004,
+                  0.0106
+                ],
+                "clean_margin_delta": 0.0007039170652627945,
+                "count": 5000,
+                "harm_count": 252,
+                "harm_rate": 0.0504,
+                "net_rescue_count": -32,
+                "net_rescue_rate": -0.0064,
+                "rescue_count": 220,
+                "rescue_rate": 0.044,
+                "robust_accuracy_delta": -0.0064,
+                "robust_accuracy_delta_ci95": [
+                  -0.0154,
+                  0.0018049999999999726
+                ]
+              },
+              "nonselected_count": 35632,
+              "selected_count": 9368,
+              "spillover": {
+                "adversarial_margin_delta": -0.005692449327663664,
+                "clean_accuracy_delta": -0.006118096093399192,
+                "clean_accuracy_delta_ci95": [
+                  -0.008531656937584195,
+                  -0.003676470588235294
+                ],
+                "clean_margin_delta": -0.002583258206524092,
+                "count": 35632,
+                "harm_count": 1510,
+                "harm_rate": 0.04237763807813202,
+                "net_rescue_count": -357,
+                "net_rescue_rate": -0.010019083969465648,
+                "rescue_count": 1153,
+                "rescue_rate": 0.032358554108666365,
+                "robust_accuracy_delta": -0.010019083969465648,
+                "robust_accuracy_delta_ci95": [
+                  -0.012854316344858554,
+                  -0.007268045577009434
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T2WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "462f0cf83ad6405621d211b88b032b7333397aeff3f1300b13b8d36a86feed02",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T2WCONF-e071467",
+                "sha256": "1695a87b72fff29397da8c594f02de68a9938c39675e7ee0633cbd0c512c2977",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.003528848269534401,
+                "clean_accuracy_delta": 0.007483629560336763,
+                "clean_accuracy_delta_ci95": [
+                  -0.007483629560336763,
+                  0.022918615528531337
+                ],
+                "clean_margin_delta": 0.0008367314321399293,
+                "count": 2138,
+                "harm_count": 87,
+                "harm_rate": 0.04069223573433115,
+                "net_rescue_count": -31,
+                "net_rescue_rate": -0.014499532273152479,
+                "rescue_count": 56,
+                "rescue_rate": 0.026192703461178673,
+                "robust_accuracy_delta": -0.014499532273152479,
+                "robust_accuracy_delta_ci95": [
+                  -0.025257249766136577,
+                  -0.00420954162768943
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.004844444444444445,
+                "control_clean_accuracy": 0.7950444444444444,
+                "control_robust_accuracy": 0.5182,
+                "count": 45000,
+                "robust_accuracy_delta": -0.0168,
+                "treatment_clean_accuracy": 0.7902,
+                "treatment_robust_accuracy": 0.5014
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.008958626157045364,
+                "clean_accuracy_delta": 0.0014,
+                "clean_accuracy_delta_ci95": [
+                  -0.0058,
+                  0.0086
+                ],
+                "clean_margin_delta": -0.003172124555706978,
+                "count": 5000,
+                "harm_count": 302,
+                "harm_rate": 0.0604,
+                "net_rescue_count": -98,
+                "net_rescue_rate": -0.0196,
+                "rescue_count": 204,
+                "rescue_rate": 0.0408,
+                "robust_accuracy_delta": -0.0196,
+                "robust_accuracy_delta_ci95": [
+                  -0.028405,
+                  -0.0108
+                ]
+              },
+              "nonselected_count": 42862,
+              "selected_count": 2138,
+              "spillover": {
+                "adversarial_margin_delta": -0.009322287514892707,
+                "clean_accuracy_delta": -0.0054593812701227195,
+                "clean_accuracy_delta_ci95": [
+                  -0.007559143297092996,
+                  -0.0033357052867341733
+                ],
+                "clean_margin_delta": -0.005699479869799743,
+                "count": 42862,
+                "harm_count": 2398,
+                "harm_rate": 0.055946992674163594,
+                "net_rescue_count": -725,
+                "net_rescue_rate": -0.016914749661705007,
+                "rescue_count": 1673,
+                "rescue_rate": 0.03903224301245859,
+                "robust_accuracy_delta": -0.016914749661705007,
+                "robust_accuracy_delta_ci95": [
+                  -0.019901661145070224,
+                  -0.014021744202323737
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T3LP05CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "35ade8725cd321dc57f6a6a09e8267a96a54179df99684da044ad50b7ec3995c",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T3LP05CONF-e071467",
+                "sha256": "fe7f27e3bcaddf651e18c693ca33192a9eb1f9f56d39bbacf2959ffc9f38cd43",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.005318778831530668,
+                "clean_accuracy_delta": 0.04178430265386787,
+                "clean_accuracy_delta_ci95": [
+                  0.023150762281197064,
+                  0.06324110671936758
+                ],
+                "clean_margin_delta": 0.002313308443039033,
+                "count": 1771,
+                "harm_count": 27,
+                "harm_rate": 0.015245623941276116,
+                "net_rescue_count": 0,
+                "net_rescue_rate": 0.0,
+                "rescue_count": 27,
+                "rescue_rate": 0.015245623941276116,
+                "robust_accuracy_delta": 0.0,
+                "robust_accuracy_delta_ci95": [
+                  -0.00846979107848673,
+                  0.007905138339920948
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": 0.00015555555555555556,
+                "control_clean_accuracy": 0.7950444444444444,
+                "control_robust_accuracy": 0.5182,
+                "count": 45000,
+                "robust_accuracy_delta": -0.015222222222222222,
+                "treatment_clean_accuracy": 0.7952,
+                "treatment_robust_accuracy": 0.5029777777777777
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.009452178137004375,
+                "clean_accuracy_delta": -0.0034,
+                "clean_accuracy_delta_ci95": [
+                  -0.0104,
+                  0.0032
+                ],
+                "clean_margin_delta": 9.220301508903504e-05,
+                "count": 5000,
+                "harm_count": 292,
+                "harm_rate": 0.0584,
+                "net_rescue_count": -107,
+                "net_rescue_rate": -0.0214,
+                "rescue_count": 185,
+                "rescue_rate": 0.037,
+                "robust_accuracy_delta": -0.0214,
+                "robust_accuracy_delta_ci95": [
+                  -0.0298,
+                  -0.0128
+                ]
+              },
+              "nonselected_count": 43229,
+              "selected_count": 1771,
+              "spillover": {
+                "adversarial_margin_delta": -0.007515183905145038,
+                "clean_accuracy_delta": -0.001549885493534433,
+                "clean_accuracy_delta_ci95": [
+                  -0.003539290753892063,
+                  0.0005094959402253086
+                ],
+                "clean_margin_delta": -0.0007777460204349605,
+                "count": 43229,
+                "harm_count": 2332,
+                "harm_rate": 0.05394526822272086,
+                "net_rescue_count": -685,
+                "net_rescue_rate": -0.01584584422494159,
+                "rescue_count": 1647,
+                "rescue_rate": 0.03809942399777927,
+                "robust_accuracy_delta": -0.01584584422494159,
+                "robust_accuracy_delta_ci95": [
+                  -0.01878426519234773,
+                  -0.013046218973374359
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            }
+          },
+          "train_identity": {
+            "class_counts": {
+              "0": 4500,
+              "1": 4500,
+              "2": 4500,
+              "3": 4500,
+              "4": 4500,
+              "5": 4500,
+              "6": 4500,
+              "7": 4500,
+              "8": 4500,
+              "9": 4500
+            },
+            "count": 45000,
+            "name": "train",
+            "sample_id_label_sha256": "083045ab272059eeae54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
+          },
+          "validation_identity": {
+            "class_counts": {
+              "0": 500,
+              "1": 500,
+              "2": 500,
+              "3": 500,
+              "4": 500,
+              "5": 500,
+              "6": 500,
+              "7": 500,
+              "8": 500,
+              "9": 500
+            },
+            "count": 5000,
+            "name": "validation",
+            "sample_id_label_sha256": "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+          }
+        },
+        "94": {
+          "arms": {
+            "C79CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "37f0741e04bc6c2490f0cdf7962ff6dcc1b933922360e8cb01471805c081ec6e",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/C79CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-C79CONF-5b707db",
+                "sha256": "efb15bcbf00e3ed640535aa513a607cb7a9bc1c975761e34272f9f0f8638f3c5",
+                "source_git_sha": "5b707dbeac509e67848c0d80e81b3b77dccd72c0"
+              },
+              "direct": null,
+              "global_train": {
+                "clean_accuracy_delta": 0.0,
+                "count": 45000,
+                "robust_accuracy_delta": 0.0
+              },
+              "heldout": {
+                "clean_accuracy_delta": 0.0,
+                "count": 5000,
+                "robust_accuracy_delta": 0.0
+              },
+              "nonselected_count": 45000,
+              "selected_count": 0,
+              "spillover": null
+            },
+            "T1WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "f41f1ff289f7f6f50eb0546d5492e402e2573bab6b05580289ee94d6e9bed9a3",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T1WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T1WCONF-e071467",
+                "sha256": "e198fe651929bd16318bd54d8e6462b39cafce8a71d1e8d651e1bd2df7bfed46",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.012796953660105916,
+                "clean_accuracy_delta": -0.0017079419299743809,
+                "clean_accuracy_delta_ci95": [
+                  -0.006725021349274125,
+                  0.0032023911187019642
+                ],
+                "clean_margin_delta": 0.0068443775014756176,
+                "count": 9368,
+                "harm_count": 1102,
+                "harm_rate": 0.11763450042698548,
+                "net_rescue_count": -353,
+                "net_rescue_rate": -0.03768146883005978,
+                "rescue_count": 749,
+                "rescue_rate": 0.07995303159692571,
+                "robust_accuracy_delta": -0.03768146883005978,
+                "robust_accuracy_delta_ci95": [
+                  -0.04643467122117848,
+                  -0.029032344150298903
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": 0.00022222222222222223,
+                "control_clean_accuracy": 0.8028444444444445,
+                "control_robust_accuracy": 0.5209777777777778,
+                "count": 45000,
+                "robust_accuracy_delta": -0.018111111111111113,
+                "treatment_clean_accuracy": 0.8030666666666667,
+                "treatment_robust_accuracy": 0.5028666666666667
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.003908876115083695,
+                "clean_accuracy_delta": -0.0016,
+                "clean_accuracy_delta_ci95": [
+                  -0.0086,
+                  0.0058
+                ],
+                "clean_margin_delta": 0.005721430610120297,
+                "count": 5000,
+                "harm_count": 262,
+                "harm_rate": 0.0524,
+                "net_rescue_count": -46,
+                "net_rescue_rate": -0.0092,
+                "rescue_count": 216,
+                "rescue_rate": 0.0432,
+                "robust_accuracy_delta": -0.0092,
+                "robust_accuracy_delta_ci95": [
+                  -0.0178,
+                  -0.0002
+                ]
+              },
+              "nonselected_count": 35632,
+              "selected_count": 9368,
+              "spillover": {
+                "adversarial_margin_delta": -0.002987004299641833,
+                "clean_accuracy_delta": 0.0007296811854512797,
+                "clean_accuracy_delta_ci95": [
+                  -0.0017400089806915132,
+                  0.0032281376290974368
+                ],
+                "clean_margin_delta": 0.00808392449327693,
+                "count": 35632,
+                "harm_count": 1674,
+                "harm_rate": 0.04698024247867086,
+                "net_rescue_count": -462,
+                "net_rescue_rate": -0.012965873372249663,
+                "rescue_count": 1212,
+                "rescue_rate": 0.034014369106421194,
+                "robust_accuracy_delta": -0.012965873372249663,
+                "robust_accuracy_delta_ci95": [
+                  -0.01594283228558599,
+                  -0.010046447013920075
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 8.131516293641283e-20,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T2WCONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "1dbc2590c11e8ed11ec66c1692a4bfe24b30deb79f706efb9604ae016cd1e0bd",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T2WCONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T2WCONF-e071467",
+                "sha256": "1695a87b72fff29397da8c594f02de68a9938c39675e7ee0633cbd0c512c2977",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.0011277151432574856,
+                "clean_accuracy_delta": 0.04911131898971001,
+                "clean_accuracy_delta_ci95": [
+                  0.03319691300280637,
+                  0.06454630495790459
+                ],
+                "clean_margin_delta": 0.013444970801849027,
+                "count": 2138,
+                "harm_count": 86,
+                "harm_rate": 0.040224508886810104,
+                "net_rescue_count": -19,
+                "net_rescue_rate": -0.008886810102899906,
+                "rescue_count": 67,
+                "rescue_rate": 0.0313376987839102,
+                "robust_accuracy_delta": -0.008886810102899906,
+                "robust_accuracy_delta_ci95": [
+                  -0.0205799812909261,
+                  0.0023386342376052385
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": 0.008644444444444444,
+                "control_clean_accuracy": 0.8028444444444445,
+                "control_robust_accuracy": 0.5209777777777778,
+                "count": 45000,
+                "robust_accuracy_delta": -0.007622222222222222,
+                "treatment_clean_accuracy": 0.8114888888888889,
+                "treatment_robust_accuracy": 0.5133555555555556
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.0022221621230244636,
+                "clean_accuracy_delta": 0.0036,
+                "clean_accuracy_delta_ci95": [
+                  -0.0034,
+                  0.0106
+                ],
+                "clean_margin_delta": 0.005802325040102005,
+                "count": 5000,
+                "harm_count": 225,
+                "harm_rate": 0.045,
+                "net_rescue_count": -16,
+                "net_rescue_rate": -0.0032,
+                "rescue_count": 209,
+                "rescue_rate": 0.0418,
+                "robust_accuracy_delta": -0.0032,
+                "robust_accuracy_delta_ci95": [
+                  -0.011604999999999999,
+                  0.0048
+                ]
+              },
+              "nonselected_count": 42862,
+              "selected_count": 2138,
+              "spillover": {
+                "adversarial_margin_delta": -0.0008946696297116489,
+                "clean_accuracy_delta": 0.006625915729550651,
+                "clean_accuracy_delta_ci95": [
+                  0.004478909056973543,
+                  0.008772922402127755
+                ],
+                "clean_margin_delta": 0.007595628349798058,
+                "count": 42862,
+                "harm_count": 2173,
+                "harm_rate": 0.050697587606737905,
+                "net_rescue_count": -324,
+                "net_rescue_rate": -0.007559143297092996,
+                "rescue_count": 1849,
+                "rescue_rate": 0.043138444309644905,
+                "robust_accuracy_delta": -0.007559143297092996,
+                "robust_accuracy_delta_ci95": [
+                  -0.010428818067285708,
+                  -0.004735546638047691
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            },
+            "T3LP05CONF": {
+              "checkpoint": {
+                "checkpoint_sha256": "df1889b7565660b02e41d66bf0d84e27876ea563fe8821f69c5a337bfd99b206",
+                "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-confirmatory-t123/L4/T3LP05CONF/run-bundle/manifest.json",
+                "run_id": "ert-confirmatory-t123-2-T3LP05CONF-e071467",
+                "sha256": "fe7f27e3bcaddf651e18c693ca33192a9eb1f9f56d39bbacf2959ffc9f38cd43",
+                "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+              },
+              "direct": {
+                "adversarial_margin_delta": -0.009979042775175922,
+                "clean_accuracy_delta": 0.010163749294184076,
+                "clean_accuracy_delta_ci95": [
+                  -0.009034443817052512,
+                  0.029361942405420668
+                ],
+                "clean_margin_delta": 0.00043399915107557963,
+                "count": 1771,
+                "harm_count": 21,
+                "harm_rate": 0.011857707509881422,
+                "net_rescue_count": -2,
+                "net_rescue_rate": -0.001129305477131564,
+                "rescue_count": 19,
+                "rescue_rate": 0.010728402032749858,
+                "robust_accuracy_delta": -0.001129305477131564,
+                "robust_accuracy_delta_ci95": [
+                  -0.007905138339920948,
+                  0.00564652738565782
+                ]
+              },
+              "global_train": {
+                "clean_accuracy_delta": -0.002511111111111111,
+                "control_clean_accuracy": 0.8028444444444445,
+                "control_robust_accuracy": 0.5209777777777778,
+                "count": 45000,
+                "robust_accuracy_delta": -0.012688888888888888,
+                "treatment_clean_accuracy": 0.8003333333333333,
+                "treatment_robust_accuracy": 0.5082888888888889
+              },
+              "heldout": {
+                "adversarial_margin_delta": -0.0032716432854533197,
+                "clean_accuracy_delta": -0.0038,
+                "clean_accuracy_delta_ci95": [
+                  -0.0104,
+                  0.0032
+                ],
+                "clean_margin_delta": 0.003461501754820347,
+                "count": 5000,
+                "harm_count": 241,
+                "harm_rate": 0.0482,
+                "net_rescue_count": -48,
+                "net_rescue_rate": -0.0096,
+                "rescue_count": 193,
+                "rescue_rate": 0.0386,
+                "robust_accuracy_delta": -0.0096,
+                "robust_accuracy_delta_ci95": [
+                  -0.017605,
+                  -0.0013950000000000273
+                ]
+              },
+              "nonselected_count": 43229,
+              "selected_count": 1771,
+              "spillover": {
+                "adversarial_margin_delta": -0.0026646565657394523,
+                "clean_accuracy_delta": -0.0030303731291494137,
+                "clean_accuracy_delta_ci95": [
+                  -0.005135441486039464,
+                  -0.000925304772259363
+                ],
+                "clean_margin_delta": 0.005052816250741257,
+                "count": 43229,
+                "harm_count": 2295,
+                "harm_rate": 0.05308936130838095,
+                "net_rescue_count": -569,
+                "net_rescue_rate": -0.013162460385389438,
+                "rescue_count": 1726,
+                "rescue_rate": 0.03992690092299151,
+                "robust_accuracy_delta": -0.013162460385389438,
+                "robust_accuracy_delta_ci95": [
+                  -0.016008350875569642,
+                  -0.0104559439265308
+                ]
+              },
+              "weighted_identity": {
+                "clean_abs_error": 0.0,
+                "robust_abs_error": 0.0
+              }
+            }
+          },
+          "train_identity": {
+            "class_counts": {
+              "0": 4500,
+              "1": 4500,
+              "2": 4500,
+              "3": 4500,
+              "4": 4500,
+              "5": 4500,
+              "6": 4500,
+              "7": 4500,
+              "8": 4500,
+              "9": 4500
+            },
+            "count": 45000,
+            "name": "train",
+            "sample_id_label_sha256": "083045ab272059eeae54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
+          },
+          "validation_identity": {
+            "class_counts": {
+              "0": 500,
+              "1": 500,
+              "2": 500,
+              "3": 500,
+              "4": 500,
+              "5": 500,
+              "6": 500,
+              "7": 500,
+              "8": 500,
+              "9": 500
+            },
+            "count": 5000,
+            "name": "validation",
+            "sample_id_label_sha256": "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+          }
+        }
+      },
+      "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1"
+    }
+  },
+  "source_git_sha": "e0714671045cd80a99d4fb09dbfc9a7dbd76723d"
+}

@@ -1,0 +1,19 @@
+{
+  "advkd_multiplier_t3": 0.5,
+  "beta_advce": 0.075,
+  "calibration_sha256": "0e3b98b4e1cfcc7727786fd23da57a82903fa2c8b95a16b6e12ca1425d34da16",
+  "contract": "ert_confirmatory_t123_calibration_sanity_v1",
+  "measurement_count": 64,
+  "median_advce_cosine": 0.7657734453678131,
+  "median_scaled_advce_to_base_advkd_gradient_ratio": 0.2635770718462068,
+  "optimizer_step": false,
+  "ratio_max": 0.3079964735970129,
+  "ratio_min": 0.2079768291991763,
+  "sample_state_mutation": false,
+  "scheduler_step": false,
+  "schema_version": 1,
+  "source_dirty": false,
+  "source_git_sha": "eda3f929d7aeba72468ed3aa88b38da074e74596",
+  "status": "complete_no_update",
+  "validation_metric_used": false
+}
