@@ -153,6 +153,7 @@ class Trainer:
         clean_ce_coefficient: float | None = None,
         clean_wrong_mode: str | None = None,
         clean_wrong_attack_skip: bool = False,
+        dynamic_s3_router: Any | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
         frozen_risk_lookup: FrozenRiskLookup | None = None,
@@ -192,10 +193,24 @@ class Trainer:
                 clean_wrong_mode,
             )
         )
+        # A teacher target policy can be selected by an ordinary WeightPolicy
+        # (for example rslad_student) and is not itself a fixed-ID treatment.
+        # Only these explicit per-ID outer-loss branches need a static mask or
+        # the same-step dynamic router.
+        requires_explicit_mask = any(
+            value is not None
+            for value in (
+                adversarial_kd_multiplier,
+                adversarial_ce_coefficient,
+                clean_wrong_mode,
+            )
+        )
         if intervention_mask is not None and prescriptive_v3_route != "nr_prefix" and not has_treatment:
             raise ValueError("an intervention mask requires at least one registered treatment")
-        if intervention_mask is None and has_treatment:
+        if intervention_mask is None and requires_explicit_mask and dynamic_s3_router is None:
             raise ValueError("a registered treatment requires a fixed intervention mask")
+        if dynamic_s3_router is not None and intervention_mask is not None:
+            raise ValueError("dynamic S3 routing cannot be combined with a fixed intervention mask")
         if adversarial_kd_multiplier is not None and not 0.0 <= adversarial_kd_multiplier <= 1.0:
             raise ValueError("adversarial KD intervention multiplier must be in [0, 1]")
         if adversarial_ce_coefficient is not None and not torch.isfinite(torch.as_tensor(adversarial_ce_coefficient)):
@@ -235,6 +250,7 @@ class Trainer:
         self.clean_ce_coefficient = clean_ce_coefficient
         self.clean_wrong_mode = clean_wrong_mode
         self.clean_wrong_attack_skip = clean_wrong_attack_skip
+        self.dynamic_s3_router = dynamic_s3_router
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
         if policy_warmup_epochs < 0:
@@ -648,6 +664,25 @@ class Trainer:
                     ),
                 )
                 objective_inputs["adversarial_target_probabilities"] = target_output.probabilities
+            dynamic_s3_decision = None
+            if self.dynamic_s3_router is not None:
+                if clean_student_logits is None or teacher_clean_logits is None or self.teacher is None:
+                    raise ValueError("same-step dynamic S3 routing requires RSLAD clean Student/Teacher logits")
+                dynamic_s3_decision = self.dynamic_s3_router.observe(
+                    epoch=self.current_epoch,
+                    sample_ids=batch.sample_ids,
+                    labels=batch.labels,
+                    valid_mask=valid_mask,
+                    student_clean_logits=clean_student_logits,
+                    student_adversarial_logits=logits,
+                    teacher_clean_logits=teacher_clean_logits,
+                    teacher_adversarial_logits=self._teacher_adversarial_response(adversarial),
+                )
+                # The router decision is a detached hard current-step mask.
+                # It does not feed the PGD inner problem or any next-epoch state.
+                treatment_risk = dynamic_s3_decision.action_active.to(
+                    device=logits.device, dtype=logits.dtype
+                )
             terms = self.objective(**objective_inputs)
             if weights is not None:
                 terms = terms.apply_policy(weights)
@@ -685,6 +720,13 @@ class Trainer:
                     batch.labels,
                     logits,
                     intervention_risk,
+                    coefficient=float(self.adversarial_ce_coefficient),
+                )
+            if dynamic_s3_decision is not None and self.adversarial_ce_coefficient is not None:
+                terms = terms.add_adversarial_ce(
+                    batch.labels,
+                    logits,
+                    treatment_risk,
                     coefficient=float(self.adversarial_ce_coefficient),
                 )
             if self.diagnostics is not None:
@@ -872,6 +914,16 @@ class Trainer:
                 loader.dataset.set_epoch(epoch)
             train_metrics = self.train_epoch(loader)
             self._flush_sample_store()
+            if self.dynamic_s3_router is not None:
+                self.dynamic_s3_router.flush_epoch(epoch)
+                # The capture map is part of scientific lineage: a resumed
+                # fixed arm must restore the epoch-80 decision, never rebuild
+                # it from a later model state.  This assignment occurs before
+                # the common checkpoint write below.
+                self.fork_lineage = {
+                    **({} if self.fork_lineage is None else self.fork_lineage),
+                    "dynamic_s3_state": self.dynamic_s3_router.state_dict(),
+                }
             if self.diagnostics is not None:
                 self.diagnostics.flush()
             validation_metrics = self.validate_epoch(validation_loader)
@@ -944,6 +996,12 @@ class Trainer:
             raise ValueError("checkpoint tracker run ID does not match the active tracker")
         self.tracker_run_id, self.sample_state = state.tracker_run_id, state.sample_state
         self.fork_lineage = state.fork_lineage
+        if self.dynamic_s3_router is not None:
+            if not isinstance(self.fork_lineage, dict) or not isinstance(
+                self.fork_lineage.get("dynamic_s3_state"), dict
+            ):
+                raise ValueError("dynamic S3 resume checkpoint lacks immutable routing state")
+            self.dynamic_s3_router.load_state_dict(self.fork_lineage["dynamic_s3_state"])
         if self.sample_store is not None:
             self.sample_store.load_state_dict(state.sample_state)
             self.sample_state = self.sample_store.state_dict()

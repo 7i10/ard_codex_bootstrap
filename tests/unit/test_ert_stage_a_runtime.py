@@ -4,8 +4,15 @@ import json
 from pathlib import Path
 
 import pytest
+import torch
 
-from ard.analysis.ert_stage_a_runtime import StageARuntimeError, StageATreatment, _mask_from_overlay
+from ard.analysis.ert_stage_a_runtime import (
+    StageARuntimeError,
+    StageATreatment,
+    _epoch80_equivalence,
+    _epoch80_gate,
+    _mask_from_overlay,
+)
 
 
 def test_stage_a_treatment_requires_explicit_clean_wrong_mode() -> None:
@@ -59,3 +66,32 @@ def test_horizon_contract_rejects_duplicate_or_pre_parent_epochs() -> None:
     with pytest.raises(StageARuntimeError, match="unique"):
         _validate_horizons((84, 84), 94)
     _validate_horizons((84, 89, 94), 94)
+
+
+def test_epoch80_gate_requires_full_state_parity_and_capture_identity(tmp_path: Path) -> None:
+    payload = {
+        "model": {"x": torch.tensor([1])},
+        "optimizer": {"state": {}},
+        "scheduler": {},
+        "scaler": None,
+        "rng": [{"torch_cpu": torch.tensor([2])}],
+        "sampler_epoch": [80],
+        "sampler_state": [{"epoch": 80}],
+        "sample_state": {"records": {}},
+        "global_step": 10,
+    }
+    components = _epoch80_equivalence(payload)
+    assert set(components) == set(payload)
+    own_dir, peer_dir = tmp_path / "own", tmp_path / "peer"
+    own_dir.mkdir()
+    peer_dir.mkdir()
+    capture = {"selected_ids_sha256": "a" * 64}
+    (own_dir / "routing-capture-mask.json").write_text(json.dumps(capture), encoding="utf-8")
+    (peer_dir / "routing-capture-mask.json").write_text(json.dumps(capture), encoding="utf-8")
+    peer = peer_dir / "epoch80-routing-state.json"
+    peer.write_text(json.dumps({"components": components}), encoding="utf-8")
+    _epoch80_gate(
+        own={"components": components, "capture_path": str(own_dir / "routing-capture-mask.json")},
+        peer_path=peer,
+        timeout_seconds=0.01,
+    )

@@ -8,8 +8,11 @@ specification, then delegates the actual update path to the shared Trainer.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import os
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -93,11 +96,72 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _state_component_sha256(value: Any) -> str:
+    """Hash a checkpoint component without child-only lineage metadata."""
+    buffer = io.BytesIO()
+    torch.save(value, buffer)
+    return hashlib.sha256(buffer.getvalue()).hexdigest()
+
+
+def _epoch80_equivalence(payload: dict[str, Any]) -> dict[str, str]:
+    required = (
+        "model",
+        "optimizer",
+        "scheduler",
+        "scaler",
+        "rng",
+        "sampler_epoch",
+        "sampler_state",
+        "sample_state",
+        "global_step",
+    )
+    if any(key not in payload for key in required):
+        raise StageARuntimeError("epoch-80 checkpoint lacks a parity component")
+    return {key: _state_component_sha256(payload[key]) for key in required}
+
+
+def _require_attack_identity(actual: dict[str, object], expected: object, *, label: str) -> None:
+    if not isinstance(expected, dict) or set(expected) != set(actual):
+        raise StageARuntimeError(f"dynamic S3 {label} attack contract must contain the complete exact identity")
+    if expected != actual:
+        raise StageARuntimeError(f"dynamic S3 {label} attack contract differs from the parent")
+
+
+def _epoch80_gate(*, own: dict[str, Any], peer_path: Path, timeout_seconds: float = 600.0) -> None:
+    """Block epoch 81 until the paired arm proves common epoch-80 state."""
+    deadline = time.monotonic() + timeout_seconds
+    peer: dict[str, Any] | None = None
+    while peer is None:
+        if time.monotonic() >= deadline:
+            raise StageARuntimeError(f"timed out waiting for paired epoch-80 state: {peer_path}")
+        if peer_path.is_file():
+            try:
+                peer = _load_json(peer_path)
+            except (OSError, json.JSONDecodeError):
+                pass
+        if peer is None:
+            time.sleep(1.0)
+    if own.get("components") != peer.get("components"):
+        raise StageARuntimeError("fixed/dynamic epoch-80 model/optimizer/scheduler/RNG state differs")
+    own_capture = Path(str(own.get("capture_path", "")))
+    peer_capture = peer_path.parent / "routing-capture-mask.json"
+    if not own_capture.is_file() or not peer_capture.is_file():
+        raise StageARuntimeError("paired epoch-80 routing capture artifact is missing")
+    if _load_json(own_capture).get("selected_ids_sha256") != _load_json(peer_capture).get("selected_ids_sha256"):
+        raise StageARuntimeError("fixed/dynamic epoch-80 capture action differs")
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise StageARuntimeError(f"expected JSON object: {path}")
     return value
+
+
+def _write_json_atomic(path: Path, value: dict[str, Any]) -> None:
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
 
 
 def _mask_from_overlay(path: Path, key: str) -> FixedInterventionMask:
@@ -116,10 +180,21 @@ def _mask_from_overlay(path: Path, key: str) -> FixedInterventionMask:
     return FixedInterventionMask(frozenset(ids), digest, counts)
 
 
-def _arm_hash(parent_hash: str, treatment: StageATreatment, source_sha: str) -> str:
+def _arm_hash(
+    parent_hash: str,
+    treatment: StageATreatment,
+    source_sha: str,
+    *,
+    dynamic_s3: dict[str, Any] | None = None,
+) -> str:
     return hashlib.sha256(
         json.dumps(
-            {"parent_config_hash": parent_hash, "treatment": treatment.__dict__, "source_git_sha": source_sha},
+            {
+                "parent_config_hash": parent_hash,
+                "treatment": treatment.__dict__,
+                "dynamic_s3": dynamic_s3,
+                "source_git_sha": source_sha,
+            },
             sort_keys=True,
             separators=(",", ":"),
         ).encode()
@@ -138,6 +213,11 @@ def run_stage_a_arm(
     end_epoch: int,
     horizon_epochs: tuple[int, ...] = (84,),
     run_namespace: str = "stage-a",
+    dynamic_s3_arm: str | None = None,
+    dynamic_s3_beta_advce: float | None = None,
+    dynamic_s3_attack_contract: dict[str, object] | None = None,
+    dynamic_s3_endpoint_contract: dict[str, object] | None = None,
+    dynamic_s3_peer_epoch80_state: Path | None = None,
 ) -> dict[str, Any]:
     config = load_config(parent_config_path)
     if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
@@ -167,13 +247,52 @@ def run_stage_a_arm(
     source_sha = source_state.get("sha")
     if source_state.get("dirty") is not False or not isinstance(source_sha, str):
         raise StageARuntimeError("Stage A runtime requires a clean Git tree")
-    arm_hash = _arm_hash(parent_hash, treatment, source_sha)
+    if (dynamic_s3_arm is None) != (dynamic_s3_beta_advce is None):
+        raise StageARuntimeError("dynamic S3 arm and frozen coefficient must be supplied together")
+    if dynamic_s3_arm not in {None, "baseline", "fixed", "dynamic"}:
+        raise StageARuntimeError("unknown dynamic S3 arm")
+    if dynamic_s3_beta_advce is not None and dynamic_s3_beta_advce != 0.075:
+        raise StageARuntimeError("dynamic S3 recovery requires the frozen AdvCE coefficient 0.075")
+    if dynamic_s3_arm is not None:
+        if config.method.selection_attack is None:
+            raise StageARuntimeError("dynamic S3 requires a saved CE-PGD20 endpoint attack")
+        _require_attack_identity(config.method.attack.identity(), dynamic_s3_attack_contract, label="training")
+        _require_attack_identity(
+            config.method.selection_attack.identity(), dynamic_s3_endpoint_contract, label="endpoint"
+        )
+        if dynamic_s3_arm in {"fixed", "dynamic"} and dynamic_s3_peer_epoch80_state is None:
+            raise StageARuntimeError("fixed/dynamic S3 arms require a paired epoch-80 gate path")
+    dynamic_s3_identity = (
+        None
+        if dynamic_s3_arm is None
+        else {"arm": dynamic_s3_arm, "beta_advce": dynamic_s3_beta_advce, "timing": "same_step_pre_update"}
+    )
+    arm_hash = _arm_hash(parent_hash, treatment, source_sha, dynamic_s3=dynamic_s3_identity)
     train_dataset, validation_dataset = build_train_validation_views(
         config.dataset,
         validation_fraction=config.training.validation_fraction,
         split_seed=config.seeds.split,
         augmentation_seed=config.seeds.augmentation,
     )
+    dynamic_s3_router = None
+    if dynamic_s3_arm is not None:
+        from ard.analysis.ert_dynamic_s3_recovery import DynamicS3Router
+
+        # CIFAR train views retain sparse original source IDs in the subset;
+        # read labels from the unaugmented underlying targets, never through a
+        # stochastic transformed item.
+        try:
+            source_ids = list(train_dataset.indices)
+            targets = train_dataset.dataset.dataset.targets
+            train_labels = {int(sample_id): int(targets[int(sample_id)]) for sample_id in source_ids}
+        except (AttributeError, TypeError, IndexError) as exc:
+            raise StageARuntimeError("dynamic S3 routing cannot prove the exact train ID/label universe") from exc
+        dynamic_s3_router = DynamicS3Router(
+            arm=dynamic_s3_arm,
+            train_labels=train_labels,
+            output_dir=output_dir,
+            capture_epoch=80,
+        )
     sampler = EpochShuffleSampler(
         len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
     )
@@ -268,10 +387,15 @@ def run_stage_a_arm(
         target_policy=target_policy,
         intervention_mask=mask,
         adversarial_kd_multiplier=treatment.advkd_multiplier,
-        adversarial_ce_coefficient=treatment.beta_advce,
         clean_ce_coefficient=treatment.beta_cleance,
         clean_wrong_mode=treatment.clean_wrong_mode,
         clean_wrong_attack_skip=treatment.kind == "clean_wrong",
+        dynamic_s3_router=dynamic_s3_router,
+        # The baseline diagnostic arm observes the exact same state but
+        # deliberately ignores the decision, so it never receives AdvCE.
+        adversarial_ce_coefficient=(
+            dynamic_s3_beta_advce if dynamic_s3_arm in {"fixed", "dynamic"} else treatment.beta_advce
+        ),
         observation_profile="teacher_response",
     )
     # Restore the complete epoch-79 optimizer/scheduler/RNG/sampler/sample
@@ -303,6 +427,7 @@ def run_stage_a_arm(
         "child_config_hash": arm_hash,
         "calibration_sha256": calibration.get("artifact_sha256"),
         "source_git_sha": source_sha,
+        "dynamic_s3": dynamic_s3_identity,
     }
     (output_dir / "resolved_config.yaml").write_text(
         yaml.safe_dump(
@@ -315,6 +440,11 @@ def run_stage_a_arm(
                 "child_config_hash": arm_hash,
                 "run_namespace": run_namespace,
                 "horizon_epochs": list(horizon_epochs),
+                "dynamic_s3": (
+                    None
+                    if dynamic_s3_arm is None
+                    else {"arm": dynamic_s3_arm, "beta_advce": dynamic_s3_beta_advce, "timing": "same_step_pre_update"}
+                ),
             },
             sort_keys=True,
         ),
@@ -340,9 +470,14 @@ def run_stage_a_arm(
     metrics_path = output_dir / "epoch-metrics.jsonl"
     horizon_dir = output_dir / "checkpoints"
     horizon_paths: dict[str, Path] = {}
+    dynamic_epoch80: dict[str, Any] | None = None
 
     def record(metrics: dict[str, float], improved: bool) -> None:
+        nonlocal dynamic_epoch80
         row = {"epoch": trainer.current_epoch, "global_step": trainer.global_step, **metrics, "improved": improved}
+        if dynamic_s3_router is not None:
+            state = dynamic_s3_router.epoch_statistics.get(trainer.current_epoch, {})
+            row.update({f"routing_{key}": value for key, value in state.items()})
         with metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
         tracker.log_metrics(row, step=trainer.global_step)
@@ -351,6 +486,22 @@ def run_stage_a_arm(
             horizon_path = horizon_dir / f"epoch-{trainer.current_epoch}.pt"
             shutil.copy2(output_dir / "last.pt", horizon_path)
             horizon_paths[str(trainer.current_epoch)] = horizon_path
+        if dynamic_s3_router is not None and trainer.current_epoch == 80:
+            horizon_dir.mkdir(exist_ok=True)
+            epoch80_path = horizon_dir / "epoch-80.pt"
+            shutil.copy2(output_dir / "last.pt", epoch80_path)
+            payload = torch.load(epoch80_path, map_location="cpu", weights_only=False)
+            if not isinstance(payload, dict):
+                raise StageARuntimeError("epoch-80 dynamic routing checkpoint is malformed")
+            dynamic_epoch80 = {
+                "path": str(epoch80_path.resolve()),
+                "checkpoint_sha256": _sha256(epoch80_path),
+                "components": _epoch80_equivalence(payload),
+                "capture_path": str((output_dir / "routing-capture-mask.json").resolve()),
+            }
+            _write_json_atomic(output_dir / "epoch80-routing-state.json", dynamic_epoch80)
+            if dynamic_s3_peer_epoch80_state is not None:
+                _epoch80_gate(own=dynamic_epoch80, peer_path=dynamic_s3_peer_epoch80_state)
 
     trainer.fork_lineage = {
         **trainer.fork_lineage,
@@ -360,6 +511,7 @@ def run_stage_a_arm(
 
     try:
         trainer.fit(loader, validation_loader=validation_loader, epochs=end_epoch, start_epoch=80, on_epoch_end=record)
+        dynamic_s3_artifacts = None if dynamic_s3_router is None else dynamic_s3_router.finalize()
         tracker.set_summary(
             {
                 "best_metric": trainer.best_metric,
@@ -377,6 +529,27 @@ def run_stage_a_arm(
         tracker.log_artifact(
             output_dir / "best.pt", name=f"model-{run_id}-best", artifact_type="model", aliases=("best",)
         )
+        if dynamic_s3_artifacts is not None and "artifacts" in dynamic_s3_artifacts:
+            artifacts = dynamic_s3_artifacts["artifacts"]
+            tracker.log_artifact(
+                Path(artifacts["capture"]["path"]),
+                name=f"dynamic-s3-capture-{run_id}",
+                artifact_type="routing-input",
+                aliases=("capture",),
+            )
+            tracker.log_artifact(
+                Path(artifacts["state"]["path"]),
+                name=f"dynamic-s3-state-{run_id}",
+                artifact_type="sample-state",
+                aliases=("state",),
+            )
+        if dynamic_epoch80 is not None:
+            tracker.log_artifact(
+                output_dir / "epoch80-routing-state.json",
+                name=f"dynamic-s3-epoch80-state-{run_id}",
+                artifact_type="routing-input",
+                aliases=("epoch-80-routing-state",),
+            )
         horizon_manifest = {
             str(epoch): {
                 "path": str(path.resolve()),
@@ -415,4 +588,6 @@ def run_stage_a_arm(
             epoch: {"path": str(path.resolve()), "sha256": _sha256(path)}
             for epoch, path in sorted(horizon_paths.items(), key=lambda item: int(item[0]))
         },
+        "dynamic_s3": dynamic_s3_artifacts,
+        "dynamic_s3_epoch80": dynamic_epoch80,
     }
