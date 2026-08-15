@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "contract": "ert_s3_history_replay_result_v1",
+  "status": "offline_complete_no_training",
+  "source_git_sha": "fadb274b8aa94d3d9dd856978d903d359f0da2d8",
+  "config_sha256": "8834d9bbfb6be3bc8835f88ec2f462e3713676de6758e78e4536443f7486bec9",
+  "report_path": ".cache/analysis/ert-s3-history-replay-v1/report-v2.json",
+  "report_sha256": "7c6b41f482ebda34d0f3511cad734e00643f333fd84dcc6e3871d37153701932",
+  "trajectory": {
+    "L2": {
+      "path": ".cache/analysis/ert-dynamic-s3-recovery-v1/L2/S3DYN075-r3/dynamic-state.parquet",
+      "sha256": "cf6827c7b3b8b605720152ea6ebaf7532f434f43d97787396679101661d1cfff",
+      "row_count": 675000,
+      "stable_id_class_sha256": "615e67980788b40c78793c6bbdfcdccd292f805869eb9085f445b202fe9a49c8"
+    },
+    "L4": {
+      "path": ".cache/analysis/ert-dynamic-s3-recovery-v1/L4/S3DYN075-r1/dynamic-state.parquet",
+      "sha256": "e3f40b10e4926c09aefc7a381f2f684b028aeb82f59444675d14be17908a0d5a",
+      "row_count": 675000,
+      "stable_id_class_sha256": "615e67980788b40c78793c6bbdfcdccd292f805869eb9085f445b202fe9a49c8"
+    }
+  },
+  "future_reference": "next 3 visits contain at least 2 adversarial-wrong visits; descriptive only",
+  "aggregate_l2_l4_mean": {
+    "Instant": {"action_fraction": 0.303, "action_switches": 150346, "switch_reduction": 0.0, "persistent_capture": 0.790, "transient_activation": 1.0, "median_entry_delay": 0},
+    "Consecutive-2": {"action_fraction": 0.193, "action_switches": 86975, "switch_reduction": 0.421, "persistent_capture": 0.611, "transient_activation": 0.392, "median_entry_delay": 1},
+    "Consecutive-3": {"action_fraction": 0.139, "action_switches": 57224, "switch_reduction": 0.619, "persistent_capture": 0.487, "transient_activation": 0.194, "median_entry_delay": 2},
+    "Majority-3": {"action_fraction": 0.264, "action_switches": 85628, "switch_reduction": 0.430, "persistent_capture": 0.694, "transient_activation": 0.520, "median_entry_delay": 2},
+    "Majority-5": {"action_fraction": 0.224, "action_switches": 62257, "switch_reduction": 0.586, "persistent_capture": 0.566, "transient_activation": 0.361, "median_entry_delay": 4},
+    "Loose-5": {"action_fraction": 0.293, "action_switches": 67267, "switch_reduction": 0.553, "persistent_capture": 0.623, "transient_activation": 0.529, "median_entry_delay": 4},
+    "Majority-5_exit-2-correct": {"action_fraction": 0.230, "action_switches": 61886, "switch_reduction": 0.588, "persistent_capture": 0.571, "transient_activation": 0.368, "median_entry_delay": 4},
+    "Majority-5_exit-3-correct": {"action_fraction": 0.250, "action_switches": 53138, "switch_reduction": 0.646, "persistent_capture": 0.593, "transient_activation": 0.382, "median_entry_delay": 4}
+  },
+  "recommendation": {
+    "primary": "Majority-3",
+    "teacher_gate": "current teacher adversarial correct",
+    "secondary_stability_comparator": "Majority-5_exit-3-correct",
+    "reason": "best simplicity/capture/delay compromise across L2 and L4",
+    "automatic_training_started": false
+  },
+  "tests": {
+    "command": "pytest -q tests/unit/test_ert_s3_history_replay.py",
+    "result": "3 passed",
+    "ruff": "passed"
+  }
+}
