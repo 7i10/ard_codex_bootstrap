@@ -25,6 +25,15 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/ert_confirmatory_report.py",
+            "src/ard/cli/ert_confirmatory_report.py",
+            "configs/analysis/ert_confirmatory_t123_v1.yaml",
+        ),
+        ("tests/unit/test_ert_confirmatory_report.py",),
+        ("T0", "T1", "T2"),
+    ),
+    (
+        (
             "src/ard/analysis/ert_stage_a_calibration.py",
             "src/ard/cli/ert_stage_a_calibration.py",
             "configs/analysis/ert_stage_a_calibration_v1.yaml",
