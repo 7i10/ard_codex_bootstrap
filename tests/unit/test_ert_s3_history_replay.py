@@ -71,3 +71,29 @@ def test_majority3_exit_and_dwell_are_distinct_persistence_controls() -> None:
     dwell_two_reentry = minimum_dwell_state(reentry_wrong, entry_rule="Majority-3", dwell_visits=2)
     assert exit_two_reentry.tolist() == [[False, False, True, True, True, True, False]]
     assert dwell_two_reentry.tolist() == [[False, False, True, True, True, False, False]]
+
+
+def test_s3_observation_excludes_clean_wrong_samples() -> None:
+    # A clean-wrong/adv-wrong visit must not count as Student S3; only the
+    # clean-correct/adv-wrong visit enters the history signal.
+    import ard.analysis.ert_s3_history_replay as replay
+
+    trajectory = {
+        "path": "fixture",
+        "sha256": "0" * 64,
+        "sample_ids": np.array([1, 2]),
+        "classes": np.array([0, 0]),
+        "epochs": np.array([80, 81, 82]),
+        "student_clean_correct": np.array(
+            [[False, False, False], [True, True, True]], dtype=bool
+        ),
+        "student_adv_correct": np.array(
+            [[False, False, False], [True, True, False]], dtype=bool
+        ),
+        "teacher_adv_correct": np.ones((2, 3), dtype=bool),
+        "stable_id_class_sha256": "1" * 64,
+    }
+    report = replay.analyze_run(label="fixture", trajectory=trajectory)
+    # Clean-wrong sample is never a Majority-3 entry.  The second sample has
+    # only one S3 visit, so full-window semantics also keep it inactive.
+    assert report["rules"]["Majority-3"]["state_active_fraction"] == 0.0

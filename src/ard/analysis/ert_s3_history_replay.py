@@ -22,6 +22,7 @@ REQUIRED_COLUMNS = (
     "epoch",
     "sample_id",
     "class_id",
+    "student_clean_correct",
     "student_adv_correct",
     "teacher_adv_correct",
 )
@@ -178,6 +179,7 @@ def load_trajectory(path: Path, *, expected_count: int, expected_epochs: tuple[i
         "sample_ids": sample_matrix[:, 0].copy(),
         "classes": class_matrix[:, 0].copy(),
         "epochs": expected_epoch_array.copy(),
+        "student_clean_correct": columns["student_clean_correct"][order].reshape(matrix_shape).astype(bool),
         "student_adv_correct": columns["student_adv_correct"][order].reshape(matrix_shape).astype(bool),
         "teacher_adv_correct": columns["teacher_adv_correct"][order].reshape(matrix_shape).astype(bool),
     }
@@ -315,7 +317,9 @@ def summarize_rule(
 
 
 def analyze_run(*, label: str, trajectory: dict[str, Any]) -> dict[str, Any]:
-    wrong = ~trajectory["student_adv_correct"]
+    # The production router's S3 state is not “adv wrong” alone.  Clean-wrong
+    # samples are a separate route and must never enter the S3 history.
+    wrong = trajectory["student_clean_correct"] & ~trajectory["student_adv_correct"]
     teacher_correct = trajectory["teacher_adv_correct"]
     future_counts = np.zeros_like(wrong, dtype=np.int16)
     if wrong.shape[1] > 3:
@@ -347,6 +351,7 @@ def analyze_run(*, label: str, trajectory: dict[str, Any]) -> dict[str, Any]:
             "epoch_count": int(wrong.shape[1]),
             "epochs": [int(epoch) for epoch in trajectory["epochs"]],
             "stable_id_class_sha256": trajectory["stable_id_class_sha256"],
+            "s3_observation": "student_clean_correct AND NOT student_adv_correct",
         },
         "rules": {
             name: summarize_rule(
