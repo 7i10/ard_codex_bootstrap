@@ -156,8 +156,8 @@ def run_stage_a_arm(
     parent_hash = payload.get("config_hash")
     if not isinstance(parent_hash, str) or len(parent_hash) != 64:
         raise StageARuntimeError("parent checkpoint lacks a valid config hash")
-    if end_epoch <= 79:
-        raise StageARuntimeError("Stage A endpoint must be after epoch 79")
+    if end_epoch <= 80:
+        raise StageARuntimeError("Stage A endpoint must leave at least one epoch after epoch 79")
     _validate_horizons(horizon_epochs, end_epoch)
     if not run_namespace or any(char.isspace() for char in run_namespace):
         raise StageARuntimeError("run namespace must be a non-empty token")
