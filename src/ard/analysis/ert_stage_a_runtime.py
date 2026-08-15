@@ -244,6 +244,16 @@ def run_stage_a_arm(
     dynamic_s3_experiment_parent_checkpoint: Path | None = None,
 ) -> dict[str, Any]:
     config = load_config(parent_config_path)
+    if config.training.deterministic:
+        # Stage-A forks are compared at an exact parent boundary.  The
+        # ordinary train CLI applies these flags, but this standalone runtime
+        # must do so as well or independent CUDA forks can diverge before the
+        # first treatment visit.
+        torch.use_deterministic_algorithms(True)
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
     if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
         raise StageARuntimeError("Stage A parent is not the observed RSLAD KL-PGD10 run")
     if config.method.attack.kl_target != "teacher_clean":
