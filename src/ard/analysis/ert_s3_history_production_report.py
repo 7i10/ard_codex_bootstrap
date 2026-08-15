@@ -141,7 +141,13 @@ def build_report(*, config_path: Path, training_root: Path, endpoint_root: Path,
             rows = pq.read_table(state_path).to_pylist()
             capture_path = arm_dir / "routing-capture-mask.json"
             capture = _json(capture_path)
-            if capture.get("arm") != arm or not isinstance(capture.get("selected_ids"), list):
+            expected_capture_arm = {
+                "BASE": "baseline",
+                "INST075": "instant",
+                "M3_075": "majority3",
+                "M3E2_075": "majority3_exit2",
+            }[arm]
+            if capture.get("arm") != expected_capture_arm or not isinstance(capture.get("selected_ids"), list):
                 raise HistoryProductionReportError(f"invalid routing capture: {capture_path}")
             seed_result["arms"][arm] = {
                 "training_state": {"path": str(state_path.resolve()), "sha256": _sha256(state_path), "rows": len(rows)},
