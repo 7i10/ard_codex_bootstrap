@@ -64,7 +64,9 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
   difference `0.0`).
 - Feature/replay attack identity matched the 64 existing endpoint outputs:
   `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`.
-- Report source hash: `9f999504ee9e474c93e11741775f72b43ccee6cd5523167da88d0b08bd96c9b9`.
+- The initial endpoint-conditioned report is retained as the historical
+  subtype analysis; its feature replay used the older epoch-84 observation
+  contract and is not used for the pre-treatment selector claim.
 - The clean-only versus robust-only contrast shows that Teacher adversarial
   correctness and positive adversarial margin, rather than `DeltaT` alone,
   distinguish robust rescue. C10/C13 robust-rescue Jaccard is 0.250 (L2) and
@@ -78,8 +80,15 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
 - CW-R was fixed as `mT_adv > 0`; CW-U as `mT_adv <= 0`. No outcome-derived
   threshold or tuning was used.
 - L2/L4 feature rows exactly matched the registered sparse masks and endpoint
-  attack identity. The stratified report was generated with source hash
-  `0a4a191bdbaa231c2fe7db566b18c7262e6d71162e9f989e2ee94c2feac1393a`.
+  attack identity. A lineage audit found that the first L4 replay used a
+  different epoch-79 checkpoint than the broad-screen fork; it was discarded.
+  L4 was rerun with the exact fork parent `026a36d3…`, and the report now
+  fails closed on this mismatch. L2 was also rerun from the exact fork parent
+  `ad43d72d…` under the final clean source.
+- The current machine report is
+  `docs/experiments/ert_clean_wrong_reliability_stratified_v1.json`; its final
+  content hash is recorded in the handoff commit after both replays are
+  regenerated.
 - C13 had nearly equal L2 robust deltas in CW-R/CW-U and was neutral in both
   L4 strata; the proposed Teacher-unreliable contamination explanation is not
   confirmed. C10 showed higher robust net-rescue in CW-R but no consistently

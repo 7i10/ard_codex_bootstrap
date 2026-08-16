@@ -1,6 +1,23 @@
 # ERT Clean-Wrong Rescue Subtype Analysis
 
-Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis. No new training or route selection.
+Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis, stratified by
+Teacher reliability measured **before treatment** at the epoch-79 parent. No
+new training or route selection.
+
+## Frozen pre-treatment split
+
+For each fixed epoch-79 Clean-Wrong cohort, `CW-R` is defined by
+`teacher_adversarial_margin > 0` under an independent eval-mode CE-PGD20
+replay; `CW-U` is the complement. This is a fixed, threshold-free split and
+is not selected from epoch-84 outcomes. The endpoint is the paired C0 versus
+C10/C12/C13 epoch-84 train result. The report is associative and sample-level;
+it is not a training-seed confidence interval or a causal estimate.
+
+Lineage is fail-closed: each replay checkpoint SHA must equal the C0
+continuation's `fork_lineage.parent_checkpoint_sha256`, and endpoint and
+feature attacks must share the exact CE-PGD20 identity. L2 uses
+`ad43d72d…`; L4 uses `026a36d3…`. Both cohorts are replayed in full train
+ordering and retain only the registered stable IDs.
 
 ## L2
 
@@ -71,65 +88,3 @@ Fixed Clean-Wrong cohort: 8925 samples.
 | C12 | CW-U | 5806 | 0.000 | -0.1191 | +0.0120 | +0.0130 | +0.0036 |
 | C13 | CW-R | 3119 | 1.000 | 0.1052 | +0.0005 | -0.0000 | -0.0022 |
 | C13 | CW-U | 5806 | 0.000 | -0.1191 | +0.0037 | -0.0001 | -0.0012 |
-
-## Interpretation
-
-The strata were fixed before reading treatment outcomes:
-
-$$
-CW\text{-}R = \{i:m_{T,i}^{adv}(epoch79)>0\},\qquad
-CW\text{-}U = \{i:m_{T,i}^{adv}(epoch79)\le 0\}.
-$$
-
-Because probability-margin positivity is equivalent to Teacher adversarial
-correctness, this is a preregistered semantic split rather than a tuned
-threshold. The L2 counts are 2,908/5,715 and L4 counts are 3,119/5,806.
-
-### Does Teacher reliability select a better C13 action?
-
-No clear two-seed confirmation was found. C13 robust effects were:
-
-| arm / stratum | L2 robust Δ | L4 robust Δ | L2 robust net rescue | L4 robust net rescue |
-|---|---:|---:|---:|---:|
-| C13 / CW-R | +0.853 pp | −0.005 pp | +1.72 pp | −0.22 pp |
-| C13 / CW-U | +0.843 pp | −0.006 pp | 0.00 pp | −0.12 pp |
-
-The L2 gain is almost identical in CW-R and CW-U, while L4 is neutral in
-both. Therefore the hypothesis “C13 is harmful mainly because it is applied
-to Teacher-unreliable samples” is not supported by this endpoint.
-
-### Does Teacher reliability select a better C10 action?
-
-C10 has a more informative safety pattern than C13, but not a stronger robust
-accuracy effect in CW-R across both seeds:
-
-| arm / stratum | L2 clean Δ | L4 clean Δ | L2 robust Δ | L4 robust Δ |
-|---|---:|---:|---:|---:|
-| C10 / CW-R | +1.477 pp | +2.504 pp | +0.481 pp | +1.072 pp |
-| C10 / CW-U | +1.813 pp | +2.027 pp | +0.943 pp | +0.640 pp |
-
-CW-R has a higher robust net-rescue rate (`+2.99/+1.51 pp`) than CW-U
-(`+0.45/+0.10 pp`), because harm is much lower. However, the paired robust
-accuracy delta is not consistently larger in CW-R. Teacher reliability may
-therefore be useful as a safety gate for CleanCE, but it is not yet validated
-as a robust-benefit selector.
-
-C12 is similarly inconclusive: robust Δ is `+0.005/+1.266 pp` in CW-R and
-`+0.905/+1.299 pp` in CW-U. This does not show a reliable Teacher-gated
-advantage.
-
-### Decision
-
-The correct conclusion is narrower than a routing claim:
-
-1. The earlier outcome-conditioned result was not sufficient to establish a
-   Teacher-reliability selector.
-2. With treatment-pre Teacher reliability fixed first, C13 does not show a
-   reproducible CW-R advantage.
-3. C10 shows a possible harm-reduction/safety effect in CW-R, but not a
-   reproducible larger robust-accuracy gain.
-4. The next method, if pursued, should separate robust rescue from clean
-   rescue and preregister safety (harm/net-rescue) as a distinct endpoint.
-
-No threshold tuning, new treatment, official test, AutoAttack, or new seed was
-started. Full feature fields and paired IDs are in the JSON artifact.
