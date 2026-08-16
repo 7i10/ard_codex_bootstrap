@@ -27,6 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--arm", choices=tuple(f"C{i}" for i in range(16)))
     parser.add_argument("--run-namespace", default="ert-clean-wrong-broad")
     parser.add_argument("--epochs", type=int, default=85)
+    parser.add_argument("--horizon-epoch", type=int, default=84)
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     parser.add_argument("--calibrate-bce", action="store_true")
     parser.add_argument("--calibration-output", type=Path)
@@ -95,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         calibration=calibration,
         device=torch.device(args.device),
         end_epoch=args.epochs,
-        horizon_epochs=(84,),
+        horizon_epochs=(args.horizon_epoch,),
         run_namespace=args.run_namespace,
     )
     print(json.dumps(result, sort_keys=True))
