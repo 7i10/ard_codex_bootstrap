@@ -19,6 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mask", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
+    parser.add_argument("--expected-epoch", type=int, default=79)
     parser.add_argument("--run", choices=("L2", "L4"))
     parser.add_argument("--root", type=Path)
     parser.add_argument("--l2-features", type=Path)
@@ -36,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
             mask_path=args.mask,
             output_dir=args.output,
             device=torch.device(args.device),
+            expected_epoch=args.expected_epoch,
         )
     else:
         required = (args.root, args.l2_features, args.l4_features, args.output_json, args.output_markdown)

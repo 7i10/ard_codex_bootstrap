@@ -13,7 +13,7 @@ official test, or AutoAttack is permitted.
 
 - Chen ERT L2/seed1 and L4/seed2, exact epoch-79 Clean-Wrong masks.
 - Outcome: fixed C0 versus C10, C12, and C13 epoch-84 train endpoints.
-- Feature replay: C0 epoch-84 checkpoint, full train ordering, independent
+- Feature replay: C0 epoch-79 parent checkpoint, full train ordering, independent
   eval-mode CE-PGD20 with pixel `[0,1]`, Linf epsilon `8/255`, step `2/255`,
   20 steps, random start, hard-label CE. Only registered Clean-Wrong IDs are
   retained, but the full ordering is replayed to preserve the attack RNG

@@ -61,7 +61,7 @@ def replay_features(
     mask_path: Path,
     output_dir: Path,
     device: torch.device,
-    expected_epoch: int = 84,
+    expected_epoch: int = 79,
 ) -> dict[str, Any]:
     """Replay the full train ordering and retain only the registered CW IDs."""
     config = load_config(config_path)
@@ -151,7 +151,8 @@ def replay_features(
     write_sample_parquet(rows, rows_path)
     result = {
         "schema_version": 1,
-        "contract": "ert_clean_wrong_epoch84_c0_ce_pgd20_features_v1",
+        "contract": "ert_clean_wrong_c0_ce_pgd20_features_v1",
+        "feature_epoch": expected_epoch,
         "run": mask["run"],
         "checkpoint": str(checkpoint.resolve()),
         "checkpoint_epoch": expected_epoch,
@@ -246,8 +247,10 @@ def build_report(
     }
     for run, feature_root in feature_roots.items():
         feature_meta = json.loads((feature_root / "clean-wrong-feature-replay.json").read_text(encoding="utf-8"))
-        if feature_meta.get("contract") != "ert_clean_wrong_epoch84_c0_ce_pgd20_features_v1":
+        if feature_meta.get("contract") != "ert_clean_wrong_c0_ce_pgd20_features_v1":
             raise CleanWrongSubtypeError("feature replay contract mismatch")
+        if feature_meta.get("feature_epoch") != 79:
+            raise CleanWrongSubtypeError("subtype analysis requires epoch-79 pre-treatment features")
         feature_rows = _read_rows(feature_root / "clean-wrong-feature-stats.parquet")
         selected = set(feature_rows)
         endpoints: dict[str, dict[int, dict[str, Any]]] = {}
