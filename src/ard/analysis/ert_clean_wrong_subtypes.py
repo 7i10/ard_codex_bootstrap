@@ -78,7 +78,9 @@ def replay_features(
     student = build_student(config.student, tier=config.tier)
     payload = load_saved_student_checkpoint(checkpoint, student)
     if payload.get("epoch") != expected_epoch or payload.get("epoch_boundary") != "end":
-        raise CleanWrongSubtypeError("feature replay requires the epoch-84 end checkpoint")
+        raise CleanWrongSubtypeError(
+            f"feature replay requires the epoch-{expected_epoch} end checkpoint"
+        )
     teacher_cfg = config.teacher
     if teacher_cfg is None:
         raise CleanWrongSubtypeError("feature replay requires a teacher")
@@ -282,6 +284,23 @@ def build_report(
             raise CleanWrongSubtypeError("subtype analysis requires epoch-79 pre-treatment features")
         feature_rows = _read_rows(feature_root / "clean-wrong-feature-stats.parquet")
         selected = set(feature_rows)
+        # The pre-treatment replay must use the exact parent that produced the
+        # endpoint continuation.  Endpoint rows alone only identify epoch 84;
+        # the run-bundle manifest is the immutable parent-lineage binding.
+        parent_manifest = root / run / "C0" / "run-bundle" / "manifest.json"
+        if not parent_manifest.is_file():
+            raise CleanWrongSubtypeError(f"missing endpoint parent manifest: {parent_manifest}")
+        parent_lineage = json.loads(parent_manifest.read_text(encoding="utf-8")).get(
+            "parent_lineage", {}
+        )
+        expected_parent_sha = parent_lineage.get("parent_checkpoint_sha256")
+        if not isinstance(expected_parent_sha, str):
+            raise CleanWrongSubtypeError("endpoint manifest lacks parent checkpoint SHA")
+        if feature_meta.get("checkpoint_sha256") != expected_parent_sha:
+            raise CleanWrongSubtypeError(
+                f"pre-treatment feature checkpoint does not match endpoint parent for {run}: "
+                f"{feature_meta.get('checkpoint_sha256')} != {expected_parent_sha}"
+            )
         endpoints: dict[str, dict[int, dict[str, Any]]] = {}
         endpoint_meta: dict[str, Any] = {}
         for arm in ARMS:
