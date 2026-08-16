@@ -1,6 +1,6 @@
 # 0045 — ERT Clean-Wrong sample-wise rescue subtype analysis
 
-Status: completed (descriptive analysis; no follow-up training)
+Status: completed (pre-treatment reliability stratification; no follow-up training)
 
 ## Objective
 
@@ -70,3 +70,17 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
   distinguish robust rescue. C10/C13 robust-rescue Jaccard is 0.250 (L2) and
   0.181 (L4).
 - No additional training or automatic intervention was started.
+
+## Reliability-stratified follow-up
+
+- Epoch-79 parent replay was run for both seeds using the same full-train
+  ordering and CE-PGD20 identity as the epoch-84 endpoint.
+- CW-R was fixed as `mT_adv > 0`; CW-U as `mT_adv <= 0`. No outcome-derived
+  threshold or tuning was used.
+- L2/L4 feature rows exactly matched the registered sparse masks and endpoint
+  attack identity. The stratified report was generated with source hash
+  `0a4a191bdbaa231c2fe7db566b18c7262e6d71162e9f989e2ee94c2feac1393a`.
+- C13 had nearly equal L2 robust deltas in CW-R/CW-U and was neutral in both
+  L4 strata; the proposed Teacher-unreliable contamination explanation is not
+  confirmed. C10 showed higher robust net-rescue in CW-R but no consistently
+  larger robust accuracy delta.

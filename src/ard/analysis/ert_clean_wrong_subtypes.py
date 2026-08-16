@@ -230,6 +230,35 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _effect(base: list[dict[str, Any]], treatment: list[dict[str, Any]], key: str) -> dict[str, float]:
+    if len(base) != len(treatment):
+        raise CleanWrongSubtypeError("reliability stratum row count mismatch")
+    base_by_id = {int(row["sample_id"]): row for row in base}
+    treatment_by_id = {int(row["sample_id"]): row for row in treatment}
+    if set(base_by_id) != set(treatment_by_id):
+        raise CleanWrongSubtypeError("reliability stratum stable-ID mismatch")
+    ids = sorted(base_by_id)
+    deltas = [float(treatment_by_id[item][key]) - float(base_by_id[item][key]) for item in ids]
+    correctness_key = "robust_correct" if key.startswith("adversarial") else "clean_correct"
+    base_correct = [bool(base_by_id[item][correctness_key]) for item in ids]
+    treatment_correct = [
+        bool(treatment_by_id[item][correctness_key]) for item in ids
+    ]
+    rescue = sum(not before and after for before, after in zip(base_correct, treatment_correct, strict=True))
+    harm = sum(before and not after for before, after in zip(base_correct, treatment_correct, strict=True))
+    n = len(ids)
+    return {
+        "n": n,
+        "delta_accuracy": sum(deltas) / n if n else None,
+        "delta_margin": sum(deltas) / n if n else None,
+        "rescue_rate": rescue / n if n else None,
+        "harm_rate": harm / n if n else None,
+        "net_rescue_rate": (rescue - harm) / n if n else None,
+        "rescue_count": rescue,
+        "harm_count": harm,
+    }
+
+
 def build_report(
     *,
     root: Path,
@@ -289,6 +318,30 @@ def build_report(
                     json.dumps(ids, separators=(",", ":")).encode()
                 ).hexdigest()
             treatment_reports[arm] = {"groups": groups, "group_ids": group_ids}
+        reliability_strata: dict[str, list[int]] = {"CW-R": [], "CW-U": []}
+        for sample_id in sorted(selected):
+            reliability_strata["CW-R" if float(feature_rows[sample_id]["teacher_adv_margin"]) > 0 else "CW-U"].append(
+                sample_id
+            )
+        reliability_effects: dict[str, Any] = {}
+        for arm in ("C10", "C12", "C13"):
+            reliability_effects[arm] = {}
+            for stratum, ids in reliability_strata.items():
+                base_rows = [base[item] for item in ids]
+                treatment_rows = [endpoints[arm][item] for item in ids]
+                feature_subset = [feature_rows[item] for item in ids]
+                reliability_effects[arm][stratum] = {
+                    "n": len(ids),
+                    "teacher_adv_correct_rate": sum(row["teacher_adv_correct"] for row in feature_subset) / len(ids),
+                    "teacher_adv_margin_mean": sum(float(row["teacher_adv_margin"]) for row in feature_subset)
+                    / len(ids),
+                    "teacher_adv_true_probability_mean": sum(
+                        float(row["teacher_adv_true_probability"]) for row in feature_subset
+                    )
+                    / len(ids),
+                    "clean": _effect(base_rows, treatment_rows, "clean_probability_margin"),
+                    "robust": _effect(base_rows, treatment_rows, "adversarial_probability_margin"),
+                }
         overlaps: dict[str, Any] = {}
         for dimension, key in (("clean", "clean_only_rescue"), ("robust", "robust_only_rescue")):
             sets = {}
@@ -312,6 +365,17 @@ def build_report(
             "endpoint_meta": endpoint_meta,
             "selected_count": len(selected),
             "treatments": treatment_reports,
+            "reliability_rule": "CW-R iff pre-treatment epoch-79 teacher_adversarial_margin > 0; otherwise CW-U",
+            "reliability_strata": {
+                name: {
+                    "n": len(ids),
+                    "sample_ids_sha256": hashlib.sha256(
+                        json.dumps(ids, separators=(",", ":")).encode()
+                    ).hexdigest(),
+                }
+                for name, ids in reliability_strata.items()
+            },
+            "reliability_effects": reliability_effects,
             "c10_c13_rescue_overlap": overlaps,
         }
     machine["source_sha256"] = hashlib.sha256(json.dumps(machine, sort_keys=True).encode()).hexdigest()
@@ -348,6 +412,19 @@ def build_report(
                 f"intersection={value['intersection_count']}, union={value['union_count']}, "
                 f"Jaccard={value['jaccard'] if value['jaccard'] is not None else '—'}"
             )
+        lines += ["", "### Pre-treatment Teacher reliability strata", ""]
+        lines += [
+            "| arm | stratum | n | Teacher adv correct | mean mT_adv | clean Δ | robust Δ | robust net rescue |",
+            "|---|---|---:|---:|---:|---:|---:|---:|",
+        ]
+        for arm in ("C10", "C12", "C13"):
+            for stratum in ("CW-R", "CW-U"):
+                value = report["reliability_effects"][arm][stratum]
+                lines.append(
+                    f"| {arm} | {stratum} | {value['n']} | {value['teacher_adv_correct_rate']:.3f} | "
+                    f"{value['teacher_adv_margin_mean']:.4f} | {value['clean']['delta_accuracy']:+.4f} | "
+                    f"{value['robust']['delta_accuracy']:+.4f} | {value['robust']['net_rescue_rate']:+.4f} |"
+                )
         lines.append("")
     output_markdown.parent.mkdir(parents=True, exist_ok=True)
     output_markdown.write_text("\n".join(lines), encoding="utf-8")
