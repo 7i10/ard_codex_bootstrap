@@ -1,6 +1,6 @@
 # 0045 — ERT Clean-Wrong sample-wise rescue subtype analysis
 
-Status: in progress
+Status: completed (descriptive analysis; no follow-up training)
 
 ## Objective
 
@@ -38,11 +38,11 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
 ## Execution checklist
 
 - [x] Reconcile clean `master` at `478b8a3` and verify broad-screen inputs.
-- [ ] Implement hash-bound C0 feature replay and subtype aggregator.
-- [ ] Run focused tests and one real sparse-ID smoke.
-- [ ] Run L2/L4 feature replay in parallel on Hamster GPUs.
-- [ ] Generate point report and immutable JSON/Markdown outputs.
-- [ ] Review joins, attack identity, and group denominators; then stop.
+- [x] Implement hash-bound C0 feature replay and subtype aggregator.
+- [x] Run focused tests and one real sparse-ID smoke.
+- [x] Run L2/L4 feature replay on Hamster GPUs.
+- [x] Generate point report and immutable JSON/Markdown outputs.
+- [x] Review joins, attack identity, and group denominators; then stop.
 
 ## Risks / interpretation limits
 
@@ -54,3 +54,19 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
   artifacts. No outcome is used to alter the feature replay.
 - If any checkpoint, attack identity, stable-ID universe, or source SHA does
   not match, the CLI must fail closed.
+
+## Execution record
+
+- Source commit for replay: `9109d3624100329e2da830598c808ad252ead568`.
+- L2 feature replay: 8,623 rows; L4 feature replay: 8,925 rows.
+- Both replays used the full train ordering and matched saved C0 Student
+  clean/adv correctness and margins exactly (maximum absolute margin
+  difference `0.0`).
+- Feature/replay attack identity matched the 64 existing endpoint outputs:
+  `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`.
+- Report source hash: `9f999504ee9e474c93e11741775f72b43ccee6cd5523167da88d0b08bd96c9b9`.
+- The clean-only versus robust-only contrast shows that Teacher adversarial
+  correctness and positive adversarial margin, rather than `DeltaT` alone,
+  distinguish robust rescue. C10/C13 robust-rescue Jaccard is 0.250 (L2) and
+  0.181 (L4).
+- No additional training or automatic intervention was started.
