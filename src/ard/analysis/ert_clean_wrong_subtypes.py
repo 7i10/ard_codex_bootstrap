@@ -290,10 +290,12 @@ def build_report(
         parent_manifest = root / run / "C0" / "run-bundle" / "manifest.json"
         if not parent_manifest.is_file():
             raise CleanWrongSubtypeError(f"missing endpoint parent manifest: {parent_manifest}")
-        parent_lineage = json.loads(parent_manifest.read_text(encoding="utf-8")).get(
-            "parent_lineage", {}
+        manifest = json.loads(parent_manifest.read_text(encoding="utf-8"))
+        parent_lineage = manifest.get("parent_lineage", {})
+        fork_lineage = manifest.get("fork_lineage", {})
+        expected_parent_sha = parent_lineage.get("checkpoint_sha256") or fork_lineage.get(
+            "parent_checkpoint_sha256"
         )
-        expected_parent_sha = parent_lineage.get("parent_checkpoint_sha256")
         if not isinstance(expected_parent_sha, str):
             raise CleanWrongSubtypeError("endpoint manifest lacks parent checkpoint SHA")
         if feature_meta.get("checkpoint_sha256") != expected_parent_sha:
