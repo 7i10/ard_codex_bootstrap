@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,10 @@ from ard.analysis.ert_clean_wrong_broad_screen import ARMS, fixed_clean_wrong_ma
 
 class CleanWrongReportError(RuntimeError):
     """Raised when screen endpoint lineage or joins are incomplete."""
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _paired(base: list[dict[str, Any]], treatment: list[dict[str, Any]], *, key: str) -> dict[str, float]:
@@ -86,13 +91,20 @@ def build_report(
         "contract": "ert_clean_wrong_broad_screen_results_v1",
         "endpoint_epoch": 84,
         "seeds": {},
+        "arm_definitions": [asdict(arm) for arm in ARMS],
         "bootstrap": {"replicates": 2000, "seed": 20260816, "enabled": bootstrap},
     }
     for run, mask_path in masks.items():
         mask = fixed_clean_wrong_mask(mask_path, run=run)
         run_data: dict[str, Any] = {"mask": mask, "arms": {}}
+        run_lineage: dict[str, Any] = {"mask_sha256": mask["mask_sha256"], "arms": {}}
         for arm in ARMS:
             endpoint_data: dict[str, Any] = {}
+            arm_lineage: dict[str, Any] = {}
+            manifest_path = root / run / arm.name / "run-bundle" / "manifest.json"
+            if not manifest_path.is_file():
+                raise CleanWrongReportError(f"missing run manifest: {manifest_path}")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             for split in ("train", "validation"):
                 endpoint = root / run / arm.name / "endpoint" / split / "endpoint.json"
                 rows_path = endpoint.with_name("endpoint-sample-stats.parquet")
@@ -103,8 +115,43 @@ def build_report(
 
                 rows = pq.read_table(rows_path).to_pylist()
                 endpoint_data[split] = {"meta": payload, "rows": rows}
+                arm_lineage[split] = {
+                    "endpoint_path": str(endpoint.resolve()),
+                    "rows_path": str(rows_path.resolve()),
+                    "contract": payload.get("contract"),
+                    "checkpoint": payload.get("checkpoint"),
+                    "checkpoint_epoch": payload.get("checkpoint_epoch"),
+                    "checkpoint_sha256": payload.get("checkpoint_sha256"),
+                    "rows_sha256": payload.get("rows_sha256"),
+                    "source_git_sha": payload.get("source_git_sha"),
+                    "attack": payload.get("attack"),
+                    "attack_identity_sha256": payload.get("attack_identity_sha256"),
+                    "split_identity": payload.get("split_identity"),
+                }
             run_data["arms"][arm.name] = endpoint_data
+            teacher = manifest.get("teacher") or {}
+            parent = manifest.get("parent_lineage") or {}
+            fork = manifest.get("fork_lineage") or {}
+            arm_lineage["manifest"] = {
+                "path": str(manifest_path.resolve()),
+                "sha256": _sha256(manifest_path),
+                "run_id": manifest.get("run_id"),
+                "run_name": manifest.get("run_name"),
+                "wandb_url": manifest.get("wandb_url"),
+                "config_hash": manifest.get("config_hash"),
+                "git": manifest.get("git"),
+                "tier": manifest.get("tier"),
+                "tracking_mode": manifest.get("tracking_mode"),
+                "training_seed": manifest.get("training_seed"),
+                "teacher_checkpoint_sha256": teacher.get("checkpoint_actual_sha256")
+                or teacher.get("checkpoint_sha256"),
+                "parent_checkpoint_sha256": parent.get("checkpoint_sha256"),
+                "parent_epoch": parent.get("epoch"),
+                "fork_lineage": fork,
+            }
+            run_lineage["arms"][arm.name] = arm_lineage
         machine["seeds"][run] = {"mask": mask, "arms": {}}
+        machine["seeds"][run]["lineage"] = run_lineage
         base_data = run_data["arms"]["C0"]
         selected = set(mask["selected_ids"])
         labels = {int(row["sample_id"]): int(row["true_label"]) for row in base_data["train"]["rows"]}

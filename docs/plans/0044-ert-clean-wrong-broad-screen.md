@@ -1,6 +1,6 @@
 # 0044 — ERT Clean-Wrong Broad Treatment Screen
 
-Status: in progress
+Status: completed (screen only; human review required)
 
 ## Objective
 
@@ -39,16 +39,16 @@ promotion.
 
 - [x] Reconcile HEAD, parent checkpoints, registered masks, and existing RSLAD
       contract.
-- [ ] Implement treatment API, mixed-budget attack, calibration, screen CLI,
+- [x] Implement treatment API, mixed-budget attack, calibration, screen CLI,
       and report aggregation.
-- [ ] Focused unit/fixed-batch tests and `scripts/verify.py --changed`.
-- [ ] Commit clean scientific source before GPU launch.
-- [ ] Run one-batch engineering canary per unique treatment path.
-- [ ] Launch 32 trajectories (two seeds × 16 arms), then 64 independent
+- [x] Focused unit/fixed-batch tests and `scripts/verify.py --changed`.
+- [x] Commit clean scientific source before GPU launch.
+- [x] Run one-batch engineering canary per unique treatment path.
+- [x] Launch 32 trajectories (two seeds × 16 arms), then 64 independent
       endpoint evaluations (train/held-out validation).
-- [ ] Generate direct/spillover/held-out report and 2,000-replicate
+- [x] Generate direct/spillover/held-out report and 2,000-replicate
       class-stratified paired bootstrap without using it to tune the screen.
-- [ ] Update human report and machine artifact; stop for human review.
+- [x] Update human report and machine artifact; stop for human review.
 
 ## Acceptance and risks
 
@@ -59,3 +59,24 @@ lineage, and independent endpoint attacks. The principal risks are accidental
 attack-budget mixing, replacing rather than adding the selected CleanCE
 branch, and interpreting direct train-cohort rescue as held-out improvement;
 each is guarded by tests and separate report strata.
+
+## Execution record
+
+- Scientific source commit used for all valid runs: `cbe03a7b3be0b11fa1555b573c6f453a3d10f27b`.
+- Valid runs: L2/seed1 (`ert-clean-wrong-broad-v1`) and L4/seed2
+  (`ert-clean-wrong-broad-v1-l4r2`), 16 arms each, epoch 79→84.
+- Endpoint: 64 independent eval-mode CE-PGD20 outputs (32 train + 32 fixed
+  validation), with attack identity SHA `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`.
+- Fixed epoch-79 Clean-Wrong masks: L2 8,623 IDs; L4 8,925 IDs.
+- C12 no-update BCE calibration was frozen before training:
+  `beta_BCE=0.08891977369785309`, pooled target gradient ratio 0.25.
+- Report command completed with 2,000 class-stratified paired bootstrap
+  replicates per non-baseline cohort; result SHA is recorded in the machine
+  artifact and human report.
+- W&B online production tracking was enabled for the valid trajectories.
+- One duplicate L4 C0 launch and an initial endpoint directory precreation
+  mistake were stopped before valid evaluation; their outputs are excluded
+  from the report. The valid L4 namespace was rerun from the same registered
+  parent and is the only lineage included.
+- No official test, AutoAttack, new seed, +15 continuation, or automatic
+  winner promotion was performed.
