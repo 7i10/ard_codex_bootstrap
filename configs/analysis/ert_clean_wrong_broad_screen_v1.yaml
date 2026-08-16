@@ -1,0 +1,42 @@
+schema_version: 1
+contract: ert_clean_wrong_broad_screen_v1
+description: Fixed epoch-79 Chen Clean-Wrong broad mechanism screen; no automatic promotion.
+parent_epoch: 79
+end_epoch: 85
+endpoint_epoch: 84
+training_attack:
+  loss: kl
+  kl_target: teacher_clean
+  norm: linf
+  input_domain: pixel_0_1
+  epsilon: 8/255
+  step_size: 2/255
+  steps: 10
+  random_start: true
+endpoint_attack:
+  loss: ce
+  norm: linf
+  input_domain: pixel_0_1
+  epsilon: 8/255
+  step_size: 2/255
+  steps: 20
+  random_start: true
+screen:
+  mask_key: student_clean_wrong
+  arms: [C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15]
+  seeds: [L2, L4]
+  bootstrap:
+    replicates: 2000
+    seed: 20260816
+    stratification: true_class
+runs:
+  L2:
+    seed: 1
+    parent_config: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/C79/resolved_config.yaml
+    parent_checkpoint: .cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s1-confirm-v2/last.pt
+    mask: .cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L2.json
+  L4:
+    seed: 2
+    parent_config: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/resolved_config.yaml
+    parent_checkpoint: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/last.pt
+    mask: .cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L4.json

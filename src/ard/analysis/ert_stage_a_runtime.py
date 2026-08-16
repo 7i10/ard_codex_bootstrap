@@ -57,9 +57,16 @@ class StageATreatment:
     beta_cleance: float | None = None
     clean_wrong_mode: str | None = None
     tau: float | None = None
+    selected_attack_epsilon: float | None = None
+    selected_attack_step_size: float | None = None
+    extra_clean_ce: float | None = None
+    bce_adv: float | None = None
+    adaptive_advkd_gamma: float | None = None
+    teacher_reliability_gate: bool = False
+    iad_inspired: bool = False
 
     def __post_init__(self) -> None:
-        if self.kind not in {"baseline", "advce", "soft_advkd", "advkd_advce", "clean_wrong"}:
+        if self.kind not in {"baseline", "advce", "soft_advkd", "advkd_advce", "clean_wrong", "broad"}:
             raise StageARuntimeError(f"unknown Stage A treatment kind: {self.kind}")
         if self.kind == "clean_wrong" and self.clean_wrong_mode not in {
             "clean_ce_only",
@@ -90,6 +97,19 @@ class StageATreatment:
             )
         ):
             raise StageARuntimeError("baseline treatment cannot carry treatment coefficients")
+        if self.selected_attack_epsilon is not None and self.selected_attack_step_size is None:
+            raise StageARuntimeError("selected attack epsilon requires a selected step size")
+        if self.selected_attack_step_size is not None and self.selected_attack_epsilon is None:
+            raise StageARuntimeError("selected attack step size requires a selected epsilon")
+        for value in (
+            self.selected_attack_epsilon,
+            self.selected_attack_step_size,
+            self.extra_clean_ce,
+            self.bce_adv,
+            self.adaptive_advkd_gamma,
+        ):
+            if value is not None and value < 0:
+                raise StageARuntimeError("broad treatment coefficients must be non-negative")
 
 
 def _sha256(path: Path) -> str:
@@ -410,10 +430,15 @@ def run_stage_a_arm(
     scheduler = build_scheduler(optimizer, config.scheduler)
     sample_store = SampleStateStore(ema_decay=config.method.student_ema_decay)
     mask = None
+    teacher_reliability_mask = None
     if treatment.mask_key is not None:
         if mask_path is None:
             raise StageARuntimeError("selected Stage A treatment requires a mask path")
         mask = _mask_from_overlay(mask_path, treatment.mask_key)
+        if treatment.teacher_reliability_gate:
+            teacher_reliability_mask = _mask_from_overlay(
+                mask_path, "student_clean_wrong_teacher_clean_correct"
+            )
     target_policy = (
         TeacherOnlyTemperatureTargetPolicy(target_temperature=treatment.tau, baseline_temperature=1.0)
         if treatment.kind == "soft_advkd"
@@ -507,6 +532,13 @@ def run_stage_a_arm(
         clean_ce_coefficient=treatment.beta_cleance,
         clean_wrong_mode=treatment.clean_wrong_mode,
         clean_wrong_attack_skip=treatment.kind == "clean_wrong",
+        selected_attack_epsilon=treatment.selected_attack_epsilon,
+        selected_attack_step_size=treatment.selected_attack_step_size,
+        extra_clean_ce_coefficient=treatment.extra_clean_ce,
+        adversarial_bce_coefficient=treatment.bce_adv,
+        adaptive_advkd_gamma=treatment.adaptive_advkd_gamma,
+        teacher_clean_reliability_mask=teacher_reliability_mask,
+        iad_inspired=treatment.iad_inspired,
         dynamic_s3_router=dynamic_s3_router,
         # The baseline diagnostic arm observes the exact same state but
         # deliberately ignores the decision, so it never receives AdvCE.

@@ -63,6 +63,25 @@ def test_pgd_trace_collection_is_explicit_and_exact() -> None:
     assert all(isinstance(loss, float) and torch.isfinite(torch.tensor(loss)) for loss in result.step_losses)
 
 
+def test_pgd_mixed_per_sample_budget_keeps_each_example_within_its_bound() -> None:
+    model = linear_model()
+    inputs = torch.rand(3, 3, 4, 4)
+    labels = torch.tensor([0, 1, 2])
+    config = AttackConfig(epsilon="8/255", step_size="2/255", steps=3, random_start=True, student_mode="eval")
+    result = LinfPGD(config).generate(
+        AttackRequest(
+            inputs=inputs,
+            labels=labels,
+            student=model,
+            generator=torch.Generator().manual_seed(4),
+            epsilon_override=torch.tensor([8 / 255, 4 / 255, 2 / 255]),
+            step_size_override=torch.tensor([2 / 255, 1 / 255, 0.5 / 255]),
+        )
+    )
+    delta = (result.adversarial - inputs).abs().flatten(1).amax(dim=1)
+    assert torch.all(delta <= torch.tensor([8 / 255, 4 / 255, 2 / 255]) + 1e-7)
+
+
 def test_pgd_captured_prefix_is_from_the_same_random_start_trajectory() -> None:
     torch.manual_seed(31)
     model = linear_model()

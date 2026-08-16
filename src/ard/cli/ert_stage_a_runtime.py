@@ -12,6 +12,15 @@ import torch
 from ard.analysis.ert_stage_a_runtime import StageATreatment, run_stage_a_arm
 
 
+def _parse_budget(raw: str | None) -> float | None:
+    if raw is None:
+        return None
+    if "/" in raw:
+        numerator, denominator = raw.split("/", 1)
+        return float(numerator) / float(denominator)
+    return float(raw)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run one ERT Stage A treatment from an epoch-79 parent.")
     parser.add_argument("--parent-config", type=Path, required=True)
@@ -22,13 +31,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--arm", required=True)
     parser.add_argument(
-        "--kind", choices=("baseline", "advce", "soft_advkd", "advkd_advce", "clean_wrong"), required=True
+        "--kind", choices=("baseline", "advce", "soft_advkd", "advkd_advce", "clean_wrong", "broad"), required=True
     )
     parser.add_argument("--beta-advce", type=float)
     parser.add_argument("--advkd-multiplier", type=float)
     parser.add_argument("--beta-cleance", type=float)
     parser.add_argument("--clean-wrong-mode", choices=("clean_ce_only", "teacher_clean_gate", "clean_kd"))
     parser.add_argument("--tau", type=float)
+    parser.add_argument("--selected-attack-epsilon")
+    parser.add_argument("--selected-attack-step-size")
+    parser.add_argument("--extra-clean-ce", type=float)
+    parser.add_argument("--bce-adv", type=float)
+    parser.add_argument("--adaptive-advkd-gamma", type=float)
+    parser.add_argument("--teacher-reliability-gate", action="store_true")
+    parser.add_argument("--iad-inspired", action="store_true")
     parser.add_argument("--epochs", type=int, default=85)
     parser.add_argument(
         "--horizon-epochs",
@@ -57,6 +73,13 @@ def main(argv: list[str] | None = None) -> int:
         beta_cleance=args.beta_cleance,
         clean_wrong_mode=args.clean_wrong_mode,
         tau=args.tau,
+        selected_attack_epsilon=_parse_budget(args.selected_attack_epsilon),
+        selected_attack_step_size=_parse_budget(args.selected_attack_step_size),
+        extra_clean_ce=args.extra_clean_ce,
+        bce_adv=args.bce_adv,
+        adaptive_advkd_gamma=args.adaptive_advkd_gamma,
+        teacher_reliability_gate=args.teacher_reliability_gate,
+        iad_inspired=args.iad_inspired,
     )
     if treatment.mask_key is not None and args.mask is None:
         raise ValueError("selected treatment requires --mask")

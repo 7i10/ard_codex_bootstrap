@@ -18,6 +18,11 @@ class AttackRequest:
     target_logits: torch.Tensor | None = None
     generator: torch.Generator | None = None
     capture_step: int | None = None
+    # Optional per-example treatment budget.  These are only used by an
+    # explicitly registered mixed-budget screen; when absent the resolved
+    # AttackConfig scalar budget is used for every sample.
+    epsilon_override: torch.Tensor | None = None
+    step_size_override: torch.Tensor | None = None
 
 
 @dataclass(frozen=True)

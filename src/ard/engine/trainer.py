@@ -153,6 +153,13 @@ class Trainer:
         clean_ce_coefficient: float | None = None,
         clean_wrong_mode: str | None = None,
         clean_wrong_attack_skip: bool = False,
+        selected_attack_epsilon: float | None = None,
+        selected_attack_step_size: float | None = None,
+        extra_clean_ce_coefficient: float | None = None,
+        adversarial_bce_coefficient: float | None = None,
+        adaptive_advkd_gamma: float | None = None,
+        teacher_clean_reliability_mask: FixedInterventionMask | None = None,
+        iad_inspired: bool = False,
         dynamic_s3_router: Any | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
@@ -191,6 +198,13 @@ class Trainer:
                 adversarial_kd_multiplier,
                 adversarial_ce_coefficient,
                 clean_wrong_mode,
+                selected_attack_epsilon,
+                selected_attack_step_size,
+                extra_clean_ce_coefficient,
+                adversarial_bce_coefficient,
+                adaptive_advkd_gamma,
+                teacher_clean_reliability_mask,
+                iad_inspired,
             )
         )
         # A teacher target policy can be selected by an ordinary WeightPolicy
@@ -211,8 +225,10 @@ class Trainer:
             raise ValueError("a registered treatment requires a fixed intervention mask")
         if dynamic_s3_router is not None and intervention_mask is not None:
             raise ValueError("dynamic S3 routing cannot be combined with a fixed intervention mask")
-        if adversarial_kd_multiplier is not None and not 0.0 <= adversarial_kd_multiplier <= 1.0:
-            raise ValueError("adversarial KD intervention multiplier must be in [0, 1]")
+        if adversarial_kd_multiplier is not None and (
+            not torch.isfinite(torch.as_tensor(adversarial_kd_multiplier)) or adversarial_kd_multiplier < 0
+        ):
+            raise ValueError("adversarial KD intervention multiplier must be finite and non-negative")
         if adversarial_ce_coefficient is not None and not torch.isfinite(torch.as_tensor(adversarial_ce_coefficient)):
             raise ValueError("adversarial CE intervention coefficient must be finite")
         if adversarial_ce_coefficient is not None and adversarial_ce_coefficient < 0:
@@ -225,6 +241,19 @@ class Trainer:
             raise ValueError("unknown clean-wrong treatment mode")
         if clean_wrong_attack_skip and clean_wrong_mode is None:
             raise ValueError("clean-wrong attack skipping requires a clean-wrong treatment mode")
+        for name, value in (
+            ("selected attack epsilon", selected_attack_epsilon),
+            ("selected attack step size", selected_attack_step_size),
+            ("extra clean CE coefficient", extra_clean_ce_coefficient),
+            ("adversarial BCE coefficient", adversarial_bce_coefficient),
+            ("adaptive AdvKD gamma", adaptive_advkd_gamma),
+        ):
+            if value is not None and (not torch.isfinite(torch.as_tensor(value)) or value < 0):
+                raise ValueError(f"{name} must be finite and non-negative")
+        if (selected_attack_epsilon is None) != (selected_attack_step_size is None):
+            raise ValueError("selected attack epsilon and step size must be supplied together")
+        if teacher_clean_reliability_mask is not None and intervention_mask is None:
+            raise ValueError("teacher reliability mask requires a selected treatment mask")
         self.intervention_mask = intervention_mask
         if prescriptive_v3_route not in {None, "pf_retention", "nr_prefix"}:
             raise ValueError("prescriptive route must be pf_retention or nr_prefix")
@@ -250,6 +279,13 @@ class Trainer:
         self.clean_ce_coefficient = clean_ce_coefficient
         self.clean_wrong_mode = clean_wrong_mode
         self.clean_wrong_attack_skip = clean_wrong_attack_skip
+        self.selected_attack_epsilon = selected_attack_epsilon
+        self.selected_attack_step_size = selected_attack_step_size
+        self.extra_clean_ce_coefficient = extra_clean_ce_coefficient
+        self.adversarial_bce_coefficient = adversarial_bce_coefficient
+        self.adaptive_advkd_gamma = adaptive_advkd_gamma
+        self.teacher_clean_reliability_mask = teacher_clean_reliability_mask
+        self.iad_inspired = iad_inspired
         self.dynamic_s3_router = dynamic_s3_router
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
@@ -518,6 +554,27 @@ class Trainer:
                 and not self._prescriptive_active()
             ):
                 treatment_risk = torch.zeros_like(treatment_risk)
+            epsilon_override = step_override = None
+            if self.selected_attack_epsilon is not None:
+                attack_config = getattr(self.attack, "config", None)
+                baseline_epsilon = getattr(attack_config, "epsilon_value", None)
+                baseline_step = getattr(attack_config, "step_size_value", None)
+                if baseline_epsilon is None or baseline_step is None or treatment_risk is None:
+                    raise ValueError("mixed selected attack budget requires a resolved PGD attack and mask")
+                epsilon_override = torch.where(
+                    treatment_risk > 0,
+                    torch.as_tensor(self.selected_attack_epsilon, device=batch.images.device, dtype=batch.images.dtype),
+                    torch.as_tensor(baseline_epsilon, device=batch.images.device, dtype=batch.images.dtype),
+                )
+                step_override = torch.where(
+                    treatment_risk > 0,
+                    torch.as_tensor(
+                        self.selected_attack_step_size,
+                        device=batch.images.device,
+                        dtype=batch.images.dtype,
+                    ),
+                    torch.as_tensor(baseline_step, device=batch.images.device, dtype=batch.images.dtype),
+                )
             skip_selected = (
                 self.clean_wrong_attack_skip
                 and treatment_risk is not None
@@ -540,8 +597,14 @@ class Trainer:
                             labels=batch.labels.index_select(0, attack_indices),
                             student=self.model,
                             teacher=self.teacher,
-                            target_logits=subset_target,
-                            generator=self._attack_generator(),
+                        target_logits=subset_target,
+                        generator=self._attack_generator(),
+                        epsilon_override=(
+                            None if epsilon_override is None else epsilon_override.index_select(0, attack_indices)
+                        ),
+                        step_size_override=(
+                            None if step_override is None else step_override.index_select(0, attack_indices)
+                        ),
                         )
                     )
                     adversarial.index_copy_(0, attack_indices, attack_result.adversarial)
@@ -556,6 +619,8 @@ class Trainer:
                         teacher=self.teacher,
                         target_logits=teacher_clean_logits,
                         generator=self._attack_generator(),
+                        epsilon_override=epsilon_override,
+                        step_size_override=step_override,
                         capture_step=5
                         if self.prescriptive_v3_route == "nr_prefix" and self._prescriptive_active()
                         else None,
@@ -683,6 +748,22 @@ class Trainer:
                 treatment_risk = dynamic_s3_decision.action_active.to(
                     device=logits.device, dtype=logits.dtype
                 )
+            if self.iad_inspired:
+                if clean_student_logits is None or teacher_clean_logits is None or self.teacher is None:
+                    raise ValueError("IAD-inspired branch requires clean Student and Teacher logits")
+                teacher_adv = self._teacher_adversarial_response(adversarial)
+                with torch.no_grad():
+                    alpha = F.softmax(teacher_adv.float(), dim=1).gather(1, batch.labels[:, None]).squeeze(1)
+                    teacher_target = F.softmax(teacher_clean_logits.detach().float(), dim=1)
+                    self_target = F.softmax(clean_student_logits.detach().float(), dim=1)
+                    if treatment_risk is None:
+                        selected = torch.zeros_like(alpha)
+                    else:
+                        selected = treatment_risk.detach().clamp(0.0, 1.0)
+                    mixed = (1.0 - selected[:, None]) * teacher_target + selected[:, None] * (
+                        alpha[:, None] * teacher_target + (1.0 - alpha[:, None]) * self_target
+                    )
+                objective_inputs["adversarial_target_probabilities"] = mixed.detach()
             terms = self.objective(**objective_inputs)
             if weights is not None:
                 terms = terms.apply_policy(weights)
@@ -709,10 +790,58 @@ class Trainer:
                     ),
                     clean_kd=torch.where(selected, replacement_kd, terms.clean_kd),
                 )
+            if treatment_risk is not None and self.extra_clean_ce_coefficient is not None:
+                if clean_student_logits is None:
+                    raise ValueError("extra CleanCE requires clean Student logits")
+                clean_ce = F.cross_entropy(clean_student_logits, batch.labels, reduction="none")
+                terms = ObjectiveTerms(
+                    hard=terms.hard + self.extra_clean_ce_coefficient * treatment_risk * clean_ce,
+                    kd=terms.kd,
+                    regularization=terms.regularization,
+                    adversarial_kd=terms.adversarial_kd,
+                    clean_kd=terms.clean_kd,
+                )
+            if treatment_risk is not None and self.teacher_clean_reliability_mask is not None:
+                if terms.adversarial_kd is None or terms.clean_kd is None:
+                    raise ValueError("teacher reliability gate requires exposed KD branches")
+                gate = self.teacher_clean_reliability_mask.values(
+                    batch.sample_ids, device=logits.device, dtype=logits.dtype
+                )
+                multiplier = treatment_risk * (0.5 + 0.5 * gate) + (1.0 - treatment_risk)
+                terms = terms.scale_adversarial_kd(
+                    multiplier,
+                    coefficient=float(getattr(self.objective, "ADVERSARIAL_COEFFICIENT", 1.0)),
+                )
+                assert terms.clean_kd is not None
+                clean_multiplier = 1.0 - 0.5 * treatment_risk * (1.0 - gate)
+                terms = ObjectiveTerms(
+                    hard=terms.hard,
+                    kd=terms.kd
+                    + float(getattr(self.objective, "CLEAN_COEFFICIENT", 1.0))
+                    * (clean_multiplier - 1.0)
+                    * terms.clean_kd,
+                    regularization=terms.regularization,
+                    adversarial_kd=terms.adversarial_kd,
+                    clean_kd=terms.clean_kd * clean_multiplier,
+                )
             if intervention_risk is not None and self.adversarial_kd_multiplier is not None:
                 multiplier = 1.0 - (1.0 - self.adversarial_kd_multiplier) * intervention_risk
                 terms = terms.scale_adversarial_kd(
                     multiplier,
+                    coefficient=float(getattr(self.objective, "ADVERSARIAL_COEFFICIENT", 1.0)),
+                )
+            if intervention_risk is not None and self.adaptive_advkd_gamma is not None:
+                if terms.adversarial_kd is None:
+                    raise ValueError("adaptive AdvKD requires exposed adversarial KD")
+                if clean_student_logits is None:
+                    raise ValueError("adaptive AdvKD requires clean Student logits")
+                with torch.no_grad():
+                    probability = F.softmax(clean_student_logits.detach().float(), dim=1).gather(
+                        1, batch.labels[:, None]
+                    ).squeeze(1)
+                    adaptive = 1.0 + self.adaptive_advkd_gamma * (1.0 - probability)
+                terms = terms.scale_adversarial_kd(
+                    1.0 + intervention_risk * (adaptive - 1.0),
                     coefficient=float(getattr(self.objective, "ADVERSARIAL_COEFFICIENT", 1.0)),
                 )
             if intervention_risk is not None and self.adversarial_ce_coefficient is not None:
@@ -722,7 +851,21 @@ class Trainer:
                     intervention_risk,
                     coefficient=float(self.adversarial_ce_coefficient),
                 )
+            if intervention_risk is not None and self.adversarial_bce_coefficient is not None:
+                probabilities = F.softmax(logits.float(), dim=1)
+                true_probability = probabilities.gather(1, batch.labels[:, None]).squeeze(1).clamp_min(1e-8)
+                wrong = probabilities.scatter(1, batch.labels[:, None], 0.0).amax(dim=1)
+                bce = -torch.log(true_probability) - torch.log((1.0 - wrong).clamp_min(1e-8))
+                terms = ObjectiveTerms(
+                    hard=terms.hard + self.adversarial_bce_coefficient * intervention_risk * bce,
+                    kd=terms.kd,
+                    regularization=terms.regularization,
+                    adversarial_kd=terms.adversarial_kd,
+                    clean_kd=terms.clean_kd,
+                )
             if dynamic_s3_decision is not None and self.adversarial_ce_coefficient is not None:
+                if treatment_risk is None:
+                    raise RuntimeError("dynamic S3 action lost its batch mask")
                 terms = terms.add_adversarial_ce(
                     batch.labels,
                     logits,

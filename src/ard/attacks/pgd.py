@@ -38,6 +38,19 @@ def _validate_pixels(inputs: torch.Tensor) -> None:
         raise ValueError("attack inputs must lie in pixel domain [0, 1]")
 
 
+def _budget(value: torch.Tensor | None, scalar: float, *, batch: int, device: torch.device, name: str) -> torch.Tensor:
+    if value is None:
+        return torch.full((batch, 1, 1, 1), scalar, device=device, dtype=torch.float32)
+    if value.ndim == 1 and value.shape[0] == batch:
+        value = value.reshape(batch, 1, 1, 1)
+    if value.shape != (batch, 1, 1, 1):
+        raise ValueError(f"{name} override must have shape [batch] or [batch,1,1,1]")
+    value = value.detach().to(device=device, dtype=torch.float32)
+    if not torch.isfinite(value).all() or bool((value < 0).any()):
+        raise ValueError(f"{name} override must be finite and non-negative")
+    return value
+
+
 class LinfPGD(AttackGenerator):
     def __init__(self, config: AttackConfig) -> None:
         if config.norm != "linf" or config.input_domain != "pixel_0_1":
@@ -81,11 +94,28 @@ class LinfPGD(AttackGenerator):
         epsilon = self.config.epsilon_value
         step_size = self.config.step_size_value
         assert epsilon is not None and step_size is not None  # resolved by AttackConfig validation
+        epsilon_tensor = _budget(
+            request.epsilon_override,
+            epsilon,
+            batch=clean.shape[0],
+            device=clean.device,
+            name="epsilon",
+        )
+        step_tensor = _budget(
+            request.step_size_override,
+            step_size,
+            batch=clean.shape[0],
+            device=clean.device,
+            name="step_size",
+        )
+        if bool((step_tensor > epsilon_tensor).any()):
+            raise ValueError("per-sample PGD step size cannot exceed epsilon")
         if request.capture_step is not None and not 1 <= request.capture_step < self.config.steps:
             raise ValueError("captured PGD step must be a strict positive prefix of the configured trajectory")
         delta = torch.zeros_like(clean)
-        if self.config.random_start and epsilon > 0:
-            delta.uniform_(-epsilon, epsilon, generator=request.generator)
+        if self.config.random_start and bool((epsilon_tensor > 0).any()):
+            delta.uniform_(-1.0, 1.0, generator=request.generator)
+            delta = delta * epsilon_tensor
             delta = (clean + delta).clamp(0, 1) - clean
         initial_delta = delta.detach().clone()
         adversarial = (clean + delta).detach()
@@ -106,8 +136,8 @@ class LinfPGD(AttackGenerator):
                 gradient = torch.autograd.grad(loss, adversarial, only_inputs=True)[0]
                 if losses is not None:
                     losses.append(float(loss.detach().cpu()))
-                adversarial = adversarial.detach() + step_size * gradient.detach().sign()
-                delta = (adversarial - clean).clamp(-epsilon, epsilon)
+                adversarial = adversarial.detach() + step_tensor * gradient.detach().sign()
+                delta = torch.maximum(torch.minimum(adversarial - clean, epsilon_tensor), -epsilon_tensor)
                 adversarial = (clean + delta).clamp(0, 1).detach()
                 if step == request.capture_step:
                     captured = adversarial.clone()
