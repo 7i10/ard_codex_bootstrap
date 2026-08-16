@@ -1,23 +1,6 @@
 # ERT Clean-Wrong Rescue Subtype Analysis
 
-Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis, stratified by
-Teacher reliability measured **before treatment** at the epoch-79 parent. No
-new training or route selection.
-
-## Frozen pre-treatment split
-
-For each fixed epoch-79 Clean-Wrong cohort, `CW-R` is defined by
-`teacher_adversarial_margin > 0` under an independent eval-mode CE-PGD20
-replay; `CW-U` is the complement. This is a fixed, threshold-free split and
-is not selected from epoch-84 outcomes. The endpoint is the paired C0 versus
-C10/C12/C13 epoch-84 train result. The report is associative and sample-level;
-it is not a training-seed confidence interval or a causal estimate.
-
-Lineage is fail-closed: each replay checkpoint SHA must equal the C0
-continuation's `fork_lineage.parent_checkpoint_sha256`, and endpoint and
-feature attacks must share the exact CE-PGD20 identity. L2 uses
-`ad43d72d…`; L4 uses `026a36d3…`. Both cohorts are replayed in full train
-ordering and retain only the registered stable IDs.
+Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis. No new training or route selection.
 
 ## L2
 
@@ -33,7 +16,7 @@ Fixed Clean-Wrong cohort: 8623 samples.
 | C12 | clean_only_rescue | 641 | 0.835 | 0.378 | 0.1894 | 0.2188 | 0.0992 |
 | C12 | robust_only_rescue | 167 | 0.946 | 0.713 | 0.2264 | 0.3087 | 0.0933 |
 | C12 | neither_or_harm | 7807 | 0.606 | 0.326 | 0.1710 | 0.2072 | 0.0902 |
-| C13 | clean_and_robust_rescue | 5 | 1.000 | 1.000 | 0.2276 | 0.3032 | 0.0445 |
+| C13 | clean_and_robust_rescue | 5 | 1.000 | 1.000 | 0.2276 | 0.3033 | 0.0445 |
 | C13 | clean_only_rescue | 412 | 0.905 | 0.522 | 0.2045 | 0.2507 | 0.1024 |
 | C13 | robust_only_rescue | 132 | 0.992 | 0.894 | 0.2470 | 0.3393 | 0.0974 |
 | C13 | neither_or_harm | 8074 | 0.610 | 0.318 | 0.1706 | 0.2058 | 0.0902 |

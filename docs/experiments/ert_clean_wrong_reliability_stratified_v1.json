@@ -90,14 +90,14 @@
         "full_train_order_replayed": true,
         "mask_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L2.json",
         "mask_sha256": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
-        "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-clean-wrong-subtypes-v2/L2/clean-wrong-feature-stats.parquet",
-        "rows_sha256": "c91b63980ed56e6f3c12811cb727ebeef90312b71c8107d0efcd476cbbb3543c",
+        "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-clean-wrong-subtypes-v4/L2/clean-wrong-feature-stats.parquet",
+        "rows_sha256": "7a47fb5f77d250acd6f4194ccfa80e78640c9e9562fbe3cd97c9b80e6529cc2b",
         "run": "1",
         "schema_version": 1,
         "selected_count": 8623,
-        "source_git_sha": "6cda3082bcc95cf04ec6ff6df6898c865f345d74"
+        "source_git_sha": "5196df3d4618d7e9183e14e4a9a40a462f9fef17"
       },
-      "feature_rows_sha256": "c91b63980ed56e6f3c12811cb727ebeef90312b71c8107d0efcd476cbbb3543c",
+      "feature_rows_sha256": "7a47fb5f77d250acd6f4194ccfa80e78640c9e9562fbe3cd97c9b80e6529cc2b",
       "reliability_effects": {
         "C10": {
           "CW-R": {
@@ -123,8 +123,8 @@
               "rescue_rate": 0.05261348005502063
             },
             "teacher_adv_correct_rate": 1.0,
-            "teacher_adv_margin_mean": 0.10230327758072084,
-            "teacher_adv_true_probability_mean": 0.3017423904540614
+            "teacher_adv_margin_mean": 0.10230328290988441,
+            "teacher_adv_true_probability_mean": 0.3017425282539331
           },
           "CW-U": {
             "clean": {
@@ -177,8 +177,8 @@
               "rescue_rate": 0.04264099037138927
             },
             "teacher_adv_correct_rate": 1.0,
-            "teacher_adv_margin_mean": 0.10230327758072084,
-            "teacher_adv_true_probability_mean": 0.3017423904540614
+            "teacher_adv_margin_mean": 0.10230328290988441,
+            "teacher_adv_true_probability_mean": 0.3017425282539331
           },
           "CW-U": {
             "clean": {
@@ -231,8 +231,8 @@
               "rescue_rate": 0.042297111416781295
             },
             "teacher_adv_correct_rate": 1.0,
-            "teacher_adv_margin_mean": 0.10230327758072084,
-            "teacher_adv_true_probability_mean": 0.3017423904540614
+            "teacher_adv_margin_mean": 0.10230328290988441,
+            "teacher_adv_true_probability_mean": 0.3017425282539331
           },
           "CW-U": {
             "clean": {
@@ -9066,7 +9066,7 @@
                 "9": 557
               },
               "delta_teacher_margin": {
-                "mean": 0.0902364752485426,
+                "mean": 0.09023647323382503,
                 "median": 0.08583804965019226,
                 "q25": 0.059062838554382324,
                 "q75": 0.11613941192626953
@@ -9075,13 +9075,13 @@
               "sample_ids_sha256": "2970b4dfb0c87783589a98c3ce6c6ec32efe3379cc86a454d01f25d5cd19f976",
               "student_adv_correct_rate": 0.006370254810192408,
               "student_adv_margin": {
-                "mean": -0.2270561792053286,
+                "mean": -0.22705619257607934,
                 "median": -0.19818685948848724,
                 "q25": -0.29166150093078613,
                 "q75": -0.1387370526790619
               },
               "student_adv_true_probability": {
-                "mean": 0.10083849653923711,
+                "mean": 0.10083849990614015,
                 "median": 0.09348034113645554,
                 "q25": 0.0677623525261879,
                 "q75": 0.12464957684278488
@@ -9101,13 +9101,13 @@
               },
               "teacher_adv_correct_rate": 0.3170826833073323,
               "teacher_adv_margin": {
-                "mean": -0.0514612672739099,
+                "mean": -0.05146126525919231,
                 "median": -0.05833493173122406,
                 "q25": -0.133976012468338,
                 "q75": 0.027066856622695923
               },
               "teacher_adv_true_probability": {
-                "mean": 0.20592583292776556,
+                "mean": 0.2059258850237129,
                 "median": 0.18898046016693115,
                 "q25": 0.13696785271167755,
                 "q75": 0.25545424222946167
@@ -17919,7 +17919,7 @@
                 "9": 50
               },
               "delta_teacher_margin": {
-                "mean": 0.09920207089083428,
+                "mean": 0.09920204671422331,
                 "median": 0.09497921168804169,
                 "q25": 0.0708855539560318,
                 "q75": 0.125993013381958
@@ -17928,13 +17928,13 @@
               "sample_ids_sha256": "dd159dfd32bbfa98aef36c0f5274535cde9d847a3c3c6640468fff8c60e87ec1",
               "student_adv_correct_rate": 0.0062402496099844,
               "student_adv_margin": {
-                "mean": -0.19761391724467092,
+                "mean": -0.19761407769367959,
                 "median": -0.17688745260238647,
                 "q25": -0.2459200918674469,
                 "q75": -0.12619774043560028
               },
               "student_adv_true_probability": {
-                "mean": 0.10957833038070551,
+                "mean": 0.10957837078354195,
                 "median": 0.10603902488946915,
                 "q25": 0.08211863040924072,
                 "q75": 0.12962692975997925
@@ -17954,13 +17954,13 @@
               },
               "teacher_adv_correct_rate": 0.37753510140405616,
               "teacher_adv_margin": {
-                "mean": -0.017978501150184043,
+                "mean": -0.017978476973573056,
                 "median": -0.023457393050193787,
                 "q25": -0.07881349325180054,
                 "q75": 0.03004482388496399
               },
               "teacher_adv_true_probability": {
-                "mean": 0.21879257126921983,
+                "mean": 0.21879319642058773,
                 "median": 0.2068631798028946,
                 "q25": 0.1635524034500122,
                 "q75": 0.25666356086730957
@@ -26771,22 +26771,22 @@
                 "5": 1
               },
               "delta_teacher_margin": {
-                "mean": 0.044507157802581784,
+                "mean": 0.044504058361053464,
                 "median": 0.03306756913661957,
                 "q25": 0.030444905161857605,
-                "q75": 0.0431637167930603
+                "q75": 0.0431482195854187
               },
               "n": 5,
               "sample_ids_sha256": "db5870695f10921cb1bfbcf50d4d7ed06591123ff005bc0ee3b74287d9b7fb00",
               "student_adv_correct_rate": 0.2,
               "student_adv_margin": {
-                "mean": -0.10778484344482422,
+                "mean": -0.1078054130077362,
                 "median": -0.12484763562679291,
                 "q25": -0.1267985999584198,
-                "q75": -0.08771379292011261
+                "q75": -0.08781664073467255
               },
               "student_adv_true_probability": {
-                "mean": 0.14810028821229934,
+                "mean": 0.14810546785593032,
                 "median": 0.13515937328338623,
                 "q25": 0.13020791113376617,
                 "q75": 0.17646284401416779
@@ -26806,14 +26806,14 @@
               },
               "teacher_adv_correct_rate": 1.0,
               "teacher_adv_margin": {
-                "mean": 0.07747494280338288,
+                "mean": 0.0774780422449112,
                 "median": 0.058611899614334106,
-                "q25": 0.03709271550178528,
+                "q25": 0.03710821270942688,
                 "q75": 0.12313380837440491
               },
               "teacher_adv_true_probability": {
-                "mean": 0.3031915873289108,
-                "median": 0.31145527958869934,
+                "mean": 0.3032717317342758,
+                "median": 0.3118560016155243,
                 "q25": 0.3013850152492523,
                 "q75": 0.325675368309021
               },
@@ -55013,5 +55013,5 @@
     }
   },
   "schema_version": 1,
-  "source_sha256": "04136ae513cfcfeacaaea7a8466c0d9a0d7a218085380a4b2d4e53996b269918"
+  "source_sha256": "1994a53ac69608ddc361f5b4dced0a6a66b9d81ce99eadb8a86fc59dc3a870ab"
 }
