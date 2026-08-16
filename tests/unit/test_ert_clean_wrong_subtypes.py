@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ard.analysis.ert_clean_wrong_subtypes import GROUPS, _group, _summary
+from ard.analysis.ert_clean_wrong_subtypes import GROUPS, _effect, _group, _summary
 
 
 def _row(*, clean: bool, robust: bool, treatment_clean: bool, treatment_robust: bool) -> dict[str, object]:
@@ -39,3 +39,45 @@ def test_summary_reports_teacher_rates_and_quantiles() -> None:
     assert result["teacher_clean_correct_rate"] == 1.0
     assert result["teacher_adv_correct_rate"] == 0.5
     assert result["student_clean_margin"]["mean"] == 0.2
+
+
+def test_effect_separates_accuracy_and_margin_delta() -> None:
+    base = [
+        {
+            "sample_id": 1,
+            "clean_correct": False,
+            "robust_correct": False,
+            "clean_probability_margin": -0.2,
+            "adversarial_probability_margin": -0.3,
+        },
+        {
+            "sample_id": 2,
+            "clean_correct": True,
+            "robust_correct": True,
+            "clean_probability_margin": 0.2,
+            "adversarial_probability_margin": 0.3,
+        },
+    ]
+    treatment = [
+        {
+            "sample_id": 1,
+            "clean_correct": True,
+            "robust_correct": False,
+            "clean_probability_margin": -0.1,
+            "adversarial_probability_margin": -0.4,
+        },
+        {
+            "sample_id": 2,
+            "clean_correct": False,
+            "robust_correct": True,
+            "clean_probability_margin": 0.1,
+            "adversarial_probability_margin": 0.2,
+        },
+    ]
+    clean = _effect(base, treatment, "clean_probability_margin")
+    robust = _effect(base, treatment, "adversarial_probability_margin")
+    assert clean["accuracy_delta"] == 0.0
+    assert clean["margin_delta"] == 0.0
+    assert robust["accuracy_delta"] == 0.0
+    assert abs(float(robust["margin_delta"]) + 0.1) < 1e-12
+    assert clean["accuracy_delta"] == clean["rescue_rate"] - clean["harm_rate"]

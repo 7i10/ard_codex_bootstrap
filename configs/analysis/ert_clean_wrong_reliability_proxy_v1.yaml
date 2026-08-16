@@ -1,0 +1,26 @@
+schema_version: 1
+contract: ert_clean_wrong_reliability_proxy_safety_v1
+description: Read-only epoch-79 KL-PGD10 versus CE-PGD20 Teacher reliability and safety analysis.
+pre_treatment_epoch: 79
+endpoint_epoch: 84
+training_attack:
+  loss: kl
+  kl_target: teacher_clean
+  norm: linf
+  input_domain: pixel_0_1
+  epsilon: 8/255
+  step_size: 2/255
+  steps: 10
+  random_start: true
+oracle_attack:
+  loss: ce
+  norm: linf
+  input_domain: pixel_0_1
+  epsilon: 8/255
+  step_size: 2/255
+  steps: 20
+  random_start: true
+quantiles: 5
+student_teacher_split: median_only
+threshold_tuning: false
+new_training: false

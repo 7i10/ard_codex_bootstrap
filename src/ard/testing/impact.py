@@ -90,6 +90,18 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         (
+            "src/ard/analysis/ert_clean_wrong_reliability_proxy.py",
+            "src/ard/cli/ert_clean_wrong_reliability_proxy.py",
+            "configs/analysis/ert_clean_wrong_reliability_proxy_v1.yaml",
+        ),
+        (
+            "tests/unit/test_ert_clean_wrong_reliability_proxy.py",
+            "tests/unit/test_ert_clean_wrong_subtypes.py",
+        ),
+        ("T0", "T1", "T2"),
+    ),
+    (
+        (
             "src/ard/campaign/",
             "scripts/campaign/",
             "configs/campaigns/",

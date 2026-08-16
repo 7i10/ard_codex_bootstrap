@@ -249,10 +249,16 @@ def _effect(base: list[dict[str, Any]], treatment: list[dict[str, Any]], key: st
     rescue = sum(not before and after for before, after in zip(base_correct, treatment_correct, strict=True))
     harm = sum(before and not after for before, after in zip(base_correct, treatment_correct, strict=True))
     n = len(ids)
+    accuracy_delta = (rescue - harm) / n if n else None
+    margin_delta = sum(deltas) / n if n else None
     return {
         "n": n,
-        "delta_accuracy": sum(deltas) / n if n else None,
-        "delta_margin": sum(deltas) / n if n else None,
+        "accuracy_delta": accuracy_delta,
+        "margin_delta": margin_delta,
+        # Deprecated aliases retained for consumers of the earlier report;
+        # they now have the correct, distinct semantics.
+        "delta_accuracy": accuracy_delta,
+        "delta_margin": margin_delta,
         "rescue_rate": rescue / n if n else None,
         "harm_rate": harm / n if n else None,
         "net_rescue_rate": (rescue - harm) / n if n else None,
@@ -470,8 +476,8 @@ def build_report(
                 value = report["reliability_effects"][arm][stratum]
                 lines.append(
                     f"| {arm} | {stratum} | {value['n']} | {value['teacher_adv_correct_rate']:.3f} | "
-                    f"{value['teacher_adv_margin_mean']:.4f} | {value['clean']['delta_accuracy']:+.4f} | "
-                    f"{value['robust']['delta_accuracy']:+.4f} | {value['robust']['net_rescue_rate']:+.4f} |"
+                    f"{value['teacher_adv_margin_mean']:.4f} | {value['clean']['accuracy_delta']:+.4f} | "
+                    f"{value['robust']['accuracy_delta']:+.4f} | {value['robust']['net_rescue_rate']:+.4f} |"
                 )
         lines.append("")
     output_markdown.parent.mkdir(parents=True, exist_ok=True)
