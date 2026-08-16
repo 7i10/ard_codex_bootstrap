@@ -46,9 +46,9 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
 
 ## Risks / interpretation limits
 
-- The feature replay is an epoch-84 C0 observation, while the outcome is the
-  paired C0-to-treatment transition at the same endpoint. It is an association
-  analysis, not prospective prediction.
+- The historical subtype block uses an epoch-84 C0 observation, while the
+  reliability follow-up uses an epoch-79 pre-treatment observation. Both are
+  association analyses, not prospective prediction or causal estimates.
 - Student/Teacher probabilities and margins come from the common feature
   replay; endpoint transition labels come only from previously saved endpoint
   artifacts. No outcome is used to alter the feature replay.
@@ -57,7 +57,8 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
 
 ## Execution record
 
-- Source commit for replay: `9109d3624100329e2da830598c808ad252ead568`.
+- Source commit for the historical endpoint-conditioned replay:
+  `9109d3624100329e2da830598c808ad252ead568`.
 - L2 feature replay: 8,623 rows; L4 feature replay: 8,925 rows.
 - Both replays used the full train ordering and matched saved C0 Student
   clean/adv correctness and margins exactly (maximum absolute margin
@@ -87,8 +88,13 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
   `ad43d72d…` under the final clean source.
 - The current machine report is
   `docs/experiments/ert_clean_wrong_reliability_stratified_v1.json`; its final
-  content hash is recorded in the handoff commit after both replays are
-  regenerated.
+  content hash is
+  `c5107dd5236054ff23f7931b4f19f33c7a62a2ed5bb8e7c8792daea5024ebd7f`.
+- Final reliability replay provenance is L2 source
+  `5196df3d4618d7e9183e14e4a9a40a462f9fef17` with parent
+  `ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c`, and
+  L4 source `4a81f40f2c1265d966baac26f08b167949d8a5db` with parent
+  `026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1`.
 - C13 had nearly equal L2 robust deltas in CW-R/CW-U and was neutral in both
   L4 strata; the proposed Teacher-unreliable contamination explanation is not
   confirmed. C10 showed higher robust net-rescue in CW-R but no consistently
