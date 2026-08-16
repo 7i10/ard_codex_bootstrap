@@ -1,0 +1,2189 @@
+{
+  "contract": "ert_clean_wrong_reliability_proxy_safety_v1",
+  "endpoint_epoch": 84,
+  "metric_semantics": {
+    "accuracy_delta": "rescue_rate - harm_rate",
+    "margin_delta": "mean(treatment_probability_margin - control_probability_margin)"
+  },
+  "no_training": true,
+  "pre_treatment_epoch": 79,
+  "reliability_rule": "CW-R iff teacher adversarial probability margin > 0; CW-U otherwise",
+  "runs": {
+    "L2": {
+      "ce_feature_meta": {
+        "attack": {
+          "epsilon": "8/255",
+          "epsilon_value": 0.03137254901960784,
+          "input_domain": "pixel_0_1",
+          "kl_target": null,
+          "loss": "ce",
+          "norm": "linf",
+          "random_start": true,
+          "step_size": "2/255",
+          "step_size_value": 0.00784313725490196,
+          "steps": 20,
+          "student_mode": "eval",
+          "teacher_mode": "eval",
+          "temperature": 1.0,
+          "temperature_squared": true
+        },
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s1-confirm-v2/last.pt",
+        "checkpoint_epoch": 79,
+        "checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "contract": "ert_clean_wrong_c0_ce_pgd20_features_v1",
+        "feature_epoch": 79,
+        "full_train_order_replayed": true,
+        "mask_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L2.json",
+        "mask_sha256": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
+        "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-clean-wrong-subtypes-v4/L2/clean-wrong-feature-stats.parquet",
+        "rows_sha256": "7a47fb5f77d250acd6f4194ccfa80e78640c9e9562fbe3cd97c9b80e6529cc2b",
+        "run": "1",
+        "schema_version": 1,
+        "selected_count": 8623,
+        "source_git_sha": "5196df3d4618d7e9183e14e4a9a40a462f9fef17"
+      },
+      "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+      "kl_feature_meta": {
+        "attack": {
+          "epsilon": "8/255",
+          "epsilon_value": 0.03137254901960784,
+          "input_domain": "pixel_0_1",
+          "kl_target": "teacher_clean",
+          "loss": "kl",
+          "norm": "linf",
+          "random_start": true,
+          "step_size": "2/255",
+          "step_size_value": 0.00784313725490196,
+          "steps": 10,
+          "student_mode": "eval",
+          "teacher_mode": "eval",
+          "temperature": 1.0,
+          "temperature_squared": true
+        },
+        "attack_identity_sha256": "98194e2a6ee02add8c675b0df1146007f371ed1811ef34b9ef37d052997348bd",
+        "attack_seed_protocol": "model_init_seed + 1000003*(checkpoint_global_step + batch_index)",
+        "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s1-confirm-v2/last.pt",
+        "checkpoint_epoch": 79,
+        "checkpoint_global_step": 28160,
+        "checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "contract": "ert_clean_wrong_c0_kl_pgd10_features_v1",
+        "feature_epoch": 79,
+        "full_train_order_replayed": true,
+        "mask_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L2.json",
+        "mask_sha256": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
+        "max_abs_delta": 0.03137257695198059,
+        "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-clean-wrong-reliability-proxy-v1/L2/clean-wrong-kl10-feature-stats.parquet",
+        "rows_sha256": "7de4120d9de1dd3f5773fb3ddf4d707c9d4697d7b7daaef8c060b3cb0b8421bc",
+        "run": "1",
+        "schema_version": 1,
+        "selected_count": 8623,
+        "source_git_sha": "828bccb690d1277c1c9fccb7a2edd150d9d12ec7"
+      },
+      "proxy_agreement": {
+        "confusion": {
+          "KL-R_to_CE-R": 2798,
+          "KL-R_to_CE-U": 654,
+          "KL-U_to_CE-R": 110,
+          "KL-U_to_CE-U": 5061
+        },
+        "correctness_agreement": 0.9113997448683753,
+        "pearson": 0.937375295786598,
+        "sign_agreement": 0.9113997448683753,
+        "spearman": 0.9203020569608222
+      },
+      "quantile_effects": {
+        "CE20": {
+          "Q1": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.023781902552204175,
+                  "delta_accuracy": 0.023781902552204175,
+                  "delta_margin": 0.021200018755555706,
+                  "harm_count": 9,
+                  "harm_rate": 0.005220417633410673,
+                  "margin_delta": 0.021200018755555706,
+                  "n": 1724,
+                  "net_rescue_rate": 0.023781902552204175,
+                  "rescue_count": 50,
+                  "rescue_rate": 0.029002320185614848
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.001160092807424594,
+                  "delta_accuracy": 0.001160092807424594,
+                  "delta_margin": 0.015643984818368668,
+                  "harm_count": 0,
+                  "harm_rate": 0.0,
+                  "margin_delta": 0.015643984818368668,
+                  "n": 1724,
+                  "net_rescue_rate": 0.001160092807424594,
+                  "rescue_count": 2,
+                  "rescue_rate": 0.001160092807424594
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.021461716937354988,
+                  "delta_accuracy": 0.021461716937354988,
+                  "delta_margin": 0.014339668079864951,
+                  "harm_count": 10,
+                  "harm_rate": 0.00580046403712297,
+                  "margin_delta": 0.014339668079864951,
+                  "n": 1724,
+                  "net_rescue_rate": 0.021461716937354988,
+                  "rescue_count": 47,
+                  "rescue_rate": 0.027262180974477957
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.0017401392111368909,
+                  "delta_accuracy": 0.0017401392111368909,
+                  "delta_margin": 0.010213853557985233,
+                  "harm_count": 0,
+                  "harm_rate": 0.0,
+                  "margin_delta": 0.010213853557985233,
+                  "n": 1724,
+                  "net_rescue_rate": 0.0017401392111368909,
+                  "rescue_count": 3,
+                  "rescue_rate": 0.0017401392111368909
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.00580046403712297,
+                  "delta_accuracy": 0.00580046403712297,
+                  "delta_margin": 0.008084071890868056,
+                  "harm_count": 10,
+                  "harm_rate": 0.00580046403712297,
+                  "margin_delta": 0.008084071890868056,
+                  "n": 1724,
+                  "net_rescue_rate": 0.00580046403712297,
+                  "rescue_count": 20,
+                  "rescue_rate": 0.01160092807424594
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.000580046403712297,
+                  "delta_accuracy": 0.000580046403712297,
+                  "delta_margin": 0.010858029796981757,
+                  "harm_count": 0,
+                  "harm_rate": 0.0,
+                  "margin_delta": 0.010858029796981757,
+                  "n": 1724,
+                  "net_rescue_rate": 0.000580046403712297,
+                  "rescue_count": 1,
+                  "rescue_rate": 0.000580046403712297
+                }
+              }
+            },
+            "value_max": -0.14626988768577576,
+            "value_min": -0.6131420135498047
+          },
+          "Q2": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.044057971014492756,
+                  "delta_accuracy": 0.044057971014492756,
+                  "delta_margin": 0.018092096979203432,
+                  "harm_count": 39,
+                  "harm_rate": 0.022608695652173914,
+                  "margin_delta": 0.018092096979203432,
+                  "n": 1725,
+                  "net_rescue_rate": 0.044057971014492756,
+                  "rescue_count": 115,
+                  "rescue_rate": 0.06666666666666667
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.0011594202898550724,
+                  "delta_accuracy": 0.0011594202898550724,
+                  "delta_margin": 0.00860319279242253,
+                  "harm_count": 3,
+                  "harm_rate": 0.0017391304347826088,
+                  "margin_delta": 0.00860319279242253,
+                  "n": 1725,
+                  "net_rescue_rate": 0.0011594202898550724,
+                  "rescue_count": 5,
+                  "rescue_rate": 0.002898550724637681
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.034782608695652174,
+                  "delta_accuracy": 0.034782608695652174,
+                  "delta_margin": 0.015535097592982694,
+                  "harm_count": 52,
+                  "harm_rate": 0.030144927536231884,
+                  "margin_delta": 0.015535097592982694,
+                  "n": 1725,
+                  "net_rescue_rate": 0.034782608695652174,
+                  "rescue_count": 112,
+                  "rescue_rate": 0.06492753623188406
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.002898550724637681,
+                  "delta_accuracy": 0.002898550724637681,
+                  "delta_margin": 0.010854414252267368,
+                  "harm_count": 3,
+                  "harm_rate": 0.0017391304347826088,
+                  "margin_delta": 0.010854414252267368,
+                  "n": 1725,
+                  "net_rescue_rate": 0.002898550724637681,
+                  "rescue_count": 8,
+                  "rescue_rate": 0.00463768115942029
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": -0.005797101449275362,
+                  "delta_accuracy": -0.005797101449275362,
+                  "delta_margin": 0.0033713530716688736,
+                  "harm_count": 50,
+                  "harm_rate": 0.028985507246376812,
+                  "margin_delta": 0.0033713530716688736,
+                  "n": 1725,
+                  "net_rescue_rate": -0.005797101449275362,
+                  "rescue_count": 40,
+                  "rescue_rate": 0.02318840579710145
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.0,
+                  "delta_accuracy": 0.0,
+                  "delta_margin": 0.007998577580935712,
+                  "harm_count": 2,
+                  "harm_rate": 0.0011594202898550724,
+                  "margin_delta": 0.007998577580935712,
+                  "n": 1725,
+                  "net_rescue_rate": 0.0,
+                  "rescue_count": 2,
+                  "rescue_rate": 0.0011594202898550724
+                }
+              }
+            },
+            "value_max": -0.07977930456399918,
+            "value_min": -0.1462683379650116
+          },
+          "Q3": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.08178654292343387,
+                  "delta_accuracy": 0.08178654292343387,
+                  "delta_margin": 0.015208235062364912,
+                  "harm_count": 56,
+                  "harm_rate": 0.03248259860788863,
+                  "margin_delta": 0.015208235062364912,
+                  "n": 1724,
+                  "net_rescue_rate": 0.08178654292343387,
+                  "rescue_count": 197,
+                  "rescue_rate": 0.1142691415313225
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.009280742459396751,
+                  "delta_accuracy": 0.009280742459396751,
+                  "delta_margin": 0.005394316081761484,
+                  "harm_count": 7,
+                  "harm_rate": 0.004060324825986079,
+                  "margin_delta": 0.005394316081761484,
+                  "n": 1724,
+                  "net_rescue_rate": 0.009280742459396751,
+                  "rescue_count": 23,
+                  "rescue_rate": 0.01334106728538283
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.05568445475638051,
+                  "delta_accuracy": 0.05568445475638051,
+                  "delta_margin": 0.009003360446741299,
+                  "harm_count": 78,
+                  "harm_rate": 0.04524361948955916,
+                  "margin_delta": 0.009003360446741299,
+                  "n": 1724,
+                  "net_rescue_rate": 0.05568445475638051,
+                  "rescue_count": 174,
+                  "rescue_rate": 0.10092807424593968
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.012180974477958236,
+                  "delta_accuracy": 0.012180974477958236,
+                  "delta_margin": 0.005956850842229175,
+                  "harm_count": 6,
+                  "harm_rate": 0.0034802784222737818,
+                  "margin_delta": 0.005956850842229175,
+                  "n": 1724,
+                  "net_rescue_rate": 0.012180974477958236,
+                  "rescue_count": 27,
+                  "rescue_rate": 0.015661252900232018
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.000580046403712297,
+                  "delta_accuracy": 0.000580046403712297,
+                  "delta_margin": 0.0021208947105225166,
+                  "harm_count": 102,
+                  "harm_rate": 0.05916473317865429,
+                  "margin_delta": 0.0021208947105225166,
+                  "n": 1724,
+                  "net_rescue_rate": 0.000580046403712297,
+                  "rescue_count": 103,
+                  "rescue_rate": 0.05974477958236659
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.0,
+                  "delta_accuracy": 0.0,
+                  "delta_margin": 0.007339191132521131,
+                  "harm_count": 6,
+                  "harm_rate": 0.0034802784222737818,
+                  "margin_delta": 0.007339191132521131,
+                  "n": 1724,
+                  "net_rescue_rate": 0.0,
+                  "rescue_count": 6,
+                  "rescue_rate": 0.0034802784222737818
+                }
+              }
+            },
+            "value_max": -0.021043583750724792,
+            "value_min": -0.07977756857872009
+          },
+          "Q4": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.08057971014492754,
+                  "delta_accuracy": 0.08057971014492754,
+                  "delta_margin": 0.016278933973416038,
+                  "harm_count": 83,
+                  "harm_rate": 0.04811594202898551,
+                  "margin_delta": 0.016278933973416038,
+                  "n": 1725,
+                  "net_rescue_rate": 0.08057971014492754,
+                  "rescue_count": 222,
+                  "rescue_rate": 0.12869565217391304
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.015072463768115942,
+                  "delta_accuracy": 0.015072463768115942,
+                  "delta_margin": 0.003360348451828611,
+                  "harm_count": 24,
+                  "harm_rate": 0.01391304347826087,
+                  "margin_delta": 0.003360348451828611,
+                  "n": 1725,
+                  "net_rescue_rate": 0.015072463768115942,
+                  "rescue_count": 50,
+                  "rescue_rate": 0.028985507246376812
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.044057971014492756,
+                  "delta_accuracy": 0.044057971014492756,
+                  "delta_margin": 0.008600750695104185,
+                  "harm_count": 120,
+                  "harm_rate": 0.06956521739130435,
+                  "margin_delta": 0.008600750695104185,
+                  "n": 1725,
+                  "net_rescue_rate": 0.044057971014492756,
+                  "rescue_count": 196,
+                  "rescue_rate": 0.1136231884057971
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.010434782608695653,
+                  "delta_accuracy": 0.010434782608695653,
+                  "delta_margin": 0.004543714030929234,
+                  "harm_count": 25,
+                  "harm_rate": 0.014492753623188406,
+                  "margin_delta": 0.004543714030929234,
+                  "n": 1725,
+                  "net_rescue_rate": 0.010434782608695653,
+                  "rescue_count": 43,
+                  "rescue_rate": 0.024927536231884057
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.0034782608695652175,
+                  "delta_accuracy": 0.0034782608695652175,
+                  "delta_margin": 0.0016316905790481014,
+                  "harm_count": 125,
+                  "harm_rate": 0.07246376811594203,
+                  "margin_delta": 0.0016316905790481014,
+                  "n": 1725,
+                  "net_rescue_rate": 0.0034782608695652175,
+                  "rescue_count": 131,
+                  "rescue_rate": 0.07594202898550724
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.002318840579710145,
+                  "delta_accuracy": 0.002318840579710145,
+                  "delta_margin": 0.0061066185261892236,
+                  "harm_count": 28,
+                  "harm_rate": 0.016231884057971015,
+                  "margin_delta": 0.0061066185261892236,
+                  "n": 1725,
+                  "net_rescue_rate": 0.002318840579710145,
+                  "rescue_count": 32,
+                  "rescue_rate": 0.01855072463768116
+                }
+              }
+            },
+            "value_max": 0.05587798357009888,
+            "value_min": -0.020984098315238953
+          },
+          "Q5": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.042318840579710144,
+                  "delta_accuracy": 0.042318840579710144,
+                  "delta_margin": 0.014199863559957863,
+                  "harm_count": 92,
+                  "harm_rate": 0.05333333333333334,
+                  "margin_delta": 0.014199863559957863,
+                  "n": 1725,
+                  "net_rescue_rate": 0.042318840579710144,
+                  "rescue_count": 165,
+                  "rescue_rate": 0.09565217391304348
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.03884057971014493,
+                  "delta_accuracy": 0.03884057971014493,
+                  "delta_margin": 0.006361971514812414,
+                  "harm_count": 46,
+                  "harm_rate": 0.02666666666666667,
+                  "margin_delta": 0.006361971514812414,
+                  "n": 1725,
+                  "net_rescue_rate": 0.03884057971014493,
+                  "rescue_count": 113,
+                  "rescue_rate": 0.0655072463768116
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": -0.01217391304347826,
+                  "delta_accuracy": -0.01217391304347826,
+                  "delta_margin": -0.0009069237631300221,
+                  "harm_count": 141,
+                  "harm_rate": 0.0817391304347826,
+                  "margin_delta": -0.0009069237631300221,
+                  "n": 1725,
+                  "net_rescue_rate": -0.01217391304347826,
+                  "rescue_count": 120,
+                  "rescue_rate": 0.06956521739130435
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.02434782608695652,
+                  "delta_accuracy": 0.02434782608695652,
+                  "delta_margin": -0.001510513096615888,
+                  "harm_count": 52,
+                  "harm_rate": 0.030144927536231884,
+                  "margin_delta": -0.001510513096615888,
+                  "n": 1725,
+                  "net_rescue_rate": 0.02434782608695652,
+                  "rescue_count": 94,
+                  "rescue_rate": 0.05449275362318841
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": -0.0011594202898550724,
+                  "delta_accuracy": -0.0011594202898550724,
+                  "delta_margin": 0.00214272731024286,
+                  "harm_count": 125,
+                  "harm_rate": 0.07246376811594203,
+                  "margin_delta": 0.00214272731024286,
+                  "n": 1725,
+                  "net_rescue_rate": -0.0011594202898550724,
+                  "rescue_count": 123,
+                  "rescue_rate": 0.07130434782608695
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.02608695652173913,
+                  "delta_accuracy": 0.02608695652173913,
+                  "delta_margin": 0.010003044043762097,
+                  "harm_count": 51,
+                  "harm_rate": 0.029565217391304348,
+                  "margin_delta": 0.010003044043762097,
+                  "n": 1725,
+                  "net_rescue_rate": 0.02608695652173913,
+                  "rescue_count": 96,
+                  "rescue_rate": 0.05565217391304348
+                }
+              }
+            },
+            "value_max": 0.6312470436096191,
+            "value_min": 0.0560297816991806
+          }
+        },
+        "KL10": {
+          "Q1": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.029582366589327145,
+                  "delta_accuracy": 0.029582366589327145,
+                  "delta_margin": 0.020376900414095678,
+                  "harm_count": 8,
+                  "harm_rate": 0.004640371229698376,
+                  "margin_delta": 0.020376900414095678,
+                  "n": 1724,
+                  "net_rescue_rate": 0.029582366589327145,
+                  "rescue_count": 59,
+                  "rescue_rate": 0.034222737819025524
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.0,
+                  "delta_accuracy": 0.0,
+                  "delta_margin": 0.012918362255681418,
+                  "harm_count": 0,
+                  "harm_rate": 0.0,
+                  "margin_delta": 0.012918362255681418,
+                  "n": 1724,
+                  "net_rescue_rate": 0.0,
+                  "rescue_count": 0,
+                  "rescue_rate": 0.0
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.02494199535962877,
+                  "delta_accuracy": 0.02494199535962877,
+                  "delta_margin": 0.014198455289697702,
+                  "harm_count": 15,
+                  "harm_rate": 0.008700696055684454,
+                  "margin_delta": 0.014198455289697702,
+                  "n": 1724,
+                  "net_rescue_rate": 0.02494199535962877,
+                  "rescue_count": 58,
+                  "rescue_rate": 0.033642691415313224
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.002320185614849188,
+                  "delta_accuracy": 0.002320185614849188,
+                  "delta_margin": 0.009077444296598158,
+                  "harm_count": 0,
+                  "harm_rate": 0.0,
+                  "margin_delta": 0.009077444296598158,
+                  "n": 1724,
+                  "net_rescue_rate": 0.002320185614849188,
+                  "rescue_count": 4,
+                  "rescue_rate": 0.002320185614849188
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.0034802784222737818,
+                  "delta_accuracy": 0.0034802784222737818,
+                  "delta_margin": 0.00618051640309065,
+                  "harm_count": 16,
+                  "harm_rate": 0.009280742459396751,
+                  "margin_delta": 0.00618051640309065,
+                  "n": 1724,
+                  "net_rescue_rate": 0.0034802784222737818,
+                  "rescue_count": 22,
+                  "rescue_rate": 0.012761020881670533
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.0,
+                  "delta_accuracy": 0.0,
+                  "delta_margin": 0.008925758747345056,
+                  "harm_count": 0,
+                  "harm_rate": 0.0,
+                  "margin_delta": 0.008925758747345056,
+                  "n": 1724,
+                  "net_rescue_rate": 0.0,
+                  "rescue_count": 0,
+                  "rescue_rate": 0.0
+                }
+              }
+            },
+            "value_max": -0.12336303293704987,
+            "value_min": -0.6033031344413757
+          },
+          "Q2": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.042318840579710144,
+                  "delta_accuracy": 0.042318840579710144,
+                  "delta_margin": 0.016373036089150802,
+                  "harm_count": 43,
+                  "harm_rate": 0.024927536231884057,
+                  "margin_delta": 0.016373036089150802,
+                  "n": 1725,
+                  "net_rescue_rate": 0.042318840579710144,
+                  "rescue_count": 116,
+                  "rescue_rate": 0.0672463768115942
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.0005797101449275362,
+                  "delta_accuracy": 0.0005797101449275362,
+                  "delta_margin": 0.00753802334052929,
+                  "harm_count": 5,
+                  "harm_rate": 0.002898550724637681,
+                  "margin_delta": 0.00753802334052929,
+                  "n": 1725,
+                  "net_rescue_rate": 0.0005797101449275362,
+                  "rescue_count": 6,
+                  "rescue_rate": 0.0034782608695652175
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.03188405797101449,
+                  "delta_accuracy": 0.03188405797101449,
+                  "delta_margin": 0.012877450339172198,
+                  "harm_count": 55,
+                  "harm_rate": 0.03188405797101449,
+                  "margin_delta": 0.012877450339172198,
+                  "n": 1725,
+                  "net_rescue_rate": 0.03188405797101449,
+                  "rescue_count": 110,
+                  "rescue_rate": 0.06376811594202898
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.0034782608695652175,
+                  "delta_accuracy": 0.0034782608695652175,
+                  "delta_margin": 0.009420490325361058,
+                  "harm_count": 2,
+                  "harm_rate": 0.0011594202898550724,
+                  "margin_delta": 0.009420490325361058,
+                  "n": 1725,
+                  "net_rescue_rate": 0.0034782608695652175,
+                  "rescue_count": 8,
+                  "rescue_rate": 0.00463768115942029
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": -0.004057971014492754,
+                  "delta_accuracy": -0.004057971014492754,
+                  "delta_margin": 0.003348203132981839,
+                  "harm_count": 59,
+                  "harm_rate": 0.034202898550724635,
+                  "margin_delta": 0.003348203132981839,
+                  "n": 1725,
+                  "net_rescue_rate": -0.004057971014492754,
+                  "rescue_count": 52,
+                  "rescue_rate": 0.030144927536231884
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.0,
+                  "delta_accuracy": 0.0,
+                  "delta_margin": 0.007283896644046341,
+                  "harm_count": 3,
+                  "harm_rate": 0.0017391304347826088,
+                  "margin_delta": 0.007283896644046341,
+                  "n": 1725,
+                  "net_rescue_rate": 0.0,
+                  "rescue_count": 3,
+                  "rescue_rate": 0.0017391304347826088
+                }
+              }
+            },
+            "value_max": -0.056559622287750244,
+            "value_min": -0.12332457304000854
+          },
+          "Q3": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.0771461716937355,
+                  "delta_accuracy": 0.0771461716937355,
+                  "delta_margin": 0.01804786923572663,
+                  "harm_count": 51,
+                  "harm_rate": 0.029582366589327145,
+                  "margin_delta": 0.01804786923572663,
+                  "n": 1724,
+                  "net_rescue_rate": 0.0771461716937355,
+                  "rescue_count": 184,
+                  "rescue_rate": 0.10672853828306264
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.012180974477958236,
+                  "delta_accuracy": 0.012180974477958236,
+                  "delta_margin": 0.00853503347221079,
+                  "harm_count": 6,
+                  "harm_rate": 0.0034802784222737818,
+                  "margin_delta": 0.00853503347221079,
+                  "n": 1724,
+                  "net_rescue_rate": 0.012180974477958236,
+                  "rescue_count": 27,
+                  "rescue_rate": 0.015661252900232018
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.06148491879350348,
+                  "delta_accuracy": 0.06148491879350348,
+                  "delta_margin": 0.012705565216300658,
+                  "harm_count": 73,
+                  "harm_rate": 0.04234338747099768,
+                  "margin_delta": 0.012705565216300658,
+                  "n": 1724,
+                  "net_rescue_rate": 0.06148491879350348,
+                  "rescue_count": 179,
+                  "rescue_rate": 0.10382830626450117
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.015081206496519721,
+                  "delta_accuracy": 0.015081206496519721,
+                  "delta_margin": 0.009210877539698042,
+                  "harm_count": 4,
+                  "harm_rate": 0.002320185614849188,
+                  "margin_delta": 0.009210877539698042,
+                  "n": 1724,
+                  "net_rescue_rate": 0.015081206496519721,
+                  "rescue_count": 30,
+                  "rescue_rate": 0.01740139211136891
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.00580046403712297,
+                  "delta_accuracy": 0.00580046403712297,
+                  "delta_margin": 0.003510233490207079,
+                  "harm_count": 88,
+                  "harm_rate": 0.05104408352668213,
+                  "margin_delta": 0.003510233490207079,
+                  "n": 1724,
+                  "net_rescue_rate": 0.00580046403712297,
+                  "rescue_count": 98,
+                  "rescue_rate": 0.0568445475638051
+                },
+                "n": 1724,
+                "robust": {
+                  "accuracy_delta": 0.002900232018561485,
+                  "delta_accuracy": 0.002900232018561485,
+                  "delta_margin": 0.008873724130148678,
+                  "harm_count": 4,
+                  "harm_rate": 0.002320185614849188,
+                  "margin_delta": 0.008873724130148678,
+                  "n": 1724,
+                  "net_rescue_rate": 0.002900232018561485,
+                  "rescue_count": 9,
+                  "rescue_rate": 0.005220417633410673
+                }
+              }
+            },
+            "value_max": 4.248321056365967e-05,
+            "value_min": -0.05652277171611786
+          },
+          "Q4": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.08405797101449275,
+                  "delta_accuracy": 0.08405797101449275,
+                  "delta_margin": 0.016466671833093617,
+                  "harm_count": 84,
+                  "harm_rate": 0.04869565217391304,
+                  "margin_delta": 0.016466671833093617,
+                  "n": 1725,
+                  "net_rescue_rate": 0.08405797101449275,
+                  "rescue_count": 229,
+                  "rescue_rate": 0.1327536231884058
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.015072463768115942,
+                  "delta_accuracy": 0.015072463768115942,
+                  "delta_margin": 0.003601192883823229,
+                  "harm_count": 25,
+                  "harm_rate": 0.014492753623188406,
+                  "margin_delta": 0.003601192883823229,
+                  "n": 1725,
+                  "net_rescue_rate": 0.015072463768115942,
+                  "rescue_count": 51,
+                  "rescue_rate": 0.029565217391304348
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.03072463768115942,
+                  "delta_accuracy": 0.03072463768115942,
+                  "delta_margin": 0.007617110044196032,
+                  "harm_count": 123,
+                  "harm_rate": 0.07130434782608695,
+                  "margin_delta": 0.007617110044196032,
+                  "n": 1725,
+                  "net_rescue_rate": 0.03072463768115942,
+                  "rescue_count": 176,
+                  "rescue_rate": 0.10202898550724637
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.006956521739130435,
+                  "delta_accuracy": 0.006956521739130435,
+                  "delta_margin": 0.004348284856996674,
+                  "harm_count": 27,
+                  "harm_rate": 0.01565217391304348,
+                  "margin_delta": 0.004348284856996674,
+                  "n": 1725,
+                  "net_rescue_rate": 0.006956521739130435,
+                  "rescue_count": 39,
+                  "rescue_rate": 0.022608695652173914
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": -0.0052173913043478265,
+                  "delta_accuracy": -0.0052173913043478265,
+                  "delta_margin": 0.002333935028400974,
+                  "harm_count": 133,
+                  "harm_rate": 0.07710144927536232,
+                  "margin_delta": 0.002333935028400974,
+                  "n": 1725,
+                  "net_rescue_rate": -0.0052173913043478265,
+                  "rescue_count": 124,
+                  "rescue_rate": 0.07188405797101449
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.002898550724637681,
+                  "delta_accuracy": 0.002898550724637681,
+                  "delta_margin": 0.007309190790722336,
+                  "harm_count": 29,
+                  "harm_rate": 0.01681159420289855,
+                  "margin_delta": 0.007309190790722336,
+                  "n": 1725,
+                  "net_rescue_rate": 0.002898550724637681,
+                  "rescue_count": 34,
+                  "rescue_rate": 0.01971014492753623
+                }
+              }
+            },
+            "value_max": 0.07170099020004272,
+            "value_min": 0.0001234114170074463
+          },
+          "Q5": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.03942028985507246,
+                  "delta_accuracy": 0.03942028985507246,
+                  "delta_margin": 0.013715839753116386,
+                  "harm_count": 93,
+                  "harm_rate": 0.05391304347826087,
+                  "margin_delta": 0.013715839753116386,
+                  "n": 1725,
+                  "net_rescue_rate": 0.03942028985507246,
+                  "rescue_count": 161,
+                  "rescue_rate": 0.09333333333333334
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.03768115942028986,
+                  "delta_accuracy": 0.03768115942028986,
+                  "delta_margin": 0.006771442341631738,
+                  "harm_count": 44,
+                  "harm_rate": 0.025507246376811593,
+                  "margin_delta": 0.006771442341631738,
+                  "n": 1725,
+                  "net_rescue_rate": 0.03768115942028986,
+                  "rescue_count": 109,
+                  "rescue_rate": 0.06318840579710144
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": -0.0052173913043478265,
+                  "delta_accuracy": -0.0052173913043478265,
+                  "delta_margin": -0.0008245634946270266,
+                  "harm_count": 135,
+                  "harm_rate": 0.0782608695652174,
+                  "margin_delta": -0.0008245634946270266,
+                  "n": 1725,
+                  "net_rescue_rate": -0.0052173913043478265,
+                  "rescue_count": 126,
+                  "rescue_rate": 0.07304347826086957
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.023768115942028985,
+                  "delta_accuracy": 0.023768115942028985,
+                  "delta_margin": -0.001997549827548041,
+                  "harm_count": 53,
+                  "harm_rate": 0.03072463768115942,
+                  "margin_delta": -0.001997549827548041,
+                  "n": 1725,
+                  "net_rescue_rate": 0.023768115942028985,
+                  "rescue_count": 94,
+                  "rescue_rate": 0.05449275362318841
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.002898550724637681,
+                  "delta_accuracy": 0.002898550724637681,
+                  "delta_margin": 0.001977551411027494,
+                  "harm_count": 116,
+                  "harm_rate": 0.0672463768115942,
+                  "margin_delta": 0.001977551411027494,
+                  "n": 1725,
+                  "net_rescue_rate": 0.002898550724637681,
+                  "rescue_count": 121,
+                  "rescue_rate": 0.07014492753623189
+                },
+                "n": 1725,
+                "robust": {
+                  "accuracy_delta": 0.02318840579710145,
+                  "delta_accuracy": 0.02318840579710145,
+                  "delta_margin": 0.009912660195343736,
+                  "harm_count": 51,
+                  "harm_rate": 0.029565217391304348,
+                  "margin_delta": 0.009912660195343736,
+                  "n": 1725,
+                  "net_rescue_rate": 0.02318840579710145,
+                  "rescue_count": 91,
+                  "rescue_rate": 0.0527536231884058
+                }
+              }
+            },
+            "value_max": 0.6323320865631104,
+            "value_min": 0.07170775532722473
+          }
+        }
+      },
+      "selected_count": 8623,
+      "student_teacher_median_split": {
+        "effects": {
+          "teacher_high__student_high": {
+            "C10": {
+              "clean": {
+                "accuracy_delta": 0.06758720930232558,
+                "delta_accuracy": 0.06758720930232558,
+                "delta_margin": 0.014491989231278557,
+                "harm_count": 130,
+                "harm_rate": 0.047238372093023256,
+                "margin_delta": 0.014491989231278557,
+                "n": 2752,
+                "net_rescue_rate": 0.06758720930232558,
+                "rescue_count": 316,
+                "rescue_rate": 0.11482558139534883
+              },
+              "n": 2752,
+              "robust": {
+                "accuracy_delta": 0.029069767441860465,
+                "delta_accuracy": 0.029069767441860465,
+                "delta_margin": 0.004369117460365213,
+                "harm_count": 48,
+                "harm_rate": 0.01744186046511628,
+                "margin_delta": 0.004369117460365213,
+                "n": 2752,
+                "net_rescue_rate": 0.029069767441860465,
+                "rescue_count": 128,
+                "rescue_rate": 0.046511627906976744
+              }
+            },
+            "n": 2752
+          },
+          "teacher_high__student_low": {
+            "C10": {
+              "clean": {
+                "accuracy_delta": 0.0641025641025641,
+                "delta_accuracy": 0.0641025641025641,
+                "delta_margin": 0.016955131894120803,
+                "harm_count": 78,
+                "harm_rate": 0.05,
+                "margin_delta": 0.016955131894120803,
+                "n": 1560,
+                "net_rescue_rate": 0.0641025641025641,
+                "rescue_count": 178,
+                "rescue_rate": 0.1141025641025641
+              },
+              "n": 1560,
+              "robust": {
+                "accuracy_delta": 0.016025641025641024,
+                "delta_accuracy": 0.016025641025641024,
+                "delta_margin": 0.0057243335753297195,
+                "harm_count": 25,
+                "harm_rate": 0.016025641025641024,
+                "margin_delta": 0.0057243335753297195,
+                "n": 1560,
+                "net_rescue_rate": 0.016025641025641024,
+                "rescue_count": 50,
+                "rescue_rate": 0.03205128205128205
+              }
+            },
+            "n": 1560
+          },
+          "teacher_low__student_high": {
+            "C10": {
+              "clean": {
+                "accuracy_delta": 0.05512820512820513,
+                "delta_accuracy": 0.05512820512820513,
+                "delta_margin": 0.015582233839310133,
+                "harm_count": 25,
+                "harm_rate": 0.016025641025641024,
+                "margin_delta": 0.015582233839310133,
+                "n": 1560,
+                "net_rescue_rate": 0.05512820512820513,
+                "rescue_count": 111,
+                "rescue_rate": 0.07115384615384615
+              },
+              "n": 1560,
+              "robust": {
+                "accuracy_delta": 0.000641025641025641,
+                "delta_accuracy": 0.000641025641025641,
+                "delta_margin": 0.007671414019587712,
+                "harm_count": 5,
+                "harm_rate": 0.003205128205128205,
+                "margin_delta": 0.007671414019587712,
+                "n": 1560,
+                "net_rescue_rate": 0.000641025641025641,
+                "rescue_count": 6,
+                "rescue_rate": 0.0038461538461538464
+              }
+            },
+            "n": 1560
+          },
+          "teacher_low__student_low": {
+            "C10": {
+              "clean": {
+                "accuracy_delta": 0.035623409669211195,
+                "delta_accuracy": 0.035623409669211195,
+                "delta_margin": 0.020324383027139296,
+                "harm_count": 46,
+                "harm_rate": 0.016721192293711377,
+                "margin_delta": 0.020324383027139296,
+                "n": 2751,
+                "net_rescue_rate": 0.035623409669211195,
+                "rescue_count": 144,
+                "rescue_rate": 0.05234460196292257
+              },
+              "n": 2751,
+              "robust": {
+                "accuracy_delta": 0.002544529262086514,
+                "delta_accuracy": 0.002544529262086514,
+                "delta_margin": 0.012708238008801437,
+                "harm_count": 2,
+                "harm_rate": 0.0007270083605961468,
+                "margin_delta": 0.012708238008801437,
+                "n": 2751,
+                "net_rescue_rate": 0.002544529262086514,
+                "rescue_count": 9,
+                "rescue_rate": 0.003271537622682661
+              }
+            },
+            "n": 2751
+          }
+        },
+        "student_adv_margin_median": -0.19541245698928833,
+        "teacher_ce_margin_median": -0.05069279670715332
+      }
+    },
+    "L4": {
+      "ce_feature_meta": {
+        "attack": {
+          "epsilon": "8/255",
+          "epsilon_value": 0.03137254901960784,
+          "input_domain": "pixel_0_1",
+          "kl_target": null,
+          "loss": "ce",
+          "norm": "linf",
+          "random_start": true,
+          "step_size": "2/255",
+          "step_size_value": 0.00784313725490196,
+          "steps": 20,
+          "student_mode": "eval",
+          "teacher_mode": "eval",
+          "temperature": 1.0,
+          "temperature_squared": true
+        },
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/last.pt",
+        "checkpoint_epoch": 79,
+        "checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "contract": "ert_clean_wrong_c0_ce_pgd20_features_v1",
+        "feature_epoch": 79,
+        "full_train_order_replayed": true,
+        "mask_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L4.json",
+        "mask_sha256": "fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6",
+        "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-clean-wrong-subtypes-v4/L4/clean-wrong-feature-stats.parquet",
+        "rows_sha256": "5b35c92a8b417d5dbfb30556f71e3ddbf7f44c32cd7b37b572416d94ce825dfe",
+        "run": "2",
+        "schema_version": 1,
+        "selected_count": 8925,
+        "source_git_sha": "4a81f40f2c1265d966baac26f08b167949d8a5db"
+      },
+      "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+      "kl_feature_meta": {
+        "attack": {
+          "epsilon": "8/255",
+          "epsilon_value": 0.03137254901960784,
+          "input_domain": "pixel_0_1",
+          "kl_target": "teacher_clean",
+          "loss": "kl",
+          "norm": "linf",
+          "random_start": true,
+          "step_size": "2/255",
+          "step_size_value": 0.00784313725490196,
+          "steps": 10,
+          "student_mode": "eval",
+          "teacher_mode": "eval",
+          "temperature": 1.0,
+          "temperature_squared": true
+        },
+        "attack_identity_sha256": "98194e2a6ee02add8c675b0df1146007f371ed1811ef34b9ef37d052997348bd",
+        "attack_seed_protocol": "model_init_seed + 1000003*(checkpoint_global_step + batch_index)",
+        "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/last.pt",
+        "checkpoint_epoch": 79,
+        "checkpoint_global_step": 28160,
+        "checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "contract": "ert_clean_wrong_c0_kl_pgd10_features_v1",
+        "feature_epoch": 79,
+        "full_train_order_replayed": true,
+        "mask_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L4.json",
+        "mask_sha256": "fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6",
+        "max_abs_delta": 0.03137257695198059,
+        "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-clean-wrong-reliability-proxy-v1/L4/clean-wrong-kl10-feature-stats.parquet",
+        "rows_sha256": "9bf6691c8d10cd5c8818ec1f150f8f617b7cae8834df993f9adad3c9f971b0a2",
+        "run": "2",
+        "schema_version": 1,
+        "selected_count": 8925,
+        "source_git_sha": "828bccb690d1277c1c9fccb7a2edd150d9d12ec7"
+      },
+      "proxy_agreement": {
+        "confusion": {
+          "KL-R_to_CE-R": 3020,
+          "KL-R_to_CE-U": 709,
+          "KL-U_to_CE-R": 99,
+          "KL-U_to_CE-U": 5097
+        },
+        "correctness_agreement": 0.909467787114846,
+        "pearson": 0.9355348293261126,
+        "sign_agreement": 0.909467787114846,
+        "spearman": 0.9148520635343236
+      },
+      "quantile_effects": {
+        "CE20": {
+          "Q1": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.016246498599439777,
+                  "delta_accuracy": 0.016246498599439777,
+                  "delta_margin": 0.018665433201302335,
+                  "harm_count": 21,
+                  "harm_rate": 0.011764705882352941,
+                  "margin_delta": 0.018665433201302335,
+                  "n": 1785,
+                  "net_rescue_rate": 0.016246498599439777,
+                  "rescue_count": 50,
+                  "rescue_rate": 0.028011204481792718
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0016806722689075631,
+                  "delta_accuracy": -0.0016806722689075631,
+                  "delta_margin": 0.006099142084101669,
+                  "harm_count": 4,
+                  "harm_rate": 0.002240896358543417,
+                  "margin_delta": 0.006099142084101669,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0016806722689075631,
+                  "rescue_count": 1,
+                  "rescue_rate": 0.0005602240896358543
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.010644257703081233,
+                  "delta_accuracy": 0.010644257703081233,
+                  "delta_margin": 0.015611060765110145,
+                  "harm_count": 18,
+                  "harm_rate": 0.010084033613445379,
+                  "margin_delta": 0.015611060765110145,
+                  "n": 1785,
+                  "net_rescue_rate": 0.010644257703081233,
+                  "rescue_count": 37,
+                  "rescue_rate": 0.02072829131652661
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0005602240896358543,
+                  "delta_accuracy": -0.0005602240896358543,
+                  "delta_margin": 0.01644502733768869,
+                  "harm_count": 3,
+                  "harm_rate": 0.0016806722689075631,
+                  "margin_delta": 0.01644502733768869,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0005602240896358543,
+                  "rescue_count": 2,
+                  "rescue_rate": 0.0011204481792717086
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.007282913165266107,
+                  "delta_accuracy": 0.007282913165266107,
+                  "delta_margin": 0.0023507908070120823,
+                  "harm_count": 27,
+                  "harm_rate": 0.015126050420168067,
+                  "margin_delta": 0.0023507908070120823,
+                  "n": 1785,
+                  "net_rescue_rate": 0.007282913165266107,
+                  "rescue_count": 40,
+                  "rescue_rate": 0.022408963585434174
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0016806722689075631,
+                  "delta_accuracy": -0.0016806722689075631,
+                  "delta_margin": -0.0010961716707681075,
+                  "harm_count": 4,
+                  "harm_rate": 0.002240896358543417,
+                  "margin_delta": -0.0010961716707681075,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0016806722689075631,
+                  "rescue_count": 1,
+                  "rescue_rate": 0.0005602240896358543
+                }
+              }
+            },
+            "value_max": -0.14623470604419708,
+            "value_min": -0.5922148823738098
+          },
+          "Q2": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.05434173669467787,
+                  "delta_accuracy": 0.05434173669467787,
+                  "delta_margin": 0.01850257310546747,
+                  "harm_count": 34,
+                  "harm_rate": 0.01904761904761905,
+                  "margin_delta": 0.01850257310546747,
+                  "n": 1785,
+                  "net_rescue_rate": 0.05434173669467787,
+                  "rescue_count": 131,
+                  "rescue_rate": 0.07338935574229692
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0011204481792717086,
+                  "delta_accuracy": -0.0011204481792717086,
+                  "delta_margin": 0.004483589358857366,
+                  "harm_count": 2,
+                  "harm_rate": 0.0011204481792717086,
+                  "margin_delta": 0.004483589358857366,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0011204481792717086,
+                  "rescue_count": 0,
+                  "rescue_rate": 0.0
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.03697478991596639,
+                  "delta_accuracy": 0.03697478991596639,
+                  "delta_margin": 0.010600971837504572,
+                  "harm_count": 33,
+                  "harm_rate": 0.018487394957983194,
+                  "margin_delta": 0.010600971837504572,
+                  "n": 1785,
+                  "net_rescue_rate": 0.03697478991596639,
+                  "rescue_count": 99,
+                  "rescue_rate": 0.05546218487394958
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.0016806722689075631,
+                  "delta_accuracy": 0.0016806722689075631,
+                  "delta_margin": 0.01226105634070912,
+                  "harm_count": 2,
+                  "harm_rate": 0.0011204481792717086,
+                  "margin_delta": 0.01226105634070912,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0016806722689075631,
+                  "rescue_count": 5,
+                  "rescue_rate": 0.0028011204481792717
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.0056022408963585435,
+                  "delta_accuracy": 0.0056022408963585435,
+                  "delta_margin": 0.004074365852259788,
+                  "harm_count": 48,
+                  "harm_rate": 0.02689075630252101,
+                  "margin_delta": 0.004074365852259788,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0056022408963585435,
+                  "rescue_count": 58,
+                  "rescue_rate": 0.032492997198879554
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0005602240896358543,
+                  "delta_accuracy": -0.0005602240896358543,
+                  "delta_margin": 0.0006150181303505136,
+                  "harm_count": 2,
+                  "harm_rate": 0.0011204481792717086,
+                  "margin_delta": 0.0006150181303505136,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0005602240896358543,
+                  "rescue_count": 1,
+                  "rescue_rate": 0.0005602240896358543
+                }
+              }
+            },
+            "value_max": -0.07755400240421295,
+            "value_min": -0.14623326063156128
+          },
+          "Q3": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.09019607843137255,
+                  "delta_accuracy": 0.09019607843137255,
+                  "delta_margin": 0.023541283703484787,
+                  "harm_count": 63,
+                  "harm_rate": 0.03529411764705882,
+                  "margin_delta": 0.023541283703484787,
+                  "n": 1785,
+                  "net_rescue_rate": 0.09019607843137255,
+                  "rescue_count": 224,
+                  "rescue_rate": 0.12549019607843137
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.00392156862745098,
+                  "delta_accuracy": 0.00392156862745098,
+                  "delta_margin": 0.008538303204945155,
+                  "harm_count": 7,
+                  "harm_rate": 0.00392156862745098,
+                  "margin_delta": 0.008538303204945155,
+                  "n": 1785,
+                  "net_rescue_rate": 0.00392156862745098,
+                  "rescue_count": 14,
+                  "rescue_rate": 0.00784313725490196
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.0392156862745098,
+                  "delta_accuracy": 0.0392156862745098,
+                  "delta_margin": 0.010660613175867653,
+                  "harm_count": 70,
+                  "harm_rate": 0.0392156862745098,
+                  "margin_delta": 0.010660613175867653,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0392156862745098,
+                  "rescue_count": 140,
+                  "rescue_rate": 0.0784313725490196
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.00392156862745098,
+                  "delta_accuracy": 0.00392156862745098,
+                  "delta_margin": 0.010550246882338484,
+                  "harm_count": 8,
+                  "harm_rate": 0.004481792717086834,
+                  "margin_delta": 0.010550246882338484,
+                  "n": 1785,
+                  "net_rescue_rate": 0.00392156862745098,
+                  "rescue_count": 15,
+                  "rescue_rate": 0.008403361344537815
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.025210084033613446,
+                  "delta_accuracy": 0.025210084033613446,
+                  "delta_margin": 0.005105275500054453,
+                  "harm_count": 72,
+                  "harm_rate": 0.040336134453781515,
+                  "margin_delta": 0.005105275500054453,
+                  "n": 1785,
+                  "net_rescue_rate": 0.025210084033613446,
+                  "rescue_count": 117,
+                  "rescue_rate": 0.06554621848739496
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0028011204481792717,
+                  "delta_accuracy": -0.0028011204481792717,
+                  "delta_margin": -2.1360184298176057e-05,
+                  "harm_count": 9,
+                  "harm_rate": 0.005042016806722689,
+                  "margin_delta": -2.1360184298176057e-05,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0028011204481792717,
+                  "rescue_count": 4,
+                  "rescue_rate": 0.002240896358543417
+                }
+              }
+            },
+            "value_max": -0.01710924506187439,
+            "value_min": -0.07752324640750885
+          },
+          "Q4": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.12380952380952381,
+                  "delta_accuracy": 0.12380952380952381,
+                  "delta_margin": 0.02356963383049524,
+                  "harm_count": 78,
+                  "harm_rate": 0.043697478991596636,
+                  "margin_delta": 0.02356963383049524,
+                  "n": 1785,
+                  "net_rescue_rate": 0.12380952380952381,
+                  "rescue_count": 299,
+                  "rescue_rate": 0.16750700280112044
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.00784313725490196,
+                  "delta_accuracy": 0.00784313725490196,
+                  "delta_margin": 0.008590513125521127,
+                  "harm_count": 20,
+                  "harm_rate": 0.011204481792717087,
+                  "margin_delta": 0.008590513125521127,
+                  "n": 1785,
+                  "net_rescue_rate": 0.00784313725490196,
+                  "rescue_count": 34,
+                  "rescue_rate": 0.01904761904761905
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.05322128851540616,
+                  "delta_accuracy": 0.05322128851540616,
+                  "delta_margin": 0.010779889466381875,
+                  "harm_count": 108,
+                  "harm_rate": 0.06050420168067227,
+                  "margin_delta": 0.010779889466381875,
+                  "n": 1785,
+                  "net_rescue_rate": 0.05322128851540616,
+                  "rescue_count": 203,
+                  "rescue_rate": 0.11372549019607843
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.027450980392156862,
+                  "delta_accuracy": 0.027450980392156862,
+                  "delta_margin": 0.013360903902548033,
+                  "harm_count": 15,
+                  "harm_rate": 0.008403361344537815,
+                  "margin_delta": 0.013360903902548033,
+                  "n": 1785,
+                  "net_rescue_rate": 0.027450980392156862,
+                  "rescue_count": 64,
+                  "rescue_rate": 0.035854341736694675
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.026330532212885154,
+                  "delta_accuracy": 0.026330532212885154,
+                  "delta_margin": 0.003957690102379529,
+                  "harm_count": 111,
+                  "harm_rate": 0.06218487394957983,
+                  "margin_delta": 0.003957690102379529,
+                  "n": 1785,
+                  "net_rescue_rate": 0.026330532212885154,
+                  "rescue_count": 158,
+                  "rescue_rate": 0.08851540616246499
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.002240896358543417,
+                  "delta_accuracy": 0.002240896358543417,
+                  "delta_margin": 0.000988738142809614,
+                  "harm_count": 21,
+                  "harm_rate": 0.011764705882352941,
+                  "margin_delta": 0.000988738142809614,
+                  "n": 1785,
+                  "net_rescue_rate": 0.002240896358543417,
+                  "rescue_count": 25,
+                  "rescue_rate": 0.014005602240896359
+                }
+              }
+            },
+            "value_max": 0.06326256692409515,
+            "value_min": -0.017095565795898438
+          },
+          "Q5": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.10084033613445378,
+                  "delta_accuracy": 0.10084033613445378,
+                  "delta_margin": 0.025403495183011063,
+                  "harm_count": 81,
+                  "harm_rate": 0.0453781512605042,
+                  "margin_delta": 0.025403495183011063,
+                  "n": 1785,
+                  "net_rescue_rate": 0.10084033613445378,
+                  "rescue_count": 261,
+                  "rescue_rate": 0.146218487394958
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.02072829131652661,
+                  "delta_accuracy": 0.02072829131652661,
+                  "delta_margin": 0.011845230609595943,
+                  "harm_count": 78,
+                  "harm_rate": 0.043697478991596636,
+                  "margin_delta": 0.011845230609595943,
+                  "n": 1785,
+                  "net_rescue_rate": 0.02072829131652661,
+                  "rescue_count": 115,
+                  "rescue_rate": 0.06442577030812324
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.048179271708683476,
+                  "delta_accuracy": 0.048179271708683476,
+                  "delta_margin": 0.004995276956331163,
+                  "harm_count": 114,
+                  "harm_rate": 0.06386554621848739,
+                  "margin_delta": 0.004995276956331163,
+                  "n": 1785,
+                  "net_rescue_rate": 0.048179271708683476,
+                  "rescue_count": 200,
+                  "rescue_rate": 0.11204481792717087
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.016246498599439777,
+                  "delta_accuracy": 0.016246498599439777,
+                  "delta_margin": 0.011767100766092456,
+                  "harm_count": 79,
+                  "harm_rate": 0.044257703081232495,
+                  "margin_delta": 0.011767100766092456,
+                  "n": 1785,
+                  "net_rescue_rate": 0.016246498599439777,
+                  "rescue_count": 108,
+                  "rescue_rate": 0.06050420168067227
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.011204481792717087,
+                  "delta_accuracy": 0.011204481792717087,
+                  "delta_margin": -0.0024621129745528813,
+                  "harm_count": 133,
+                  "harm_rate": 0.07450980392156863,
+                  "margin_delta": -0.0024621129745528813,
+                  "n": 1785,
+                  "net_rescue_rate": 0.011204481792717087,
+                  "rescue_count": 153,
+                  "rescue_rate": 0.08571428571428572
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.005042016806722689,
+                  "delta_accuracy": -0.005042016806722689,
+                  "delta_margin": -0.0007623709675644626,
+                  "harm_count": 94,
+                  "harm_rate": 0.05266106442577031,
+                  "margin_delta": -0.0007623709675644626,
+                  "n": 1785,
+                  "net_rescue_rate": -0.005042016806722689,
+                  "rescue_count": 85,
+                  "rescue_rate": 0.047619047619047616
+                }
+              }
+            },
+            "value_max": 0.7392657399177551,
+            "value_min": 0.06336307525634766
+          }
+        },
+        "KL10": {
+          "Q1": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.021848739495798318,
+                  "delta_accuracy": 0.021848739495798318,
+                  "delta_margin": 0.018155611892875168,
+                  "harm_count": 25,
+                  "harm_rate": 0.014005602240896359,
+                  "margin_delta": 0.018155611892875168,
+                  "n": 1785,
+                  "net_rescue_rate": 0.021848739495798318,
+                  "rescue_count": 64,
+                  "rescue_rate": 0.035854341736694675
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0016806722689075631,
+                  "delta_accuracy": -0.0016806722689075631,
+                  "delta_margin": 0.004354876555314585,
+                  "harm_count": 3,
+                  "harm_rate": 0.0016806722689075631,
+                  "margin_delta": 0.004354876555314585,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0016806722689075631,
+                  "rescue_count": 0,
+                  "rescue_rate": 0.0
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.013445378151260505,
+                  "delta_accuracy": 0.013445378151260505,
+                  "delta_margin": 0.015025616226409997,
+                  "harm_count": 21,
+                  "harm_rate": 0.011764705882352941,
+                  "margin_delta": 0.015025616226409997,
+                  "n": 1785,
+                  "net_rescue_rate": 0.013445378151260505,
+                  "rescue_count": 45,
+                  "rescue_rate": 0.025210084033613446
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0011204481792717086,
+                  "delta_accuracy": -0.0011204481792717086,
+                  "delta_margin": 0.015565930453001284,
+                  "harm_count": 3,
+                  "harm_rate": 0.0016806722689075631,
+                  "margin_delta": 0.015565930453001284,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0011204481792717086,
+                  "rescue_count": 1,
+                  "rescue_rate": 0.0005602240896358543
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.0033613445378151263,
+                  "delta_accuracy": 0.0033613445378151263,
+                  "delta_margin": 0.0009833115030403565,
+                  "harm_count": 32,
+                  "harm_rate": 0.017927170868347338,
+                  "margin_delta": 0.0009833115030403565,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0033613445378151263,
+                  "rescue_count": 38,
+                  "rescue_rate": 0.021288515406162466
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0011204481792717086,
+                  "delta_accuracy": -0.0011204481792717086,
+                  "delta_margin": -0.00338391411204298,
+                  "harm_count": 3,
+                  "harm_rate": 0.0016806722689075631,
+                  "margin_delta": -0.00338391411204298,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0011204481792717086,
+                  "rescue_count": 1,
+                  "rescue_rate": 0.0005602240896358543
+                }
+              }
+            },
+            "value_max": -0.11945837736129761,
+            "value_min": -0.5841469764709473
+          },
+          "Q2": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.050980392156862744,
+                  "delta_accuracy": 0.050980392156862744,
+                  "delta_margin": 0.018702247705446238,
+                  "harm_count": 40,
+                  "harm_rate": 0.022408963585434174,
+                  "margin_delta": 0.018702247705446238,
+                  "n": 1785,
+                  "net_rescue_rate": 0.050980392156862744,
+                  "rescue_count": 131,
+                  "rescue_rate": 0.07338935574229692
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.0016806722689075631,
+                  "delta_accuracy": 0.0016806722689075631,
+                  "delta_margin": 0.004528018218629501,
+                  "harm_count": 2,
+                  "harm_rate": 0.0011204481792717086,
+                  "margin_delta": 0.004528018218629501,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0016806722689075631,
+                  "rescue_count": 5,
+                  "rescue_rate": 0.0028011204481792717
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.026330532212885154,
+                  "delta_accuracy": 0.026330532212885154,
+                  "delta_margin": 0.011108243123156015,
+                  "harm_count": 45,
+                  "harm_rate": 0.025210084033613446,
+                  "margin_delta": 0.011108243123156015,
+                  "n": 1785,
+                  "net_rescue_rate": 0.026330532212885154,
+                  "rescue_count": 92,
+                  "rescue_rate": 0.0515406162464986
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.00392156862745098,
+                  "delta_accuracy": 0.00392156862745098,
+                  "delta_margin": 0.012844570657285321,
+                  "harm_count": 2,
+                  "harm_rate": 0.0011204481792717086,
+                  "margin_delta": 0.012844570657285321,
+                  "n": 1785,
+                  "net_rescue_rate": 0.00392156862745098,
+                  "rescue_count": 9,
+                  "rescue_rate": 0.005042016806722689
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.0011204481792717086,
+                  "delta_accuracy": 0.0011204481792717086,
+                  "delta_margin": 0.0030571796688712944,
+                  "harm_count": 56,
+                  "harm_rate": 0.03137254901960784,
+                  "margin_delta": 0.0030571796688712944,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0011204481792717086,
+                  "rescue_count": 58,
+                  "rescue_rate": 0.032492997198879554
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.0005602240896358543,
+                  "delta_accuracy": -0.0005602240896358543,
+                  "delta_margin": -0.0007247880184683813,
+                  "harm_count": 2,
+                  "harm_rate": 0.0011204481792717086,
+                  "margin_delta": -0.0007247880184683813,
+                  "n": 1785,
+                  "net_rescue_rate": -0.0005602240896358543,
+                  "rescue_count": 1,
+                  "rescue_rate": 0.0005602240896358543
+                }
+              }
+            },
+            "value_max": -0.05143481492996216,
+            "value_min": -0.11944340169429779
+          },
+          "Q3": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.08907563025210084,
+                  "delta_accuracy": 0.08907563025210084,
+                  "delta_margin": 0.02327914330221358,
+                  "harm_count": 55,
+                  "harm_rate": 0.03081232492997199,
+                  "margin_delta": 0.02327914330221358,
+                  "n": 1785,
+                  "net_rescue_rate": 0.08907563025210084,
+                  "rescue_count": 214,
+                  "rescue_rate": 0.11988795518207283
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.004481792717086834,
+                  "delta_accuracy": 0.004481792717086834,
+                  "delta_margin": 0.010651108864642659,
+                  "harm_count": 7,
+                  "harm_rate": 0.00392156862745098,
+                  "margin_delta": 0.010651108864642659,
+                  "n": 1785,
+                  "net_rescue_rate": 0.004481792717086834,
+                  "rescue_count": 15,
+                  "rescue_rate": 0.008403361344537815
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.03529411764705882,
+                  "delta_accuracy": 0.03529411764705882,
+                  "delta_margin": 0.009804704171769759,
+                  "harm_count": 70,
+                  "harm_rate": 0.0392156862745098,
+                  "margin_delta": 0.009804704171769759,
+                  "n": 1785,
+                  "net_rescue_rate": 0.03529411764705882,
+                  "rescue_count": 133,
+                  "rescue_rate": 0.07450980392156863
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.010084033613445379,
+                  "delta_accuracy": 0.010084033613445379,
+                  "delta_margin": 0.011000910551608109,
+                  "harm_count": 9,
+                  "harm_rate": 0.005042016806722689,
+                  "margin_delta": 0.011000910551608109,
+                  "n": 1785,
+                  "net_rescue_rate": 0.010084033613445379,
+                  "rescue_count": 27,
+                  "rescue_rate": 0.015126050420168067
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.01680672268907563,
+                  "delta_accuracy": 0.01680672268907563,
+                  "delta_margin": 0.005635565022627512,
+                  "harm_count": 75,
+                  "harm_rate": 0.04201680672268908,
+                  "margin_delta": 0.005635565022627512,
+                  "n": 1785,
+                  "net_rescue_rate": 0.01680672268907563,
+                  "rescue_count": 105,
+                  "rescue_rate": 0.058823529411764705
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.0,
+                  "delta_accuracy": 0.0,
+                  "delta_margin": 0.002461293807216719,
+                  "harm_count": 9,
+                  "harm_rate": 0.005042016806722689,
+                  "margin_delta": 0.002461293807216719,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0,
+                  "rescue_count": 9,
+                  "rescue_rate": 0.005042016806722689
+                }
+              }
+            },
+            "value_max": 0.005377620458602905,
+            "value_min": -0.05140911042690277
+          },
+          "Q4": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.12100840336134454,
+                  "delta_accuracy": 0.12100840336134454,
+                  "delta_margin": 0.024219916689963567,
+                  "harm_count": 79,
+                  "harm_rate": 0.044257703081232495,
+                  "margin_delta": 0.024219916689963567,
+                  "n": 1785,
+                  "net_rescue_rate": 0.12100840336134454,
+                  "rescue_count": 295,
+                  "rescue_rate": 0.16526610644257703
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.007282913165266107,
+                  "delta_accuracy": 0.007282913165266107,
+                  "delta_margin": 0.007307224330447969,
+                  "harm_count": 20,
+                  "harm_rate": 0.011204481792717087,
+                  "margin_delta": 0.007307224330447969,
+                  "n": 1785,
+                  "net_rescue_rate": 0.007282913165266107,
+                  "rescue_count": 33,
+                  "rescue_rate": 0.018487394957983194
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.06162464985994398,
+                  "delta_accuracy": 0.06162464985994398,
+                  "delta_margin": 0.011045747097967719,
+                  "harm_count": 88,
+                  "harm_rate": 0.04929971988795518,
+                  "margin_delta": 0.011045747097967719,
+                  "n": 1785,
+                  "net_rescue_rate": 0.06162464985994398,
+                  "rescue_count": 198,
+                  "rescue_rate": 0.11092436974789915
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.020168067226890758,
+                  "delta_accuracy": 0.020168067226890758,
+                  "delta_margin": 0.013090447330174325,
+                  "harm_count": 16,
+                  "harm_rate": 0.008963585434173669,
+                  "margin_delta": 0.013090447330174325,
+                  "n": 1785,
+                  "net_rescue_rate": 0.020168067226890758,
+                  "rescue_count": 52,
+                  "rescue_rate": 0.029131652661064426
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.03473389355742297,
+                  "delta_accuracy": 0.03473389355742297,
+                  "delta_margin": 0.005105219209561495,
+                  "harm_count": 102,
+                  "harm_rate": 0.05714285714285714,
+                  "margin_delta": 0.005105219209561495,
+                  "n": 1785,
+                  "net_rescue_rate": 0.03473389355742297,
+                  "rescue_count": 164,
+                  "rescue_rate": 0.09187675070028012
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.002240896358543417,
+                  "delta_accuracy": 0.002240896358543417,
+                  "delta_margin": 0.0013114482331342723,
+                  "harm_count": 21,
+                  "harm_rate": 0.011764705882352941,
+                  "margin_delta": 0.0013114482331342723,
+                  "n": 1785,
+                  "net_rescue_rate": 0.002240896358543417,
+                  "rescue_count": 25,
+                  "rescue_rate": 0.014005602240896359
+                }
+              }
+            },
+            "value_max": 0.07886554300785065,
+            "value_min": 0.005422621965408325
+          },
+          "Q5": {
+            "effects": {
+              "C10": {
+                "clean": {
+                  "accuracy_delta": 0.10252100840336134,
+                  "delta_accuracy": 0.10252100840336134,
+                  "delta_margin": 0.02532549943326234,
+                  "harm_count": 78,
+                  "harm_rate": 0.043697478991596636,
+                  "margin_delta": 0.02532549943326234,
+                  "n": 1785,
+                  "net_rescue_rate": 0.10252100840336134,
+                  "rescue_count": 261,
+                  "rescue_rate": 0.146218487394958
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.017927170868347338,
+                  "delta_accuracy": 0.017927170868347338,
+                  "delta_margin": 0.012715550413986547,
+                  "harm_count": 79,
+                  "harm_rate": 0.044257703081232495,
+                  "margin_delta": 0.012715550413986547,
+                  "n": 1785,
+                  "net_rescue_rate": 0.017927170868347338,
+                  "rescue_count": 111,
+                  "rescue_rate": 0.06218487394957983
+                }
+              },
+              "C12": {
+                "clean": {
+                  "accuracy_delta": 0.0515406162464986,
+                  "delta_accuracy": 0.0515406162464986,
+                  "delta_margin": 0.005663501581891912,
+                  "harm_count": 119,
+                  "harm_rate": 0.06666666666666667,
+                  "margin_delta": 0.005663501581891912,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0515406162464986,
+                  "rescue_count": 211,
+                  "rescue_rate": 0.11820728291316526
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": 0.01568627450980392,
+                  "delta_accuracy": 0.01568627450980392,
+                  "delta_margin": 0.011882476237307744,
+                  "harm_count": 77,
+                  "harm_rate": 0.043137254901960784,
+                  "margin_delta": 0.011882476237307744,
+                  "n": 1785,
+                  "net_rescue_rate": 0.01568627450980392,
+                  "rescue_count": 105,
+                  "rescue_rate": 0.058823529411764705
+                }
+              },
+              "C13": {
+                "clean": {
+                  "accuracy_delta": 0.0196078431372549,
+                  "delta_accuracy": 0.0196078431372549,
+                  "delta_margin": -0.001755266116947687,
+                  "harm_count": 126,
+                  "harm_rate": 0.07058823529411765,
+                  "margin_delta": -0.001755266116947687,
+                  "n": 1785,
+                  "net_rescue_rate": 0.0196078431372549,
+                  "rescue_count": 161,
+                  "rescue_rate": 0.09019607843137255
+                },
+                "n": 1785,
+                "robust": {
+                  "accuracy_delta": -0.008403361344537815,
+                  "delta_accuracy": -0.008403361344537815,
+                  "delta_margin": 5.981354068975155e-05,
+                  "harm_count": 95,
+                  "harm_rate": 0.05322128851540616,
+                  "margin_delta": 5.981354068975155e-05,
+                  "n": 1785,
+                  "net_rescue_rate": -0.008403361344537815,
+                  "rescue_count": 80,
+                  "rescue_rate": 0.04481792717086835
+                }
+              }
+            },
+            "value_max": 0.7393714785575867,
+            "value_min": 0.07914133369922638
+          }
+        }
+      },
+      "selected_count": 8925,
+      "student_teacher_median_split": {
+        "effects": {
+          "teacher_high__student_high": {
+            "C10": {
+              "clean": {
+                "accuracy_delta": 0.11766875691626706,
+                "delta_accuracy": 0.11766875691626706,
+                "delta_margin": 0.022448433592657198,
+                "harm_count": 130,
+                "harm_rate": 0.04795278495020288,
+                "margin_delta": 0.022448433592657198,
+                "n": 2711,
+                "net_rescue_rate": 0.11766875691626706,
+                "rescue_count": 449,
+                "rescue_rate": 0.16562154186646993
+              },
+              "n": 2711,
+              "robust": {
+                "accuracy_delta": 0.014016967908520842,
+                "delta_accuracy": 0.014016967908520842,
+                "delta_margin": 0.008718668342691997,
+                "harm_count": 61,
+                "harm_rate": 0.02250092216894135,
+                "margin_delta": 0.008718668342691997,
+                "n": 2711,
+                "net_rescue_rate": 0.014016967908520842,
+                "rescue_count": 99,
+                "rescue_rate": 0.036517890077462194
+              }
+            },
+            "n": 2711
+          },
+          "teacher_high__student_low": {
+            "C10": {
+              "clean": {
+                "accuracy_delta": 0.10159817351598173,
+                "delta_accuracy": 0.10159817351598173,
+                "delta_margin": 0.027554505802350773,
+                "harm_count": 61,
+                "harm_rate": 0.034817351598173514,
+                "margin_delta": 0.027554505802350773,
+                "n": 1752,
+                "net_rescue_rate": 0.10159817351598173,
+                "rescue_count": 239,
+                "rescue_rate": 0.13641552511415525
+              },
+              "n": 1752,
+              "robust": {
+                "accuracy_delta": 0.008561643835616438,
+                "delta_accuracy": 0.008561643835616438,
+                "delta_margin": 0.011908647098225545,
+                "harm_count": 41,
+                "harm_rate": 0.023401826484018264,
+                "margin_delta": 0.011908647098225545,
+                "n": 1752,
+                "net_rescue_rate": 0.008561643835616438,
+                "rescue_count": 56,
+                "rescue_rate": 0.0319634703196347
+              }
+            },
+            "n": 1752
+          },
+          "teacher_low__student_high": {
+            "C10": {
+              "clean": {
+                "accuracy_delta": 0.04965753424657534,
+                "delta_accuracy": 0.04965753424657534,
+                "delta_margin": 0.01818685972272125,
+                "harm_count": 28,
+                "harm_rate": 0.01598173515981735,
+                "margin_delta": 0.01818685972272125,
+                "n": 1752,
+                "net_rescue_rate": 0.04965753424657534,
+                "rescue_count": 115,
+                "rescue_rate": 0.0656392694063927
+              },
+              "n": 1752,
+              "robust": {
+                "accuracy_delta": 0.0005707762557077625,
+                "delta_accuracy": 0.0005707762557077625,
+                "delta_margin": 0.005693695099692638,
+                "harm_count": 4,
+                "harm_rate": 0.00228310502283105,
+                "margin_delta": 0.005693695099692638,
+                "n": 1752,
+                "net_rescue_rate": 0.0005707762557077625,
+                "rescue_count": 5,
+                "rescue_rate": 0.0028538812785388126
+              }
+            },
+            "n": 1752
+          },
+          "teacher_low__student_low": {
+            "C10": {
+              "clean": {
+                "accuracy_delta": 0.03837638376383764,
+                "delta_accuracy": 0.03837638376383764,
+                "delta_margin": 0.020216436194757693,
+                "harm_count": 58,
+                "harm_rate": 0.021402214022140223,
+                "margin_delta": 0.020216436194757693,
+                "n": 2710,
+                "net_rescue_rate": 0.03837638376383764,
+                "rescue_count": 162,
+                "rescue_rate": 0.05977859778597786
+              },
+              "n": 2710,
+              "robust": {
+                "accuracy_delta": -0.00036900369003690036,
+                "delta_accuracy": -0.00036900369003690036,
+                "delta_margin": 0.0059532236184141295,
+                "harm_count": 5,
+                "harm_rate": 0.0018450184501845018,
+                "margin_delta": 0.0059532236184141295,
+                "n": 2710,
+                "net_rescue_rate": -0.00036900369003690036,
+                "rescue_count": 4,
+                "rescue_rate": 0.0014760147601476014
+              }
+            },
+            "n": 2710
+          }
+        },
+        "student_adv_margin_median": -0.20365235209465027,
+        "teacher_ce_margin_median": -0.04798336327075958
+      }
+    }
+  },
+  "schema_version": 1,
+  "source_sha256": "05a288ad38b0d71181b166360aab9e2a0f76fb99d596525c638e60284077e82d"
+}

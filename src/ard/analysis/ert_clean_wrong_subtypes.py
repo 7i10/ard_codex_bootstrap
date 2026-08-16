@@ -251,6 +251,10 @@ def _effect(base: list[dict[str, Any]], treatment: list[dict[str, Any]], key: st
     n = len(ids)
     accuracy_delta = (rescue - harm) / n if n else None
     margin_delta = sum(deltas) / n if n else None
+    if accuracy_delta is not None:
+        expected_accuracy_delta = (rescue / n) - (harm / n)
+        if abs(accuracy_delta - expected_accuracy_delta) > 1e-12:
+            raise CleanWrongSubtypeError("accuracy delta does not equal rescue rate minus harm rate")
     return {
         "n": n,
         "accuracy_delta": accuracy_delta,

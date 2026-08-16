@@ -89,7 +89,11 @@ with intersection, union, and Jaccard; it is not used to construct a new arm.
 - The current machine report is
   `docs/experiments/ert_clean_wrong_reliability_stratified_v1.json`; its final
   content hash is
-  `c5107dd5236054ff23f7931b4f19f33c7a62a2ed5bb8e7c8792daea5024ebd7f`.
+  `c01b5090efe2fd7701452c109817bc9b2a7bb8c80e164bfbe7ecc11c36065d02`.
+- The previous report's `delta_accuracy` field was found to contain margin
+  deltas. It was corrected to separate `accuracy_delta` and `margin_delta`,
+  so the reliability rows in the machine and Markdown reports were
+  regenerated before the proxy/safety follow-up.
 - Final reliability replay provenance is L2 source
   `5196df3d4618d7e9183e14e4a9a40a462f9fef17` with parent
   `ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c`, and
