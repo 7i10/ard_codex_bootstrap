@@ -1,6 +1,17 @@
 # ERT Clean-Wrong Rescue Subtype Analysis
 
-Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis. No new training or route selection.
+Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis, stratified by pre-treatment Teacher reliability. No new training or route selection.
+
+## Frozen pre-treatment split
+
+CW-R is defined by epoch-79 pre-treatment `teacher_adversarial_margin > 0`; CW-U is the complement. The split is fixed before reading epoch-84 outcomes. Endpoint and feature replay use the exact CE-PGD20 identity, and the feature checkpoint must match the C0 fork parent SHA.
+
+| run | replay source SHA | parent checkpoint SHA | feature rows | mask SHA |
+|---|---|---|---:|---|
+| L2 | `5196df3d4618d7e9183e14e4a9a40a462f9fef17` | `ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c` | 8623 | `0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b` |
+| L4 | `4a81f40f2c1265d966baac26f08b167949d8a5db` | `026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1` | 8925 | `fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6` |
+
+Machine report content hash: `c5107dd5236054ff23f7931b4f19f33c7a62a2ed5bb8e7c8792daea5024ebd7f`.
 
 ## L2
 
