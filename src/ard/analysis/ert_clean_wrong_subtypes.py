@@ -408,9 +408,33 @@ def build_report(
     lines = [
         "# ERT Clean-Wrong Rescue Subtype Analysis",
         "",
-        "Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis. No new training or route selection.",
+        (
+            "Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis, "
+            "stratified by pre-treatment Teacher reliability. No new training "
+            "or route selection."
+        ),
         "",
+        "## Frozen pre-treatment split",
+        "",
+        (
+            "CW-R is defined by epoch-79 pre-treatment "
+            "`teacher_adversarial_margin > 0`; CW-U is the complement. The "
+            "split is fixed before reading epoch-84 outcomes. Endpoint and "
+            "feature replay use the exact CE-PGD20 identity, and the feature "
+            "checkpoint must match the C0 fork parent SHA."
+        ),
+        "",
+        "| run | replay source SHA | parent checkpoint SHA | feature rows | mask SHA |",
+        "|---|---|---|---:|---|",
     ]
+    for run, report in machine["runs"].items():
+        feature_meta = report["feature_meta"]
+        lines.append(
+            f"| {run} | `{feature_meta['source_git_sha']}` | "
+            f"`{feature_meta['checkpoint_sha256']}` | {report['selected_count']} | "
+            f"`{feature_meta['mask_sha256']}` |"
+        )
+    lines += ["", f"Machine report content hash: `{machine['source_sha256']}`.", ""]
     for run, report in machine["runs"].items():
         lines += [f"## {run}", "", f"Fixed Clean-Wrong cohort: {report['selected_count']} samples.", ""]
         lines += [
