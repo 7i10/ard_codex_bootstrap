@@ -54,6 +54,10 @@ No winner, coefficient, threshold, +15 continuation, official test, or AutoAttac
 - C12 BCE coefficient was calibrated without optimizer steps or endpoint
   metrics: $\beta_{BCE}=0.08891977369785309$, pooled median target gradient
   ratio 0.25. It was not retuned after results.
+- The calibration JSON itself was generated before source-SHA capture and has
+  `source_git_sha: null`; the valid training manifests, parent hashes, and
+  frozen coefficient are recorded, but this provenance gap must be repaired
+  before treating C12 as publication-ready evidence.
 - C0 endpoint baselines: L2 train clean/robust `0.78998/0.50762`, validation
   `0.77820/0.47140`; L4 train `0.79222/0.51067`, validation
   `0.79020/0.46420`.
