@@ -293,8 +293,11 @@ def build_report(
         manifest = json.loads(parent_manifest.read_text(encoding="utf-8"))
         parent_lineage = manifest.get("parent_lineage", {})
         fork_lineage = manifest.get("fork_lineage", {})
-        expected_parent_sha = parent_lineage.get("checkpoint_sha256") or fork_lineage.get(
-            "parent_checkpoint_sha256"
+        # Treatment runs record the causal parent in fork_lineage.  The
+        # generic parent_lineage may instead describe the source artifact
+        # inventory and can legitimately differ for a continuation fork.
+        expected_parent_sha = fork_lineage.get("parent_checkpoint_sha256") or parent_lineage.get(
+            "checkpoint_sha256"
         )
         if not isinstance(expected_parent_sha, str):
             raise CleanWrongSubtypeError("endpoint manifest lacks parent checkpoint SHA")
