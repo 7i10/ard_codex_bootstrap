@@ -514,6 +514,10 @@ class TrackingConfig(StrictModel):
     panel_size: int = Field(default=24, ge=0)
     panel_interval_epochs: int = Field(default=5, ge=1)
     artifact_interval_epochs: int = Field(default=5, ge=1)
+    # Checkpoints and the complete run bundle remain authoritative on the
+    # local output filesystem.  W&B receives lightweight metrics/lineage by
+    # default; explicit promotion is required for heavyweight artifacts.
+    artifact_retention: Literal["metrics_only", "best_last", "full"] = "metrics_only"
 
     @model_validator(mode="after")
     def validate_wandb_identity(self) -> TrackingConfig:

@@ -14,6 +14,8 @@ changed after endpoint inspection.  The only training arms are fresh
 - [x] Reconcile current HEAD, parent checkpoints, masks, and replay artifacts.
 - [x] Implement hash-bound CE20/KL10 selector overlay preparation.
 - [x] Add focused selector contract test.
+- [x] Set W&B artifact retention to metrics/lineage by default; keep all
+  checkpoints and run-bundle files local with content hashes.
 - [ ] Commit clean scientific source before GPU launch.
 - [ ] Prepare and audit L2/L4 selector counts and RR/RU/UR/UU groups.
 - [ ] Run 8 online-tracked continuations from exact epoch-79 parents.
@@ -28,7 +30,9 @@ protocol.  Selectors are `teacher_adv_margin > 0` at epoch 79; CE20 uses
 hard-label eval PGD20, KL10 uses the teacher-clean training PGD10 replay.
 Training remains baseline KL-PGD10 and only selected samples receive an
 additional `0.15 * CE(clean)` under full-batch mean reduction.  W&B remains
-online through the production parent config. Official test and AutoAttack are
+online through the production parent config, but the default retention policy
+publishes metrics, lineage, and small analysis artifacts only; checkpoints and
+the run bundle remain local and hash-bound. Official test and AutoAttack are
 excluded.
 
 ## Risks / completion

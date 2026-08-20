@@ -171,7 +171,27 @@ robust_correct
 scalar sample statisticsはgenuine Parquetとして別artifactへ保存し、`pyarrow`がない場合は偽の
 `.parquet`を作らず明示的に失敗します。
 
-## 7. Artifacts
+## 7. Artifact retention
+
+W&B is the live metrics and lineage index; the local output directory is the
+authoritative store for checkpoints, sample state, and the complete run
+bundle.  `tracking.artifact_retention` makes this tradeoff explicit:
+
+| Policy | W&B model artifacts | W&B run bundle | Local files |
+|---|---|---|---|
+| `metrics_only` (default) | none | none | best/last, horizons, sample state, bundle |
+| `best_last` | terminal best and last only | none | all local files |
+| `full` | periodic, terminal, and horizon checkpoints | yes | all local files |
+
+Every policy still publishes scalar epoch metrics, resolved configuration,
+lineage, and the small analysis-input/sample-stat artifacts required by the
+run contract.  A metrics-only run is therefore reproducible from its local
+manifest and checkpoint hashes without consuming the W&B model/bundle quota.
+Canonical results may explicitly opt into `best_last` after the run is
+accepted; `full` is reserved for a deliberate archival promotion.  Deleting a
+remote copy never deletes the local checkpoint or changes its SHA-256.
+
+## 8. Artifacts
 
 train run:
 
@@ -230,7 +250,7 @@ run-bundle artifactの存在、file artifactのsource/local content hashを検�
 `epoch_metrics_complete`を持つ場合はepoch-metrics artifactも必須です。旧manifestは互換性のためこの新artifactを
 要求しません。summary、artifact history、sample-stat bytesは再生成しません。
 
-## 8. 履歴解析とrun分類
+## 9. 履歴解析とrun分類
 
 W&B project全体のhistoryを反復scanしません。解析対象は
 `configs/analysis/wandb_ro_cohort.yaml`のexact run IDに固定し、次を使用します。
@@ -256,7 +276,7 @@ Tiny-ImageNet evaluation adapterのsplit identityは、expected digestなしで�
 `expected-unverified`であり、training時のobserved digestではありません。Tiny-ImageNetのT5/paper集計前には、
 observed training split identityをtraining lineageへ永続化して評価時に照合する追加実装が必要です。
 
-## 9. Verified scope
+## 10. Verified scope
 
 Teacher acquisition templates and registry inspection do not initialize W&B.
 Until a checkpoint is explicitly registered and a reproducible run approved,

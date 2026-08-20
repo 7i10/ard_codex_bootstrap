@@ -33,7 +33,12 @@ from ard.policies import FixedInterventionMask, RSLADBaselinePolicy
 from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
 from ard.targets import TeacherOnlyTemperatureTargetPolicy
-from ard.tracking.adapter import ExperimentTracker, collect_git_state, create_tracker
+from ard.tracking.adapter import (
+    ExperimentTracker,
+    collect_git_state,
+    create_tracker,
+    should_upload_model_artifact,
+)
 
 
 class StageARuntimeError(RuntimeError):
@@ -601,6 +606,7 @@ def run_stage_a_arm(
                 "calibration": calibration,
                 "child_config_hash": arm_hash,
                 "run_namespace": run_namespace,
+                "wandb_artifact_retention": config.tracking.artifact_retention,
                 "horizon_epochs": list(horizon_epochs),
                 "dynamic_s3": (
                     None
@@ -691,12 +697,13 @@ def run_stage_a_arm(
                 "horizon_epochs": list(horizon_epochs),
             }
         )
-        tracker.log_artifact(
-            output_dir / "last.pt", name=f"model-{run_id}-last", artifact_type="model", aliases=("last",)
-        )
-        tracker.log_artifact(
-            output_dir / "best.pt", name=f"model-{run_id}-best", artifact_type="model", aliases=("best",)
-        )
+        if should_upload_model_artifact(tracked_config.tracking.artifact_retention, is_final=True):
+            tracker.log_artifact(
+                output_dir / "last.pt", name=f"model-{run_id}-last", artifact_type="model", aliases=("last",)
+            )
+            tracker.log_artifact(
+                output_dir / "best.pt", name=f"model-{run_id}-best", artifact_type="model", aliases=("best",)
+            )
         if dynamic_s3_artifacts is not None and "artifacts" in dynamic_s3_artifacts:
             artifacts = dynamic_s3_artifacts["artifacts"]
             tracker.log_artifact(
@@ -732,13 +739,14 @@ def run_stage_a_arm(
         (output_dir / "horizon-checkpoints.json").write_text(
             json.dumps(horizon_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        for epoch, path in sorted(horizon_paths.items(), key=lambda item: int(item[0])):
-            tracker.log_artifact(
-                path,
-                name=f"model-{run_id}-epoch-{epoch}",
-                artifact_type="model",
-                aliases=(f"epoch-{epoch}",),
-            )
+        if tracked_config.tracking.artifact_retention == "full":
+            for epoch, path in sorted(horizon_paths.items(), key=lambda item: int(item[0])):
+                tracker.log_artifact(
+                    path,
+                    name=f"model-{run_id}-epoch-{epoch}",
+                    artifact_type="model",
+                    aliases=(f"epoch-{epoch}",),
+                )
         tracker.prepare_finish()
         tracker.finish()
     except Exception:

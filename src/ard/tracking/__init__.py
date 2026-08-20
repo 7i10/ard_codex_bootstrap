@@ -9,6 +9,8 @@ from .adapter import (
     coordinated_create_tracker,
     coordinated_tracker_action,
     create_tracker,
+    should_upload_model_artifact,
+    should_upload_run_bundle,
     stable_run_id,
     validate_tracking_guard,
 )
@@ -23,5 +25,7 @@ __all__ = [
     "coordinated_create_tracker",
     "coordinated_tracker_action",
     "stable_run_id",
+    "should_upload_model_artifact",
+    "should_upload_run_bundle",
     "validate_tracking_guard",
 ]

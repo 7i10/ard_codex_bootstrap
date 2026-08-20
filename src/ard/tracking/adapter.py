@@ -57,6 +57,32 @@ QUALITATIVE_COLUMNS = (
 )
 
 
+def should_upload_model_artifact(
+    retention: str, *, is_final: bool = False, is_periodic: bool = False
+) -> bool:
+    """Return whether a checkpoint should be published to W&B.
+
+    Local checkpoints are always written by the training/runtime code.  This
+    helper only controls the remote copy, keeping storage policy explicit and
+    testable. ``best_last`` promotes only the terminal best/last pair; ``full``
+    preserves the historical periodic publication behavior.
+    """
+    if retention == "metrics_only":
+        return False
+    if retention == "best_last":
+        return is_final
+    if retention == "full":
+        return is_final or is_periodic
+    raise ValueError(f"unknown W&B artifact retention policy: {retention}")
+
+
+def should_upload_run_bundle(retention: str) -> bool:
+    """Run bundles are opt-in because local output remains authoritative."""
+    if retention not in {"metrics_only", "best_last", "full"}:
+        raise ValueError(f"unknown W&B artifact retention policy: {retention}")
+    return retention == "full"
+
+
 class ExperimentTracker(Protocol):
     run_id: str
 

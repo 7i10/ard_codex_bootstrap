@@ -31,9 +31,32 @@ from ard.tracking.adapter import (
     canonical_run_group,
     canonical_run_name,
     collect_git_state,
+    should_upload_model_artifact,
+    should_upload_run_bundle,
 )
 
 pytestmark = [pytest.mark.t1, pytest.mark.wandb]
+
+
+@pytest.mark.parametrize(
+    ("retention", "final", "periodic", "expected"),
+    [
+        ("metrics_only", False, False, False),
+        ("metrics_only", True, True, False),
+        ("best_last", False, True, False),
+        ("best_last", True, False, True),
+        ("full", False, True, True),
+        ("full", True, False, True),
+    ],
+)
+def test_wandb_artifact_retention_policy(retention: str, final: bool, periodic: bool, expected: bool) -> None:
+    assert should_upload_model_artifact(retention, is_final=final, is_periodic=periodic) is expected
+
+
+def test_run_bundle_is_explicitly_opt_in() -> None:
+    assert should_upload_run_bundle("metrics_only") is False
+    assert should_upload_run_bundle("best_last") is False
+    assert should_upload_run_bundle("full") is True
 
 
 def test_collect_git_state_hashes_untracked_file_content(tmp_path: Path) -> None:

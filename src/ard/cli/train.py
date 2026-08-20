@@ -67,6 +67,8 @@ from ard.tracking import (
     TrackingError,
     coordinated_create_tracker,
     coordinated_tracker_action,
+    should_upload_model_artifact,
+    should_upload_run_bundle,
     validate_tracking_guard,
 )
 from ard.tracking.adapter import collect_git_state
@@ -919,9 +921,10 @@ def main(argv: list[str] | None = None) -> int:
                 # Reject a conflicting resumed epoch before the remote backend
                 # can receive a second row for that epoch.
                 active_tracker.log_metrics(values, step=trainer.global_step)
-                publish_models = (
-                    trainer.current_epoch + 1 == config.training.epochs
-                    or (trainer.current_epoch + 1) % config.tracking.artifact_interval_epochs == 0
+                publish_models = should_upload_model_artifact(
+                    config.tracking.artifact_retention,
+                    is_final=trainer.current_epoch + 1 == config.training.epochs,
+                    is_periodic=(trainer.current_epoch + 1) % config.tracking.artifact_interval_epochs == 0,
                 )
                 if publish_models:
                     active_tracker.log_artifact(
@@ -1060,7 +1063,10 @@ def main(argv: list[str] | None = None) -> int:
             )
             (bundle / "error-marker.txt").write_text("no application error recorded\n", encoding="utf-8")
             active_tracker.prepare_finish()
-            active_tracker.log_artifact(bundle, name=f"run-bundle-{active_tracker.run_id}", artifact_type="run-bundle")
+            if should_upload_run_bundle(config.tracking.artifact_retention):
+                active_tracker.log_artifact(
+                    bundle, name=f"run-bundle-{active_tracker.run_id}", artifact_type="run-bundle"
+                )
             active_tracker.finish()
 
         coordinated_tracker_action(active_tracker, phase="tracker finish", action=_finalize)
