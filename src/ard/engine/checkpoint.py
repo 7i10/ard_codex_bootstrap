@@ -8,6 +8,7 @@ import os
 import random
 import tempfile
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -51,7 +52,15 @@ class TrainingState:
 
 
 def config_digest(config: Mapping[str, Any]) -> str:
-    encoded = json.dumps(config, sort_keys=True, separators=(",", ":"), default=str).encode()
+    # W&B retention is an operational publication choice, not a model
+    # trajectory identity.  Excluding it preserves resume compatibility when
+    # an old checkpoint is reopened after switching from full to local-only
+    # artifact retention.
+    canonical = deepcopy(dict(config))
+    tracking = canonical.get("tracking")
+    if isinstance(tracking, dict):
+        tracking.pop("artifact_retention", None)
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), default=str).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 

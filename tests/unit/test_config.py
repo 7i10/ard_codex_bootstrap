@@ -9,8 +9,16 @@ from pydantic import ValidationError
 from ard.config import load_config, save_resolved_config
 from ard.config.schema import AttackConfig, ExperimentConfig, MethodConfig, NormalizationConfig
 from ard.config.teacher_audit import load_teacher_audit_config
+from ard.engine.checkpoint import config_digest
 
 pytestmark = pytest.mark.t0
+
+
+def test_wandb_retention_does_not_change_training_identity() -> None:
+    base = {"training": {"epochs": 2}, "tracking": {"mode": "online"}}
+    metrics_only = {**base, "tracking": {**base["tracking"], "artifact_retention": "metrics_only"}}
+    full = {**base, "tracking": {**base["tracking"], "artifact_retention": "full"}}
+    assert config_digest(base) == config_digest(metrics_only) == config_digest(full)
 
 
 def _set_repository_config_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, per_rank: int = 64) -> None:
