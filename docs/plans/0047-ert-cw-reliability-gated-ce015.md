@@ -16,7 +16,7 @@ changed after endpoint inspection.  The only training arms are fresh
 - [x] Add focused selector contract test.
 - [x] Set W&B artifact retention to metrics/lineage by default; keep all
   checkpoints and run-bundle files local with content hashes.
-- [ ] Commit clean scientific source before GPU launch.
+- [x] Commit clean scientific source before GPU launch (`1039ff3`).
 - [ ] Prepare and audit L2/L4 selector counts and RR/RU/UR/UU groups.
 - [ ] Run 8 online-tracked continuations from exact epoch-79 parents.
 - [ ] Evaluate all 24 checkpoints (train and fixed validation) with CE-PGD20.
