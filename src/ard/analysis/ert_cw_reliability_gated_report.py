@@ -106,7 +106,10 @@ def build_report(
         for epoch in HORIZONS:
             arm_rows: dict[str, dict[int, dict[str, Any]]] = {}
             for arm in ARMS:
-                path = training_dirs[run][arm] / "endpoint" / f"epoch-{epoch}" / "validation"
+                # Endpoint evaluation is deliberately stored outside the training
+                # bundle.  Keep the training directory for lineage only and use
+                # the explicit endpoint root for the immutable evaluation rows.
+                path = endpoint_root / run / arm / f"epoch-{epoch}" / "validation"
                 meta_path, rows_path = path / "endpoint.json", path / "endpoint-sample-stats.parquet"
                 if not meta_path.is_file() or not rows_path.is_file():
                     raise ReliabilityGatedReportError(f"missing endpoint: {run}/{arm}/epoch-{epoch}")
