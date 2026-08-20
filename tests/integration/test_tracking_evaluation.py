@@ -161,6 +161,22 @@ def test_offline_training_bundle_and_checkpoint_publication(offline_run: dict[st
     assert manifest["summary"]["epoch_metrics_complete"] is True
 
 
+def test_metrics_only_retention_keeps_local_files_without_remote_heavy_artifacts(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[2]
+    output = tmp_path / "metrics-only"
+    raw_config = _training_config(output)
+    raw_config["tracking"]["artifact_retention"] = "metrics_only"
+    config_path = tmp_path / "metrics-only.yaml"
+    config_path.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+    trained = _run(root, "ard.cli.train", "--config", str(config_path))
+    assert trained.returncode == 0, trained.stderr
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert (output / "best.pt").is_file() and (output / "last.pt").is_file()
+    assert not {entry["type"] for entry in manifest["artifacts"]} & {"model", "run-bundle"}
+
+
 def test_diagnostics_off_constructs_no_diagnostics_or_sample_statistics(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
