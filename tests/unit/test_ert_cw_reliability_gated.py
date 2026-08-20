@@ -7,6 +7,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ard.analysis.ert_cw_reliability_gated import prepare_selector_bundle
+from ard.cli.ert_cw_reliability_gated_ce015 import PRIMARY_ENDPOINT_EPOCH, TRAINING_END_EPOCH
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path]:
@@ -70,3 +71,8 @@ def test_prepare_bundle_uses_fixed_positive_margin_and_confusion_groups(tmp_path
     assert result["counts"]["RU"] == 2
     assert result["counts"]["UR"] == 1
     assert result["counts"]["UU"] == 0
+
+
+def test_gated_screen_includes_primary_endpoint_epoch() -> None:
+    assert PRIMARY_ENDPOINT_EPOCH == 94
+    assert TRAINING_END_EPOCH == PRIMARY_ENDPOINT_EPOCH + 1

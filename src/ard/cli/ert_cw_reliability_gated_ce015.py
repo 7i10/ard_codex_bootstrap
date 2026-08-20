@@ -12,6 +12,11 @@ import torch
 from ard.analysis.ert_cw_reliability_gated import prepare_selector_bundle
 from ard.analysis.ert_stage_a_runtime import StageATreatment, run_stage_a_arm
 
+PRIMARY_ENDPOINT_EPOCH = 94
+# Trainer.fit uses an exclusive epoch upper bound; epoch 94 therefore
+# requires ``epochs=95`` when continuing from the epoch-79 parent.
+TRAINING_END_EPOCH = PRIMARY_ENDPOINT_EPOCH + 1
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -71,8 +76,8 @@ def main(argv: list[str] | None = None) -> int:
         treatment=treatment,
         calibration=calibration,
         device=torch.device(args.device),
-        end_epoch=94,
-        horizon_epochs=(84, 89, 94),
+        end_epoch=TRAINING_END_EPOCH,
+        horizon_epochs=(84, 89, PRIMARY_ENDPOINT_EPOCH),
         run_namespace=args.run_namespace,
     )
     print(json.dumps(result, sort_keys=True))
