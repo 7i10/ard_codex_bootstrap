@@ -78,6 +78,9 @@ def _training_config(output: Path) -> dict[str, Any]:
             "run_id": "offline-smoke",
             "group": "fixture-comparison",
             "panel_size": 2,
+            # This fixture exercises the complete artifact lifecycle.  The
+            # production default is metrics_only; full is explicit here.
+            "artifact_retention": "full",
         },
         "evaluation": {
             "dataset": {

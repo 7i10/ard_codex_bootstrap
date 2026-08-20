@@ -28,7 +28,7 @@ from ard.evaluation import (
     validate_checkpoint_lineage,
 )
 from ard.models import build_student
-from ard.tracking import LocalTracker, create_tracker, validate_tracking_guard
+from ard.tracking import LocalTracker, create_tracker, should_upload_run_bundle, validate_tracking_guard
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -423,9 +423,10 @@ def main(argv: list[str] | None = None) -> int:
         (bundle / "error-marker.txt").write_text("no application error recorded\n", encoding="utf-8")
         evaluation_tracker.set_summary({"evaluation_checkpoints": [result["checkpoint"] for result in results]})
         evaluation_tracker.prepare_finish()
-        evaluation_tracker.log_artifact(
-            bundle, name=f"run-bundle-{evaluation_tracker.run_id}", artifact_type="run-bundle"
-        )
+        if should_upload_run_bundle(tracker_config.tracking.artifact_retention):
+            evaluation_tracker.log_artifact(
+                bundle, name=f"run-bundle-{evaluation_tracker.run_id}", artifact_type="run-bundle"
+            )
         evaluation_tracker.finish()
     except Exception:
         try:

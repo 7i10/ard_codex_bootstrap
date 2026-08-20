@@ -187,6 +187,8 @@ Every policy still publishes scalar epoch metrics, resolved configuration,
 lineage, and the small analysis-input/sample-stat artifacts required by the
 run contract.  A metrics-only run is therefore reproducible from its local
 manifest and checkpoint hashes without consuming the W&B model/bundle quota.
+Saved-checkpoint evaluation follows the same policy for its evaluation
+run-bundle; its JSON results and lineage artifacts remain published.
 Canonical results may explicitly opt into `best_last` after the run is
 accepted; `full` is reserved for a deliberate archival promotion.  Deleting a
 remote copy never deletes the local checkpoint or changes its SHA-256.

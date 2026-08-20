@@ -28,10 +28,14 @@ class EvaluationResolvedConfig:
 
 
 def _mapping_digest(value: Mapping[str, Any]) -> str:
-    """Match the checkpoint config digest without normalizing legacy fields."""
+    """Match the checkpoint digest while excluding operational W&B policy."""
     import hashlib
 
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
+    canonical = deepcopy(dict(value))
+    tracking = canonical.get("tracking")
+    if isinstance(tracking, dict):
+        tracking.pop("artifact_retention", None)
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), default=str).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
