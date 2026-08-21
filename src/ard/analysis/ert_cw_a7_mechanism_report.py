@@ -385,6 +385,25 @@ def build_report(
                         f"{summary['cosine_margin_base']['mean']:.6g} |"
                     )
             markdown.append("")
+        markdown.extend(
+            [
+                "### CE20 pre-treatment Q1--Q5 mapping (epoch 79)",
+                "",
+                "Quantile boundaries are pre-treatment Teacher CE-PGD20 margins; "
+                "they are not fitted to endpoint outcomes.",
+                "",
+                "| quantile | n | R0 | R1 | R2 | R3 |",
+                "|---|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for label in ("Q1", "Q2", "Q3", "Q4", "Q5"):
+            q = run_machine["pre_treatment_ce20_quantiles"][label]
+            counts = q["regime_by_epoch"]["79"]
+            markdown.append(
+                f"| {label} | {q['n']} | {counts.get('R0', 0)} | {counts.get('R1', 0)} | "
+                f"{counts.get('R2', 0)} | {counts.get('R3', 0)} |"
+            )
+        markdown.append("")
         for epoch in EPOCHS:
             a7 = run_machine["epochs"][str(epoch)]["A7"]["regimes"]
             markdown.append(
