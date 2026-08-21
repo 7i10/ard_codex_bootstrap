@@ -119,8 +119,10 @@ def probe_checkpoint(
         images = batch.images.index_select(0, index).float()
         labels = batch.labels.index_select(0, index)
         sample_ids = [int(item) for item in batch.sample_ids.index_select(0, index).tolist()]
+        # Keep the Student clean graph: the probe measures its clean-CE
+        # gradient.  Only the frozen Teacher target is detached.
+        student_clean_logits = student(images)
         with torch.no_grad():
-            student_clean_logits = student(images)
             teacher_clean_logits = teacher(images)
         generator = torch.Generator(device=device).manual_seed(
             config.seeds.model_init + 1_000_003 * (global_step + batch_index)
