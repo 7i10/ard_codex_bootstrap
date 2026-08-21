@@ -62,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Epochs for immutable post-epoch checkpoint copies (all must be <= --epochs).",
     )
     parser.add_argument("--run-namespace", default="stage-a")
+    parser.add_argument(
+        "--continuation-seed",
+        type=int,
+        help="Post-resume attack RNG seed for an independent matched continuation replicate.",
+    )
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     return parser
 
@@ -107,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         end_epoch=args.epochs,
         horizon_epochs=tuple(args.horizon_epochs),
         run_namespace=args.run_namespace,
+        continuation_seed=args.continuation_seed,
     )
     print(json.dumps(result, sort_keys=True))
     return 0

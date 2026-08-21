@@ -98,6 +98,16 @@ def test_horizon_contract_rejects_duplicate_or_pre_parent_epochs() -> None:
     _validate_horizons((84, 89, 94), 94)
 
 
+def test_continuation_seed_is_included_in_arm_identity() -> None:
+    from ard.analysis.ert_stage_a_runtime import _arm_hash
+
+    treatment = StageATreatment(arm="A100", mask_key="student_clean_wrong", kind="broad", margin_coefficient=0.2,
+                                margin_target_mode="teacher_floor", margin_floor=0.1, margin_cap=0.2)
+    first = _arm_hash("a" * 64, treatment, "b" * 40, continuation_seed=11)
+    second = _arm_hash("a" * 64, treatment, "b" * 40, continuation_seed=12)
+    assert first != second
+
+
 def test_epoch80_gate_requires_full_state_parity_and_capture_identity(tmp_path: Path) -> None:
     payload = {
         "model": {"x": torch.tensor([1])},

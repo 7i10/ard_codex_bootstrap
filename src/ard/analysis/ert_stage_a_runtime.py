@@ -255,6 +255,7 @@ def _arm_hash(
     treatment: StageATreatment,
     source_sha: str,
     *,
+    continuation_seed: int | None = None,
     dynamic_s3: dict[str, Any] | None = None,
 ) -> str:
     return hashlib.sha256(
@@ -262,6 +263,7 @@ def _arm_hash(
             {
                 "parent_config_hash": parent_hash,
                 "treatment": treatment.__dict__,
+                "continuation_seed": continuation_seed,
                 "dynamic_s3": dynamic_s3,
                 "source_git_sha": source_sha,
             },
@@ -283,6 +285,7 @@ def run_stage_a_arm(
     end_epoch: int,
     horizon_epochs: tuple[int, ...] = (84,),
     run_namespace: str = "stage-a",
+    continuation_seed: int | None = None,
     dynamic_s3_arm: str | None = None,
     dynamic_s3_beta_advce: float | None = None,
     dynamic_s3_attack_contract: dict[str, object] | None = None,
@@ -390,7 +393,15 @@ def run_stage_a_arm(
         if dynamic_s3_arm is None
         else {"arm": dynamic_s3_arm, "beta_advce": dynamic_s3_beta_advce, "timing": "same_step_pre_update"}
     )
-    arm_hash = _arm_hash(parent_hash, treatment, source_sha, dynamic_s3=dynamic_s3_identity)
+    if continuation_seed is not None and (isinstance(continuation_seed, bool) or continuation_seed < 0):
+        raise StageARuntimeError("continuation seed must be a non-negative integer")
+    arm_hash = _arm_hash(
+        parent_hash,
+        treatment,
+        source_sha,
+        continuation_seed=continuation_seed,
+        dynamic_s3=dynamic_s3_identity,
+    )
     train_dataset, validation_dataset = build_train_validation_views(
         config.dataset,
         validation_fraction=config.training.validation_fraction,
@@ -602,6 +613,24 @@ def run_stage_a_arm(
     trainer.tracker_run_id = run_id
     trainer.sample_state = state.sample_state
     sample_store.load_state_dict(state.sample_state)
+    if continuation_seed is not None:
+        # The epoch-79 optimizer/sampler/sample state remains the exact parent
+        # state.  Only the post-resume attack RNG stream is reseeded so R1/R2
+        # are independent continuation replicates while all arms within a
+        # matched block share the same seed.
+        import random
+
+        random.seed(continuation_seed)
+        torch.manual_seed(continuation_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(continuation_seed)
+        try:
+            import numpy as np
+
+            np.random.seed(continuation_seed)
+        except ImportError:
+            pass
+        trainer.seed = continuation_seed
     trainer.fork_lineage = {
         "kind": "ert_stage_a_treatment_v1",
         "arm": treatment.arm,
@@ -634,6 +663,7 @@ def run_stage_a_arm(
                 "calibration": calibration,
                 "child_config_hash": arm_hash,
                 "run_namespace": run_namespace,
+                "continuation_seed": continuation_seed,
                 "wandb_artifact_retention": config.tracking.artifact_retention,
                 "horizon_epochs": list(horizon_epochs),
                 "dynamic_s3": (
@@ -786,6 +816,7 @@ def run_stage_a_arm(
         "output_dir": str(output_dir.resolve()),
         "config_hash": arm_hash,
         "parent_checkpoint_sha256": _sha256(parent_checkpoint),
+        "continuation_seed": continuation_seed,
         "last_checkpoint_sha256": _sha256(output_dir / "last.pt"),
         "best_checkpoint_sha256": _sha256(output_dir / "best.pt"),
         "horizon_checkpoints": {
