@@ -32,7 +32,7 @@ PARENT_SHA = {
 }
 MASK_SHA = {
     "L2": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
-    "L4": "fe818e755e4b2da7a5beb7e1a791a52ab92905f01064870237972bb58344a6",
+    "L4": "fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6",
 }
 HIST_ENDPOINT_ROOT = ROOT / ".cache/analysis/ert-cw-margin-screen-v1-r3-endpoints-v2"
 F3_ENDPOINT_ROOT = ROOT / ".cache/analysis/ert-cw-a7-cleance-ablation-v1-endpoints"
