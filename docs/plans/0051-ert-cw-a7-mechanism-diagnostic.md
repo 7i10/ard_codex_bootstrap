@@ -47,7 +47,7 @@ checkpoint-bound no-update replay, and existing CE-PGD20 endpoint rows.
   79 and 94 (128 deterministic IDs per probe).
 - No training, optimizer/scheduler update, W&B run, official test, or
   AutoAttack was launched.
-- Report source SHA: `9e35df477a6bda25b7d7dbbb360a80557b48b098`.
+- Report source SHA: `9d54d2a0f6d7c2e66ca19bd384cb392e5e804b4c`.
 
 ## Outputs
 
