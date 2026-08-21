@@ -394,6 +394,14 @@ def main() -> None:
         "",
         "The report distinguishes direct train-cohort correction from non-selected train effects and held-out Clean-Wrong effects. Held-out Q1–Q5 use train-derived upper boundaries; validation outcomes never define the bins.",
         "",
+        "## Frozen lineage",
+        "",
+        f"- Analysis source SHA: `{machine['source_git_sha']}`",
+        f"- Endpoint attack identity (CE-PGD20): `{ENDPOINT_ATTACK}`",
+        "- Epoch-79 parents: L2 `ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c`; L4 `026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1`",
+        "- Fixed Clean-Wrong mask hashes: L2 `0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b`; L4 `fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6`",
+        "- Validation feature attacks: CE-PGD20 and KL-PGD10; all four replay outputs contain 5,000 stable IDs and are hash-bound in the machine JSON.",
+        "",
         "## Held-out cohort and boundary transfer",
         "",
         "| seed | train CW | held-out CW | held-out CE20 Q1–Q5 counts | held-out KL10 Q1–Q5 counts |",
@@ -452,6 +460,32 @@ def main() -> None:
     lines += [
         "",
         "For the broad-screen arms, the held-out Clean-Wrong table above is the subtype-transfer endpoint; the full-validation effects are available under `broad_effects[*].heldout_validation_overall` in the machine JSON.",
+        "",
+        "## Observed findings",
+        "",
+        (
+            f"- Broad Screen C10 (CleanCE 0.15) has held-out Clean-Wrong robust effects of "
+            f"{pp(machine['seeds']['L2']['broad_effects']['C10']['heldout_clean_wrong']['robust']['accuracy_delta'])} pp (L2) and "
+            f"{pp(machine['seeds']['L4']['broad_effects']['C10']['heldout_clean_wrong']['robust']['accuracy_delta'])} pp (L4); this is not a consistent robust subtype transfer."
+        ),
+        (
+            f"- C12 (MART-inspired adversarial hard-label proxy) is positive on the held-out Clean-Wrong subset in both seeds "
+            f"({pp(machine['seeds']['L2']['broad_effects']['C12']['heldout_clean_wrong']['robust']['accuracy_delta'])} pp, "
+            f"{pp(machine['seeds']['L4']['broad_effects']['C12']['heldout_clean_wrong']['robust']['accuracy_delta'])} pp), but its non-CW train spillover is negative in both seeds; this is a candidate family signal, not a generalization claim."
+        ),
+        (
+            f"- G2 (CE20 reliability gate) selected-CW robust effects are "
+            f"{pp(machine['seeds']['L2']['gated_effects']['G2_CW_R_CE20_CE015']['heldout_selected_cw']['robust']['accuracy_delta'])} pp (L2) and "
+            f"{pp(machine['seeds']['L4']['gated_effects']['G2_CW_R_CE20_CE015']['heldout_selected_cw']['robust']['accuracy_delta'])} pp (L4), while all-validation effects are "
+            f"{pp(machine['seeds']['L2']['gated_effects']['G2_CW_R_CE20_CE015']['heldout_validation_overall']['robust']['accuracy_delta'])} pp and "
+            f"{pp(machine['seeds']['L4']['gated_effects']['G2_CW_R_CE20_CE015']['heldout_validation_overall']['robust']['accuracy_delta'])} pp; the gate is not confirmed as a robust generalization selector."
+        ),
+        (
+            f"- G3 (KL10 practical gate) has all-validation robust effects of "
+            f"{pp(machine['seeds']['L2']['gated_effects']['G3_CW_R_KL10_CE015']['heldout_validation_overall']['robust']['accuracy_delta'])} pp and "
+            f"{pp(machine['seeds']['L4']['gated_effects']['G3_CW_R_KL10_CE015']['heldout_validation_overall']['robust']['accuracy_delta'])} pp; it does not provide a reliable online-selector justification."
+        ),
+        "- The dominant pattern is positive direct train-cohort effects accompanied by negative non-CW spillover and weak or seed-dependent held-out robust effects. This is evidence of distribution/interference sensitivity, not proof that Clean-Wrong treatment is generally ineffective.",
         "",
         "## Interpretation rules",
         "",
