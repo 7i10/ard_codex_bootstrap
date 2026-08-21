@@ -43,6 +43,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--extra-clean-ce", type=float)
     parser.add_argument("--bce-adv", type=float)
     parser.add_argument("--adaptive-advkd-gamma", type=float)
+    parser.add_argument(
+        "--margin-target-mode",
+        choices=("fixed", "teacher_zero", "teacher_floor", "teacher_abstain"),
+    )
+    parser.add_argument("--margin-coefficient", type=float)
+    parser.add_argument("--margin-gamma", type=float)
+    parser.add_argument("--margin-floor", type=float)
+    parser.add_argument("--margin-cap", type=float)
     parser.add_argument("--teacher-reliability-gate", action="store_true")
     parser.add_argument("--iad-inspired", action="store_true")
     parser.add_argument("--epochs", type=int, default=85)
@@ -78,6 +86,11 @@ def main(argv: list[str] | None = None) -> int:
         extra_clean_ce=args.extra_clean_ce,
         bce_adv=args.bce_adv,
         adaptive_advkd_gamma=args.adaptive_advkd_gamma,
+        margin_coefficient=args.margin_coefficient,
+        margin_target_mode=args.margin_target_mode,
+        margin_gamma=args.margin_gamma,
+        margin_floor=args.margin_floor,
+        margin_cap=args.margin_cap,
         teacher_reliability_gate=args.teacher_reliability_gate,
         iad_inspired=args.iad_inspired,
     )

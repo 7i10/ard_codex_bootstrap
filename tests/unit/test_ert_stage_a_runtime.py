@@ -59,6 +59,35 @@ def test_confirmatory_treatment_coefficients_are_explicit() -> None:
     assert t3.advkd_multiplier == 0.5
 
 
+def test_margin_treatment_contracts_cover_fixed_and_teacher_targets() -> None:
+    fixed = StageATreatment(
+        arm="A4",
+        mask_key="student_clean_wrong",
+        kind="broad",
+        margin_coefficient=0.2,
+        margin_target_mode="fixed",
+        margin_gamma=0.5,
+    )
+    assert fixed.margin_gamma == 0.5
+    for mode in ("teacher_zero", "teacher_floor", "teacher_abstain"):
+        kwargs = {
+            "margin_coefficient": 0.2,
+            "margin_target_mode": mode,
+            "margin_cap": 0.75,
+        }
+        if mode == "teacher_floor":
+            kwargs["margin_floor"] = 0.1
+        assert StageATreatment(arm=f"{mode}", mask_key="student_clean_wrong", kind="broad", **kwargs)
+    with pytest.raises(StageARuntimeError, match="requires gamma"):
+        StageATreatment(
+            arm="bad",
+            mask_key="student_clean_wrong",
+            kind="broad",
+            margin_coefficient=0.2,
+            margin_target_mode="fixed",
+        )
+
+
 def test_horizon_contract_rejects_duplicate_or_pre_parent_epochs() -> None:
     from ard.analysis.ert_stage_a_runtime import StageARuntimeError, _validate_horizons
 

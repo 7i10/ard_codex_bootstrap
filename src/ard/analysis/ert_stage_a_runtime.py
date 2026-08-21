@@ -67,6 +67,11 @@ class StageATreatment:
     extra_clean_ce: float | None = None
     bce_adv: float | None = None
     adaptive_advkd_gamma: float | None = None
+    margin_coefficient: float | None = None
+    margin_target_mode: str | None = None
+    margin_gamma: float | None = None
+    margin_floor: float | None = None
+    margin_cap: float | None = None
     teacher_reliability_gate: bool = False
     iad_inspired: bool = False
 
@@ -87,6 +92,20 @@ class StageATreatment:
             raise StageARuntimeError("Stage A softening requires the frozen tau=2.0")
         if self.kind == "clean_wrong" and (self.beta_cleance is None or self.beta_cleance < 0):
             raise StageARuntimeError("clean-wrong treatments require a non-negative frozen coefficient")
+        if self.margin_target_mode not in {None, "fixed", "teacher_zero", "teacher_floor", "teacher_abstain"}:
+            raise StageARuntimeError("unknown adversarial margin target mode")
+        if self.margin_target_mode is not None and self.margin_coefficient is None:
+            raise StageARuntimeError("margin target treatments require a frozen margin coefficient")
+        if self.margin_coefficient is not None and self.margin_target_mode is None:
+            raise StageARuntimeError("margin coefficient requires a target mode")
+        if self.margin_target_mode == "fixed" and self.margin_gamma is None:
+            raise StageARuntimeError("fixed margin treatment requires gamma")
+        if self.margin_target_mode in {"teacher_zero", "teacher_floor", "teacher_abstain"} and self.margin_cap is None:
+            raise StageARuntimeError("Teacher margin treatment requires cap")
+        if self.margin_target_mode == "teacher_floor" and self.margin_floor is None:
+            raise StageARuntimeError("Teacher floor treatment requires floor")
+        if self.margin_floor is not None and self.margin_cap is not None and self.margin_floor > self.margin_cap:
+            raise StageARuntimeError("margin floor cannot exceed cap")
         if self.kind == "advkd_advce" and (
             self.advkd_multiplier is None or not 0.0 <= self.advkd_multiplier <= 1.0
         ):
@@ -112,6 +131,10 @@ class StageATreatment:
             self.extra_clean_ce,
             self.bce_adv,
             self.adaptive_advkd_gamma,
+            self.margin_coefficient,
+            self.margin_gamma,
+            self.margin_floor,
+            self.margin_cap,
         ):
             if value is not None and value < 0:
                 raise StageARuntimeError("broad treatment coefficients must be non-negative")
@@ -542,6 +565,11 @@ def run_stage_a_arm(
         extra_clean_ce_coefficient=treatment.extra_clean_ce,
         adversarial_bce_coefficient=treatment.bce_adv,
         adaptive_advkd_gamma=treatment.adaptive_advkd_gamma,
+        margin_coefficient=treatment.margin_coefficient,
+        margin_target_mode=treatment.margin_target_mode,
+        margin_gamma=treatment.margin_gamma,
+        margin_floor=treatment.margin_floor,
+        margin_cap=treatment.margin_cap,
         teacher_clean_reliability_mask=teacher_reliability_mask,
         iad_inspired=treatment.iad_inspired,
         dynamic_s3_router=dynamic_s3_router,

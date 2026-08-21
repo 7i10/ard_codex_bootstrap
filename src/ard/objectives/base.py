@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import torch
+import torch.nn.functional as F
 
 from ard.policies import PolicyWeights
 
@@ -79,6 +80,49 @@ class ObjectiveTerms:
             raise ValueError("adversarial CE multiplier must be finite and non-negative")
         return ObjectiveTerms(
             hard=self.hard + coefficient * multiplier * ce,
+            kd=self.kd,
+            regularization=self.regularization,
+            adversarial_kd=self.adversarial_kd,
+            clean_kd=self.clean_kd,
+        )
+
+    def add_adversarial_margin(
+        self,
+        logits: torch.Tensor,
+        labels: torch.Tensor,
+        target_margin: torch.Tensor,
+        multiplier: torch.Tensor,
+        *,
+        coefficient: float,
+    ) -> ObjectiveTerms:
+        """Add a probability-margin hinge to the unreduced hard term.
+
+        The target is detached deliberately: Teacher-derived targets are
+        supervision, never an additional gradient path.  Margins are defined
+        in probability space as ``p(y) - max_{c != y} p(c)`` so the contract is
+        independent of logit scale and can be checked with small exact tests.
+        """
+        if logits.ndim != 2 or labels.shape != self.hard.shape or target_margin.shape != self.hard.shape:
+            raise ValueError("margin logits/target must match the unreduced objective batch")
+        if multiplier.shape != self.hard.shape or multiplier.ndim != 1:
+            raise ValueError("margin multiplier must match the unreduced objective batch")
+        if coefficient < 0 or not torch.isfinite(torch.as_tensor(coefficient, device=logits.device)):
+            raise ValueError("margin coefficient must be finite and non-negative")
+        if not torch.isfinite(target_margin).all() or not torch.isfinite(multiplier).all():
+            raise ValueError("margin target and multiplier must be finite")
+        if bool((multiplier < 0).any()):
+            raise ValueError("margin multiplier must be non-negative")
+        if labels.dtype not in (torch.int64, torch.int32, torch.int16, torch.int8):
+            raise ValueError("margin labels must be integer class indices")
+        if bool((labels < 0).any()) or bool((labels >= logits.shape[1]).any()):
+            raise ValueError("margin labels are outside the class range")
+        probabilities = F.softmax(logits.float(), dim=1)
+        true_probability = probabilities.gather(1, labels[:, None]).squeeze(1)
+        wrong_probabilities = probabilities.scatter(1, labels[:, None], 0.0)
+        student_margin = true_probability - wrong_probabilities.amax(dim=1)
+        hinge = F.relu(target_margin.detach().to(student_margin.dtype) - student_margin)
+        return ObjectiveTerms(
+            hard=self.hard + coefficient * multiplier * hinge,
             kd=self.kd,
             regularization=self.regularization,
             adversarial_kd=self.adversarial_kd,

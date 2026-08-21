@@ -158,6 +158,11 @@ class Trainer:
         extra_clean_ce_coefficient: float | None = None,
         adversarial_bce_coefficient: float | None = None,
         adaptive_advkd_gamma: float | None = None,
+        margin_coefficient: float | None = None,
+        margin_target_mode: str | None = None,
+        margin_gamma: float | None = None,
+        margin_floor: float | None = None,
+        margin_cap: float | None = None,
         teacher_clean_reliability_mask: FixedInterventionMask | None = None,
         iad_inspired: bool = False,
         dynamic_s3_router: Any | None = None,
@@ -203,6 +208,11 @@ class Trainer:
                 extra_clean_ce_coefficient,
                 adversarial_bce_coefficient,
                 adaptive_advkd_gamma,
+                margin_coefficient,
+                margin_target_mode,
+                margin_gamma,
+                margin_floor,
+                margin_cap,
                 teacher_clean_reliability_mask,
                 iad_inspired,
             )
@@ -217,6 +227,7 @@ class Trainer:
                 adversarial_kd_multiplier,
                 adversarial_ce_coefficient,
                 clean_wrong_mode,
+                margin_coefficient,
             )
         )
         if intervention_mask is not None and prescriptive_v3_route != "nr_prefix" and not has_treatment:
@@ -247,6 +258,10 @@ class Trainer:
             ("extra clean CE coefficient", extra_clean_ce_coefficient),
             ("adversarial BCE coefficient", adversarial_bce_coefficient),
             ("adaptive AdvKD gamma", adaptive_advkd_gamma),
+            ("margin coefficient", margin_coefficient),
+            ("margin gamma", margin_gamma),
+            ("margin floor", margin_floor),
+            ("margin cap", margin_cap),
         ):
             if value is not None and (not torch.isfinite(torch.as_tensor(value)) or value < 0):
                 raise ValueError(f"{name} must be finite and non-negative")
@@ -254,6 +269,19 @@ class Trainer:
             raise ValueError("selected attack epsilon and step size must be supplied together")
         if teacher_clean_reliability_mask is not None and intervention_mask is None:
             raise ValueError("teacher reliability mask requires a selected treatment mask")
+        valid_margin_modes = {None, "fixed", "teacher_zero", "teacher_floor", "teacher_abstain"}
+        if margin_target_mode not in valid_margin_modes:
+            raise ValueError("unknown adversarial margin target mode")
+        if margin_target_mode is not None and margin_coefficient is None:
+            raise ValueError("margin target mode requires a margin coefficient")
+        if margin_coefficient is not None and margin_target_mode is None:
+            raise ValueError("margin coefficient requires a margin target mode")
+        if margin_target_mode == "fixed" and margin_gamma is None:
+            raise ValueError("fixed margin target requires gamma")
+        if margin_target_mode in {"teacher_zero", "teacher_floor", "teacher_abstain"} and margin_cap is None:
+            raise ValueError("Teacher margin target requires a finite cap")
+        if margin_floor is not None and margin_cap is not None and margin_floor > margin_cap:
+            raise ValueError("margin floor cannot exceed margin cap")
         self.intervention_mask = intervention_mask
         if prescriptive_v3_route not in {None, "pf_retention", "nr_prefix"}:
             raise ValueError("prescriptive route must be pf_retention or nr_prefix")
@@ -284,6 +312,11 @@ class Trainer:
         self.extra_clean_ce_coefficient = extra_clean_ce_coefficient
         self.adversarial_bce_coefficient = adversarial_bce_coefficient
         self.adaptive_advkd_gamma = adaptive_advkd_gamma
+        self.margin_coefficient = margin_coefficient
+        self.margin_target_mode = margin_target_mode
+        self.margin_gamma = margin_gamma
+        self.margin_floor = margin_floor
+        self.margin_cap = margin_cap
         self.teacher_clean_reliability_mask = teacher_clean_reliability_mask
         self.iad_inspired = iad_inspired
         self.dynamic_s3_router = dynamic_s3_router
@@ -397,6 +430,54 @@ class Trainer:
             self._teacher_adversarial_logits = self.teacher(adversarial.float()).detach().float()
         self._teacher_adversarial_forward_calls += 1.0
         return self._teacher_adversarial_logits
+
+    @staticmethod
+    def _probability_margin(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        """Return ``p(y) - max_{c != y} p(c)`` in detached-safe FP32 math."""
+        if logits.ndim != 2 or labels.ndim != 1 or logits.shape[0] != labels.shape[0]:
+            raise ValueError("probability margin expects [batch, classes] logits and [batch] labels")
+        if labels.dtype not in (torch.int64, torch.int32, torch.int16, torch.int8):
+            raise ValueError("probability-margin labels must be integer class indices")
+        if bool((labels < 0).any()) or bool((labels >= logits.shape[1]).any()):
+            raise ValueError("probability-margin labels are outside the class range")
+        probabilities = F.softmax(logits.float(), dim=1)
+        true_probability = probabilities.gather(1, labels[:, None]).squeeze(1)
+        wrong_probability = probabilities.scatter(1, labels[:, None], 0.0).amax(dim=1)
+        margin = true_probability - wrong_probability
+        if not bool(torch.isfinite(margin).all()):
+            raise FloatingPointError("probability margin is non-finite")
+        return margin
+
+    def _adversarial_margin_target(
+        self,
+        *,
+        teacher_adversarial_logits: torch.Tensor,
+        labels: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Build a frozen Teacher margin target and its active multiplier."""
+        if self.margin_target_mode is None or self.margin_coefficient is None:
+            raise RuntimeError("adversarial margin target requested without a configured margin treatment")
+        teacher_margin = self._probability_margin(teacher_adversarial_logits, labels).detach()
+        mode = self.margin_target_mode
+        if mode == "fixed":
+            assert self.margin_gamma is not None
+            target = torch.full_like(teacher_margin, float(self.margin_gamma))
+            active = torch.ones_like(teacher_margin)
+        else:
+            assert self.margin_cap is not None
+            clipped = teacher_margin.clamp(min=0.0, max=float(self.margin_cap))
+            if mode == "teacher_floor":
+                if self.margin_floor is None:
+                    raise RuntimeError("Teacher floor margin target requires a floor")
+                target = teacher_margin.clamp(min=float(self.margin_floor), max=float(self.margin_cap))
+                active = torch.ones_like(teacher_margin)
+            elif mode == "teacher_abstain":
+                target = clipped
+                active = (teacher_margin > 0).to(dtype=teacher_margin.dtype)
+            else:  # teacher_zero
+                target = clipped
+                active = torch.ones_like(teacher_margin)
+        return target.detach(), active.detach()
 
     def _student_aware_signals(
         self,
@@ -862,6 +943,19 @@ class Trainer:
                     regularization=terms.regularization,
                     adversarial_kd=terms.adversarial_kd,
                     clean_kd=terms.clean_kd,
+                )
+            if treatment_risk is not None and self.margin_target_mode is not None:
+                teacher_adversarial_logits = self._teacher_adversarial_response(adversarial)
+                target_margin, target_active = self._adversarial_margin_target(
+                    teacher_adversarial_logits=teacher_adversarial_logits,
+                    labels=batch.labels,
+                )
+                terms = terms.add_adversarial_margin(
+                    logits,
+                    batch.labels,
+                    target_margin,
+                    treatment_risk * target_active,
+                    coefficient=float(self.margin_coefficient),
                 )
             if dynamic_s3_decision is not None and self.adversarial_ce_coefficient is not None:
                 if treatment_risk is None:
