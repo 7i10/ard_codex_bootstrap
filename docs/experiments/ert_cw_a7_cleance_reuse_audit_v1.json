@@ -1,0 +1,361 @@
+{
+  "calibration": {
+    "expected_sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5",
+    "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_cw_margin_calibration_v1.json",
+    "sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5"
+  },
+  "contract": "ert_cw_a7_reuse_audit_v1",
+  "fresh_training_required": [
+    "F3_L2",
+    "F3_L4"
+  ],
+  "historical_a7_is_full_f3": false,
+  "historical_source_git_sha": "bb59b512185af7bb70633c3266efd95bb24a563f",
+  "mapping": {
+    "F0": "historical A0",
+    "F1": "historical A1",
+    "F2": "historical A7",
+    "F3": null
+  },
+  "prohibitions": [
+    "no lambda sweep",
+    "no floor/cap sweep",
+    "no new seed",
+    "no official test",
+    "no AutoAttack"
+  ],
+  "relevant_source_component_hashes": {
+    "src/ard/analysis/ert_stage_a_runtime.py": {
+      "current": "b5272358d2c9872d7e875fe5d292898fa05d7763992687ba7f3717555597ff8d",
+      "historical": "b5272358d2c9872d7e875fe5d292898fa05d7763992687ba7f3717555597ff8d"
+    },
+    "src/ard/attacks/pgd.py": {
+      "current": "287a1dd05c8cfde2ec60929d4a20a4e1d9d695e0c06aae70364bb4a05728b412",
+      "historical": "287a1dd05c8cfde2ec60929d4a20a4e1d9d695e0c06aae70364bb4a05728b412"
+    },
+    "src/ard/engine/trainer.py": {
+      "current": "626a7fb5cdd3b2143e699cfd103af58f4c0fe7a1e63afdee5d057810ab11e6a1",
+      "historical": "626a7fb5cdd3b2143e699cfd103af58f4c0fe7a1e63afdee5d057810ab11e6a1"
+    },
+    "src/ard/objectives/rslad.py": {
+      "current": "646d95f8da74c4fc920cacf4ea353ec7104059305d4f2c154973643c9920d3da",
+      "historical": "646d95f8da74c4fc920cacf4ea353ec7104059305d4f2c154973643c9920d3da"
+    }
+  },
+  "reuse_decision": {
+    "F0": "reuse",
+    "F1": "reuse",
+    "F2": "reuse",
+    "F3": "fresh_required"
+  },
+  "reuse_gate_passed": true,
+  "runs": [
+    {
+      "arm": "A0",
+      "calibration_sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5",
+      "expected_treatment": {
+        "extra_clean_ce": null,
+        "kind": "baseline",
+        "margin_target_mode": null,
+        "mask_key": null
+      },
+      "lineage_identity_exact": true,
+      "manifest": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L2/A0/run-bundle/manifest.json",
+        "sha256": "17370c6617ffda755088882c2abfdb25488b4f253def85b99cd605f1273460db"
+      },
+      "mask_sha256": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
+      "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+      "parent_lineage_exact": true,
+      "resolved_config": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L2/A0/resolved_config.yaml",
+        "sha256": "eb5ec2a55482713c2e4fc08618068dd680dbe00790197f781892d00854906bf7"
+      },
+      "seed": "L2",
+      "shared_endpoint_epochs": true,
+      "source_git_sha": "bb59b512185af7bb70633c3266efd95bb24a563f",
+      "training_seed": 1,
+      "treatment": {
+        "adaptive_advkd_gamma": null,
+        "advkd_multiplier": null,
+        "arm": "A0",
+        "bce_adv": null,
+        "beta_advce": null,
+        "beta_cleance": null,
+        "clean_wrong_mode": null,
+        "extra_clean_ce": null,
+        "iad_inspired": false,
+        "kind": "baseline",
+        "margin_cap": null,
+        "margin_coefficient": null,
+        "margin_floor": null,
+        "margin_gamma": null,
+        "margin_target_mode": null,
+        "mask_key": null,
+        "selected_attack_epsilon": null,
+        "selected_attack_step_size": null,
+        "tau": null,
+        "teacher_reliability_gate": false
+      },
+      "treatment_matches_expected": true,
+      "treatment_mismatches": {}
+    },
+    {
+      "arm": "A1",
+      "calibration_sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5",
+      "expected_treatment": {
+        "extra_clean_ce": 0.15,
+        "kind": "broad",
+        "margin_target_mode": null,
+        "mask_key": "student_clean_wrong"
+      },
+      "lineage_identity_exact": true,
+      "manifest": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L2/A1/run-bundle/manifest.json",
+        "sha256": "9f58d81068454728e99e667bb461350ff1e4a6ecdce3e7fc2f98068f13b83f57"
+      },
+      "mask_sha256": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
+      "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+      "parent_lineage_exact": true,
+      "resolved_config": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L2/A1/resolved_config.yaml",
+        "sha256": "385e4da2e5d22967c5eec29e1a268d421be5f07464bfc8c9edabb424901d7029"
+      },
+      "seed": "L2",
+      "shared_endpoint_epochs": true,
+      "source_git_sha": "bb59b512185af7bb70633c3266efd95bb24a563f",
+      "training_seed": 1,
+      "treatment": {
+        "adaptive_advkd_gamma": null,
+        "advkd_multiplier": null,
+        "arm": "A1",
+        "bce_adv": null,
+        "beta_advce": null,
+        "beta_cleance": null,
+        "clean_wrong_mode": null,
+        "extra_clean_ce": 0.15,
+        "iad_inspired": false,
+        "kind": "broad",
+        "margin_cap": null,
+        "margin_coefficient": null,
+        "margin_floor": null,
+        "margin_gamma": null,
+        "margin_target_mode": null,
+        "mask_key": "student_clean_wrong",
+        "selected_attack_epsilon": null,
+        "selected_attack_step_size": null,
+        "tau": null,
+        "teacher_reliability_gate": false
+      },
+      "treatment_matches_expected": true,
+      "treatment_mismatches": {}
+    },
+    {
+      "arm": "A7",
+      "calibration_sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5",
+      "expected_treatment": {
+        "extra_clean_ce": null,
+        "kind": "broad",
+        "margin_cap": 0.13952550292015076,
+        "margin_coefficient": 0.2388051152229309,
+        "margin_floor": 0.03221710026264191,
+        "margin_target_mode": "teacher_floor",
+        "mask_key": "student_clean_wrong"
+      },
+      "lineage_identity_exact": true,
+      "manifest": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L2/A7/run-bundle/manifest.json",
+        "sha256": "12b6e4fbcb16cba0485c0ed6efcfef00429fe20379ee899bf47631b51b78bcbc"
+      },
+      "mask_sha256": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
+      "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+      "parent_lineage_exact": true,
+      "resolved_config": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L2/A7/resolved_config.yaml",
+        "sha256": "d29f3941d24a0094432d49e6f3b767b7de4ad1b0f4b7ad984f6b8d057a7fe79a"
+      },
+      "seed": "L2",
+      "shared_endpoint_epochs": true,
+      "source_git_sha": "bb59b512185af7bb70633c3266efd95bb24a563f",
+      "training_seed": 1,
+      "treatment": {
+        "adaptive_advkd_gamma": null,
+        "advkd_multiplier": null,
+        "arm": "A7",
+        "bce_adv": null,
+        "beta_advce": null,
+        "beta_cleance": null,
+        "clean_wrong_mode": null,
+        "extra_clean_ce": null,
+        "iad_inspired": false,
+        "kind": "broad",
+        "margin_cap": 0.13952550292015076,
+        "margin_coefficient": 0.2388051152229309,
+        "margin_floor": 0.03221710026264191,
+        "margin_gamma": null,
+        "margin_target_mode": "teacher_floor",
+        "mask_key": "student_clean_wrong",
+        "selected_attack_epsilon": null,
+        "selected_attack_step_size": null,
+        "tau": null,
+        "teacher_reliability_gate": false
+      },
+      "treatment_matches_expected": true,
+      "treatment_mismatches": {}
+    },
+    {
+      "arm": "A0",
+      "calibration_sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5",
+      "expected_treatment": {
+        "extra_clean_ce": null,
+        "kind": "baseline",
+        "margin_target_mode": null,
+        "mask_key": null
+      },
+      "lineage_identity_exact": true,
+      "manifest": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L4/A0/run-bundle/manifest.json",
+        "sha256": "c339188a331a26c8b896bdf717eeed9d58125e11441bbc624c6e1711fe9e3b39"
+      },
+      "mask_sha256": "fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6",
+      "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+      "parent_lineage_exact": true,
+      "resolved_config": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L4/A0/resolved_config.yaml",
+        "sha256": "916c314dd3eeadc7374ca35c69e8b252a560b7f8144a7a3820285d4426412090"
+      },
+      "seed": "L4",
+      "shared_endpoint_epochs": true,
+      "source_git_sha": "bb59b512185af7bb70633c3266efd95bb24a563f",
+      "training_seed": 2,
+      "treatment": {
+        "adaptive_advkd_gamma": null,
+        "advkd_multiplier": null,
+        "arm": "A0",
+        "bce_adv": null,
+        "beta_advce": null,
+        "beta_cleance": null,
+        "clean_wrong_mode": null,
+        "extra_clean_ce": null,
+        "iad_inspired": false,
+        "kind": "baseline",
+        "margin_cap": null,
+        "margin_coefficient": null,
+        "margin_floor": null,
+        "margin_gamma": null,
+        "margin_target_mode": null,
+        "mask_key": null,
+        "selected_attack_epsilon": null,
+        "selected_attack_step_size": null,
+        "tau": null,
+        "teacher_reliability_gate": false
+      },
+      "treatment_matches_expected": true,
+      "treatment_mismatches": {}
+    },
+    {
+      "arm": "A1",
+      "calibration_sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5",
+      "expected_treatment": {
+        "extra_clean_ce": 0.15,
+        "kind": "broad",
+        "margin_target_mode": null,
+        "mask_key": "student_clean_wrong"
+      },
+      "lineage_identity_exact": true,
+      "manifest": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L4/A1/run-bundle/manifest.json",
+        "sha256": "f0d1226f40b634368b4d7d83bdfdfd23fb393f0976d81e968c7032cd9a7af376"
+      },
+      "mask_sha256": "fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6",
+      "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+      "parent_lineage_exact": true,
+      "resolved_config": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L4/A1/resolved_config.yaml",
+        "sha256": "ea93313e8b14a26eba7b7d632c2ffff3c48dcf62c902fa86da14951500b57adb"
+      },
+      "seed": "L4",
+      "shared_endpoint_epochs": true,
+      "source_git_sha": "bb59b512185af7bb70633c3266efd95bb24a563f",
+      "training_seed": 2,
+      "treatment": {
+        "adaptive_advkd_gamma": null,
+        "advkd_multiplier": null,
+        "arm": "A1",
+        "bce_adv": null,
+        "beta_advce": null,
+        "beta_cleance": null,
+        "clean_wrong_mode": null,
+        "extra_clean_ce": 0.15,
+        "iad_inspired": false,
+        "kind": "broad",
+        "margin_cap": null,
+        "margin_coefficient": null,
+        "margin_floor": null,
+        "margin_gamma": null,
+        "margin_target_mode": null,
+        "mask_key": "student_clean_wrong",
+        "selected_attack_epsilon": null,
+        "selected_attack_step_size": null,
+        "tau": null,
+        "teacher_reliability_gate": false
+      },
+      "treatment_matches_expected": true,
+      "treatment_mismatches": {}
+    },
+    {
+      "arm": "A7",
+      "calibration_sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5",
+      "expected_treatment": {
+        "extra_clean_ce": null,
+        "kind": "broad",
+        "margin_cap": 0.13952550292015076,
+        "margin_coefficient": 0.2388051152229309,
+        "margin_floor": 0.03221710026264191,
+        "margin_target_mode": "teacher_floor",
+        "mask_key": "student_clean_wrong"
+      },
+      "lineage_identity_exact": true,
+      "manifest": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L4/A7/run-bundle/manifest.json",
+        "sha256": "02a739aab2d8c85fbadc38a04defa8e1ef22993e2464ad56f5f5e50a7ca8a8e4"
+      },
+      "mask_sha256": "fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6",
+      "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+      "parent_lineage_exact": true,
+      "resolved_config": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-cw-margin-screen-v1-r3/L4/A7/resolved_config.yaml",
+        "sha256": "825be08569e1d14a463b6dbfe50f98a67ea2ee60c33cfe9c7f2f0343e03fa7ce"
+      },
+      "seed": "L4",
+      "shared_endpoint_epochs": true,
+      "source_git_sha": "bb59b512185af7bb70633c3266efd95bb24a563f",
+      "training_seed": 2,
+      "treatment": {
+        "adaptive_advkd_gamma": null,
+        "advkd_multiplier": null,
+        "arm": "A7",
+        "bce_adv": null,
+        "beta_advce": null,
+        "beta_cleance": null,
+        "clean_wrong_mode": null,
+        "extra_clean_ce": null,
+        "iad_inspired": false,
+        "kind": "broad",
+        "margin_cap": 0.13952550292015076,
+        "margin_coefficient": 0.2388051152229309,
+        "margin_floor": 0.03221710026264191,
+        "margin_gamma": null,
+        "margin_target_mode": "teacher_floor",
+        "mask_key": "student_clean_wrong",
+        "selected_attack_epsilon": null,
+        "selected_attack_step_size": null,
+        "tau": null,
+        "teacher_reliability_gate": false
+      },
+      "treatment_matches_expected": true,
+      "treatment_mismatches": {}
+    }
+  ],
+  "schema_version": 1
+}
