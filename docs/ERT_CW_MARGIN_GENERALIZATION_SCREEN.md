@@ -2,10 +2,7 @@
 
 This is a preregistered point report for the fixed epoch-79 Clean-Wrong screen. No arm is promoted automatically.
 
-- Report source Git SHA: `bb59b512185af7bb70633c3266efd95bb24a563f`
-- Report aggregation was run with `--allow-dirty`; the aggregation source is
-  currently uncommitted because this environment's `.git` is read-only. Treat
-  this report as provisional until that source is committed and rerun.
+- Report source Git SHA: `315b7f8081f6fd33abdbf1474f55c46784a9d6b5`
 - Training source Git SHA: `bb59b512185af7bb70633c3266efd95bb24a563f`
 - Endpoint attack: `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2` (CE-PGD20, pixel-space $L_\u221e$, $8/255$)
 - Calibration: `a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5`
