@@ -1,7 +1,7 @@
 # ERT Clean-Wrong Generalization Diagnostic
 
-Status: held-out feature replay implementation prepared; GPU execution pending
-environment preflight. No training is part of this plan.
+Status: complete (read-only validation feature replay and CPU diagnostic report)
+No training is part of this plan.
 
 ## Frozen objective
 
@@ -26,7 +26,7 @@ same epoch-79 parents and validation split. No model or optimizer state is
 modified.
 
 After the four artifacts pass row-count, stable-ID/class, attack, parent, and
-source-lineage checks, a CPU report will compute:
+source-lineage checks, the CPU report computes:
 
 - Broad Screen Direct / non-Clean-Wrong train Spillover / validation Held-out;
 - train-derived Q1–Q5 subtype transfer;
@@ -38,3 +38,15 @@ The report will fail closed if validation feature lineage, endpoint attack
 identity, stable IDs/classes, or train-derived quantile boundaries do not
 match. No threshold, coefficient, new seed, official test, AutoAttack, or new
 intervention will be started automatically.
+
+## Completed execution record
+
+The four validation replays were run on exact epoch-79 parents:
+
+- L2 × CE-PGD20 and L2 × KL-PGD10;
+- L4 × CE-PGD20 and L4 × KL-PGD10.
+
+Each artifact contains 5,000 fixed validation IDs and is hash-bound to its
+parent, attack identity, source SHA, schema, and Parquet rows. The resulting
+report is `docs/ERT_CW_GENERALIZATION_DIAGNOSTIC.md` with machine output at
+`docs/experiments/ert_cw_generalization_diagnostic_v1.json`.
