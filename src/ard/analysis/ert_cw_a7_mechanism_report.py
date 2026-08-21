@@ -237,10 +237,14 @@ def build_report(
     for run in ("L2", "L4"):
         replay: dict[str, dict[int, dict[int, dict[str, Any]]]] = defaultdict(dict)
         run_machine: dict[str, Any] = {"epochs": {}, "transitions": {}, "endpoint_effects": {}}
+        replay_source_shas: set[str] = set()
+        replay_mask_shas: set[str] = set()
         for arm in ARMS:
             for epoch in EPOCHS:
                 meta, rows = _load_replay(replay_root, run, arm, epoch)
                 replay[arm][epoch] = rows
+                replay_source_shas.add(str(meta["source_git_sha"]))
+                replay_mask_shas.add(str(meta["mask_sha256"]))
                 floor = float(meta["treatment"].get("margin_floor") or 0.03221710026264191)
                 buffer_fractions = {
                     label: sum(
@@ -273,6 +277,8 @@ def build_report(
                     },
                     "positive_buffer": {"floor": floor, **buffer_fractions},
                 }
+        run_machine["replay_source_git_shas"] = sorted(replay_source_shas)
+        run_machine["replay_mask_sha256"] = sorted(replay_mask_shas)
         for arm in ARMS:
             run_machine["transitions"][arm] = _transitions({epoch: replay[arm][epoch] for epoch in EPOCHS})
         ids = set(replay["A7"][79])
@@ -394,6 +400,21 @@ def build_report(
         markdown.append("")
     machine["interpretation_boundary"] = (
         "No causal claim; endpoint outcomes are joined descriptively to no-update replay regimes."
+    )
+    markdown.extend(
+        [
+            "## Interpretation boundary and next priorities",
+            "",
+            "The endpoint tables are descriptive joins to replayed training-time regimes; "
+            "they do not identify a causal effect of any target rule.",
+            "The fixed 128-ID gradient probes are no-update diagnostics and were not used "
+            "to select a coefficient or treatment.",
+            "A7 follow-up priorities remain: (1) isolate A7 from extra CleanCE, "
+            "(2) preregister a small lambda sensitivity check, and "
+            "(3) separately test floor/cap sensitivity.",
+            "No follow-up training is started by this report.",
+            "",
+        ]
     )
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(machine, indent=2, sort_keys=True) + "\n", encoding="utf-8")
