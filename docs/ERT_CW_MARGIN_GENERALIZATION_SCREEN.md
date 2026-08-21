@@ -1,0 +1,141 @@
+# ERT Clean-Wrong Margin Generalization Screen
+
+This is a preregistered point report for the fixed epoch-79 Clean-Wrong screen. No arm is promoted automatically.
+
+- Report source Git SHA: `bb59b512185af7bb70633c3266efd95bb24a563f`
+- Report aggregation was run with `--allow-dirty`; the aggregation source is
+  currently uncommitted because this environment's `.git` is read-only. Treat
+  this report as provisional until that source is committed and rerun.
+- Training source Git SHA: `bb59b512185af7bb70633c3266efd95bb24a563f`
+- Endpoint attack: `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2` (CE-PGD20, pixel-space $L_\u221e$, $8/255$)
+- Calibration: `a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5`
+- Bootstrap: not run; this report contains fixed point estimates and sample-level paired effects.
+
+## Endpoint robust accuracy
+
+Values are held-out validation robust accuracy; `Δ` is paired against A0 at the same seed and horizon.
+
+| seed | epoch | arm | clean | robust | robust Δ vs A0 | clean Δ vs A0 |
+|---|---:|---|---:|---:|---:|---:|
+| L2 | 84 | A0 | 0.7782 | 0.4714 | +0.0000 | +0.0000 |
+| L2 | 84 | A1 | 0.7906 | 0.4718 | +0.0004 | +0.0124 |
+| L2 | 84 | A2 | 0.7790 | 0.4762 | +0.0048 | +0.0008 |
+| L2 | 84 | A3 | 0.7886 | 0.4588 | -0.0126 | +0.0104 |
+| L2 | 84 | A4 | 0.7760 | 0.4710 | -0.0004 | -0.0022 |
+| L2 | 84 | A5 | 0.7784 | 0.4620 | -0.0094 | +0.0002 |
+| L2 | 84 | A6 | 0.7734 | 0.4730 | +0.0016 | -0.0048 |
+| L2 | 84 | A7 | 0.7848 | 0.4748 | +0.0034 | +0.0066 |
+| L2 | 84 | A8 | 0.7728 | 0.4666 | -0.0048 | -0.0054 |
+| L2 | 89 | A0 | 0.7888 | 0.4532 | +0.0000 | +0.0000 |
+| L2 | 89 | A1 | 0.7956 | 0.4506 | -0.0026 | +0.0068 |
+| L2 | 89 | A2 | 0.7986 | 0.4628 | +0.0096 | +0.0098 |
+| L2 | 89 | A3 | 0.7916 | 0.4480 | -0.0052 | +0.0028 |
+| L2 | 89 | A4 | 0.7874 | 0.4572 | +0.0040 | -0.0014 |
+| L2 | 89 | A5 | 0.8022 | 0.4528 | -0.0004 | +0.0134 |
+| L2 | 89 | A6 | 0.7896 | 0.4704 | +0.0172 | +0.0008 |
+| L2 | 89 | A7 | 0.7856 | 0.4598 | +0.0066 | -0.0032 |
+| L2 | 89 | A8 | 0.7916 | 0.4588 | +0.0056 | +0.0028 |
+| L2 | 94 | A0 | 0.7752 | 0.4544 | +0.0000 | +0.0000 |
+| L2 | 94 | A1 | 0.7766 | 0.4380 | -0.0164 | +0.0014 |
+| L2 | 94 | A2 | 0.7700 | 0.4600 | +0.0056 | -0.0052 |
+| L2 | 94 | A3 | 0.7752 | 0.4524 | -0.0020 | +0.0000 |
+| L2 | 94 | A4 | 0.7714 | 0.4572 | +0.0028 | -0.0038 |
+| L2 | 94 | A5 | 0.7824 | 0.4392 | -0.0152 | +0.0072 |
+| L2 | 94 | A6 | 0.7742 | 0.4694 | +0.0150 | -0.0010 |
+| L2 | 94 | A7 | 0.7730 | 0.4626 | +0.0082 | -0.0022 |
+| L2 | 94 | A8 | 0.7644 | 0.4554 | +0.0010 | -0.0108 |
+| L4 | 84 | A0 | 0.7902 | 0.4642 | +0.0000 | +0.0000 |
+| L4 | 84 | A1 | 0.8044 | 0.4586 | -0.0056 | +0.0142 |
+| L4 | 84 | A2 | 0.7852 | 0.4610 | -0.0032 | -0.0050 |
+| L4 | 84 | A3 | 0.7908 | 0.4488 | -0.0154 | +0.0006 |
+| L4 | 84 | A4 | 0.7856 | 0.4604 | -0.0038 | -0.0046 |
+| L4 | 84 | A5 | 0.7976 | 0.4522 | -0.0120 | +0.0074 |
+| L4 | 84 | A6 | 0.7874 | 0.4632 | -0.0010 | -0.0028 |
+| L4 | 84 | A7 | 0.7896 | 0.4602 | -0.0040 | -0.0006 |
+| L4 | 84 | A8 | 0.7806 | 0.4594 | -0.0048 | -0.0096 |
+| L4 | 89 | A0 | 0.7824 | 0.4754 | +0.0000 | +0.0000 |
+| L4 | 89 | A1 | 0.8028 | 0.4836 | +0.0082 | +0.0204 |
+| L4 | 89 | A2 | 0.7880 | 0.4714 | -0.0040 | +0.0056 |
+| L4 | 89 | A3 | 0.8028 | 0.4812 | +0.0058 | +0.0204 |
+| L4 | 89 | A4 | 0.7862 | 0.4800 | +0.0046 | +0.0038 |
+| L4 | 89 | A5 | 0.7870 | 0.4608 | -0.0146 | +0.0046 |
+| L4 | 89 | A6 | 0.7758 | 0.4760 | +0.0006 | -0.0066 |
+| L4 | 89 | A7 | 0.7846 | 0.4796 | +0.0042 | +0.0022 |
+| L4 | 89 | A8 | 0.7826 | 0.4786 | +0.0032 | +0.0002 |
+| L4 | 94 | A0 | 0.7848 | 0.4722 | +0.0000 | +0.0000 |
+| L4 | 94 | A1 | 0.7970 | 0.4658 | -0.0064 | +0.0122 |
+| L4 | 94 | A2 | 0.7814 | 0.4732 | +0.0010 | -0.0034 |
+| L4 | 94 | A3 | 0.8134 | 0.4624 | -0.0098 | +0.0286 |
+| L4 | 94 | A4 | 0.7912 | 0.4696 | -0.0026 | +0.0064 |
+| L4 | 94 | A5 | 0.8020 | 0.4612 | -0.0110 | +0.0172 |
+| L4 | 94 | A6 | 0.7914 | 0.4686 | -0.0036 | +0.0066 |
+| L4 | 94 | A7 | 0.7902 | 0.4828 | +0.0106 | +0.0054 |
+| L4 | 94 | A8 | 0.7860 | 0.4734 | +0.0012 | +0.0012 |
+
+## Direct / spillover effects at epoch 94
+
+| seed | arm | region | n | clean Δ | robust Δ | robust rescue | robust harm |
+|---|---|---|---:|---:|---:|---:|---:|
+| L2 | A1 | direct_clean_wrong | 8623 | +0.0564 | +0.0037 | 0.0139 | 0.0102 |
+| L2 | A1 | spillover_non_clean_wrong | 36377 | -0.0112 | -0.0310 | 0.0436 | 0.0746 |
+| L2 | A1 | overall | 45000 | +0.0017 | -0.0244 | 0.0379 | 0.0623 |
+| L2 | A2 | direct_clean_wrong | 8623 | +0.0057 | +0.0038 | 0.0122 | 0.0083 |
+| L2 | A2 | spillover_non_clean_wrong | 36377 | -0.0094 | +0.0025 | 0.0595 | 0.0570 |
+| L2 | A2 | overall | 45000 | -0.0065 | +0.0028 | 0.0504 | 0.0477 |
+| L2 | A3 | direct_clean_wrong | 8623 | +0.0624 | +0.0119 | 0.0201 | 0.0081 |
+| L2 | A3 | spillover_non_clean_wrong | 36377 | -0.0063 | -0.0116 | 0.0509 | 0.0626 |
+| L2 | A3 | overall | 45000 | +0.0069 | -0.0071 | 0.0450 | 0.0521 |
+| L2 | A4 | direct_clean_wrong | 8623 | +0.0065 | +0.0006 | 0.0106 | 0.0100 |
+| L2 | A4 | spillover_non_clean_wrong | 36377 | -0.0078 | -0.0102 | 0.0490 | 0.0592 |
+| L2 | A4 | overall | 45000 | -0.0051 | -0.0081 | 0.0416 | 0.0498 |
+| L2 | A5 | direct_clean_wrong | 8623 | +0.0865 | +0.0082 | 0.0181 | 0.0099 |
+| L2 | A5 | spillover_non_clean_wrong | 36377 | -0.0014 | -0.0287 | 0.0457 | 0.0744 |
+| L2 | A5 | overall | 45000 | +0.0155 | -0.0216 | 0.0404 | 0.0620 |
+| L2 | A6 | direct_clean_wrong | 8623 | +0.0115 | +0.0056 | 0.0147 | 0.0092 |
+| L2 | A6 | spillover_non_clean_wrong | 36377 | -0.0048 | +0.0045 | 0.0546 | 0.0501 |
+| L2 | A6 | overall | 45000 | -0.0017 | +0.0047 | 0.0470 | 0.0422 |
+| L2 | A7 | direct_clean_wrong | 8623 | +0.0202 | +0.0044 | 0.0125 | 0.0081 |
+| L2 | A7 | spillover_non_clean_wrong | 36377 | -0.0004 | +0.0040 | 0.0534 | 0.0495 |
+| L2 | A7 | overall | 45000 | +0.0035 | +0.0040 | 0.0456 | 0.0415 |
+| L2 | A8 | direct_clean_wrong | 8623 | +0.0015 | +0.0002 | 0.0116 | 0.0114 |
+| L2 | A8 | spillover_non_clean_wrong | 36377 | -0.0126 | -0.0157 | 0.0468 | 0.0625 |
+| L2 | A8 | overall | 45000 | -0.0099 | -0.0126 | 0.0401 | 0.0527 |
+| L4 | A1 | direct_clean_wrong | 8925 | +0.0867 | +0.0160 | 0.0254 | 0.0094 |
+| L4 | A1 | spillover_non_clean_wrong | 36075 | -0.0038 | -0.0154 | 0.0515 | 0.0669 |
+| L4 | A1 | overall | 45000 | +0.0142 | -0.0092 | 0.0464 | 0.0555 |
+| L4 | A2 | direct_clean_wrong | 8925 | +0.0236 | +0.0121 | 0.0225 | 0.0104 |
+| L4 | A2 | spillover_non_clean_wrong | 36075 | -0.0126 | -0.0037 | 0.0543 | 0.0580 |
+| L4 | A2 | overall | 45000 | -0.0054 | -0.0006 | 0.0480 | 0.0486 |
+| L4 | A3 | direct_clean_wrong | 8925 | +0.1118 | +0.0138 | 0.0242 | 0.0104 |
+| L4 | A3 | spillover_non_clean_wrong | 36075 | +0.0094 | -0.0099 | 0.0552 | 0.0651 |
+| L4 | A3 | overall | 45000 | +0.0297 | -0.0052 | 0.0490 | 0.0542 |
+| L4 | A4 | direct_clean_wrong | 8925 | +0.0280 | +0.0068 | 0.0166 | 0.0097 |
+| L4 | A4 | spillover_non_clean_wrong | 36075 | -0.0030 | -0.0046 | 0.0541 | 0.0587 |
+| L4 | A4 | overall | 45000 | +0.0032 | -0.0024 | 0.0466 | 0.0490 |
+| L4 | A5 | direct_clean_wrong | 8925 | +0.0946 | +0.0155 | 0.0246 | 0.0092 |
+| L4 | A5 | spillover_non_clean_wrong | 36075 | +0.0004 | -0.0173 | 0.0535 | 0.0708 |
+| L4 | A5 | overall | 45000 | +0.0191 | -0.0108 | 0.0478 | 0.0586 |
+| L4 | A6 | direct_clean_wrong | 8925 | +0.0216 | +0.0059 | 0.0166 | 0.0106 |
+| L4 | A6 | spillover_non_clean_wrong | 36075 | -0.0067 | -0.0026 | 0.0557 | 0.0582 |
+| L4 | A6 | overall | 45000 | -0.0011 | -0.0009 | 0.0479 | 0.0488 |
+| L4 | A7 | direct_clean_wrong | 8925 | +0.0188 | +0.0099 | 0.0198 | 0.0100 |
+| L4 | A7 | spillover_non_clean_wrong | 36075 | -0.0035 | +0.0085 | 0.0604 | 0.0519 |
+| L4 | A7 | overall | 45000 | +0.0009 | +0.0088 | 0.0523 | 0.0436 |
+| L4 | A8 | direct_clean_wrong | 8925 | +0.0170 | +0.0039 | 0.0146 | 0.0106 |
+| L4 | A8 | spillover_non_clean_wrong | 36075 | -0.0019 | +0.0043 | 0.0555 | 0.0512 |
+| L4 | A8 | overall | 45000 | +0.0019 | +0.0042 | 0.0474 | 0.0431 |
+
+## Validation Pareto fronts at epoch 94
+
+| seed | non-dominated arms (Δ clean, Δ robust) |
+|---|---|
+| L2 | A3, A5, A6 |
+| L4 | A1, A3, A4, A6, A7 |
+
+## Interpretation guardrails
+
+- Direct effects are paired effects within the fixed epoch-79 Clean-Wrong cohort.
+- Spillover is the complement within the 45,000-sample train universe.
+- Validation is held-out internal validation, not official CIFAR-10 test.
+- Bootstrap, AutoAttack, official test, and automatic winner selection were not performed.
+- These results do not by themselves justify a new threshold, coefficient, or follow-up training arm.
