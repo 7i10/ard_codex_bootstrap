@@ -1,6 +1,7 @@
 # ERT Clean-Wrong A7 CleanCE ablation
 
-Status: in progress; historical reuse audit passed, F3 canary/training/evaluation pending.
+Status: complete; historical reuse audit, F3 canary/training, CE-PGD20 endpoints,
+and factorial report are complete.
 
 ## Scientific correction
 
@@ -51,6 +52,19 @@ the false claim that historical A7 was the full F3 arm.
    population inference.
 6. Stop after the report; do not automatically start sensitivity or another
    intervention.
+
+## Completion record
+
+- Reuse audit passed: historical A0/A1/A7 are F0/F1/F2 respectively; F3 was
+  trained fresh for both seeds. The historical A7 was not mislabeled as F3.
+- The one-epoch F3 L2 canary passed with finite metrics, exact parent lineage,
+  fixed mask, combined loss path, and metrics-only W&B retention.
+- F3 L2/L4 both completed epochs 80--94 and saved 84/89/94 checkpoints.
+- All six F3 endpoints (two seeds, three horizons, train/validation) completed
+  under independent CE-PGD20. Existing F0/F1/F2 endpoints were reused after
+  stable-ID, class, attack, checkpoint, and row-hash validation.
+- No lambda/floor/cap sweep, new seed, official test, or AutoAttack was run.
+- The report is descriptive and does not auto-promote a treatment.
 
 ## Machine records
 
