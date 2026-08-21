@@ -1,6 +1,6 @@
 # ERT Clean-Wrong Generalizable Robust Action Screen
 
-Status: in preparation; GPU launch blocked pending exact L4 epoch-79 parent recovery.
+Status: parent recovered; calibration and deterministic canary in progress.
 
 ## Objective
 
@@ -57,16 +57,18 @@ continuation at epochs 84, 89, and 94 with independent CE-PGD20.
 
 ## Current blocker and accepted non-substitution rule
 
-L2 exact parent is present locally and hashes correctly.  The local L4 file
-`.cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s2-confirm-v2/last.pt`
-hashes to `9b51bca767871ada6c80c75ad92997f9b7f246c0c1e35f3edad35d4e787a4a9c`,
-not the frozen `026a...` SHA.  No local checkpoint with the frozen L4 SHA was
-found.  The `9b51...` file must not be substituted.  GPU launch therefore
-remains blocked until the exact L4 parent is restored and hash-verified.
+L2 exact parent is present locally and hashes correctly.  The exact L4 parent
+was recovered and hash-verified at
+`.cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/last.pt`, with a
+stable copy at `.cache/analysis/ert-cw-l4-parent-recovery-audit/parent-epoch79.pt`.
+The observed source checkpoint `9b51...` remains provenance for the fork and is
+not substituted.  The complete recovery evidence is in
+`docs/ERT_CW_L4_PARENT_RECOVERY_AUDIT.md`.
 
-CPU implementation, contract tests, and artifact preparation may proceed in
-the meantime.  Once the parent is restored, rerun the preflight and canary;
-do not start production from a dirty or mismatched lineage.
+The no-update calibration must complete on the current clean source before
+the coefficient artifact is frozen.  A deterministic canary and all selected
+contract tests must then pass; production must not start from a dirty or
+mismatched lineage.  No endpoint result may alter calibration values.
 
 ## Output
 

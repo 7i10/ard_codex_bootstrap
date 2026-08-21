@@ -1,0 +1,17 @@
+schema_version: 1
+contract: ert_cw_margin_calibration_v1
+batch_size: 64
+max_samples_per_seed: 256
+runs:
+  L2:
+    parent_config: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/C79/resolved_config.yaml
+    checkpoint: .cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s1-confirm-v2/last.pt
+    mask: .cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L2.json
+    feature_meta: .cache/analysis/ert-clean-wrong-reliability-proxy-v1/L2/clean-wrong-kl10-feature-replay.json
+    feature_rows: .cache/analysis/ert-clean-wrong-reliability-proxy-v1/L2/clean-wrong-kl10-feature-stats.parquet
+  L4:
+    parent_config: .cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/resolved_config.yaml
+    checkpoint: .cache/analysis/ert-cw-l4-parent-recovery-audit/parent-epoch79.pt
+    mask: .cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L4.json
+    feature_meta: .cache/analysis/ert-clean-wrong-reliability-proxy-v1/L4/clean-wrong-kl10-feature-replay.json
+    feature_rows: .cache/analysis/ert-clean-wrong-reliability-proxy-v1/L4/clean-wrong-kl10-feature-stats.parquet
