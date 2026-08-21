@@ -1,6 +1,6 @@
 # ERT Clean-Wrong A7 mechanism diagnostic
 
-Status: in progress; read-only/no-update analysis.
+Status: complete; read-only/no-update analysis completed.
 
 ## Objective
 
@@ -37,6 +37,17 @@ checkpoint-bound no-update replay, and existing CE-PGD20 endpoint rows.
    artifacts; write the machine JSON and human report.
 6. Stop after the diagnostic report; propose (without launching) the next
    A7-without-CleanCE, lambda, and floor/cap sensitivity priorities.
+
+## Completion record
+
+- 32/32 replay artifacts completed for L2/L4 × A5--A8 × epochs 79/84/89/94.
+- The public CLI smoke used a real L2 A7 epoch-84 checkpoint and sparse fixed
+  IDs; schema, lineage, stable-ID joins, and report writing passed.
+- No-update gradient probes completed for both runs, all four arms, and epochs
+  79 and 94 (128 deterministic IDs per probe).
+- No training, optimizer/scheduler update, W&B run, official test, or
+  AutoAttack was launched.
+- Report source SHA: `02b34ad658a56e585e866dd47134b73f1d497ef2`.
 
 ## Outputs
 
