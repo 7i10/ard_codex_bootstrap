@@ -160,7 +160,7 @@ def _transitions(replay_by_epoch: dict[int, dict[int, dict[str, Any]]]) -> dict[
         (sequence[index], sequence[index + 1]) for sequence in sequences.values() for index in range(len(sequence) - 1)
     )
     switches = [
-        sum(left != right for left, right in zip(sequence, sequence[1:], strict=True))
+        sum(left != right for left, right in zip(sequence, sequence[1:]))
         for sequence in sequences.values()
     ]
     return {
