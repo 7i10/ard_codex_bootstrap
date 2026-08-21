@@ -17,11 +17,22 @@ changed after endpoint inspection.  The only training arms are fresh
 - [x] Set W&B artifact retention to metrics/lineage by default; keep all
   checkpoints and run-bundle files local with content hashes.
 - [x] Commit clean scientific source before GPU launch (`1039ff3`).
-- [ ] Prepare and audit L2/L4 selector counts and RR/RU/UR/UU groups.
-- [ ] Run 8 online-tracked continuations from exact epoch-79 parents.
-- [ ] Evaluate all 24 checkpoints (train and fixed validation) with CE-PGD20.
-- [ ] Aggregate paired direct/excluded-CW/non-CW/held-out effects.
-- [ ] Write result JSON/Markdown and perform one scientific contract review.
+- [x] Prepare and audit L2/L4 selector counts and RR/RU/UR/UU groups.
+- [x] Run 8 online-tracked continuations from exact epoch-79 parents.
+- [x] Evaluate all 24 checkpoints (train and fixed validation) with CE-PGD20.
+- [x] Aggregate paired direct/excluded-CW/non-CW/held-out effects.
+- [x] Write result JSON/Markdown and perform one scientific contract review.
+
+## Result record
+
+All 8 trajectories and 48 endpoint artifacts completed at Git SHA
+`8544fed4505d423cefe6e89ad789f45c52488aac`. The endpoint report is in
+`docs/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md` and the hash-bound machine
+record is `docs/experiments/ert_cw_reliability_gated_ce015_v1.json`.
+Gating was not confirmed: G2 was positive versus G0 at epoch 94 only for L2
+(`+0.44 pp` robust validation accuracy) and negative for L4 (`-0.56 pp`);
+G3 was negative for both seeds (`-1.06/-1.14 pp`). No follow-up training,
+threshold tuning, official-test evaluation, or AutoAttack was launched.
 
 ## Frozen lineage and contracts
 
