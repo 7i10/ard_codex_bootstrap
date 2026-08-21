@@ -97,6 +97,12 @@ def _effect(base: dict[int, dict[str, Any]], treatment: dict[int, dict[str, Any]
     }
 
 
+def _subset(rows: dict[int, dict[str, Any]], ids: set[int]) -> dict[int, dict[str, Any]]:
+    if not ids.issubset(rows):
+        raise A7MechanismReportError("endpoint subset IDs are not present")
+    return {item: rows[item] for item in ids}
+
+
 def _load_replay(root: Path, run: str, arm: str, epoch: int) -> tuple[dict[str, Any], dict[int, dict[str, Any]]]:
     directory = root / run / arm / f"epoch-{epoch}"
     meta_path = directory / "a7-mechanism-replay.json"
@@ -236,7 +242,13 @@ def build_report(
     ]
     for run in ("L2", "L4"):
         replay: dict[str, dict[int, dict[int, dict[str, Any]]]] = defaultdict(dict)
-        run_machine: dict[str, Any] = {"epochs": {}, "transitions": {}, "endpoint_effects": {}}
+        run_machine: dict[str, Any] = {
+            "epochs": {},
+            "transitions": {},
+            "endpoint_effects": {},
+            "endpoint_effects_direct": {},
+            "endpoint_effects_spillover": {},
+        }
         replay_source_shas: set[str] = set()
         replay_mask_shas: set[str] = set()
         for arm in ARMS:
@@ -295,10 +307,19 @@ def build_report(
         for epoch in ENDPOINT_EPOCHS:
             base = _load_endpoint(endpoint_root, run, "A0", epoch)
             effects: dict[str, Any] = {}
+            direct_effects: dict[str, Any] = {}
+            spillover_effects: dict[str, Any] = {}
+            spillover_ids = set(base) - ids
             for arm in ARMS:
                 treatment = _load_endpoint(endpoint_root, run, arm, epoch)
                 effects[arm] = _effect(base, treatment)
+                direct_effects[arm] = _effect(_subset(base, ids), _subset(treatment, ids))
+                spillover_effects[arm] = _effect(
+                    _subset(base, spillover_ids), _subset(treatment, spillover_ids)
+                )
             run_machine["endpoint_effects"][str(epoch)] = effects
+            run_machine["endpoint_effects_direct"][str(epoch)] = direct_effects
+            run_machine["endpoint_effects_spillover"][str(epoch)] = spillover_effects
         if gradient_root is not None:
             run_machine["gradient_probes"] = {}
             for arm in ARMS:
@@ -387,6 +408,26 @@ def build_report(
                 f"{effect['robust']['accuracy_delta']:+.4f} | {effect['clean']['rescue']} | "
                 f"{effect['clean']['harm']} | {effect['robust']['rescue']} | "
                 f"{effect['robust']['harm']} |"
+            )
+        markdown.extend(
+            [
+                "",
+                "### Endpoint effect partition (epoch 94)",
+                "",
+                "Direct is the fixed Clean-Wrong cohort; spillover is its complement in the train endpoint.",
+                "",
+                "| arm | direct clean Δ | direct robust Δ | spillover clean Δ | spillover robust Δ |",
+                "|---|---:|---:|---:|---:|",
+            ]
+        )
+        for arm in ARMS:
+            direct = run_machine["endpoint_effects_direct"]["94"][arm]
+            spillover = run_machine["endpoint_effects_spillover"]["94"][arm]
+            markdown.append(
+                f"| {arm} | {direct['clean']['accuracy_delta']:+.4f} | "
+                f"{direct['robust']['accuracy_delta']:+.4f} | "
+                f"{spillover['clean']['accuracy_delta']:+.4f} | "
+                f"{spillover['robust']['accuracy_delta']:+.4f} |"
             )
         markdown.extend(
             [
