@@ -43,6 +43,17 @@ The fixed 128-ID probes are diagnostics only; they do not tune coefficients or u
 | A7 | +0.0035 | +0.0040 | 1340 | 1181 | 2051 | 1869 |
 | A8 | -0.0099 | -0.0126 | 1128 | 1575 | 1804 | 2373 |
 
+### Endpoint effect partition (epoch 94)
+
+Direct is the fixed Clean-Wrong cohort; spillover is its complement in the train endpoint.
+
+| arm | direct clean Δ | direct robust Δ | spillover clean Δ | spillover robust Δ |
+|---|---:|---:|---:|---:|
+| A5 | +0.0865 | +0.0082 | -0.0014 | -0.0287 |
+| A6 | +0.0115 | +0.0056 | -0.0048 | +0.0045 |
+| A7 | +0.0202 | +0.0044 | -0.0004 | +0.0040 |
+| A8 | +0.0015 | +0.0002 | -0.0126 | -0.0157 |
+
 ### A7 dominant-regime rescue/harm
 
 | dominant regime | rescue | harm | net |
@@ -88,6 +99,17 @@ The fixed 128-ID probes are diagnostics only; they do not tune coefficients or u
 | A6 | -0.0011 | -0.0009 | 1316 | 1364 | 2156 | 2195 |
 | A7 | +0.0009 | +0.0088 | 1323 | 1281 | 2355 | 1960 |
 | A8 | +0.0019 | +0.0042 | 1320 | 1236 | 2132 | 1941 |
+
+### Endpoint effect partition (epoch 94)
+
+Direct is the fixed Clean-Wrong cohort; spillover is its complement in the train endpoint.
+
+| arm | direct clean Δ | direct robust Δ | spillover clean Δ | spillover robust Δ |
+|---|---:|---:|---:|---:|
+| A5 | +0.0946 | +0.0155 | +0.0004 | -0.0173 |
+| A6 | +0.0216 | +0.0059 | -0.0067 | -0.0026 |
+| A7 | +0.0188 | +0.0099 | -0.0035 | +0.0085 |
+| A8 | +0.0170 | +0.0039 | -0.0019 | +0.0043 |
 
 ### A7 dominant-regime rescue/harm
 
