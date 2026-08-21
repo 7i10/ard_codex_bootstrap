@@ -100,16 +100,12 @@
     "config_sha256": "36562d37b9b7341b626c634cd4fc4e5274618f75286ad2c24be04979acae18b6",
     "git": {
       "branch": "master",
-      "diff": "diff --git a/docs/plans/0050-ert-cw-margin-generalization-screen.md b/docs/plans/0050-ert-cw-margin-generalization-screen.md\nindex 46324dc..72d00d6 100644\n--- a/docs/plans/0050-ert-cw-margin-generalization-screen.md\n+++ b/docs/plans/0050-ert-cw-margin-generalization-screen.md\n@@ -1,6 +1,6 @@\n # ERT Clean-Wrong Generalizable Robust Action Screen\n \n-Status: parent recovered; calibration and deterministic canary in progress.\n+Status: parent recovered; no-update calibration complete; deterministic canary next.\n \n ## Objective\n \n@@ -70,6 +70,11 @@ the coefficient artifact is frozen.  A deterministic canary and all selected\n contract tests must then pass; production must not start from a dirty or\n mismatched lineage.  No endpoint result may alter calibration values.\n \n+Calibration is now frozen in\n+`docs/experiments/ert_cw_margin_calibration_v1.json` (artifact SHA\n+`6921a8d527f09fbb2433b45656d3c072b948b0f39f046d4273022e73258cfa04`); the\n+human-facing summary is `docs/ERT_CW_MARGIN_CALIBRATION.md`.\n+\n ## Output\n \n - `docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md`",
-      "diff_sha256": "12890e0bbb93333ecf7d84814fefebe526acb7d0da20aa13151eb92aec869f5a",
-      "dirty": true,
-      "sha": "cfeaddcfcd9c05cd4d03556c685646d4b574ce77",
-      "status": "M docs/plans/0050-ert-cw-margin-generalization-screen.md\n?? docs/ERT_CW_MARGIN_CALIBRATION.md\n?? docs/experiments/ert_cw_margin_calibration_v1.json\n?? docs/experiments/ert_cw_margin_calibration_v1.json.sha256",
-      "untracked_sha256": {
-        "docs/ERT_CW_MARGIN_CALIBRATION.md": "ed1c2a808c74175f58a632d14616a2207e198b6d7551573bb1b74b86fd8c7882",
-        "docs/experiments/ert_cw_margin_calibration_v1.json": "6921a8d527f09fbb2433b45656d3c072b948b0f39f046d4273022e73258cfa04",
-        "docs/experiments/ert_cw_margin_calibration_v1.json.sha256": "cac3a1efa12d9c8af612193d220217bb2711508bf4a7d7d9b20a17989e82ef5f"
-      }
+      "diff": "",
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "dirty": false,
+      "sha": "9697723dc315f41361edd4418eadd2f798bace80",
+      "status": "",
+      "untracked_sha256": {}
     }
   },
   "schema_version": 1,

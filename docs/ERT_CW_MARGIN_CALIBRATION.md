@@ -39,7 +39,7 @@ Machine-readable artifact:
 
 ```text
 docs/experiments/ert_cw_margin_calibration_v1.json
-SHA256: 058d3c440511308df2b004c3015f3fdec8aca027176c01620bba1913c0dc1582
+SHA256: a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5
 ```
 
 Both parent checkpoint hashes, both fixed Clean-Wrong mask hashes, feature

@@ -72,7 +72,7 @@ mismatched lineage.  No endpoint result may alter calibration values.
 
 Calibration is now frozen in
 `docs/experiments/ert_cw_margin_calibration_v1.json` (artifact SHA
-`058d3c440511308df2b004c3015f3fdec8aca027176c01620bba1913c0dc1582`); the
+`a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5`); the
 human-facing summary is `docs/ERT_CW_MARGIN_CALIBRATION.md`.
 
 ## Output
