@@ -1,6 +1,6 @@
 # ERT Clean-Wrong Generalizable Robust Action Screen
 
-Status: core screen complete; CE20/KL10 quantile action-map follow-up remains pending.
+Status: complete; held-out Clean-Wrong and CE20/KL10 Q1--Q5 tables added.
 
 ## Objective
 
@@ -80,8 +80,7 @@ human-facing summary is `docs/ERT_CW_MARGIN_CALIBRATION.md`.
 - `docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md`
 - `docs/experiments/ert_cw_margin_generalization_screen_v1.json`
 
-The 18 trajectories and 108 endpoint artifacts are complete. The current
-report contains endpoint, direct, spillover, held-out, rescue/harm, margin,
-and Pareto point estimates. The CE20/KL10 Q1--Q5 action-map extension is a
-CPU-only follow-up and is not included in this milestone. The campaign does
-not promote a winner automatically.
+The 18 trajectories and 108 endpoint artifacts are complete. The report
+contains endpoint, held-out Clean-Wrong, train-derived CE20/KL10 Q1--Q5,
+direct, non-Clean-Wrong spillover, rescue/harm, margin, and Pareto point
+estimates. The campaign does not promote a winner automatically.

@@ -18,6 +18,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--calibration", type=Path, required=True)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-markdown", type=Path, required=True)
+    parser.add_argument(
+        "--train-ce-feature-root",
+        type=Path,
+        default=Path(".cache/analysis/ert-clean-wrong-subtypes-v4"),
+    )
+    parser.add_argument(
+        "--train-kl-feature-root",
+        type=Path,
+        default=Path(".cache/analysis/ert-clean-wrong-reliability-proxy-v1"),
+    )
+    parser.add_argument(
+        "--validation-ce-feature-root",
+        type=Path,
+        default=Path(".cache/analysis/ert-cw-generalization-v1"),
+    )
+    parser.add_argument(
+        "--validation-kl-feature-root",
+        type=Path,
+        default=Path(".cache/analysis/ert-cw-generalization-v1"),
+    )
     parser.add_argument("--allow-dirty", action="store_true")
     args = parser.parse_args(argv)
     result = build_report(
@@ -28,6 +48,10 @@ def main(argv: list[str] | None = None) -> int:
         output_json=args.output_json,
         output_markdown=args.output_markdown,
         allow_dirty=args.allow_dirty,
+        train_ce_feature_root=args.train_ce_feature_root,
+        train_kl_feature_root=args.train_kl_feature_root,
+        validation_ce_feature_root=args.validation_ce_feature_root,
+        validation_kl_feature_root=args.validation_kl_feature_root,
     )
     print(
         json.dumps(
