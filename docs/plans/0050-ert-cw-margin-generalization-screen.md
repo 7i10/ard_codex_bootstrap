@@ -1,6 +1,6 @@
 # ERT Clean-Wrong Generalizable Robust Action Screen
 
-Status: parent recovered; calibration and deterministic canary in progress.
+Status: parent recovered; no-update calibration complete; deterministic canary next.
 
 ## Objective
 
@@ -69,6 +69,11 @@ The no-update calibration must complete on the current clean source before
 the coefficient artifact is frozen.  A deterministic canary and all selected
 contract tests must then pass; production must not start from a dirty or
 mismatched lineage.  No endpoint result may alter calibration values.
+
+Calibration is now frozen in
+`docs/experiments/ert_cw_margin_calibration_v1.json` (artifact SHA
+`058d3c440511308df2b004c3015f3fdec8aca027176c01620bba1913c0dc1582`); the
+human-facing summary is `docs/ERT_CW_MARGIN_CALIBRATION.md`.
 
 ## Output
 

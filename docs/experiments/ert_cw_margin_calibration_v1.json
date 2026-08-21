@@ -1,0 +1,119 @@
+{
+  "beta_advce": 0.07726448029279709,
+  "contract": "ert_cw_margin_calibration_v1",
+  "device": "cuda",
+  "inputs": {
+    "L2": {
+      "calibration_sample_ids_sha256": "53067367efbdbfb73159fe64e0a5b280108e6f3fee10c4ddf6930a76053e912b",
+      "checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+      "feature_meta_sha256": "99545d4c3e032b4cecb13b586130f175aaae13070052576f5d7014a579e3975e",
+      "feature_rows_sha256": "7de4120d9de1dd3f5773fb3ddf4d707c9d4697d7b7daaef8c060b3cb0b8421bc",
+      "mask_sha256": "0859507a2d86023f016ac4d7af890b556735ccfcd56faf14110dd161c1989d8b",
+      "parent_config": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ffnr-causal-pilot-screens-e79-94/L2/C79/resolved_config.yaml",
+      "positive_teacher_margin_count": 3452,
+      "quantiles": {
+        "q25": 0.031003598123788834,
+        "q50": 0.07157778739929199,
+        "q75": 0.13749052211642265
+      }
+    },
+    "L4": {
+      "calibration_sample_ids_sha256": "532641df5078ca510bf1c2b386a8b718ea6992abf1ad13ad325d48dcc28c9617",
+      "checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+      "feature_meta_sha256": "8cc16575d47788487598f3cbc3c71828a7ef7f385798b365a475990f03f332f2",
+      "feature_rows_sha256": "9bf6691c8d10cd5c8818ec1f150f8f617b7cae8834df993f9adad3c9f971b0a2",
+      "mask_sha256": "fe818e755e4b2da7a5beb7e1a791a52ab9290295f01064870237972bb58344a6",
+      "parent_config": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ffnr-causal-pilot-screens-e79-94/L4/C79/resolved_config.yaml",
+      "positive_teacher_margin_count": 3729,
+      "quantiles": {
+        "q25": 0.03355267643928528,
+        "q50": 0.07522600889205933,
+        "q75": 0.1408998668193817
+      }
+    }
+  },
+  "margin_coefficient": 0.2388051152229309,
+  "measurements": [
+    {
+      "advce_norm": 3.068695068359375,
+      "base_advkd_norm": 0.9665606617927551,
+      "batch": 0,
+      "margin_norm": 1.09041166305542,
+      "run": "L2"
+    },
+    {
+      "advce_norm": 3.2371368408203125,
+      "base_advkd_norm": 0.9705101251602173,
+      "batch": 1,
+      "margin_norm": 1.0069645643234253,
+      "run": "L2"
+    },
+    {
+      "advce_norm": 3.009716033935547,
+      "base_advkd_norm": 0.9301765561103821,
+      "batch": 2,
+      "margin_norm": 0.9737820625305176,
+      "run": "L2"
+    },
+    {
+      "advce_norm": 3.045914649963379,
+      "base_advkd_norm": 0.9721616506576538,
+      "batch": 3,
+      "margin_norm": 0.9370759129524231,
+      "run": "L2"
+    },
+    {
+      "advce_norm": 3.220276117324829,
+      "base_advkd_norm": 1.0195413827896118,
+      "batch": 0,
+      "margin_norm": 1.026100754737854,
+      "run": "L4"
+    },
+    {
+      "advce_norm": 3.532186269760132,
+      "base_advkd_norm": 1.0987510681152344,
+      "batch": 1,
+      "margin_norm": 1.1387172937393188,
+      "run": "L4"
+    },
+    {
+      "advce_norm": 3.2228505611419678,
+      "base_advkd_norm": 0.9576997756958008,
+      "batch": 2,
+      "margin_norm": 1.070044994354248,
+      "run": "L4"
+    },
+    {
+      "advce_norm": 3.1275827884674072,
+      "base_advkd_norm": 0.9121202826499939,
+      "batch": 3,
+      "margin_norm": 1.03070867061615,
+      "run": "L4"
+    }
+  ],
+  "pooled_positive_margin_quantiles": {
+    "q25": 0.03221710026264191,
+    "q50": 0.07321701943874359,
+    "q75": 0.13952550292015076
+  },
+  "provenance": {
+    "config_sha256": "36562d37b9b7341b626c634cd4fc4e5274618f75286ad2c24be04979acae18b6",
+    "git": {
+      "branch": "master",
+      "diff": "diff --git a/docs/plans/0050-ert-cw-margin-generalization-screen.md b/docs/plans/0050-ert-cw-margin-generalization-screen.md\nindex 46324dc..72d00d6 100644\n--- a/docs/plans/0050-ert-cw-margin-generalization-screen.md\n+++ b/docs/plans/0050-ert-cw-margin-generalization-screen.md\n@@ -1,6 +1,6 @@\n # ERT Clean-Wrong Generalizable Robust Action Screen\n \n-Status: parent recovered; calibration and deterministic canary in progress.\n+Status: parent recovered; no-update calibration complete; deterministic canary next.\n \n ## Objective\n \n@@ -70,6 +70,11 @@ the coefficient artifact is frozen.  A deterministic canary and all selected\n contract tests must then pass; production must not start from a dirty or\n mismatched lineage.  No endpoint result may alter calibration values.\n \n+Calibration is now frozen in\n+`docs/experiments/ert_cw_margin_calibration_v1.json` (artifact SHA\n+`6921a8d527f09fbb2433b45656d3c072b948b0f39f046d4273022e73258cfa04`); the\n+human-facing summary is `docs/ERT_CW_MARGIN_CALIBRATION.md`.\n+\n ## Output\n \n - `docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md`",
+      "diff_sha256": "12890e0bbb93333ecf7d84814fefebe526acb7d0da20aa13151eb92aec869f5a",
+      "dirty": true,
+      "sha": "cfeaddcfcd9c05cd4d03556c685646d4b574ce77",
+      "status": "M docs/plans/0050-ert-cw-margin-generalization-screen.md\n?? docs/ERT_CW_MARGIN_CALIBRATION.md\n?? docs/experiments/ert_cw_margin_calibration_v1.json\n?? docs/experiments/ert_cw_margin_calibration_v1.json.sha256",
+      "untracked_sha256": {
+        "docs/ERT_CW_MARGIN_CALIBRATION.md": "ed1c2a808c74175f58a632d14616a2207e198b6d7551573bb1b74b86fd8c7882",
+        "docs/experiments/ert_cw_margin_calibration_v1.json": "6921a8d527f09fbb2433b45656d3c072b948b0f39f046d4273022e73258cfa04",
+        "docs/experiments/ert_cw_margin_calibration_v1.json.sha256": "cac3a1efa12d9c8af612193d220217bb2711508bf4a7d7d9b20a17989e82ef5f"
+      }
+    }
+  },
+  "schema_version": 1,
+  "status": "complete_no_update",
+  "target_ratio": 0.25,
+  "tau": 2.0
+}
