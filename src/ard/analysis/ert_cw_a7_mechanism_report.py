@@ -133,6 +133,23 @@ def _load_endpoint(root: Path, run: str, arm: str, epoch: int) -> dict[int, dict
     return _rows(path)
 
 
+def _load_gradient(root: Path, run: str, arm: str, epoch: int, checkpoint_sha256: str) -> dict[str, Any]:
+    path = root / run / arm / f"epoch-{epoch}.json"
+    if not path.is_file():
+        raise A7MechanismReportError(f"missing gradient probe: {path}")
+    payload = _json(path)
+    if (
+        payload.get("contract") != "ert_cw_a7_gradient_probe_v1"
+        or payload.get("no_update") is not True
+        or payload.get("run") != run
+        or payload.get("arm") != arm
+        or payload.get("epoch") != epoch
+        or payload.get("checkpoint_sha256") != checkpoint_sha256
+    ):
+        raise A7MechanismReportError(f"gradient probe lineage mismatch: {path}")
+    return payload
+
+
 def _quantile_members(feature_root: Path, ids: set[int]) -> dict[str, set[int]]:
     meta = _json(feature_root / "clean-wrong-feature-replay.json")
     rows = _rows(Path(str(meta["rows_path"])))
@@ -186,6 +203,7 @@ def build_report(
     replay_root: Path,
     endpoint_root: Path,
     ce_feature_root: Path,
+    gradient_root: Path | None = None,
     output_json: Path,
     output_markdown: Path,
 ) -> dict[str, Any]:
@@ -201,6 +219,7 @@ def build_report(
         "mask_sha256": MASK_SHA256,
         "arms": ARMS,
         "epochs": EPOCHS,
+        "gradient_probe_root": str(gradient_root) if gradient_root is not None else None,
         "runs": {},
     }
     markdown: list[str] = [
@@ -274,6 +293,21 @@ def build_report(
                 treatment = _load_endpoint(endpoint_root, run, arm, epoch)
                 effects[arm] = _effect(base, treatment)
             run_machine["endpoint_effects"][str(epoch)] = effects
+        if gradient_root is not None:
+            run_machine["gradient_probes"] = {}
+            for arm in ARMS:
+                run_machine["gradient_probes"][arm] = {}
+                for epoch in (79, 94):
+                    replay_meta = _json(
+                        replay_root / run / arm / f"epoch-{epoch}" / "a7-mechanism-replay.json"
+                    )
+                    run_machine["gradient_probes"][arm][str(epoch)] = _load_gradient(
+                        gradient_root,
+                        run,
+                        arm,
+                        epoch,
+                        str(replay_meta["checkpoint_sha256"]),
+                    )
         a7_endpoint = _load_endpoint(endpoint_root, run, "A7", 94)
         base_endpoint = _load_endpoint(endpoint_root, run, "A0", 94)
         outcome_by_regime: dict[str, dict[str, int]] = {
@@ -301,6 +335,27 @@ def build_report(
                 "",
             ]
         )
+        if gradient_root is not None:
+            markdown.extend(
+                [
+                    "### No-update gradient probe",
+                    "",
+                    "The fixed 128-ID probes are diagnostics only; they do not tune coefficients "
+                    "or use endpoint outcomes.",
+                    "",
+                    "| arm | epoch | base norm | margin/base ratio | margin/base cosine |",
+                    "|---|---:|---:|---:|---:|",
+                ]
+            )
+            for arm in ARMS:
+                for epoch in (79, 94):
+                    summary = run_machine["gradient_probes"][arm][str(epoch)]["summary"]
+                    markdown.append(
+                        f"| {arm} | {epoch} | {summary['base_norm']['mean']:.6g} | "
+                        f"{summary['weighted_margin_base_ratio']['mean']:.6g} | "
+                        f"{summary['cosine_margin_base']['mean']:.6g} |"
+                    )
+            markdown.append("")
         for epoch in EPOCHS:
             a7 = run_machine["epochs"][str(epoch)]["A7"]["regimes"]
             markdown.append(

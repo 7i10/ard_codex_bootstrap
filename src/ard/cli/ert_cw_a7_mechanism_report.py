@@ -14,6 +14,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--replay-root", type=Path, required=True)
     parser.add_argument("--endpoint-root", type=Path, required=True)
     parser.add_argument("--ce-feature-root", type=Path, required=True)
+    parser.add_argument("--gradient-root", type=Path)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-markdown", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -21,6 +22,7 @@ def main(argv: list[str] | None = None) -> int:
         replay_root=args.replay_root,
         endpoint_root=args.endpoint_root,
         ce_feature_root=args.ce_feature_root,
+        gradient_root=args.gradient_root,
         output_json=args.output_json,
         output_markdown=args.output_markdown,
     )
