@@ -319,6 +319,550 @@
           }
         }
       },
+      "endpoint_effects_direct": {
+        "84": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.060999652093239015,
+              "harm": 311,
+              "harm_rate": 0.03606633422242839,
+              "margin_delta": 0.018104233273660227,
+              "n": 8623,
+              "net_rescue_rate": 0.060999652093239015,
+              "rescue": 837,
+              "rescue_rate": 0.0970659863156674
+            },
+            "robust": {
+              "accuracy_delta": 0.023889597587846458,
+              "harm": 71,
+              "harm_rate": 0.008233793343383974,
+              "margin_delta": 0.010960794459960583,
+              "n": 8623,
+              "net_rescue_rate": 0.023889597587846458,
+              "rescue": 277,
+              "rescue_rate": 0.03212339093123043
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": -0.001739533804940276,
+              "harm": 433,
+              "harm_rate": 0.0502145425026093,
+              "margin_delta": 0.0016668734212949134,
+              "n": 8623,
+              "net_rescue_rate": -0.001739533804940276,
+              "rescue": 418,
+              "rescue_rate": 0.04847500869766903
+            },
+            "robust": {
+              "accuracy_delta": 0.005218601414820828,
+              "harm": 92,
+              "harm_rate": 0.01066914067030036,
+              "margin_delta": 0.008468395756359071,
+              "n": 8623,
+              "net_rescue_rate": 0.005218601414820828,
+              "rescue": 137,
+              "rescue_rate": 0.015887742085121188
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": 0.010553171749971007,
+              "harm": 400,
+              "harm_rate": 0.04638756813174069,
+              "margin_delta": 0.004656270409900849,
+              "n": 8623,
+              "net_rescue_rate": 0.010553171749971007,
+              "rescue": 491,
+              "rescue_rate": 0.0569407398817117
+            },
+            "robust": {
+              "accuracy_delta": 0.003015191928563145,
+              "harm": 98,
+              "harm_rate": 0.011364954192276469,
+              "margin_delta": 0.000529154431829593,
+              "n": 8623,
+              "net_rescue_rate": 0.003015191928563145,
+              "rescue": 124,
+              "rescue_rate": 0.014380146120839614
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": -0.0011596892032935174,
+              "harm": 492,
+              "harm_rate": 0.057056708802041056,
+              "margin_delta": 0.0005767368498222328,
+              "n": 8623,
+              "net_rescue_rate": -0.0011596892032935174,
+              "rescue": 482,
+              "rescue_rate": 0.05589701959874754
+            },
+            "robust": {
+              "accuracy_delta": 0.0054505392554795315,
+              "harm": 96,
+              "harm_rate": 0.011133016351617767,
+              "margin_delta": -0.002189237191092867,
+              "n": 8623,
+              "net_rescue_rate": 0.0054505392554795315,
+              "rescue": 143,
+              "rescue_rate": 0.0165835556070973
+            }
+          }
+        },
+        "89": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.08755653484866056,
+              "harm": 286,
+              "harm_rate": 0.0331671112141946,
+              "margin_delta": 0.03103447704211225,
+              "n": 8623,
+              "net_rescue_rate": 0.08755653484866056,
+              "rescue": 1041,
+              "rescue_rate": 0.12072364606285516
+            },
+            "robust": {
+              "accuracy_delta": 0.01809115157137887,
+              "harm": 57,
+              "harm_rate": 0.006610228458773049,
+              "margin_delta": 0.02623541349879719,
+              "n": 8623,
+              "net_rescue_rate": 0.01809115157137887,
+              "rescue": 213,
+              "rescue_rate": 0.024701380030151918
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": 0.019714716455989795,
+              "harm": 483,
+              "harm_rate": 0.056012988519076885,
+              "margin_delta": 0.01182217130016924,
+              "n": 8623,
+              "net_rescue_rate": 0.019714716455989795,
+              "rescue": 653,
+              "rescue_rate": 0.07572770497506669
+            },
+            "robust": {
+              "accuracy_delta": 0.00533457033515018,
+              "harm": 75,
+              "harm_rate": 0.00869766902470138,
+              "margin_delta": 0.02046132867931836,
+              "n": 8623,
+              "net_rescue_rate": 0.00533457033515018,
+              "rescue": 121,
+              "rescue_rate": 0.01403223935985156
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": 0.028992230082337932,
+              "harm": 522,
+              "harm_rate": 0.06053577641192161,
+              "margin_delta": 0.01569524806052892,
+              "n": 8623,
+              "net_rescue_rate": 0.028992230082337932,
+              "rescue": 772,
+              "rescue_rate": 0.08952800649425954
+            },
+            "robust": {
+              "accuracy_delta": 0.011480923112605821,
+              "harm": 69,
+              "harm_rate": 0.00800185550272527,
+              "margin_delta": 0.0290428740996835,
+              "n": 8623,
+              "net_rescue_rate": 0.011480923112605821,
+              "rescue": 168,
+              "rescue_rate": 0.01948277861533109
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": 0.010785109590629711,
+              "harm": 545,
+              "harm_rate": 0.06320306157949669,
+              "margin_delta": 0.006532912093000734,
+              "n": 8623,
+              "net_rescue_rate": 0.010785109590629711,
+              "rescue": 638,
+              "rescue_rate": 0.0739881711701264
+            },
+            "robust": {
+              "accuracy_delta": 0.0054505392554795315,
+              "harm": 69,
+              "harm_rate": 0.00800185550272527,
+              "margin_delta": 0.009143866794742233,
+              "n": 8623,
+              "net_rescue_rate": 0.0054505392554795315,
+              "rescue": 116,
+              "rescue_rate": 0.0134523947582048
+            }
+          }
+        },
+        "94": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.0865128145656964,
+              "harm": 251,
+              "harm_rate": 0.029108199002667284,
+              "margin_delta": 0.030808061757041257,
+              "n": 8623,
+              "net_rescue_rate": 0.0865128145656964,
+              "rescue": 997,
+              "rescue_rate": 0.11562101356836368
+            },
+            "robust": {
+              "accuracy_delta": 0.008233793343383974,
+              "harm": 85,
+              "harm_rate": 0.009857358227994897,
+              "margin_delta": 0.012984635154802533,
+              "n": 8623,
+              "net_rescue_rate": 0.008233793343383974,
+              "rescue": 156,
+              "rescue_rate": 0.01809115157137887
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": 0.011480923112605821,
+              "harm": 389,
+              "harm_rate": 0.045111910008117824,
+              "margin_delta": 0.008120050080743534,
+              "n": 8623,
+              "net_rescue_rate": 0.011480923112605821,
+              "rescue": 488,
+              "rescue_rate": 0.05659283312072365
+            },
+            "robust": {
+              "accuracy_delta": 0.0055665081758088835,
+              "harm": 79,
+              "harm_rate": 0.009161544706018787,
+              "margin_delta": 0.00950770909823136,
+              "n": 8623,
+              "net_rescue_rate": 0.0055665081758088835,
+              "rescue": 127,
+              "rescue_rate": 0.01472805288182767
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": 0.020178592137307202,
+              "harm": 362,
+              "harm_rate": 0.041980749159225325,
+              "margin_delta": 0.007625451114252909,
+              "n": 8623,
+              "net_rescue_rate": 0.020178592137307202,
+              "rescue": 536,
+              "rescue_rate": 0.06215934129653253
+            },
+            "robust": {
+              "accuracy_delta": 0.004406818972515366,
+              "harm": 70,
+              "harm_rate": 0.008117824423054622,
+              "margin_delta": 0.009306235991268884,
+              "n": 8623,
+              "net_rescue_rate": 0.004406818972515366,
+              "rescue": 108,
+              "rescue_rate": 0.012524643395569987
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": 0.0015075959642815726,
+              "harm": 434,
+              "harm_rate": 0.05033051142293865,
+              "margin_delta": -0.0018662524234732908,
+              "n": 8623,
+              "net_rescue_rate": 0.0015075959642815726,
+              "rescue": 447,
+              "rescue_rate": 0.05183810738722022
+            },
+            "robust": {
+              "accuracy_delta": 0.00023193784065870347,
+              "harm": 98,
+              "harm_rate": 0.011364954192276469,
+              "margin_delta": -0.003925913194209341,
+              "n": 8623,
+              "net_rescue_rate": 0.00023193784065870347,
+              "rescue": 100,
+              "rescue_rate": 0.011596892032935173
+            }
+          }
+        }
+      },
+      "endpoint_effects_spillover": {
+        "84": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": -0.016686367759848254,
+              "harm": 1350,
+              "harm_rate": 0.037111361574621325,
+              "margin_delta": -0.00900307426453751,
+              "n": 36377,
+              "net_rescue_rate": -0.016686367759848254,
+              "rescue": 743,
+              "rescue_rate": 0.02042499381477307
+            },
+            "robust": {
+              "accuracy_delta": -0.02724248838551832,
+              "harm": 2693,
+              "harm_rate": 0.07403029386700388,
+              "margin_delta": -0.013466513091431773,
+              "n": 36377,
+              "net_rescue_rate": -0.02724248838551832,
+              "rescue": 1702,
+              "rescue_rate": 0.046787805481485555
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": -0.010418671138356653,
+              "harm": 1066,
+              "harm_rate": 0.029304230695219508,
+              "margin_delta": -0.011029828029621767,
+              "n": 36377,
+              "net_rescue_rate": -0.010418671138356653,
+              "rescue": 687,
+              "rescue_rate": 0.018885559556862854
+            },
+            "robust": {
+              "accuracy_delta": -0.004535833081342607,
+              "harm": 1943,
+              "harm_rate": 0.05341287076999203,
+              "margin_delta": -0.0036292591760982195,
+              "n": 36377,
+              "net_rescue_rate": -0.004535833081342607,
+              "rescue": 1778,
+              "rescue_rate": 0.04887703768864942
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": -0.0033537674904472606,
+              "harm": 917,
+              "harm_rate": 0.02520823597327982,
+              "margin_delta": 0.0068498497960588905,
+              "n": 36377,
+              "net_rescue_rate": -0.0033537674904472606,
+              "rescue": 795,
+              "rescue_rate": 0.02185446848283256
+            },
+            "robust": {
+              "accuracy_delta": -0.004095994721939687,
+              "harm": 1887,
+              "harm_rate": 0.05187343651208181,
+              "margin_delta": 0.0035911669152445674,
+              "n": 36377,
+              "net_rescue_rate": -0.004095994721939687,
+              "rescue": 1738,
+              "rescue_rate": 0.04777744179014212
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": -0.014734585039997802,
+              "harm": 1285,
+              "harm_rate": 0.035324518239546965,
+              "margin_delta": -0.004287128943673334,
+              "n": 36377,
+              "net_rescue_rate": -0.014734585039997802,
+              "rescue": 749,
+              "rescue_rate": 0.020589933199549167
+            },
+            "robust": {
+              "accuracy_delta": -0.020095115045220883,
+              "harm": 2502,
+              "harm_rate": 0.06877972345163152,
+              "margin_delta": -0.007001544701306558,
+              "n": 36377,
+              "net_rescue_rate": -0.020095115045220883,
+              "rescue": 1771,
+              "rescue_rate": 0.048684608406410645
+            }
+          }
+        },
+        "89": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.004288424004178465,
+              "harm": 831,
+              "harm_rate": 0.022844104791489128,
+              "margin_delta": -0.006469997268839968,
+              "n": 36377,
+              "net_rescue_rate": 0.004288424004178465,
+              "rescue": 987,
+              "rescue_rate": 0.027132528795667594
+            },
+            "robust": {
+              "accuracy_delta": -0.0074772521098496305,
+              "harm": 2350,
+              "harm_rate": 0.0646012590373038,
+              "margin_delta": -0.006867545920995317,
+              "n": 36377,
+              "net_rescue_rate": -0.0074772521098496305,
+              "rescue": 2078,
+              "rescue_rate": 0.05712400692745416
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": 0.0029963988234323886,
+              "harm": 842,
+              "harm_rate": 0.023146493663578634,
+              "margin_delta": -0.012912212425976165,
+              "n": 36377,
+              "net_rescue_rate": 0.0029963988234323886,
+              "rescue": 951,
+              "rescue_rate": 0.026142892487011023
+            },
+            "robust": {
+              "accuracy_delta": 0.009319075239849355,
+              "harm": 2020,
+              "harm_rate": 0.055529592874618575,
+              "margin_delta": -0.0031749290812597866,
+              "n": 36377,
+              "net_rescue_rate": 0.009319075239849355,
+              "rescue": 2359,
+              "rescue_rate": 0.06484866811446793
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": 0.0006047777441790142,
+              "harm": 985,
+              "harm_rate": 0.02707754900074223,
+              "margin_delta": -0.017308325608514568,
+              "n": 36377,
+              "net_rescue_rate": 0.0006047777441790142,
+              "rescue": 1007,
+              "rescue_rate": 0.027682326744921243
+            },
+            "robust": {
+              "accuracy_delta": 0.007037413750446711,
+              "harm": 2360,
+              "harm_rate": 0.06487615801193061,
+              "margin_delta": -0.006214274976315577,
+              "n": 36377,
+              "net_rescue_rate": 0.007037413750446711,
+              "rescue": 2616,
+              "rescue_rate": 0.07191357176237732
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": 0.0010171262061192511,
+              "harm": 926,
+              "harm_rate": 0.02545564505044396,
+              "margin_delta": -0.004223714861913855,
+              "n": 36377,
+              "net_rescue_rate": 0.0010171262061192511,
+              "rescue": 963,
+              "rescue_rate": 0.026472771256563214
+            },
+            "robust": {
+              "accuracy_delta": 0.008769277290595706,
+              "harm": 2114,
+              "harm_rate": 0.05811364323611073,
+              "margin_delta": -0.0018014797474024081,
+              "n": 36377,
+              "net_rescue_rate": 0.008769277290595706,
+              "rescue": 2433,
+              "rescue_rate": 0.06688292052670644
+            }
+          }
+        },
+        "94": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": -0.0013744948731341231,
+              "harm": 917,
+              "harm_rate": 0.02520823597327982,
+              "margin_delta": -0.004375177192179063,
+              "n": 36377,
+              "net_rescue_rate": -0.0013744948731341231,
+              "rescue": 867,
+              "rescue_rate": 0.023833741100145696
+            },
+            "robust": {
+              "accuracy_delta": -0.028726942848503176,
+              "harm": 2706,
+              "harm_rate": 0.07438766253401875,
+              "margin_delta": -0.01776092250172405,
+              "n": 36377,
+              "net_rescue_rate": -0.028726942848503176,
+              "rescue": 1661,
+              "rescue_rate": 0.04566071968551557
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": -0.004783242158506749,
+              "harm": 888,
+              "harm_rate": 0.024411028946862028,
+              "margin_delta": 0.001327517266186919,
+              "n": 36377,
+              "net_rescue_rate": -0.004783242158506749,
+              "rescue": 714,
+              "rescue_rate": 0.019627786788355278
+            },
+            "robust": {
+              "accuracy_delta": 0.004508343183879924,
+              "harm": 1822,
+              "harm_rate": 0.05008659317700745,
+              "margin_delta": 0.004543448743800659,
+              "n": 36377,
+              "net_rescue_rate": 0.004508343183879924,
+              "rescue": 1986,
+              "rescue_rate": 0.05459493636088737
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": -0.000412348461940237,
+              "harm": 819,
+              "harm_rate": 0.022514226021936937,
+              "margin_delta": -0.0006691994050836525,
+              "n": 36377,
+              "net_rescue_rate": -0.000412348461940237,
+              "rescue": 804,
+              "rescue_rate": 0.0221018775599967
+            },
+            "robust": {
+              "accuracy_delta": 0.003958545234626275,
+              "harm": 1799,
+              "harm_rate": 0.04945432553536575,
+              "margin_delta": 0.0006978732189944169,
+              "n": 36377,
+              "net_rescue_rate": 0.003958545234626275,
+              "rescue": 1943,
+              "rescue_rate": 0.05341287076999203
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": -0.012645352832833934,
+              "harm": 1141,
+              "harm_rate": 0.031365973004920694,
+              "margin_delta": -0.0040333176950665545,
+              "n": 36377,
+              "net_rescue_rate": -0.012645352832833934,
+              "rescue": 681,
+              "rescue_rate": 0.01872062017208676
+            },
+            "robust": {
+              "accuracy_delta": -0.015696731451191687,
+              "harm": 2275,
+              "harm_rate": 0.0625395167276026,
+              "margin_delta": -0.007900199638057753,
+              "n": 36377,
+              "net_rescue_rate": -0.015696731451191687,
+              "rescue": 1704,
+              "rescue_rate": 0.04684278527641092
+            }
+          }
+        }
+      },
       "epochs": {
         "79": {
           "A5": {
@@ -3720,6 +4264,550 @@
           }
         }
       },
+      "endpoint_effects_direct": {
+        "84": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.08089635854341737,
+              "harm": 262,
+              "harm_rate": 0.029355742296918768,
+              "margin_delta": 0.02480458966657227,
+              "n": 8925,
+              "net_rescue_rate": 0.08089635854341737,
+              "rescue": 984,
+              "rescue_rate": 0.11025210084033614
+            },
+            "robust": {
+              "accuracy_delta": 0.007955182072829131,
+              "harm": 102,
+              "harm_rate": 0.011428571428571429,
+              "margin_delta": 0.012400936172956846,
+              "n": 8925,
+              "net_rescue_rate": 0.007955182072829131,
+              "rescue": 173,
+              "rescue_rate": 0.01938375350140056
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": 0.020840336134453782,
+              "harm": 438,
+              "harm_rate": 0.04907563025210084,
+              "margin_delta": 0.006224212084664684,
+              "n": 8925,
+              "net_rescue_rate": 0.020840336134453782,
+              "rescue": 624,
+              "rescue_rate": 0.06991596638655462
+            },
+            "robust": {
+              "accuracy_delta": -0.001792717086834734,
+              "harm": 130,
+              "harm_rate": 0.014565826330532213,
+              "margin_delta": 0.0027202257305300203,
+              "n": 8925,
+              "net_rescue_rate": -0.001792717086834734,
+              "rescue": 114,
+              "rescue_rate": 0.012773109243697478
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": 0.013781512605042017,
+              "harm": 401,
+              "harm_rate": 0.04492997198879552,
+              "margin_delta": 0.00726352846672555,
+              "n": 8925,
+              "net_rescue_rate": 0.013781512605042017,
+              "rescue": 524,
+              "rescue_rate": 0.058711484593837536
+            },
+            "robust": {
+              "accuracy_delta": 0.004369747899159664,
+              "harm": 99,
+              "harm_rate": 0.011092436974789916,
+              "margin_delta": 0.009953602984839795,
+              "n": 8925,
+              "net_rescue_rate": 0.004369747899159664,
+              "rescue": 138,
+              "rescue_rate": 0.01546218487394958
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": 0.004257703081232493,
+              "harm": 433,
+              "harm_rate": 0.04851540616246498,
+              "margin_delta": 0.0003829777858504394,
+              "n": 8925,
+              "net_rescue_rate": 0.004257703081232493,
+              "rescue": 471,
+              "rescue_rate": 0.05277310924369748
+            },
+            "robust": {
+              "accuracy_delta": 0.0005602240896358543,
+              "harm": 119,
+              "harm_rate": 0.013333333333333334,
+              "margin_delta": 0.00210924274781171,
+              "n": 8925,
+              "net_rescue_rate": 0.0005602240896358543,
+              "rescue": 124,
+              "rescue_rate": 0.013893557422969188
+            }
+          }
+        },
+        "89": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.08336134453781513,
+              "harm": 309,
+              "harm_rate": 0.0346218487394958,
+              "margin_delta": 0.026127858300502894,
+              "n": 8925,
+              "net_rescue_rate": 0.08336134453781513,
+              "rescue": 1053,
+              "rescue_rate": 0.11798319327731092
+            },
+            "robust": {
+              "accuracy_delta": 0.022296918767507,
+              "harm": 76,
+              "harm_rate": 0.008515406162464986,
+              "margin_delta": 0.022995206776286373,
+              "n": 8925,
+              "net_rescue_rate": 0.022296918767507,
+              "rescue": 275,
+              "rescue_rate": 0.03081232492997199
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": 0.014453781512605042,
+              "harm": 475,
+              "harm_rate": 0.05322128851540616,
+              "margin_delta": 0.0049171729456810725,
+              "n": 8925,
+              "net_rescue_rate": 0.014453781512605042,
+              "rescue": 604,
+              "rescue_rate": 0.06767507002801121
+            },
+            "robust": {
+              "accuracy_delta": 0.015238095238095238,
+              "harm": 84,
+              "harm_rate": 0.009411764705882352,
+              "margin_delta": 0.012157025588493721,
+              "n": 8925,
+              "net_rescue_rate": 0.015238095238095238,
+              "rescue": 220,
+              "rescue_rate": 0.02464985994397759
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": 0.016582633053221288,
+              "harm": 448,
+              "harm_rate": 0.05019607843137255,
+              "margin_delta": 0.009449776183156407,
+              "n": 8925,
+              "net_rescue_rate": 0.016582633053221288,
+              "rescue": 596,
+              "rescue_rate": 0.06677871148459384
+            },
+            "robust": {
+              "accuracy_delta": 0.013221288515406162,
+              "harm": 82,
+              "harm_rate": 0.00918767507002801,
+              "margin_delta": 0.0165728196401556,
+              "n": 8925,
+              "net_rescue_rate": 0.013221288515406162,
+              "rescue": 200,
+              "rescue_rate": 0.022408963585434174
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": 0.018263305322128852,
+              "harm": 437,
+              "harm_rate": 0.048963585434173666,
+              "margin_delta": 0.005961880176341167,
+              "n": 8925,
+              "net_rescue_rate": 0.018263305322128852,
+              "rescue": 600,
+              "rescue_rate": 0.06722689075630252
+            },
+            "robust": {
+              "accuracy_delta": 0.0036974789915966387,
+              "harm": 95,
+              "harm_rate": 0.010644257703081233,
+              "margin_delta": 0.0023719549220817095,
+              "n": 8925,
+              "net_rescue_rate": 0.0036974789915966387,
+              "rescue": 128,
+              "rescue_rate": 0.014341736694677872
+            }
+          }
+        },
+        "94": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.09456582633053222,
+              "harm": 325,
+              "harm_rate": 0.036414565826330535,
+              "margin_delta": 0.03049325980141717,
+              "n": 8925,
+              "net_rescue_rate": 0.09456582633053222,
+              "rescue": 1169,
+              "rescue_rate": 0.13098039215686275
+            },
+            "robust": {
+              "accuracy_delta": 0.01546218487394958,
+              "harm": 82,
+              "harm_rate": 0.00918767507002801,
+              "margin_delta": 0.01775660726953955,
+              "n": 8925,
+              "net_rescue_rate": 0.01546218487394958,
+              "rescue": 220,
+              "rescue_rate": 0.02464985994397759
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": 0.021624649859943976,
+              "harm": 467,
+              "harm_rate": 0.052324929971988794,
+              "margin_delta": 0.01112912740360121,
+              "n": 8925,
+              "net_rescue_rate": 0.021624649859943976,
+              "rescue": 660,
+              "rescue_rate": 0.07394957983193277
+            },
+            "robust": {
+              "accuracy_delta": 0.005938375350140056,
+              "harm": 95,
+              "harm_rate": 0.010644257703081233,
+              "margin_delta": 0.012076806001970414,
+              "n": 8925,
+              "net_rescue_rate": 0.005938375350140056,
+              "rescue": 148,
+              "rescue_rate": 0.016582633053221288
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": 0.018823529411764704,
+              "harm": 463,
+              "harm_rate": 0.05187675070028011,
+              "margin_delta": 0.008635988037626283,
+              "n": 8925,
+              "net_rescue_rate": 0.018823529411764704,
+              "rescue": 631,
+              "rescue_rate": 0.07070028011204482
+            },
+            "robust": {
+              "accuracy_delta": 0.009859943977591037,
+              "harm": 89,
+              "harm_rate": 0.009971988795518208,
+              "margin_delta": 0.010977494520466535,
+              "n": 8925,
+              "net_rescue_rate": 0.009859943977591037,
+              "rescue": 177,
+              "rescue_rate": 0.019831932773109243
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": 0.01703081232492997,
+              "harm": 446,
+              "harm_rate": 0.04997198879551821,
+              "margin_delta": 0.006036790630229715,
+              "n": 8925,
+              "net_rescue_rate": 0.01703081232492997,
+              "rescue": 598,
+              "rescue_rate": 0.06700280112044818
+            },
+            "robust": {
+              "accuracy_delta": 0.00392156862745098,
+              "harm": 95,
+              "harm_rate": 0.010644257703081233,
+              "margin_delta": 0.006956229871478067,
+              "n": 8925,
+              "net_rescue_rate": 0.00392156862745098,
+              "rescue": 130,
+              "rescue_rate": 0.014565826330532213
+            }
+          }
+        }
+      },
+      "endpoint_effects_spillover": {
+        "84": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.0008593208593208593,
+              "harm": 809,
+              "harm_rate": 0.022425502425502425,
+              "margin_delta": -0.0032161136935010028,
+              "n": 36075,
+              "net_rescue_rate": 0.0008593208593208593,
+              "rescue": 840,
+              "rescue_rate": 0.023284823284823286
+            },
+            "robust": {
+              "accuracy_delta": -0.01857241857241857,
+              "harm": 2467,
+              "harm_rate": 0.06838530838530839,
+              "margin_delta": -0.011622389011389666,
+              "n": 36075,
+              "net_rescue_rate": -0.01857241857241857,
+              "rescue": 1797,
+              "rescue_rate": 0.04981288981288981
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": 0.0031046431046431048,
+              "harm": 690,
+              "harm_rate": 0.019126819126819128,
+              "margin_delta": 0.006247865689230395,
+              "n": 36075,
+              "net_rescue_rate": 0.0031046431046431048,
+              "rescue": 802,
+              "rescue_rate": 0.022231462231462232
+            },
+            "robust": {
+              "accuracy_delta": -0.005765765765765766,
+              "harm": 2013,
+              "harm_rate": 0.0558004158004158,
+              "margin_delta": -3.1496594328890225e-05,
+              "n": 36075,
+              "net_rescue_rate": -0.005765765765765766,
+              "rescue": 1805,
+              "rescue_rate": 0.05003465003465003
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": 0.001496881496881497,
+              "harm": 692,
+              "harm_rate": 0.019182259182259184,
+              "margin_delta": -0.005053143533706996,
+              "n": 36075,
+              "net_rescue_rate": 0.001496881496881497,
+              "rescue": 746,
+              "rescue_rate": 0.02067914067914068
+            },
+            "robust": {
+              "accuracy_delta": -0.001995841995841996,
+              "harm": 1840,
+              "harm_rate": 0.051004851004851005,
+              "margin_delta": -0.004458891017025573,
+              "n": 36075,
+              "net_rescue_rate": -0.001995841995841996,
+              "rescue": 1768,
+              "rescue_rate": 0.04900900900900901
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": -0.006153846153846154,
+              "harm": 857,
+              "harm_rate": 0.023756063756063758,
+              "margin_delta": -0.002764815185025427,
+              "n": 36075,
+              "net_rescue_rate": -0.006153846153846154,
+              "rescue": 635,
+              "rescue_rate": 0.017602217602217602
+            },
+            "robust": {
+              "accuracy_delta": -0.006153846153846154,
+              "harm": 1913,
+              "harm_rate": 0.053028413028413025,
+              "margin_delta": -0.003318682838998069,
+              "n": 36075,
+              "net_rescue_rate": -0.006153846153846154,
+              "rescue": 1691,
+              "rescue_rate": 0.04687456687456688
+            }
+          }
+        },
+        "89": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": -0.012002772002772003,
+              "harm": 1209,
+              "harm_rate": 0.03351351351351351,
+              "margin_delta": -0.01586003185351194,
+              "n": 36075,
+              "net_rescue_rate": -0.012002772002772003,
+              "rescue": 776,
+              "rescue_rate": 0.02151074151074151
+            },
+            "robust": {
+              "accuracy_delta": -0.020900900900900903,
+              "harm": 2613,
+              "harm_rate": 0.07243243243243243,
+              "margin_delta": -0.014985838840177963,
+              "n": 36075,
+              "net_rescue_rate": -0.020900900900900903,
+              "rescue": 1859,
+              "rescue_rate": 0.05153153153153153
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": -0.015218295218295218,
+              "harm": 1185,
+              "harm_rate": 0.03284823284823285,
+              "margin_delta": -0.010241460383805813,
+              "n": 36075,
+              "net_rescue_rate": -0.015218295218295218,
+              "rescue": 636,
+              "rescue_rate": 0.01762993762993763
+            },
+            "robust": {
+              "accuracy_delta": -0.0018018018018018018,
+              "harm": 2077,
+              "harm_rate": 0.05757449757449758,
+              "margin_delta": -0.004151026113778456,
+              "n": 36075,
+              "net_rescue_rate": -0.0018018018018018018,
+              "rescue": 2012,
+              "rescue_rate": 0.05577269577269577
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": -0.008094248094248094,
+              "harm": 950,
+              "harm_rate": 0.026334026334026334,
+              "margin_delta": -0.010044858816259864,
+              "n": 36075,
+              "net_rescue_rate": -0.008094248094248094,
+              "rescue": 658,
+              "rescue_rate": 0.01823977823977824
+            },
+            "robust": {
+              "accuracy_delta": -0.00218988218988219,
+              "harm": 1992,
+              "harm_rate": 0.055218295218295216,
+              "margin_delta": -0.004030844895937174,
+              "n": 36075,
+              "net_rescue_rate": -0.00218988218988219,
+              "rescue": 1913,
+              "rescue_rate": 0.053028413028413025
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": 0.0025225225225225223,
+              "harm": 721,
+              "harm_rate": 0.019986139986139986,
+              "margin_delta": 0.0032051440997001453,
+              "n": 36075,
+              "net_rescue_rate": 0.0025225225225225223,
+              "rescue": 812,
+              "rescue_rate": 0.02250866250866251
+            },
+            "robust": {
+              "accuracy_delta": -0.0054331254331254335,
+              "harm": 1978,
+              "harm_rate": 0.05483021483021483,
+              "margin_delta": -0.000498394908916595,
+              "n": 36075,
+              "net_rescue_rate": -0.0054331254331254335,
+              "rescue": 1782,
+              "rescue_rate": 0.049397089397089394
+            }
+          }
+        },
+        "94": {
+          "A5": {
+            "clean": {
+              "accuracy_delta": 0.0003880803880803881,
+              "harm": 828,
+              "harm_rate": 0.022952182952182952,
+              "margin_delta": -0.003070849383860434,
+              "n": 36075,
+              "net_rescue_rate": 0.0003880803880803881,
+              "rescue": 842,
+              "rescue_rate": 0.023340263340263342
+            },
+            "robust": {
+              "accuracy_delta": -0.017325017325017324,
+              "harm": 2554,
+              "harm_rate": 0.0707969507969508,
+              "margin_delta": -0.011136875984491942,
+              "n": 36075,
+              "net_rescue_rate": -0.017325017325017324,
+              "rescue": 1929,
+              "rescue_rate": 0.05347193347193347
+            }
+          },
+          "A6": {
+            "clean": {
+              "accuracy_delta": -0.00668052668052668,
+              "harm": 897,
+              "harm_rate": 0.024864864864864864,
+              "margin_delta": -0.006769622438745373,
+              "n": 36075,
+              "net_rescue_rate": -0.00668052668052668,
+              "rescue": 656,
+              "rescue_rate": 0.018184338184338185
+            },
+            "robust": {
+              "accuracy_delta": -0.00255024255024255,
+              "harm": 2100,
+              "harm_rate": 0.058212058212058215,
+              "margin_delta": -0.007218819926244388,
+              "n": 36075,
+              "net_rescue_rate": -0.00255024255024255,
+              "rescue": 2008,
+              "rescue_rate": 0.05566181566181566
+            }
+          },
+          "A7": {
+            "clean": {
+              "accuracy_delta": -0.0034927234927234927,
+              "harm": 818,
+              "harm_rate": 0.022674982674982674,
+              "margin_delta": -0.0048661187888017895,
+              "n": 36075,
+              "net_rescue_rate": -0.0034927234927234927,
+              "rescue": 692,
+              "rescue_rate": 0.019182259182259184
+            },
+            "robust": {
+              "accuracy_delta": 0.00851004851004851,
+              "harm": 1871,
+              "harm_rate": 0.05186417186417187,
+              "margin_delta": 0.0003533601713362289,
+              "n": 36075,
+              "net_rescue_rate": 0.00851004851004851,
+              "rescue": 2178,
+              "rescue_rate": 0.060374220374220376
+            }
+          },
+          "A8": {
+            "clean": {
+              "accuracy_delta": -0.001884961884961885,
+              "harm": 790,
+              "harm_rate": 0.021898821898821898,
+              "margin_delta": -0.006186732266689454,
+              "n": 36075,
+              "net_rescue_rate": -0.001884961884961885,
+              "rescue": 722,
+              "rescue_rate": 0.020013860013860015
+            },
+            "robust": {
+              "accuracy_delta": 0.004324324324324324,
+              "harm": 1846,
+              "harm_rate": 0.05117117117117117,
+              "margin_delta": -0.0028824365066721963,
+              "n": 36075,
+              "net_rescue_rate": 0.004324324324324324,
+              "rescue": 2002,
+              "rescue_rate": 0.0554954954954955
+            }
+          }
+        }
+      },
       "epochs": {
         "79": {
           "A5": {
@@ -6828,5 +7916,5 @@
     }
   },
   "schema_version": 1,
-  "source_git_sha": "9e35df477a6bda25b7d7dbbb360a80557b48b098"
+  "source_git_sha": "9d54d2a0f6d7c2e66ca19bd384cb392e5e804b4c"
 }
