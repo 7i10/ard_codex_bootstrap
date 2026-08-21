@@ -338,6 +338,8 @@ def build_report(
                 "### Regime and hinge summary",
                 "",
                 "Epoch-wise regime/target/deficit/hinge summaries are stored in the machine artifact.",
+                f"Replay source SHAs observed: {', '.join(run_machine['replay_source_git_shas'])}.",
+                f"Replay mask-container SHA256: {', '.join(run_machine['replay_mask_sha256'])}.",
                 "",
             ]
         )

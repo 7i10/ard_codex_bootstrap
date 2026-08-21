@@ -11,6 +11,8 @@ A5 fixed, A6 zero/cap, A7 positive-floor, and A8 abstain were replayed with unch
 ### Regime and hinge summary
 
 Epoch-wise regime/target/deficit/hinge summaries are stored in the machine artifact.
+Replay source SHAs observed: 059505033deced71a02cd71d97f758925c57ff6a, 38004e157fd29466bebbae0c9163ed47158e6c4a, 821bdc6f96cfbc1e9d78d619b66749d000f5240b.
+Replay mask-container SHA256: 73152e263bfd613d1880c9b27a3d15aa567e61537681c012cea248b375868184.
 
 ### No-update gradient probe
 
@@ -55,6 +57,8 @@ The fixed 128-ID probes are diagnostics only; they do not tune coefficients or u
 ### Regime and hinge summary
 
 Epoch-wise regime/target/deficit/hinge summaries are stored in the machine artifact.
+Replay source SHAs observed: 059505033deced71a02cd71d97f758925c57ff6a, 38004e157fd29466bebbae0c9163ed47158e6c4a, 821bdc6f96cfbc1e9d78d619b66749d000f5240b.
+Replay mask-container SHA256: ad3eb7830ca52ad8ee25c842f53e646eaf49805301b1adea526760ffca9e041b.
 
 ### No-update gradient probe
 
