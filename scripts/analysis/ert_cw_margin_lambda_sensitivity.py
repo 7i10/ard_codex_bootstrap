@@ -81,7 +81,13 @@ def binary(base: list[bool], treatment: list[bool]) -> dict[str, float]:
 
 def effect(base: dict[int, dict[str, Any]], treatment: dict[int, dict[str, Any]], ids: list[int]) -> dict[str, Any]:
     if not ids:
-        raise RuntimeError("empty effect cohort")
+        # Train-derived quantile boundaries may yield an empty validation bin.
+        # Preserve that fact explicitly instead of fabricating an effect.
+        return {
+            "n": 0,
+            "clean": None,
+            "robust": None,
+        }
     clean = binary([bool(base[i]["clean_correct"]) for i in ids], [bool(treatment[i]["clean_correct"]) for i in ids])
     robust = binary([bool(base[i]["robust_correct"]) for i in ids], [bool(treatment[i]["robust_correct"]) for i in ids])
 
@@ -159,11 +165,14 @@ def main() -> None:
         "cap": 0.13952550292015076,
         "results": {},
         "lineage": {},
+        "trajectory": {},
+        "cross_seed": {},
     }
     mask_root = ROOT / ".cache/analysis/ert-state-overlay-v1-review"
     feature_root = ROOT / ".cache/analysis/ert-clean-wrong-subtypes-v4"
     kl_root = ROOT / ".cache/analysis/ert-clean-wrong-reliability-proxy-v1"
     validation_feature_root = ROOT / ".cache/analysis/ert-cw-generalization-v1"
+    trajectory_root = ROOT / ".cache/analysis/ert-cw-margin-lambda-sensitivity-v1-runs"
     for run in RUNS:
         mask_path = mask_root / f"anchor79-fixed-masks-{run}.json"
         if sha256(mask_path) != MASK[run]:
@@ -184,6 +193,33 @@ def main() -> None:
             "kl_bounds": kl_bounds,
         }
         machine["results"][run] = {}
+        machine["trajectory"][run] = {}
+        for arm in ARMS:
+            metrics_root = (
+                trajectory_root
+                if arm not in {"L0_BASE", "L2_CAL"}
+                else ROOT / ".cache/analysis/ert-cw-margin-screen-v1-r3"
+            )
+            metrics_arm = ARMS[arm][0] if arm not in {"L0_BASE", "L2_CAL"} else {
+                "L0_BASE": "A0",
+                "L2_CAL": "A7",
+            }[arm]
+            metrics_path = metrics_root / run / metrics_arm / "epoch-metrics.jsonl"
+            if not metrics_path.is_file():
+                raise RuntimeError(f"missing trajectory metrics: {metrics_path}")
+            metrics = [json.loads(line) for line in metrics_path.read_text(encoding="utf-8").splitlines()]
+            by_epoch = {int(row["epoch"]): row for row in metrics}
+            machine["trajectory"][run][arm] = {
+                str(epoch): by_epoch[epoch]
+                for epoch in EPOCHS
+                if epoch in by_epoch
+            }
+            if set(machine["trajectory"][run][arm]) != {str(epoch) for epoch in EPOCHS}:
+                raise RuntimeError(f"trajectory epochs are incomplete: {metrics_path}")
+            machine["lineage"][run].setdefault("trajectory", {})[arm] = {
+                "metrics_path": str(metrics_path),
+                "metrics_sha256": sha256(metrics_path),
+            }
         for epoch in EPOCHS:
             machine["results"][run][str(epoch)] = {}
             loaded: dict[str, dict[str, dict[int, dict[str, Any]]]] = {}
@@ -215,20 +251,30 @@ def main() -> None:
                 }
                 rec["validation_q"] = {
                     "CE20": {
-                        q: effect(base_val, loaded[arm]["validation"], ids)
-                        for q, ids in (
-                            (q, [i for i in ce_q["validation"] if i in base_val]) for q in ce_q["validation"]
-                        )
+                        q: effect(base_val, loaded[arm]["validation"], [i for i in ids if i in base_val])
+                        for q, ids in ce_q["validation"].items()
                     },
                     "KL10": {
-                        q: effect(base_val, loaded[arm]["validation"], ids)
-                        for q, ids in (
-                            (q, [i for i in kl_q["validation"] if i in base_val]) for q in kl_q["validation"]
-                        )
+                        q: effect(base_val, loaded[arm]["validation"], [i for i in ids if i in base_val])
+                        for q, ids in kl_q["validation"].items()
                     },
                 }
                 record[arm] = rec
             machine["results"][run][str(epoch)] = record
+    for epoch in EPOCHS:
+        machine["cross_seed"][str(epoch)] = {}
+        for arm in ARMS:
+            values = [
+                machine["results"][run][str(epoch)][arm]["validation_overall"]["robust"]["accuracy_delta"]
+                for run in RUNS
+            ]
+            machine["cross_seed"][str(epoch)][arm] = {
+                "L2_delta": values[0],
+                "L4_delta": values[1],
+                "mean_delta": sum(values) / len(values),
+                "same_nonnegative_direction": values[0] >= 0 and values[1] >= 0,
+                "same_nonpositive_direction": values[0] <= 0 and values[1] <= 0,
+            }
     payload = json.dumps(machine, sort_keys=True, separators=(",", ":")).encode()
     machine["report_sha256"] = hashlib.sha256(payload).hexdigest()
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
@@ -252,6 +298,83 @@ def main() -> None:
                     f"| {run} | {epoch} | {arm} | {value:.6f} | "
                     f"{clean_delta:.3f} | {robust_delta:.3f} | {spillover_delta:.3f} |"
                 )
+    lines += [
+        "",
+        "## Epoch-94 Clean-Wrong direct cohort",
+        "",
+        "| seed | arm | n | clean Δ | robust Δ | clean net rescue | robust net rescue |",
+        "|---|---|---:|---:|---:|---:|---:|",
+    ]
+    for run in RUNS:
+        for arm, (_, value) in ARMS.items():
+            rec = machine["results"][run]["94"][arm]["train_direct_cw"]
+            lines.append(
+                f"| {run} | {arm} (λ={value:.6f}) | {rec['n']} | "
+                f"{100 * rec['clean']['accuracy_delta']:.3f} | "
+                f"{100 * rec['robust']['accuracy_delta']:.3f} | "
+                f"{100 * rec['clean']['net_rescue']:.3f} | "
+                f"{100 * rec['robust']['net_rescue']:.3f} |"
+            )
+    lines += [
+        "",
+        "## Epoch-94 held-out Clean-Wrong subgroup",
+        "",
+        "| seed | arm | n | clean Δ | robust Δ |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for run in RUNS:
+        for arm, (_, value) in ARMS.items():
+            rec = machine["results"][run]["94"][arm]["validation_cw"]
+            lines.append(
+                f"| {run} | {arm} (λ={value:.6f}) | {rec['n']} | "
+                f"{100 * rec['clean']['accuracy_delta']:.3f} | "
+                f"{100 * rec['robust']['accuracy_delta']:.3f} |"
+            )
+    for domain in ("CE20", "KL10"):
+        lines += [
+            "",
+            f"## Epoch-94 held-out {domain} Teacher-margin Q1--Q5",
+            "",
+            "Q bins are derived from the train Clean-Wrong feature distribution; "
+            "empty validation bins are reported as `n=0` and are not assigned an effect.",
+            "",
+            "| seed | arm | Q1 robust Δ | Q2 | Q3 | Q4 | Q5 |",
+            "|---|---|---:|---:|---:|---:|---:|",
+        ]
+        for run in RUNS:
+            for arm, (_, value) in ARMS.items():
+                cells = []
+                for q in ("Q1", "Q2", "Q3", "Q4", "Q5"):
+                    rec = machine["results"][run]["94"][arm]["validation_q"][domain][q]
+                    cells.append("n=0" if rec["n"] == 0 else f"{100 * rec['robust']['accuracy_delta']:.3f}")
+                lines.append(
+                    f"| {run} | {arm} (λ={value:.6f}) | " + " | ".join(cells) + " |"
+                )
+    lines += [
+        "",
+        "## Training trajectory validation PGD accuracy",
+        "",
+        "| seed | arm | epoch84 | epoch89 | epoch94 |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for run in RUNS:
+        for arm, (_, value) in ARMS.items():
+            cells = [f"{machine['trajectory'][run][arm][str(epoch)]['val_pgd_accuracy']:.4f}" for epoch in EPOCHS]
+            lines.append(f"| {run} | {arm} (λ={value:.6f}) | " + " | ".join(cells) + " |")
+    lines += [
+        "",
+        "## Cross-seed epoch-94 held-out robust delta",
+        "",
+        "| arm | L2 Δ | L4 Δ | mean Δ | same nonnegative direction |",
+        "|---|---:|---:|---:|---|",
+    ]
+    for arm, (_, value) in ARMS.items():
+        rec = machine["cross_seed"]["94"][arm]
+        lines.append(
+            f"| {arm} (λ={value:.6f}) | {100 * rec['L2_delta']:.3f} | "
+            f"{100 * rec['L4_delta']:.3f} | {100 * rec['mean_delta']:.3f} | "
+            f"{rec['same_nonnegative_direction']} |"
+        )
     lines += [
         "",
         "The primary endpoint is epoch-94 held-out CE-PGD20 robust accuracy. "
