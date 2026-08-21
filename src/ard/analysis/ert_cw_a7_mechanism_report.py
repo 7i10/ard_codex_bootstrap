@@ -108,8 +108,16 @@ def _load_replay(root: Path, run: str, arm: str, epoch: int) -> tuple[dict[str, 
         raise A7MechanismReportError(f"replay identity mismatch: {meta_path}")
     if meta.get("rows_sha256") != _sha256(rows_path) or meta.get("no_training") is not True:
         raise A7MechanismReportError(f"replay hash/no-update contract mismatch: {meta_path}")
-    if meta.get("parent_checkpoint_sha256") != PARENTS[run] or meta.get("mask_sha256") != MASK_SHA256[run]:
+    if meta.get("parent_checkpoint_sha256") != PARENTS[run]:
         raise A7MechanismReportError(f"replay lineage mismatch: {meta_path}")
+    # The replay consumes the hash-bound state-overlay container, whose byte
+    # hash is intentionally different from the compact registered CW-mask
+    # manifest used by the endpoint/feature panels.  Validate that container
+    # itself here; the exact selected-ID universe is checked below against the
+    # CE20 feature panel before any effect is reported.
+    mask_path = Path(str(meta.get("mask_path", "")))
+    if not mask_path.is_file() or meta.get("mask_sha256") != _sha256(mask_path):
+        raise A7MechanismReportError(f"replay mask identity mismatch: {meta_path}")
     return meta, _rows(rows_path)
 
 
