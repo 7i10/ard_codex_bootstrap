@@ -2,7 +2,7 @@
 
 This is a preregistered point report for the fixed epoch-79 Clean-Wrong screen. No arm is promoted automatically.
 
-- Report source Git SHA: `2a42af279c4f00f16a505f01a278129e7fc6ce23`
+- Report source Git SHA: `f8812d75bc1880739776c2c7acaa7e037252548e`
 - Training source Git SHA: `bb59b512185af7bb70633c3266efd95bb24a563f`
 - Endpoint attack: `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2` (CE-PGD20, pixel-space $L_\u221e$, $8/255$)
 - Calibration: `a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5`
