@@ -78,6 +78,7 @@ def calibrate(*, config_path: Path, output: Path, device: str = "cuda") -> dict[
     device_obj = torch.device(device if device != "cuda" or torch.cuda.is_available() else "cpu")
     measurements: list[dict[str, float | int | str]] = []
     inputs: dict[str, Any] = {}
+    pooled_positive_margins: list[float] = []
     for run_name in ("L2", "L4"):
         spec = raw["runs"][run_name]
         if not isinstance(spec, Mapping):
@@ -102,6 +103,7 @@ def calibrate(*, config_path: Path, output: Path, device: str = "cuda") -> dict[
             expected_checkpoint=metadata.get("checkpoint_sha256"),
             expected_mask=metadata.get("mask_sha256"),
         )
+        pooled_positive_margins.extend(positive_margins)
         config, student, teacher, payload = _load_parent(
             config_path=parent_config, checkpoint_path=checkpoint, device=device_obj
         )
@@ -223,6 +225,7 @@ def calibrate(*, config_path: Path, output: Path, device: str = "cuda") -> dict[
         "target_ratio": 0.25,
         "beta_advce": 0.25 * advce_scale,
         "margin_coefficient": 0.25 * margin_scale,
+        "pooled_positive_margin_quantiles": _quantiles(pooled_positive_margins),
         "device": str(device_obj),
         "inputs": inputs,
         "measurements": measurements,
