@@ -29,6 +29,18 @@ The fixed 128-ID probes are diagnostics only; they do not tune coefficients or u
 | A8 | 79 | 9.78548 | 0.0363939 | 0.594403 |
 | A8 | 94 | 12.1727 | 0.0317379 | 0.55793 |
 
+### CE20 pre-treatment Q1--Q5 mapping (epoch 79)
+
+Quantile boundaries are pre-treatment Teacher CE-PGD20 margins; they are not fitted to endpoint outcomes.
+
+| quantile | n | R0 | R1 | R2 | R3 |
+|---|---:|---:|---:|---:|---:|
+| Q1 | 1724 | 1681 | 20 | 21 | 2 |
+| Q2 | 1725 | 1618 | 55 | 43 | 9 |
+| Q3 | 1724 | 1470 | 168 | 74 | 12 |
+| Q4 | 1725 | 401 | 639 | 671 | 14 |
+| Q5 | 1725 | 1 | 11 | 902 | 811 |
+
 - epoch 79: A7 R0=5171, R1=893, R2=1711, R3=848; positive-deficit mean=0.279342
 - epoch 84: A7 R0=4696, R1=911, R2=1969, R3=1047; positive-deficit mean=0.231058
 - epoch 89: A7 R0=4622, R1=947, R2=2088, R3=966; positive-deficit mean=0.207738
@@ -85,6 +97,18 @@ The fixed 128-ID probes are diagnostics only; they do not tune coefficients or u
 | A7 | 94 | 8.80861 | 0.0604882 | 0.717156 |
 | A8 | 79 | 11.4617 | 0.0315593 | 0.675528 |
 | A8 | 94 | 9.54896 | 0.0408274 | 0.635644 |
+
+### CE20 pre-treatment Q1--Q5 mapping (epoch 79)
+
+Quantile boundaries are pre-treatment Teacher CE-PGD20 margins; they are not fitted to endpoint outcomes.
+
+| quantile | n | R0 | R1 | R2 | R3 |
+|---|---:|---:|---:|---:|---:|
+| Q1 | 1785 | 1719 | 27 | 32 | 7 |
+| Q2 | 1785 | 1650 | 72 | 55 | 8 |
+| Q3 | 1785 | 1478 | 191 | 108 | 8 |
+| Q4 | 1785 | 348 | 599 | 826 | 12 |
+| Q5 | 1785 | 1 | 13 | 859 | 912 |
 
 - epoch 79: A7 R0=5196, R1=902, R2=1880, R3=947; positive-deficit mean=0.282816
 - epoch 84: A7 R0=4937, R1=860, R2=2011, R3=1117; positive-deficit mean=0.216899
