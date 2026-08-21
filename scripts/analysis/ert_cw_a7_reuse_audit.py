@@ -20,6 +20,10 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 HIST_ROOT = ROOT / ".cache/analysis/ert-cw-margin-screen-v1-r3"
 CALIBRATION = ROOT / "docs/experiments/ert_cw_margin_calibration_v1.json"
+MASK_PATHS = {
+    "L2": ROOT / ".cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L2.json",
+    "L4": ROOT / ".cache/analysis/ert-state-overlay-v1-review/anchor79-fixed-masks-L4.json",
+}
 EXPECTED = {
     "L2": {
         "seed": 1,
@@ -58,6 +62,18 @@ def treatment(config: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def mask_identity(path: Path) -> tuple[str, str, int]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    selected = payload.get("masks", {}).get("student_clean_wrong", {}).get("selected_ids")
+    if payload.get("anchor_epoch") != 79 or not isinstance(selected, list):
+        raise ValueError(f"invalid epoch-79 fixed mask: {path}")
+    ids = [int(item) for item in selected]
+    if len(ids) != len(set(ids)):
+        raise ValueError(f"duplicate fixed mask IDs: {path}")
+    digest = hashlib.sha256(json.dumps(sorted(ids), separators=(",", ":")).encode()).hexdigest()
+    return sha256(path), digest, len(ids)
+
+
 def expected_arm_fields(arm: str) -> dict[str, Any]:
     common = {"mask_key": "student_clean_wrong"}
     if arm == "A0":
@@ -89,6 +105,7 @@ def run_record(seed_name: str, arm: str) -> dict[str, Any]:
     if not isinstance(fork, dict):
         raise ValueError(f"missing fork lineage: {manifest_path}")
     exp = EXPECTED[seed_name]
+    mask_file_sha, mask_ids_sha, mask_count = mask_identity(MASK_PATHS[seed_name])
     actual_treatment = treatment(config)
     expected_treatment = expected_arm_fields(arm)
     mismatches = {
@@ -119,6 +136,10 @@ def run_record(seed_name: str, arm: str) -> dict[str, Any]:
         "source_git_sha": fork.get("source_git_sha"),
         "parent_checkpoint_sha256": fork.get("parent_checkpoint_sha256"),
         "mask_sha256": exp["mask"],
+        "mask_path": str(MASK_PATHS[seed_name]),
+        "mask_selected_ids_sha256": mask_ids_sha,
+        "mask_count": mask_count,
+        "mask_identity_exact": mask_file_sha == exp["mask"],
         "calibration_sha256": fork.get("calibration_sha256"),
         "treatment": actual_treatment,
         "expected_treatment": expected_treatment,
@@ -145,6 +166,7 @@ def main() -> int:
         row["treatment_matches_expected"]
         and row["parent_lineage_exact"]
         and row["lineage_identity_exact"]
+        and row["mask_identity_exact"]
         and row["shared_endpoint_epochs"]
         for row in runs
     ) and calibration_sha == CALIBRATION_SHA and all(

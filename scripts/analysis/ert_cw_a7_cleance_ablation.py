@@ -301,11 +301,69 @@ def main() -> None:
             for split in ("train", "validation"):
                 absolute_values = machine["results"][run][str(epoch)]["F3"][split]
                 lines.append(f"| {run} | {epoch} | {split} | {absolute_values['absolute']['clean_accuracy']:.4f} | {absolute_values['absolute']['robust_accuracy']:.4f} |")
+    lines += [
+        "",
+        "## Epoch-94 held-out overall (all factorial arms)",
+        "",
+        "| seed | arm | clean | robust | clean Δ vs F0 | robust Δ vs F0 |",
+        "|---|---|---:|---:|---:|---:|",
+    ]
+    for run in RUNS:
+        base = machine["results"][run]["94"]["F0"]["validation"]["absolute"]
+        for arm in ARMS:
+            absolute_values = machine["results"][run]["94"][arm]["validation"]["absolute"]
+            lines.append(
+                f"| {run} | {arm} | {absolute_values['clean_accuracy']:.4f} | {absolute_values['robust_accuracy']:.4f} | "
+                f"{absolute_values['clean_accuracy'] - base['clean_accuracy']:+.4f} | {absolute_values['robust_accuracy'] - base['robust_accuracy']:+.4f} |"
+            )
+    lines += [
+        "",
+        "## Epoch-94 Direct / Spillover / Held-out Clean-Wrong effects",
+        "",
+        "Effects are paired accuracy deltas versus F0; positive values mean rescue exceeds harm.",
+        "",
+        "| seed | arm | direct clean | direct robust | spillover robust | held-out CW clean | held-out CW robust |",
+        "|---|---|---:|---:|---:|---:|---:|",
+    ]
+    for run in RUNS:
+        for arm in ARMS:
+            result = machine["results"][run]["94"][arm]
+            lines.append(
+                f"| {run} | {arm} | {result['train_direct_cw']['clean']['accuracy_delta']:+.4f} | "
+                f"{result['train_direct_cw']['robust']['accuracy_delta']:+.4f} | "
+                f"{result['train_spillover_non_cw']['robust']['accuracy_delta']:+.4f} | "
+                f"{result['validation_cw']['clean']['accuracy_delta']:+.4f} | "
+                f"{result['validation_cw']['robust']['accuracy_delta']:+.4f} |"
+            )
     lines += ["", "## Epoch-94 factorial contrasts (paired accuracy deltas)", "", "| seed | cohort/metric | CE no margin | margin no CE | CE given margin | margin given CE | interaction |", "|---|---|---:|---:|---:|---:|---:|"]
     for run in RUNS:
         for key, value in machine["factorial"][run]["94"].items():
             lines.append(f"| {run} | {key} | {value['ce_no_margin']:+.4f} | {value['margin_no_ce']:+.4f} | {value['ce_given_margin']:+.4f} | {value['margin_given_ce']:+.4f} | {value['interaction']:+.4f} |")
-    lines += ["", "## Held-out Clean-Wrong Q1--Q5", "", "The machine JSON contains CE20 and KL10 train-derived quantile boundaries and paired clean/robust effects for every arm and horizon. Validation Q groups are restricted to pre-treatment validation Clean-Wrong IDs; no outcome is used for binning.", "", "## Next decision", "", "Do not launch lambda/floor/cap sensitivity automatically. Human review is required after comparing F2 (margin-only) and F3 (full combination)."]
+    lines += [
+        "",
+        "## Held-out Clean-Wrong Q1--Q5 (epoch 94)",
+        "",
+        "Q1--Q5 boundaries are derived from the epoch-79 train Clean-Wrong feature distribution and are applied to pre-treatment validation Clean-Wrong IDs. No outcome is used for binning.",
+    ]
+    for domain in ("CE20", "KL10"):
+        lines += ["", f"### {domain} Teacher-margin bins: clean Δ vs F0", "", "| seed | arm | Q1 | Q2 | Q3 | Q4 | Q5 |", "|---|---|---:|---:|---:|---:|---:|"]
+        for run in RUNS:
+            for arm in ARMS:
+                q = machine["results"][run]["94"][arm]["quantile_effects"][domain]["validation"]
+                lines.append(f"| {run} | {arm} | " + " | ".join(f"{q[f'Q{i}']['clean']['accuracy_delta']:+.4f}" for i in range(1, 6)) + " |")
+        lines += ["", f"### {domain} Teacher-margin bins: robust Δ vs F0", "", "| seed | arm | Q1 | Q2 | Q3 | Q4 | Q5 |", "|---|---|---:|---:|---:|---:|---:|"]
+        for run in RUNS:
+            for arm in ARMS:
+                q = machine["results"][run]["94"][arm]["quantile_effects"][domain]["validation"]
+                lines.append(f"| {run} | {arm} | " + " | ".join(f"{q[f'Q{i}']['robust']['accuracy_delta']:+.4f}" for i in range(1, 6)) + " |")
+    lines += [
+        "",
+        "The machine JSON also contains the same Q1--Q5 paired effects at epochs 84 and 89, train-side direct/spillover effects, quantile boundaries, stable-ID hashes, and all endpoint lineage hashes.",
+        "",
+        "## Next decision",
+        "",
+        "Do not launch lambda/floor/cap sensitivity automatically. Human review is required after comparing F2 (margin-only) and F3 (full combination).",
+    ]
     args.output_md.parent.mkdir(parents=True, exist_ok=True)
     args.output_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps({"output_json": str(args.output_json), "output_md": str(args.output_md), "source_git_sha": source_sha}))
