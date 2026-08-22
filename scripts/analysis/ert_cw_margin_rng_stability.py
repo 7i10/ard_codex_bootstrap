@@ -616,8 +616,13 @@ def load_gradient_summary(replay_root: Path) -> dict[str, Any]:
 def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> None:
     machine_0054 = json.loads(MACHINE_0054.read_text())
     source = collect_git_state(ROOT)
-    if source.get("dirty") is not False:
-        raise RuntimeError("aggregation requires a clean source tree")
+    allowed_output_status = {
+        f"?? {output_md.relative_to(ROOT)}",
+        f"?? {output_json.relative_to(ROOT)}",
+    }
+    status_lines = {line.strip() for line in str(source.get("status", "")).splitlines() if line.strip()}
+    if source.get("dirty") is not False and not status_lines.issubset(allowed_output_status):
+        raise RuntimeError("aggregation requires a clean source tree apart from its declared output files")
     fixed = fixed_probe_summary(replay_root)
     gradient = load_gradient_summary(replay_root)
     curves = training_curves()
