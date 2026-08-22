@@ -2,7 +2,7 @@
   "schema_version": 1,
   "status": "completed_source_audit",
   "scope": "epoch-79 RSLAD continuation and the new RNG-source decomposition plumbing",
-  "source_revision_audited": "working-tree delta based on 13a5f60f95d54f89ab99a9ae15e471620249baba",
+  "source_revision_audited": "working-tree delta based on f6f8e11",
   "audit_method": "repository source inspection; no production trajectory was launched",
   "stream_contract": {
     "attack": {

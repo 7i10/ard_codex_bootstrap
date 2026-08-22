@@ -3,7 +3,7 @@
 ## Status
 
 - Owner: Codex / repository owner
-- Branch / base SHA: `master` / `13a5f60f95d54f89ab99a9ae15e471620249baba`
+- Branch / implementation SHA: `master` / `f6f8e11`
 - Current milestone: M1 implementation and preregistration complete; GPU campaign pending
 - Last updated: 2026-08-22
 
@@ -178,6 +178,8 @@ mechanical canary hashing bug that was fixed locally.
   trajectory or endpoint has been launched.
 - 2026-08-22: Revised host assignment to Hamster-only so both teachers and all
   matched arms share one controlled environment; Ferret is excluded.
+- 2026-08-22: Pinned the reviewed implementation source to `f6f8e11`; the
+  subsequent metadata-only pin update does not alter runtime code.
 
 ## Completion report
 

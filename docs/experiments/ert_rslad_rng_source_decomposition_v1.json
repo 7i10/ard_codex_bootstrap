@@ -3,12 +3,12 @@
   "status": "preregistered_pending_gpu_execution",
   "experiment": "ERT / RSLAD baseline RNG-source decomposition",
   "purpose": "Separate PGD random-start, data-side stochasticity, attack-data interaction, and residual nondeterminism in epoch-79-to-94 BASE RSLAD continuation.",
-  "implementation_base_sha": "13a5f60f95d54f89ab99a9ae15e471620249baba",
-  "production_source_sha": null,
+  "implementation_base_sha": "f6f8e11",
+  "production_source_sha": "f6f8e11",
   "source_sha_policy": "resolve to one clean immutable commit after implementation review and before the first production arm",
   "source_audit": {
     "path": "docs/experiments/ert_rslad_rng_source_audit_v1.json",
-    "sha256": "37bacdb4475dcc2b0277cdf96edf805a294907b9b34421af898d3fbcc3af9df1"
+    "sha256": "a9bb7366f7b72fe6fbd984b53d294bcf29248689eb5eb45a496911ad9b755856"
   },
   "parents": {
     "epoch": 79,
