@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "status": "completed_source_audit",
+  "scope": "epoch-79 RSLAD continuation and the new RNG-source decomposition plumbing",
+  "source_revision_audited": "working-tree delta based on 13a5f60f95d54f89ab99a9ae15e471620249baba",
+  "audit_method": "repository source inspection; no production trajectory was launched",
+  "stream_contract": {
+    "attack": {
+      "seed_name": "attack_seed",
+      "draw": "PGD random-start uniform draw",
+      "generator_owner": "Trainer._attack_generator",
+      "generator_formula": "attack_seed + 1000003*global_step + 10007*rank",
+      "source": "src/ard/engine/trainer.py:Trainer._attack_generator",
+      "consumers": ["src/ard/attacks/pgd.py:LinfPGD.generate"],
+      "status": "isolated_by_explicit_generator"
+    },
+    "data": {
+      "seed_name": "data_seed",
+      "draws": [
+        "epoch-level sampler order",
+        "source-keyed CIFAR crop and horizontal flip",
+        "DataLoader worker base seed"
+      ],
+      "sampler": {
+        "source": "src/ard/data/indexed.py:EpochShuffleSampler.__iter__",
+        "formula": "data_seed + epoch",
+        "status": "isolated_by_explicit_generator"
+      },
+      "augmentation": {
+        "source": "src/ard/data/datasets.py:EpochSourceTransform.__call__",
+        "formula": "data_seed + 1000003*epoch + 10007*source_id",
+        "status": "source-keyed and independent of sampler order"
+      },
+      "workers": {
+        "source": "src/ard/data/rng.py:data_loader_generator and seed_data_loader_worker",
+        "policy": "DataLoader CPU generator supplies worker base seeds; Python/NumPy worker seeds descend from torch.initial_seed",
+        "status": "explicitly owned by data stream"
+      }
+    },
+    "other": {
+      "seed_name": "other_seed",
+      "draws": ["Python random", "NumPy global RNG", "Torch CPU global RNG", "Torch CUDA global RNG"],
+      "source": "src/ard/analysis/ert_rslad_rng_sources.py:reseed_other_stream",
+      "model_side_stochasticity": {
+        "repository_search": "no Dropout or StochasticDepth occurrence in src/ard/models",
+        "student": "repository-owned SAAD student contains BatchNorm but no stochastic layer found",
+        "teacher": "frozen TeacherAdapter forces eval mode; external constructor is treated as an audited dependency",
+        "status": "global stream retained as a residual/other control"
+      }
+    }
+  },
+  "global_rng_lifecycle": {
+    "fresh_train": "src/ard/cli/train.py:_seed_everything(seeds.model_init + rank)",
+    "checkpoint_capture": "src/ard/engine/checkpoint.py:capture_rng_state",
+    "checkpoint_restore": "src/ard/engine/checkpoint.py:restore_rng_state",
+    "continuation_reseed_boundary": "after exact epoch-79 load_checkpoint and before the first epoch-80 iterator",
+    "legacy_compatibility": "--continuation-seed preserves the historical parent data stream and maps the scalar to the legacy attack/global streams"
+  },
+  "threat_and_objective": {
+    "method": "rslad",
+    "training_attack": {
+      "norm": "linf",
+      "input_domain": "pixel_0_1",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 10,
+      "random_start": true,
+      "loss": "kl",
+      "kl_target": "teacher_clean",
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "student_mode": "eval",
+      "teacher_mode": "eval"
+    },
+    "forbidden_changes": [
+      "margin loss",
+      "CleanCE",
+      "floor/cap",
+      "adaptive lambda",
+      "dynamic routing",
+      "PGD budget or step count",
+      "optimizer or scheduler"
+    ]
+  },
+  "determinism_controls": {
+    "training_config": "training.deterministic=true",
+    "stage_a_runtime": [
+      "torch.use_deterministic_algorithms(True)",
+      "cudnn.benchmark=false",
+      "cudnn.deterministic=true",
+      "CUDA and cuDNN TF32 disabled"
+    ],
+    "residual_boundary": "same-source REF1/REF2 is required; no arbitrary residual threshold is imposed"
+  },
+  "canary": {
+    "command": "PYTHONPATH=src python scripts/ert_rslad_rng_source_canary.py --batches 2",
+    "implementation": "src/ard/analysis/ert_rslad_rng_sources.py:run_seed_isolation_canary",
+    "checks": [
+      "REF and ATTACK have identical data identity hashes",
+      "REF and ATTACK have different raw PGD draw hashes",
+      "REF and DATA have different data identity hashes",
+      "REF and DATA have identical raw PGD draw hashes"
+    ],
+    "last_local_result": "passed on CPU with one-batch focused test and two-batch command contract"
+  },
+  "known_limits": [
+    "The canary proves stream ownership for the observed public paths; it cannot prove absence of hardware-specific CUDA nondeterminism.",
+    "The source audit does not claim that external RobustBench constructor internals are stochastic-free; the frozen teacher is forced to eval mode and REF repeat remains the residual control.",
+    "No production accuracy or source ranking is claimed before the 16 trajectories and fixed-seed endpoint evaluations complete."
+  ]
+}

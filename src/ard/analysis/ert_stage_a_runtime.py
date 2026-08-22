@@ -22,9 +22,16 @@ import yaml
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 
+from ard.analysis.ert_rslad_rng_sources import RNGSourceSeeds, reseed_data_stream, reseed_other_stream
 from ard.attacks import LinfPGD
 from ard.config import load_config
-from ard.data import EpochShuffleSampler, build_train_validation_views, collate_indexed
+from ard.data import (
+    EpochShuffleSampler,
+    build_train_validation_views,
+    collate_indexed,
+    data_loader_generator,
+    seed_data_loader_worker,
+)
 from ard.engine import Trainer, get_rank, get_world_size
 from ard.engine.checkpoint import load_checkpoint
 from ard.models import build_student, build_teacher
@@ -84,9 +91,7 @@ class StageATreatment:
             "clean_kd",
         }:
             raise StageARuntimeError("clean-wrong treatment requires an explicit mode")
-        if self.kind in {"advce", "advkd_advce"} and (
-            self.beta_advce is None or self.beta_advce < 0
-        ):
+        if self.kind in {"advce", "advkd_advce"} and (self.beta_advce is None or self.beta_advce < 0):
             raise StageARuntimeError("AdvCE treatments require a non-negative frozen coefficient")
         if self.kind == "soft_advkd" and self.tau != 2.0:
             raise StageARuntimeError("Stage A softening requires the frozen tau=2.0")
@@ -106,9 +111,7 @@ class StageATreatment:
             raise StageARuntimeError("Teacher floor treatment requires floor")
         if self.margin_floor is not None and self.margin_cap is not None and self.margin_floor > self.margin_cap:
             raise StageARuntimeError("margin floor cannot exceed cap")
-        if self.kind == "advkd_advce" and (
-            self.advkd_multiplier is None or not 0.0 <= self.advkd_multiplier <= 1.0
-        ):
+        if self.kind == "advkd_advce" and (self.advkd_multiplier is None or not 0.0 <= self.advkd_multiplier <= 1.0):
             raise StageARuntimeError("AdvKD/AdvCE treatments require an AdvKD multiplier in [0, 1]")
         if self.kind == "baseline" and any(
             value is not None
@@ -256,6 +259,7 @@ def _arm_hash(
     source_sha: str,
     *,
     continuation_seed: int | None = None,
+    rng_source_seeds: RNGSourceSeeds | None = None,
     dynamic_s3: dict[str, Any] | None = None,
 ) -> str:
     return hashlib.sha256(
@@ -264,6 +268,7 @@ def _arm_hash(
                 "parent_config_hash": parent_hash,
                 "treatment": treatment.__dict__,
                 "continuation_seed": continuation_seed,
+                "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
                 "dynamic_s3": dynamic_s3,
                 "source_git_sha": source_sha,
             },
@@ -286,6 +291,8 @@ def run_stage_a_arm(
     horizon_epochs: tuple[int, ...] = (84,),
     run_namespace: str = "stage-a",
     continuation_seed: int | None = None,
+    rng_source_seeds: RNGSourceSeeds | None = None,
+    expected_parent_checkpoint_sha256: str | None = None,
     dynamic_s3_arm: str | None = None,
     dynamic_s3_beta_advce: float | None = None,
     dynamic_s3_attack_contract: dict[str, object] | None = None,
@@ -316,15 +323,17 @@ def run_stage_a_arm(
     ):
         raise StageARuntimeError("Stage A parent selection attack is not CE-PGD20")
     payload = torch.load(parent_checkpoint, map_location="cpu", weights_only=False)
+    actual_parent_checkpoint_sha256 = _sha256(parent_checkpoint)
+    if (
+        expected_parent_checkpoint_sha256 is not None
+        and actual_parent_checkpoint_sha256 != expected_parent_checkpoint_sha256
+    ):
+        raise StageARuntimeError("parent checkpoint bytes do not match the registered SHA-256")
     shared_prefix = dynamic_s3_shared_prefix_checkpoint is not None
     if shared_prefix:
         if dynamic_s3_shared_prefix_checkpoint.resolve() != parent_checkpoint.resolve():
             raise StageARuntimeError("shared-prefix checkpoint must be the actual resume checkpoint")
-        if (
-            not isinstance(payload, dict)
-            or payload.get("epoch") != 80
-            or payload.get("epoch_boundary") != "end"
-        ):
+        if not isinstance(payload, dict) or payload.get("epoch") != 80 or payload.get("epoch_boundary") != "end":
             raise StageARuntimeError("shared-prefix continuation requires an exact epoch-80 end-boundary checkpoint")
         if dynamic_s3_arm not in {"fixed", "dynamic"}:
             raise StageARuntimeError("only fixed/dynamic S3 arms may resume a shared capture prefix")
@@ -382,11 +391,7 @@ def run_stage_a_arm(
         _require_attack_identity(
             config.method.selection_attack.identity(), dynamic_s3_endpoint_contract, label="endpoint"
         )
-        if (
-            dynamic_s3_arm in {"fixed", "dynamic"}
-            and not shared_prefix
-            and dynamic_s3_peer_epoch80_state is None
-        ):
+        if dynamic_s3_arm in {"fixed", "dynamic"} and not shared_prefix and dynamic_s3_peer_epoch80_state is None:
             raise StageARuntimeError("fixed/dynamic S3 arms require a paired epoch-80 gate path")
     dynamic_s3_identity = (
         None
@@ -395,18 +400,30 @@ def run_stage_a_arm(
     )
     if continuation_seed is not None and (isinstance(continuation_seed, bool) or continuation_seed < 0):
         raise StageARuntimeError("continuation seed must be a non-negative integer")
+    if continuation_seed is not None and rng_source_seeds is not None:
+        raise StageARuntimeError("continuation_seed cannot be combined with explicit RNG source seeds")
+    explicit_rng_source_seeds = rng_source_seeds is not None
+    if continuation_seed is not None:
+        rng_source_seeds = RNGSourceSeeds(
+            # Preserve the historical continuation contract: the legacy
+            # scalar never changed sampler/augmentation streams.
+            data_seed=config.seeds.data_order,
+            attack_seed=continuation_seed,
+            other_seed=continuation_seed,
+        )
     arm_hash = _arm_hash(
         parent_hash,
         treatment,
         source_sha,
         continuation_seed=continuation_seed,
+        rng_source_seeds=None if continuation_seed is not None else rng_source_seeds,
         dynamic_s3=dynamic_s3_identity,
     )
     train_dataset, validation_dataset = build_train_validation_views(
         config.dataset,
         validation_fraction=config.training.validation_fraction,
         split_seed=config.seeds.split,
-        augmentation_seed=config.seeds.augmentation,
+        augmentation_seed=(config.seeds.augmentation if not explicit_rng_source_seeds else rng_source_seeds.data_seed),
     )
     dynamic_s3_router = None
     if dynamic_s3_arm is not None:
@@ -443,6 +460,8 @@ def run_stage_a_arm(
         sampler=sampler,
         num_workers=config.training.num_workers,
         collate_fn=collate_indexed,
+        generator=data_loader_generator(config.seeds.data_order),
+        worker_init_fn=seed_data_loader_worker,
     )
     validation_loader = DataLoader(
         validation_dataset,
@@ -450,6 +469,8 @@ def run_stage_a_arm(
         sampler=validation_sampler,
         num_workers=config.training.num_workers,
         collate_fn=collate_indexed,
+        generator=data_loader_generator(config.seeds.data_order + 1),
+        worker_init_fn=seed_data_loader_worker,
     )
     student = build_student(config.student, tier=config.tier).to(device)
     teacher = build_teacher(config.teacher, tier=config.tier).to(device) if config.teacher is not None else None
@@ -475,9 +496,7 @@ def run_stage_a_arm(
             raise StageARuntimeError("selected Stage A treatment requires a mask path")
         mask = _mask_from_overlay(mask_path, treatment.mask_key)
         if treatment.teacher_reliability_gate:
-            teacher_reliability_mask = _mask_from_overlay(
-                mask_path, "student_clean_wrong_teacher_clean_correct"
-            )
+            teacher_reliability_mask = _mask_from_overlay(mask_path, "student_clean_wrong_teacher_clean_correct")
     target_policy = (
         TeacherOnlyTemperatureTargetPolicy(target_temperature=treatment.tau, baseline_temperature=1.0)
         if treatment.kind == "soft_advkd"
@@ -613,24 +632,20 @@ def run_stage_a_arm(
     trainer.tracker_run_id = run_id
     trainer.sample_state = state.sample_state
     sample_store.load_state_dict(state.sample_state)
-    if continuation_seed is not None:
+    if rng_source_seeds is not None:
         # The epoch-79 optimizer/sampler/sample state remains the exact parent
-        # state.  Only the post-resume attack RNG stream is reseeded so R1/R2
-        # are independent continuation replicates while all arms within a
-        # matched block share the same seed.
-        import random
-
-        random.seed(continuation_seed)
-        torch.manual_seed(continuation_seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(continuation_seed)
-        try:
-            import numpy as np
-
-            np.random.seed(continuation_seed)
-        except ImportError:
-            pass
-        trainer.seed = continuation_seed
+        # state. Only the explicitly selected post-resume streams are rebound.
+        reseed_other_stream(rng_source_seeds.other_seed)
+        if explicit_rng_source_seeds:
+            if loader.generator is None:
+                raise StageARuntimeError("training DataLoader must expose its data-side generator")
+            reseed_data_stream(
+                dataset=train_dataset,
+                sampler=sampler,
+                loader_generator=loader.generator,
+                seed=rng_source_seeds.data_seed,
+            )
+        trainer.seed = rng_source_seeds.attack_seed
     trainer.fork_lineage = {
         "kind": "ert_stage_a_treatment_v1",
         "arm": treatment.arm,
@@ -644,6 +659,7 @@ def run_stage_a_arm(
         "child_config_hash": arm_hash,
         "calibration_sha256": calibration.get("artifact_sha256"),
         "source_git_sha": source_sha,
+        "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
         "dynamic_s3": dynamic_s3_identity,
     }
     (output_dir / "resolved_config.yaml").write_text(
@@ -664,6 +680,7 @@ def run_stage_a_arm(
                 "child_config_hash": arm_hash,
                 "run_namespace": run_namespace,
                 "continuation_seed": continuation_seed,
+                "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
                 "wandb_artifact_retention": config.tracking.artifact_retention,
                 "horizon_epochs": list(horizon_epochs),
                 "dynamic_s3": (
@@ -817,6 +834,7 @@ def run_stage_a_arm(
         "config_hash": arm_hash,
         "parent_checkpoint_sha256": _sha256(parent_checkpoint),
         "continuation_seed": continuation_seed,
+        "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
         "last_checkpoint_sha256": _sha256(output_dir / "last.pt"),
         "best_checkpoint_sha256": _sha256(output_dir / "best.pt"),
         "horizon_checkpoints": {

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import torch
 
+from ard.analysis.ert_rslad_rng_sources import RNGSourceSeeds
 from ard.analysis.ert_stage_a_runtime import StageATreatment, run_stage_a_arm
 
 
@@ -67,6 +68,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Post-resume attack RNG seed for an independent matched continuation replicate.",
     )
+    parser.add_argument("--data-seed", type=int, help="Post-resume data order/augmentation/worker seed.")
+    parser.add_argument("--attack-seed", type=int, help="Post-resume PGD random-start seed.")
+    parser.add_argument("--other-seed", type=int, help="Post-resume Python/NumPy/global Torch seed.")
+    parser.add_argument(
+        "--expected-parent-sha256",
+        help="Fail closed unless the supplied epoch-79 parent has this exact SHA-256.",
+    )
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     return parser
 
@@ -101,6 +109,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     if treatment.mask_key is not None and args.mask is None:
         raise ValueError("selected treatment requires --mask")
+    stream_values = (args.data_seed, args.attack_seed, args.other_seed)
+    if any(value is not None for value in stream_values) and not all(value is not None for value in stream_values):
+        raise ValueError("--data-seed, --attack-seed, and --other-seed must be supplied together")
+    rng_source_seeds = (
+        None
+        if args.data_seed is None
+        else RNGSourceSeeds(
+            data_seed=args.data_seed,
+            attack_seed=args.attack_seed,
+            other_seed=args.other_seed,
+        )
+    )
     result = run_stage_a_arm(
         parent_config_path=args.parent_config,
         parent_checkpoint=args.parent_checkpoint,
@@ -113,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
         horizon_epochs=tuple(args.horizon_epochs),
         run_namespace=args.run_namespace,
         continuation_seed=args.continuation_seed,
+        rng_source_seeds=rng_source_seeds,
+        expected_parent_checkpoint_sha256=args.expected_parent_sha256,
     )
     print(json.dumps(result, sort_keys=True))
     return 0

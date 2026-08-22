@@ -96,6 +96,10 @@ class IndexedDataset(Dataset[IndexedItem]):
         if self.transform is not None and hasattr(self.transform, "set_epoch"):
             self.transform.set_epoch(epoch)
 
+    def set_augmentation_seed(self, seed: int) -> None:
+        if self.transform is not None and hasattr(self.transform, "set_seed"):
+            self.transform.set_seed(seed)
+
 
 def collate_indexed(items: list[tuple[Any, ...]]) -> IndexedBatch:
     if not items:
@@ -128,6 +132,12 @@ class EpochShuffleSampler(Sampler[SampleRef]):
         if epoch < 0:
             raise ValueError("epoch must be non-negative")
         self.epoch = epoch
+
+    def reseed(self, seed: int) -> None:
+        """Change only future sample-order draws after an exact parent restore."""
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise ValueError("sampler seed must be a non-negative integer")
+        self.seed = seed
 
     def __iter__(self) -> Iterator[SampleRef]:
         if self.shuffle:

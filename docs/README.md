@@ -15,6 +15,7 @@
 - [FFNR CE/KL attack factorial](FFNR_ATTACK_FACTORIAL_RESULTS.md): Chen L2/L4 CE/KL × PGD10/20 failure-mask agreement
 - [FFNR state and Teacher mechanism](FFNR_STATE_AND_TEACHER_MECHANISM.md): Chen 3-state candidates, margin risk surfaces, and Teacher clean/response decomposition
 - [Seed-0 signal audit](SIGNAL_AUDIT.md): Student/Joint signalの探索的関連、周期checkpoint、正式判定の境界
+- [ERT RSLAD RNG-source decomposition](ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md): BASE continuation RNG-source decomposition protocol and pending result boundary
 - [Reproduction status](REPRODUCTION_STATUS.md): 実装済み機能、実行済み検証、未実行の重い実験、実際のCLI手順
 - [Research decisions](RESEARCH_DECISIONS.md): 今回の研究・実装で固定した方針
 - [Implementation specification](IMPLEMENTATION_SPEC.md): リポジトリ構造と責務

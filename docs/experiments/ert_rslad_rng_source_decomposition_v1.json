@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "status": "preregistered_pending_gpu_execution",
+  "experiment": "ERT / RSLAD baseline RNG-source decomposition",
+  "purpose": "Separate PGD random-start, data-side stochasticity, attack-data interaction, and residual nondeterminism in epoch-79-to-94 BASE RSLAD continuation.",
+  "implementation_base_sha": "13a5f60f95d54f89ab99a9ae15e471620249baba",
+  "production_source_sha": null,
+  "source_sha_policy": "resolve to one clean immutable commit after implementation review and before the first production arm",
+  "source_audit": {
+    "path": "docs/experiments/ert_rslad_rng_source_audit_v1.json",
+    "sha256": "37bacdb4475dcc2b0277cdf96edf805a294907b9b34421af898d3fbcc3af9df1"
+  },
+  "parents": {
+    "epoch": 79,
+    "restore_contract": "exact model, optimizer, scheduler, scaler, Python/NumPy/Torch/CUDA RNG, sampler, sample state, global step, and selection state",
+    "L2": {
+      "teacher": "chen2021_ltd_wrn34_10",
+      "parent_checkpoint": ".cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s1-confirm-v2/last.pt",
+      "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+      "parent_config": ".cache/analysis/ffnr-causal-pilot-epoch79/run-bundles/chen-rslad-observed-s1-confirm-v2/resolved_config.yaml"
+    },
+    "L4": {
+      "teacher": "chen2021_ltd_wrn34_10",
+      "parent_checkpoint": ".cache/analysis/ert-cw-l4-parent-recovery-audit/parent-epoch79.pt",
+      "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+      "parent_config": ".cache/analysis/ffnr-causal-pilot-epoch79/run-bundles/chen-rslad-observed-s2-confirm-v2/resolved_config.yaml",
+      "recovery_note": "Use the fork parent SHA, not the historical generic 9b51... source binding."
+    }
+  },
+  "canonical_contract": {
+    "method": "rslad",
+    "objective": "BASE RSLAD only; uniform KD, hard-label fallback zero",
+    "training_attack": {
+      "norm": "linf",
+      "input_domain": "pixel_0_1",
+      "epsilon": "8/255",
+      "epsilon_value": 0.03137254901960784,
+      "step_size": "2/255",
+      "step_size_value": 0.00784313725490196,
+      "steps": 10,
+      "random_start": true,
+      "loss": "kl",
+      "kl_target": "teacher_clean",
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "student_mode": "eval",
+      "teacher_mode": "eval"
+    },
+    "endpoint_attack": {
+      "norm": "linf",
+      "input_domain": "pixel_0_1",
+      "epsilon": "8/255",
+      "epsilon_value": 0.03137254901960784,
+      "step_size": "2/255",
+      "step_size_value": 0.00784313725490196,
+      "steps": 20,
+      "random_start": true,
+      "loss": "ce",
+      "kl_target": null,
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "student_mode": "eval",
+      "teacher_mode": "eval"
+    },
+    "training_epochs_argument": 95,
+    "training_epoch_range": "80..94 inclusive; --epochs 95 is required for epoch-94 checkpoint",
+    "horizon_epochs": [84, 89, 94],
+    "endpoint_evaluation_seed": 0,
+    "endpoint_mode": "saved checkpoint, eval mode, independent CE-PGD20 process",
+    "forbidden": ["margin loss", "CleanCE", "floor/cap", "adaptive lambda", "dynamic routing", "official test", "AutoAttack", "5-seed final campaign"]
+  },
+  "seed_derivation": {
+    "algorithm": "int.from_bytes(sha256(f'{experiment_name}|{teacher}|{source_name}|{replicate}').digest()[:8], 'big') % (2**31 - 1)",
+    "experiment_name": "ert_rslad_rng_source_decomposition_v1",
+    "replicate": "seed-registry-v1",
+    "source_names": ["D0", "D1", "D2", "A0", "A1", "A2", "O0"],
+    "outcome_independent": true,
+    "registry": {
+      "L2": {
+        "D0": 1202472836,
+        "D1": 464508622,
+        "D2": 748441478,
+        "A0": 2098449520,
+        "A1": 1051822590,
+        "A2": 1088401649,
+        "O0": 2058870454
+      },
+      "L4": {
+        "D0": 910595568,
+        "D1": 567355981,
+        "D2": 1249311148,
+        "A0": 486141081,
+        "A1": 1656379385,
+        "A2": 1508852080,
+        "O0": 970765270
+      }
+    }
+  },
+  "arm_design": [
+    {"arm": "REF1", "data": "D0", "attack": "A0", "other": "O0", "purpose": "reference"},
+    {"arm": "REF2", "data": "D0", "attack": "A0", "other": "O0", "purpose": "exact-repeat residual control"},
+    {"arm": "ATTACK1", "data": "D0", "attack": "A1", "other": "O0", "purpose": "attack RNG only"},
+    {"arm": "ATTACK2", "data": "D0", "attack": "A2", "other": "O0", "purpose": "attack RNG only"},
+    {"arm": "DATA1", "data": "D1", "attack": "A0", "other": "O0", "purpose": "data RNG only"},
+    {"arm": "DATA2", "data": "D2", "attack": "A0", "other": "O0", "purpose": "data RNG only"},
+    {"arm": "BOTH1", "data": "D1", "attack": "A1", "other": "O0", "purpose": "both changed"},
+    {"arm": "BOTH2", "data": "D2", "attack": "A2", "other": "O0", "purpose": "both changed"}
+  ],
+  "execution": {
+    "teachers": ["L2", "L4"],
+    "trajectory_count": 16,
+    "host_assignment": {"L2": "Hamster", "L4": "Hamster"},
+    "same_teacher_same_host_family": true,
+    "host_assignment_note": "Hamster-only campaign: current operational rule prefers the measured faster host and keeps both teachers in one controlled environment; Ferret is excluded.",
+    "REF_rule": "same host and physical GPU, sequential where possible",
+    "preflight": ["nvidia-smi", "ps", "disk usage", "git rev-parse HEAD", "clean source SHA"],
+    "no_user_job_kill": true,
+    "tracking": "W&B production; rank zero only; data_seed/attack_seed/other_seed and host/GPU identity required"
+  },
+  "canary_contract": {
+    "command": "PYTHONPATH=src python scripts/ert_rslad_rng_source_canary.py --batches 2",
+    "must_pass_before_production": true,
+    "assertions": ["attack change preserves data hashes", "attack change changes raw PGD draw hashes", "data change changes data hashes", "data change preserves raw PGD draw hashes"]
+  },
+  "measurement_contract": {
+    "primary": "validation robust accuracy at epoch 94",
+    "trajectory": ["validation robust accuracy at 84", "validation robust accuracy at 89", "validation robust accuracy at 94"],
+    "secondary": ["validation clean at 84/89/94", "train clean/robust at 94", "train CW/non-CW robust at 94 when stable IDs are available", "robust probability margin"],
+    "required_lineage_fields": ["source SHA", "parent SHA", "teacher identity", "resolved training config", "endpoint attack identity", "data seed", "attack seed", "other seed", "host", "GPU ID/model", "CUDA", "PyTorch", "deterministic flags"],
+    "per_teacher_arm_epoch_fields": ["validation clean", "validation robust", "train clean", "train robust", "epoch-94 subgroup metrics"],
+    "derived_fields": ["delta_A_1", "delta_A_2", "delta_D_1", "delta_D_2", "delta_AD_1", "delta_AD_2", "interaction_1", "interaction_2", "S_A", "S_D", "S_AD", "delta_REF", "best_last_gap"]
+  },
+  "analysis_rules": {
+    "delta_A": "Y(D0,Ar)-Y(D0,A0)",
+    "delta_D": "Y(Dr,A0)-Y(D0,A0)",
+    "delta_AD": "Y(Dr,Ar)-Y(D0,A0)",
+    "interaction": "delta_AD-delta_A-delta_D",
+    "sensitivity": "mean absolute effect over the two preregistered perturbations",
+    "inference_boundary": "descriptive only; two perturbations are not population inference",
+    "residual": "report REF2-REF1 absolute difference without an arbitrary threshold",
+    "outcome_selection": "forbidden for data/attack diagnostics and seed interpretation"
+  },
+  "results": {
+    "status": "not_collected",
+    "trajectories": [],
+    "derived": null,
+    "endpoint_evaluations": []
+  },
+  "stop_rule": "After 16 BASE trajectories, endpoint evaluations, decomposition, and report: stop and request human review; do not auto-start stabilization."
+}

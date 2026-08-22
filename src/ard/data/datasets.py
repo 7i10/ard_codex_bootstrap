@@ -33,6 +33,11 @@ class EpochSourceTransform:
             raise ValueError("augmentation epoch must be non-negative")
         self.epoch = epoch
 
+    def set_seed(self, seed: int) -> None:
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise ValueError("augmentation seed must be a non-negative integer")
+        self.augmentation_seed = seed
+
     def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
         # This is deliberately independent of worker order, sampler order,
         # rank, and process RNG state.  It makes a resumed epoch reproduce the
@@ -84,6 +89,9 @@ class SourceIndexedSubset(Dataset[IndexedItem]):
 
     def set_epoch(self, epoch: int) -> None:
         self.dataset.set_epoch(epoch)
+
+    def set_augmentation_seed(self, seed: int) -> None:
+        self.dataset.set_augmentation_seed(seed)
 
 
 class SyntheticCIFAR(Dataset[tuple[torch.Tensor, int]]):
