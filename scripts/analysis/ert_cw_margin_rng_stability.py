@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import statistics
 from collections import Counter
 from pathlib import Path
@@ -464,6 +465,54 @@ def fixed_probe_summary(replay_root: Path) -> dict[str, Any]:
     return summary
 
 
+def _pearson(left: list[float], right: list[float]) -> float | None:
+    if len(left) != len(right) or len(left) < 3:
+        return None
+    lm, rm = statistics.fmean(left), statistics.fmean(right)
+    numerator = sum((a - lm) * (b - rm) for a, b in zip(left, right, strict=True))
+    denominator = math.sqrt(sum((a - lm) ** 2 for a in left) * sum((b - rm) ** 2 for b in right))
+    return None if denominator == 0 else numerator / denominator
+
+
+def _rank(values: list[float]) -> list[float]:
+    order = sorted(range(len(values)), key=lambda index: (values[index], index))
+    result = [0.0] * len(values)
+    for position, index in enumerate(order):
+        result[index] = float(position)
+    return result
+
+
+def diagnostic_correlations(fixed: dict[str, Any], endpoint: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for epoch in (84, 89):
+        result[str(epoch)] = {}
+        for field in ("teacher_adv_margin", "target", "raw_deficit"):
+            outcomes: list[float] = []
+            diagnostics: list[float] = []
+            for teacher in TEACHERS:
+                for arm in ARMS:
+                    outcomes.append(float(endpoint[teacher]["94"]["robust_accuracy"]["treatment_effect_gap"][arm]))
+                    diagnostics.append(float(fixed[teacher][arm][str(epoch)]["sample_abs_mean_difference"][field]))
+            result[str(epoch)][f"final_effect_gap_vs_{field}_abs_diff"] = {
+                "n": len(outcomes),
+                "pearson": _pearson(outcomes, diagnostics),
+                "spearman": _pearson(_rank(outcomes), _rank(diagnostics)),
+            }
+        for field in ("regime_disagreement_rate", "hinge_disagreement_rate"):
+            outcomes = []
+            diagnostics = []
+            for teacher in TEACHERS:
+                for arm in ARMS:
+                    outcomes.append(float(endpoint[teacher]["94"]["robust_accuracy"]["treatment_effect_gap"][arm]))
+                    diagnostics.append(float(fixed[teacher][arm][str(epoch)][field]))
+            result[str(epoch)][f"final_effect_gap_vs_{field}"] = {
+                "n": len(outcomes),
+                "pearson": _pearson(outcomes, diagnostics),
+                "spearman": _pearson(_rank(outcomes), _rank(diagnostics)),
+            }
+    return result
+
+
 def _flat_grads(grads: tuple[torch.Tensor | None, ...], parameters: tuple[torch.nn.Parameter, ...]) -> torch.Tensor:
     values = []
     for gradient, parameter in zip(grads, parameters, strict=True):
@@ -627,6 +676,7 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
     gradient = load_gradient_summary(replay_root)
     curves = training_curves()
     endpoint = endpoint_absolute_variance(machine_0054)
+    correlations = diagnostic_correlations(fixed, endpoint)
     machine = {
         "schema_version": 1,
         "contract": "ert_cw_margin_rng_stability_diagnostic_v1",
@@ -646,6 +696,7 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
         "base_and_treatment_endpoint_variance": endpoint,
         "training_metric_curves": curves,
         "fixed_probe_replay": fixed,
+        "descriptive_correlations": correlations,
     }
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_md.parent.mkdir(parents=True, exist_ok=True)
@@ -706,6 +757,18 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
                 lines.append(
                     f"| {teacher} | {arm} | {epoch} | {d['teacher_adv_margin']:.6f} | {d['target']:.6f} | {d['raw_deficit']:.6f} | {item['regime_disagreement_rate']:.3%} | {item['hinge_disagreement_rate']:.3%} | {item['target_contraction_ratio']:.3f} |"
                 )
+    lines += [
+        "",
+        "## Descriptive link to final treatment-effect variance",
+        "",
+        "Pearson/Spearman values use only six teacher×arm pairs and are exploratory; no p-value or causal claim is made.",
+        "",
+        "| diagnostic at epoch | feature | Pearson | Spearman | n |",
+        "|---:|---|---:|---:|---:|",
+    ]
+    for epoch in (84, 89):
+        for feature, values in correlations[str(epoch)].items():
+            lines.append(f"| {epoch} | {feature} | {values['pearson']:+.3f} | {values['spearman']:+.3f} | {values['n']} |")
     if gradient.get("status") == "completed":
         lines += [
             "",
