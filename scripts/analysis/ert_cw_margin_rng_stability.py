@@ -572,8 +572,12 @@ def gradient_pair(*, block: str, arm: str, epoch: int, device: str, replay_root:
     right_checkpoint = checkpoint_path(right_block, arm, epoch)
     left_probe = replay_root / left_block / arm / f"epoch-{epoch}" / "probe-sample-stats.parquet"
     right_probe = replay_root / right_block / arm / f"epoch-{epoch}" / "probe-sample-stats.parquet"
-    if sha256(left_probe) != sha256(right_probe):
-        raise RuntimeError(f"gradient pair requires identical fixed probe rows: {block}/{arm}/{epoch}")
+    left_probe_rows = load_rows(left_probe)
+    right_probe_rows = load_rows(right_probe)
+    if sorted(left_probe_rows) != sorted(right_probe_rows) or any(
+        int(left_probe_rows[item]["true_label"]) != int(right_probe_rows[item]["true_label"]) for item in left_probe_rows
+    ):
+        raise RuntimeError(f"gradient pair requires identical fixed probe IDs/classes: {block}/{arm}/{epoch}")
     left, left_vectors = _gradient_one(block=left_block, arm=arm, epoch=epoch, checkpoint=left_checkpoint, probe_rows=left_probe, device=device)
     right, right_vectors = _gradient_one(block=right_block, arm=arm, epoch=epoch, checkpoint=right_checkpoint, probe_rows=right_probe, device=device)
     result = {"contract": "ert_cw_margin_rng_gradient_pair_v1", "no_update": True, "source_git_sha": collect_git_state(ROOT)["sha"], "teacher": teacher, "arm": arm, "epoch": epoch, "R1": left, "R2": right}
