@@ -1,6 +1,6 @@
 # ERT Clean-Wrong Teacher-Adaptive Margin Local Lambda Stability
 
-Status: in progress (preflight/canary before production)
+Status: complete (Hamster production, endpoint evaluation, and point analysis complete)
 
 ## Question
 
@@ -83,6 +83,18 @@ retention; checkpoints and run bundles remain local.
    training-seed population claim from two replicates per seed.
 7. Write the machine result and human report, then stop.  Do not auto-select
    a lambda or start another intervention.
+
+## Completion note
+
+The first launch used `--epochs 94` and was stopped before it could be treated
+as a valid result because the runtime's end boundary is exclusive; it cannot
+produce the required epoch-94 checkpoint.  The frozen experiment was rerun
+from the same parents with `--epochs 95`, with no change to the treatment,
+seed, mask, attack, or endpoint contract.  The partial first launch is
+excluded from all results.  The valid v2 campaign completed all 24 trajectories
+and 96 endpoint evaluations on Hamster.  Results are recorded in
+`docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md` and
+`docs/experiments/ert_cw_margin_local_lambda_stability_v1.json`.
 
 ## Exclusions
 
