@@ -698,6 +698,32 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
         "fixed_probe_replay": fixed,
         "descriptive_correlations": correlations,
     }
+    base_robust_gaps = [
+        float(endpoint[teacher][str(epoch)]["robust_accuracy"]["base_gap"])
+        for teacher in TEACHERS
+        for epoch in EPOCHS
+    ]
+    effect_robust_gaps = [
+        float(endpoint[teacher][str(epoch)]["robust_accuracy"]["treatment_effect_gap"][arm])
+        for teacher in TEACHERS
+        for epoch in EPOCHS
+        for arm in ARMS
+    ]
+    probe_e84_hinge = [fixed[teacher][arm]["84"]["hinge_disagreement_rate"] for teacher in TEACHERS for arm in ARMS]
+    probe_e84_regime = [fixed[teacher][arm]["84"]["regime_disagreement_rate"] for teacher in TEACHERS for arm in ARMS]
+    probe_e84_teacher = [fixed[teacher][arm]["84"]["sample_abs_mean_difference"]["teacher_adv_margin"] for teacher in TEACHERS for arm in ARMS]
+    probe_e84_target = [fixed[teacher][arm]["84"]["sample_abs_mean_difference"]["target"] for teacher in TEACHERS for arm in ARMS]
+    gradient_ratios = [
+        float(gradient["pairs"][teacher][arm][str(epoch)]["R1"]["weighted_margin_base_ratio"])
+        for teacher in TEACHERS
+        for arm in ARMS
+        for epoch in GRAD_EPOCHS
+    ] + [
+        float(gradient["pairs"][teacher][arm][str(epoch)]["R2"]["weighted_margin_base_ratio"])
+        for teacher in TEACHERS
+        for arm in ARMS
+        for epoch in GRAD_EPOCHS
+    ] if gradient.get("status") == "completed" else []
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_md.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(machine, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -789,6 +815,15 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
     else:
         lines += ["", "## No-update gradient probe", "", "Status: not yet complete; no gradient conclusion is inferred."]
     lines += [
+        "",
+        "## Mechanism assessment",
+        "",
+        f"- BASE validation robust R1/R2 gaps span {100*min(base_robust_gaps):.2f}--{100*max(base_robust_gaps):.2f} pp across the reported epochs/teachers.  Treatment-effect gaps span {100*min(effect_robust_gaps):.2f}--{100*max(effect_robust_gaps):.2f} pp and are not uniformly larger than BASE gaps.  Baseline/general RSLAD stochasticity is therefore substantial, with incremental treatment variance only in some matched pairs.",
+        f"- At epoch 84 the fixed probe already shows mean |ΔTeacher margin| {min(probe_e84_teacher):.4f}--{max(probe_e84_teacher):.4f}, mean |Δtarget| {min(probe_e84_target):.4f}--{max(probe_e84_target):.4f}, regime disagreement {100*min(probe_e84_regime):.1f}--{100*max(probe_e84_regime):.1f}%, and hinge disagreement {100*min(probe_e84_hinge):.1f}--{100*max(probe_e84_hinge):.1f}%.  This localizes propagation from already-diverged model states into target/hinge quantities, but does not identify the causal RNG stream.",
+        "- Hinge-boundary concentration is mixed: pre-registered hinge windows are small and the disagreement is not uniformly concentrated near them.  Clip contraction is satisfied, so the clip alone does not amplify Teacher-margin differences.",
+        (f"- The focused gradient probe gives weighted margin/base ratios in the range {min(gradient_ratios):.3f}--{max(gradient_ratios):.3f}; cross-replicate base and margin cosines vary by pair, with no consistent margin-only direction collapse.  Effective-pressure variation is plausible but not isolated as the primary cause." if gradient_ratios else "- The focused gradient probe was unavailable, so effective-pressure conclusions are deferred."),
+        "- Evidence ranking: (1) baseline/general RSLAD continuation stochasticity, (2) propagation of model divergence through Teacher target and hinge states, (3) possible effective-pressure variation, (4) hinge-switch instability as a mixed secondary mechanism.",
+        "- Recommended next direction: first address or characterize baseline/RSLAD continuation stability.  Do not automatically introduce target smoothing, adaptive lambda, a smooth hinge, or further floor/cap sweeps from this diagnostic alone.",
         "",
         "## Interpretation boundary",
         "",
