@@ -18,6 +18,7 @@ from typing import Any
 
 import pyarrow.parquet as pq
 import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from ard.analysis import write_sample_parquet
@@ -27,6 +28,7 @@ from ard.attacks import AttackRequest, LinfPGD
 from ard.data import EpochShuffleSampler, build_train_validation_views, collate_indexed
 from ard.evaluation.saved_checkpoint import load_saved_student_checkpoint
 from ard.models import build_student, build_teacher
+from ard.objectives import RSLADObjective
 from ard.tracking.adapter import collect_git_state
 
 
@@ -48,6 +50,7 @@ TEACHERS = ("L2", "L4")
 REPLICATES = ("R1", "R2")
 ARMS = ("N95", "A100", "N105")
 EPOCHS = (84, 89, 94)
+GRAD_EPOCHS = (84, 94)
 PROBE_COUNT = 256
 FLOOR = 0.03221710026264191
 CAP = 0.13952550292015076
@@ -461,12 +464,158 @@ def fixed_probe_summary(replay_root: Path) -> dict[str, Any]:
     return summary
 
 
+def _flat_grads(grads: tuple[torch.Tensor | None, ...], parameters: tuple[torch.nn.Parameter, ...]) -> torch.Tensor:
+    values = []
+    for gradient, parameter in zip(grads, parameters, strict=True):
+        values.append(torch.zeros_like(parameter, dtype=torch.float32).reshape(-1) if gradient is None else gradient.detach().float().reshape(-1))
+    return torch.cat(values)
+
+
+def _gradient_one(*, block: str, arm: str, epoch: int, checkpoint: Path, probe_rows: Path, device: str) -> tuple[dict[str, Any], dict[str, torch.Tensor]]:
+    teacher_name, _ = block.split("-", 1)
+    config = _runtime_config(config_path(block, arm))
+    _assert_attack(config)
+    treatment = _treatment(config_path(block, arm))
+    probe = load_rows(probe_rows)
+    ids = sorted(probe)[:128]
+    probe_set = set(ids)
+    student = build_student(config.student, tier=config.tier)
+    payload = load_saved_student_checkpoint(checkpoint, student)
+    if payload.get("epoch") != epoch or payload.get("epoch_boundary") != "end":
+        raise RuntimeError(f"gradient checkpoint epoch mismatch: {checkpoint}")
+    if config.teacher is None:
+        raise RuntimeError("gradient probe requires the registered Teacher")
+    teacher = build_teacher(config.teacher, tier=config.tier)
+    torch_device = torch.device(device)
+    student.to(torch_device).eval()
+    teacher.to(torch_device).eval()
+    for parameter in teacher.parameters():
+        parameter.requires_grad_(False)
+        parameter.grad = None
+    attack = LinfPGD(config.method.attack)
+    objective = RSLADObjective(temperature=config.method.temperature, temperature_squared=config.method.temperature_squared)
+    parameters = tuple(student.parameters())
+    total_n = 0
+    accum = {"base": None, "margin": None}
+    cosine_summaries: list[float] = []
+    for batch_index, images, labels, sample_ids in _load_probe_batches(config, epoch, probe_set, torch_device):
+        with torch.no_grad():
+            teacher_clean_logits = teacher(images.float())
+        student_clean_logits = student(images.float())
+        generator = torch.Generator(device=torch_device).manual_seed(_probe_seed(teacher_name, epoch, batch_index))
+        attack_result = attack.generate(
+            AttackRequest(
+                inputs=images,
+                labels=labels,
+                student=student,
+                teacher=teacher,
+                target_logits=teacher_clean_logits.detach().float(),
+                generator=generator,
+            )
+        )
+        student_adv_logits = student(attack_result.adversarial.float())
+        with torch.no_grad():
+            teacher_adv_logits = teacher(attack_result.adversarial.float())
+        terms = objective(
+            student_logits=student_adv_logits,
+            labels=labels,
+            teacher_logits=teacher_clean_logits,
+            clean_student_logits=student_clean_logits,
+        )
+        teacher_margin = _probability_stats(teacher_adv_logits, labels)["margin"]
+        target, active = _targets(teacher_margin, treatment)
+        student_margin = _probability_stats(student_adv_logits, labels)["margin"]
+        margin_loss = (float(treatment["margin_coefficient"]) * active * F.relu(target - student_margin)).mean()
+        base_loss = terms.total.mean()
+        base_grad = torch.autograd.grad(base_loss, parameters, retain_graph=True, allow_unused=True)
+        margin_grad = torch.autograd.grad(margin_loss, parameters, retain_graph=False, allow_unused=True)
+        base_vector = _flat_grads(base_grad, parameters)
+        margin_vector = _flat_grads(margin_grad, parameters)
+        batch_n = len(ids) if len(sample_ids) == 0 else int(len(sample_ids))
+        total_n += batch_n
+        accum["base"] = base_vector * batch_n if accum["base"] is None else accum["base"] + base_vector * batch_n
+        accum["margin"] = margin_vector * batch_n if accum["margin"] is None else accum["margin"] + margin_vector * batch_n
+        denom = float(base_vector.norm().item() * margin_vector.norm().item())
+        if denom:
+            cosine_summaries.append(float(torch.dot(base_vector, margin_vector).item() / denom))
+        student.zero_grad(set_to_none=True)
+    if total_n != len(probe_set):
+        raise RuntimeError(f"gradient probe did not recover all fixed IDs: {block}/{arm}/epoch-{epoch}")
+    base_vector = accum["base"] / total_n
+    margin_vector = accum["margin"] / total_n
+    total_vector = base_vector + margin_vector
+    summary = {
+        "checkpoint_sha256": sha256(checkpoint),
+        "probe_rows_sha256": sha256(probe_rows),
+        "probe_count": len(probe_set),
+        "base_norm": float(base_vector.norm().item()),
+        "margin_norm": float(margin_vector.norm().item()),
+        "total_norm": float(total_vector.norm().item()),
+        "weighted_margin_base_ratio": float(margin_vector.norm().item() / base_vector.norm().item()) if base_vector.norm().item() else None,
+        "cosine_margin_base": _cosine_vectors(margin_vector, base_vector),
+        "cosine_total_base": _cosine_vectors(total_vector, base_vector),
+        "batch_cosine_margin_base_mean": _mean(cosine_summaries),
+    }
+    return summary, {"base": base_vector, "margin": margin_vector, "total": total_vector}
+
+
+def _cosine_vectors(left: torch.Tensor, right: torch.Tensor) -> float | None:
+    denominator = float(left.norm().item() * right.norm().item())
+    return None if denominator == 0.0 else float(torch.dot(left, right).item() / denominator)
+
+
+def gradient_pair(*, block: str, arm: str, epoch: int, device: str, replay_root: Path) -> dict[str, Any]:
+    teacher, _ = block.split("-", 1)
+    left_block = f"{teacher}-R1"
+    right_block = f"{teacher}-R2"
+    left_checkpoint = checkpoint_path(left_block, arm, epoch)
+    right_checkpoint = checkpoint_path(right_block, arm, epoch)
+    left_probe = replay_root / left_block / arm / f"epoch-{epoch}" / "probe-sample-stats.parquet"
+    right_probe = replay_root / right_block / arm / f"epoch-{epoch}" / "probe-sample-stats.parquet"
+    if sha256(left_probe) != sha256(right_probe):
+        raise RuntimeError(f"gradient pair requires identical fixed probe rows: {block}/{arm}/{epoch}")
+    left, left_vectors = _gradient_one(block=left_block, arm=arm, epoch=epoch, checkpoint=left_checkpoint, probe_rows=left_probe, device=device)
+    right, right_vectors = _gradient_one(block=right_block, arm=arm, epoch=epoch, checkpoint=right_checkpoint, probe_rows=right_probe, device=device)
+    result = {"contract": "ert_cw_margin_rng_gradient_pair_v1", "no_update": True, "source_git_sha": collect_git_state(ROOT)["sha"], "teacher": teacher, "arm": arm, "epoch": epoch, "R1": left, "R2": right}
+    for field in ("base_norm", "margin_norm", "total_norm", "weighted_margin_base_ratio", "cosine_margin_base", "cosine_total_base"):
+        lv, rv = left[field], right[field]
+        result[f"r1_r2_abs_gap_{field}"] = None if lv is None or rv is None else abs(float(lv) - float(rv))
+    result["cross_replicate_cosine_base"] = _cosine_vectors(left_vectors["base"], right_vectors["base"])
+    result["cross_replicate_cosine_margin"] = _cosine_vectors(left_vectors["margin"], right_vectors["margin"])
+    result["cross_replicate_cosine_total"] = _cosine_vectors(left_vectors["total"], right_vectors["total"])
+    return result
+
+
+def load_gradient_summary(replay_root: Path) -> dict[str, Any]:
+    root = replay_root / "gradient"
+    result: dict[str, Any] = {"status": "completed", "pairs": {}}
+    missing = []
+    for teacher in TEACHERS:
+        result["pairs"][teacher] = {}
+        for arm in ARMS:
+            result["pairs"][teacher][arm] = {}
+            for epoch in GRAD_EPOCHS:
+                path = root / teacher / arm / f"epoch-{epoch}.json"
+                if not path.is_file():
+                    missing.append(str(path))
+                    continue
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                if payload.get("contract") != "ert_cw_margin_rng_gradient_pair_v1" or payload.get("no_update") is not True:
+                    raise RuntimeError(f"gradient contract mismatch: {path}")
+                result["pairs"][teacher][arm][str(epoch)] = payload
+    if missing:
+        result["status"] = "partial_or_unavailable"
+        result["missing"] = missing
+    return result
+
+
 def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> None:
     machine_0054 = json.loads(MACHINE_0054.read_text())
     source = collect_git_state(ROOT)
     if source.get("dirty") is not False:
         raise RuntimeError("aggregation requires a clean source tree")
     fixed = fixed_probe_summary(replay_root)
+    gradient = load_gradient_summary(replay_root)
     curves = training_curves()
     endpoint = endpoint_absolute_variance(machine_0054)
     machine = {
@@ -484,7 +633,7 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
         "blocks": list(BLOCKS),
         "arms": list(ARMS),
         "epochs": list(EPOCHS),
-        "gradient_probe": {"status": "pending_or_unavailable", "note": "Gradient vector comparison is run separately when the focused no-update probe is available."},
+        "gradient_probe": gradient,
         "base_and_treatment_endpoint_variance": endpoint,
         "training_metric_curves": curves,
         "fixed_probe_replay": fixed,
@@ -548,6 +697,25 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
                 lines.append(
                     f"| {teacher} | {arm} | {epoch} | {d['teacher_adv_margin']:.6f} | {d['target']:.6f} | {d['raw_deficit']:.6f} | {item['regime_disagreement_rate']:.3%} | {item['hinge_disagreement_rate']:.3%} | {item['target_contraction_ratio']:.3f} |"
                 )
+    if gradient.get("status") == "completed":
+        lines += [
+            "",
+            "## No-update gradient probe",
+            "",
+            "The focused probe uses the first 128 fixed IDs and the same deterministic KL-PGD10 seed protocol.  Cosines compare the full flattened Student parameter gradients between R1/R2; they are descriptive, not population inference.",
+            "",
+            "| teacher | arm | epoch | base cosine | margin cosine | total cosine | margin/base norm gap |",
+            "|---|---|---:|---:|---:|---:|---:|",
+        ]
+        for teacher in TEACHERS:
+            for arm in ARMS:
+                for epoch in GRAD_EPOCHS:
+                    item = gradient["pairs"][teacher][arm][str(epoch)]
+                    lines.append(
+                        f"| {teacher} | {arm} | {epoch} | {item['cross_replicate_cosine_base']:.5f} | {item['cross_replicate_cosine_margin']:.5f} | {item['cross_replicate_cosine_total']:.5f} | {item['r1_r2_abs_gap_weighted_margin_base_ratio']:.6f} |"
+                    )
+    else:
+        lines += ["", "## No-update gradient probe", "", "Status: not yet complete; no gradient conclusion is inferred."]
     lines += [
         "",
         "## Interpretation boundary",
@@ -564,7 +732,7 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("replay", "aggregate"), required=True)
+    parser.add_argument("--mode", choices=("replay", "gradient", "aggregate"), required=True)
     parser.add_argument("--block")
     parser.add_argument("--arm", choices=ARMS)
     parser.add_argument("--epoch", type=int, choices=EPOCHS)
@@ -578,6 +746,17 @@ def main() -> int:
             parser.error("replay requires --block, --arm, and --epoch")
         result = replay_one(block=args.block, arm=args.arm, epoch=args.epoch, device=args.device, output_root=args.replay_root)
         print(json.dumps({"contract": result["contract"], "rows_sha256": result["rows_sha256"]}, sort_keys=True))
+        return 0
+    if args.mode == "gradient":
+        if args.block is None or args.arm is None or args.epoch is None:
+            parser.error("gradient requires --block, --arm, and --epoch")
+        output = args.replay_root / "gradient" / args.block.split("-", 1)[0] / args.arm / f"epoch-{args.epoch}.json"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        if output.exists():
+            raise RuntimeError(f"refusing to overwrite gradient output: {output}")
+        result = gradient_pair(block=args.block, arm=args.arm, epoch=args.epoch, device=args.device, replay_root=args.replay_root)
+        output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(json.dumps({"contract": result["contract"], "output": str(output)}, sort_keys=True))
         return 0
     build_report(replay_root=args.replay_root, output_json=args.output_json, output_md=args.output_md)
     print(json.dumps({"status": "completed", "output": str(args.output_json)}, sort_keys=True))
