@@ -674,6 +674,14 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
         raise RuntimeError("aggregation requires a clean source tree apart from its declared output files")
     fixed = fixed_probe_summary(replay_root)
     gradient = load_gradient_summary(replay_root)
+    replay_source_shas = sorted({str(json.loads(path.read_text()).get("source_git_sha")) for path in replay_root.glob("L*-R*/**/replay.json")})
+    gradient_source_shas = sorted({
+        str(payload.get("source_git_sha"))
+        for teacher_pairs in gradient.get("pairs", {}).values()
+        for arm_pairs in teacher_pairs.values()
+        for payload in arm_pairs.values()
+        if payload.get("source_git_sha")
+    })
     curves = training_curves()
     endpoint = endpoint_absolute_variance(machine_0054)
     correlations = diagnostic_correlations(fixed, endpoint)
@@ -683,6 +691,8 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
         "status": "completed_read_only_point_estimates",
         "source_git_sha": source["sha"],
         "source_0054_git_sha": SOURCE_0054,
+        "replay_artifact_source_git_shas": replay_source_shas,
+        "gradient_artifact_source_git_shas": gradient_source_shas,
         "parent_checkpoint_sha256": PARENTS,
         "mask_sha256": MASK_SHA,
         "calibration_sha256": "a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5",
@@ -833,6 +843,7 @@ def build_report(*, replay_root: Path, output_json: Path, output_md: Path) -> No
         "",
         f"- Source Git SHA: `{source['sha']}`; 0054 source: `{SOURCE_0054}`.",
         f"- Machine artifact: `{output_json}`.",
+        f"- Fixed-probe replay artifact source SHA(s): {', '.join(replay_source_shas)}; gradient artifact source SHA(s): {', '.join(gradient_source_shas)}.",
     ]
     output_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
