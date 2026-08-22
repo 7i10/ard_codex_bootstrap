@@ -1,6 +1,6 @@
 # ERT Clean-Wrong Teacher-Adaptive Margin RNG Stability Diagnostic
 
-Status: in progress (read-only trajectory audit and fixed-probe replay)
+Status: complete (read-only trajectory audit, fixed-probe replay, and gradient probe)
 
 ## Purpose
 
@@ -67,3 +67,13 @@ allowed.
 - `docs/experiments/ert_cw_margin_rng_stability_diagnostic_v1.json`
 
 After the report is complete, stop for human review.
+
+## Completion note
+
+The valid 0054 v2 campaign supplied all 36 fixed-probe replay artifacts and
+12 paired no-update gradient probes on Hamster.  The first replay wave was
+fail-closed after detecting a one-character L4 mask-hash typo in the analysis
+script; no invalid L4 result was adopted.  The corrected wave was rerun in a
+separate output root.  Results are recorded in
+`docs/ERT_CW_MARGIN_RNG_STABILITY_DIAGNOSTIC.md` and
+`docs/experiments/ert_cw_margin_rng_stability_diagnostic_v1.json`.
