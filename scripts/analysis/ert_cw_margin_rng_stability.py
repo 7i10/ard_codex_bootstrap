@@ -158,8 +158,8 @@ def replay_one(*, block: str, arm: str, epoch: int, device: str, output_root: Pa
     ids = probe_ids(teacher_name)
     probe_set = set(ids)
     source = collect_git_state(ROOT)
-    if source.get("dirty") is not False or source.get("sha") != SOURCE_0054:
-        raise RuntimeError("fixed replay requires the clean 0054 source commit")
+    if source.get("dirty") is not False:
+        raise RuntimeError("fixed replay requires a clean diagnostic source commit")
     expected_parent = PARENTS[teacher_name]
     if config_path(block, arm).read_text(encoding="utf-8").find(expected_parent) < 0:
         raise RuntimeError(f"parent SHA is not bound in resolved config: {block}")
