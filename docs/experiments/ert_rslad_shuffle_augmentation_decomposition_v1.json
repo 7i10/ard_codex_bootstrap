@@ -126,9 +126,14 @@
     "outcome_selection": "forbidden for seed, arm, or ordering selection"
   },
   "results": {
-    "status": "not_collected",
-    "result_artifact": null,
-    "human_report": null
+    "status": "completed",
+    "result_artifact": "docs/experiments/ert_rslad_shuffle_augmentation_decomposition_results_v1.json",
+    "human_report": "docs/ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md",
+    "trajectory_count": 16,
+    "endpoint_count": 96,
+    "source_git_sha": "e066fd3300cb58b5d2f32c2820cab3ed81ce9f9d",
+    "input_inventory_sha256": "b32c14d4e2d60922d4421722585e73e204bdaadb4f328febb2281b7e3a036850",
+    "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
   },
   "stop_rule": "After 16 BASE trajectories, fixed-seed endpoint evaluations, decomposition, and report: stop and request human review; do not auto-start state-aware ordering."
 }

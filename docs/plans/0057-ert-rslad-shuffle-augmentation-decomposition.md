@@ -4,11 +4,11 @@
 
 - Owner: repository owner / one campaign owner
 - Branch: `master`
-- Current milestone: real-parent smoke passed; production matrix ready
+- Current milestone: campaign complete; result report recorded; human review required
 - Production implementation: `3d26183b4861fa423c4cb6beba7105677284a85f`; the
   current clean metadata tip is `c4bf46630601e6aed70833b80ef1bc3f1dcfa30a`.
-  The actual launch SHA must be captured in every run manifest; production has
-  not started.
+  The actual launch SHA `e066fd3300cb58b5d2f32c2820cab3ed81ce9f9d` is captured in
+  every production run manifest and endpoint record.
 
 ## Goal
 
@@ -103,9 +103,9 @@ decomposition, and report are complete, stop and request human review.
 - [x] M2: preregister seed registry, arms, endpoint, and analysis rules.
 - [x] M3: commit/pin immutable source SHA and run Hamster preflight + real-parent
   smoke.
-- [ ] M4: run 16 trajectories through epoch 94 with checkpoints 84/89/94.
-- [ ] M5: run 96 independent endpoints and deterministic aggregation.
-- [ ] M6: write report, update result status, run focused verification, and stop.
+- [x] M4: run 16 trajectories through epoch 94 with checkpoints 84/89/94.
+- [x] M5: run 96 independent endpoints and deterministic aggregation.
+- [x] M6: write report, update result status, run focused verification, and stop.
 
 ## Progress log
 
@@ -126,8 +126,17 @@ decomposition, and report are complete, stop and request human review.
   exact L2/L4 parents. The split-stream CLI contract was corrected before the
   smoke; the audit artifact records the manifests, parent hashes, and output
   paths. No production trajectory has started yet.
+- 2026-08-27: Hamster-only production completed all 16 trajectories through
+  epoch 94 at launch SHA `e066fd3300cb58b5d2f32c2820cab3ed81ce9f9d`. The
+  independent CE-PGD20 matrix completed 96/96 records (three horizons, train
+  and fixed validation splits) with one attack identity. The hash-bound result
+  inventory is `b32c14d4e2d60922d4421722585e73e204bdaadb4f328febb2281b7e3a036850`.
 
 ## Completion report
 
-Pending M3–M6. No scientific conclusion about shuffle versus augmentation is
-made until the registered 16-arm campaign and endpoint matrix are complete.
+M0–M6 are complete. The descriptive result is in
+[`ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md`](../ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md)
+and machine form in
+[`ert_rslad_shuffle_augmentation_decomposition_results_v1.json`](../experiments/ert_rslad_shuffle_augmentation_decomposition_results_v1.json).
+No automatic stabilization run, new seed, official test, or AutoAttack was
+started; source ranking remains a human-review decision.
