@@ -111,8 +111,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     if treatment.mask_key is not None and args.mask is None:
         raise ValueError("selected treatment requires --mask")
-    stream_values = (args.data_seed, args.attack_seed, args.other_seed)
-    if any(value is not None for value in stream_values) and not all(value is not None for value in stream_values):
+    # ``attack`` and ``other`` are shared by both contracts.  Do not reject a
+    # split invocation merely because those two flags are present without the
+    # legacy ``data-seed``; validate the old triplet only when that entrypoint
+    # is actually selected below.
+    if args.data_seed is not None and (args.attack_seed is None or args.other_seed is None):
         raise ValueError("--data-seed, --attack-seed, and --other-seed must be supplied together")
     rng_source_seeds = (
         None
