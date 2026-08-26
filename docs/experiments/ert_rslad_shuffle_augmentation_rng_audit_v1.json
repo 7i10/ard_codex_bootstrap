@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "audited_pending_production",
-  "source_revision": "working tree after 594f31a plus split shuffle/augmentation implementation",
+  "source_revision": "3d26183b4861fa423c4cb6beba7105677284a85f",
   "stream_contract": {
     "shuffle": {
       "source": "src/ard/data/indexed.py:EpochShuffleSampler",

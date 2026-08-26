@@ -4,8 +4,8 @@
   "experiment": "ERT / RSLAD Shuffle-vs-Augmentation RNG Decomposition",
   "purpose": "Separate sample-order stochasticity from source-keyed augmentation stochasticity in the exact epoch-79-to-94 BASE RSLAD continuation.",
   "implementation_base_sha": "594f31aff555911f6dce33fe71312dc5c95079c0",
-  "production_source_sha": null,
-  "source_sha_policy": "resolve to one clean immutable commit after the split-stream implementation, tests, and canary are complete; use that SHA for every host and arm",
+  "production_source_sha": "3d26183b4861fa423c4cb6beba7105677284a85f",
+  "source_sha_policy": "all hosts and arms must run this clean immutable commit",
   "parents": {
     "epoch": 79,
     "restore_contract": "exact model, optimizer, scheduler, scaler, Python/NumPy/Torch/CUDA RNG, sampler, sample state, global step, and selection state",
