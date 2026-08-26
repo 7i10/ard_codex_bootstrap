@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "status": "preregistered_pending_gpu_execution",
+  "status": "completed",
   "experiment": "ERT / RSLAD baseline RNG-source decomposition",
   "purpose": "Separate PGD random-start, data-side stochasticity, attack-data interaction, and residual nondeterminism in epoch-79-to-94 BASE RSLAD continuation.",
   "implementation_base_sha": "f6f8e11",
-  "production_source_sha": "f6f8e11",
+  "production_source_sha": "09e627e95a66a136a0cc7aa15bcb4deab141c719",
   "source_sha_policy": "resolve to one clean immutable commit after implementation review and before the first production arm",
   "source_audit": {
     "path": "docs/experiments/ert_rslad_rng_source_audit_v1.json",
@@ -141,10 +141,22 @@
     "outcome_selection": "forbidden for data/attack diagnostics and seed interpretation"
   },
   "results": {
-    "status": "not_collected",
-    "trajectories": [],
-    "derived": null,
-    "endpoint_evaluations": []
+    "status": "completed",
+    "result_artifact": "docs/experiments/ert_rslad_rng_source_decomposition_v1_results.json",
+    "human_report": "docs/ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md",
+    "source_git_sha": "09e627e95a66a136a0cc7aa15bcb4deab141c719",
+    "input_inventory_sha256": "5ef2d9dd88e6ee9de1647b997be73cb5aa24616ee2eb8f1a685b4de909bd8b3c",
+    "trajectory_count": 16,
+    "endpoint_count": 96,
+    "trajectory_status": "16/16 completed through epoch 94",
+    "endpoint_status": "96/96 complete (16 trajectories × 3 horizons × 2 splits)",
+    "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+    "endpoint_evaluations": {
+      "horizons": [84, 89, 94],
+      "splits": ["train", "validation"],
+      "evaluation_seed": 0,
+      "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1"
+    }
   },
   "stop_rule": "After 16 BASE trajectories, endpoint evaluations, decomposition, and report: stop and request human review; do not auto-start stabilization."
 }

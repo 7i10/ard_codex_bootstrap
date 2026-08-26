@@ -100,32 +100,31 @@ the exact L2/L4 epoch-79 BASE RSLAD continuation, then stop after the registered
   - Rollback: remove only the new experiment documentation.
   - Commit boundary: same cohesive milestone commit.
 
-- [ ] M3 bounded production preflight and GPU canary
+- [x] M3 bounded production preflight and GPU canary
   - Files: host/job metadata and canary output outside Git, plus local run
     bundles.
   - Owner: repository owner; requires host/GPU and W&B authority.
-  - Acceptance: clean immutable source SHA, exact parent hashes, idle Hamster
-    resources, W&B production identity, and canary pass on the production
-    environment.
+  - Acceptance: clean immutable source SHA, exact parent hashes, Hamster-only
+    production identity, and canary pass on the production environment.
   - Rollback: do not launch production arms if any gate fails.
   - Commit boundary: none; runtime artifacts are not committed.
 
-- [ ] M4 16 trajectories and endpoint collection
-  - Files: local run bundles and endpoint results outside Git; update the two
-    registered JSON/report files only after validation.
+- [x] M4 16 trajectories and endpoint collection
+  - Files: local run bundles and endpoint results outside Git; update the
+    registered JSON/report files after validation.
   - Owner: repository owner / one campaign owner.
-  - Acceptance: all L2/L4 arms reach epoch 94 from exact parents, retain 84/89/94,
-    evaluate fixed-seed CE-PGD20, and have complete lineage.
+  - Acceptance: all L2/L4 arms reached epoch 94 from exact parents, retained
+    84/89/94, evaluated fixed-seed CE-PGD20, and had complete lineage.
   - Rollback: exclude incomplete/failed arms; never overwrite a valid arm.
   - Commit boundary: one results/report commit after point-estimate checks.
 
-- [ ] M5 point decomposition and human review stop
+- [x] M5 point decomposition and human review stop
   - Files: registered machine artifact and human report.
   - Owner: main thread for deterministic aggregation; one consolidated
     scientific review after evidence is stable.
-  - Acceptance: answer REF residual, attack/data sensitivity, interaction,
-    L2/L4 ranking, trajectory divergence, and next-step decision without
-    population claims.
+  - Acceptance: the result report answers REF residual, attack/data sensitivity,
+    interaction, L2/L4 ranking, trajectory divergence, and the stop decision
+    without population claims.
   - Rollback: mark result incomplete rather than filling missing values.
   - Commit boundary: results-only commit.
 
@@ -180,8 +179,19 @@ mechanical canary hashing bug that was fixed locally.
   matched arms share one controlled environment; Ferret is excluded.
 - 2026-08-22: Pinned the reviewed implementation source to `f6f8e11`; the
   subsequent metadata-only pin update does not alter runtime code.
+- 2026-08-23: Hamster-only production completed all 16 trajectories through
+  epoch 94. REF1/REF2, attack-only, data-only, and both-source arms were
+  collected under source SHA `09e627e`.
+- 2026-08-23: Independent CE-PGD20 endpoint evaluation completed 96/96 records
+  for epochs 84/89/94 on train and fixed validation splits. The endpoint matrix
+  passed the complete attack, row-count, source-SHA, and contract checks.
+- 2026-08-24: Deterministic point aggregation and source decomposition were
+  written to `docs/experiments/ert_rslad_rng_source_decomposition_v1_results.json`
+  and `docs/ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md`. The preregistered stop
+  boundary was reached; no stabilization run was started.
 
 ## Completion report
 
-Pending M3–M5. Current implementation is ready for a clean-source review and
-production preflight, but it does not contain scientific outcome results.
+Complete through M5. The 16 trajectories and 96 endpoint records are present,
+the point decomposition is recorded in the result artifact/report, and the
+campaign is stopped at the preregistered boundary pending human review.
