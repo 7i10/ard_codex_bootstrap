@@ -4,7 +4,7 @@
 
 - Owner: repository owner / one campaign owner
 - Branch: `master`
-- Current milestone: implementation and CPU isolation canary
+- Current milestone: real-parent smoke passed; production matrix ready
 - Production implementation: `3d26183b4861fa423c4cb6beba7105677284a85f`; the
   current clean metadata tip is `c4bf46630601e6aed70833b80ef1bc3f1dcfa30a`.
   The actual launch SHA must be captured in every run manifest; production has
@@ -101,7 +101,7 @@ decomposition, and report are complete, stop and request human review.
   contracts.
 - [x] M1: implement split shuffle/augmentation seed contract and CPU canary.
 - [x] M2: preregister seed registry, arms, endpoint, and analysis rules.
-- [ ] M3: commit/pin immutable source SHA and run Hamster preflight + real-parent
+- [x] M3: commit/pin immutable source SHA and run Hamster preflight + real-parent
   smoke.
 - [ ] M4: run 16 trajectories through epoch 94 with checkpoints 84/89/94.
 - [ ] M5: run 96 independent endpoints and deterministic aggregation.
@@ -122,6 +122,10 @@ decomposition, and report are complete, stop and request human review.
   as `3d26183b4861fa423c4cb6beba7105677284a85f`; this is the implementation
   source SHA. A metadata-only pin followed at `c4bf466`; the launch SHA is
   recorded separately in each immutable run bundle.
+- 2026-08-27: Hamster preflight and real-parent epoch-80 smoke passed for both
+  exact L2/L4 parents. The split-stream CLI contract was corrected before the
+  smoke; the audit artifact records the manifests, parent hashes, and output
+  paths. No production trajectory has started yet.
 
 ## Completion report
 

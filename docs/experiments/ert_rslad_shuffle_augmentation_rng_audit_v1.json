@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "audited_pending_production",
-  "source_revision": "3d26183b4861fa423c4cb6beba7105677284a85f",
+  "status": "preflight_and_real_parent_smoke_passed",
+  "source_revision": "a7d22cb0cf24c4581cfaca7b7590e0e0a1c07565",
   "stream_contract": {
     "shuffle": {
       "source": "src/ard/data/indexed.py:EpochShuffleSampler",
@@ -40,6 +40,41 @@
       "attack_stream_fixed": true,
       "reference_repeat_exact": true
     }
+  },
+  "host_preflight": {
+    "host": "islab-WS-C621E-SAGE-Series",
+    "execution_host_label": "Hamster",
+    "linger": "yes",
+    "cuda_devices": 2,
+    "gpu_model": "NVIDIA GeForce RTX 4090",
+    "status": "passed"
+  },
+  "real_parent_smoke": {
+    "status": "passed",
+    "epochs": [80],
+    "public_cli": "ard.cli.ert_stage_a_runtime",
+    "arms": {
+      "L2": {
+        "parent_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "output": ".cache/analysis/ert-rslad-shuffle-augmentation-decomposition-v1/smoke/L2",
+        "manifest_status": "completed",
+        "manifest_git_sha": "a7d22cb0cf24c4581cfaca7b7590e0e0a1c07565",
+        "horizon_checkpoint": "epoch-80.pt"
+      },
+      "L4": {
+        "parent_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "output": ".cache/analysis/ert-rslad-shuffle-augmentation-decomposition-v1/smoke/L4",
+        "manifest_status": "completed",
+        "manifest_git_sha": "a7d22cb0cf24c4581cfaca7b7590e0e0a1c07565",
+        "horizon_checkpoint": "epoch-80.pt"
+      }
+    },
+    "checks": [
+      "CLI completed one real parent continuation epoch",
+      "run-bundle manifest and fork lineage were written",
+      "stable parent SHA and split RNG seeds were recorded",
+      "epoch-80 checkpoint and epoch metrics were written"
+    ]
   },
   "known_limits": [
     "The canary covers the source-keyed CIFAR path and cannot prove absence of hardware-specific CUDA nondeterminism.",
