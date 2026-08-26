@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "status": "preregistered_pending_gpu_execution",
+  "experiment": "ERT / RSLAD Shuffle-vs-Augmentation RNG Decomposition",
+  "purpose": "Separate sample-order stochasticity from source-keyed augmentation stochasticity in the exact epoch-79-to-94 BASE RSLAD continuation.",
+  "implementation_base_sha": "594f31aff555911f6dce33fe71312dc5c95079c0",
+  "production_source_sha": null,
+  "source_sha_policy": "resolve to one clean immutable commit after the split-stream implementation, tests, and canary are complete; use that SHA for every host and arm",
+  "parents": {
+    "epoch": 79,
+    "restore_contract": "exact model, optimizer, scheduler, scaler, Python/NumPy/Torch/CUDA RNG, sampler, sample state, global step, and selection state",
+    "L2": {
+      "teacher": "chen2021_ltd_wrn34_10",
+      "parent_checkpoint": ".cache/analysis/ffnr-causal-pilot-epoch79/chen-rslad-observed-s1-confirm-v2/last.pt",
+      "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+      "parent_config": ".cache/analysis/ffnr-causal-pilot-epoch79/run-bundles/chen-rslad-observed-s1-confirm-v2/resolved_config.yaml"
+    },
+    "L4": {
+      "teacher": "chen2021_ltd_wrn34_10",
+      "parent_checkpoint": ".cache/analysis/ert-cw-l4-parent-recovery-audit/parent-epoch79.pt",
+      "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+      "parent_config": ".cache/analysis/ffnr-causal-pilot-epoch79/run-bundles/chen-rslad-observed-s2-confirm-v2/resolved_config.yaml"
+    }
+  },
+  "canonical_contract": {
+    "method": "rslad",
+    "objective": "BASE RSLAD only; uniform KD, hard-label fallback zero",
+    "training_attack": {
+      "norm": "linf",
+      "input_domain": "pixel_0_1",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 10,
+      "random_start": true,
+      "loss": "kl",
+      "kl_target": "teacher_clean",
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "student_mode": "eval",
+      "teacher_mode": "eval"
+    },
+    "endpoint_attack": {
+      "norm": "linf",
+      "input_domain": "pixel_0_1",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 20,
+      "random_start": true,
+      "loss": "ce",
+      "kl_target": null,
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "student_mode": "eval",
+      "teacher_mode": "eval"
+    },
+    "training_epoch_range": "80..94 inclusive",
+    "training_epochs_argument": 95,
+    "horizon_epochs": [84, 89, 94],
+    "endpoint_evaluation_seed": 0,
+    "endpoint_mode": "saved checkpoint, eval mode, independent CE-PGD20 process",
+    "forbidden": ["Teacher-adaptive margin", "CleanCE", "lambda/floor/cap", "state-aware ordering", "weighted sampling", "attack RNG change", "other RNG change", "official test", "AutoAttack", "new seed"]
+  },
+  "stream_contract": {
+    "shuffle": "sampler order only; EpochShuffleSampler seed S and fixed DataLoader worker generator",
+    "augmentation": "source-keyed epoch-aware CIFAR crop/flip using U; invariant to sampler order",
+    "attack": "PGD random start uses fixed A0 across all arms",
+    "other": "Python/NumPy/global Torch/CUDA uses fixed O0 across all arms",
+    "worker_policy": "worker base generator remains fixed across arms; no worker RNG consumer is allowed to affect source-keyed augmentation"
+  },
+  "seed_derivation": {
+    "algorithm": "int.from_bytes(sha256(f'{experiment_name}|{teacher}|{source_name}|{replicate}').digest()[:8], 'big') % (2**31 - 1)",
+    "experiment_name": "ert_rslad_shuffle_augmentation_decomposition_v1",
+    "replicate": "seed-registry-v1",
+    "source_names": ["S0", "S1", "S2", "U0", "U1", "U2", "A0", "O0"],
+    "outcome_independent": true,
+    "registry": {
+      "L2": {
+        "S0": 1693338244,
+        "S1": 1527052747,
+        "S2": 477664031,
+        "U0": 815144564,
+        "U1": 1126961195,
+        "U2": 1831364296,
+        "A0": 147510587,
+        "O0": 2001721786
+      },
+      "L4": {
+        "S0": 1562497822,
+        "S1": 815300702,
+        "S2": 1700966302,
+        "U0": 1836944160,
+        "U1": 1486466590,
+        "U2": 439090466,
+        "A0": 1461814414,
+        "O0": 390651326
+      }
+    }
+  },
+  "arms": [
+    {"arm": "REF1", "shuffle": "S0", "augmentation": "U0", "attack": "A0", "other": "O0", "purpose": "reference"},
+    {"arm": "REF2", "shuffle": "S0", "augmentation": "U0", "attack": "A0", "other": "O0", "purpose": "exact-repeat residual control"},
+    {"arm": "SHUF1", "shuffle": "S1", "augmentation": "U0", "attack": "A0", "other": "O0", "purpose": "shuffle only"},
+    {"arm": "SHUF2", "shuffle": "S2", "augmentation": "U0", "attack": "A0", "other": "O0", "purpose": "shuffle only"},
+    {"arm": "AUG1", "shuffle": "S0", "augmentation": "U1", "attack": "A0", "other": "O0", "purpose": "augmentation only"},
+    {"arm": "AUG2", "shuffle": "S0", "augmentation": "U2", "attack": "A0", "other": "O0", "purpose": "augmentation only"},
+    {"arm": "BOTH1", "shuffle": "S1", "augmentation": "U1", "attack": "A0", "other": "O0", "purpose": "shuffle and augmentation"},
+    {"arm": "BOTH2", "shuffle": "S2", "augmentation": "U2", "attack": "A0", "other": "O0", "purpose": "shuffle and augmentation"}
+  ],
+  "execution": {
+    "teachers": ["L2", "L4"],
+    "trajectory_count": 16,
+    "host_assignment": {"L2": "Hamster", "L4": "Hamster"},
+    "same_teacher_same_host_family": true,
+    "host_assignment_note": "Hamster-only campaign; Ferret is excluded to keep all matched arms on the measured faster host.",
+    "training_horizons": [84, 89, 94],
+    "endpoint_splits": ["train", "validation"],
+    "tracking": "W&B production; rank zero only; local run bundles authoritative"
+  },
+  "analysis_rules": {
+    "delta_S": "Y(Sr,U0)-Y(S0,U0)",
+    "delta_U": "Y(S0,Ur)-Y(S0,U0)",
+    "delta_SU": "Y(Sr,Ur)-Y(S0,U0)",
+    "interaction": "delta_SU-delta_S-delta_U",
+    "sensitivity": "mean absolute effect over two preregistered perturbations",
+    "inference_boundary": "descriptive only; two perturbations are not population inference",
+    "outcome_selection": "forbidden for seed, arm, or ordering selection"
+  },
+  "results": {
+    "status": "not_collected",
+    "result_artifact": null,
+    "human_report": null
+  },
+  "stop_rule": "After 16 BASE trajectories, fixed-seed endpoint evaluations, decomposition, and report: stop and request human review; do not auto-start state-aware ordering."
+}

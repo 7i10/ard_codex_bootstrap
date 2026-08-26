@@ -9,7 +9,7 @@ from pathlib import Path
 
 import torch
 
-from ard.analysis.ert_rslad_rng_sources import RNGSourceSeeds
+from ard.analysis.ert_rslad_rng_sources import RNGSourceSeeds, ShuffleAugmentationSeeds
 from ard.analysis.ert_stage_a_runtime import StageATreatment, run_stage_a_arm
 
 
@@ -71,6 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-seed", type=int, help="Post-resume data order/augmentation/worker seed.")
     parser.add_argument("--attack-seed", type=int, help="Post-resume PGD random-start seed.")
     parser.add_argument("--other-seed", type=int, help="Post-resume Python/NumPy/global Torch seed.")
+    parser.add_argument("--shuffle-seed", type=int, help="Post-resume sampler-order seed.")
+    parser.add_argument("--augmentation-seed", type=int, help="Post-resume source-keyed augmentation seed.")
     parser.add_argument(
         "--expected-parent-sha256",
         help="Fail closed unless the supplied epoch-79 parent has this exact SHA-256.",
@@ -121,6 +123,23 @@ def main(argv: list[str] | None = None) -> int:
             other_seed=args.other_seed,
         )
     )
+    split_values = (args.shuffle_seed, args.augmentation_seed, args.attack_seed, args.other_seed)
+    if any(value is not None for value in split_values) and not all(value is not None for value in split_values):
+        raise ValueError(
+            "--shuffle-seed, --augmentation-seed, --attack-seed, and --other-seed must be supplied together"
+        )
+    if any(value is not None for value in split_values) and rng_source_seeds is not None:
+        raise ValueError("split shuffle/augmentation seeds cannot be combined with --data-seed")
+    shuffle_augmentation_seeds = (
+        None
+        if args.shuffle_seed is None
+        else ShuffleAugmentationSeeds(
+            shuffle_seed=args.shuffle_seed,
+            augmentation_seed=args.augmentation_seed,
+            attack_seed=args.attack_seed,
+            other_seed=args.other_seed,
+        )
+    )
     result = run_stage_a_arm(
         parent_config_path=args.parent_config,
         parent_checkpoint=args.parent_checkpoint,
@@ -134,6 +153,7 @@ def main(argv: list[str] | None = None) -> int:
         run_namespace=args.run_namespace,
         continuation_seed=args.continuation_seed,
         rng_source_seeds=rng_source_seeds,
+        shuffle_augmentation_seeds=shuffle_augmentation_seeds,
         expected_parent_checkpoint_sha256=args.expected_parent_sha256,
     )
     print(json.dumps(result, sort_keys=True))

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "status": "audited_pending_production",
+  "source_revision": "working tree after 594f31a plus split shuffle/augmentation implementation",
+  "stream_contract": {
+    "shuffle": {
+      "source": "src/ard/data/indexed.py:EpochShuffleSampler",
+      "seed": "shuffle_seed",
+      "draw": "epoch-level sample order",
+      "status": "newly independently rebindable"
+    },
+    "augmentation": {
+      "source": "src/ard/data/datasets.py:EpochSourceTransform",
+      "seed": "augmentation_seed",
+      "formula": "augmentation_seed + 1000003*epoch + 10007*source_id",
+      "draw": ["random crop top/left", "horizontal flip"],
+      "status": "already source-keyed and order invariant"
+    },
+    "attack": {
+      "source": "src/ard/engine/trainer.py:Trainer._attack_generator",
+      "seed": "attack_seed",
+      "status": "fixed A0 across all production arms"
+    },
+    "other": {
+      "source": "src/ard/analysis/ert_rslad_rng_sources.py:reseed_other_stream",
+      "seed": "other_seed",
+      "status": "fixed O0 across all production arms"
+    },
+    "worker": {
+      "source": "src/ard/data/rng.py:data_loader_generator",
+      "status": "fixed generator; source-keyed transform does not consume worker/global RNG"
+    }
+  },
+  "canary": {
+    "command": "PYTHONPATH=src python -c 'from ard.analysis.ert_rslad_rng_sources import run_shuffle_augmentation_canary; print(run_shuffle_augmentation_canary())'",
+    "status": "passed",
+    "assertions": {
+      "shuffle_changes_order_only": true,
+      "augmentation_changes_view_only": true,
+      "attack_stream_fixed": true,
+      "reference_repeat_exact": true
+    }
+  },
+  "known_limits": [
+    "The canary covers the source-keyed CIFAR path and cannot prove absence of hardware-specific CUDA nondeterminism.",
+    "The production decomposition uses two perturbations per source and is descriptive, not population inference.",
+    "Ordering diagnostics are analysis-only; no state-aware sampler is implemented in this experiment."
+  ],
+  "production_gate": "source SHA, exact parent hashes, clean tree, and split-stream canary must be recorded before launch"
+}

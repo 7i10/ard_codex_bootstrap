@@ -22,7 +22,13 @@ import yaml
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 
-from ard.analysis.ert_rslad_rng_sources import RNGSourceSeeds, reseed_data_stream, reseed_other_stream
+from ard.analysis.ert_rslad_rng_sources import (
+    RNGSourceSeeds,
+    ShuffleAugmentationSeeds,
+    reseed_data_stream,
+    reseed_other_stream,
+    reseed_shuffle_augmentation_stream,
+)
 from ard.attacks import LinfPGD
 from ard.config import load_config
 from ard.data import (
@@ -260,6 +266,7 @@ def _arm_hash(
     *,
     continuation_seed: int | None = None,
     rng_source_seeds: RNGSourceSeeds | None = None,
+    shuffle_augmentation_seeds: ShuffleAugmentationSeeds | None = None,
     dynamic_s3: dict[str, Any] | None = None,
 ) -> str:
     return hashlib.sha256(
@@ -269,6 +276,9 @@ def _arm_hash(
                 "treatment": treatment.__dict__,
                 "continuation_seed": continuation_seed,
                 "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
+                "shuffle_augmentation_seeds": (
+                    None if shuffle_augmentation_seeds is None else shuffle_augmentation_seeds.as_dict()
+                ),
                 "dynamic_s3": dynamic_s3,
                 "source_git_sha": source_sha,
             },
@@ -292,6 +302,7 @@ def run_stage_a_arm(
     run_namespace: str = "stage-a",
     continuation_seed: int | None = None,
     rng_source_seeds: RNGSourceSeeds | None = None,
+    shuffle_augmentation_seeds: ShuffleAugmentationSeeds | None = None,
     expected_parent_checkpoint_sha256: str | None = None,
     dynamic_s3_arm: str | None = None,
     dynamic_s3_beta_advce: float | None = None,
@@ -402,6 +413,10 @@ def run_stage_a_arm(
         raise StageARuntimeError("continuation seed must be a non-negative integer")
     if continuation_seed is not None and rng_source_seeds is not None:
         raise StageARuntimeError("continuation_seed cannot be combined with explicit RNG source seeds")
+    if continuation_seed is not None and shuffle_augmentation_seeds is not None:
+        raise StageARuntimeError("continuation_seed cannot be combined with split shuffle/augmentation seeds")
+    if rng_source_seeds is not None and shuffle_augmentation_seeds is not None:
+        raise StageARuntimeError("data RNG seeds cannot be combined with split shuffle/augmentation seeds")
     explicit_rng_source_seeds = rng_source_seeds is not None
     if continuation_seed is not None:
         rng_source_seeds = RNGSourceSeeds(
@@ -417,13 +432,22 @@ def run_stage_a_arm(
         source_sha,
         continuation_seed=continuation_seed,
         rng_source_seeds=None if continuation_seed is not None else rng_source_seeds,
+        shuffle_augmentation_seeds=shuffle_augmentation_seeds,
         dynamic_s3=dynamic_s3_identity,
     )
     train_dataset, validation_dataset = build_train_validation_views(
         config.dataset,
         validation_fraction=config.training.validation_fraction,
         split_seed=config.seeds.split,
-        augmentation_seed=(config.seeds.augmentation if not explicit_rng_source_seeds else rng_source_seeds.data_seed),
+        augmentation_seed=(
+            config.seeds.augmentation
+            if not explicit_rng_source_seeds and shuffle_augmentation_seeds is None
+            else (
+                shuffle_augmentation_seeds.augmentation_seed
+                if shuffle_augmentation_seeds is not None
+                else rng_source_seeds.data_seed
+            )
+        ),
     )
     dynamic_s3_router = None
     if dynamic_s3_arm is not None:
@@ -646,6 +670,15 @@ def run_stage_a_arm(
                 seed=rng_source_seeds.data_seed,
             )
         trainer.seed = rng_source_seeds.attack_seed
+    if shuffle_augmentation_seeds is not None:
+        reseed_other_stream(shuffle_augmentation_seeds.other_seed)
+        reseed_shuffle_augmentation_stream(
+            dataset=train_dataset,
+            sampler=sampler,
+            shuffle_seed=shuffle_augmentation_seeds.shuffle_seed,
+            augmentation_seed=shuffle_augmentation_seeds.augmentation_seed,
+        )
+        trainer.seed = shuffle_augmentation_seeds.attack_seed
     trainer.fork_lineage = {
         "kind": "ert_stage_a_treatment_v1",
         "arm": treatment.arm,
@@ -660,6 +693,9 @@ def run_stage_a_arm(
         "calibration_sha256": calibration.get("artifact_sha256"),
         "source_git_sha": source_sha,
         "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
+        "shuffle_augmentation_seeds": (
+            None if shuffle_augmentation_seeds is None else shuffle_augmentation_seeds.as_dict()
+        ),
         "dynamic_s3": dynamic_s3_identity,
     }
     (output_dir / "resolved_config.yaml").write_text(
@@ -681,6 +717,9 @@ def run_stage_a_arm(
                 "run_namespace": run_namespace,
                 "continuation_seed": continuation_seed,
                 "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
+                "shuffle_augmentation_seeds": (
+                    None if shuffle_augmentation_seeds is None else shuffle_augmentation_seeds.as_dict()
+                ),
                 "wandb_artifact_retention": config.tracking.artifact_retention,
                 "horizon_epochs": list(horizon_epochs),
                 "dynamic_s3": (

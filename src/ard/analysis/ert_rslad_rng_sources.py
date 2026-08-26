@@ -52,6 +52,34 @@ class RNGSourceSeeds:
         }
 
 
+@dataclass(frozen=True)
+class ShuffleAugmentationSeeds:
+    """Independent seeds for sampler order, augmentation, attack, and other RNG."""
+
+    shuffle_seed: int
+    augmentation_seed: int
+    attack_seed: int
+    other_seed: int
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("shuffle_seed", self.shuffle_seed),
+            ("augmentation_seed", self.augmentation_seed),
+            ("attack_seed", self.attack_seed),
+            ("other_seed", self.other_seed),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= MAX_SEED:
+                raise ValueError(f"{name} must be an integer in [0, {MAX_SEED}]")
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "shuffle_seed": self.shuffle_seed,
+            "augmentation_seed": self.augmentation_seed,
+            "attack_seed": self.attack_seed,
+            "other_seed": self.other_seed,
+        }
+
+
 def derive_seed(*, experiment_name: str, teacher: str, source_name: str, replicate: str) -> int:
     """Derive a preregistration-safe seed without observing outcomes."""
     key = f"{experiment_name}|{teacher}|{source_name}|{replicate}".encode()
@@ -88,6 +116,27 @@ def reseed_data_stream(
     loader_generator.manual_seed(seed)
     if hasattr(dataset, "set_augmentation_seed"):
         dataset.set_augmentation_seed(seed)
+
+
+def reseed_shuffle_augmentation_stream(
+    *,
+    dataset: Any,
+    sampler: EpochShuffleSampler,
+    shuffle_seed: int,
+    augmentation_seed: int,
+) -> None:
+    """Rebind sampler and source-keyed augmentation independently.
+
+    The DataLoader worker generator is intentionally not touched: source-keyed
+    CIFAR augmentation does not consume worker/global RNG, so worker seeding
+    remains a fixed runtime control while only order and augmentation vary.
+    """
+    for name, value in (("shuffle seed", shuffle_seed), ("augmentation seed", augmentation_seed)):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{name} must be a non-negative integer")
+    sampler.reseed(shuffle_seed)
+    if hasattr(dataset, "set_augmentation_seed"):
+        dataset.set_augmentation_seed(augmentation_seed)
 
 
 def _generator_clone(generator: torch.Generator) -> torch.Generator:
@@ -191,5 +240,88 @@ def run_seed_isolation_canary(*, batches: int = 2) -> dict[str, Any]:
             "attack_change_changes_random_start": True,
             "data_change_changes_data": True,
             "data_change_preserves_random_start": True,
+        },
+    }
+
+
+def _canary_shuffle_augmentation_arm(*, shuffle_seed: int, augmentation_seed: int, attack_seed: int) -> dict[str, Any]:
+    raw = SyntheticCIFAR(size=32, num_classes=3, image_size=32, seed=1717)
+    dataset = IndexedDataset(raw, EpochSourceTransform(augmentation_seed=augmentation_seed))
+    sampler = EpochShuffleSampler(len(dataset), seed=shuffle_seed, shuffle=True)
+    loader = DataLoader(
+        dataset,
+        batch_size=4,
+        sampler=sampler,
+        num_workers=0,
+        collate_fn=collate_indexed,
+        generator=data_loader_generator(10101),
+        worker_init_fn=seed_data_loader_worker,
+    )
+    model = nn.Sequential(nn.Flatten(), nn.Linear(3 * 32 * 32, 3))
+    attack = LinfPGD(
+        AttackConfig(
+            epsilon="1/255",
+            step_size="1/255",
+            steps=1,
+            random_start=True,
+            loss="ce",
+            student_mode="eval",
+            teacher_mode="eval",
+        )
+    )
+    generator = torch.Generator(device="cpu").manual_seed(attack_seed)
+    order: list[int] = []
+    augmentation_hashes: dict[int, str] = {}
+    attack_hashes: list[str] = []
+    for batch in loader:
+        ids = [int(value) for value in batch.sample_ids.tolist()]
+        order.extend(ids)
+        for sample_id, image in zip(ids, batch.images):
+            augmentation_hashes[sample_id] = _tensor_sha256(image)
+        attack_hashes.append(_raw_attack_draw_hash(batch.images.shape, device=torch.device("cpu"), generator=generator))
+        attack.generate(
+            AttackRequest(
+                inputs=batch.images,
+                labels=batch.labels,
+                student=model,
+                teacher=None,
+                generator=generator,
+            )
+        )
+    return {
+        "order": order,
+        "augmentation_hashes": augmentation_hashes,
+        "attack_draw_hashes": attack_hashes,
+    }
+
+
+def run_shuffle_augmentation_canary() -> dict[str, Any]:
+    """Prove order and source-keyed augmentation can vary independently."""
+    reference = _canary_shuffle_augmentation_arm(shuffle_seed=101, augmentation_seed=202, attack_seed=303)
+    shuffle_changed = _canary_shuffle_augmentation_arm(shuffle_seed=404, augmentation_seed=202, attack_seed=303)
+    augmentation_changed = _canary_shuffle_augmentation_arm(shuffle_seed=101, augmentation_seed=505, attack_seed=303)
+    repeated = _canary_shuffle_augmentation_arm(shuffle_seed=101, augmentation_seed=202, attack_seed=303)
+    if reference["order"] == shuffle_changed["order"]:
+        raise AssertionError("shuffle-only arm did not change sample order")
+    if reference["augmentation_hashes"] != shuffle_changed["augmentation_hashes"]:
+        raise AssertionError("shuffle-only arm changed source-keyed augmentation")
+    if reference["order"] != augmentation_changed["order"]:
+        raise AssertionError("augmentation-only arm changed sample order")
+    if reference["augmentation_hashes"] == augmentation_changed["augmentation_hashes"]:
+        raise AssertionError("augmentation-only arm did not change augmentation")
+    if reference["attack_draw_hashes"] != shuffle_changed["attack_draw_hashes"]:
+        raise AssertionError("shuffle-only arm changed attack random stream")
+    if reference["attack_draw_hashes"] != augmentation_changed["attack_draw_hashes"]:
+        raise AssertionError("augmentation-only arm changed attack random stream")
+    if reference != repeated:
+        raise AssertionError("reference repeat is not deterministic")
+    return {
+        "schema_version": 1,
+        "status": "passed",
+        "assertions": {
+            "shuffle_changes_order_only": True,
+            "augmentation_changes_view_only": True,
+            "attack_stream_fixed": True,
+            "reference_repeat_exact": True,
         },
     }
