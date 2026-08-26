@@ -5,7 +5,10 @@
 - Owner: repository owner / one campaign owner
 - Branch: `master`
 - Current milestone: implementation and CPU isolation canary
-- Production: source pinned to `3d26183b4861fa423c4cb6beba7105677284a85f`; not started
+- Production implementation: `3d26183b4861fa423c4cb6beba7105677284a85f`; the
+  current clean metadata tip is `c4bf46630601e6aed70833b80ef1bc3f1dcfa30a`.
+  The actual launch SHA must be captured in every run manifest; production has
+  not started.
 
 ## Goal
 
@@ -98,7 +101,7 @@ decomposition, and report are complete, stop and request human review.
   contracts.
 - [x] M1: implement split shuffle/augmentation seed contract and CPU canary.
 - [x] M2: preregister seed registry, arms, endpoint, and analysis rules.
-- [x] M3: commit/pin immutable source SHA and run Hamster preflight + real-parent
+- [ ] M3: commit/pin immutable source SHA and run Hamster preflight + real-parent
   smoke.
 - [ ] M4: run 16 trajectories through epoch 94 with checkpoints 84/89/94.
 - [ ] M5: run 96 independent endpoints and deterministic aggregation.
@@ -116,8 +119,9 @@ decomposition, and report are complete, stop and request human review.
   passed all four assertions. GPU production remains gated on immutable commit
   and real-parent smoke.
 - 2026-08-24: Split-stream implementation and preregistration were committed
-  as `3d26183b4861fa423c4cb6beba7105677284a85f`; this is the production source
-  SHA for all 16 arms.
+  as `3d26183b4861fa423c4cb6beba7105677284a85f`; this is the implementation
+  source SHA. A metadata-only pin followed at `c4bf466`; the launch SHA is
+  recorded separately in each immutable run bundle.
 
 ## Completion report
 
