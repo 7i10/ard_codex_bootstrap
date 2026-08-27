@@ -42,7 +42,9 @@ class EpochSourceTransform:
         # This is deliberately independent of worker order, sampler order,
         # rank, and process RNG state.  It makes a resumed epoch reproduce the
         # same train view for every immutable official source ID.
-        generator = torch.Generator().manual_seed(self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id)
+        generator = torch.Generator().manual_seed(
+            self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
+        )
         padded = transform_functional.pad(image, padding=4, fill=0)
         top = int(torch.randint(0, 9, (), generator=generator).item())
         left = int(torch.randint(0, 9, (), generator=generator).item())
@@ -89,9 +91,7 @@ class EpochCropshiftTransform:
         )
 
     def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
-        generator = torch.Generator().manual_seed(
-            self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
-        )
+        generator = torch.Generator().manual_seed(self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id)
         width, height = transform_functional.get_image_size(image)
         max_strength = min(self.high - 1, width - 1, height - 1)
         strength = int(torch.randint(0, max_strength + 1, (), generator=generator).item())

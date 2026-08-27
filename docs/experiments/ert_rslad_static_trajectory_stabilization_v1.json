@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "ert_rslad_static_trajectory_stabilization_preregistration",
   "status": "pre_training_frozen_pending_source_commit",
-  "source_git_sha": "pending-final-source-freeze",
+  "source_git_sha": "a94d3b13b66c018cd043fc5b530d002722ad16c1",
   "teacher": {"registry_id": "chen2021_ltd_wrn34_10", "checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"},
   "student": "saad_resnet18_cifar_v1",
   "dataset": {"name": "cifar10", "split": "controlled_train_45000_validation_5000", "split_seed": 20260722},

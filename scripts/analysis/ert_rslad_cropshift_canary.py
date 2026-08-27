@@ -19,7 +19,7 @@ def _digest(tensor: torch.Tensor) -> str:
 
 
 def run() -> dict[str, object]:
-    image = Image.frombytes("RGB", (32, 32), bytes((index % 256 for index in range(32 * 32 * 3))) )
+    image = Image.frombytes("RGB", (32, 32), bytes(index % 256 for index in range(32 * 32 * 3)))
     canonical = EpochSourceTransform(augmentation_seed=11)
     cropshift = EpochCropshiftTransform(augmentation_seed=11, high=11)
     canonical.set_epoch(7)

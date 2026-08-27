@@ -1,8 +1,8 @@
 """Datasets whose batches retain stable source sample identifiers."""
 
 from .datasets import (
-    EpochSourceTransform,
     EpochCropshiftTransform,
+    EpochSourceTransform,
     SyntheticCIFAR,
     TinyImageNetDataset,
     build_dataset,
