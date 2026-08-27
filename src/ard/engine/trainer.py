@@ -171,6 +171,7 @@ class Trainer:
         frozen_risk_lookup: FrozenRiskLookup | None = None,
         diagnostics: TrainingDiagnostics | None = None,
         observation_profile: str = "off",
+        checkpoint_epochs: tuple[int, ...] = (),
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -183,6 +184,7 @@ class Trainer:
         self.device, self.output_dir, self.config_hash, self.seed = device, output_dir, config_hash, seed
         self.evaluation_attack_seed = seed if evaluation_attack_seed is None else evaluation_attack_seed
         self.tracker_run_id = tracker_run_id
+        self.checkpoint_epochs = tuple(checkpoint_epochs)
         self.fork_lineage = None if fork_lineage is None else dict(fork_lineage)
         self.policy = policy
         self.sample_store = sample_store
@@ -1192,6 +1194,8 @@ class Trainer:
                 fork_lineage=self.fork_lineage,
             )
             save_checkpoint(self.output_dir / "last.pt", **common)
+            if epoch + 1 in self.checkpoint_epochs:
+                save_checkpoint(self.output_dir / f"epoch-{epoch + 1:03d}.pt", **common)
             if improved:
                 save_checkpoint(self.output_dir / "best.pt", **common)
             epoch_metrics = {

@@ -459,6 +459,7 @@ class MethodConfig(StrictModel):
 
 class TrainingConfig(StrictModel):
     epochs: int = Field(default=1, ge=1)
+    checkpoint_epochs: tuple[int, ...] = (49, 99, 149, 199)
     per_rank_batch_size: int = Field(ge=1)
     global_batch_size: int = Field(ge=1)
     num_workers: int = Field(default=0, ge=0)
@@ -473,6 +474,9 @@ class TrainingConfig(StrictModel):
     def validate_batch_identity(self) -> TrainingConfig:
         if self.global_batch_size < self.per_rank_batch_size:
             raise ValueError("global_batch_size must be at least per_rank_batch_size")
+        ordered = tuple(sorted(set(self.checkpoint_epochs)))
+        if any(epoch < 1 for epoch in self.checkpoint_epochs) or ordered != self.checkpoint_epochs:
+            raise ValueError("checkpoint_epochs must be strictly increasing positive epoch numbers")
         return self
 
 

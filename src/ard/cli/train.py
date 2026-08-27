@@ -887,6 +887,7 @@ def main(argv: list[str] | None = None) -> int:
             frozen_risk_lookup=frozen_risk_lookup,
             diagnostics=diagnostics,
             observation_profile=config.observation.profile,
+            checkpoint_epochs=config.training.checkpoint_epochs,
         )
         start_epoch = 0
         if args.resume is not None:
