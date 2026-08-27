@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
@@ -92,22 +93,173 @@ class EpochCropshiftTransform:
 
     def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
         generator = torch.Generator().manual_seed(self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id)
-        width, height = transform_functional.get_image_size(image)
-        max_strength = min(self.high - 1, width - 1, height - 1)
-        strength = int(torch.randint(0, max_strength + 1, (), generator=generator).item())
-
-        # Match IDBH ordering: RandomHorizontalFlip before CropShift.
-        if bool(torch.randint(0, 2, (), generator=generator).item()):
-            image = transform_functional.hflip(image)
-        crop_x = int(torch.randint(0, strength + 1, (), generator=generator).item())
-        crop_y = strength - crop_x
-        crop_width, crop_height = width - crop_x, height - crop_y
-        top_x, top_y = self._sample_top(generator, crop_x, crop_y)
-        image = transform_functional.crop(image, top=top_y, left=top_x, height=crop_height, width=crop_width)
-        image = transform_functional.pad(image, padding=[crop_x, crop_y], fill=0)
-        top_x, top_y = self._sample_top(generator, crop_x, crop_y)
-        image = transform_functional.crop(image, top=top_y, left=top_x, height=height, width=width)
+        image = _apply_cropshift(image, generator=generator, high=self.high)
         return _to_tensor(image)
+
+
+def _apply_cropshift(image: Any, *, generator: torch.Generator, high: int) -> Any:
+    width, height = transform_functional.get_image_size(image)
+    max_strength = min(high - 1, width - 1, height - 1)
+    strength = int(torch.randint(0, max_strength + 1, (), generator=generator).item())
+
+    # Match IDBH ordering: RandomHorizontalFlip before CropShift.
+    if bool(torch.randint(0, 2, (), generator=generator).item()):
+        image = transform_functional.hflip(image)
+    crop_x = int(torch.randint(0, strength + 1, (), generator=generator).item())
+    crop_y = strength - crop_x
+    crop_width, crop_height = width - crop_x, height - crop_y
+
+    def sample_top(x: int, y: int) -> tuple[int, int]:
+        return (
+            int(torch.randint(0, x + 1, (), generator=generator).item()),
+            int(torch.randint(0, y + 1, (), generator=generator).item()),
+        )
+
+    top_x, top_y = sample_top(crop_x, crop_y)
+    image = transform_functional.crop(image, top=top_y, left=top_x, height=crop_height, width=crop_width)
+    image = transform_functional.pad(image, padding=[crop_x, crop_y], fill=0)
+    top_x, top_y = sample_top(crop_x, crop_y)
+    return transform_functional.crop(image, top=top_y, left=top_x, height=height, width=width)
+
+
+def _source_layer_seed(*, augmentation_seed: int, epoch: int, source_id: int, layer: str) -> int:
+    """Derive a deterministic named substream without touching global RNG state."""
+    payload = f"ard-augmentation-v1|{augmentation_seed}|{epoch}|{source_id}|{layer}".encode()
+    return int.from_bytes(hashlib.sha256(payload).digest()[:8], "little") & ((1 << 63) - 1)
+
+
+def _layer_generator(*, augmentation_seed: int, epoch: int, source_id: int, layer: str) -> torch.Generator:
+    return torch.Generator().manual_seed(
+        _source_layer_seed(augmentation_seed=augmentation_seed, epoch=epoch, source_id=source_id, layer=layer)
+    )
+
+
+def _random_erase_with_generator(
+    image: torch.Tensor,
+    *,
+    generator: torch.Generator,
+    p: float = 0.5,
+    scale: tuple[float, float] = (0.02, 0.33),
+    ratio: tuple[float, float] = (0.3, 3.3),
+    value: float = 0.0,
+) -> torch.Tensor:
+    """Torchvision RandomErasing defaults with an explicit deterministic RNG."""
+    if float(torch.rand((), generator=generator).item()) >= p:
+        return image
+    channels, height, width = image.shape[-3:]
+    area = height * width
+    log_ratio = torch.log(torch.tensor(ratio, dtype=torch.float32))
+    for _ in range(10):
+        erase_area = area * (scale[0] + (scale[1] - scale[0]) * float(torch.rand((), generator=generator).item()))
+        aspect_ratio = float(
+            torch.exp(log_ratio[0] + (log_ratio[1] - log_ratio[0]) * float(torch.rand((), generator=generator).item()))
+        )
+        erase_height = int(round((erase_area * aspect_ratio) ** 0.5))
+        erase_width = int(round((erase_area / aspect_ratio) ** 0.5))
+        if not (erase_height < height and erase_width < width):
+            continue
+        top = int(torch.randint(0, height - erase_height + 1, (), generator=generator).item())
+        left = int(torch.randint(0, width - erase_width + 1, (), generator=generator).item())
+        fill = torch.full((channels, erase_height, erase_width), value, dtype=image.dtype, device=image.device)
+        return transform_functional.erase(image, top, left, erase_height, erase_width, fill, False)
+    return image
+
+
+def _idbh_color_with_generator(image: Any, *, generator: torch.Generator) -> Any:
+    """Upstream IDBH ``ColorShape('color')`` distribution with named RNG draws."""
+    operations: tuple[tuple[str, float, float], ...] = (
+        ("color", 0.1, 1.9),
+        ("brightness", 0.5, 1.9),
+        ("contrast", 0.5, 1.9),
+        ("sharpness", 0.1, 1.9),
+        ("autocontrast", 0.0, 0.0),
+        ("equalize", 0.0, 0.0),
+        ("shear", 0.05, 0.15),
+        ("rotate", 1.0, 11.0),
+    )
+    index = min(int(float(torch.rand((), generator=generator).item()) * len(operations)), len(operations) - 1)
+    operation, lower, upper = operations[index]
+    if operation == "color":
+        strength = lower + (upper - lower) * float(torch.rand((), generator=generator).item())
+        return transform_functional.adjust_saturation(image, strength)
+    if operation == "brightness":
+        strength = lower + (upper - lower) * float(torch.rand((), generator=generator).item())
+        return transform_functional.adjust_brightness(image, strength)
+    if operation == "contrast":
+        strength = lower + (upper - lower) * float(torch.rand((), generator=generator).item())
+        return transform_functional.adjust_contrast(image, strength)
+    if operation == "sharpness":
+        strength = lower + (upper - lower) * float(torch.rand((), generator=generator).item())
+        return transform_functional.adjust_sharpness(image, strength)
+    if operation == "autocontrast":
+        return transform_functional.autocontrast(image)
+    if operation == "equalize":
+        return transform_functional.equalize(image)
+    if operation == "shear":
+        strength = lower + (upper - lower) * float(torch.rand((), generator=generator).item())
+        if bool(torch.randint(2, (), generator=generator).item()):
+            strength *= -1
+        degrees = math.degrees(strength)
+        axis_x = bool(torch.randint(2, (), generator=generator).item())
+        shear = [degrees, 0.0] if axis_x else [0.0, degrees]
+        return transform_functional.affine(
+            image,
+            angle=0.0,
+            translate=[0, 0],
+            scale=1.0,
+            shear=shear,
+            interpolation=transforms.InterpolationMode.NEAREST,
+            fill=0,
+        )
+    strength = int(torch.randint(int(lower), int(upper), (), generator=generator).item())
+    if bool(torch.randint(2, (), generator=generator).item()):
+        strength *= -1
+    return transform_functional.rotate(
+        image, angle=strength, interpolation=transforms.InterpolationMode.NEAREST, fill=0
+    )
+
+
+class EpochCropReTransform(EpochCropshiftTransform):
+    """CROPSHIFT followed by upstream-default Random Erasing."""
+
+    policy_id = "crop_re"
+
+    def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
+        spatial_generator = torch.Generator().manual_seed(
+            self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
+        )
+        image = _apply_cropshift(image, generator=spatial_generator, high=self.high)
+        return _random_erase_with_generator(
+            _to_tensor(image),
+            generator=_layer_generator(
+                augmentation_seed=self.augmentation_seed, epoch=self.epoch, source_id=source_id, layer="erase"
+            ),
+        )
+
+
+class EpochIdbhWeakTransform(EpochCropshiftTransform):
+    """Upstream IDBH CIFAR weak distribution with isolated deterministic layers."""
+
+    policy_id = "idbh_weak"
+
+    def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
+        spatial_generator = torch.Generator().manual_seed(
+            self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
+        )
+        image = _apply_cropshift(image, generator=spatial_generator, high=self.high)
+        image = _idbh_color_with_generator(
+            image,
+            generator=_layer_generator(
+                augmentation_seed=self.augmentation_seed, epoch=self.epoch, source_id=source_id, layer="colorshape"
+            ),
+        )
+        tensor = _to_tensor(image)
+        return _random_erase_with_generator(
+            tensor,
+            generator=_layer_generator(
+                augmentation_seed=self.augmentation_seed, epoch=self.epoch, source_id=source_id, layer="erase"
+            ),
+        )
 
 
 def _to_tensor(image: Any) -> torch.Tensor:
@@ -312,6 +464,14 @@ def build_train_validation_views(
             train_transform = EpochSourceTransform(augmentation_seed=augmentation_seed)
         elif config.augmentation_policy == "cropshift":
             train_transform = EpochCropshiftTransform(
+                augmentation_seed=augmentation_seed, high=config.augmentation_crop_shift_high
+            )
+        elif config.augmentation_policy == "crop_re":
+            train_transform = EpochCropReTransform(
+                augmentation_seed=augmentation_seed, high=config.augmentation_crop_shift_high
+            )
+        elif config.augmentation_policy == "idbh_weak":
+            train_transform = EpochIdbhWeakTransform(
                 augmentation_seed=augmentation_seed, high=config.augmentation_crop_shift_high
             )
         else:  # pragma: no cover - DatasetConfig rejects unknown literals

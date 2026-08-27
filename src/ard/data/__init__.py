@@ -1,7 +1,9 @@
 """Datasets whose batches retain stable source sample identifiers."""
 
 from .datasets import (
+    EpochCropReTransform,
     EpochCropshiftTransform,
+    EpochIdbhWeakTransform,
     EpochSourceTransform,
     SyntheticCIFAR,
     TinyImageNetDataset,
@@ -17,6 +19,8 @@ __all__ = [
     "EpochShuffleSampler",
     "EpochSourceTransform",
     "EpochCropshiftTransform",
+    "EpochCropReTransform",
+    "EpochIdbhWeakTransform",
     "IndexedBatch",
     "IndexedDataset",
     "SampleRef",

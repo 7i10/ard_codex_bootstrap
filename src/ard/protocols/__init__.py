@@ -152,6 +152,26 @@ _CROPSHIFT_METADATA = MappingProxyType(
     {**_CONTROLLED_METADATA, "train_augmentation": "RandomHorizontalFlip+CropShift(0,11)"}
 )
 
+_CROP_RE_METADATA = MappingProxyType(
+    {
+        **_CONTROLLED_METADATA,
+        "train_augmentation": (
+            "RandomHorizontalFlip+CropShift(0,11)+ToTensor+"
+            "RandomErasing(p=0.5,scale=(0.02,0.33),ratio=(0.3,3.3),value=0,inplace=False)"
+        ),
+    }
+)
+
+_IDBH_WEAK_METADATA = MappingProxyType(
+    {
+        **_CONTROLLED_METADATA,
+        "train_augmentation": (
+            "RandomHorizontalFlip+CropShift(0,11)+ColorShape(color)+ToTensor+"
+            "RandomErasing(p=0.5,scale=(0.02,0.33),ratio=(0.3,3.3),value=0,inplace=False)"
+        ),
+    }
+)
+
 _PILOT_METADATA = MappingProxyType(
     {
         **_CONTROLLED_METADATA,
@@ -242,6 +262,18 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_CROPSHIFT_METADATA,
+        ),
+        "controlled_cifar10_r18_crop_re_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_crop_re_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_CROP_RE_METADATA,
+        ),
+        "controlled_cifar10_r18_idbh_weak_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_idbh_weak_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_IDBH_WEAK_METADATA,
         ),
         "controlled_cifar10_r18_delayed_multistep_v1": ProtocolSpec(
             id="controlled_cifar10_r18_delayed_multistep_v1",

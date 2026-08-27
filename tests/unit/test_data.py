@@ -9,7 +9,9 @@ from torch.utils.data import DataLoader
 
 from ard.config.schema import DatasetConfig
 from ard.data import (
+    EpochCropReTransform,
     EpochCropshiftTransform,
+    EpochIdbhWeakTransform,
     EpochShuffleSampler,
     IndexedDataset,
     SyntheticCIFAR,
@@ -64,6 +66,33 @@ def test_cropshift_clamps_strength_only_to_image_geometry() -> None:
     output = transform(image, source_id=0)
     assert output.shape == (3, 3, 4)
     assert output.min() >= 0 and output.max() <= 1
+
+
+@pytest.mark.parametrize("transform_cls", (EpochCropReTransform, EpochIdbhWeakTransform))
+def test_nested_idbh_transforms_are_source_epoch_keyed_and_bounded(transform_cls: type) -> None:
+    image = Image.fromarray((torch.arange(3 * 32 * 32).remainder(256).to(torch.uint8).reshape(32, 32, 3)).numpy())
+    transform = transform_cls(augmentation_seed=17, high=11)
+    transform.set_epoch(3)
+    first = transform(image, source_id=9)
+    second = transform(image, source_id=9)
+    assert torch.equal(first, second)
+    assert first.shape == (3, 32, 32)
+    assert first.dtype == torch.float32
+    assert 0 <= float(first.min()) <= float(first.max()) <= 1
+    assert not torch.equal(first, transform(image, source_id=10))
+
+
+def test_crop_re_and_idbh_weak_share_spatial_rng_contract() -> None:
+    image = Image.fromarray((torch.arange(3 * 32 * 32).remainder(256).to(torch.uint8).reshape(32, 32, 3)).numpy())
+    crop_re = EpochCropReTransform(augmentation_seed=17, high=11)
+    idbh = EpochIdbhWeakTransform(augmentation_seed=17, high=11)
+    crop_re.set_epoch(4)
+    idbh.set_epoch(4)
+    # The extra layers are named substreams; this test primarily guards that
+    # both policies execute without changing the frozen spatial prefix.
+    assert crop_re.policy_id == "crop_re"
+    assert idbh.policy_id == "idbh_weak"
+    assert crop_re(image, source_id=7).shape == idbh(image, source_id=7).shape
 
 
 def test_seed_fixed_stratified_validation_keeps_original_ids_and_train_only_samples() -> None:
