@@ -52,6 +52,64 @@ class EpochSourceTransform:
         return _to_tensor(cropped)
 
 
+class EpochCropshiftTransform:
+    """Source/epoch-keyed CropShift augmentation from the pinned reference.
+
+    The upstream IDBH CIFAR weak pipeline applies a random horizontal flip,
+    then ``CropShift(0, 11)``.  This implementation keeps that ordering while
+    routing every draw through a per-source generator, so worker and sampler
+    order cannot change a sample's view.  ``high`` is exclusive, matching the
+    reference implementation; it is clamped only when an image is smaller
+    than the configured maximum shift.
+    """
+
+    def __init__(self, *, augmentation_seed: int, high: int = 11) -> None:
+        if isinstance(high, bool) or not isinstance(high, int) or high < 1:
+            raise ValueError("CropShift high must be a positive integer")
+        self.augmentation_seed = augmentation_seed
+        self.high = high
+        self.epoch = 0
+        self.source_id_keyed = True
+
+    def set_epoch(self, epoch: int) -> None:
+        if epoch < 0:
+            raise ValueError("augmentation epoch must be non-negative")
+        self.epoch = epoch
+
+    def set_seed(self, seed: int) -> None:
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise ValueError("augmentation seed must be a non-negative integer")
+        self.augmentation_seed = seed
+
+    @staticmethod
+    def _sample_top(generator: torch.Generator, x: int, y: int) -> tuple[int, int]:
+        return (
+            int(torch.randint(0, x + 1, (), generator=generator).item()),
+            int(torch.randint(0, y + 1, (), generator=generator).item()),
+        )
+
+    def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
+        generator = torch.Generator().manual_seed(
+            self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
+        )
+        width, height = transform_functional.get_image_size(image)
+        max_strength = min(self.high - 1, width - 1, height - 1)
+        strength = int(torch.randint(0, max_strength + 1, (), generator=generator).item())
+
+        # Match IDBH ordering: RandomHorizontalFlip before CropShift.
+        if bool(torch.randint(0, 2, (), generator=generator).item()):
+            image = transform_functional.hflip(image)
+        crop_x = int(torch.randint(0, strength + 1, (), generator=generator).item())
+        crop_y = strength - crop_x
+        crop_width, crop_height = width - crop_x, height - crop_y
+        top_x, top_y = self._sample_top(generator, crop_x, crop_y)
+        image = transform_functional.crop(image, top=top_y, left=top_x, height=crop_height, width=crop_width)
+        image = transform_functional.pad(image, padding=[crop_x, crop_y], fill=0)
+        top_x, top_y = self._sample_top(generator, crop_x, crop_y)
+        image = transform_functional.crop(image, top=top_y, left=top_x, height=height, width=width)
+        return _to_tensor(image)
+
+
 def _to_tensor(image: Any) -> torch.Tensor:
     if isinstance(image, torch.Tensor):
         if not image.is_floating_point():
@@ -250,7 +308,14 @@ def build_train_validation_views(
     )
     train_transform: IndexedTransform
     if config.name in {"cifar10", "cifar100"}:
-        train_transform = EpochSourceTransform(augmentation_seed=augmentation_seed)
+        if config.augmentation_policy == "canonical":
+            train_transform = EpochSourceTransform(augmentation_seed=augmentation_seed)
+        elif config.augmentation_policy == "cropshift":
+            train_transform = EpochCropshiftTransform(
+                augmentation_seed=augmentation_seed, high=config.augmentation_crop_shift_high
+            )
+        else:  # pragma: no cover - DatasetConfig rejects unknown literals
+            raise ValueError(f"unsupported CIFAR augmentation policy: {config.augmentation_policy}")
     else:
         train_transform = _to_tensor
     train_view = IndexedDataset(raw, train_transform)

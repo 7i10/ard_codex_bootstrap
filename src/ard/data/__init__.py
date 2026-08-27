@@ -2,6 +2,7 @@
 
 from .datasets import (
     EpochSourceTransform,
+    EpochCropshiftTransform,
     SyntheticCIFAR,
     TinyImageNetDataset,
     build_dataset,
@@ -15,6 +16,7 @@ from .rng import data_loader_generator, seed_data_loader_worker
 __all__ = [
     "EpochShuffleSampler",
     "EpochSourceTransform",
+    "EpochCropshiftTransform",
     "IndexedBatch",
     "IndexedDataset",
     "SampleRef",

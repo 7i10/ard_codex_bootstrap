@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_static_trajectory_baseline_inventory",
+  "inventory_policy": "Only exact controlled CIFAR-10 BASE RSLAD trajectories are eligible; incompatible teacher, intervention, schedule, RNG, transform, or incomplete trajectory is excluded.",
+  "source_git_sha": "1a82907a012a6bad1dade880759f2ce775d19eca",
+  "scan_roots": [
+    "outputs/scientific",
+    ".cache/analysis"
+  ],
+  "eligible_retrospective": [
+    {
+      "run_id": "chen-rslad-observed-s1-confirm-v2",
+      "path": "outputs/scientific/chen-rslad-observed-s1-confirm-v2",
+      "teacher": "chen2021_ltd_wrn34_10",
+      "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+      "training_seed": 1,
+      "model_init_seed": 1,
+      "data_order_seed": 1,
+      "augmentation_seed": 1,
+      "train_attack_seed": 1,
+      "protocol": "controlled_cifar10_r18_v1",
+      "method": "rslad",
+      "intervention": null,
+      "augmentation_policy": "legacy source-keyed canonical crop+flip (config field absent; not reusable as the primary paired arm)",
+      "schedule": {"milestones": [100, 150], "gamma": 0.1, "step_at": "epoch_end"},
+      "trajectory_metrics": "run-bundle/metrics.jsonl",
+      "completed_epoch": 199,
+      "best_epoch": 190,
+      "best_val_pgd": 0.585,
+      "last_val_pgd": 0.5834,
+      "robust_overfit_gap": 0.0016,
+      "reuse_for_primary_pair": false,
+      "reuse_reason": "Only one historical seed and pre-policy config/source; fresh paired BASE is required."
+    }
+  ],
+  "excluded": [
+    {
+      "run_id": "bart-rslad-logging-only-s1-confirm-v1",
+      "path": "outputs/scientific/bart-rslad-logging-only-s1-confirm-v1",
+      "reason": "different teacher and legacy rslad_logging_only method; manifest has no latest_progress despite completed marker"
+    },
+    {
+      "run_id": "bart-h3-c-s2-20260802-v1",
+      "path": ".cache/analysis/ffnr-strong-replay/l3-source",
+      "reason": "Bartoldson teacher, epoch-99 intervention fork, not a from-initialization BASE trajectory"
+    },
+    {
+      "run_id": "bart-rslad-delayed-s1-dev-v1",
+      "path": "outputs/scientific/bart-rslad-delayed-s1-dev-v1",
+      "reason": "different teacher and delayed schedule"
+    },
+    {
+      "run_id": "ert-rslad-shuffle-augmentation-decomposition-v1/*",
+      "path": ".cache/analysis/ert-rslad-shuffle-augmentation-decomposition-v1",
+      "reason": "epoch-79 continuation perturbations (shuffle/augmentation decomposition), not full from-initialization BASE"
+    },
+    {
+      "run_id": "ert-cw-margin-screen-v1* / ert-cw-reliability-gated-ce015-v1* / ert-s3-history-production-v1*",
+      "path": ".cache/analysis",
+      "reason": "intervention arms or short-horizon forks"
+    },
+    {
+      "run_id": "pgd-at-controlled-s0 / trades-controlled-s0",
+      "path": "outputs/scientific",
+      "reason": "different adversarial-training objective"
+    }
+  ],
+  "primary_screen_policy": {
+    "teacher": "chen2021_ltd_wrn34_10",
+    "seeds": [1, 2],
+    "methods": ["BASE", "CROPSHIFT"],
+    "historical_reuse": "none",
+    "reason": "No exact two-seed from-initialization pair with the new explicit augmentation policy is available."
+  }
+}

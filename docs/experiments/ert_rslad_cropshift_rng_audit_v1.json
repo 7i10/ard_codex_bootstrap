@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "cropshift_rng_audit",
+  "upstream": {
+    "repository": "https://github.com/TreeLLi/DA-Alone-Improves-AT.git",
+    "commit": "38b740aeffe5933c16869a126c6972ef443a8352",
+    "license": "MIT",
+    "license_sha256": "e824bdf7f389c53ce7a64a38033778496fa9a25ac98e043a47df21149fbb1937",
+    "reference_file": ".external/DA-Alone-Improves-AT/src/data/idbh.py",
+    "reference_file_sha256": "423bbf19aaa065f66acd1b7ef671b0c13b58650316bf9719ab5d112490274471"
+  },
+  "local_mapping": {
+    "implementation": "src/ard/data/datasets.py:EpochCropshiftTransform",
+    "policy_id": "cropshift",
+    "parameters": {"low": 0, "high": 11, "high_is_exclusive": true},
+    "order": ["RandomHorizontalFlip", "CropShift"],
+    "crop_shift": "sample strength, split into crop_x/crop_y, crop, symmetric pad, second crop; fill=0",
+    "rng_ownership": "torch.Generator seeded by augmentation_seed + 1000003*epoch + 10007*source_id",
+    "resolution": "arbitrary H/W; maximum strength is clamped to min(H,W)-1",
+    "sample_identity": "original source ID retained by IndexedDataset"
+  },
+  "canonical_comparison": {
+    "baseline": "EpochSourceTransform: RandomCrop(32,padding=4)+RandomHorizontalFlip",
+    "cropshift": "EpochCropshiftTransform: RandomHorizontalFlip+CropShift(0,11)",
+    "objective": "unchanged RSLAD; augmentation is the only intended training-view factor"
+  },
+  "canary": {
+    "status": "pass",
+    "unit_tests": "tests/unit/test_data.py::test_cropshift_is_source_epoch_keyed_and_supports_non_cifar_resolution",
+    "deterministic_hashes": {
+      "source_id": 123,
+      "epoch": 7,
+      "canonical_sha256": "f0ae712966807763e86ae6d58aeea168035e40ebf23399c928a079514a33468",
+      "cropshift_sha256": "d0131040530b56894e0bd4c95748e6feaa14d91e9dba14c94cd2b70bd9620103",
+      "arbitrary_shape": [3, 40, 48]
+    }
+  }
+}

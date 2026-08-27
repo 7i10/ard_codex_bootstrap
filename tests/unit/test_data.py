@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 
 from ard.config.schema import DatasetConfig
 from ard.data import (
+    EpochCropshiftTransform,
     EpochShuffleSampler,
     IndexedDataset,
     SyntheticCIFAR,
@@ -42,6 +43,27 @@ def test_synthetic_samples_depend_only_on_seed_and_index() -> None:
     torch.manual_seed(999)
     assert torch.equal(first[2][0], second[2][0])
     assert first[2][1] == second[2][1] == 0
+
+
+def test_cropshift_is_source_epoch_keyed_and_supports_non_cifar_resolution() -> None:
+    image = Image.fromarray((torch.arange(3 * 40 * 48).remainder(256).to(torch.uint8).reshape(40, 48, 3)).numpy())
+    transform = EpochCropshiftTransform(augmentation_seed=17, high=11)
+    transform.set_epoch(3)
+    first = transform(image, source_id=9)
+    second = transform(image, source_id=9)
+    assert torch.equal(first, second)
+    assert first.shape == (3, 40, 48)
+    assert first.dtype == torch.float32
+    assert 0 <= float(first.min()) <= float(first.max()) <= 1
+    assert not torch.equal(first, transform(image, source_id=10))
+
+
+def test_cropshift_clamps_strength_only_to_image_geometry() -> None:
+    image = Image.new("RGB", (4, 3), color=(10, 20, 30))
+    transform = EpochCropshiftTransform(augmentation_seed=1, high=11)
+    output = transform(image, source_id=0)
+    assert output.shape == (3, 3, 4)
+    assert output.min() >= 0 and output.max() <= 1
 
 
 def test_seed_fixed_stratified_validation_keeps_original_ids_and_train_only_samples() -> None:

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_static_trajectory_stabilization_preregistration",
+  "status": "pre_training_frozen_pending_source_commit",
+  "source_git_sha": "pending-final-source-freeze",
+  "teacher": {"registry_id": "chen2021_ltd_wrn34_10", "checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"},
+  "student": "saad_resnet18_cifar_v1",
+  "dataset": {"name": "cifar10", "split": "controlled_train_45000_validation_5000", "split_seed": 20260722},
+  "protocols": {"base": "controlled_cifar10_r18_v1", "cropshift": "controlled_cifar10_r18_cropshift_v1"},
+  "arms": ["BASE", "CROPSHIFT"],
+  "seeds": [1, 2],
+  "augmentation": {"base": "RandomCrop(32,padding=4)+RandomHorizontalFlip", "cropshift": "RandomHorizontalFlip+CropShift(0,11)", "rng": "source-keyed by augmentation seed, epoch, source ID"},
+  "training": {"epochs": 200, "optimizer": "SGD(lr=0.1,momentum=0.9,weight_decay=0.0005)", "scheduler": {"milestones": [100, 150], "gamma": 0.1, "step_at": "epoch_end"}, "attack": {"loss": "kl", "target": "teacher_clean", "epsilon": "8/255", "step_size": "2/255", "steps": 10, "random_start": true}},
+  "endpoints": {"attack": {"loss": "ce", "epsilon": "8/255", "step_size": "2/255", "steps": 20, "random_start": true, "seed": 0}, "epochs": [49, 99, 149, 199], "split": "fixed_internal_validation_5000"},
+  "primary": ["mean_validation_robust_trajectory_auc", "validation_ce_pgd20_robust_accuracy_epoch199"],
+  "secondary": ["best_last_ro_gap", "clean_accuracy", "worst_seed", "paired_spread", "forgetting", "sample_agreement", "throughput"],
+  "decision": "paired descriptive effects; no population inference, seed shopping, post-hoc augmentation tuning, or automatic follow-up",
+  "exclusions": ["official test", "AutoAttack", "Tiny-ImageNet", "CutMix", "MixUp", "IDBH full", "history intervention", "additional seeds"]
+}

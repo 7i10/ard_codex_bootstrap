@@ -40,6 +40,7 @@ class ProtocolConfig(StrictModel):
         "saad_paper_reproduction_v1",
         "saad_code_295121c_audit_v1",
         "controlled_cifar10_r18_v1",
+        "controlled_cifar10_r18_cropshift_v1",
         "controlled_cifar10_r18_delayed_multistep_v1",
         "controlled_cifar10_r18_prescriptive_v3_v1",
         "controlled_cifar10_r18_pilot_v1",
@@ -250,6 +251,8 @@ class DatasetConfig(StrictModel):
     image_size: int = Field(default=32, ge=1)
     seed: int = 0
     content_sha256: str | None = None
+    augmentation_policy: Literal["canonical", "cropshift"] = "canonical"
+    augmentation_crop_shift_high: int = Field(default=11, ge=1)
 
     @model_validator(mode="after")
     def validate_dataset(self) -> DatasetConfig:
@@ -260,6 +263,8 @@ class DatasetConfig(StrictModel):
             raise ValueError(f"{self.name} requires num_classes={expected}")
         if self.name == "tiny_imagenet" and self.root is None:
             raise ValueError("tiny_imagenet requires an explicit root")
+        if self.augmentation_policy == "cropshift" and self.name not in {"cifar10", "cifar100"}:
+            raise ValueError("cropshift augmentation is currently defined only for CIFAR datasets")
         if self.content_sha256 is not None and (
             len(self.content_sha256) != 64
             or any(character not in "0123456789abcdef" for character in self.content_sha256)
@@ -1143,6 +1148,7 @@ class ExperimentConfig(StrictModel):
             return
         if self.protocol.id not in {
             "controlled_cifar10_r18_v1",
+            "controlled_cifar10_r18_cropshift_v1",
             "controlled_cifar10_r18_delayed_multistep_v1",
             "controlled_cifar10_r18_prescriptive_v3_v1",
             *pilot_protocols,

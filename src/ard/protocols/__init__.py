@@ -144,6 +144,14 @@ _CONTROLLED_METADATA = MappingProxyType(
     }
 )
 
+# Static-augmentation ablations retain every controlled CIFAR-10 contract
+# field and differ only in the explicitly named train-view policy.  Keeping a
+# separate protocol identity prevents a Cropshift run from being mistaken for
+# the canonical RandomCrop baseline in lineage comparisons.
+_CROPSHIFT_METADATA = MappingProxyType(
+    {**_CONTROLLED_METADATA, "train_augmentation": "RandomHorizontalFlip+CropShift(0,11)"}
+)
+
 _PILOT_METADATA = MappingProxyType(
     {
         **_CONTROLLED_METADATA,
@@ -228,6 +236,12 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_CONTROLLED_METADATA,
+        ),
+        "controlled_cifar10_r18_cropshift_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_cropshift_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_CROPSHIFT_METADATA,
         ),
         "controlled_cifar10_r18_delayed_multistep_v1": ProtocolSpec(
             id="controlled_cifar10_r18_delayed_multistep_v1",
