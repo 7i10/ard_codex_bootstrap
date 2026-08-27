@@ -10,6 +10,7 @@
     "reference_file_sha256": "423bbf19aaa065f66acd1b7ef671b0c13b58650316bf9719ab5d112490274471"
   },
   "local_mapping": {
+    "source_git_sha": "be5f072fa25bd10c0316268a67db0bab4e09805c",
     "implementation": "src/ard/data/datasets.py:EpochCropshiftTransform",
     "policy_id": "cropshift",
     "parameters": {"low": 0, "high": 11, "high_is_exclusive": true},
