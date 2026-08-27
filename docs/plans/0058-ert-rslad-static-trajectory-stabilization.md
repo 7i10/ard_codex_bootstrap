@@ -2,9 +2,9 @@
 
 ## Status
 
-Implementation and preflight in progress; production is Hamster-only. This
-plan is the frozen protocol for the first static augmentation screen after the
-shuffle/augmentation RNG decomposition (`1a82907`).
+Completed on Hamster. This plan records the first static augmentation screen
+after the shuffle/augmentation RNG decomposition (`1a82907`); the result
+artifact is `docs/experiments/ert_rslad_static_trajectory_stabilization_results_v1.json`.
 
 ## Objective
 
@@ -43,6 +43,20 @@ primary; two-seed spread is descriptive only.
 5. Evaluate fixed validation endpoints, aggregate dense and checkpoint AUC,
    final/best/last/RO-gap, clean metrics, forgetting and sample agreement when
    available, then perform one consolidated scientific review.
+
+## Execution result
+
+- Four production trajectories completed: BASE/CROPSHIFT × seeds 1/2, each
+  with 200 metric rows and registered checkpoints 49/99/149/199.
+- All 16 independent validation CE-PGD20 endpoint evaluations completed with
+  verified checkpoint and sample-row hashes.
+- CROPSHIFT robust accuracy exceeded BASE at every registered endpoint in both
+  seeds; mean final gain was +1.24 percentage points and mean trajectory-AUC
+  gain was +0.897 pp. Final clean accuracy was -0.30 pp on average.
+- Per-sample forgetting transitions are unavailable because the campaign saved
+  only final train sample-state tables, not dense sample snapshots.
+- No official test, AutoAttack, additional seed, or history intervention was
+  launched.
 
 ## Decision rule
 

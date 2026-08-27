@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_static_trajectory_stabilization_results",
+  "status": "complete",
+  "source_git_sha": "ffc217dd635462e1f14c93720561208db2d70254",
+  "teacher": {
+    "registry_id": "chen2021_ltd_wrn34_10",
+    "checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+  },
+  "student": "saad_resnet18_cifar_v1",
+  "dataset": {
+    "name": "cifar10",
+    "split": "controlled_train_45000_validation_5000",
+    "split_seed": 20260722,
+    "validation_sample_id_label_sha256": "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+  },
+  "protocols": {
+    "base": "controlled_cifar10_r18_v1",
+    "cropshift": "controlled_cifar10_r18_cropshift_v1",
+    "upstream_cropshift_commit": "38b740aeffe5933c16869a126c6972ef443a8352"
+  },
+  "training": {
+    "epochs": 200,
+    "optimizer": "SGD(lr=0.1,momentum=0.9,weight_decay=0.0005)",
+    "scheduler_milestones": [100, 150],
+    "train_attack": {"loss": "kl", "target": "teacher_clean", "epsilon": "8/255", "step_size": "2/255", "steps": 10, "random_start": true},
+    "augmentation_rng": "source-keyed by augmentation seed, epoch, source ID",
+    "wandb_upload_policy": "metrics_only_no_model_or_run_bundle"
+  },
+  "endpoint": {
+    "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+    "split": "validation",
+    "row_count": 5000,
+    "attack": {"loss": "ce", "epsilon": "8/255", "step_size": "2/255", "steps": 20, "random_start": true, "input_domain": "pixel_0_1", "student_mode": "eval", "teacher_mode": "eval"},
+    "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+    "display_epochs": [49, 99, 149, 199],
+    "payload_epoch_rule": "checkpoint payload epoch = display epoch - 1"
+  },
+  "runs": [
+    {
+      "run_id": "ert-rslad-trajstab-base-s1-r2-20260827",
+      "short_id": "B1",
+      "arm": "BASE",
+      "seed": 1,
+      "protocol_id": "controlled_cifar10_r18_v1",
+      "config_hash": "739f7da1835603f1b33684489cffb4f72e9ca141dfa76f73fbfe5f504eae819b",
+      "wandb_url": "https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/ert-rslad-trajstab-base-s1-r2-20260827",
+      "metrics_artifact_sha256": "1092037f09b72a374817a22ca9db02c342f77b67ea623ae9e8e4b357736d0c0a",
+      "sample_stats_artifact_sha256": "39f23e7e9708ac68227d54239159b4a68ad6adec4b29c1c77d722bf427a7a61f",
+      "trajectory": {"rows": 200, "auc": 0.505652261306533, "best_metric_epoch_0based": 179, "best_robust": 0.5848, "last_robust": 0.5816, "last_clean": 0.8620, "robust_overfit_gap": 0.0032, "late_mean_epoch_150_199": 0.580464, "mean_epoch_100_199": 0.571858, "median_images_per_second": 635.2414439334409}
+    },
+    {
+      "run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827",
+      "short_id": "C1",
+      "arm": "CROPSHIFT",
+      "seed": 1,
+      "protocol_id": "controlled_cifar10_r18_cropshift_v1",
+      "config_hash": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+      "wandb_url": "https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/ert-rslad-trajstab-cropshift-s1-r2-20260827",
+      "metrics_artifact_sha256": "55f15c5b2286abee0d81dea4848abffb89ab3fae3ece98f20e8ece8ac893a825",
+      "sample_stats_artifact_sha256": "0d7a374466cec2dfdacc3455ed9fcae70fc66a540194502ae1baa5252e4bb7cc",
+      "trajectory": {"rows": 200, "auc": 0.5146025125628138, "best_metric_epoch_0based": 198, "best_robust": 0.5940, "last_robust": 0.5930, "last_clean": 0.8626, "robust_overfit_gap": 0.0010, "late_mean_epoch_150_199": 0.589564, "mean_epoch_100_199": 0.579456, "median_images_per_second": 623.2502255201904}
+    },
+    {
+      "run_id": "ert-rslad-trajstab-base-s2-r1-20260827",
+      "short_id": "B2",
+      "arm": "BASE",
+      "seed": 2,
+      "protocol_id": "controlled_cifar10_r18_v1",
+      "config_hash": "c678a52bfe1051ee6a7dc1ca11760042b1b8a207f0a05b3ee5a6b64784f5815a",
+      "wandb_url": "https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/ert-rslad-trajstab-base-s2-r1-20260827",
+      "metrics_artifact_sha256": "b7c169b945087bf82fae81f66dc88742f6d3d53f372d88fdd9021ed09276e3e9",
+      "sample_stats_artifact_sha256": "b3493c485313ce4e6510d2ae035ad322dc8abf58ee5a859b362597dc4b271ef3",
+      "trajectory": {"rows": 200, "auc": 0.505478391959799, "best_metric_epoch_0based": 195, "best_robust": 0.5864, "last_robust": 0.5852, "last_clean": 0.8656, "robust_overfit_gap": 0.0012, "late_mean_epoch_150_199": 0.58238, "mean_epoch_100_199": 0.572144, "median_images_per_second": 636.7554933456349}
+    },
+    {
+      "run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827",
+      "short_id": "C2",
+      "arm": "CROPSHIFT",
+      "seed": 2,
+      "protocol_id": "controlled_cifar10_r18_cropshift_v1",
+      "config_hash": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+      "wandb_url": "https://wandb.ai/shunsuke-n-waseda-university/single-teacher-ard/runs/ert-rslad-trajstab-cropshift-s2-r1-20260827",
+      "metrics_artifact_sha256": "8f153c106dd980bd27b45d910419e7ce6e8a1897810695541948ef264a5e63fa",
+      "sample_stats_artifact_sha256": "78c5e15e713d1715368c06310022719142b4ec185e23e3fb79438b4c0d5c6d5c",
+      "trajectory": {"rows": 200, "auc": 0.5144663316582911, "best_metric_epoch_0based": 178, "best_robust": 0.5950, "last_robust": 0.5912, "last_clean": 0.8630, "robust_overfit_gap": 0.0038, "late_mean_epoch_150_199": 0.590272, "mean_epoch_100_199": 0.579792, "median_images_per_second": 622.4541283621589}
+    }
+  ],
+  "endpoint_results": [
+    {"short_id":"B1","display_epoch":49,"payload_epoch":48,"robust":0.4642,"clean":0.7636,"checkpoint_sha256":"5a661c9ca8b4a9cbdcc39c9388299537d885e96b5b0afd1fa89b4efc459ae7e6","rows_sha256":"31a56f90b816a76f239324ccd79b523c5de46c582b47abd9ef24bef4ad099a38"},
+    {"short_id":"B1","display_epoch":99,"payload_epoch":98,"robust":0.4760,"clean":0.7914,"checkpoint_sha256":"3bcad19196948a114307be98c30a9315438b2b127fcade4fa2135159cafaad29","rows_sha256":"66ea0c4cf20a42ce8fe91346c6bf09fe593e28e461038296a11badb083ba77e0"},
+    {"short_id":"B1","display_epoch":149,"payload_epoch":148,"robust":0.5658,"clean":0.8484,"checkpoint_sha256":"821ec44e4f03bc708952e2870d7ba44dbd3292b2f5f5e1b690d599f45526f939","rows_sha256":"b31e6e4cdbf499f9c0456a4d882f50c0d6382bd3d8c69c8440769cbef6c2b31b"},
+    {"short_id":"B1","display_epoch":199,"payload_epoch":198,"robust":0.5808,"clean":0.8644,"checkpoint_sha256":"6fe1ce9f09eb8dbe44365a30254339730e19ea3d8f27afee22d6f844894bc3bd","rows_sha256":"4a4b1153cc0fac2dbaaf36b35af2236426c0815ed495a38c5b84be81a3cb895e"},
+    {"short_id":"C1","display_epoch":49,"payload_epoch":48,"robust":0.4680,"clean":0.7698,"checkpoint_sha256":"455b906e6bf7284d9659a300144cf2c28b7e7c454b2473af6870f2d637bd87c8","rows_sha256":"94bb3145301cd53bdb934710ee78ab76ccb7b68e05218a09a5e2dd0fe2a8f734"},
+    {"short_id":"C1","display_epoch":99,"payload_epoch":98,"robust":0.4916,"clean":0.7846,"checkpoint_sha256":"dd28f02e39e1a4484fe75ee72708d5d43620af79ed9a3bf52caec80b8baf54fd","rows_sha256":"cf7dd8f3d0a716f77a6924e20bb63d71f7eaf6e7595501bd217399f108135028"},
+    {"short_id":"C1","display_epoch":149,"payload_epoch":148,"robust":0.5706,"clean":0.8464,"checkpoint_sha256":"9171e52fe20496f40761af12fad0309bbefd79fe1db5420fa30f15914d21b006","rows_sha256":"d589a3480a3454e707140387ce905ef67e0da55e4a2c15ed087171b8b8d23b36"},
+    {"short_id":"C1","display_epoch":199,"payload_epoch":198,"robust":0.5940,"clean":0.8612,"checkpoint_sha256":"82ce316f84fbf33d49cfc0a5521d15369cb2f9b8b07bf64a0e5f17d82cc1975f","rows_sha256":"8e7af04d45bab448ca519e9931f10433f287e60a32e13ff302a4e2e964ba53cb"},
+    {"short_id":"B2","display_epoch":49,"payload_epoch":48,"robust":0.4596,"clean":0.7566,"checkpoint_sha256":"458fef3b04ef1093ca8b939b915b3fb19c47c2f88ba4adc6f8a676753936139b","rows_sha256":"0b7d1e471f01a7e3a07d9caf237f6c3b16c2a33e19bae018cbf654592183e624"},
+    {"short_id":"B2","display_epoch":99,"payload_epoch":98,"robust":0.4554,"clean":0.7760,"checkpoint_sha256":"4715ca247616a6ac0c6f4831f9ae9650a9546df81348fae3bd0f1c8fbd953e35","rows_sha256":"52a8b51653791af8e6ef0bc75fc376efde04162da10e13f8a0585af32b54a054"},
+    {"short_id":"B2","display_epoch":149,"payload_epoch":148,"robust":0.5640,"clean":0.8506,"checkpoint_sha256":"61db898b10fba6231aca75ca60f7f9e94a90ae2bc48364499f0cc1e884f62925","rows_sha256":"92737a6af3da4463fd8441c2b9e0b78ca86060b316e990703e65aefb76c53e88"},
+    {"short_id":"B2","display_epoch":199,"payload_epoch":198,"robust":0.5810,"clean":0.8650,"checkpoint_sha256":"aca7f73e9d5b5929e7445bb79968234ccbfc21788aa9ea33a3a87cae838dccce","rows_sha256":"ad2be0f39ede7c21a8c54bd2aad991767b39fc5b36fb44a3f1bece3a13bd0226"},
+    {"short_id":"C2","display_epoch":49,"payload_epoch":48,"robust":0.4752,"clean":0.7626,"checkpoint_sha256":"5929b39532962582b3f71825da10730fe109a015ecf09ec1798a9a8356d68c92","rows_sha256":"f9eb824bf7145599f823694a923feb199c54164b4053a671be5bb041b85e288a"},
+    {"short_id":"C2","display_epoch":99,"payload_epoch":98,"robust":0.4560,"clean":0.7808,"checkpoint_sha256":"d7a701b338b31b61090c00cad696735d81393837f62443d50f41570577ee3758","rows_sha256":"a1261cf0b2d6dfb746c9f9d1d1bc1704e958e59f1730f49cf7753dde8db1ec27"},
+    {"short_id":"C2","display_epoch":149,"payload_epoch":148,"robust":0.5762,"clean":0.8512,"checkpoint_sha256":"f8d6f582b1ffd1492113a7bf835561801ed69f845a0c5cae3bcc670078e8d97a","rows_sha256":"7b9acacd44b499adc9dc82801cc015776b04188737de8d1fd6a7e17b65bf65d0"},
+    {"short_id":"C2","display_epoch":199,"payload_epoch":198,"robust":0.5926,"clean":0.8622,"checkpoint_sha256":"08f5461c39331aaa93f5a0ddc2d98e2c70b5fe65b495452c1d359d544b98e388","rows_sha256":"9c906ee0f52900463e1ef15ee998c884bc1d988902e4438ed153327c4adc239c"}
+  ],
+  "paired_crop_minus_base_endpoint_delta_pp": {
+    "seed1": {"49": {"robust": 0.38, "clean": 0.62}, "99": {"robust": 1.56, "clean": -0.68}, "149": {"robust": 0.48, "clean": -0.20}, "199": {"robust": 1.32, "clean": -0.32}},
+    "seed2": {"49": {"robust": 1.56, "clean": 0.60}, "99": {"robust": 0.06, "clean": 0.48}, "149": {"robust": 1.22, "clean": 0.06}, "199": {"robust": 1.16, "clean": -0.28}},
+    "mean": {"49": {"robust": 0.97, "clean": 0.61}, "99": {"robust": 0.81, "clean": -0.10}, "149": {"robust": 0.85, "clean": -0.07}, "199": {"robust": 1.24, "clean": -0.30}}
+  },
+  "paired_crop_minus_base_trajectory_delta": {
+    "seed1": {"auc": 0.0089502512562808, "best_robust": 0.0092, "last_robust": 0.0114, "late_mean_150_199": 0.0091},
+    "seed2": {"auc": 0.0089879396984921, "best_robust": 0.0086, "last_robust": 0.0060, "late_mean_150_199": 0.007892},
+    "mean": {"auc": 0.00896909547738645, "best_robust": 0.0089, "last_robust": 0.0087, "late_mean_150_199": 0.008496}
+  },
+  "sample_agreement": {
+    "same_seed_crop_vs_base_epoch199": {
+      "seed1": {"robust_label_agreement": 0.9372, "robust_jaccard": 0.8985, "crop_only_robust": 190, "base_only_robust": 124, "clean_label_agreement": 0.9580},
+      "seed2": {"robust_label_agreement": 0.9348, "robust_jaccard": 0.8947, "crop_only_robust": 192, "base_only_robust": 134, "clean_label_agreement": 0.9588}
+    },
+    "cross_seed_robust_label_agreement": {
+      "base": {"49": 0.8462, "99": 0.8314, "149": 0.9122, "199": 0.9354},
+      "cropshift": {"49": 0.8604, "99": 0.8460, "149": 0.9004, "199": 0.9410}
+    }
+  },
+  "limitations": [
+    "Only two training seeds; effects are paired descriptive, not population inference.",
+    "No sample-level trajectory snapshots were saved, so per-sample forgetting transitions cannot be estimated from this campaign.",
+    "Validation CE-PGD20 is an internal held-out endpoint; official test and AutoAttack were not run.",
+    "Endpoint checkpoint payload epoch is zero-based; display epoch labels are the registered checkpoint labels."
+  ],
+  "decision": {
+    "static_candidate": "supported_for_follow_up",
+    "reason": "CROPSHIFT improves validation CE-PGD20 robust accuracy at all four registered endpoints in both seeds, with mean final gain +1.24 pp and mean trajectory-AUC gain +0.897 pp; final clean accuracy is -0.30 pp on average.",
+    "automatic_follow_up": false,
+    "excluded": ["official test", "AutoAttack", "additional seed", "history intervention", "post-hoc augmentation tuning"]
+  }
+}
