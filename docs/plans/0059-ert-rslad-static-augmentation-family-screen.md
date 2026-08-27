@@ -55,7 +55,7 @@ pinned upstream reference is TreeLLi/DA-Alone-Improves-AT
 - [x] M1 implement CROP_RE/IDBH_WEAK policies, protocol IDs, and configs.
 - [x] M2 run focused data/config tests and the existing CROPSHIFT canary.
 - [x] M3 run bounded distribution/RNG canary and freeze audit artifacts.
-- [ ] M4 launch four fresh full Hamster trajectories (CROP_RE/IDBH_WEAK ×
+- [~] M4 launch four fresh full Hamster trajectories (CROP_RE/IDBH_WEAK ×
   seeds 1/2), with metrics-only W&B and checkpoints 49/99/149/199.
 - [ ] M5 run 16 independent validation CE-PGD20 endpoints and aggregate
   trajectory/AUC, incremental, clean, RO, sample, and throughput metrics.
@@ -100,8 +100,13 @@ aggregation; no per-run reviewers.
   `0.26.0+cu128`; RandomErasing rate was `0.4963`, each ColorShape operation
   was within `0.03` of its expected `0.125`, global RNG and source/order
   independence checks passed, and the frozen CROPSHIFT canary hashes matched.
+- 2026-08-28: after the production source was frozen at `63bfe7b`, launched
+  CROP_RE seed 1 on Hamster GPU0 and IDBH_WEAK seed 1 on GPU1 as persistent
+  metrics-only W&B services; seed 2 will follow on each GPU after its seed-1
+  service completes.
 
 ## Completion report
 
-M3 is complete; the audit JSON is frozen before production. M4–M6 remain
-pending. No fresh production trajectory has been launched yet.
+M3 is complete and the audit JSON is frozen before production. M4 is in
+progress; M5–M6 remain pending. Production services are pinned to
+`63bfe7b` and use local checkpoints with no model/run-bundle W&B uploads.
