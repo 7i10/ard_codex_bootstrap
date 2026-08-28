@@ -24,7 +24,6 @@ CHILD = {
 }
 SWITCH = {"I50": 50, "I75": 75, "I125": 125}
 ENDPOINT_ATTACK = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
-SOURCE_SHA = "54b637492309bcf4bb9f3c99ddec0398aa7cce1e"
 TEACHER_SHA = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
 
 
@@ -89,6 +88,20 @@ def control_endpoint(seed: int, epoch: int, split: str = "validation") -> dict[s
 def child_endpoint(seed: int, arm: str, epoch: int, split: str) -> dict[str, Any]:
     path = RUN_ROOT / CHILD[arm][seed] / "stagewise-endpoints" / f"epoch-{epoch:03d}" / split / "endpoint.json"
     return endpoint(path, expected_rows=5000 if split == "validation" else 45000)
+
+
+def production_source_sha(arms: list[dict[str, Any]]) -> str:
+    shas: set[str] = set()
+    for row in arms:
+        manifest = read_json(Path(row["child_dir"]) / "run-bundle" / "manifest.json")
+        git = manifest.get("git")
+        sha = git.get("sha") if isinstance(git, dict) else None
+        if not isinstance(sha, str) or len(sha) != 40:
+            raise ValueError(f"missing child production Git SHA: {row['child_dir']}")
+        shas.add(sha)
+    if len(shas) != 1:
+        raise ValueError(f"production source SHA mismatch: {sorted(shas)}")
+    return shas.pop()
 
 
 def build_arm(arm: str, seed: int) -> dict[str, Any]:
@@ -218,6 +231,7 @@ def load_reference_profile() -> dict[str, Any]:
 
 def main() -> None:
     arms = [build_arm(arm, seed) for arm in ("I50", "I75", "I125") for seed in (1, 2)]
+    source_sha = production_source_sha(arms)
     by_key = {(row["arm"], row["seed"]): row for row in arms}
     promotion: dict[str, Any] = {}
     for arm in ("I50", "I75", "I125"):
@@ -274,7 +288,7 @@ def main() -> None:
         "schema_version": 1,
         "kind": "ert_rslad_single_switch_timing_results_v1",
         "status": "complete",
-        "source_git_sha": SOURCE_SHA,
+        "source_git_sha": source_sha,
         "teacher_checkpoint_sha256": TEACHER_SHA,
         "endpoint_attack_identity_sha256": ENDPOINT_ATTACK,
         "dataset": {"name": "cifar10", "train_count": 45000, "validation_count": 5000, "split_seed": 20260722},
@@ -317,7 +331,7 @@ def main() -> None:
         "",
         "## Contract and lineage",
         "",
-        f"- Production source SHA: `{SOURCE_SHA}`.",
+        f"- Production source SHA (from every child run manifest): `{source_sha}`.",
         f"- Teacher SHA-256: `{TEACHER_SHA}`.",
         "- Prefix: accepted CROPSHIFT control; late policy: frozen IDBH_WEAK.",
         "- Training attack: KL-PGD10, epsilon 8/255, step 2/255, random start, teacher-clean target.",
