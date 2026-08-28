@@ -114,7 +114,10 @@ def main() -> int:
         raise ValueError("source config hash does not match sparse checkpoint")
     if payload.get("world_size") != 1:
         raise ValueError("parent materialization requires the historical single-rank checkpoint")
-    expected_lr = 0.1 if args.boundary <= 100 else 0.01
+    # The sparse source is the state immediately before the continuation.  A
+    # boundary of 125 therefore starts from the epoch-099 file while still at
+    # the first-stage LR; the decay at 100 is applied by the normal scheduler.
+    expected_lr = 0.1 if source_label <= 100 else 0.01
     actual_lr = float(payload["optimizer"]["param_groups"][0]["lr"])
     if abs(actual_lr - expected_lr) > 1e-12:
         raise ValueError(f"unexpected sparse parent LR: {actual_lr}")
