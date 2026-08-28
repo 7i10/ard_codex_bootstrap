@@ -13,7 +13,7 @@ Run scripts from the repository root. Configuration precedence is CLI arguments,
 .agents/skills/run-on-ferret/scripts/ferret-preflight
 .agents/skills/run-on-ferret/scripts/ferret-prepare --sha <40-lowercase-hex> --run-id <id>
 .agents/skills/run-on-ferret/scripts/ferret-launch --run-id <id> --gpus 0,1 -- \
-  /usr/bin/env PYTHONPATH=src /absolute/path/to/python -m ard.cli.train --config <config>
+  /usr/bin/env PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.train --config <config>
 .agents/skills/run-on-ferret/scripts/ferret-status --run-id <id>
 .agents/skills/run-on-ferret/scripts/ferret-logs --run-id <id> --tail 200 --both
 .agents/skills/run-on-ferret/scripts/ferret-collect --run-id <id>
@@ -60,7 +60,9 @@ Pass physical indices such as `0`, `0,1`, or `0,1,2`. The launch manifest record
 
 `collect` excludes checkpoints, W&B offline data, caches, and bytecode by default. Use an explicit include option only after assessing storage and lineage needs.
 
-For this repository's CIFAR-10 single-GPU workload on Ferret, begin with
+For this repository's CIFAR-10 single-GPU workload on Ferret, use the pinned
+`/home/shunsukenaito/.conda/envs/adv/bin/python` environment (the system
+`/usr/bin/python3` does not contain Torch), and begin with
 `ARD_NUM_WORKERS=4`. A bounded 2026-08-01 teacher-response profile measured
 387.4 images/s with 4 workers versus 338.4 with 8; see
 `tools/internal/performance/provenance/ferret_workers_2026-08-01.yaml`. Treat
