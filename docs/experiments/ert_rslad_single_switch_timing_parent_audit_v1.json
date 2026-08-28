@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "experiment": "ert_rslad_single_switch_timing_v1",
+  "source_git_sha": "8083f9c5df9b46a3a02399fbf293ceee6db85083",
+  "teacher_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+  "scheduler": {
+    "id": "multistep",
+    "milestones": [100, 150],
+    "gamma": 0.1,
+    "step_at": "epoch_end"
+  },
+  "parent_contract": {
+    "payload_epoch": "switch - 1",
+    "epoch_boundary": "end",
+    "global_step": "switch * 352",
+    "world_size": 1,
+    "lr": {"switch_lt_100": 0.1, "switch_ge_100": 0.01}
+  },
+  "parents": [
+    {
+      "seed": 1,
+      "switch": 50,
+      "host": "Hamster",
+      "materialization_source_git_sha": "not recorded by legacy local materializer",
+      "source_checkpoint_sha256": "455b906e6bf7284d9659a300144cf2c28b7e7c454b2473af6870f2d637bd87c8",
+      "target_checkpoint": "parents/seed1/s50/epoch-050.pt",
+      "target_checkpoint_sha256": "cc0ba107345edec44e71e9c3c1ea3753cbafbd2657955d63c9ab688261659db8",
+      "materialization_sha256": "94473f6b77814ca9f3cbe90cfeb1508d55172fa575634dbb29c9875d46ac9b31",
+      "payload_epoch": 49,
+      "next_epoch": 50,
+      "global_step": 17600,
+      "scheduler_last_epoch": 50,
+      "learning_rate": 0.1,
+      "source_tracker_run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827"
+    },
+    {
+      "seed": 1,
+      "switch": 75,
+      "host": "Hamster",
+      "materialization_source_git_sha": "not recorded by legacy local materializer",
+      "source_checkpoint_sha256": "455b906e6bf7284d9659a300144cf2c28b7e7c454b2473af6870f2d637bd87c8",
+      "target_checkpoint": "parents/seed1/s75/epoch-075.pt",
+      "target_checkpoint_sha256": "32e87b5630015db8f683579b0feb658d29792bf0e8766949c00c9c3550d5a917",
+      "materialization_sha256": "09f0685a07a28e92f38b7e8a162e82daa1bc69f44575c2083d8d1e4fd8b264a7",
+      "payload_epoch": 74,
+      "next_epoch": 75,
+      "global_step": 26400,
+      "scheduler_last_epoch": 75,
+      "learning_rate": 0.1,
+      "source_tracker_run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827"
+    },
+    {
+      "seed": 1,
+      "switch": 125,
+      "host": "Ferret",
+      "materialization_source_git_sha": "0794c687788c396ebe56c3e5c6e7fbb62d3d08df",
+      "source_checkpoint_sha256": "dd28f02e39e1a4484fe75ee72708d5d43620af79ed9a3bf52caec80b8baf54fd",
+      "target_checkpoint": "parents/seed1/s125/epoch-125.pt",
+      "target_checkpoint_sha256": "73a01b5e2691f06edb9b633c117817fc286f96f7e87e8f9c5e3366d245fd9861",
+      "materialization_sha256": "ff495d0e56f49766f719abe2a0709baeabdd49cee407f767eb73b245b4d2cccf",
+      "payload_epoch": 124,
+      "next_epoch": 125,
+      "global_step": 44000,
+      "scheduler_last_epoch": 125,
+      "learning_rate": 0.01,
+      "source_tracker_run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827"
+    },
+    {
+      "seed": 2,
+      "switch": 50,
+      "host": "Hamster",
+      "materialization_source_git_sha": "not recorded by legacy local materializer",
+      "source_checkpoint_sha256": "5929b39532962582b3f71825da10730fe109a015ecf09ec1798a9a8356d68c92",
+      "target_checkpoint": "parents/seed2/s50/epoch-050.pt",
+      "target_checkpoint_sha256": "b793e25131fa326d3aefca5bc49465a3f451850ab18e15eeaff379c9c2d38e33",
+      "materialization_sha256": "9dbd2f5de99e404bd5aff594f4ce33d9a73374b9c826025703d86aae0005380b",
+      "payload_epoch": 49,
+      "next_epoch": 50,
+      "global_step": 17600,
+      "scheduler_last_epoch": 50,
+      "learning_rate": 0.1,
+      "source_tracker_run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827"
+    },
+    {
+      "seed": 2,
+      "switch": 75,
+      "host": "Ferret",
+      "materialization_source_git_sha": "c632a2f3685fb1bc49657d0ad62e719acf28aebf",
+      "source_checkpoint_sha256": "5929b39532962582b3f71825da10730fe109a015ecf09ec1798a9a8356d68c92",
+      "target_checkpoint": "parents/seed2/s75/epoch-075.pt",
+      "target_checkpoint_sha256": "7570d5ddbe54bc023f027f07eedca0d6bd27c7792ca8b4fefbc1e4a86699f897",
+      "materialization_sha256": "56bd95769a20422515331b8dc2eb142fbad1f11925989c41eeb4bda48689d463",
+      "payload_epoch": 74,
+      "next_epoch": 75,
+      "global_step": 26400,
+      "scheduler_last_epoch": 75,
+      "learning_rate": 0.1,
+      "source_tracker_run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827"
+    },
+    {
+      "seed": 2,
+      "switch": 125,
+      "host": "Ferret",
+      "materialization_source_git_sha": "0794c687788c396ebe56c3e5c6e7fbb62d3d08df",
+      "source_checkpoint_sha256": "d7a701b338b31b61090c00cad696735d81393837f62443d50f41570577ee3758",
+      "target_checkpoint": "parents/seed2/s125/epoch-125.pt",
+      "target_checkpoint_sha256": "7781a459a6d1f9390e76df7cabc4162bb6c76aefc9d892dbe1a112c1b0464652",
+      "materialization_sha256": "713c8c4729c2fa730f44b73e3ff29586c476eb05c3f48fc7b7d5bc7155e1677f",
+      "payload_epoch": 124,
+      "next_epoch": 125,
+      "global_step": 44000,
+      "scheduler_last_epoch": 125,
+      "learning_rate": 0.01,
+      "source_tracker_run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827"
+    }
+  ],
+  "parity": {
+    "status": "pass",
+    "checks": ["payload epoch", "epoch boundary", "global step", "scheduler last_epoch", "learning rate", "complete state keys", "SHA256 after rsync"],
+    "note": "All parents were produced by CROPSHIFT-only continuation; legacy local materializers did not emit their own Git SHA. Their target config and state contracts match the accepted source controls."
+  }
+}

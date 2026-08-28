@@ -3,8 +3,8 @@
 ## Status
 
 - Owner: Codex root
-- Branch / base SHA: `master` / `960844f032a171edb0963b743ae1f7de5a2b1c0a`
-- Current milestone: M0 reconciliation and parent inventory
+- Branch / base SHA: `master` / `8083f9c5df9b46a3a02399fbf293ceee6db85083`
+- Current milestone: M3 continuations in progress
 - Last updated: 2026-08-29
 
 ## Goal
@@ -61,9 +61,9 @@ remain local.
 
 ## Milestones
 
-- [ ] M0 repo reconciliation, scheduler/RNG audit, and parent inventory
-- [ ] M1 exact S50/S75/S125 parent materialization and parity
-- [ ] M2 switch canaries and immutable source/config freeze
+- [x] M0 repo reconciliation, scheduler/RNG audit, and parent inventory
+- [x] M1 exact S50/S75/S125 parent materialization and parity
+- [x] M2 switch canaries and immutable source/config freeze
 - [ ] M3 six Hamster/Ferret continuations through epoch 199
 - [ ] M4 CE-PGD20 endpoints and hybrid/post-switch AUC analysis
 - [ ] M5 timing profile, I100 replacement decision, and freeze artifact
@@ -97,10 +97,13 @@ remain local.
 
 ## Progress log
 
-- 2026-08-29: Reconciled clean `master` at `960844f`; previous stage-wise
-  result commit is present on `origin/master`. No active training or endpoint
-  jobs are running. Existing I100/I150 results and exact sparse CROPSHIFT
-  checkpoints are available locally.
+- 2026-08-29: Reconciled clean `master` at `8083f9c`; this is the immutable
+  production source for all six fresh continuations. Exact S50/S75/S125
+  parents were materialized from accepted CROPSHIFT controls, with scheduler
+  last-epoch/LR/global-step boundary checks and hash-verified Ferret transfer.
+  Hamster runs I50 seed1/2 and Ferret runs I75 seed2, I125 seed1/2 are active;
+  I75 seed1 is forked and staged for the first freed Hamster GPU. Canaries for
+  I50, I75, and I125 passed on the frozen source. W&B is metrics-only.
 
 ## Completion report
 
