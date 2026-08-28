@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""Materialize exact LR-boundary parents from sparse CROPSHIFT checkpoints.
+
+This is a narrow, no-W&B continuation tool.  It runs only the missing
+CROPSHIFT epoch (98->99 for S100 or 148->149 for S150), preserving the full
+checkpoint state and original config hash.  It is intentionally not a general
+resume launcher: the source run, sparse checkpoint, target epoch, and output
+path are all explicit and verified.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+
+import torch
+from torch.optim import SGD
+from torch.utils.data import DataLoader
+
+from ard.attacks import LinfPGD
+from ard.cli.train import _build_method, _seed_everything
+from ard.config import load_config
+from ard.config.loader import resolved_config_dict
+from ard.data import (
+    EpochShuffleSampler,
+    build_train_validation_views,
+    collate_indexed,
+    data_loader_generator,
+    seed_data_loader_worker,
+)
+from ard.engine import Trainer, config_digest
+from ard.models import build_student, build_teacher
+from ard.schedules import build_scheduler
+from ard.state import SampleStateStore
+
+RUNS = {
+    1: Path(
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
+        "ert-rslad-static-trajstab-v1/cropshift-s1-r2"
+    ),
+    2: Path(
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
+        "ert-rslad-static-trajstab-v1/cropshift-s2-r1"
+    ),
+}
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--seed", type=int, choices=(1, 2), required=True)
+    parser.add_argument("--boundary", type=int, choices=(100, 150), required=True)
+    parser.add_argument("--device", default="cuda", choices=("cuda", "cpu"))
+    parser.add_argument("--output-root", type=Path, required=True)
+    return parser
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    run_root = RUNS[args.seed]
+    config_path = run_root / "run-bundle" / "resolved_config.yaml"
+    sparse = run_root / f"epoch-{args.boundary - 1:03d}.pt"
+    target_epoch = args.boundary - 1
+    target_name = f"epoch-{args.boundary:03d}.pt"
+    output_dir = args.output_root / f"seed{args.seed}" / f"s{args.boundary}"
+    if not config_path.is_file() or not sparse.is_file():
+        raise FileNotFoundError(f"missing source config/checkpoint: {config_path} / {sparse}")
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise FileExistsError(f"refusing to overwrite materialized parent directory: {output_dir}")
+
+    payload = torch.load(sparse, map_location="cpu", weights_only=False)
+    if not isinstance(payload, dict) or payload.get("epoch") != target_epoch - 1:
+        raise ValueError(f"sparse checkpoint must contain payload epoch {target_epoch - 1}")
+    source_config = load_config(config_path)
+    expected_config_hash = config_digest(resolved_config_dict(source_config))
+    if payload.get("config_hash") != expected_config_hash:
+        raise ValueError("source config hash does not match sparse checkpoint")
+    if payload.get("world_size") != 1:
+        raise ValueError("parent materialization requires the historical single-rank checkpoint")
+    expected_lr = 0.1 if args.boundary == 100 else 0.01
+    actual_lr = float(payload["optimizer"]["param_groups"][0]["lr"])
+    if abs(actual_lr - expected_lr) > 1e-12:
+        raise ValueError(f"unexpected sparse parent LR: {actual_lr}")
+    if payload["scheduler"]["last_epoch"] != args.boundary - 1:
+        raise ValueError("sparse parent scheduler boundary is inconsistent")
+
+    config = source_config
+    _seed_everything(config.seeds.model_init)
+    torch.use_deterministic_algorithms(True)
+    if args.device == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA requested but unavailable")
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
+    train_dataset, validation_dataset = build_train_validation_views(
+        config.dataset,
+        validation_fraction=config.training.validation_fraction,
+        split_seed=config.seeds.split,
+        augmentation_seed=config.seeds.augmentation,
+    )
+    sampler = EpochShuffleSampler(
+        len(train_dataset), seed=config.seeds.data_order, rank=0, world_size=1, shuffle=True
+    )
+    validation_sampler = EpochShuffleSampler(
+        len(validation_dataset), seed=config.seeds.data_order, rank=0, world_size=1, shuffle=False
+    )
+    loader = DataLoader(
+        train_dataset,
+        batch_size=config.training.per_rank_batch_size,
+        sampler=sampler,
+        num_workers=config.training.num_workers,
+        collate_fn=collate_indexed,
+        generator=data_loader_generator(config.seeds.data_order),
+        worker_init_fn=seed_data_loader_worker,
+    )
+    validation_loader = DataLoader(
+        validation_dataset,
+        batch_size=config.training.per_rank_batch_size,
+        sampler=validation_sampler,
+        num_workers=config.training.num_workers,
+        collate_fn=collate_indexed,
+        generator=data_loader_generator(config.seeds.data_order + 1),
+        worker_init_fn=seed_data_loader_worker,
+    )
+    student = build_student(config.student, tier=config.tier).to(device)
+    teacher = build_teacher(config.teacher, tier=config.tier) if config.teacher is not None else None
+    optimizer = SGD(
+        student.parameters(),
+        lr=config.optimizer.learning_rate,
+        momentum=config.optimizer.momentum,
+        weight_decay=config.optimizer.weight_decay,
+        nesterov=config.optimizer.nesterov,
+    )
+    scheduler = build_scheduler(optimizer, config.scheduler)
+    objective, policy, sample_store, target_policy = _build_method(config)
+    if config.observation.records_student_history and sample_store is None:
+        sample_store = SampleStateStore(ema_decay=config.method.student_ema_decay)
+    selection_attack_config = config.method.selection_attack
+    if selection_attack_config is None:
+        raise ValueError("historical CROPSHIFT config has no selection attack")
+
+    output_dir.mkdir(parents=True)
+    trainer = Trainer(
+        model=student,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        scaler=None,
+        attack=LinfPGD(config.method.attack),
+        selection_attack=LinfPGD(selection_attack_config),
+        objective=objective,
+        policy=policy,
+        device=device,
+        output_dir=output_dir,
+        config_hash=expected_config_hash,
+        seed=config.seeds.train_attack,
+        evaluation_attack_seed=config.seeds.evaluation_attack,
+        tracker_run_id=payload.get("tracker_run_id"),
+        teacher=teacher,
+        sample_store=sample_store,
+        target_policy=target_policy,
+        observation_profile=config.observation.profile,
+        checkpoint_epochs=(args.boundary,),
+    )
+    state = trainer.resume(sparse, sampler=sampler)
+    if state.next_epoch != target_epoch:
+        raise ValueError(f"resume next epoch {state.next_epoch} != target epoch {target_epoch}")
+    history = trainer.fit(
+        loader,
+        validation_loader=validation_loader,
+        epochs=target_epoch + 1,
+        start_epoch=state.next_epoch,
+    )
+    target = output_dir / target_name
+    if not target.is_file():
+        raise RuntimeError(f"materialization did not create {target}")
+    target_payload = torch.load(target, map_location="cpu", weights_only=False)
+    if not isinstance(target_payload, dict) or target_payload.get("epoch") != target_epoch:
+        raise RuntimeError("materialized checkpoint has the wrong payload epoch")
+    result = {
+        "seed": args.seed,
+        "boundary": args.boundary,
+        "source_checkpoint": str(sparse.resolve()),
+        "source_checkpoint_sha256": sha256(sparse),
+        "target_checkpoint": str(target.resolve()),
+        "target_checkpoint_sha256": sha256(target),
+        "target_payload_epoch": target_payload["epoch"],
+        "target_global_step": target_payload["global_step"],
+        "target_scheduler_last_epoch": target_payload["scheduler"]["last_epoch"],
+        "target_learning_rate": target_payload["optimizer"]["param_groups"][0]["lr"],
+        "target_config_hash": target_payload["config_hash"],
+        "tracker_run_id": target_payload.get("tracker_run_id"),
+        "history": history,
+    }
+    (output_dir / "materialization.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -13,6 +13,7 @@ from ard.data import (
     EpochCropshiftTransform,
     EpochIdbhWeakTransform,
     EpochShuffleSampler,
+    EpochStagewiseAugmentationTransform,
     IndexedDataset,
     SyntheticCIFAR,
     build_dataset,
@@ -93,6 +94,24 @@ def test_crop_re_and_idbh_weak_share_spatial_rng_contract() -> None:
     assert crop_re.policy_id == "crop_re"
     assert idbh.policy_id == "idbh_weak"
     assert crop_re(image, source_id=7).shape == idbh(image, source_id=7).shape
+
+
+@pytest.mark.parametrize(
+    "late_policy, late_cls", (("crop_re", EpochCropReTransform), ("idbh_weak", EpochIdbhWeakTransform))
+)
+def test_stagewise_switch_preserves_prefix_and_uses_late_policy(late_policy: str, late_cls: type) -> None:
+    image = Image.fromarray((torch.arange(3 * 32 * 32).remainder(256).to(torch.uint8).reshape(32, 32, 3)).numpy())
+    stagewise = EpochStagewiseAugmentationTransform(
+        augmentation_seed=17, switch_epoch=5, late_policy=late_policy
+    )
+    reference_prefix = EpochCropshiftTransform(augmentation_seed=17)
+    reference_late = late_cls(augmentation_seed=17)
+    for epoch in (4, 5):
+        stagewise.set_epoch(epoch)
+        reference_prefix.set_epoch(epoch)
+        reference_late.set_epoch(epoch)
+        expected = reference_prefix(image, source_id=7) if epoch < 5 else reference_late(image, source_id=7)
+        assert torch.equal(stagewise(image, source_id=7), expected)
 
 
 def test_seed_fixed_stratified_validation_keeps_original_ids_and_train_only_samples() -> None:

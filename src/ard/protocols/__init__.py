@@ -172,6 +172,15 @@ _IDBH_WEAK_METADATA = MappingProxyType(
     }
 )
 
+_STAGEWISE_AUGMENTATION_METADATA = MappingProxyType(
+    {
+        **_CONTROLLED_METADATA,
+        "train_augmentation": "CropShift prefix with preregistered LR-boundary switch to CROP_RE or IDBH_WEAK",
+        "switch_boundaries": (100, 150),
+        "late_policies": ("crop_re", "idbh_weak"),
+    }
+)
+
 _PILOT_METADATA = MappingProxyType(
     {
         **_CONTROLLED_METADATA,
@@ -274,6 +283,13 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_IDBH_WEAK_METADATA,
+        ),
+        "controlled_cifar10_r18_stagewise_augmentation_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_stagewise_augmentation_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_STAGEWISE_AUGMENTATION_METADATA,
+            required_resume_fork_kind="stagewise_augmentation_fork_v1",
         ),
         "controlled_cifar10_r18_delayed_multistep_v1": ProtocolSpec(
             id="controlled_cifar10_r18_delayed_multistep_v1",

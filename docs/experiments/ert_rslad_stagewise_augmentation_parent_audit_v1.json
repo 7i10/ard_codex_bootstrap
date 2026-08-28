@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_stagewise_augmentation_parent_audit_v1",
+  "status": "complete",
+  "source_git_sha": "ffc217dd635462e1f14c93720561208db2d70254",
+  "current_git_sha": "9322eea50f4c5eed873b808beca48819d914d249",
+  "teacher": {
+    "registry_id": "chen2021_ltd_wrn34_10",
+    "checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+  },
+  "scheduler": {
+    "id": "multistep",
+    "milestones": [100, 150],
+    "gamma": 0.1,
+    "step_at": "epoch_end",
+    "scientific_switches": {
+      "S100": {
+        "late_first_training_epoch": 100,
+        "parent_payload_epoch": 99,
+        "parent_completed_epoch_count": 100,
+        "parent_scheduler_last_epoch": 100,
+        "parent_learning_rate": 0.01
+      },
+      "S150": {
+        "late_first_training_epoch": 150,
+        "parent_payload_epoch": 149,
+        "parent_completed_epoch_count": 150,
+        "parent_scheduler_last_epoch": 150,
+        "parent_learning_rate": 0.001
+      }
+    }
+  },
+  "runs": {
+    "seed1": {
+      "run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827",
+      "run_bundle": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s1-r2/run-bundle/manifest.json",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s1-r2",
+      "config_hash": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+      "sparse_checkpoints": {
+        "epoch_099_file_payload_epoch_98": {
+          "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s1-r2/epoch-099.pt",
+          "sha256": "dd28f02e39e1a4484fe75ee72708d5d43620af79ed9a3bf52caec80b8baf54fd"
+        },
+        "epoch_149_file_payload_epoch_148": {
+          "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s1-r2/epoch-149.pt",
+          "sha256": "9171e52fe20496f40761af12fad0309bbefd79fe1db5420fa30f15914d21b006"
+        }
+      },
+      "target_parents": {
+        "S100": {
+          "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+          "sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+          "payload_epoch": 99,
+          "scheduler_last_epoch": 100,
+          "learning_rate": 0.010000000000000002,
+          "global_step": 35200,
+          "status": "complete"
+        },
+        "S150": {
+          "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s150/epoch-150.pt",
+          "sha256": "c9e16ef82b834909b676e64c5fe784647af5c2d4a5257c448cbdcae0a1278cfe",
+          "payload_epoch": 149,
+          "scheduler_last_epoch": 150,
+          "learning_rate": 0.0010000000000000002,
+          "global_step": 52800,
+          "status": "complete"
+        }
+      }
+    },
+    "seed2": {
+      "run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827",
+      "run_bundle": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s2-r1/run-bundle/manifest.json",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s2-r1",
+      "config_hash": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+      "sparse_checkpoints": {
+        "epoch_099_file_payload_epoch_98": {
+          "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s2-r1/epoch-099.pt",
+          "sha256": "d7a701b338b31b61090c00cad696735d81393837f62443d50f41570577ee3758"
+        },
+        "epoch_149_file_payload_epoch_148": {
+          "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s2-r1/epoch-149.pt",
+          "sha256": "f8d6f582b1ffd1492113a7bf835561801ed69f845a0c5cae3bcc670078e8d97a"
+        }
+      },
+      "target_parents": {
+        "S100": {
+          "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+          "sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+          "payload_epoch": 99,
+          "scheduler_last_epoch": 100,
+          "learning_rate": 0.010000000000000002,
+          "global_step": 35200,
+          "status": "complete"
+        },
+        "S150": {
+          "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s150/epoch-150.pt",
+          "sha256": "212167135a117dcd4d74bd09d5ffa996205ea6274365e3ff51736b063ac13249",
+          "payload_epoch": 149,
+          "scheduler_last_epoch": 150,
+          "learning_rate": 0.0010000000000000002,
+          "global_step": 52800,
+          "status": "complete"
+        }
+      }
+    }
+  },
+  "notes": [
+    "W&B relevant runs use metrics_only retention and do not contain model artifacts.",
+    "Checkpoint paths and SHA-256 values are verified from local run bundles; SHA is authoritative.",
+    "No production stage-wise continuation may start until all four target parents are materialized and parity-checked."
+  ]
+}

@@ -262,6 +262,55 @@ class EpochIdbhWeakTransform(EpochCropshiftTransform):
         )
 
 
+class EpochStagewiseAugmentationTransform:
+    """Hard switch from CropShift to one fixed late augmentation policy.
+
+    Both component transforms derive their spatial prefix from the same
+    source/epoch-keyed stream.  The wrapper therefore changes only the late
+    policy at ``switch_epoch``; it never resets augmentation or global RNG.
+    """
+
+    policy_id = "stagewise"
+
+    def __init__(
+        self,
+        *,
+        augmentation_seed: int,
+        switch_epoch: int,
+        late_policy: str,
+        high: int = 11,
+    ) -> None:
+        if isinstance(switch_epoch, bool) or not isinstance(switch_epoch, int) or switch_epoch < 1:
+            raise ValueError("stagewise switch epoch must be a positive integer")
+        if late_policy not in {"crop_re", "idbh_weak"}:
+            raise ValueError("stagewise late policy must be crop_re or idbh_weak")
+        self.switch_epoch = switch_epoch
+        self.late_policy = late_policy
+        self.prefix = EpochCropshiftTransform(augmentation_seed=augmentation_seed, high=high)
+        self.late = (
+            EpochCropReTransform(augmentation_seed=augmentation_seed, high=high)
+            if late_policy == "crop_re"
+            else EpochIdbhWeakTransform(augmentation_seed=augmentation_seed, high=high)
+        )
+        self.epoch = 0
+        self.source_id_keyed = True
+
+    def set_epoch(self, epoch: int) -> None:
+        if epoch < 0:
+            raise ValueError("augmentation epoch must be non-negative")
+        self.epoch = epoch
+        self.prefix.set_epoch(epoch)
+        self.late.set_epoch(epoch)
+
+    def set_seed(self, seed: int) -> None:
+        self.prefix.set_seed(seed)
+        self.late.set_seed(seed)
+
+    def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
+        transform = self.prefix if self.epoch < self.switch_epoch else self.late
+        return transform(image, source_id=source_id)
+
+
 def _to_tensor(image: Any) -> torch.Tensor:
     if isinstance(image, torch.Tensor):
         if not image.is_floating_point():
@@ -473,6 +522,15 @@ def build_train_validation_views(
         elif config.augmentation_policy == "idbh_weak":
             train_transform = EpochIdbhWeakTransform(
                 augmentation_seed=augmentation_seed, high=config.augmentation_crop_shift_high
+            )
+        elif config.augmentation_policy == "stagewise":
+            assert config.stagewise_switch_epoch is not None
+            assert config.stagewise_late_policy is not None
+            train_transform = EpochStagewiseAugmentationTransform(
+                augmentation_seed=augmentation_seed,
+                switch_epoch=config.stagewise_switch_epoch,
+                late_policy=config.stagewise_late_policy,
+                high=config.augmentation_crop_shift_high,
             )
         else:  # pragma: no cover - DatasetConfig rejects unknown literals
             raise ValueError(f"unsupported CIFAR augmentation policy: {config.augmentation_policy}")

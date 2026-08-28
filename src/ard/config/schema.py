@@ -253,8 +253,10 @@ class DatasetConfig(StrictModel):
     image_size: int = Field(default=32, ge=1)
     seed: int = 0
     content_sha256: str | None = None
-    augmentation_policy: Literal["canonical", "cropshift", "crop_re", "idbh_weak"] = "canonical"
+    augmentation_policy: Literal["canonical", "cropshift", "crop_re", "idbh_weak", "stagewise"] = "canonical"
     augmentation_crop_shift_high: int = Field(default=11, ge=1)
+    stagewise_switch_epoch: int | None = Field(default=None, ge=1, le=199)
+    stagewise_late_policy: Literal["crop_re", "idbh_weak"] | None = None
 
     @model_validator(mode="after")
     def validate_dataset(self) -> DatasetConfig:
@@ -267,6 +269,11 @@ class DatasetConfig(StrictModel):
             raise ValueError("tiny_imagenet requires an explicit root")
         if self.augmentation_policy != "canonical" and self.name not in {"cifar10", "cifar100"}:
             raise ValueError("non-canonical augmentation policies are currently defined only for CIFAR datasets")
+        if self.augmentation_policy == "stagewise":
+            if self.stagewise_switch_epoch is None or self.stagewise_late_policy is None:
+                raise ValueError("stagewise augmentation requires a switch epoch and late policy")
+        elif self.stagewise_switch_epoch is not None or self.stagewise_late_policy is not None:
+            raise ValueError("stagewise fields are valid only with augmentation_policy=stagewise")
         if self.content_sha256 is not None and (
             len(self.content_sha256) != 64
             or any(character not in "0123456789abcdef" for character in self.content_sha256)
