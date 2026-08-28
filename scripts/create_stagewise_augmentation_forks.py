@@ -22,6 +22,22 @@ from ard.tracking import stable_run_id
 from ard.tracking.adapter import collect_git_state
 
 PARENTS = {
+    (1, 50): Path(
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
+        "ert-rslad-single-switch-timing-v1/parents/seed1/s50/epoch-050.pt"
+    ),
+    (2, 50): Path(
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
+        "ert-rslad-single-switch-timing-v1/parents/seed2/s50/epoch-050.pt"
+    ),
+    (1, 75): Path(
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
+        "ert-rslad-single-switch-timing-v1/parents/seed1/s75/epoch-075.pt"
+    ),
+    (2, 75): Path(
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
+        "ert-rslad-single-switch-timing-v1/parents/seed2/s75/epoch-075.pt"
+    ),
     (1, 100): Path(
         "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
         "ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt"
@@ -38,6 +54,14 @@ PARENTS = {
         "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
         "ert-rslad-stagewise-v1/seed2/s150/epoch-150.pt"
     ),
+    (1, 125): Path(
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
+        "ert-rslad-single-switch-timing-v1/parents/seed1/s125/epoch-125.pt"
+    ),
+    (2, 125): Path(
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/"
+        "ert-rslad-single-switch-timing-v1/parents/seed2/s125/epoch-125.pt"
+    ),
 }
 
 
@@ -52,10 +76,11 @@ def sha256(path: Path) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, choices=(1, 2), required=True)
-    parser.add_argument("--switch", type=int, choices=(100, 150), required=True)
+    parser.add_argument("--switch", type=int, choices=(50, 75, 100, 125, 150), required=True)
     parser.add_argument("--late-policy", choices=("crop_re", "idbh_weak"), required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--parent", type=Path, default=None, help="override the registered parent path")
     return parser
 
 
@@ -73,7 +98,7 @@ def _atomic_save(payload: Mapping[str, object], path: Path) -> None:
 
 def main() -> int:
     args = build_parser().parse_args()
-    parent_path = PARENTS[(args.seed, args.switch)]
+    parent_path = (args.parent if args.parent is not None else PARENTS[(args.seed, args.switch)]).resolve()
     if not parent_path.is_file():
         raise FileNotFoundError(f"missing materialized parent: {parent_path}")
     parent = torch.load(parent_path, map_location="cpu", weights_only=False)

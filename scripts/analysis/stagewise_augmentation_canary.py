@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--switch", type=int, choices=(100, 150), required=True)
+    parser.add_argument("--switch", type=int, choices=(50, 75, 100, 125, 150), required=True)
     parser.add_argument("--late-policy", choices=("crop_re", "idbh_weak"), required=True)
     return parser
 

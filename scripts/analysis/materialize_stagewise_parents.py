@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Materialize exact LR-boundary parents from sparse CROPSHIFT checkpoints.
+"""Materialize exact single-switch parents from sparse CROPSHIFT checkpoints.
 
-This is a narrow, no-W&B continuation tool.  It runs only the missing
-CROPSHIFT epoch (98->99 for S100 or 148->149 for S150), preserving the full
-checkpoint state and original config hash.  It is intentionally not a general
-resume launcher: the source run, sparse checkpoint, target epoch, and output
-path are all explicit and verified.
+The source controls save sparse checkpoints at file labels 49, 99 and 149.
+This tool continues CROPSHIFT only until the checkpoint immediately before a
+requested switch (50, 75, 100, 125 or 150).  The full optimizer, scheduler,
+RNG, sampler and sample-state payload is restored; no W&B run is created.
 """
 
 from __future__ import annotations
@@ -46,6 +45,17 @@ RUNS = {
     ),
 }
 
+# A checkpoint file labelled ``N`` contains the state at the end of payload
+# epoch N-1.  Use the nearest earlier sparse control checkpoint and continue
+# with CROPSHIFT until payload epoch ``boundary - 1``.
+SOURCE_LABELS = {
+    50: 49,
+    75: 49,
+    100: 99,
+    125: 99,
+    150: 149,
+}
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -58,7 +68,7 @@ def sha256(path: Path) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, choices=(1, 2), required=True)
-    parser.add_argument("--boundary", type=int, choices=(100, 150), required=True)
+    parser.add_argument("--boundary", type=int, choices=tuple(SOURCE_LABELS), required=True)
     parser.add_argument("--device", default="cuda", choices=("cuda", "cpu"))
     parser.add_argument("--output-root", type=Path, required=True)
     return parser
@@ -68,7 +78,8 @@ def main() -> int:
     args = build_parser().parse_args()
     run_root = RUNS[args.seed]
     config_path = run_root / "run-bundle" / "resolved_config.yaml"
-    sparse = run_root / f"epoch-{args.boundary - 1:03d}.pt"
+    source_label = SOURCE_LABELS[args.boundary]
+    sparse = run_root / f"epoch-{source_label:03d}.pt"
     target_epoch = args.boundary - 1
     target_name = f"epoch-{args.boundary:03d}.pt"
     output_dir = args.output_root / f"seed{args.seed}" / f"s{args.boundary}"
@@ -78,19 +89,20 @@ def main() -> int:
         raise FileExistsError(f"refusing to overwrite materialized parent directory: {output_dir}")
 
     payload = torch.load(sparse, map_location="cpu", weights_only=False)
-    if not isinstance(payload, dict) or payload.get("epoch") != target_epoch - 1:
-        raise ValueError(f"sparse checkpoint must contain payload epoch {target_epoch - 1}")
+    expected_source_payload = source_label - 1
+    if not isinstance(payload, dict) or payload.get("epoch") != expected_source_payload:
+        raise ValueError(f"sparse checkpoint must contain payload epoch {expected_source_payload}")
     source_config = load_config(config_path)
     expected_config_hash = config_digest(resolved_config_dict(source_config))
     if payload.get("config_hash") != expected_config_hash:
         raise ValueError("source config hash does not match sparse checkpoint")
     if payload.get("world_size") != 1:
         raise ValueError("parent materialization requires the historical single-rank checkpoint")
-    expected_lr = 0.1 if args.boundary == 100 else 0.01
+    expected_lr = 0.1 if args.boundary <= 100 else 0.01
     actual_lr = float(payload["optimizer"]["param_groups"][0]["lr"])
     if abs(actual_lr - expected_lr) > 1e-12:
         raise ValueError(f"unexpected sparse parent LR: {actual_lr}")
-    if payload["scheduler"]["last_epoch"] != args.boundary - 1:
+    if payload["scheduler"]["last_epoch"] != source_label:
         raise ValueError("sparse parent scheduler boundary is inconsistent")
 
     config = source_config
@@ -173,8 +185,8 @@ def main() -> int:
         checkpoint_epochs=(args.boundary,),
     )
     state = trainer.resume(sparse, sampler=sampler)
-    if state.next_epoch != target_epoch:
-        raise ValueError(f"resume next epoch {state.next_epoch} != target epoch {target_epoch}")
+    if state.next_epoch != source_label:
+        raise ValueError(f"resume next epoch {state.next_epoch} != source epoch {source_label}")
     history = trainer.fit(
         loader,
         validation_loader=validation_loader,
