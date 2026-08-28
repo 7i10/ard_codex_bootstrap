@@ -43,6 +43,7 @@ class ProtocolConfig(StrictModel):
         "controlled_cifar10_r18_cropshift_v1",
         "controlled_cifar10_r18_crop_re_v1",
         "controlled_cifar10_r18_idbh_weak_v1",
+        "controlled_cifar10_r18_stagewise_augmentation_v1",
         "controlled_cifar10_r18_delayed_multistep_v1",
         "controlled_cifar10_r18_prescriptive_v3_v1",
         "controlled_cifar10_r18_pilot_v1",
