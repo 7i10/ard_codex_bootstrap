@@ -4,7 +4,7 @@
 
 - Owner: Codex root
 - Branch / base SHA: `master` / `9322eea50f4c5eed873b808beca48819d914d249`
-- Current milestone: M0 parent inventory and boundary audit
+- Current milestone: M4 eight registered continuations and endpoint evaluation
 - Last updated: 2026-08-28
 
 ## Goal
@@ -60,10 +60,10 @@ the authoritative bytes.
 
 ## Milestones
 
-- [ ] M0 parent inventory, scheduler/off-by-one audit, and source compatibility
-- [ ] M1 deterministic parent materialization and parity evidence
-- [ ] M2 stage-wise transform/config implementation and focused tests
-- [ ] M3 one-boundary canary on Hamster
+- [x] M0 parent inventory, scheduler/off-by-one audit, and source compatibility
+- [x] M1 deterministic parent materialization and parity evidence
+- [x] M2 stage-wise transform/config implementation and focused tests
+- [x] M3 one-boundary canary on Hamster
 - [ ] M4 eight registered continuations and endpoint evaluation
 - [ ] M5 hybrid/post-switch AUC, shock/recovery, promotion gates, and report
 - [ ] M6 consolidated scientific review, cohesive commit, and stop
@@ -98,6 +98,14 @@ review cycles for unchanged evidence.
   CROPSHIFT run bundles, scheduler `[100,150]`, and exact sparse checkpoint
   hashes. W&B relevant runs contain metrics/sample-state artifacts but no model
   artifacts. Exact S100/S150 parents still require deterministic materialization.
+
+- 2026-08-28: Materialized and SHA-verified exact S100/S150 parents for both
+  seeds. Implemented the stage-wise transform, protocol, configs, and fork
+  lineage; focused data/protocol tests passed. Four Hamster canaries (both
+  boundaries and both late policies) passed with correct next epoch/LR,
+  prefix identity, late activation, and finite resumed gradients. Production
+  source is frozen at `bb68afc0ff505248f84c0263179ec24f0b346bcd`; the eight-arm
+  preregistration is `docs/experiments/ert_rslad_stagewise_augmentation_v1.json`.
 
 ## Completion report
 

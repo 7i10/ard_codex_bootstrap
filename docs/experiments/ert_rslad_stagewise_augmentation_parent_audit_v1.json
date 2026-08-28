@@ -3,7 +3,7 @@
   "kind": "ert_rslad_stagewise_augmentation_parent_audit_v1",
   "status": "complete",
   "source_git_sha": "ffc217dd635462e1f14c93720561208db2d70254",
-  "current_git_sha": "9322eea50f4c5eed873b808beca48819d914d249",
+  "current_git_sha": "bb68afc0ff505248f84c0263179ec24f0b346bcd",
   "teacher": {
     "registry_id": "chen2021_ltd_wrn34_10",
     "checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
@@ -107,6 +107,6 @@
   "notes": [
     "W&B relevant runs use metrics_only retention and do not contain model artifacts.",
     "Checkpoint paths and SHA-256 values are verified from local run bundles; SHA is authoritative.",
-    "No production stage-wise continuation may start until all four target parents are materialized and parity-checked."
+    "All four target parents are materialized and parity-checked; production forks and canaries use source bb68afc0ff505248f84c0263179ec24f0b346bcd."
   ]
 }

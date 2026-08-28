@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_stagewise_augmentation_v1",
+  "status": "preregistered_production",
+  "source_git_sha": "bb68afc0ff505248f84c0263179ec24f0b346bcd",
+  "teacher": {
+    "registry_id": "chen2021_ltd_wrn34_10",
+    "checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+  },
+  "dataset": {
+    "name": "cifar10",
+    "train_root": "/home/shunsukenaito/workspace-local/datasets/ard/torchvision",
+    "split_seed": 20260722,
+    "validation_fraction": 0.1
+  },
+  "objective": "baseline_rslad_unchanged",
+  "training": {
+    "epochs": 200,
+    "attack": {
+      "loss": "kl",
+      "target": "teacher_clean",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 10,
+      "random_start": true,
+      "space": "pixel_[0,1]"
+    },
+    "scheduler": {
+      "id": "multistep",
+      "milestones": [100, 150],
+      "gamma": 0.1,
+      "step_at": "epoch_end"
+    },
+    "augmentation_prefix": "cropshift",
+    "late_policies": ["crop_re", "idbh_weak"],
+    "switch_boundaries": [100, 150],
+    "seeds": [1, 2]
+  },
+  "evaluation": {
+    "endpoint_attack": {
+      "loss": "ce",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 20,
+      "random_start": true,
+      "mode": "eval",
+      "space": "pixel_[0,1]",
+      "seed": 0
+    },
+    "reused_prefix_endpoints": {
+      "S100": [99],
+      "S150": [149]
+    },
+    "new_endpoints": {
+      "S100": [149, 199],
+      "S150": [199]
+    },
+    "official_test": false,
+    "autoattack": false
+  },
+  "arms": [
+    "r100-s1", "r100-s2", "i100-s1", "i100-s2",
+    "r150-s1", "r150-s2", "i150-s1", "i150-s2"
+  ],
+  "lineage": {
+    "parent_audit": "docs/experiments/ert_rslad_stagewise_augmentation_parent_audit_v1.json",
+    "parent_contract": "exact_materialized_cropshift_boundary_parent",
+    "fork_kind": "stagewise_augmentation_fork_v1",
+    "control": "historical_cropshift_seed1_seed2"
+  },
+  "promotion_gate": {
+    "final_ce_pgd20_delta_vs_cropshift_both_seeds": ">0",
+    "hybrid_auc_0_199_delta_vs_cropshift_both_seeds": ">=0",
+    "post_switch_auc_delta_vs_cropshift_both_seeds": ">0",
+    "clean_delta_floor_pp": ">=-1.0",
+    "throughput_degradation_floor": "<=10%"
+  },
+  "exclusions": [
+    "third_switch_point", "schedule_sweep", "gradual_ramp",
+    "new_augmentation", "new_seed", "history_intervention",
+    "state_aware_ordering", "official_cifar10_test", "autoattack",
+    "cleance", "a7", "teacher_adaptive_margin", "swa"
+  ],
+  "notes": [
+    "Switch 100 means the first late-policy minibatch is scientific epoch 100 after payload epoch 99 parent.",
+    "Switch 150 means the first late-policy minibatch is scientific epoch 150 after payload epoch 149 parent.",
+    "No endpoint result may be used to add a timing, tune a policy, or change a coefficient.",
+    "W&B is metrics-only; checkpoints and run bundles remain local."
+  ]
+}
