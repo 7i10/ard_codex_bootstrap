@@ -3,9 +3,9 @@
 ## Status
 
 - Owner: Codex root
-- Branch / base SHA: `master` / `9322eea50f4c5eed873b808beca48819d914d249`
-- Current milestone: M4 eight registered continuations and endpoint evaluation
-- Last updated: 2026-08-28
+- Branch / base SHA: `master` / `03e478db2d9415b6cb6706205d40d1e52a8a3977`
+- Current milestone: M6 complete; results recorded and stopped
+- Last updated: 2026-08-29
 
 ## Goal
 
@@ -64,9 +64,9 @@ the authoritative bytes.
 - [x] M1 deterministic parent materialization and parity evidence
 - [x] M2 stage-wise transform/config implementation and focused tests
 - [x] M3 one-boundary canary on Hamster
-- [ ] M4 eight registered continuations and endpoint evaluation
-- [ ] M5 hybrid/post-switch AUC, shock/recovery, promotion gates, and report
-- [ ] M6 consolidated scientific review, cohesive commit, and stop
+- [x] M4 eight registered continuations and endpoint evaluation
+- [x] M5 hybrid/post-switch AUC, shock/recovery, promotion gates, and report
+- [x] M6 consolidated scientific review, cohesive commit, and stop
 
 ## Agent and review budget
 
@@ -107,7 +107,42 @@ review cycles for unchanged evidence.
   source is frozen at `bb68afc0ff505248f84c0263179ec24f0b346bcd`; the eight-arm
   preregistration is `docs/experiments/ert_rslad_stagewise_augmentation_v1.json`.
 
+- 2026-08-29: Completed all eight Hamster continuations (R100/I100/R150/I150
+  × seeds 1/2) through canonical epoch 199. Independent CE-PGD20 endpoint
+  evaluation completed for all 24 scheduled train/validation endpoints. The
+  endpoint launcher had a shell `set -u` local-variable ordering defect; it was
+  corrected before endpoint execution and did not affect training artifacts.
+
+- 2026-08-29: Generated the hash-bound result artifact and report. The final
+  endpoint deltas are computed from independent CE-PGD20 endpoint values (not
+  dense trajectory metrics); dense `val_pgd_accuracy` deltas are retained only
+  for AUC and shock analysis. All four schedules pass the preregistered
+  descriptive gates in both seeds, so the protocol requires human review and
+  makes no automatic promotion; CROPSHIFT remains the incumbent pending that
+  review. No official test, AutoAttack, extra timing, or new training was run.
+
+- 2026-08-29: `ruff` and the focused config/intervention tests pass. The broad
+  `scripts/verify.py --changed` sweep was attempted; it still reports an
+  unrelated environment-sensitive CUDA RNG test failure in
+  `tests/unit/test_schedule_control_fork.py` (and had exposed two stale test
+  expectations, which were updated). This does not invalidate the completed
+  stage-wise result aggregation or endpoint artifacts.
+
 ## Completion report
 
-To be filled after M6 with commands, hashes, test results, review findings, and
-remaining uncertainty.
+- Source SHA for all eight production continuations: `bb68afc0ff505248f84c0263179ec24f0b346bcd`.
+- Result artifact: `docs/experiments/ert_rslad_stagewise_augmentation_results_v1.json`,
+  SHA-256 `d7ae5afce02792faf95c58e753d509c40a0ca19f8732d1bf829fe64ca0631faf`.
+- Human report: `docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`.
+- Independent endpoint attack identity:
+  `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`.
+- All schedules have positive final CE-PGD20 robustness deltas in both seeds:
+  R100 `+0.70/+0.84 pp`, I100 `+1.20/+1.04 pp`, R150 `+0.28/+0.64 pp`,
+  I150 `+0.76/+0.90 pp` (seeds 1/2). Full and post-switch AUC deltas are
+  positive for every schedule and seed, and no clean guardrail is violated.
+- Because four schedules qualify descriptively and the preregistration forbids
+  automatic promotion, the freeze decision is `human_review_required`; no
+  follow-up experiment was started.
+- Remaining uncertainty: two development seeds, internal validation only, no
+  official test or AutoAttack, and the broad verify sweep retains the unrelated
+  CUDA RNG test failure noted above.

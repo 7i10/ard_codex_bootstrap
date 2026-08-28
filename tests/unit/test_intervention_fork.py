@@ -746,7 +746,7 @@ def test_common_state_fork_rejects_parent_hash_drift_before_creating_outputs(tmp
     import yaml
 
     path.write_text(yaml.safe_dump(child), encoding="utf-8")
-    with pytest.raises(InterventionForkError, match="exactly the registered C/HS/RS/HD/RD"):
+    with pytest.raises(InterventionForkError, match="exactly one registered five-arm screen"):
         create_intervention_forks(
             parent_checkpoint=checkpoint,
             parent_resolved_config=parent_config,
