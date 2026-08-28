@@ -18,9 +18,9 @@ CONTROL_ROOT = ROOT / "ert-rslad-static-trajstab-v1"
 RUN_ROOT = ROOT / "ert-rslad-single-switch-timing-v1" / "runs"
 CONTROL = {1: CONTROL_ROOT / "cropshift-s1-r2", 2: CONTROL_ROOT / "cropshift-s2-r1"}
 CHILD = {
-    "I50": {1: "idbh-s50-s1-final", 2: "idbh-s50-s2-final"},
-    "I75": {1: "idbh-s75-s1-final", 2: "idbh-s75-s2-final"},
-    "I125": {1: "idbh-s125-s1-final", 2: "idbh-s125-s2-final"},
+    "I50": {1: "idbh-s50-s1-prod", 2: "idbh-s50-s2-prod"},
+    "I75": {1: "idbh-s75-s1-prod", 2: "idbh-s75-s2-prod"},
+    "I125": {1: "idbh-s125-s1-prod", 2: "idbh-s125-s2-prod"},
 }
 SWITCH = {"I50": 50, "I75": 75, "I125": 125}
 ENDPOINT_ATTACK = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
