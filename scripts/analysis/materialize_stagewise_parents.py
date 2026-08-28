@@ -12,16 +12,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import torch
+import yaml
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 from ard.attacks import LinfPGD
 from ard.cli.train import _build_method, _seed_everything
 from ard.config import load_config
-from ard.config.loader import resolved_config_dict
 from ard.data import (
     EpochShuffleSampler,
     build_train_validation_views,
@@ -29,7 +30,7 @@ from ard.data import (
     data_loader_generator,
     seed_data_loader_worker,
 )
-from ard.engine import Trainer, config_digest
+from ard.engine import Trainer
 from ard.models import build_student, build_teacher
 from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
@@ -65,6 +66,21 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def historical_config_hash(path: Path) -> str:
+    """Hash the saved resolved mapping exactly as the historical run did."""
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("resolved source config must be a mapping")
+    canonical = deepcopy(raw)
+    tracking = canonical.get("tracking")
+    if isinstance(tracking, dict):
+        # This is the post-hoc operational-retention exception already used by
+        # the checkpoint loader; it is not part of trajectory identity.
+        tracking.pop("artifact_retention", None)
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), default=str).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, choices=(1, 2), required=True)
@@ -93,7 +109,7 @@ def main() -> int:
     if not isinstance(payload, dict) or payload.get("epoch") != expected_source_payload:
         raise ValueError(f"sparse checkpoint must contain payload epoch {expected_source_payload}")
     source_config = load_config(config_path)
-    expected_config_hash = config_digest(resolved_config_dict(source_config))
+    expected_config_hash = historical_config_hash(config_path)
     if payload.get("config_hash") != expected_config_hash:
         raise ValueError("source config hash does not match sparse checkpoint")
     if payload.get("world_size") != 1:
