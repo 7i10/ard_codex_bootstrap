@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_static_augmentation_family_screen",
+  "status": "complete",
+  "training_source": {
+    "seed1_git_sha": "63bfe7b68c03034d3b760bdb0c460c3928682995",
+    "seed2_git_sha": "cabc125ad1c2773d6cd67197a65e05cd0836f883",
+    "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+    "external_upstream": {
+      "da_alone_improves_at": "38b740aeffe5933c16869a126c6972ef443a8352",
+      "torchvision": "0.26.0+cu128"
+    }
+  },
+  "dataset": {
+    "name": "cifar10",
+    "scope": "controlled_train_45000_validation_5000",
+    "split_seed": 20260722,
+    "validation_row_count": 5000
+  },
+  "attack": {
+    "training": {"loss": "kl", "target": "teacher_clean", "epsilon": "8/255", "step_size": "2/255", "steps": 10, "random_start": true},
+    "endpoint": {"loss": "ce", "epsilon": "8/255", "step_size": "2/255", "steps": 20, "random_start": true, "input_domain": "pixel_0_1", "identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"}
+  },
+  "incumbent": {
+    "arm": "CROPSHIFT",
+    "source_record": "docs/experiments/ert_rslad_static_trajectory_stabilization_results_v1.json",
+    "trajectory": {
+      "seed1": {"auc": 0.5146025125628138, "best_robust": 0.594, "last_robust": 0.593, "last_clean": 0.8626, "late_mean_150_199": 0.589564, "mean_100_199": 0.579456, "median_images_per_second": 623.2502255201904},
+      "seed2": {"auc": 0.5144663316582911, "best_robust": 0.595, "last_robust": 0.5912, "last_clean": 0.863, "late_mean_150_199": 0.590272, "mean_100_199": 0.579792, "median_images_per_second": 622.4541283621589}
+    },
+    "endpoint": {
+      "seed1": {"49": {"clean": 0.7698, "robust": 0.468}, "99": {"clean": 0.7846, "robust": 0.4916}, "149": {"clean": 0.8464, "robust": 0.5706}, "199": {"clean": 0.8612, "robust": 0.594}},
+      "seed2": {"49": {"clean": 0.7626, "robust": 0.4752}, "99": {"clean": 0.7808, "robust": 0.456}, "149": {"clean": 0.8512, "robust": 0.5762}, "199": {"clean": 0.8622, "robust": 0.5926}}
+    }
+  },
+  "candidates": {
+    "CROP_RE": {
+      "policy": "CROPSHIFT + torchvision RandomErasing defaults p=0.5 scale=(0.02,0.33) ratio=(0.3,3.3) value=0",
+      "runs": {
+        "seed1": {"run_id": "ert-rslad-augfamily-crop-re-s1-20260828", "protocol_id": "controlled_cifar10_r18_crop_re_v1", "config_hash": "d338a7f3904cad7b29ba468c2f4c8e25cc2ba177dcf0774e914ab957b005d69c", "git_sha": "63bfe7b68c03034d3b760bdb0c460c3928682995", "metrics_sha256": "b88ac80b2ef13c14df728971d8bec088dab396208fadfde6c673394138a73851", "sample_stats_sha256": "2052ae621986be9029eeccba952b67300a0cdc5118b61261fe71f5628df62dec", "trajectory": {"rows": 200, "auc": 0.5095140703517591, "best_epoch_0based": 198, "best_robust": 0.604, "last_robust": 0.6016, "last_clean": 0.8604, "robust_overfit_gap": 0.0024, "late_mean_150_199": 0.595248, "mean_100_199": 0.579894, "mean_120_199": 0.585825, "slope_120_199": 0.0005016690107829347, "clean_auc": 0.787791959798995, "clean_late_mean_150_199": 0.858172, "median_images_per_second": 638.0725110172649}},
+        "seed2": {"run_id": "ert-rslad-augfamily-crop-re-s2-20260828", "protocol_id": "controlled_cifar10_r18_crop_re_v1", "config_hash": "7151a7d094c047626bfff87b00f0d2aa211334e5d3c2bd3d8a625fbf0917ba64", "git_sha": "cabc125ad1c2773d6cd67197a65e05cd0836f883", "metrics_sha256": "6109c84c0bbbe134e3d2946f1096782171d2df3e7400ac95c32380aa41d34521", "sample_stats_sha256": "40086ac2ee44c1852c4bf5f7a587e9b2c0bc7a43a91b1669f40260f4040d5e62", "trajectory": {"rows": 200, "auc": 0.5065266331658292, "best_epoch_0based": 196, "best_robust": 0.6012, "last_robust": 0.5992, "last_clean": 0.8568, "robust_overfit_gap": 0.002, "late_mean_150_199": 0.59116, "mean_100_199": 0.577008, "mean_120_199": 0.5826, "slope_120_199": 0.0004817768401312704, "clean_auc": 0.7862442211055273, "clean_late_mean_150_199": 0.855636, "median_images_per_second": 634.5622822250369}}
+      },
+      "endpoint": {
+        "seed1": {"49": {"clean": 0.7452, "robust": 0.4618, "checkpoint_sha256": "2b6f02778f24609ee121d017a9dd404a9c6393b9dfa9f2304f1b90b5d7f7f183", "rows_sha256": "c61c06e5d753e517870f233977d1cc2fa2b07d2ec18229daa260af958c4e54fa"}, "99": {"clean": 0.7704, "robust": 0.4784, "checkpoint_sha256": "772225208934c0707f82e215f5da9ff946cb684c369ea428eee0478121a6cdca", "rows_sha256": "4c8ef97a13891fde21c8f4239273067a80e97e9c945d3f78f3eaaf597aa4d669"}, "149": {"clean": 0.8482, "robust": 0.578, "checkpoint_sha256": "ea878086594fa36d17981e0e761ac600dc7e71608010c7f31b9a8895af7a615c", "rows_sha256": "ad0540faa1a40b2dd63549e85518996b081e47a6ddd9063d386f47d731ed72b8"}, "199": {"clean": 0.8622, "robust": 0.604, "checkpoint_sha256": "2ada861e4d207108d6a59a96726997d90cf02292a7cb004f99fe13a3844ccba2", "rows_sha256": "7056e2cdced309c15619f9255fd986c9b79c95196fdc0d07dbb822cc010d9e9f"}},
+        "seed2": {"49": {"clean": 0.735, "robust": 0.4592, "checkpoint_sha256": "1398376bdf8fe2670df6bc0cf485016a5ec6910a05867903d4a7a3561bb51eb4", "rows_sha256": "698229c6a3ee8462652c6960397d611185018fe6a3c916e22a167f315d7dbf1e"}, "99": {"clean": 0.7708, "robust": 0.4766, "checkpoint_sha256": "c4a71aab1937835cb3bde5251fd4a6dde1925ac2e97d0b9b1bce2e1f7e205859", "rows_sha256": "57ee643c6159e8d54275e4dd1322462a37fb04139eda7bd7bd0fabb8c0300048"}, "149": {"clean": 0.8408, "robust": 0.5754, "checkpoint_sha256": "13a770e06d1e189e0e38a49f04c47df42322cf2be423bc5be9d2400b06ffee88", "rows_sha256": "03146e90f928218fd67c1fa55f326e711d556303e8ba7ae780ed3f7690bfdfd1"}, "199": {"clean": 0.8622, "robust": 0.5986, "checkpoint_sha256": "1b1d830331ad21ad8600b5d6e8919b0f88eca5b3d6a948822ae791cbb8ee6214", "rows_sha256": "afe5eed1d56fe3900e4301519d583fa1f51f8d2fc13b83467175aa78adbc613f"}}
+      }
+    },
+    "IDBH_WEAK": {
+      "policy": "CROPSHIFT + upstream ColorShape('color') + the same RandomErasing",
+      "runs": {
+        "seed1": {"run_id": "ert-rslad-augfamily-idbh-weak-s1-20260828", "protocol_id": "controlled_cifar10_r18_idbh_weak_v1", "config_hash": "6941ffe6d40c55b03556bb29e73ebfa2d1cbae5cf0332d797a7a5fbc7c865885", "git_sha": "63bfe7b68c03034d3b760bdb0c460c3928682995", "metrics_sha256": "af71aa1790ead5faae250075bbaa5058822c7937d6fe35bf38603553b217ecda", "sample_stats_sha256": "3fcab2ac4da9d31c5e9030e65b5c68873f484b456259d8ea054d25c406c738df", "trajectory": {"rows": 200, "auc": 0.50903216080402, "best_epoch_0based": 193, "best_robust": 0.6054, "last_robust": 0.6004, "last_clean": 0.8614, "robust_overfit_gap": 0.005, "late_mean_150_199": 0.598272, "mean_100_199": 0.58138, "mean_120_199": 0.5877525, "slope_120_199": 0.0005597913736521337, "clean_auc": 0.7846653266331661, "clean_late_mean_150_199": 0.857336, "median_images_per_second": 622.1472026465184}},
+        "seed2": {"run_id": "ert-rslad-augfamily-idbh-weak-s2-20260828", "protocol_id": "controlled_cifar10_r18_idbh_weak_v1", "config_hash": "dc5e82b2763c6f453b37b99122a1afed88090670b142cfbb912bf1f76d6bfc56", "git_sha": "cabc125ad1c2773d6cd67197a65e05cd0836f883", "metrics_sha256": "b8c24602ef725cf98105be5cda6d5bcf5bfc61fa50de921d2b01770c77753d38", "sample_stats_sha256": "9f74330424529860a46c21298cda73c376cb6fc471eaeccfb8f50216b453d501", "trajectory": {"rows": 200, "auc": 0.508120100502513, "best_epoch_0based": 195, "best_robust": 0.5996, "last_robust": 0.5988, "last_clean": 0.8634, "robust_overfit_gap": 0.0008, "late_mean_150_199": 0.595184, "mean_100_199": 0.579138, "mean_120_199": 0.5853125, "slope_120_199": 0.0005113900609470232, "clean_auc": 0.7863246231155776, "clean_late_mean_150_199": 0.855788, "median_images_per_second": 621.5693744847788}}
+      },
+      "endpoint": {
+        "seed1": {"49": {"clean": 0.7214, "robust": 0.4456, "checkpoint_sha256": "62314f185e2542433beb8b6344b3a9ca1ca3ef714a3fb2fd35656b8fa041051a", "rows_sha256": "635e92b74f31068d94177c58a2d8490a8dc02e8baac0843afe9eae67f217de39"}, "99": {"clean": 0.7562, "robust": 0.4604, "checkpoint_sha256": "d417a69816bbdb7bea1ebb591bff9636607b65c3d4917173b5e38546c1cd4d9e", "rows_sha256": "28ae05cdc47a7bc09cfcb5923e8e79f899c6d0975be37b6de6af209eb16a43cd"}, "149": {"clean": 0.846, "robust": 0.5786, "checkpoint_sha256": "a6577da4e235a3e0861dfa5f6678c6426058883075df77ab93c8ede8eccbd92a", "rows_sha256": "c3fb00d6036bb4d6753cb1b65fa37c4148af0f2e5388607b6b63417c5d98f6c5"}, "199": {"clean": 0.8616, "robust": 0.6052, "checkpoint_sha256": "759e9c2273915f316a1e4c12caac70c06027435e1c437fca6618cf81497f0ad7", "rows_sha256": "c184f309b5986bf5d26dd103fe6ab666694542d49b717499554a0f156eb67863"}},
+        "seed2": {"49": {"clean": 0.7176, "robust": 0.4424, "checkpoint_sha256": "aa0f3e62b5044d93746fc6d6bb31be1d7b01e57b7f41da3812bfc07144617c25", "rows_sha256": "2ddf97c20c46870d2c33fc8cfbd6e5e56e4afc86421a097a8f41368cf265a6b4"}, "99": {"clean": 0.7548, "robust": 0.4606, "checkpoint_sha256": "451767f8d0b25472d13438c0b20023821e0793425a199c8f6003dfc23f34d673", "rows_sha256": "0843445c9ed894caf2157e4e42aa64c0028bab67f22accc3a4396add0e83f34f"}, "149": {"clean": 0.842, "robust": 0.5712, "checkpoint_sha256": "8f63cfb5de9b42b22651f0b4f05a3b4fe924ba5e43256fe63d6f71c0c4267e98", "rows_sha256": "6b519948b7cab6424079fd79995e36ba385b49d024ef9d0e280e2dce60b46a62"}, "199": {"clean": 0.8616, "robust": 0.5972, "checkpoint_sha256": "cfef830af44967202d1f894a18f540268e0ed747e96052f49e9fa37e692eb928", "rows_sha256": "7a151eea2b7be419a7abe061d6305ad641e141d9ff1e35f9626acc40caa3588b"}}
+      }
+    }
+  },
+  "promotion_gate": {
+    "rule": "both seeds final robust delta > 0 and both seeds normalized trajectory AUC delta >= 0; clean drop > 1pp blocks automatic promotion",
+    "CROP_RE": {"final_robust_pass": true, "auc_pass": false, "auc_delta_pp": {"seed1": -0.5088442211054645, "seed2": -0.79396984924619}, "clean_guardrail_triggered": false, "decision": "not_promoted"},
+    "IDBH_WEAK": {"final_robust_pass": true, "auc_pass": false, "auc_delta_pp": {"seed1": -0.5570351758793723, "seed2": -0.6346231155778148}, "clean_guardrail_triggered": false, "decision": "not_promoted"},
+    "incumbent": "CROPSHIFT"
+  },
+  "limitations": [
+    "Two training seeds; descriptive rather than population inference.",
+    "Internal held-out validation only; no official test or AutoAttack.",
+    "No cross-run sample-level paired treatment effect against the incumbent is claimed in this bundle.",
+    "Seed-1 and seed-2 manifests differ by a plan-only Git commit; no scientific code changed."
+  ],
+  "automatic_follow_up": false
+}

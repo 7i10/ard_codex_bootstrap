@@ -55,11 +55,11 @@ pinned upstream reference is TreeLLi/DA-Alone-Improves-AT
 - [x] M1 implement CROP_RE/IDBH_WEAK policies, protocol IDs, and configs.
 - [x] M2 run focused data/config tests and the existing CROPSHIFT canary.
 - [x] M3 run bounded distribution/RNG canary and freeze audit artifacts.
-- [~] M4 launch four fresh full Hamster trajectories (CROP_RE/IDBH_WEAK ×
+- [x] M4 launch four fresh full Hamster trajectories (CROP_RE/IDBH_WEAK ×
   seeds 1/2), with metrics-only W&B and checkpoints 49/99/149/199.
-- [ ] M5 run 16 independent validation CE-PGD20 endpoints and aggregate
+- [x] M5 run 16 independent validation CE-PGD20 endpoints and aggregate
   trajectory/AUC, incremental, clean, RO, sample, and throughput metrics.
-- [ ] M6 apply the frozen promotion tree, write the report/artifacts, review,
+- [x] M6 apply the frozen promotion tree, write the report/artifacts, review,
   commit, and stop.
 
 ## Agent and review budget
@@ -102,11 +102,18 @@ aggregation; no per-run reviewers.
   independence checks passed, and the frozen CROPSHIFT canary hashes matched.
 - 2026-08-28: after the production source was frozen at `63bfe7b`, launched
   CROP_RE seed 1 on Hamster GPU0 and IDBH_WEAK seed 1 on GPU1 as persistent
-  metrics-only W&B services; seed 2 will follow on each GPU after its seed-1
-  service completes.
+  metrics-only W&B services, followed by seed 2 on the same GPUs. All four
+  200-epoch trajectories completed; seed-2 manifests record `cabc125` because
+  the only intervening change was this plan's progress update.
+- 2026-08-28: all 16 independent validation CE-PGD20 endpoints completed after
+  correcting the runtime dataset path and explicitly assigning the remaining
+  endpoint jobs to Hamster GPUs 0/1. All endpoints have 5,000 rows and the
+  frozen attack identity.
 
 ## Completion report
 
-M3 is complete and the audit JSON is frozen before production. M4 is in
-progress; M5–M6 remain pending. Production services are pinned to
-`63bfe7b` and use local checkpoints with no model/run-bundle W&B uploads.
+M3–M6 are complete. Both candidates improve final held-out robust accuracy in
+both seeds but have negative whole-trajectory AUC increments, so the frozen
+promotion tree retains CROPSHIFT and starts no automatic follow-up. Production
+and endpoint outputs remain local; W&B was metrics-only with no model or
+run-bundle uploads.
