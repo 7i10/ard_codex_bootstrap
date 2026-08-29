@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "kind": "ert_rslad_runtime_compile_screen_v2",
+  "host": "hamster",
+  "benchmark_script_sha256": "6291d8971b6efcc1ce60b0e9af221f6679649e41624eefe619809cbbf68ce127",
+  "baseline_images_per_second": 679.0681147660731,
+  "checkpoint_sha256": "e517354323db0ba1097607939ce360efe20c522419dee15cc13b897a0b70db99",
+  "modes": [
+    {"mode": "default", "compile_seconds": 0.7341222281102091, "images_per_second": 527.3045204337583, "delta_percent": -22.34880287150497, "output_sha256": "3ea5feae4a39ededa80d48f458e7edc202a29b338cfc92fadecf48e58005d3c5", "decision": "reject"},
+    {"mode": "reduce-overhead", "compile_seconds": 0.7344415278639644, "images_per_second": 532.1390319518159, "delta_percent": -21.63686964817537, "output_sha256": "4c26d66b7a5bea4804a690c78766b07d57353d55b9d0d8d57620d66e8ceac398", "decision": "reject"},
+    {"mode": "max-autotune-no-cudagraphs", "compile_seconds": 0.7396161819342524, "images_per_second": 524.0248681280463, "delta_percent": -22.831766543984543, "output_sha256": "ac43d600286fedfbd380bf91bdaba8fccbd8333ef1883ce270e1009f31c421c3", "decision": "reject"},
+    {"mode": "max-autotune", "compile_seconds": 0.750325288856402, "images_per_second": 530.6682623490657, "delta_percent": -21.853456109940982, "output_sha256": "1b7e80c583302e2460d17928b80fe12b88433062c98ea0262d6b10ec6ea72c50", "decision": "reject"}
+  ],
+  "graph_break_log": {
+    "output_sha256": "33a347fd1a7c29fd9d627a38756211d751a69a4a7fd45b9df2f63728e3bab56c",
+    "graph_break_line_count": 6,
+    "recompile_line_count": 5,
+    "causes": ["data-dependent pixel validation branch in ard.models.registry", "requires_grad guard changes between PGD and outer forwards"]
+  },
+  "break_even": "not_applicable_compiled_path_is_slower"
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": 2,
+  "kind": "ert_rslad_runtime_host_audit_v2",
+  "source_git_sha_at_audit_start": "5c87e705925ef1bb2e6600ee01e33034d0cd63da",
+  "snapshot_policy": "single_initial_snapshot_no_active_polling",
+  "hosts": {
+    "hamster": {
+      "hostname": "islab-WS-C621E-SAGE-Series",
+      "gpu_count": 2,
+      "gpu_model": "NVIDIA GeForce RTX 4090",
+      "driver": "595.84",
+      "cuda_runtime": "12.8",
+      "gpu_topology": "GPU0/GPU1 NODE; both PCIe Gen3 x16",
+      "cpu": "Intel Xeon Gold 6230R",
+      "sockets": 1,
+      "logical_cpus": 52,
+      "numa_nodes": 1,
+      "ram_gib": 251,
+      "torch_threads": "26 intra-op / 26 inter-op (observed)",
+      "filesystem": "root NVMe ext4; approximately 23 GiB free, 100% reported use",
+      "training_process_at_snapshot": false
+    },
+    "ferret": {
+      "hostname": "islab-3gpu",
+      "gpu_count": 3,
+      "gpu_model": "NVIDIA GeForce RTX 4090",
+      "driver": "595.84",
+      "cuda_runtime": "12.8",
+      "gpu_topology": "GPU0/GPU1 NODE; GPU2 SYS; GPU2 PCIe Gen3 x16",
+      "cpu": "Intel Xeon Gold 6230R",
+      "sockets": 2,
+      "logical_cpus": 104,
+      "numa_nodes": 2,
+      "ram_gib": 251,
+      "torch_threads": "52 intra-op / 52 inter-op (observed)",
+      "filesystem": "approximately 878 GiB free at snapshot",
+      "training_process_at_snapshot": true,
+      "protected_process": "I75 seed1 continuation on GPU2",
+      "benchmark_status": "deferred_due_to_active_production_gpu2"
+    }
+  },
+  "software_parity": {
+    "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+    "torch": "2.11.0+cu128",
+    "torchvision": "0.26.0+cu128",
+    "cudnn": "91900",
+    "nvidia_driver": "595.84",
+    "result": "matched_observed_stack"
+  },
+  "classification": {
+    "ferret_gap": "H9 mixed_or_unresolved",
+    "evidence": ["host topology/NUMA differs", "Ferret controlled benchmark was correctly deferred", "historical host labels are incomplete"],
+    "not_established": ["GPU compute is the sole cause", "filesystem is the sole cause", "software environment mismatch"]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "kind": "ert_rslad_runtime_final_bundle_v2",
+  "scientific_protocol_changed": false,
+  "scientific_semantics_expected_identical": true,
+  "runtime_only_change": true,
+  "production_adoption": "none",
+  "safe_speedup_percent": 0.0,
+  "largest_retained_candidate_speedup_percent": 0.0,
+  "rejected_candidates": ["pin_memory_non_blocking_persistent_workers", "workers8", "torch.compile all tested modes"],
+  "deferred": ["Ferret controlled benchmark", "sync-removal end-to-end candidate", "PGD-region compile", "Teacher compile", "channels_last/cuDNN benchmark"],
+  "reason": "No measured low-risk candidate reached the 5% retention threshold; compile was slower and failed strict parity; active Ferret production prevented clean host comparison",
+  "final_bundle_benchmark_sha256": null,
+  "source_git_sha_at_audit_start": "5c87e705925ef1bb2e6600ee01e33034d0cd63da",
+  "benchmark_checkpoint_sha256": "e517354323db0ba1097607939ce360efe20c522419dee15cc13b897a0b70db99"
+}

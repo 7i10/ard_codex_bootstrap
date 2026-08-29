@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "kind": "ert_rslad_runtime_baseline_profile_v2",
+  "source_git_sha_at_audit_start": "5c87e705925ef1bb2e6600ee01e33034d0cd63da",
+  "benchmark_script_sha256": "6291d8971b6efcc1ce60b0e9af221f6679649e41624eefe619809cbbf68ce127",
+  "host": "hamster",
+  "gpu": "CUDA_VISIBLE_DEVICES=1, RTX 4090",
+  "workload": "real resolved idbh-s50-s1-prod config; Chen teacher; CIFAR-10 train view; RSLAD; KL-PGD10",
+  "benchmark_output_sha256": {
+    "eager_workers4": "0d8ab706174b5c8fe59a8011f6065cfc3cf78c5cf169fdd2fcf0589f33553574",
+    "eager_workers0": "8066e03d374f4d5b87b23f8a127d170ef0eecc62bdbde4e8c4bbaa35be168d42",
+    "eager_workers8_current_config": "6cb470968fd6fcf584648c131cc8cb64cf9de5a7cc866ad29a0ab70825f06396"
+  },
+  "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-single-switch-timing-v1/runs/idbh-s50-s1-prod/last.pt",
+  "checkpoint_sha256": "e517354323db0ba1097607939ce360efe20c522419dee15cc13b897a0b70db99",
+  "steady_state": {
+    "workers4_images_per_second": 681.5243755118414,
+    "workers4_batch_seconds": 0.18781426548957825,
+    "workers8_current_config_images_per_second": 679.0681147660731,
+    "workers8_current_config_batch_seconds": 0.18849360942840576,
+    "workers0_images_per_second": 540.8348596976175,
+    "workers0_batch_seconds": 0.23667113482952118,
+    "workers0_delta_percent": -20.356316555383323,
+    "workers4_segment_median_seconds": {
+      "data": 0.0018680528737604618,
+      "h2d": 0.0005697219166904688,
+      "teacher_clean": 0.0371171310544014,
+      "pgd10": 0.0825464129447937,
+      "teacher_adv": 0.03713330999016762,
+      "outer": 0.028544975444674492
+    },
+    "workers8_current_config_segment_median_seconds": {
+      "data": 0.001975612947717309,
+      "h2d": 0.0005542149301618338,
+      "teacher_clean": 0.03713710233569145,
+      "pgd10": 0.08300933241844177,
+      "teacher_adv": 0.037139393389225006,
+      "outer": 0.028701413422822952
+    },
+    "workers0_segment_median_seconds": {
+      "data": 0.049964528530836105,
+      "h2d": 0.0004045730456709862,
+      "teacher_clean": 0.037154000252485275,
+      "pgd10": 0.08408073335886002,
+      "teacher_adv": 0.037116169929504395,
+      "outer": 0.028891433030366898
+    }
+  },
+  "segment_share_of_workers4_total_percent": {
+    "data": 0.9946277876661714,
+    "h2d": 0.30334326053740707,
+    "teacher_clean": 19.76267934581413,
+    "pgd10": 43.9510879163618,
+    "teacher_adv": 19.771293673231725,
+    "outer": 15.198512940572368
+  },
+  "interpretation": "PGD10 is the largest measured segment; data wait becomes dominant only with workers=0."
+}

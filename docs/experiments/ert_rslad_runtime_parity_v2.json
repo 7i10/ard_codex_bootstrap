@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "kind": "ert_rslad_runtime_parity_v2",
+  "host": "hamster",
+  "parity_script_sha256": "1ac3eeb2522833452643bdeb8119d497ac0261a3fadf6bd9b0aec3f0d879fb5d",
+  "tolerances": {"teacher_clean": 1e-6, "adversarial": 1e-5, "adversarial_logits": 1e-4, "clean_logits": 1e-4, "loss": 1e-5, "parameters": 1e-4, "gradients": 1e-3},
+  "checks": [
+    {"candidate": "default", "pass": false, "output_sha256": "292a8575d5d8f052fbdf691fc70b7fddb7e7e0d61f99246e4d70e71548973ac2", "max_abs_diff": {"adversarial": 0.0627451241016388, "adversarial_logits": 0.07670813798904419, "clean_logits": 0.000574946403503418, "loss": 0.00011718273162841797, "parameters": 0.0011855699121952057, "gradients": 0.01185570191591978}},
+    {"candidate": "reduce-overhead", "pass": false, "output_sha256": "2c197d7cdccafc8591276d5197e35e0bea6bfc76817e230557e41e10af9e6f70", "same_divergence_as": "default"}
+  ],
+  "decision": "reject_all_compile_candidates; compiled model changes the trajectory-sensitive one-step result beyond strict tolerances"
+}

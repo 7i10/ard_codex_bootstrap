@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "kind": "ert_rslad_runtime_host_scheduling_v2",
+  "measurement_basis": "historical production rows plus Hamster controlled benchmark; Ferret controlled benchmark deferred",
+  "profiles": {
+    "hamster": {"gpus": 2, "per_gpu_images_per_second": 679.0681147660731, "aggregate_images_per_second": 1358.1362295321462, "four_worker_reference_images_per_second": 681.5243755118414, "estimated_200_epoch_hours_at_current_config_ips": 3.68, "historical_production_estimate_hours_at_620_ips": 4.03},
+    "ferret_historical": {"gpus": 3, "per_gpu_images_per_second_range": [360.0, 370.0], "aggregate_images_per_second_range": [1080.0, 1110.0], "estimated_200_epoch_hours_range": [6.76, 6.95], "host_control_status": "deferred"}
+  },
+  "historical_rows": {
+    "hamster_known_or_expected": {"base_s1": 635.24, "base_s2": 636.76, "cropshift_s1": 623.25, "cropshift_s2": 622.45, "single_switch_i50_s1": 632.67, "single_switch_i50_s2": 617.82},
+    "ferret_known_or_expected": {"single_switch_i75_s2": 364.64, "single_switch_i125_s1": 364.17, "single_switch_i125_s2": 373.73},
+    "host_provenance_caveat": "some historical manifests omit host; values are not treated as a clean cross-host causal benchmark"
+  },
+  "recommendation": {
+    "long_jobs": "Hamster first (fastest measured per GPU)",
+    "short_or_independent_jobs": "Ferret GPUs after active GPU2 job exits",
+    "assignment": "longest-processing-time-first with host-specific measured estimates",
+    "do_not_change": ["batch size", "precision", "PGD contract", "objective", "RNG", "sample order"]
+  }
+}

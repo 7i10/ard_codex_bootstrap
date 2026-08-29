@@ -1,0 +1,37 @@
+{
+  "schema_version": 2,
+  "kind": "ert_rslad_runtime_lowrisk_screen_v2",
+  "host": "hamster",
+  "benchmark_script_sha256": "6291d8971b6efcc1ce60b0e9af221f6679649e41624eefe619809cbbf68ce127",
+  "baseline": {
+    "candidate": "eager_workers8_unpinned_current_config",
+    "images_per_second": 679.0681147660731,
+    "output_sha256": "6cb470968fd6fcf584648c131cc8cb64cf9de5a7cc866ad29a0ab70825f06396",
+    "checkpoint_sha256": "e517354323db0ba1097607939ce360efe20c522419dee15cc13b897a0b70db99",
+    "comparison_reference_workers4_images_per_second": 681.5243755118414
+  },
+  "candidates": [
+    {
+      "candidate": "pin_memory_non_blocking_persistent_workers4",
+      "images_per_second": 682.9317435133711,
+      "delta_percent": 0.5689604125543424,
+      "output_sha256": "d1c04e59c789b241346bf1beec307099fd2db63fbb96482da3dafff08972f28d",
+      "decision": "reject_no_speedup"
+    },
+    {
+      "candidate": "pin_memory_non_blocking_persistent_workers8",
+      "images_per_second": 680.3142324880318,
+      "delta_percent": 0.18350408373806193,
+      "output_sha256": "84edf511458c923299428929452577bd9bd640bda3e8c281db68cf70b25c0b0d",
+      "decision": "reject_no_speedup_and_more_workers"
+    },
+    {
+      "candidate": "workers0",
+      "images_per_second": 540.8348596976175,
+      "delta_percent": -20.356316555383323,
+      "output_sha256": "8066e03d374f4d5b87b23f8a127d170ef0eecc62bdbde4e8c4bbaa35be168d42",
+      "decision": "reject_data_bottleneck"
+    }
+  ],
+  "retention_rule": "no_candidate_reaches_5_percent_speedup; production settings unchanged"
+}
