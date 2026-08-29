@@ -9,7 +9,13 @@
   "benchmark_output_sha256": {
     "eager_workers4": "0d8ab706174b5c8fe59a8011f6065cfc3cf78c5cf169fdd2fcf0589f33553574",
     "eager_workers0": "8066e03d374f4d5b87b23f8a127d170ef0eecc62bdbde4e8c4bbaa35be168d42",
-    "eager_workers8_current_config": "6cb470968fd6fcf584648c131cc8cb64cf9de5a7cc866ad29a0ab70825f06396"
+    "eager_workers8_current_config": "6cb470968fd6fcf584648c131cc8cb64cf9de5a7cc866ad29a0ab70825f06396",
+    "ferret_gpu0_eager_workers8": "d623d96ecc60c5bdb2af88ab10ef26cf46d7a48ee29be9c8c60ef09faff76309",
+    "ferret_gpu1_eager_workers8": "fa059c2ff2af405aefdc9531bbc5d6ea3a257bab4b0080283074de681abed21c",
+    "ferret_gpu2_eager_workers8": "336577c77e7a5a46fc24922d6a4d6395683cca769759a1ab5423af73c0a26717",
+    "ferret_gpu2_numa1_eager_workers8": "995bb774994c45ab1a8078efdde237e881d93efcf6b2d7a8856a7fc00480bb66",
+    "ferret_gpu2_numa1_pinned_workers4": "9bb71f4e90b16d764e981e429fa2d6c85c3198a5ea8408561ed39c41506aabf5",
+    "ferret_gpu0_numa0_eager_workers8": "afda07fae728d1d3fdb97cb6ba3dfb31dabda90db2a5a9e7f6d449d8ee1f96de"
   },
   "checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-single-switch-timing-v1/runs/idbh-s50-s1-prod/last.pt",
   "checkpoint_sha256": "e517354323db0ba1097607939ce360efe20c522419dee15cc13b897a0b70db99",
@@ -55,4 +61,23 @@
     "outer": 15.198512940572368
   },
   "interpretation": "PGD10 is the largest measured segment; data wait becomes dominant only with workers=0."
+  ,"ferret_controlled": {
+    "host": "islab-3gpu",
+    "source_git_sha": "f364ed420e730562c7b5857232099b8fbabbb9b8",
+    "remote_repo_head_before_overlay": "4dd6d9aa36e6bec45a095c48f613b38dc3dcc6ba",
+    "benchmark_script_sha256": "6291d8971b6efcc1ce60b0e9af221f6679649e41624eefe619809cbbf68ce127",
+    "config_sha256": "643b0d61077e7fc28168e117b154d0b2bc6e3ac3088bdf492a01b78075640af5",
+    "remote_execution_config_sha256": "57ddf1da38be3906b8d6a62d08ec1d673508b5eed90f5bec7af78013f497f1c5",
+    "checkpoint_sha256": "e517354323db0ba1097607939ce360efe20c522419dee15cc13b897a0b70db99",
+    "attack_and_workload": "same eager runtime_benchmark_v2, current config, workers=8, 4 warmup + 32 measured batches",
+    "single_gpu": {
+      "gpu0": {"images_per_second": 599.6503287351414, "median_batch_seconds": 0.21345773339271545, "segment_median_seconds": {"data": 0.002351494040340185, "h2d": 0.0010269328486174345, "outer": 0.03347240760922432, "pgd10": 0.10398824512958527, "teacher_adv": 0.03685438632965088, "teacher_clean": 0.03684481233358383}},
+      "gpu1": {"images_per_second": 607.0534631603726, "median_batch_seconds": 0.21085457503795624, "segment_median_seconds": {"data": 0.0024739110376685858, "h2d": 0.0010489870328456163, "outer": 0.032664354890584946, "pgd10": 0.1024770438671112, "teacher_adv": 0.035439394414424896, "teacher_clean": 0.03563417121767998}},
+      "gpu2": {"images_per_second": 375.9519268054977, "median_batch_seconds": 0.3404690623283386, "segment_median_seconds": {"data": 0.00470840185880661, "h2d": 0.001409783959388733, "outer": 0.04988238587975502, "pgd10": 0.21109819412231445, "teacher_adv": 0.0363151915371418, "teacher_clean": 0.03630007058382034}},
+      "gpu2_numa1": {"images_per_second": 424.99009216368705, "median_batch_seconds": 0.3011834919452667, "segment_median_seconds": {"data": 0.004595212172716856, "h2d": 0.00123453582637012, "outer": 0.04389309883117676, "pgd10": 0.17992112040519714, "teacher_adv": 0.03601667284965515, "teacher_clean": 0.035974327474832535}},
+      "gpu2_numa1_pinned_workers4": {"images_per_second": 429.75273330322875, "median_batch_seconds": 0.2978456914424896, "segment_median_seconds": {"data": 0.0007151849567890167, "h2d": 0.0011536919046193361, "outer": 0.04355793446302414, "pgd10": 0.18011070787906647, "teacher_adv": 0.03593868762254715, "teacher_clean": 0.03589501604437828}},
+      "gpu0_numa0": {"images_per_second": 421.27281030632406, "median_batch_seconds": 0.30384111404418945, "segment_median_seconds": {"data": 0.004616646096110344, "h2d": 0.0012277141213417053, "outer": 0.04341191053390503, "pgd10": 0.17976893484592438, "teacher_adv": 0.03737368434667587, "teacher_clean": 0.03733738139271736}}
+    },
+    "conclusion": "Ferret GPU0/1 are 11-12% below Hamster; GPU2 is 44.6% below Hamster and its PGD10 segment is 2.54x Hamster. NUMA1 binding improves GPU2 by 13.0% but does not remove the gap."
+  }
 }

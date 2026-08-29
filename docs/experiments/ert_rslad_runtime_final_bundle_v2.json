@@ -8,9 +8,24 @@
   "safe_speedup_percent": 0.0,
   "largest_retained_candidate_speedup_percent": 0.0,
   "rejected_candidates": ["pin_memory_non_blocking_persistent_workers", "workers8", "torch.compile all tested modes"],
-  "deferred": ["Ferret controlled benchmark", "sync-removal end-to-end candidate", "PGD-region compile", "Teacher compile", "channels_last/cuDNN benchmark"],
-  "reason": "No measured low-risk candidate reached the 5% retention threshold; compile was slower and failed strict parity; active Ferret production prevented clean host comparison",
+  "deferred": ["sync-removal end-to-end candidate", "PGD-region compile", "Teacher compile", "channels_last/cuDNN benchmark"],
+  "reason": "No measured low-risk candidate reached the 5% retention threshold; compile was slower and failed strict parity. A follow-up idle-Ferret benchmark resolved the host/GPU topology dependence but did not produce a safe production speedup.",
   "final_bundle_benchmark_sha256": null,
+  "ferret_controlled_benchmark": {
+    "source_git_sha": "f364ed420e730562c7b5857232099b8fbabbb9b8",
+    "remote_repo_head_before_overlay": "4dd6d9aa36e6bec45a095c48f613b38dc3dcc6ba",
+    "benchmark_script_sha256": "6291d8971b6efcc1ce60b0e9af221f6679649e41624eefe619809cbbf68ce127",
+    "config_sha256": "643b0d61077e7fc28168e117b154d0b2bc6e3ac3088bdf492a01b78075640af5",
+    "remote_execution_config_sha256": "57ddf1da38be3906b8d6a62d08ec1d673508b5eed90f5bec7af78013f497f1c5",
+    "outputs": {
+      "gpu0": "d623d96ecc60c5bdb2af88ab10ef26cf46d7a48ee29be9c8c60ef09faff76309",
+      "gpu1": "fa059c2ff2af405aefdc9531bbc5d6ea3a257bab4b0080283074de681abed21c",
+      "gpu2": "336577c77e7a5a46fc24922d6a4d6395683cca769759a1ab5423af73c0a26717",
+      "gpu2_numa1": "995bb774994c45ab1a8078efdde237e881d93efcf6b2d7a8856a7fc00480bb66",
+      "gpu2_numa1_workers4_pinned": "9bb71f4e90b16d764e981e429fa2d6c85c3198a5ea8408561ed39c41506aabf5"
+    },
+    "decision": "host-aware scheduling; no production runtime change"
+  },
   "source_git_sha_at_audit_start": "5c87e705925ef1bb2e6600ee01e33034d0cd63da",
   "benchmark_checkpoint_sha256": "e517354323db0ba1097607939ce360efe20c522419dee15cc13b897a0b70db99"
 }

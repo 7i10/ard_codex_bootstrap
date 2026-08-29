@@ -1,9 +1,8 @@
 # ERT / RSLAD Runtime Performance Audit v2
 
-Status: complete for the safe Hamster benchmark scope. Ferret's controlled
-benchmark is intentionally deferred because GPU2 was running an unrelated
-production continuation. No production process, environment, checkpoint, or
-W&B run was changed.
+Status: complete for the Hamster benchmark and the follow-up idle-Ferret
+controlled benchmark. No production process, environment, checkpoint, or W&B
+run was changed.
 
 ## Executive decision
 
@@ -20,8 +19,13 @@ W&B run was changed.
   this trajectory-sensitive project.
 - No runtime production code was changed. The safe speedup adopted today is
   **0%**; the correct operational action is host-aware scheduling.
-- Ferret's slowdown remains **H9 mixed/unresolved** until a clean, controlled
-  Ferret benchmark can be run after the protected GPU2 job exits.
+- Ferret is not uniformly slow: GPU0/1 measured 599.7/607.1 images/s, while
+  GPU2 measured 376.0 images/s under the same workload. GPU2's `SYS`/NUMA
+  topology is therefore the dominant operational factor in the historical
+  Ferret slowdown, although it is not proven to be the only low-level cause.
+- CPU/memory binding to GPU2's NUMA node improved it to 425.0 images/s
+  (+13.0%); the four-worker pinned variant reached 429.8 images/s. This is
+  scheduling guidance, not a production code change.
 
 ## Reconciliation and protected production
 
@@ -30,9 +34,10 @@ The active timing campaign used a separate pinned checkout at
 `8083f9c5df9b46a3a02399fbf293ceee6db85083`; it was not modified.
 
 The initial one-time snapshot found Hamster idle and Ferret GPU2 occupied by
-the I75 seed-1 continuation. Ferret GPU0/GPU1 were not used for host-wide
-benchmarks because CPU, RAM, filesystem, PCIe, and power resources are shared.
-No repeated completion polling was performed.
+the I75 seed-1 continuation. Ferret was benchmarked only after the user
+reported that its GPUs were free; the follow-up used one GPU per invocation
+and no active training/evaluation process was present. No repeated completion
+polling was performed.
 
 ## Host and software audit
 
@@ -60,25 +65,33 @@ cross-host causal comparison) were approximately:
 | Fresh I50 rows (host known from campaign context) | 632.67 / 617.82 |
 | Ferret I75/I125 rows (host known from campaign context) | 364.64 / 364.17 / 373.73 |
 
+Controlled follow-up on idle Ferret (same eager harness, workers=8): GPU0
+`599.65`, GPU1 `607.05`, GPU2 `375.95` images/s. Binding GPU2 to NUMA1
+reached `424.99` images/s; NUMA1 plus pinned four workers reached `429.75`.
+
 Using the conservative historical rates and 45,000 training samples per epoch,
 200 epochs are about 4.0 h on a 620 img/s Hamster GPU and 6.8–6.9 h on a
 360–370 img/s Ferret GPU. The bounded harness rate (681.5 img/s) corresponds to
 about 3.7 h and should be treated as an upper-bound microbenchmark, not a
-production ETA.
+production ETA. The controlled follow-up refines the Ferret estimate to about
+4.8--4.9 h on GPU0/1 and 7.8 h on unbound GPU2 (about 6.8 h with NUMA1
+binding).
 
 Recommended policy:
 
 1. Assign the longest sequential jobs to Hamster first.
-2. Use Ferret for independent shorter jobs, endpoint evaluations, and
-   materialization after GPU2 is clean.
-3. Greedily schedule by measured host-specific duration (longest-processing-
-   time first); do not change batch size, precision, attack, objective, RNG,
-   or sample order to equalize hosts.
+2. Use Ferret GPU0/1 for independent medium jobs and endpoint evaluations.
+3. Use Ferret GPU2 for short jobs, or bind CPU/memory to NUMA1 when a longer
+   job must run there; do not treat all three Ferret GPUs as equivalent.
+4. Greedily schedule by measured host- and GPU-specific duration
+   (longest-processing-time-first); do not change batch size, precision, attack,
+   objective, RNG, or sample order to equalize hosts.
 
 At the current-config measured rate, two Hamster GPUs provide about 1,358 img/s aggregate
 (the four-worker comparison is 1,363 img/s),
-while three historical Ferret GPUs provide about 1,080–1,110 img/s. Ferret
-still matters for parallel makespan; it should not simply be left unused.
+while three controlled Ferret single-GPU measurements sum to about 1,583 img/s
+before contention. This sum is not a concurrent scaling guarantee, but it
+shows that Ferret GPU0/1 can materially reduce makespan for independent jobs.
 
 ## Bounded workload profile
 
@@ -107,6 +120,31 @@ PGD10 is the largest measured segment. With workers disabled, data wait rises
 to 0.049965 s and total batch time to 0.237113 s; the other segments remain
 nearly unchanged. This explains the roughly 20.5% end-to-end loss without attributing
 the Ferret gap to DataLoader alone.
+
+### Controlled Ferret segment profile
+
+The same real checkpoint (`e5173543...`), resolved configuration, benchmark
+script, eager candidate, eight workers, four warmup batches, and 32 measured
+batches were used on each idle Ferret GPU. The current source files were
+hash-verified into a temporary overlay (`f364ed4...`); the remote checkout's
+pre-existing HEAD was `4dd6d9a...` and was not modified. The core segment
+medians were:
+
+| device | img/s | batch s | data | PGD10 | teacher clean | teacher adv | outer |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Ferret GPU0 | 599.65 | 0.2135 | 0.00235 | 0.10399 | 0.03684 | 0.03685 | 0.03347 |
+| Ferret GPU1 | 607.05 | 0.2109 | 0.00247 | 0.10248 | 0.03563 | 0.03544 | 0.03266 |
+| Ferret GPU2 | 375.95 | 0.3405 | 0.00471 | 0.21110 | 0.03630 | 0.03632 | 0.04988 |
+| GPU2, NUMA1 bound | 424.99 | 0.3012 | 0.00460 | 0.17992 | 0.03597 | 0.03602 | 0.04389 |
+| GPU2, NUMA1 + pinned w4 | 429.75 | 0.2978 | 0.00072 | 0.18011 | 0.03590 | 0.03594 | 0.04356 |
+
+Hamster's current-config reference is 679.1 img/s. Thus GPU0/1 are 10.6--
+11.7% slower, while unbound GPU2 is 44.6% slower. GPU2's PGD10 segment is
+2.54x Hamster's 0.0830 s; the Teacher segments are nearly unchanged. This
+identifies GPU2's `SYS`/NUMA path as the dominant operational factor in the
+historical Ferret slowdown. NUMA1 binding improves GPU2 by 13.0% but does not
+remove the gap. Binding GPU0 to NUMA0 was not stable (421.3 img/s in this
+bounded run), so no global NUMA option is adopted.
 
 ## Low-risk screen
 
@@ -179,11 +217,14 @@ Hamster bottleneck made additional speculative screens lower-value.
 
 ## Decisions and limitations
 
-This audit classifies the Hamster/Ferret gap as **H9 mixed/unresolved**. The
-software stack is matched; the observed Ferret topology/NUMA arrangement and
-historical host-local throughput make hardware/CPU-launch interaction plausible,
-but only an idle-host Ferret benchmark can distinguish H1/H3/H5/H8. The
-protected production run is not a valid benchmark baseline.
+This audit classifies the gap as **host- and GPU-topology-dependent, with the
+single low-level cause unresolved**. The matched software stack and controlled
+results rule out a simple host-wide software mismatch. GPU2's `SYS`/NUMA
+placement and isolated PGD10/outer slowdown explain why historical Ferret rows
+cluster around 360--370 img/s. GPU0/1 remain moderately slower than Hamster,
+so a host-level difference also exists. The benchmark does not prove whether
+PCIe/NUMA traffic, clock/power behavior, or another kernel-launch interaction
+is the ultimate cause, and no production optimization is claimed.
 
 No official test, AutoAttack, training continuation, W&B upload, model upload,
 or run-bundle upload was performed. The benchmark scripts are analysis-only;
@@ -201,6 +242,6 @@ Machine records:
 - [`final bundle decision`](experiments/ert_rslad_runtime_final_bundle_v2.json)
 
 The benchmark JSON hashes and raw `/tmp` output hashes are recorded in those
-machine records. No candidate is promoted automatically. A future Ferret
-audit should reuse the same harness and contract once GPU2 has naturally
-finished; until then no active waiting is required.
+machine records. No candidate is promoted automatically. The runtime audit is
+now closed; future work should use the GPU-specific scheduling policy rather
+than wait for another benchmark.

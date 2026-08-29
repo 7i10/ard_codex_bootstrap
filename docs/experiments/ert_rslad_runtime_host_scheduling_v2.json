@@ -1,10 +1,17 @@
 {
   "schema_version": 2,
   "kind": "ert_rslad_runtime_host_scheduling_v2",
-  "measurement_basis": "historical production rows plus Hamster controlled benchmark; Ferret controlled benchmark deferred",
+  "measurement_basis": "historical production rows plus controlled single-GPU benchmarks on Hamster and idle Ferret",
   "profiles": {
     "hamster": {"gpus": 2, "per_gpu_images_per_second": 679.0681147660731, "aggregate_images_per_second": 1358.1362295321462, "four_worker_reference_images_per_second": 681.5243755118414, "estimated_200_epoch_hours_at_current_config_ips": 3.68, "historical_production_estimate_hours_at_620_ips": 4.03},
-    "ferret_historical": {"gpus": 3, "per_gpu_images_per_second_range": [360.0, 370.0], "aggregate_images_per_second_range": [1080.0, 1110.0], "estimated_200_epoch_hours_range": [6.76, 6.95], "host_control_status": "deferred"}
+    "ferret_historical": {"gpus": 3, "per_gpu_images_per_second_range": [360.0, 370.0], "aggregate_images_per_second_range": [1080.0, 1110.0], "estimated_200_epoch_hours_range": [6.76, 6.95], "host_control_status": "superseded_by_controlled_measurement"},
+    "ferret_controlled": {
+      "gpus": 3,
+      "per_gpu_images_per_second": {"gpu0": 599.6503287351414, "gpu1": 607.0534631603726, "gpu2": 375.9519268054977, "gpu2_numa1": 424.99009216368705, "gpu2_numa1_workers4_pinned": 429.75273330322875},
+      "relative_to_hamster_current_config_percent": {"gpu0": -11.694843, "gpu1": -10.604273, "gpu2": -44.6408, "gpu2_numa1": -37.4182, "gpu2_numa1_workers4_pinned": -36.7162},
+      "estimated_200_epoch_hours_single_gpu": {"gpu0": 4.87, "gpu1": 4.81, "gpu2": 7.75, "gpu2_numa1": 6.86, "gpu2_numa1_workers4_pinned": 6.78},
+      "interpretation": "GPU0/1 are moderately slower than Hamster; GPU2 is substantially slower and is the dominant explanation for historical Ferret 360-370 img/s rows."
+    }
   },
   "historical_rows": {
     "hamster_known_or_expected": {"base_s1": 635.24, "base_s2": 636.76, "cropshift_s1": 623.25, "cropshift_s2": 622.45, "single_switch_i50_s1": 632.67, "single_switch_i50_s2": 617.82},
@@ -13,8 +20,8 @@
   },
   "recommendation": {
     "long_jobs": "Hamster first (fastest measured per GPU)",
-    "short_or_independent_jobs": "Ferret GPUs after active GPU2 job exits",
-    "assignment": "longest-processing-time-first with host-specific measured estimates",
+    "short_or_independent_jobs": "Ferret GPU0/1 after idle check; use GPU2 for short jobs or bind CPU/memory to NUMA1 when appropriate",
+    "assignment": "longest-processing-time-first with host- and GPU-specific measured estimates; avoid assigning the longest job to Ferret GPU2",
     "do_not_change": ["batch size", "precision", "PGD contract", "objective", "RNG", "sample order"]
   }
 }

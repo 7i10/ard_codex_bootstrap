@@ -36,7 +36,24 @@
       "filesystem": "approximately 878 GiB free at snapshot",
       "training_process_at_snapshot": true,
       "protected_process": "I75 seed1 continuation on GPU2",
-      "benchmark_status": "deferred_due_to_active_production_gpu2"
+      "benchmark_status": "completed_after_user_reported_gpu2_idle",
+      "controlled_benchmark": {
+        "source_git_sha": "f364ed420e730562c7b5857232099b8fbabbb9b8",
+        "remote_repo_head_before_overlay": "4dd6d9aa36e6bec45a095c48f613b38dc3dcc6ba",
+        "benchmark_script_sha256": "6291d8971b6efcc1ce60b0e9af221f6679649e41624eefe619809cbbf68ce127",
+        "config_sha256": "643b0d61077e7fc28168e117b154d0b2bc6e3ac3088bdf492a01b78075640af5",
+        "remote_execution_config_sha256": "57ddf1da38be3906b8d6a62d08ec1d673508b5eed90f5bec7af78013f497f1c5",
+        "checkpoint_sha256": "e517354323db0ba1097607939ce360efe20c522419dee15cc13b897a0b70db99",
+        "contract": "eager, workers=8, 4 warmup batches, 32 measured batches, same real checkpoint/config; one GPU per invocation",
+        "images_per_second": {"gpu0": 599.6503287351414, "gpu1": 607.0534631603726, "gpu2": 375.9519268054977, "gpu2_numa1": 424.99009216368705, "gpu2_numa1_workers4_pinned": 429.75273330322875},
+        "output_sha256": {
+          "gpu0": "d623d96ecc60c5bdb2af88ab10ef26cf46d7a48ee29be9c8c60ef09faff76309",
+          "gpu1": "fa059c2ff2af405aefdc9531bbc5d6ea3a257bab4b0080283074de681abed21c",
+          "gpu2": "336577c77e7a5a46fc24922d6a4d6395683cca769759a1ab5423af73c0a26717",
+          "gpu2_numa1": "995bb774994c45ab1a8078efdde237e881d93efcf6b2d7a8856a7fc00480bb66",
+          "gpu2_numa1_workers4_pinned": "9bb71f4e90b16d764e981e429fa2d6c85c3198a5ea8408561ed39c41506aabf5"
+        }
+      }
     }
   },
   "software_parity": {
@@ -48,8 +65,8 @@
     "result": "matched_observed_stack"
   },
   "classification": {
-    "ferret_gap": "H9 mixed_or_unresolved",
-    "evidence": ["host topology/NUMA differs", "Ferret controlled benchmark was correctly deferred", "historical host labels are incomplete"],
-    "not_established": ["GPU compute is the sole cause", "filesystem is the sole cause", "software environment mismatch"]
+    "ferret_gap": "host_and_gpu_topology_dependent; single_root_cause_unresolved",
+    "evidence": ["Ferret GPU0/1 controlled rate is 599.7/607.1 img/s versus Hamster 679.1 img/s", "Ferret GPU2 controlled rate is 376.0 img/s and matches historical 360-370 img/s rows", "GPU2 is SYS-connected to GPU0/1 and NUMA1-bound; NUMA1 binding improves it to 425.0 img/s", "historical host labels are incomplete"],
+    "not_established": ["GPU compute is the sole cause", "filesystem is the sole cause", "software environment mismatch", "NUMA binding alone explains all of the GPU2 deficit"]
   }
 }

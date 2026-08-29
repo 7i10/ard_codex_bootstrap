@@ -4,7 +4,7 @@
 
 - Owner: root
 - Branch / base SHA: `master` / `5c87e705925ef1bb2e6600ee01e33034d0cd63da`
-- Current milestone: M4 complete for the safe Hamster scope; Ferret controlled benchmark deferred
+- Current milestone: M5 complete; controlled Ferret benchmark and host-specific scheduling closed
 - Last updated: 2026-08-29
 
 ## Goal
@@ -27,8 +27,9 @@ any host-wide benchmark that could contaminate it.
 
 - Repository HEAD is `5c87e70`; active timing production uses pinned source
   `8083f9c5df9b46a3a02399fbf293ceee6db85083` in a separate runtime checkout.
-- Ferret GPU2 currently runs the I75 seed-1 continuation. Ferret GPU0/GPU1
-  are idle, but host-wide stress benchmarks remain prohibited until it exits.
+- The initial protected snapshot found Ferret GPU2 running the I75 seed-1
+  continuation. After the user reported all Ferret GPUs idle, a bounded
+  one-GPU-at-a-time benchmark was run; no production process was touched.
 - Hamster has no active training/evaluation process in the initial snapshot and
   may run a bounded benchmark on an isolated GPU.
 - Historical production rows show approximately 620–630 images/s on Hamster
@@ -45,8 +46,10 @@ Any adopted change requires explicit host-local parity evidence.
 
 - Use one initial process/GPU snapshot only; do not actively poll the Ferret
   production run.
-- Record Ferret controlled benchmark as deferred while GPU2 is active.
-- Run only bounded Hamster benchmarks while Hamster is confirmed idle.
+- Record the initial Ferret deferral, then run the controlled benchmark only
+  after the user-confirmed idle state.
+- Run bounded single-GPU benchmarks only while the selected host/GPU is idle;
+  never benchmark concurrently with a protected production process.
 - Treat per-batch CUDA scalar extraction (`float(...cpu())` in training totals)
   and PGD `max_abs_delta` extraction as synchronization candidates to measure,
   not remove speculatively.
@@ -63,6 +66,8 @@ Any adopted change requires explicit host-local parity evidence.
 - [x] M3 — Host-local parity checks and candidate acceptance/rejection.
 - [x] M4 — Final runtime/scheduling report and optional review-ready runtime
   change (no automatic adoption).
+- [x] M5 — Idle-Ferret GPU0/GPU1/GPU2 benchmark, NUMA diagnostic, and
+  GPU-specific scheduling update.
 
 ### M1 files and acceptance
 
@@ -100,8 +105,8 @@ stable; do not spawn per-candidate reviewers.
 - Cached: existing changed-test gate for unaffected source.
 - New: benchmark script `--help`, Python import/compile, JSON parse, and
   read-only static checks.
-- GPU-bound: bounded Hamster benchmark only while idle.
-- Deferred: Ferret controlled benchmark until production GPU2 exits.
+- GPU-bound: bounded Hamster and idle-Ferret single-GPU benchmarks only.
+- Completed: Ferret controlled benchmark after the user-confirmed idle state.
 
 ## Risks and mitigations
 
@@ -135,12 +140,18 @@ stable; do not spawn per-candidate reviewers.
   or per-sample history overhead.
 - 2026-08-29: Added hash-bound host, profile, low-risk, compile, parity,
   scheduling, and final-decision artifacts plus the human-facing audit report.
-  No production runtime change was adopted; Ferret remains deferred while GPU2
-  is active.
+  No production runtime change was adopted; Ferret GPU-specific scheduling is
+  now recorded.
+- 2026-08-29: After Ferret became idle, ran the same real-checkpoint eager
+  benchmark on GPU0/1/2. GPU0/1 reached 599.65/607.05 img/s; GPU2 reached
+  375.95 img/s. NUMA1 binding raised GPU2 to 424.99 img/s and pinned
+  four-worker NUMA1 reached 429.75 img/s. GPU2's PGD10 segment was the main
+  slowdown; no production runtime setting was changed.
 
 ## Completion report
 
-M1–M4 are complete for the permitted scope. Ferret benchmark remains
-explicitly deferred until the active GPU2 production run is complete; no
-completion polling is performed by this agent. The next Ferret measurement, if
-needed, should reuse the committed benchmark scripts and fixed contracts.
+M1–M5 are complete for the permitted scope. The controlled Ferret measurement
+closed the prior host-gap uncertainty sufficiently for scheduling: Ferret
+GPU0/1 are moderately slower than Hamster, while GPU2 is substantially slower
+and benefits from NUMA1 binding. No production runtime candidate was promoted;
+future jobs should use the GPU-specific longest-processing-time-first policy.
