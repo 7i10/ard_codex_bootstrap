@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_unseen_confirmation_orchestration_audit_v1",
+  "status": "partial_pre_completion_audit",
+  "scope": "ERT/RSLAD unseen-seed confirmation and full-training stochasticity campaign",
+  "scientific_runs_untouched": true,
+  "collection_policy": {
+    "source": "Codex-visible history, existing manifests/logs/commits and already recorded preflight data",
+    "new_polling": false,
+    "new_job_status_queries": false,
+    "production_intervention": false,
+    "unknown_value": "unknown"
+  },
+  "source": {
+    "git_sha_at_audit": "48edebc",
+    "git_sha_note": "bounded CropShift prefix protocol and registry-derived fork overrides; source was frozen before production launch",
+    "seed_registry": "docs/experiments/ert_rslad_unseen_seed_confirmation_registry_v1.json",
+    "plan": "docs/plans/0063-ert-rslad-unseen-confirmation-stochasticity.md"
+  },
+  "campaign": {
+    "confirmation_bundles": ["confirm-a", "confirm-b", "confirm-c"],
+    "arms": ["BASE", "CROP_PREFIX", "CROP_SUFFIX", "I100_SUFFIX"],
+    "intended_dag": "CROP_PREFIX -> {CROP_SUFFIX, I100_SUFFIX}",
+    "production_status_at_audit": "running (per user instruction; not queried by this audit)",
+    "completion_status": "unknown"
+  },
+  "preflight": [
+    {
+      "timestamp": "2026-08-29T07:27:59.547509+00:00",
+      "event_type": "preflight",
+      "run_id": "unseen-smoke-a-pilot5-r2",
+      "hostname": "Ferret",
+      "gpu_index": 0,
+      "detail": "Ferret preparation manifest recorded 3 idle RTX 4090 devices, pinned Python, dataset and Chen teacher cache available.",
+      "evidence_source": "Ferret preparation manifest"
+    },
+    {
+      "timestamp": "unknown",
+      "event_type": "preflight",
+      "run_id": null,
+      "hostname": "Hamster",
+      "gpu_index": null,
+      "detail": "Two idle RTX 4090 devices, linger=yes, approximately 23 GB free disk were recorded before campaign work.",
+      "evidence_source": "existing environment preflight record"
+    }
+  ],
+  "seed_and_source_events": [
+    {
+      "timestamp": "unknown",
+      "event_type": "seed_registry_frozen",
+      "run_id": null,
+      "seed_bundle": "confirm-a/confirm-b/confirm-c",
+      "detail": "Component seeds were derived before outcomes and committed in the registry.",
+      "evidence_source": "583d2ac / seed registry JSON"
+    },
+    {
+      "timestamp": "unknown",
+      "event_type": "source_frozen",
+      "run_id": null,
+      "source_sha": "48edebc",
+      "detail": "Bounded prefix protocol and fork override support were committed and pushed before production launch.",
+      "evidence_source": "git commit 48edebc"
+    }
+  ],
+  "technical_retries": [
+    {
+      "retry_number": 1,
+      "run_id": "unseen-smoke-a",
+      "failure_reason": "wrong Python absolute path on Ferret",
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": false,
+      "corrective_action": "use the pinned Ferret environment path",
+      "classification": "host-specific / operator error",
+      "evidence_source": "Codex-visible launch record"
+    },
+    {
+      "retry_number": 2,
+      "run_id": "unseen-smoke-a-retry",
+      "failure_reason": "ARD_SEED was not supplied; strict config expansion failed",
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": false,
+      "corrective_action": "supply the frozen model-init seed environment",
+      "classification": "orchestration contract omission",
+      "evidence_source": "Codex-visible launch record"
+    },
+    {
+      "retry_number": 3,
+      "run_id": "unseen-smoke-a-retry2",
+      "failure_reason": "production protocol correctly rejected training.epochs=1",
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": false,
+      "corrective_action": "switch to a bounded pilot smoke protocol",
+      "classification": "scientific-contract safeguard working as intended",
+      "evidence_source": "config validation output"
+    },
+    {
+      "retry_number": 4,
+      "run_id": "unseen-smoke-a-pilot5",
+      "failure_reason": "pilot protocol correctly rejected training.epochs=1",
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": false,
+      "corrective_action": "use the registered five-epoch pilot protocol",
+      "classification": "scientific-contract safeguard working as intended",
+      "evidence_source": "config validation output"
+    },
+    {
+      "retry_number": 5,
+      "run_id": "unseen-smoke-a-pilot5",
+      "failure_reason": "Ferret data/teacher paths used the Hamster namespace",
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": false,
+      "corrective_action": "use Ferret-resolved /home/shunsukenaito paths",
+      "classification": "host-specific path mismatch",
+      "evidence_source": "teacher registry mismatch output"
+    },
+    {
+      "retry_number": 6,
+      "run_id": "unseen-smoke-a-pilot5-r2",
+      "failure_reason": null,
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": true,
+      "corrective_action": "none; smoke reached finite epoch-0 metrics and checkpoint creation",
+      "classification": "bounded launch verification passed",
+      "evidence_source": "epoch-metrics.jsonl, output checkpoint and W&B initialization"
+    }
+  ],
+  "stable_launch_audit": {
+    "smoke_run_id": "unseen-smoke-a-pilot5-r2",
+    "stable_time": "unknown",
+    "criteria": {
+      "process_alive": true,
+      "source_config_seed_verified": true,
+      "gpu_assigned": true,
+      "teacher_data_initialized": true,
+      "finite_batches": true,
+      "wandb_initialized": true,
+      "output_writable": true
+    },
+    "note": "This was a bounded smoke only; its completion is not a production completion signal. The later cancellation manifest update was incomplete because the remote shell lacked a command named python; the named smoke process was nevertheless terminated by its process group."
+  },
+  "gpu_allocation": {
+    "planned_roles": {
+      "BASE": "longest jobs; host assignment to be recorded from production manifests",
+      "CROP_PREFIX": "one prefix per confirmation bundle",
+      "CROP_SUFFIX": "dependent child after exact epoch-99 parent",
+      "I100_SUFFIX": "dependent child after exact epoch-99 parent",
+      "endpoint_evaluation": "separate post-training process"
+    },
+    "production_jobs": "unknown; do not query while jobs are running",
+    "measured_reference": {
+      "Hamster": "approximately 679 images/s on prior runtime audit",
+      "Ferret_GPU0_GPU1": "approximately 600 images/s on prior runtime audit",
+      "Ferret_GPU2": "approximately 425 images/s on prior runtime audit"
+    },
+    "per_gpu_production_throughput": "unknown",
+    "avoidable_idle_periods": "unknown"
+  },
+  "dag_audit": {
+    "parent_ready_times": "unknown",
+    "child_launch_times": "unknown",
+    "parent_to_child_delays": "unknown",
+    "child_launch_mechanism": "unknown",
+    "dependency_success": "unknown",
+    "note": "No new status query was made for this audit. The registry and plan define the intended dependency DAG; observed completion-marker use is deferred until a later non-invasive collection turn."
+  },
+  "codex_monitoring_audit": {
+    "source_scope": "current Codex-visible turn history",
+    "counts": {
+      "necessary_preflight": 1,
+      "bounded_launch_verification": 1,
+      "anomaly_investigation": 2,
+      "completion_polling": 0,
+      "new_checks_for_this_audit": 0
+    },
+    "known_checks": [
+      "Ferret preflight",
+      "bounded smoke status/log inspection",
+      "named smoke cancellation attempt",
+      "one direct process-group verification used to safely terminate the named smoke after the helper rejected a symlink-resolved cwd"
+    ],
+    "stable_after_routine_polling": "unknown",
+    "note": "Counts are best-effort and not reconstructed from a complete shell audit log; no timestamp is invented."
+  },
+  "completion_marker_audit": {
+    "marker_path": "unknown",
+    "producer": "unknown",
+    "consumer": "unknown",
+    "expected_semantics": "parent is ready only after exact checkpoint, manifest, hash and completion marker are present",
+    "observed_success": "unknown",
+    "missed_or_delayed_child": "unknown"
+  },
+  "postmortem_classification": [
+    {
+      "issue": "Ferret-specific Python/data/teacher path resolution",
+      "classification": "reusable skill should solve + host-specific",
+      "follow_up": "resolve environment paths from the remote host during preflight; never copy Hamster paths"
+    },
+    {
+      "issue": "GPU-specific performance-aware scheduling",
+      "classification": "reusable skill should solve",
+      "follow_up": "use measured LPT scheduling and record GPU UUID/throughput without probing running jobs"
+    },
+    {
+      "issue": "1-epoch smoke attempted with production/pilot contracts",
+      "classification": "scientific-contract safeguard working as intended",
+      "follow_up": "select a registered bounded smoke protocol before launch"
+    },
+    {
+      "issue": "Symlink-resolved Ferret run path rejected by cancellation helper",
+      "classification": "repo/skill orchestration issue",
+      "follow_up": "make helper compare canonical paths before future use; do not alter current production"
+    },
+    {
+      "issue": "No long completion polling after stable launch",
+      "classification": "reusable skill should solve",
+      "follow_up": "record stable evidence once and collect completion in a later user turn"
+    }
+  ],
+  "campaign_completion_summary": {
+    "technical_retry_count": 5,
+    "total_smoke_launch_attempts": 6,
+    "production_launch_attempts": "unknown",
+    "per_gpu_jobs": "unknown",
+    "completion_polling_count": 0,
+    "finalization": "deferred until campaign completion; this artifact must not be used to alter running jobs"
+  }
+}
