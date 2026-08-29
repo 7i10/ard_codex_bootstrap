@@ -115,8 +115,10 @@ poll production jobs or invoke per-run reviewers.
   4090s and ~878 GB free with linger enabled. Existing inventories contain
   development seeds 1/2 only; no unseen registry exists.
 - 2026-08-29: Derived three outcome-independent bundle component seeds and
-  prepared the registry as the pre-training freeze boundary. Production has
-  not been launched in this milestone.
+  prepared the registry as the pre-training freeze boundary. Extended the
+  stage-wise fork utility to accept registry-derived unseen model seeds and to
+  bind the materialized parent Git identity to the clean source that created
+  the child. Production has not been launched in this milestone.
 
 ## Completion report
 

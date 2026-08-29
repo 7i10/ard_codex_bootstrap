@@ -75,7 +75,10 @@ def sha256(path: Path) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seed", type=int, choices=(1, 2), required=True)
+    # The fork utility is also used for preregistered unseen-seed bundles.
+    # Scientific seed eligibility is enforced by the caller's registry; this
+    # utility only validates the integer domain and the parent payload.
+    parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--switch", type=int, choices=(50, 75, 100, 125, 150), required=True)
     parser.add_argument("--late-policy", choices=("crop_re", "idbh_weak"), required=True)
     parser.add_argument("--config", type=Path, required=True)
@@ -162,7 +165,11 @@ def main() -> int:
         "parent_payload_epoch": expected_epoch,
         "parent_completed_epoch_count": args.switch,
         "parent_config_sha256": parent.get("config_hash"),
-        "parent_git_sha": "ffc217dd635462e1f14c93720561208db2d70254",
+        # The source checkpoint predates the child fork.  It has no embedded
+        # Git SHA, so bind the parent side to the clean source used to create
+        # this materialized child rather than claiming an unrelated historical
+        # commit.  The child runtime separately requires fork_git_sha to match.
+        "parent_git_sha": git["sha"],
         "fork_git_sha": git["sha"],
         "switch_epoch": args.switch,
         "late_policy": args.late_policy,
