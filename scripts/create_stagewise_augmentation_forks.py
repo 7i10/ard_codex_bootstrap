@@ -84,6 +84,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--parent", type=Path, default=None, help="override the registered parent path")
+    parser.add_argument(
+        "--override",
+        action="append",
+        default=[],
+        help="resolved-config dot-path override (repeatable), e.g. seeds.model_init=123",
+    )
     return parser
 
 
@@ -116,7 +122,7 @@ def main() -> int:
     if parent.get("world_size") != 1 or parent.get("global_step") != (args.switch * 352):
         raise ValueError("parent world size/global step is inconsistent with the 45k single-rank source")
 
-    config = load_config(args.config)
+    config = load_config(args.config, args.override)
     ensure_local_trainable(config.protocol.id)
     if config.protocol.id != "controlled_cifar10_r18_stagewise_augmentation_v1":
         raise ValueError("stage-wise fork requires the registered stage-wise protocol")

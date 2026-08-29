@@ -41,6 +41,7 @@ class ProtocolConfig(StrictModel):
         "saad_code_295121c_audit_v1",
         "controlled_cifar10_r18_v1",
         "controlled_cifar10_r18_cropshift_v1",
+        "controlled_cifar10_r18_cropshift_prefix_v1",
         "controlled_cifar10_r18_crop_re_v1",
         "controlled_cifar10_r18_idbh_weak_v1",
         "controlled_cifar10_r18_stagewise_augmentation_v1",
@@ -1163,6 +1164,7 @@ class ExperimentConfig(StrictModel):
         if self.protocol.id not in {
             "controlled_cifar10_r18_v1",
             "controlled_cifar10_r18_cropshift_v1",
+            "controlled_cifar10_r18_cropshift_prefix_v1",
             "controlled_cifar10_r18_delayed_multistep_v1",
             "controlled_cifar10_r18_prescriptive_v3_v1",
             *pilot_protocols,

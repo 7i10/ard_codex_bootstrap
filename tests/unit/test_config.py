@@ -153,6 +153,20 @@ def test_two_gpu_profile_can_be_resolved_as_one_gpu_batch_128(tmp_path: Path, mo
     assert config.training.global_batch_size == 128
 
 
+def test_cropshift_prefix_protocol_is_bounded_and_keeps_canonical_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
+    config = load_config(
+        Path("configs/scientific/cifar10_r18_rslad_cropshift_prefix_chen2021_ltd_wrn34_10.yaml")
+    )
+    assert config.protocol.id == "controlled_cifar10_r18_cropshift_prefix_v1"
+    assert config.training.epochs == 100
+    assert config.training.checkpoint_epochs == (49, 99)
+    assert config.dataset.augmentation_policy == "cropshift"
+    assert config.scheduler.milestones == (100, 150)
+
+
 def base_config() -> dict:
     return {
         "schema_version": 2,

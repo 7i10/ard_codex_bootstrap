@@ -152,6 +152,24 @@ _CROPSHIFT_METADATA = MappingProxyType(
     {**_CONTROLLED_METADATA, "train_augmentation": "RandomHorizontalFlip+CropShift(0,11)"}
 )
 
+# A bounded prefix capture is a distinct protocol identity. It produces the
+# exact end-of-epoch-99 state needed by the preregistered stagewise fork DAG;
+# it does not change the 200-epoch CROPSHIFT production contract.
+_CROPSHIFT_PREFIX_METADATA = MappingProxyType(
+    {
+        **_CROPSHIFT_METADATA,
+        "training": MappingProxyType(
+            {
+                "epochs": 100,
+                "global_batch_size": 128,
+                "validation_fraction": 0.1,
+                "deterministic": True,
+                "batchnorm_mode": "local_per_rank",
+            }
+        ),
+    }
+)
+
 _CROP_RE_METADATA = MappingProxyType(
     {
         **_CONTROLLED_METADATA,
@@ -271,6 +289,12 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_CROPSHIFT_METADATA,
+        ),
+        "controlled_cifar10_r18_cropshift_prefix_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_cropshift_prefix_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_CROPSHIFT_PREFIX_METADATA,
         ),
         "controlled_cifar10_r18_crop_re_v1": ProtocolSpec(
             id="controlled_cifar10_r18_crop_re_v1",
