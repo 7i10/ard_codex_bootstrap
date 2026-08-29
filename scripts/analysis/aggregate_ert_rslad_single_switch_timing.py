@@ -136,7 +136,7 @@ def build_arm(arm: str, seed: int) -> dict[str, Any]:
             split: child_endpoint(seed, arm, epoch, split) for split in ("train", "validation")
         }
     control_endpoints = {
-        str(epoch): {split: control_endpoint(seed, epoch, split) for split in ("train", "validation")}
+        str(epoch): {split: control_endpoint(seed, int(epoch), split) for split in ("train", "validation")}
         for epoch in endpoint_records
     }
     endpoint_deltas = {
@@ -273,8 +273,7 @@ def main() -> None:
                 for seed in (1, 2)
             ),
             "full_auc_not_lower_than_i100": all(
-                by_key[(arm, seed)]["hybrid"]["auc_0_199"] >= i100[seed]["hybrid"]["auc_0_199"]
-                for seed in (1, 2)
+                by_key[(arm, seed)]["hybrid"]["auc_0_199"] >= i100[seed]["hybrid"]["auc_0_199"] for seed in (1, 2)
             ),
             "post_switch_not_lower_than_i100": all(
                 by_key[(arm, seed)]["hybrid"]["auc_post_switch"] >= i100[seed]["hybrid"]["auc_post_switch"]
@@ -353,6 +352,45 @@ def main() -> None:
             f"{row['endpoint_deltas']['199']['validation']['clean'] * 100:+.2f} pp | "
             f"{row['deltas']['auc_0_199'] * 100:+.3f} | {row['deltas']['auc_post_switch'] * 100:+.3f} |"
         )
+    reference_profile = load_reference_profile()
+    lines += [
+        "",
+        "## Complete timing profile",
+        "",
+        "This descriptive profile combines the fresh I50/I75/I125 suffixes with the "
+        "hash-bound I0/I100/I150 references. I0 is IDBH_WEAK from scratch; I100 and "
+        "I150 are prior stage-wise continuations. Values are fixed internal-validation "
+        "CE-PGD20 endpoint robust accuracy and trajectory AUC.",
+        "",
+        "| seed | arm | switch | source | final clean | final robust | full AUC | post-switch AUC |",
+        "|---:|---|---:|---|---:|---:|---:|---:|",
+    ]
+    for profile_arm in ("I0", "I50", "I75", "I100", "I125", "I150"):
+        for seed in (1, 2):
+            if profile_arm in ("I50", "I75", "I125"):
+                row = by_key[(profile_arm, seed)]
+                endpoint = row["endpoints"]["199"]["validation"]
+                clean = endpoint["clean"]
+                robust = endpoint["robust"]
+                full_auc = row["hybrid"]["auc_0_199"]
+                post_auc = row["hybrid"].get("auc_post_switch")
+                switch = row["switch_epoch"]
+                source = "fresh suffix"
+            else:
+                ref = reference_profile[profile_arm][str(seed)]
+                clean = ref["final_clean"]
+                robust = ref["final_robust"]
+                full_auc = ref["auc_0_199"]
+                post_auc = ref.get("auc_post_switch")
+                switch = ref.get("switch_epoch", 0)
+                source = "reference"
+            lines.append(
+                f"| {seed} | {profile_arm} | {switch} | {source} | {fmt(clean)} | {fmt(robust)} | "
+                f"{full_auc:.6f} | {post_auc:.6f} |"
+                if post_auc is not None
+                else f"| {seed} | {profile_arm} | {switch} | {source} | {fmt(clean)} | {fmt(robust)} | "
+                f"{full_auc:.6f} | — |"
+            )
     lines += [
         "",
         "## Shock and throughput",
@@ -385,8 +423,8 @@ def main() -> None:
         "## Interpretation",
         "",
         "The timing profile is descriptive over I0/I50/I75/I100/I125/I150. A candidate is not called globally optimal "
-        "from two development seeds. I100 remains the incumbent unless a candidate satisfies the preregistered "
-        "two-seed final-robust and full-AUC dominance rules recorded in the machine artifact.",
+        "from two development seeds. I100 remains the incumbent because no fresh candidate satisfies the preregistered "
+        "two-seed replacement rule (final robust dominance plus non-lower full AUC).",
         "",
         "## Next stage (not started)",
         "",

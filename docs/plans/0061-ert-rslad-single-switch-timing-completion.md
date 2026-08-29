@@ -3,8 +3,8 @@
 ## Status
 
 - Owner: Codex root
-- Branch / base SHA: `master` / `8083f9c5df9b46a3a02399fbf293ceee6db85083`
-- Current milestone: M3 continuations in progress
+- Branch / base SHA: `master` / `3c4031033dee5c3f728f0d2981dc169c232037e2`
+- Current milestone: M6 complete; timing branch closed
 - Last updated: 2026-08-29
 
 ## Goal
@@ -64,10 +64,10 @@ remain local.
 - [x] M0 repo reconciliation, scheduler/RNG audit, and parent inventory
 - [x] M1 exact S50/S75/S125 parent materialization and parity
 - [x] M2 switch canaries and immutable source/config freeze
-- [ ] M3 six Hamster/Ferret continuations through epoch 199
-- [ ] M4 CE-PGD20 endpoints and hybrid/post-switch AUC analysis
-- [ ] M5 timing profile, I100 replacement decision, and freeze artifact
-- [ ] M6 consolidated review, cohesive commit, push only if explicitly requested, and stop
+- [x] M3 six Hamster/Ferret continuations through epoch 199
+- [x] M4 CE-PGD20 endpoints and hybrid/post-switch AUC analysis
+- [x] M5 timing profile, I100 replacement decision, and freeze artifact
+- [x] M6 consolidated review, cohesive commit, push only if explicitly requested, and stop
 
 ## Test plan
 
@@ -97,15 +97,28 @@ remain local.
 
 ## Progress log
 
-- 2026-08-29: Reconciled clean `master` at `8083f9c`; this is the immutable
-  production source for all six fresh continuations. Exact S50/S75/S125
-  parents were materialized from accepted CROPSHIFT controls, with scheduler
-  last-epoch/LR/global-step boundary checks and hash-verified Ferret transfer.
-  Hamster runs I50 seed1/2 and Ferret runs I75 seed2, I125 seed1/2 are active;
-  I75 seed1 is forked and staged for the first freed Hamster GPU. Canaries for
-  I50, I75, and I125 passed on the frozen source. W&B is metrics-only.
+- 2026-08-29: Reconciled the completed six fresh suffixes from production
+  source `8083f9c`; exact S50/S75/S125 parents were materialized from accepted
+  CROPSHIFT controls, with scheduler last-epoch/LR/global-step boundary checks
+  and hash-verified cross-host transfer. All I50/I75/I125 seed-1/2 runs reached
+  epoch 199 and produced the required train/validation CE-PGD20 endpoint rows.
+  W&B remained metrics-only; checkpoints and run bundles stayed local.
+- 2026-08-29: Ran the existing read-only aggregator against the six child
+  trajectories, accepted CROPSHIFT controls, and hash-bound endpoints. Fixed a
+  type-only epoch-key conversion in the aggregator (string JSON keys to integer
+  path formatting); no scientific inputs or definitions changed. The report
+  and machine artifact now record the timing profile and preregistered freeze.
 
 ## Completion report
 
-To be filled after M6 with parent hashes, canary results, six run IDs, endpoint
-hashes, timing profile, freeze decision, and remaining uncertainty.
+M3--M6 completed. The six fresh runs are `idbh-s50-s1-prod`,
+`idbh-s50-s2-prod`, `idbh-s75-s1-prod`, `idbh-s75-s2-prod`,
+`idbh-s125-s1-prod`, and `idbh-s125-s2-prod`. The result report and hash-bound
+machine artifact are [ERT_RSLAD_SINGLE_SWITCH_TIMING.md](../ERT_RSLAD_SINGLE_SWITCH_TIMING.md)
+and [ert_rslad_single_switch_timing_results_v1.json](../experiments/ert_rslad_single_switch_timing_results_v1.json).
+All six parent/child lineages and endpoint attack identities passed aggregation.
+I50 did not pass full/post-switch AUC gates; I75 and I125 passed their
+development gates but neither replaced I100 under the preregistered
+two-seed replacement rule. Freeze decision: `I100`; the finite timing search
+is closed. Only two development seeds and internal validation are used, so no
+population-level seed claim or official-test claim is made.
