@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_unseen_seed_confirmation_registry_v1",
+  "status": "frozen_before_training",
+  "experiment": "ert_rslad_unseen_seed_confirmation_v1",
+  "source_git_sha": "9b96c1afc59f8618aa5f46aa9f3f2f93c7ce5941",
+  "teacher": "chen2021_ltd_wrn34_10",
+  "selection_time_utc": "2026-08-29T07:17:55Z",
+  "selection_policy": {
+    "outcome_independent": true,
+    "labels": ["confirm-a", "confirm-b", "confirm-c"],
+    "replacement_after_outcomes": false,
+    "development_seeds_excluded": [1, 2],
+    "evidence": [
+      "docs/experiments/ert_rslad_trajectory_baseline_inventory_v1.json",
+      "repository/run inventory at selection time",
+      "local artifact inventory contained no confirm-a/confirm-b/confirm-c records"
+    ]
+  },
+  "dataset": {
+    "name": "cifar10",
+    "split_seed": 20260722,
+    "validation_fraction": 0.1
+  },
+  "evaluation_attack": {
+    "seed": 0,
+    "loss": "ce",
+    "epsilon": "8/255",
+    "step_size": "2/255",
+    "steps": 20,
+    "random_start": true,
+    "mode": "eval"
+  },
+  "derivation": {
+    "function": "ard.analysis.ert_rslad_rng_sources.derive_seed",
+    "formula": "SHA256(experiment_name|teacher|source_name|replicate)[:8] mod (2**31-1)",
+    "source_names": {
+      "model_init": "model_init",
+      "data_order": "data_order",
+      "augmentation": "augmentation",
+      "train_attack": "train_attack",
+      "other": "other"
+    }
+  },
+  "bundles": [
+    {
+      "bundle_id": "confirm-a",
+      "component_seeds": {
+        "model_init": 1111554379,
+        "data_order": 1867692620,
+        "augmentation": 1931953003,
+        "train_attack": 645311674,
+        "other": 293048771
+      }
+    },
+    {
+      "bundle_id": "confirm-b",
+      "component_seeds": {
+        "model_init": 317936984,
+        "data_order": 1431765270,
+        "augmentation": 359022334,
+        "train_attack": 1359006044,
+        "other": 2132565412
+      }
+    },
+    {
+      "bundle_id": "confirm-c",
+      "component_seeds": {
+        "model_init": 2147201114,
+        "data_order": 581487446,
+        "augmentation": 276688409,
+        "train_attack": 461310099,
+        "other": 438227305
+      }
+    }
+  ],
+  "confirmation_arms": ["BASE", "CROP_PREFIX", "CROP_SUFFIX", "I100_SUFFIX"],
+  "lineage": {
+    "parent_boundary": "epoch-99-end / epoch-100-first-minibatch",
+    "suffix_parent_kind": "unseen_confirmation_cropshift_prefix_v1",
+    "suffix_children": ["CROP_SUFFIX", "I100_SUFFIX"],
+    "checkpoint_epochs": [49, 99, 149, 199],
+    "wandb_artifact_retention": "metrics_only"
+  },
+  "search_closed": true,
+  "post_outcome_seed_selection_allowed": false
+}
