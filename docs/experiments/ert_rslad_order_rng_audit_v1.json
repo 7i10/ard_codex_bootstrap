@@ -1,0 +1,56 @@
+{
+  "current_contract": {
+    "augmentation_contract": "source/epoch keyed (separate from this blocker)",
+    "generator_scope": "one freshly seeded torch.Generator per training batch",
+    "random_start": "batched delta.uniform_ using request.generator",
+    "trainer_seed": "seed + 1000003*global_step + 10007*rank"
+  },
+  "decision": "BLOCK_PRODUCTION_ORDERING_ONLY",
+  "kind": "ert_rslad_order_rng_audit",
+  "no_training": true,
+  "read_only": true,
+  "reason": "The existing batch-position random-start stream assigns different initial perturbations to fixed sample IDs when the DataLoader order changes.  Changing order therefore changes attack randomness, so the requested ordering-only causal interpretation is not valid without a separately reviewed RNG-contract change.",
+  "reproduction": {
+    "batch_size": 4,
+    "changed_count": 2,
+    "changed_sample_ids": [
+      0,
+      1
+    ],
+    "control_order": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "order_changes_random_start_assignment": true,
+    "reordered_order": [
+      1,
+      0,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "schema_version": 1,
+  "source_git_sha": "62faf1b7c382a02c58140290f7090803cba0e0e1",
+  "sources": {
+    "pgd": {
+      "anchor": "delta.uniform_(-1.0, 1.0, generator=request.generator)",
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src/ard/attacks/pgd.py",
+      "sha256": "287a1dd05c8cfde2ec60929d4a20a4e1d9d695e0c06aae70364bb4a05728b412"
+    },
+    "trainer": {
+      "anchor": "def _attack_generator(self) -> torch.Generator:\n        seed = self.seed + 1_000_003 * self.global_step + 10_007 * get_rank()\n        return torch.Generator(device=self.device).manual_seed(seed)",
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src/ard/engine/trainer.py",
+      "sha256": "98bf040a3851b1efb4b70b3f486fd234a12aa7bfd9db930c0c0be20204166b68"
+    }
+  }
+}

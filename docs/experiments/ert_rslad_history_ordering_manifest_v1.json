@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "kind": "ert_rslad_history_ordering_manifest",
+  "status": "blocked_before_production",
+  "source_git_sha": "62faf1b7c382a02c58140290f7090803cba0e0e1",
+  "scientific_identity": {
+    "method": "I100",
+    "intervention": "training sample order only",
+    "start_epoch": 100,
+    "end_epoch_exclusive": 200,
+    "train_samples_per_epoch": 45000,
+    "exposure_contract": "each canonical train sample exactly once per epoch",
+    "control": "I100 with canonical EpochShuffleSampler",
+    "treatment": "History-balanced HIGH/MID/MID/LOW/MID interleaving",
+    "strata": {"HIGH": 0.2, "MID": 0.6, "LOW": 0.2},
+    "order_rng": "dedicated order substreams keyed by order seed, epoch, and stratum",
+    "loss_augmentation_attack_teacher_optimizer_scheduler": "frozen I100 contract"
+  },
+  "minimality_artifact": {
+    "path": "docs/experiments/ert_rslad_history_minimality_v1.json",
+    "selected_candidate": "H2",
+    "selected_features": ["margin_ema"],
+    "frozen_predictor_sha256": "b6be23e7eaa31dd300ed21efb84746bba2270a4a044096c86d3be035c8abebbd"
+  },
+  "parents": [
+    {
+      "seed": "dev-1",
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+      "sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "payload_epoch": 99,
+      "global_step": 35200,
+      "config_hash": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+      "scheduler_last_epoch": 100,
+      "next_learning_rate": 0.010000000000000002
+    },
+    {
+      "seed": "dev-2",
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+      "sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "payload_epoch": 99,
+      "global_step": 35200,
+      "config_hash": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+      "scheduler_last_epoch": 100,
+      "next_learning_rate": 0.010000000000000002
+    }
+  ],
+  "arms": ["dev-1-CONTROL", "dev-1-HISTORY_BALANCED", "dev-2-CONTROL", "dev-2-HISTORY_BALANCED"],
+  "endpoints": {
+    "attack": "CE-PGD20, Linf epsilon=8/255 step=2/255 steps=20 random_start=true eval mode",
+    "epochs": [149, 199],
+    "split": "fixed internal validation 5000"
+  },
+  "rng_audit": {
+    "path": "docs/experiments/ert_rslad_order_rng_audit_v1.json",
+    "decision": "BLOCK_PRODUCTION_ORDERING_ONLY",
+    "order_changes_attack_random_start_assignment": true,
+    "production_launched": false
+  },
+  "stop_reason": "Existing Trainer creates one seeded PGD generator per batch and PGD fills batched random starts position-wise; changing DataLoader order changes the random-start assignment for fixed sample IDs. A separately reviewed source-keyed attack-RNG contract is required before an ordering-only causal run."
+}
