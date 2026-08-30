@@ -1,0 +1,223 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import pytest
+
+SCRIPT = Path(__file__).parents[2] / ".agents/skills/multi-gpu-experiment-orchestrator/scripts/orchestrate.py"
+SHA = "a" * 40
+
+
+def write_manifest(tmp_path: Path, jobs: list[dict], *, hosts: dict | None = None) -> Path:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "schema_version": 1,
+        "campaign_id": "dummy-campaign",
+        "source": {"git_sha": SHA},
+        "state_path": str(tmp_path / "state.json"),
+        "hosts": hosts
+        or {"local": {"backend": "local", "gpus": [{"index": 0, "throughput": 10}, {"index": 1, "throughput": 1}]}},
+        "jobs": jobs,
+    }
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    return path
+
+
+def job(
+    tmp_path: Path,
+    job_id: str,
+    code: str,
+    *,
+    dependencies: list[str] | None = None,
+    estimated_work: float = 1,
+    gpu: int | None = None,
+    retries: int = 1,
+) -> dict:
+    value = {
+        "job_id": job_id,
+        "run_id": job_id,
+        "command": [sys.executable, "-c", code],
+        "output_dir": str(tmp_path / "outputs" / job_id),
+        "dependencies": dependencies or [],
+        "estimated_work": estimated_work,
+        "scientific_identity": {"method_id": job_id, "seed_bundle": "dummy"},
+        "retry_policy": {"max_attempts": retries},
+    }
+    if gpu is not None:
+        value["gpu"] = gpu
+    return value
+
+
+def invoke(command: str, manifest: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), command, "--manifest", str(manifest), *extra], text=True, capture_output=True
+    )
+
+
+def test_validate_and_dry_plan_are_read_only(tmp_path: Path) -> None:
+    manifest = write_manifest(tmp_path, [job(tmp_path, "root", "pass")])
+    assert invoke("validate", manifest).returncode == 0
+    planned = invoke("plan", manifest, "--dry-run")
+    assert planned.returncode == 0
+    assert json.loads(planned.stdout)["jobs"][0]["host"] == "local"
+    assert not (tmp_path / "state.json").exists()
+
+
+def test_cycle_and_missing_dependency_fail_closed(tmp_path: Path) -> None:
+    missing = write_manifest(tmp_path / "missing", [job(tmp_path / "missing", "a", "pass", dependencies=["nope"])])
+    result = invoke("validate", missing)
+    assert result.returncode != 0
+    assert "missing dependencies" in result.stderr
+    cycletmp = tmp_path / "cycle"
+    cycletmp.mkdir()
+    cyclic = write_manifest(
+        cycletmp, [job(cycletmp, "a", "pass", dependencies=["b"]), job(cycletmp, "b", "pass", dependencies=["a"])]
+    )
+    result = invoke("validate", cyclic)
+    assert result.returncode != 0
+    assert "cycle" in result.stderr
+
+
+def test_success_dag_chains_and_is_idempotent(tmp_path: Path) -> None:
+    jobs = [
+        job(tmp_path, "root-a", "from pathlib import Path; Path('root-a.txt').write_text('ok')", estimated_work=10),
+        job(tmp_path, "root-b", "from pathlib import Path; Path('root-b.txt').write_text('ok')", estimated_work=9),
+        job(
+            tmp_path, "prefix", "from pathlib import Path; Path('prefix.txt').write_text('ok')", dependencies=["root-b"]
+        ),
+        job(
+            tmp_path,
+            "control",
+            "from pathlib import Path; Path('control.txt').write_text('ok')",
+            dependencies=["prefix"],
+        ),
+        job(
+            tmp_path,
+            "treatment",
+            "from pathlib import Path; Path('treatment.txt').write_text('ok')",
+            dependencies=["prefix"],
+        ),
+        job(
+            tmp_path,
+            "endpoint",
+            "from pathlib import Path; Path('endpoint.txt').write_text('ok')",
+            dependencies=["treatment"],
+        ),
+        job(
+            tmp_path,
+            "aggregate",
+            "from pathlib import Path; Path('aggregate.txt').write_text('ok')",
+            dependencies=["control", "endpoint"],
+        ),
+        job(
+            tmp_path,
+            "report",
+            "from pathlib import Path; Path('report.txt').write_text('ok')",
+            dependencies=["aggregate"],
+            gpu=1,
+        ),
+    ]
+    manifest = write_manifest(tmp_path, jobs)
+    result = invoke("run", manifest, "--foreground", "--poll-interval", "0.02")
+    assert result.returncode == 0, result.stderr
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["status"] == "completed"
+    assert all(record["status"] == "completed" for record in state["jobs"].values())
+    assert any(e["event_type"] == "stable_confirmed" for e in state["events"])
+    attempts_before = {key: len(value["attempts"]) for key, value in state["jobs"].items()}
+    result = invoke("run", manifest, "--foreground", "--poll-interval", "0.02")
+    assert result.returncode == 0
+    state_after = json.loads((tmp_path / "state.json").read_text())
+    assert {key: len(value["attempts"]) for key, value in state_after["jobs"].items()} == attempts_before
+
+
+def test_valid_marker_recovers_without_relaunch(tmp_path: Path) -> None:
+    manifest = write_manifest(
+        tmp_path, [job(tmp_path, "root", "from pathlib import Path; Path('ran.txt').write_text('ok')")]
+    )
+    assert invoke("run", manifest, "--foreground", "--poll-interval", "0.02").returncode == 0
+    (tmp_path / "state.json").unlink()
+    assert invoke("run", manifest, "--foreground", "--poll-interval", "0.02").returncode == 0
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["jobs"]["root"]["status"] == "completed"
+    assert state["jobs"]["root"]["attempts"] == []
+    assert any(event["event_type"] == "completion_marker_recovered" for event in state["events"])
+
+
+def test_preflight_checks_job_paths_and_environment(tmp_path: Path) -> None:
+    value = job(tmp_path, "root", "pass")
+    value["required_paths"] = [str(tmp_path / "missing")]
+    value["required_env"] = ["MISSING_ORCHESTRATOR_TEST_ENV"]
+    manifest = write_manifest(tmp_path, [value])
+    result = invoke("preflight", manifest)
+    assert result.returncode == 2
+    assert "required path missing" in result.stdout
+    assert "environment variable missing" in result.stdout
+
+
+def test_technical_retry_preserves_identity_and_unblocks_endpoint(tmp_path: Path) -> None:
+    output = tmp_path / "outputs" / "flaky"
+    code = (
+        "import json, os; from pathlib import Path; out=Path(os.environ['TEST_OUT']); "
+        "\nif os.environ['ARD_ORCH_ATTEMPT']=='1':\n"
+        " out.mkdir(parents=True, exist_ok=True); "
+        "(out/'technical-failure.json').write_text(json.dumps({'failure_class': 'technical', 'retryable': True})); "
+        "raise SystemExit(7)\n"
+        "else:\n out.mkdir(parents=True, exist_ok=True); (out/'ok.txt').write_text('ok')"
+    )
+    flaky = job(tmp_path, "flaky", code, retries=2)
+    flaky["env"] = {"TEST_OUT": str(output)}
+    endpoint = job(
+        tmp_path, "endpoint", "from pathlib import Path; Path('endpoint.txt').write_text('ok')", dependencies=["flaky"]
+    )
+    manifest = write_manifest(tmp_path, [flaky, endpoint])
+    result = invoke("run", manifest, "--foreground", "--poll-interval", "0.02")
+    assert result.returncode == 0, result.stderr
+    state = json.loads((tmp_path / "state.json").read_text())
+    flaky_state = state["jobs"]["flaky"]
+    assert flaky_state["status"] == "completed"
+    assert len(flaky_state["attempts"]) == 2
+    assert flaky_state["attempts"][0]["status"] == "technical_failed"
+    assert flaky_state["attempts"][1]["status"] == "completed"
+    assert flaky_state["attempts"][0]["identity_hash"] == flaky_state["attempts"][1]["identity_hash"]
+    assert any(e["event_type"] == "technical_retry" for e in state["events"])
+    assert state["jobs"]["endpoint"]["status"] == "completed"
+
+
+def test_detached_controller_finishes_without_caller_lifetime(tmp_path: Path) -> None:
+    manifest = write_manifest(
+        tmp_path,
+        [job(tmp_path, "root", "from pathlib import Path; Path('detached.txt').write_text('ok')")],
+    )
+    result = invoke("run", manifest)
+    assert result.returncode == 0, result.stderr
+    launch = json.loads(result.stdout)
+    assert launch["controller_pid"] > 0
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        state_path = tmp_path / "state.json"
+        if state_path.exists() and json.loads(state_path.read_text())["status"] == "completed":
+            break
+        time.sleep(0.02)
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["status"] == "completed"
+
+
+@pytest.mark.parametrize("gpu_case", ["same_sequential", "missing"])
+def test_gpu_reservation_constraints_are_visible(tmp_path: Path, gpu_case: str) -> None:
+    if gpu_case == "same_sequential":
+        jobs = [job(tmp_path, "a", "pass", gpu=0), job(tmp_path, "b", "pass", gpu=0)]
+        planned = json.loads(invoke("plan", write_manifest(tmp_path, jobs)).stdout)
+        assert all(row.get("status") != "resource_conflict" for row in planned["jobs"])
+        assert all(row["gpu"] == 0 for row in planned["jobs"])
+    else:
+        jobs = [job(tmp_path, "a", "pass", gpu=4)]
+        result = invoke("validate", write_manifest(tmp_path, jobs))
+        assert result.returncode == 0
+        planned = json.loads(invoke("plan", write_manifest(tmp_path, jobs)).stdout)
+        assert planned["jobs"][0]["status"] == "resource_conflict"

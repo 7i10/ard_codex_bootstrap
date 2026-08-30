@@ -1,0 +1,4 @@
+interface:
+  display_name: "Multi-GPU Experiment Orchestrator"
+  short_description: "Run host-aware GPU campaigns as resumable DAGs"
+  default_prompt: "Use $multi-gpu-experiment-orchestrator for manifest-driven multi-host experiment orchestration."
