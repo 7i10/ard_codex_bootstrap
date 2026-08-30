@@ -802,13 +802,16 @@ def plan(manifest: dict[str, Any]) -> int:
 
 def preflight(manifest: dict[str, Any]) -> int:
     errors: list[str] = []
+    base = Path(manifest["_manifest_path"]).parent
     for name, profile in manifest["hosts"].items():
         if profile.get("backend", "local") == "local":
             python_path = profile.get("python")
-            if python_path and not Path(python_path).exists():
+            resolved_python = abs_path(python_path, base) if python_path else None
+            if resolved_python and not resolved_python.exists():
                 errors.append(f"{name}: python does not exist: {python_path}")
             for raw in profile.get("required_paths", []):
-                if not Path(raw).exists():
+                path = abs_path(raw, base)
+                if path is None or not path.exists():
                     errors.append(f"{name}: required path missing: {raw}")
         command = profile.get("preflight_command")
         if command is not None:
