@@ -3,9 +3,9 @@
 ## Status
 
 - Owner: Codex root
-- Branch / base SHA: `master` / `9b96c1afc59f8618aa5f46aa9f3f2f93c7ce5941`
-- Current milestone: M0 in progress
-- Last updated: 2026-08-29
+- Branch / base SHA: `master` / `f4f8592290fae61f15a75bb4eed6c5244c5a690e`
+- Current milestone: M7 complete
+- Last updated: 2026-08-31
 
 ## Goal
 
@@ -69,14 +69,14 @@ metrics-only; model checkpoints, row artifacts, and run bundles remain local.
 
 ## Milestones
 
-- [ ] M0 reconcile source, environment, seed-use evidence, and storage
-- [ ] M1 freeze seed registry and DAG/lineage plan before training
-- [ ] M2 add/verify minimal orchestration and sample-row instrumentation
-- [ ] M3 run one resume/parity canary per host, then launch BASE/prefix jobs
-- [ ] M4 launch dependent suffixes from exact epoch-99 parents
-- [ ] M5 run registered CE-PGD20 endpoints and collect compact rows
-- [ ] M6 aggregate confirmation and five-seed descriptive stochasticity
-- [ ] M7 write reports/artifacts, review the stable delta, commit and push
+- [x] M0 reconcile source, environment, seed-use evidence, and storage
+- [x] M1 freeze seed registry and DAG/lineage plan before training
+- [x] M2 add/verify minimal orchestration and sample-row instrumentation
+- [x] M3 run one resume/parity canary per host, then launch BASE/prefix jobs
+- [x] M4 launch dependent suffixes from exact epoch-99 parents
+- [x] M5 run registered CE-PGD20 endpoints and collect compact rows
+- [x] M6 aggregate confirmation and global trajectory comparison
+- [x] M7 write reports/artifacts and review the stable delta
 
 ## Agent and review budget
 
@@ -122,6 +122,21 @@ poll production jobs or invoke per-run reviewers.
 
 ## Completion report
 
-To be filled after M7 with the frozen registry hash, launch/lineage records,
-confirmation results, five-seed descriptive metrics, tests, review findings,
-and any blocked or deferred work.
+M7 completed on 2026-08-31. The frozen registry was used without post-outcome
+seed replacement. Twelve training trajectories (three confirmation bundles ×
+BASE/CROP_PREFIX/CROP_SUFFIX/I100_SUFFIX) and thirty independent CE-PGD20
+endpoint files were collected. All endpoint files have 5,000 rows and matching
+source, attack, and split identity hashes. I100 exceeded CROP_SUFFIX on final
+robust accuracy, full trajectory AUC, and post-100 AUC for all three
+confirmation bundles; clean accuracy was near-neutral with a small negative
+mean difference. The complete result table and hashes are in
+`docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md` and
+`docs/experiments/ert_rslad_unseen_confirmation_results_v1.json`.
+
+The endpoint campaign had technical orchestration retries (epoch-label
+off-by-one, concurrent remote fetch lock, and a helper path duplication). They
+did not change scientific identity and the affected endpoints were completed
+by the v5 retry. No official test or AutoAttack was run, and W&B remained
+metrics-only. Further timing search or new training is not part of this
+milestone; sample-level stochasticity analysis remains a separately scoped
+follow-up.
