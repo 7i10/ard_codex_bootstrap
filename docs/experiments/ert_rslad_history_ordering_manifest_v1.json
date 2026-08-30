@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "ert_rslad_history_ordering_manifest",
   "status": "blocked_before_production",
-  "source_git_sha": "62faf1b7c382a02c58140290f7090803cba0e0e1",
+  "source_git_sha": "1db92a14abd65a77d859ad3d176eea74ce1f6321",
   "scientific_identity": {
     "method": "I100",
     "intervention": "training sample order only",
