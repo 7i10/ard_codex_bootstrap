@@ -1,0 +1,227 @@
+{
+  "classification": "catch-up",
+  "conclusion": "descriptive only; not a causal attribution of robust overfitting or reconvergence",
+  "contract": {
+    "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+    "metric": "val_pgd_accuracy",
+    "sample_sd_ddof": 1,
+    "seed_count": 5,
+    "t_star_rule": "argmax five-seed BASE robust SD"
+  },
+  "endpoint_check": [
+    {
+      "adversarial_margin_mean": 0.040729122124612334,
+      "clean_accuracy": 0.7754,
+      "epoch": 99,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/local/confirm-a/base/e99/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.4626,
+      "row_count": 5000,
+      "rows_sha256": "882e6cb3c4d972816f423651f07d0c9b7d6f7dd5ff1cd27272b22f544b00e565",
+      "seed": "confirm-a"
+    },
+    {
+      "adversarial_margin_mean": 0.11644409021884203,
+      "clean_accuracy": 0.851,
+      "epoch": 149,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/local/confirm-a/base/e149/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.5684,
+      "row_count": 5000,
+      "rows_sha256": "a7cae285b7835083b823036b7783eb891c3868fecd3494f99c86083b5ba608b5",
+      "seed": "confirm-a"
+    },
+    {
+      "adversarial_margin_mean": 0.12679950313717128,
+      "clean_accuracy": 0.8568,
+      "epoch": 199,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/local/confirm-a/base/e199/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.5822,
+      "row_count": 5000,
+      "rows_sha256": "af8fe729176320a9b9e96e28df73ad8e52030070a9b0cb8708a35ad6b5a1ca50",
+      "seed": "confirm-a"
+    },
+    {
+      "adversarial_margin_mean": 0.038758829805254934,
+      "clean_accuracy": 0.7638,
+      "epoch": 99,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/local/confirm-b/base/e99/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.4614,
+      "row_count": 5000,
+      "rows_sha256": "843e047c1d2a2c698938cb4f69a596e4fae2838b9f1f00603b68a3141d20ae9c",
+      "seed": "confirm-b"
+    },
+    {
+      "adversarial_margin_mean": 0.11233896440714598,
+      "clean_accuracy": 0.8478,
+      "epoch": 149,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/local/confirm-b/base/e149/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.562,
+      "row_count": 5000,
+      "rows_sha256": "f871ea97911e5f1b8054b0fd743e7fbbdd1db4a5dd518bf297b992e958bc4278",
+      "seed": "confirm-b"
+    },
+    {
+      "adversarial_margin_mean": 0.12992292480021717,
+      "clean_accuracy": 0.8616,
+      "epoch": 199,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/local/confirm-b/base/e199/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.5858,
+      "row_count": 5000,
+      "rows_sha256": "190958caf4fd7957d6a3707ded0ae9b3662f000d532579069ccd5f1938628e8c",
+      "seed": "confirm-b"
+    },
+    {
+      "adversarial_margin_mean": 0.034480881416797636,
+      "clean_accuracy": 0.7652,
+      "epoch": 99,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/remote-v3/confirm-c/base/e99/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.4552,
+      "row_count": 5000,
+      "rows_sha256": "bda2479b0be052f30a81330908e497128683be348ed2f5f5f6cf291a9a67acf1",
+      "seed": "confirm-c"
+    },
+    {
+      "adversarial_margin_mean": 0.11337556450664997,
+      "clean_accuracy": 0.8446,
+      "epoch": 149,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/remote-v3/confirm-c/base/e149/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.5626,
+      "row_count": 5000,
+      "rows_sha256": "8e57852856a8d2c97b4c04831346c9c20c721053d7550520a1613a42c9a93933",
+      "seed": "confirm-c"
+    },
+    {
+      "adversarial_margin_mean": 0.12792375567406417,
+      "clean_accuracy": 0.861,
+      "epoch": 199,
+      "path": ".cache/analysis/ert-unseen-confirm-independent-endpoints-v2/remote-v3/confirm-c/base/e199/validation/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.5818,
+      "row_count": 5000,
+      "rows_sha256": "9d64aa0342c148acedde22fa64e52c510a553745d172a2389913bf1f29c08faf",
+      "seed": "confirm-c"
+    },
+    {
+      "adversarial_margin_mean": 0.04791226137876511,
+      "clean_accuracy": 0.7914,
+      "epoch": 99,
+      "path": ".cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/base-s1/e099/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.476,
+      "row_count": 5000,
+      "rows_sha256": "66ea0c4cf20a42ce8fe91346c6bf09fe593e28e461038296a11badb083ba77e0",
+      "seed": "dev-1"
+    },
+    {
+      "adversarial_margin_mean": 0.11773083799183369,
+      "clean_accuracy": 0.8484,
+      "epoch": 149,
+      "path": ".cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/base-s1/e149/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.5658,
+      "row_count": 5000,
+      "rows_sha256": "b31e6e4cdbf499f9c0456a4d882f50c0d6382bd3d8c69c8440769cbef6c2b31b",
+      "seed": "dev-1"
+    },
+    {
+      "adversarial_margin_mean": 0.12791541460305453,
+      "clean_accuracy": 0.8644,
+      "epoch": 199,
+      "path": ".cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/base-s1/e199/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.5808,
+      "row_count": 5000,
+      "rows_sha256": "4a4b1153cc0fac2dbaaf36b35af2236426c0815ed495a38c5b84be81a3cb895e",
+      "seed": "dev-1"
+    },
+    {
+      "adversarial_margin_mean": 0.039185979548096654,
+      "clean_accuracy": 0.776,
+      "epoch": 99,
+      "path": ".cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/base-s2/e099/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.4554,
+      "row_count": 5000,
+      "rows_sha256": "52a8b51653791af8e6ef0bc75fc376efde04162da10e13f8a0585af32b54a054",
+      "seed": "dev-2"
+    },
+    {
+      "adversarial_margin_mean": 0.11557805314064026,
+      "clean_accuracy": 0.8506,
+      "epoch": 149,
+      "path": ".cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/base-s2/e149/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.564,
+      "row_count": 5000,
+      "rows_sha256": "92737a6af3da4463fd8441c2b9e0b78ca86060b316e990703e65aefb76c53e88",
+      "seed": "dev-2"
+    },
+    {
+      "adversarial_margin_mean": 0.12978555912673473,
+      "clean_accuracy": 0.865,
+      "epoch": 199,
+      "path": ".cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/base-s2/e199/endpoint-sample-stats.parquet",
+      "robust_accuracy": 0.581,
+      "row_count": 5000,
+      "rows_sha256": "ad2be0f39ede7c21a8c54bd2aad991767b39fc5b36fb44a3f1bece3a13bd0226",
+      "seed": "dev-2"
+    }
+  ],
+  "final_range": 0.006199999999999983,
+  "final_sd": 0.0027224988521576984,
+  "macro_reconvergence_ratio": 0.09366456724079068,
+  "peak_range": 0.07319999999999999,
+  "peak_sd": 0.02906647553453978,
+  "per_seed": [
+    {
+      "best_epoch": 179,
+      "best_minus_final": 0.0031999999999999806,
+      "best_robust": 0.5848,
+      "gain_149_to_199": 0.02200000000000002,
+      "gain_tstar_to_199": 0.17759999999999998,
+      "robust_at_149": 0.5596,
+      "robust_at_199": 0.5816,
+      "robust_at_t_star": 0.404,
+      "seed": "dev-1"
+    },
+    {
+      "best_epoch": 195,
+      "best_minus_final": 0.0011999999999999789,
+      "best_robust": 0.5864,
+      "gain_149_to_199": 0.021600000000000064,
+      "gain_tstar_to_199": 0.11660000000000004,
+      "robust_at_149": 0.5636,
+      "robust_at_199": 0.5852,
+      "robust_at_t_star": 0.4686,
+      "seed": "dev-2"
+    },
+    {
+      "best_epoch": 163,
+      "best_minus_final": 0.0023999999999999577,
+      "best_robust": 0.5838,
+      "gain_149_to_199": 0.0252,
+      "gain_tstar_to_199": 0.11920000000000003,
+      "robust_at_149": 0.5562,
+      "robust_at_199": 0.5814,
+      "robust_at_t_star": 0.4622,
+      "seed": "confirm-a"
+    },
+    {
+      "best_epoch": 162,
+      "best_minus_final": 0.0030000000000000027,
+      "best_robust": 0.5888,
+      "gain_149_to_199": 0.023799999999999932,
+      "gain_tstar_to_199": 0.12379999999999997,
+      "robust_at_149": 0.562,
+      "robust_at_199": 0.5858,
+      "robust_at_t_star": 0.462,
+      "seed": "confirm-b"
+    },
+    {
+      "best_epoch": 191,
+      "best_minus_final": 0.0015999999999999348,
+      "best_robust": 0.5892,
+      "gain_149_to_199": 0.02639999999999998,
+      "gain_tstar_to_199": 0.1104,
+      "robust_at_149": 0.5612,
+      "robust_at_199": 0.5876,
+      "robust_at_t_star": 0.4772,
+      "seed": "confirm-c"
+    }
+  ],
+  "spearman_baseline_tstar_vs_final_gain": -0.9999999999999999,
+  "t_star": 97
+}

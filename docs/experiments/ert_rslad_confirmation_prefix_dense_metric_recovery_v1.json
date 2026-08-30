@@ -1,0 +1,43 @@
+{
+  "kind": "ert_rslad_confirmation_prefix_dense_metric_recovery",
+  "metric_contract": "epoch-metrics.jsonl val_pgd_accuracy/val_clean_accuracy, epochs 0..99 contiguous",
+  "no_training": true,
+  "previous_v1_limitation": "confirmation CROPSHIFT prefix dense metrics were unavailable in the prior local inventory",
+  "recovered": [
+    {
+      "epoch_end": 99,
+      "epoch_start": 0,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-a/prefix/epoch-metrics.jsonl",
+      "row_count": 100,
+      "seed": "confirm-a",
+      "sha256": "1c32130abc529567284b762c550b4bac26b8beb960008d657e8c2663e5271391",
+      "source": "Ferret historical prefix run"
+    },
+    {
+      "epoch_end": 99,
+      "epoch_start": 0,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-b/prefix/epoch-metrics.jsonl",
+      "row_count": 100,
+      "seed": "confirm-b",
+      "sha256": "9d6b88d85b4202c1fa2393d325a9e8ed7ce3bcceea84d273c556aa4400281e24",
+      "source": "Ferret historical prefix run"
+    },
+    {
+      "epoch_end": 99,
+      "epoch_start": 0,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-c/prefix/epoch-metrics.jsonl",
+      "row_count": 100,
+      "seed": "confirm-c",
+      "sha256": "30d70a41ebff6d2107bb1cd8cd30873dcaf3a2af19a743d0843fd4bd172f0044",
+      "source": "Ferret historical prefix run"
+    }
+  ],
+  "recovery_method": "targeted Ferret paths recorded in historical endpoint manifests; rsync checksum verification",
+  "schema_version": 1,
+  "seeds": [
+    "confirm-a",
+    "confirm-b",
+    "confirm-c"
+  ],
+  "source_git_sha": "7c3320361965406f4acd5f5e9a756c9abb2751e8"
+}

@@ -1,0 +1,502 @@
+{
+  "checkpoint_sha256_aggregate": "6b1b58289b7bfc9fca2f0ccfd90a276f74a72214ad727471cf8be64e3370e4ff",
+  "checkpoints": [
+    {
+      "config_hash": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+      "cutoff": 49,
+      "global_step": 17248,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s1-r2/epoch-049.pt",
+      "payload_epoch": 48,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "4911f38a145cd9cc0057ef78d827939ff0943964a37ab0cd0f71b9e81bc5e3c8",
+      "scientific_epoch": 49,
+      "seed": "dev-1",
+      "seen": 49,
+      "sha256": "455b906e6bf7284d9659a300144cf2c28b7e7c454b2473af6870f2d637bd87c8",
+      "size_bytes": 104257637,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827"
+    },
+    {
+      "config_hash": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+      "cutoff": 99,
+      "global_step": 34848,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s1-r2/epoch-099.pt",
+      "payload_epoch": 98,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "28c2b4a534b2a395ba4531f24f7dd446e50629528fbaa5b95cac70b4960362a3",
+      "scientific_epoch": 99,
+      "seed": "dev-1",
+      "seen": 99,
+      "sha256": "dd28f02e39e1a4484fe75ee72708d5d43620af79ed9a3bf52caec80b8baf54fd",
+      "size_bytes": 104259237,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827"
+    },
+    {
+      "config_hash": "2f84b5bc0ca6ffb3561a6b4cdef363b23d86ee555ceb7f8728087b31f275a87f",
+      "cutoff": 149,
+      "global_step": 52448,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s1/epoch-149.pt",
+      "payload_epoch": 148,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "e9986ad5cd281d6caae8e193c6939c9b7692c1c9c565072e4f306cc783941828",
+      "scientific_epoch": 149,
+      "seed": "dev-1",
+      "seen": 149,
+      "sha256": "76f7f7e37b89daee54060b20dfe4d9c5e1d01e70fff83f9f3bae0855728c6269",
+      "size_bytes": 104261349,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "rslad-stageaug-idbh-s100-s1-20260828"
+    },
+    {
+      "config_hash": "2f84b5bc0ca6ffb3561a6b4cdef363b23d86ee555ceb7f8728087b31f275a87f",
+      "cutoff": 199,
+      "global_step": 70048,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s1/epoch-199.pt",
+      "payload_epoch": 198,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "f93022524d92babc346d71322c6f728103626f8c6fbe9d8aa6d647cd5d7b2a59",
+      "scientific_epoch": 199,
+      "seed": "dev-1",
+      "seen": 199,
+      "sha256": "72f12c169cf02629ac66fd8d42f1bbb1d03a892e20a7c4d195ab29954c57e4b4",
+      "size_bytes": 104351589,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "rslad-stageaug-idbh-s100-s1-20260828"
+    },
+    {
+      "config_hash": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+      "cutoff": 49,
+      "global_step": 17248,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s2-r1/epoch-049.pt",
+      "payload_epoch": 48,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "47fc8d2af5667d6db5a3053e6d86c2242a7f2168b27df086aebfe56fd09af8b8",
+      "scientific_epoch": 49,
+      "seed": "dev-2",
+      "seen": 49,
+      "sha256": "5929b39532962582b3f71825da10730fe109a015ecf09ec1798a9a8356d68c92",
+      "size_bytes": 104257701,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827"
+    },
+    {
+      "config_hash": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+      "cutoff": 99,
+      "global_step": 34848,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-static-trajstab-v1/cropshift-s2-r1/epoch-099.pt",
+      "payload_epoch": 98,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "238572477566703221e39ac88cd940d1def2a9a6430ac70c638f011a7561d6a6",
+      "scientific_epoch": 99,
+      "seed": "dev-2",
+      "seen": 99,
+      "sha256": "d7a701b338b31b61090c00cad696735d81393837f62443d50f41570577ee3758",
+      "size_bytes": 104259237,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827"
+    },
+    {
+      "config_hash": "496b3983f1f69d3bc4fda2e55a5304552f2f9b9daa2231656625139ba6eaed60",
+      "cutoff": 149,
+      "global_step": 52448,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s2/epoch-149.pt",
+      "payload_epoch": 148,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "a9213924fcb030c22c95fa5670e2809d7a46d944788d9f2985832612eff2686a",
+      "scientific_epoch": 149,
+      "seed": "dev-2",
+      "seen": 149,
+      "sha256": "6ee03d34b1fb9805ab3ba4fdb908db33ca9a6b334bdc8d315ea6927814c967c8",
+      "size_bytes": 104261349,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "rslad-stageaug-idbh-s100-s2-20260828"
+    },
+    {
+      "config_hash": "496b3983f1f69d3bc4fda2e55a5304552f2f9b9daa2231656625139ba6eaed60",
+      "cutoff": 199,
+      "global_step": 70048,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s2/epoch-199.pt",
+      "payload_epoch": 198,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "86116cf70c6434615d406cfb660b023f543d697eb13b0b1203eab1b156d334e2",
+      "scientific_epoch": 199,
+      "seed": "dev-2",
+      "seen": 199,
+      "sha256": "0ccbe9e0147193ababf25b4b917b9b0cd37c74b70d35478d28613630d4c57cbd",
+      "size_bytes": 104351589,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "rslad-stageaug-idbh-s100-s2-20260828"
+    },
+    {
+      "config_hash": "f623c9e633325b3b5c3d73d1f10437f19de68ea065ad34b94911004d43509088",
+      "cutoff": 49,
+      "global_step": 17248,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-a/prefix/epoch-049.pt",
+      "payload_epoch": 48,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "1d3a2bf8e2b0a2d73a48cd7a079b155f15b5c7d212a15b5a95ffbb2fdb385386",
+      "scientific_epoch": 49,
+      "seed": "confirm-a",
+      "seen": 49,
+      "sha256": "70d86c26f375cdc86482e52334f5eaf1341f7457315c979f3c420e3be52172de",
+      "size_bytes": 104257765,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-a-prefix-r2-training"
+    },
+    {
+      "config_hash": "f623c9e633325b3b5c3d73d1f10437f19de68ea065ad34b94911004d43509088",
+      "cutoff": 99,
+      "global_step": 34848,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-a/prefix/epoch-099.pt",
+      "payload_epoch": 98,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "dc45700bfe4fa7b5690f6c6230a594aeac2dc62f7ee7237650038637c00d820e",
+      "scientific_epoch": 99,
+      "seed": "confirm-a",
+      "seen": 99,
+      "sha256": "f85928800cbdcea7e71b43340fc0df7a40ed641146f8d2e572d0f2e14d8417fc",
+      "size_bytes": 104259237,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-a-prefix-r2-training"
+    },
+    {
+      "config_hash": "599a37f1ad380b6ac4cf072cbe62493c6aa9371b287046598e56b228eb1a8847",
+      "cutoff": 149,
+      "global_step": 52448,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-a-i100-suffix/outputs/student/epoch-149.pt",
+      "payload_epoch": 148,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "3b55a9b36642cd2ec2fc25258bd598da9a35dc9b41086674e9a36e67d046699c",
+      "scientific_epoch": 149,
+      "seed": "confirm-a",
+      "seen": 149,
+      "sha256": "e598d3e71198af4474714ffd0c0e562b00581c789f6d6fd637b2955cb96daa82",
+      "size_bytes": 104261285,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-a-i100-suffix-training"
+    },
+    {
+      "config_hash": "599a37f1ad380b6ac4cf072cbe62493c6aa9371b287046598e56b228eb1a8847",
+      "cutoff": 199,
+      "global_step": 70048,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-a-i100-suffix/outputs/student/epoch-199.pt",
+      "payload_epoch": 198,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "c899c288627ac603cae3e082aff09804f870adbbdf0b344110e32d48d1db2eb8",
+      "scientific_epoch": 199,
+      "seed": "confirm-a",
+      "seen": 199,
+      "sha256": "b7c23b48517baae45c80e6a97c5976e7c1e9f13f999a43a3e0d8b34b5ed3697c",
+      "size_bytes": 104351525,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-a-i100-suffix-training"
+    },
+    {
+      "config_hash": "879645071ad90560be8950ea9c73038e027f5fa5c00e17e4a4f37a3a92ca8b9e",
+      "cutoff": 49,
+      "global_step": 17248,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-b/prefix/epoch-049.pt",
+      "payload_epoch": 48,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "f6b9af796345c49f72db9cf3b55988b984bd3ee4069260ce1f95ce524d1c6e6f",
+      "scientific_epoch": 49,
+      "seed": "confirm-b",
+      "seen": 49,
+      "sha256": "d963ee8ba9ffe9d4436aea305f1c32d750692543397ec1c8edc89f7763a61da6",
+      "size_bytes": 104257573,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-b-prefix-r2-training"
+    },
+    {
+      "config_hash": "879645071ad90560be8950ea9c73038e027f5fa5c00e17e4a4f37a3a92ca8b9e",
+      "cutoff": 99,
+      "global_step": 34848,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-b/prefix/epoch-099.pt",
+      "payload_epoch": 98,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "c023d3029876c2cb7f10a1e141e240441c97ca42b6ccda8c41fc2a2c15d4bcd0",
+      "scientific_epoch": 99,
+      "seed": "confirm-b",
+      "seen": 99,
+      "sha256": "a5f8d6a6926b3060c0c1c66d920545f832b1ac8cf09c96f547a25f9636e4865c",
+      "size_bytes": 104259237,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-b-prefix-r2-training"
+    },
+    {
+      "config_hash": "254360af50c8147a3ebfec72eb86406a6adb399a0c83131efc5df6bfe8241710",
+      "cutoff": 149,
+      "global_step": 52448,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-b-i100-suffix/outputs/student/epoch-149.pt",
+      "payload_epoch": 148,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "833c7eca7f16003b7adda53a1225402cf81034c6dbdabf51d3e22b5688bc2e04",
+      "scientific_epoch": 149,
+      "seed": "confirm-b",
+      "seen": 149,
+      "sha256": "e070965c1e6d34ba2ca17d01bbf854eb57dc8cba1b6fcfc2bc98e2ff95f304df",
+      "size_bytes": 104261285,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-b-i100-suffix-training"
+    },
+    {
+      "config_hash": "254360af50c8147a3ebfec72eb86406a6adb399a0c83131efc5df6bfe8241710",
+      "cutoff": 199,
+      "global_step": 70048,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-b-i100-suffix/outputs/student/epoch-199.pt",
+      "payload_epoch": 198,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "2c24d7003807529f3c3a7e5d9907bd3076c40ec81edea6d9d54e445d646c6d45",
+      "scientific_epoch": 199,
+      "seed": "confirm-b",
+      "seen": 199,
+      "sha256": "f848c6cc0378bb8f7f64afbd876f8b20ac9a48d40042882260766fdafa77b921",
+      "size_bytes": 104351525,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-b-i100-suffix-training"
+    },
+    {
+      "config_hash": "d91dc64219b8fcb32243b4a4d9b73671337fd0b2120e2a99afec9e29d088d9fc",
+      "cutoff": 49,
+      "global_step": 17248,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-c/prefix/epoch-049.pt",
+      "payload_epoch": 48,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "fe9ad4655335f89fa8bdbba60c06df83d11ed9c75814beca6e68c984e377b44a",
+      "scientific_epoch": 49,
+      "seed": "confirm-c",
+      "seen": 49,
+      "sha256": "2d739b03f91c9419bc743867ae12efcc6918509b1e5c3460448b99e17e6f0863",
+      "size_bytes": 104257573,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-c-prefix-r2-training"
+    },
+    {
+      "config_hash": "d91dc64219b8fcb32243b4a4d9b73671337fd0b2120e2a99afec9e29d088d9fc",
+      "cutoff": 99,
+      "global_step": 34848,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-c/prefix/epoch-099.pt",
+      "payload_epoch": 98,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "db9c6e0ec43d421aa7dfcee77b251190eae18cc18cd74dda2a0dd5c9d1908b17",
+      "scientific_epoch": 99,
+      "seed": "confirm-c",
+      "seen": 99,
+      "sha256": "a006a7a8ab3b484bd5d740a7ab9d99dc3c901403eb458ac60c7553ccafc8ab15",
+      "size_bytes": 104259109,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-c-prefix-r2-training"
+    },
+    {
+      "config_hash": "d5bfb055fe1bac3143b98ed0537eed13d3b4fdfbec93d63c9f1ad8311b1b0666",
+      "cutoff": 149,
+      "global_step": 52448,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-c/i100-suffix/epoch-149.pt",
+      "payload_epoch": 148,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "6c6e675fde9d5f43ee648ffea29b1a03917cc03f30d7c7e597e3fabd9165ed83",
+      "scientific_epoch": 149,
+      "seed": "confirm-c",
+      "seen": 149,
+      "sha256": "edcd47b08b8d1835d96c09314c40a0432d8d61017a155afca1560606af05f213",
+      "size_bytes": 104261221,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-c-i100-suffix-r3-training"
+    },
+    {
+      "config_hash": "d5bfb055fe1bac3143b98ed0537eed13d3b4fdfbec93d63c9f1ad8311b1b0666",
+      "cutoff": 199,
+      "global_step": 70048,
+      "history_statistics_complete": true,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-c/i100-suffix/epoch-199.pt",
+      "payload_epoch": 198,
+      "sample_state_format_version": 3,
+      "sample_state_pending": 0,
+      "sample_state_records": 45000,
+      "sample_state_sha256": "691f56974c00d0d8f55a23ce0c58894ed9012e5bec1bb5e546e8bf3e99e5eba6",
+      "scientific_epoch": 199,
+      "seed": "confirm-c",
+      "seen": 199,
+      "sha256": "bf77ee131bb3dd6eea2910036a6d1457bdf9aea891afa3243b3255ca433e870d",
+      "size_bytes": 104351461,
+      "teacher_identity_fields_present": true,
+      "tracker_run_id": "unseen-confirm-c-i100-suffix-r3-training"
+    }
+  ],
+  "cutoffs": [
+    49,
+    99,
+    149,
+    199
+  ],
+  "expected_train_count": 45000,
+  "feature_cutoffs": [
+    49,
+    99,
+    149
+  ],
+  "kind": "ert_rslad_student_history_inventory",
+  "lineage": {},
+  "metric_sources": {
+    "confirm-a": {
+      "base": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-a-base-r2/outputs/student/epoch-metrics.jsonl",
+        "sha256": "fa2dbbe506fb6fdfd6a0ca112e6f05b71b579ec273f810d673ff09471bf44566"
+      },
+      "crop": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-a/prefix/epoch-metrics.jsonl",
+        "sha256": "1c32130abc529567284b762c550b4bac26b8beb960008d657e8c2663e5271391"
+      },
+      "crop_suffix": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/confirm-a/crop-suffix/epoch-metrics.jsonl",
+        "sha256": "78f828775cb6f8bb90f512589f34b21b30c06d08d42bd03a22171221828a0982"
+      },
+      "suffix": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-a-i100-suffix/outputs/student/epoch-metrics.jsonl",
+        "sha256": "d2060aaff551e463689d0ec67e8507f0e3361bfaaab88a5c236c6c2147d8541a"
+      }
+    },
+    "confirm-b": {
+      "base": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-b-base-r3/outputs/student/epoch-metrics.jsonl",
+        "sha256": "34f498475b6868a2e031e5bcfd4d6378314916e90e4a745e21ca90d0532a5faa"
+      },
+      "crop": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-b/prefix/epoch-metrics.jsonl",
+        "sha256": "9d6b88d85b4202c1fa2393d325a9e8ed7ce3bcceea84d273c556aa4400281e24"
+      },
+      "crop_suffix": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-b-crop-suffix/outputs/student/epoch-metrics.jsonl",
+        "sha256": "e6d4ca28680379b5d8c9151240659d30b1500695728333f92beff7f0f40e66b4"
+      },
+      "suffix": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/unseen-confirm-b-i100-suffix/outputs/student/epoch-metrics.jsonl",
+        "sha256": "fa6bb1fe1f0adcab377ba304da38f89b14a4771caae83fa40daacac446144a6a"
+      }
+    },
+    "confirm-c": {
+      "base": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/confirm-c/base/epoch-metrics.jsonl",
+        "sha256": "6972ed402fc898703490c58fe605cc8d9e5e55afa437b0740dcdcab33be88bcf"
+      },
+      "crop": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-student-history-v1/sources/confirm-c/prefix/epoch-metrics.jsonl",
+        "sha256": "30d70a41ebff6d2107bb1cd8cd30873dcaf3a2af19a743d0843fd4bd172f0044"
+      },
+      "crop_suffix": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/confirm-c/crop-suffix/epoch-metrics.jsonl",
+        "sha256": "e93867bcd0556e95c5261d6f7d02eefd3d200572ad616007476ca78053f62115"
+      },
+      "suffix": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/confirm-c/i100-suffix/epoch-metrics.jsonl",
+        "sha256": "d5a6f107d73ea7ce76ece0ed1af47310e13b8cbb7cc50cdb0ccd842c0a98a5f7"
+      }
+    },
+    "dev-1": {
+      "base": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/base-s1/epoch-metrics.jsonl",
+        "sha256": "0799f31ee8112b9242aaca3982efcb84bac22adb09385054d05a23555c436943"
+      },
+      "crop": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/cropshift-s1/epoch-metrics.jsonl",
+        "sha256": "7f8ce23740af21eb4df0e68b507e0b7873ec90902aef06a59769d774e138cd6f"
+      },
+      "suffix": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/i100-s1/epoch-metrics.jsonl",
+        "sha256": "59f0da303262ac452e0cabf961f1c1a2f36510485610713a9d7bb6477ecfda2b"
+      }
+    },
+    "dev-2": {
+      "base": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/base-s2/epoch-metrics.jsonl",
+        "sha256": "43f35a761ddaf4415628b1222e1cc657b70ea94b0833177420480af4fa8657bf"
+      },
+      "crop": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/cropshift-s2/epoch-metrics.jsonl",
+        "sha256": "cf8d3d40ec7d57f493a8e72518b4de48ad6fc211f2fc7605cbaf735bb8be9326"
+      },
+      "suffix": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-five-seed-stochasticity-v1/sources/dev/i100-s2/epoch-metrics.jsonl",
+        "sha256": "4d1946d1f7094a4ac6c0f0aec9666c4589c98f960b149e6d2f47a561b4b3f728"
+      }
+    }
+  },
+  "sample_state_contract": {
+    "actual_seen_denominator": true,
+    "correctness": "Student robust correctness under training attack",
+    "ema_decay": 0.9,
+    "epoch_boundary": "end",
+    "format_version": 3,
+    "observation_semantics": "detached FP32 one valid observation per sample per epoch",
+    "teacher_fields": "snapshot fields are present but not used as predictive features"
+  },
+  "schema_version": 1,
+  "seeds": [
+    "dev-1",
+    "dev-2",
+    "confirm-a",
+    "confirm-b",
+    "confirm-c"
+  ],
+  "source_git_sha": "7c3320361965406f4acd5f5e9a756c9abb2751e8",
+  "stable_id_label_sha256": "99097c5dfca699fb2ab54635b40254cc31f5fbb5c40d6add038d7c2dfd3ffb74"
+}
