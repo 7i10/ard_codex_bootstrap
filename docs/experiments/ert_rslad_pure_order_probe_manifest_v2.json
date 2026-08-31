@@ -1,0 +1,875 @@
+{
+  "campaign_id": "ert-rslad-ordering-mechanism-probe-retry-v1",
+  "hosts": {
+    "hamster": {
+      "backend": "local",
+      "gpus": [
+        {
+          "index": 0,
+          "throughput": 679.0,
+          "uuid": "GPU-7ce112db-1ab9-ff86-9810-5bb92e222c2a"
+        },
+        {
+          "index": 1,
+          "throughput": 679.0,
+          "uuid": "GPU-9bb01a06-72d2-cc68-eeca-9c2c9daf37ce"
+        }
+      ],
+      "preflight_command": [
+        "nvidia-smi",
+        "-L"
+      ],
+      "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+        "/home/shunsukenaito/workspace-local/datasets/ard/torchvision",
+        "/home/shunsukenaito/workspace-local/ard_codex_bootstrap/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt"
+      ]
+    }
+  },
+  "jobs": [
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s1",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "0"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_0-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s1/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_0-s1",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 0,
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_0",
+        "seed": 1,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s1",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_1-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s1/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_1-s1",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 1,
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_1",
+        "seed": 1,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s1",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_2-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s1/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_2-s1",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 2,
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_2",
+        "seed": 1,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s1",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "3"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_3-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s1/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_3-s1",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 3,
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_3",
+        "seed": 1,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s1",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "4"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_4-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s1/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_4-s1",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 4,
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_4",
+        "seed": 1,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s1",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "5"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_5-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s1/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_5-s1",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 5,
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_5",
+        "seed": 1,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s1",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "6"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_6-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s1/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_6-s1",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 6,
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_6",
+        "seed": 1,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s1",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "7"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_7-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s1/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_7-s1",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 7,
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_7",
+        "seed": 1,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s2",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "0"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_0-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s2/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_0-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_0-s2",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 0,
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_0",
+        "seed": 2,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s2",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_1-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s2/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_1-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_1-s2",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 1,
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_1",
+        "seed": 2,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s2",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_2-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s2/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_2-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_2-s2",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 2,
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_2",
+        "seed": 2,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s2",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "3"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_3-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s2/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_3-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_3-s2",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 3,
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_3",
+        "seed": 2,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s2",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "4"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_4-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s2/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_4-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_4-s2",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 4,
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_4",
+        "seed": 2,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s2",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "5"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_5-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s2/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_5-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_5-s2",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 5,
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_5",
+        "seed": 2,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s2",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "6"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_6-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s2/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_6-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_6-s2",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 6,
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_6",
+        "seed": 2,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s2",
+        "--ordering-policy",
+        "epoch_shuffle_offset",
+        "--ordering-seed-offset",
+        "7"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "host": "hamster",
+      "job_id": "train-shuffle_plus_7-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s2/last.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/shuffle_plus_7-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-retry-v2-shuffle_plus_7-s2",
+      "scientific_identity": {
+        "attack_identity": "KL-PGD10|eps=8/255|step=2/255|random_start|teacher_clean_target",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng_pure_order_probe",
+        "order_policy": "epoch_shuffle_offset",
+        "order_seed_offset": 7,
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "probe_epochs": "100-114",
+        "schedule_id": "SHUFFLE_PLUS_7",
+        "seed": 2,
+        "telemetry_contract": "ert_rslad_pure_order_probe_telemetry_v1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "scripts/analysis/aggregate_ert_rslad_pure_order_probes.py",
+        "--registry",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_pure_order_probe_registry_v2.json",
+        "--root",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_pure_order_probe_results_v2.json"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-shuffle_plus_0-s1",
+        "train-shuffle_plus_1-s1",
+        "train-shuffle_plus_2-s1",
+        "train-shuffle_plus_3-s1",
+        "train-shuffle_plus_4-s1",
+        "train-shuffle_plus_5-s1",
+        "train-shuffle_plus_6-s1",
+        "train-shuffle_plus_7-s1",
+        "train-shuffle_plus_0-s2",
+        "train-shuffle_plus_1-s2",
+        "train-shuffle_plus_2-s2",
+        "train-shuffle_plus_3-s2",
+        "train-shuffle_plus_4-s2",
+        "train-shuffle_plus_5-s2",
+        "train-shuffle_plus_6-s2",
+        "train-shuffle_plus_7-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "estimated_work": 1,
+      "gpu_count": 0,
+      "host": "hamster",
+      "job_id": "aggregate-pure-order-probes",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/aggregate",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_pure_order_probe_registry_v1.json"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-pure-order-probe-retry-v2-aggregate",
+      "scientific_identity": {
+        "method_id": "ert_rslad_pure_order_probe_aggregate_v1",
+        "probe_count": 16,
+        "registry_sha256": "eff64c9cfb790d48b96344c8672b175cdf22e6cecaf0b91e64fbc512db592721"
+      }
+    }
+  ],
+  "reservation_root": "/home/shunsukenaito/.cache/ard-experiment-orchestrator/reservations",
+  "schema_version": 1,
+  "source": {
+    "git_sha": "0273abda01c6c80ebaa8a182d165884edce7237a"
+  },
+  "state_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v2/orchestration.state.json"
+}
