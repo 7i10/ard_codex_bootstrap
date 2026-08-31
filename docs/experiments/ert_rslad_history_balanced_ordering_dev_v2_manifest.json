@@ -593,7 +593,7 @@
   "schema_version": 1,
   "source": {
     "git_sha": "aafc5b7b18a557a027d9dcd4b0064bfcaf843404",
-    "scientific_source_note": "Frozen implementation source commit; fork lineage records the exact clean source used for materialization."
+    "scientific_source_note": "Frozen source commit; fork lineage records the exact clean source used for materialization."
   },
   "state_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/orchestration.state.json"
 }

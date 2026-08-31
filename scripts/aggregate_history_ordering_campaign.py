@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Any
 
 ATTACK_ID = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
-ROOT = Path("/home/shunsukenaito/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final")
+ROOT = Path(
+    "/home/shunsukenaito/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final"
+)
 ARMS = {"NEW_CONTROL": "epoch_shuffle_control", "NEW_HISTORY": "history_balanced_v1"}
 REPO = Path(__file__).resolve().parents[1]
 
@@ -84,7 +86,11 @@ def arm(seed: int, name: str) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-json", type=Path, default=REPO / "docs/experiments/ert_rslad_history_balanced_ordering_dev_v2_results.json")
+    parser.add_argument(
+        "--output-json",
+        type=Path,
+        default=REPO / "docs/experiments/ert_rslad_history_balanced_ordering_dev_v2_results.json",
+    )
     parser.add_argument("--output-md", type=Path, default=REPO / "docs/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV_V2.md")
     args = parser.parse_args()
     arms = [arm(seed, name) for seed in (1, 2) for name in ARMS]
@@ -100,8 +106,10 @@ def main() -> int:
                     "post100_auc": history["trajectory"]["post100_auc"] - control["trajectory"]["post100_auc"],
                     "final_robust": history["trajectory"]["last_robust"] - control["trajectory"]["last_robust"],
                     "final_clean": history["trajectory"]["last_clean"] - control["trajectory"]["last_clean"],
-                    "endpoint_149_robust": history["endpoints"]["149"]["robust"] - control["endpoints"]["149"]["robust"],
-                    "endpoint_199_robust": history["endpoints"]["199"]["robust"] - control["endpoints"]["199"]["robust"],
+                    "endpoint_149_robust": history["endpoints"]["149"]["robust"]
+                    - control["endpoints"]["149"]["robust"],
+                    "endpoint_199_robust": history["endpoints"]["199"]["robust"]
+                    - control["endpoints"]["199"]["robust"],
                     "endpoint_199_clean": history["endpoints"]["199"]["clean"] - control["endpoints"]["199"]["clean"],
                 },
             }
@@ -111,21 +119,38 @@ def main() -> int:
         "kind": "ert_rslad_history_balanced_ordering_dev_v2_results",
         "status": "complete",
         "source_git_sha": "aafc5b7b18a557a027d9dcd4b0064bfcaf843404",
-        "training_attack": {"keying": "sample_keyed_v1", "loss": "kl", "steps": 10, "epsilon": "8/255", "step_size": "2/255"},
+        "training_attack": {
+            "keying": "sample_keyed_v1",
+            "loss": "kl",
+            "steps": 10,
+            "epsilon": "8/255",
+            "step_size": "2/255",
+        },
         "endpoint_attack_identity_sha256": ATTACK_ID,
         "dataset": {"name": "cifar10", "train_count": 45000, "validation_count": 5000},
         "arms": arms,
         "paired_comparisons": comparisons,
         "promotion_gate": {
-            "both_seeds_final_robust_positive": all(item["history_minus_control"]["final_robust"] > 0 for item in comparisons),
-            "both_seeds_post100_auc_nonnegative": all(item["history_minus_control"]["post100_auc"] >= 0 for item in comparisons),
-            "mean_final_robust_at_least_0_30pp": sum(item["history_minus_control"]["final_robust"] for item in comparisons) / 2 >= 0.003,
-            "clean_delta_at_least_minus_1pp": all(item["history_minus_control"]["final_clean"] >= -0.01 for item in comparisons),
+            "both_seeds_final_robust_positive": all(
+                item["history_minus_control"]["final_robust"] > 0 for item in comparisons
+            ),
+            "both_seeds_post100_auc_nonnegative": all(
+                item["history_minus_control"]["post100_auc"] >= 0 for item in comparisons
+            ),
+            "mean_final_robust_at_least_0_30pp": sum(
+                item["history_minus_control"]["final_robust"] for item in comparisons
+            )
+            / 2
+            >= 0.003,
+            "clean_delta_at_least_minus_1pp": all(
+                item["history_minus_control"]["final_clean"] >= -0.01 for item in comparisons
+            ),
             "automatic_promotion": False,
         },
         "limitations": [
             "Two development seeds only; no confirmation seeds were run.",
-            "Sample-keyed random-start generation uses a correctness-first CPU per-sample generator and exceeded the 5% random-start-only overhead target in the bounded benchmark.",
+            "Sample-keyed random-start generation uses a correctness-first CPU generator and exceeded the 5% "
+            "random-start-only overhead target in the bounded benchmark.",
             "Internal validation only; no official test or AutoAttack.",
         ],
     }
@@ -134,7 +159,8 @@ def main() -> int:
     lines = [
         "# ERT / RSLAD History-Balanced Ordering Dev v2",
         "",
-        "Status: complete; development seeds 1 and 2 only. The primary causal comparison is NEW_HISTORY minus NEW_CONTROL under the new sample-keyed training attack RNG contract.",
+        "Status: complete; dev seeds 1 and 2 only. The primary comparison is NEW_HISTORY minus NEW_CONTROL "
+        "under the new sample-keyed training attack RNG contract.",
         "",
         "## Paired results",
         "",
@@ -145,15 +171,18 @@ def main() -> int:
         delta = item["history_minus_control"]
         lines.append(
             f"| {item['seed']} | {delta['final_robust'] * 100:+.3f} pp | {delta['final_clean'] * 100:+.3f} pp | "
-            f"{delta['post100_auc'] * 100:+.3f} pp | {delta['endpoint_149_robust'] * 100:+.3f} pp | {delta['endpoint_199_robust'] * 100:+.3f} pp |"
+            f"{delta['post100_auc'] * 100:+.3f} pp | {delta['endpoint_149_robust'] * 100:+.3f} pp | "
+            f"{delta['endpoint_199_robust'] * 100:+.3f} pp |"
         )
     lines += [
         "",
         "## Contract",
         "",
         "- Prefix: frozen I100 (CropShift epochs 0–99, IDBH_WEAK epochs 100–199).",
-        "- Training attack: KL-PGD10, 8/255, 2/255, random start, teacher-clean target; random starts are keyed by attack seed, epoch, source ID, stream tag, and restart index only.",
-        "- NEW_CONTROL uses canonical epoch shuffle; NEW_HISTORY uses frozen H2 `margin_ema` risk, HIGH/MID/LOW 20/60/20, HIGH/MID/MID/LOW/MID interleave, exact-once exposure.",
+        "- Training attack: KL-PGD10, 8/255, 2/255, random start, teacher-clean target; random starts are keyed by "
+        "attack seed, epoch, source ID, stream tag, and restart index only.",
+        "- NEW_CONTROL uses canonical epoch shuffle; NEW_HISTORY uses frozen H2 `margin_ema` risk, HIGH/MID/LOW "
+        "20/60/20, HIGH/MID/MID/LOW/MID interleave, exact-once exposure.",
         "- Endpoint: common CE-PGD20 on the fixed internal validation split (5,000 rows).",
         "- W&B policy: metrics-only; model and run-bundle uploads disabled.",
         "",
@@ -164,7 +193,9 @@ def main() -> int:
         f"Machine artifact: `{args.output_json}` (SHA-256 `{sha256(args.output_json)}`).",
     ]
     args.output_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(json.dumps({"json": str(args.output_json), "markdown": str(args.output_md), "arms": len(arms)}, sort_keys=True))
+    print(
+        json.dumps({"json": str(args.output_json), "markdown": str(args.output_md), "arms": len(arms)}, sort_keys=True)
+    )
     return 0
 
 
