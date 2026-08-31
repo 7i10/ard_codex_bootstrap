@@ -6,13 +6,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
 
 ATTACK_ID = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
 ROOT = Path(
-    "/home/shunsukenaito/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final"
+    os.environ.get(
+        "ARD_HISTORY_ORDERING_RUN_ROOT",
+        "/home/shunsukenaito/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final",
+    )
 )
 ARMS = {"NEW_CONTROL": "epoch_shuffle_control", "NEW_HISTORY": "history_balanced_v1"}
 REPO = Path(__file__).resolve().parents[1]
