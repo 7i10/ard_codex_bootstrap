@@ -228,9 +228,7 @@
       "host": "hamster",
       "job_id": "endpoint-control-s1-e149",
       "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/endpoints/epoch-149/validation",
-      "required_paths": [
-        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/epoch-149.pt"
-      ],
+      "required_paths": [],
       "retry_policy": {
         "max_attempts": 2
       },
@@ -275,9 +273,7 @@
       "host": "hamster",
       "job_id": "endpoint-control-s1-e199",
       "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/endpoints/epoch-199/validation",
-      "required_paths": [
-        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/epoch-199.pt"
-      ],
+      "required_paths": [],
       "retry_policy": {
         "max_attempts": 2
       },
@@ -322,9 +318,7 @@
       "host": "hamster",
       "job_id": "endpoint-history-s1-e149",
       "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/endpoints/epoch-149/validation",
-      "required_paths": [
-        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/epoch-149.pt"
-      ],
+      "required_paths": [],
       "retry_policy": {
         "max_attempts": 2
       },
@@ -369,9 +363,7 @@
       "host": "hamster",
       "job_id": "endpoint-history-s1-e199",
       "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/endpoints/epoch-199/validation",
-      "required_paths": [
-        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/epoch-199.pt"
-      ],
+      "required_paths": [],
       "retry_policy": {
         "max_attempts": 2
       },
@@ -416,9 +408,7 @@
       "host": "hamster",
       "job_id": "endpoint-control-s2-e149",
       "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/endpoints/epoch-149/validation",
-      "required_paths": [
-        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/epoch-149.pt"
-      ],
+      "required_paths": [],
       "retry_policy": {
         "max_attempts": 2
       },
@@ -463,9 +453,7 @@
       "host": "hamster",
       "job_id": "endpoint-control-s2-e199",
       "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/endpoints/epoch-199/validation",
-      "required_paths": [
-        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/epoch-199.pt"
-      ],
+      "required_paths": [],
       "retry_policy": {
         "max_attempts": 2
       },
@@ -510,9 +498,7 @@
       "host": "hamster",
       "job_id": "endpoint-history-s2-e149",
       "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/endpoints/epoch-149/validation",
-      "required_paths": [
-        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/epoch-149.pt"
-      ],
+      "required_paths": [],
       "retry_policy": {
         "max_attempts": 2
       },
@@ -557,9 +543,7 @@
       "host": "hamster",
       "job_id": "endpoint-history-s2-e199",
       "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/endpoints/epoch-199/validation",
-      "required_paths": [
-        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/epoch-199.pt"
-      ],
+      "required_paths": [],
       "retry_policy": {
         "max_attempts": 2
       },

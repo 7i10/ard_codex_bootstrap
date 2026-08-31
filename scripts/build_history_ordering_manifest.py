@@ -34,7 +34,7 @@ def endpoint_job(seed: int, history: bool, epoch: int) -> dict[str, object]:
     endpoint_root = root / "endpoints" / f"epoch-{epoch}" / "validation"
     command = [PYTHON, "-m", "ard.cli.ert_stage_a_endpoint", "--config", str(root / "resolved_config.yaml"), "--checkpoint", str(root / f"epoch-{epoch}.pt"), "--output", str(endpoint_root), "--expected-epoch", str(epoch - 1), "--split", "validation", "--device", "cuda"]
     return {
-        "job_id": f"endpoint-{arm}-s{seed}-e{epoch}", "run_id": f"ert-rslad-history-ordering-endpoint-{arm}-s{seed}-e{epoch}", "host": "hamster", "command": command, "cwd": str(REPO), "env": ENV, "required_paths": [str(root / f"epoch-{epoch}.pt")], "output_dir": str(endpoint_root), "completion_marker": "orchestration/completion.json", "dependencies": [f"train-{arm}-s{seed}"], "estimated_work": 10, "retry_policy": {"max_attempts": 2},
+        "job_id": f"endpoint-{arm}-s{seed}-e{epoch}", "run_id": f"ert-rslad-history-ordering-endpoint-{arm}-s{seed}-e{epoch}", "host": "hamster", "command": command, "cwd": str(REPO), "env": ENV, "required_paths": [], "output_dir": str(endpoint_root), "completion_marker": "orchestration/completion.json", "dependencies": [f"train-{arm}-s{seed}"], "estimated_work": 10, "retry_policy": {"max_attempts": 2},
         "scientific_identity": {"method_id": "CE-PGD20", "arm": "NEW_HISTORY" if history else "NEW_CONTROL", "seed": seed, "endpoint_epoch": epoch, "attack_identity": ATTACK},
     }
 
