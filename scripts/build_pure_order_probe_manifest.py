@@ -29,6 +29,7 @@ def train_job(
     *,
     run_root: Path,
     run_id_prefix: str,
+    source_root: Path,
 ) -> dict[str, object]:
     run = run_root / f"{schedule_id.lower()}-s{seed}"
     run_id = f"{run_id_prefix}-{schedule_id.lower()}-s{seed}"
@@ -51,8 +52,8 @@ def train_job(
             "--ordering-seed-offset",
             str(offset),
         ],
-        "cwd": str(REPO),
-        "env": ENV,
+        "cwd": str(source_root),
+        "env": {"PYTHONPATH": str(source_root / "src"), "PYTHONUNBUFFERED": "1", "WANDB_MODE": "online"},
         "required_paths": [str(run / "last.pt"), str(run / "resolved_config.yaml")],
         "output_dir": str(run),
         "completion_marker": "orchestration/completion.json",
@@ -82,6 +83,7 @@ def main() -> int:
     parser.add_argument("--registry", type=Path, default=REGISTRY)
     parser.add_argument("--campaign-id", default="ert-rslad-ordering-mechanism-probe-v1")
     parser.add_argument("--run-id-prefix", default="ert-rslad-pure-order")
+    parser.add_argument("--source-root", type=Path, default=REPO)
     parser.add_argument(
         "--result-output",
         type=Path,
@@ -91,6 +93,7 @@ def main() -> int:
     args = parser.parse_args()
     run_root = args.run_root.resolve()
     registry_path = args.registry.resolve()
+    source_root = args.source_root.resolve()
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     jobs: list[dict[str, object]] = []
     for seed in (1, 2):
@@ -102,6 +105,7 @@ def main() -> int:
                     seed,
                     run_root=run_root,
                     run_id_prefix=args.run_id_prefix,
+                    source_root=source_root,
                 )
             )
     aggregate_id = "aggregate-pure-order-probes"
@@ -113,7 +117,7 @@ def main() -> int:
             "gpu_count": 0,
             "command": [
                 PYTHON,
-                "scripts/analysis/aggregate_ert_rslad_pure_order_probes.py",
+                str(source_root / "scripts/analysis/aggregate_ert_rslad_pure_order_probes.py"),
                 "--registry",
                 str(registry_path),
                 "--root",
@@ -121,9 +125,9 @@ def main() -> int:
                 "--output",
                 str(args.result_output.resolve()),
             ],
-            "cwd": str(REPO),
-            "env": {"PYTHONPATH": str(REPO / "src"), "PYTHONUNBUFFERED": "1"},
-            "required_paths": [str(REGISTRY)],
+            "cwd": str(source_root),
+            "env": {"PYTHONPATH": str(source_root / "src"), "PYTHONUNBUFFERED": "1"},
+            "required_paths": [str(registry_path)],
             "output_dir": str(run_root / "aggregate"),
             "completion_marker": "orchestration/completion.json",
             "dependencies": [job["job_id"] for job in jobs],
@@ -147,7 +151,7 @@ def main() -> int:
                 "backend": "local",
                 "python": PYTHON,
                 "required_paths": [
-                    str(REPO),
+                    str(source_root),
                     "/home/shunsukenaito/workspace-local/datasets/ard/torchvision",
                     "/home/shunsukenaito/workspace-local/ard_codex_bootstrap/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt",
                 ],
