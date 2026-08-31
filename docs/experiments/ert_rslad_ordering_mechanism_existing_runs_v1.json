@@ -1,0 +1,390 @@
+{
+  "analysis_mode": "read_only",
+  "content_sha256": "26388affb2703e7f95d70029be08d0a09688823fa4f51432037fdf61e76653b0",
+  "descriptor_contract": {
+    "D1_batch_mean_risk_sd": {
+      "available": false,
+      "definition": "SD of batch mean risk",
+      "reason": "Existing artifacts contain permutation digests and final sample state, but no per-batch stable-ID/risk observations."
+    },
+    "D2_within_batch_risk_sd": {
+      "available": false,
+      "definition": "mean within-batch risk SD",
+      "reason": "Existing artifacts contain permutation digests and final sample state, but no per-batch stable-ID/risk observations."
+    },
+    "D3_high_risk_fraction_sd": {
+      "available": false,
+      "definition": "SD of high-risk fraction per batch",
+      "reason": "Existing artifacts contain permutation digests and final sample state, but no per-batch stable-ID/risk observations."
+    },
+    "D4_batch_mean_risk_lag1_acf": {
+      "available": false,
+      "definition": "lag-1 autocorrelation of batch mean risk",
+      "reason": "Existing artifacts contain permutation digests and final sample state, but no per-batch stable-ID/risk observations."
+    },
+    "D5_hard_batch_clustering": {
+      "available": false,
+      "definition": "top-20% run length and inter-batch distance",
+      "reason": "Existing artifacts contain permutation digests and final sample state, but no per-batch stable-ID/risk observations."
+    },
+    "D6_batch_position_risk_spearman": {
+      "available": false,
+      "definition": "batch position versus risk Spearman correlation",
+      "reason": "Existing artifacts contain permutation digests and final sample state, but no per-batch stable-ID/risk observations."
+    }
+  },
+  "direction_audit": {
+    "current_sampler_high_is_low_margin": true,
+    "historical_ordering_source_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+    "historical_sampler_used_inverse_direction": true,
+    "prior_history_run_not_rerun": true
+  },
+  "historical_paired_results": [
+    {
+      "history_minus_control": {
+        "endpoint_149_robust": -0.006199999999999983,
+        "endpoint_199_clean": 0.0,
+        "endpoint_199_robust": 0.00019999999999997797,
+        "final_clean": 0.0018000000000000238,
+        "final_robust": 0.0005999999999999339,
+        "post100_auc": -0.0005707070707069439
+      },
+      "seed": 1
+    },
+    {
+      "history_minus_control": {
+        "endpoint_149_robust": -0.0026000000000000467,
+        "endpoint_199_clean": 0.0020000000000000018,
+        "endpoint_199_robust": -0.0036000000000000476,
+        "final_clean": -0.0007999999999999119,
+        "final_robust": -0.0010000000000000009,
+        "post100_auc": -0.0003202020202021094
+      },
+      "seed": 2
+    }
+  ],
+  "historical_result_artifact": {
+    "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_history_balanced_ordering_dev_v2_results.json",
+    "sha256": "1b08ffa9ecfbaec61d5dccbf25022e297289069ed5cbe7dce7c9184b9e23a271"
+  },
+  "historical_result_interpretation": {
+    "reason": "The completed NEW_HISTORY run was generated before the HIGH/LOW direction correction and does not expose batch-level telemetry.",
+    "usable_as_corrected_direction_mechanism_evidence": false,
+    "usable_for_lineage_inventory": true
+  },
+  "kind": "ert_rslad_ordering_mechanism_existing_runs_v1",
+  "limitations": [
+    "Permutation SHA-256 values are one-way commitments; they cannot recover batch membership or risk values.",
+    "Final sample-stats parquet is an endpoint snapshot, not an epoch-by-epoch state trajectory.",
+    "No new training, endpoint evaluation, gradient calibration, or polling was performed."
+  ],
+  "parents": [
+    {
+      "actual_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "exists": true,
+      "expected_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+      "payload_boundary": "epoch=99, epoch_boundary=end",
+      "seed": 1,
+      "sha_match": true,
+      "size_bytes": 104259237
+    },
+    {
+      "actual_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "exists": true,
+      "expected_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+      "payload_boundary": "epoch=99, epoch_boundary=end",
+      "seed": 2,
+      "sha_match": true,
+      "size_bytes": 104259301
+    }
+  ],
+  "phase_gate": {
+    "decision": "stop_no_mechanism_identified",
+    "holdout_training": "not_run",
+    "phase_a_existing_batch_mechanism": "blocked",
+    "phase_b_gradient_geometry": "not_run",
+    "phase_c_pure_order_probe": "not_run",
+    "phase_d_second_intervention": "not_run"
+  },
+  "runs": [
+    {
+      "arm": "NEW_CONTROL",
+      "batch_telemetry_available": false,
+      "directory": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1",
+      "epoch_metrics": {
+        "contains_batch_level_values": false,
+        "exists": true,
+        "first_epoch": 100,
+        "keys": [
+          "epoch",
+          "global_step",
+          "learning_rate",
+          "next_learning_rate",
+          "train_clean_accuracy",
+          "train_cuda_peak_allocated_bytes",
+          "train_cuda_peak_reserved_bytes",
+          "train_images_per_second",
+          "train_loss",
+          "train_robust_accuracy",
+          "train_seconds",
+          "train_teacher_adversarial_forward_calls",
+          "train_teacher_clean_forward_calls",
+          "train_valid_examples",
+          "val_clean_accuracy",
+          "val_pgd_accuracy"
+        ],
+        "last_epoch": 199,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/epoch-metrics.jsonl",
+        "row_count": 100,
+        "sha256": "02cd761e61ee8c89776ac4294d470c4ece50f2112aecbb7ed7be4af8981103dd"
+      },
+      "fork_lineage": {
+        "attack_random_start_keying": "sample_keyed_v1",
+        "child_config_sha256": "5d0e1f5081e9c9e213f678467f51f03f777a082e284de34aefd73a7416ab15f1",
+        "child_tracker_run_id": "ert-rslad-history-ordering-new_control-s1",
+        "fork_git_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+        "history_predictor": "H2_margin_ema_direct_negative_rank",
+        "history_predictor_sha256": "b6be23e7eaa31dd300ed21efb84746bba2270a4a044096c86d3be035c8abebbd",
+        "kind": "stagewise_augmentation_fork_v1",
+        "ordering_policy": "epoch_shuffle_control",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "parent_completed_epoch_count": 100,
+        "parent_config_sha256": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+        "parent_git_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+        "parent_payload_epoch": 99,
+        "parent_tracker_run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827",
+        "post_fork_best_scope": true,
+        "prefix_policy": "I100_CROPSHIFT_0_99_IDBH_WEAK_100_199"
+      },
+      "manifest": {
+        "exists": true,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/run-bundle/manifest.json",
+        "sha256": "5588cef3126a20f85d95beeb896e7af741adc63050539f4d9e681cf7a38cbdca"
+      },
+      "ordering_metrics": {
+        "exists": false,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/ordering-metrics.jsonl"
+      },
+      "sample_state_sequence_available": false,
+      "seed": 1
+    },
+    {
+      "arm": "NEW_HISTORY",
+      "batch_telemetry_available": false,
+      "directory": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1",
+      "epoch_metrics": {
+        "contains_batch_level_values": false,
+        "exists": true,
+        "first_epoch": 100,
+        "keys": [
+          "epoch",
+          "global_step",
+          "learning_rate",
+          "next_learning_rate",
+          "train_clean_accuracy",
+          "train_cuda_peak_allocated_bytes",
+          "train_cuda_peak_reserved_bytes",
+          "train_images_per_second",
+          "train_loss",
+          "train_robust_accuracy",
+          "train_seconds",
+          "train_teacher_adversarial_forward_calls",
+          "train_teacher_clean_forward_calls",
+          "train_valid_examples",
+          "val_clean_accuracy",
+          "val_pgd_accuracy"
+        ],
+        "last_epoch": 199,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/epoch-metrics.jsonl",
+        "row_count": 100,
+        "sha256": "9984c3ec96a674d30ae800b5de06f9409f603ea055c922f9a9fc1d533f596265"
+      },
+      "fork_lineage": {
+        "attack_random_start_keying": "sample_keyed_v1",
+        "child_config_sha256": "41611150f2729c0fa26f4337f7a6b6588fa25b196644b9ec80bf6915122f9e42",
+        "child_tracker_run_id": "ert-rslad-history-ordering-new_history-s1",
+        "fork_git_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+        "history_predictor": "H2_margin_ema_direct_negative_rank",
+        "history_predictor_sha256": "b6be23e7eaa31dd300ed21efb84746bba2270a4a044096c86d3be035c8abebbd",
+        "kind": "stagewise_augmentation_fork_v1",
+        "ordering_policy": "history_balanced_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "parent_completed_epoch_count": 100,
+        "parent_config_sha256": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+        "parent_git_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+        "parent_payload_epoch": 99,
+        "parent_tracker_run_id": "ert-rslad-trajstab-cropshift-s1-r2-20260827",
+        "post_fork_best_scope": true,
+        "prefix_policy": "I100_CROPSHIFT_0_99_IDBH_WEAK_100_199"
+      },
+      "manifest": {
+        "exists": true,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/run-bundle/manifest.json",
+        "sha256": "972da875c4978683ae4f3e654219e449c9010d0cbf1ea111e9eda0fdda1a7d05"
+      },
+      "ordering_metrics": {
+        "contains_batch_level_values": false,
+        "exists": true,
+        "first_epoch": 100,
+        "keys": [
+          "epoch",
+          "global_step",
+          "permutation_sha256",
+          "policy",
+          "risk_definition",
+          "seed",
+          "strata_counts",
+          "strata_pattern"
+        ],
+        "last_epoch": 199,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/ordering-metrics.jsonl",
+        "row_count": 100,
+        "sha256": "086d9c7e56549c2fbc06b8a9f627e63b77c07c9e66118333b8f4297336ff09bb"
+      },
+      "sample_state_sequence_available": false,
+      "seed": 1
+    },
+    {
+      "arm": "NEW_CONTROL",
+      "batch_telemetry_available": false,
+      "directory": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2",
+      "epoch_metrics": {
+        "contains_batch_level_values": false,
+        "exists": true,
+        "first_epoch": 100,
+        "keys": [
+          "epoch",
+          "global_step",
+          "learning_rate",
+          "next_learning_rate",
+          "train_clean_accuracy",
+          "train_cuda_peak_allocated_bytes",
+          "train_cuda_peak_reserved_bytes",
+          "train_images_per_second",
+          "train_loss",
+          "train_robust_accuracy",
+          "train_seconds",
+          "train_teacher_adversarial_forward_calls",
+          "train_teacher_clean_forward_calls",
+          "train_valid_examples",
+          "val_clean_accuracy",
+          "val_pgd_accuracy"
+        ],
+        "last_epoch": 199,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/epoch-metrics.jsonl",
+        "row_count": 100,
+        "sha256": "abdea82a5dbee133b3496010d0d1bb72b967c02d77fb0eb8dd954e022242fd3a"
+      },
+      "fork_lineage": {
+        "attack_random_start_keying": "sample_keyed_v1",
+        "child_config_sha256": "be7f148801daa28d508ea8d154d5a5f53c5f6cdd8ed2b5521f0c5ac8b1125fd1",
+        "child_tracker_run_id": "ert-rslad-history-ordering-new_control-s2",
+        "fork_git_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+        "history_predictor": "H2_margin_ema_direct_negative_rank",
+        "history_predictor_sha256": "b6be23e7eaa31dd300ed21efb84746bba2270a4a044096c86d3be035c8abebbd",
+        "kind": "stagewise_augmentation_fork_v1",
+        "ordering_policy": "epoch_shuffle_control",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "parent_completed_epoch_count": 100,
+        "parent_config_sha256": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+        "parent_git_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+        "parent_payload_epoch": 99,
+        "parent_tracker_run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827",
+        "post_fork_best_scope": true,
+        "prefix_policy": "I100_CROPSHIFT_0_99_IDBH_WEAK_100_199"
+      },
+      "manifest": {
+        "exists": true,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/run-bundle/manifest.json",
+        "sha256": "cc94429b0603752943d78716607b66416263a6c2646314090be02dd22b08b089"
+      },
+      "ordering_metrics": {
+        "exists": false,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/ordering-metrics.jsonl"
+      },
+      "sample_state_sequence_available": false,
+      "seed": 2
+    },
+    {
+      "arm": "NEW_HISTORY",
+      "batch_telemetry_available": false,
+      "directory": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2",
+      "epoch_metrics": {
+        "contains_batch_level_values": false,
+        "exists": true,
+        "first_epoch": 100,
+        "keys": [
+          "epoch",
+          "global_step",
+          "learning_rate",
+          "next_learning_rate",
+          "train_clean_accuracy",
+          "train_cuda_peak_allocated_bytes",
+          "train_cuda_peak_reserved_bytes",
+          "train_images_per_second",
+          "train_loss",
+          "train_robust_accuracy",
+          "train_seconds",
+          "train_teacher_adversarial_forward_calls",
+          "train_teacher_clean_forward_calls",
+          "train_valid_examples",
+          "val_clean_accuracy",
+          "val_pgd_accuracy"
+        ],
+        "last_epoch": 199,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/epoch-metrics.jsonl",
+        "row_count": 100,
+        "sha256": "58a115b856ce8131a30d4d9ce025976f5850614e2a0c625ba6922ecf4cd23e46"
+      },
+      "fork_lineage": {
+        "attack_random_start_keying": "sample_keyed_v1",
+        "child_config_sha256": "fba4972e299b4a0fb5c831a786e131bce2e5e76fb7c902f5ec223f011f7b0f75",
+        "child_tracker_run_id": "ert-rslad-history-ordering-new_history-s2",
+        "fork_git_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+        "history_predictor": "H2_margin_ema_direct_negative_rank",
+        "history_predictor_sha256": "b6be23e7eaa31dd300ed21efb84746bba2270a4a044096c86d3be035c8abebbd",
+        "kind": "stagewise_augmentation_fork_v1",
+        "ordering_policy": "history_balanced_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "parent_completed_epoch_count": 100,
+        "parent_config_sha256": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+        "parent_git_sha": "31932d6bb9fce0517e8e408d08038ab5f9972f46",
+        "parent_payload_epoch": 99,
+        "parent_tracker_run_id": "ert-rslad-trajstab-cropshift-s2-r1-20260827",
+        "post_fork_best_scope": true,
+        "prefix_policy": "I100_CROPSHIFT_0_99_IDBH_WEAK_100_199"
+      },
+      "manifest": {
+        "exists": true,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/run-bundle/manifest.json",
+        "sha256": "69779886c06efbc9ab42b4eb5dd635f42b11ba488f8d98eb9b352c7af783438a"
+      },
+      "ordering_metrics": {
+        "contains_batch_level_values": false,
+        "exists": true,
+        "first_epoch": 100,
+        "keys": [
+          "epoch",
+          "global_step",
+          "permutation_sha256",
+          "policy",
+          "risk_definition",
+          "seed",
+          "strata_counts",
+          "strata_pattern"
+        ],
+        "last_epoch": 199,
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/ordering-metrics.jsonl",
+        "row_count": 100,
+        "sha256": "3dcc7a1c74784911ad40d6a77fc695ed8d73bf772cacbbb4f963b3183a118436"
+      },
+      "sample_state_sequence_available": false,
+      "seed": 2
+    }
+  ],
+  "schema_version": 1,
+  "source_git_sha": "8111f231a95aa33f4c132975e7f3c520e2e5c1d5",
+  "status": "blocked_missing_batch_level_telemetry"
+}

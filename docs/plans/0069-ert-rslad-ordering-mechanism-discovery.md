@@ -4,7 +4,7 @@
 
 - Owner: Codex `/root`
 - Branch / base SHA: `master` / `33fa2458cd645d0f101c5b543a98c130cf9352a9`
-- Current milestone: M0 audit and sampler contract correction
+- Current milestone: M1 existing-telemetry audit blocked the mechanism gate
 - Last updated: 2026-08-31
 
 ## Goal
@@ -44,9 +44,9 @@ contracts remain unchanged.
 
 ## Milestones
 
-- [ ] M0: fix sampler direction and focused tests.
-- [ ] M1: inventory existing trajectories and compute preregistered D1--D6
-  descriptors plus gradient geometry where artifacts permit.
+- [x] M0: fix sampler direction and focused tests.
+- [x] M1: inventory existing trajectories and assess preregistered D1--D6
+  descriptor availability.
 - [ ] M2: freeze and execute the 16 pure-order probes only if M1 permits.
 - [ ] M3: select one mechanism/policy or stop if no mechanism is identified.
 - [ ] M4: conditionally execute confirm-a/confirm-b holdout intervention.
@@ -77,8 +77,15 @@ explicitly deferred until their scientific gates pass.
 
 - 2026-08-31: reconciled clean `33fa245`; confirmed HIGH/LOW sampler direction
   mismatch and prior history-ordering result is complete.
+- 2026-08-31: corrected the sampler in commit `8111f23` and pushed it. Existing
+  NEW_HISTORY artifacts expose only epoch-level permutation hashes and final
+  sample state; no batch risk/order telemetry exists. Exact e99 I100 parents
+  matched. Phase A therefore failed closed and no GPU work was started.
 
 ## Completion report
 
-Pending.  Record exact commands, artifact availability, gate decisions, and
-remaining uncertainty here before the final commit.
+The corrected direction regression and existing-run audit passed. The mechanism
+gate remains blocked by missing batch-level telemetry; gradient geometry, pure
+order probes, and the second intervention were not run. See
+`docs/experiments/ert_rslad_ordering_mechanism_existing_runs_v1.json` and
+`docs/ERT_RSLAD_ORDERING_MECHANISM_AND_SECOND_INTERVENTION.md`.
