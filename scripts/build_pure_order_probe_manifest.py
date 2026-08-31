@@ -82,6 +82,12 @@ def main() -> int:
     parser.add_argument("--registry", type=Path, default=REGISTRY)
     parser.add_argument("--campaign-id", default="ert-rslad-ordering-mechanism-probe-v1")
     parser.add_argument("--run-id-prefix", default="ert-rslad-pure-order")
+    parser.add_argument(
+        "--result-output",
+        type=Path,
+        default=REPO / "docs/experiments/ert_rslad_pure_order_probe_results_v1.json",
+    )
+    parser.add_argument("--aggregate-run-id", default="ert-rslad-pure-order-probe-aggregate")
     args = parser.parse_args()
     run_root = args.run_root.resolve()
     registry_path = args.registry.resolve()
@@ -102,7 +108,7 @@ def main() -> int:
     jobs.append(
         {
             "job_id": aggregate_id,
-            "run_id": "ert-rslad-pure-order-probe-aggregate",
+            "run_id": args.aggregate_run_id,
             "host": "hamster",
             "gpu_count": 0,
             "command": [
@@ -113,7 +119,7 @@ def main() -> int:
                 "--root",
                 str(run_root),
                 "--output",
-                str(REPO / "docs/experiments/ert_rslad_pure_order_probe_results_v1.json"),
+                str(args.result_output.resolve()),
             ],
             "cwd": str(REPO),
             "env": {"PYTHONPATH": str(REPO / "src"), "PYTHONUNBUFFERED": "1"},
