@@ -3,8 +3,8 @@
 ## Status
 
 - Owner: Codex `/root`
-- Branch / base SHA: `master` / `33fa2458cd645d0f101c5b543a98c130cf9352a9`
-- Current milestone: M1 existing-telemetry audit blocked the mechanism gate
+- Branch / base SHA: `master` / `3592a57a9c70951d796bcf2d18c7edffc6263f59`
+- Current milestone: complete; M1 blocked the mechanism gate
 - Last updated: 2026-08-31
 
 ## Goal
@@ -47,10 +47,10 @@ contracts remain unchanged.
 - [x] M0: fix sampler direction and focused tests.
 - [x] M1: inventory existing trajectories and assess preregistered D1--D6
   descriptor availability.
-- [ ] M2: freeze and execute the 16 pure-order probes only if M1 permits.
-- [ ] M3: select one mechanism/policy or stop if no mechanism is identified.
-- [ ] M4: conditionally execute confirm-a/confirm-b holdout intervention.
-- [ ] M5: write immutable artifacts/report, review, commit, and push.
+- [x] M2: not run because M1 did not permit probes.
+- [x] M3: stopped with no mechanism identified.
+- [x] M4: not run because the mechanism gate was blocked.
+- [x] M5: write immutable artifacts/report, review, commit, and push.
 
 ## Agent and review budget
 
