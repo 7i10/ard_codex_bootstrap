@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Final
 
 import torch
 import torch.nn.functional as F
@@ -12,6 +13,74 @@ from torch import nn
 from ard.config.schema import AttackConfig
 
 from .base import AttackGenerator, AttackRequest, AttackResult
+
+_U64_MASK: Final[int] = (1 << 64) - 1
+_STREAM_OFFSET: Final[int] = 0x9E3779B97F4A7C15
+
+
+def _splitmix64(value: int) -> int:
+    """Stable scalar mixer used only to derive a PyTorch Generator seed."""
+    value = (value + _STREAM_OFFSET) & _U64_MASK
+    value = ((value ^ (value >> 30)) * 0xBF58476D1CE4E5B9) & _U64_MASK
+    value = ((value ^ (value >> 27)) * 0x94D049BB133111EB) & _U64_MASK
+    return (value ^ (value >> 31)) & _U64_MASK
+
+
+def _stream_hash(stream_tag: str) -> int:
+    # FNV-1a is stable across processes and Python versions; unlike hash(), it
+    # is not salted per process.  The resulting value is only a seed component.
+    value = 0xCBF29CE484222325
+    for byte in stream_tag.encode("utf-8"):
+        value = ((value ^ byte) * 0x100000001B3) & _U64_MASK
+    return value
+
+
+def _sample_seed(*, attack_seed: int, epoch: int, source_id: int, stream_tag: str, restart_index: int) -> int:
+    if attack_seed < 0 or epoch < 0 or source_id < 0 or restart_index < 0:
+        raise ValueError("sample-keyed random-start key fields must be non-negative")
+    value = _splitmix64(attack_seed & _U64_MASK)
+    for component in (epoch, source_id, _stream_hash(stream_tag), restart_index):
+        value = _splitmix64(value ^ (component & _U64_MASK))
+    # torch.Generator.manual_seed accepts signed 64-bit seeds.
+    return value & ((1 << 63) - 1)
+
+
+def sample_keyed_random_start(
+    clean: torch.Tensor,
+    source_ids: torch.Tensor,
+    *,
+    attack_seed: int,
+    epoch: int,
+    stream_tag: str = "train_pgd",
+    restart_index: int = 0,
+) -> torch.Tensor:
+    """Return source-keyed uniform random starts with batch-local memory.
+
+    Each source gets its own generator seeded only by the frozen key fields.
+    The reference implementation intentionally uses PyTorch's native
+    generator rather than a custom tensor PRNG; vectorization can be added
+    later only if it preserves this contract and passes the same tests.
+    """
+    if source_ids.ndim != 1 or source_ids.shape[0] != clean.shape[0]:
+        raise ValueError("source_ids must be a one-dimensional vector matching the batch")
+    if source_ids.dtype not in (torch.int32, torch.int64):
+        raise TypeError("source_ids must contain integer stable IDs")
+    # CPU is the canonical draw device: the key must produce the same values
+    # when a source moves between ranks/devices, and only this batch-local
+    # tensor is transferred to the attack device.
+    output_cpu = torch.empty(clean.shape, dtype=clean.dtype, device="cpu")
+    for position, raw_source_id in enumerate(source_ids.detach().to(device="cpu", dtype=torch.long).tolist()):
+        generator = torch.Generator(device="cpu").manual_seed(
+            _sample_seed(
+                attack_seed=attack_seed,
+                epoch=epoch,
+                source_id=int(raw_source_id),
+                stream_tag=stream_tag,
+                restart_index=restart_index,
+            )
+        )
+        output_cpu[position].uniform_(-1.0, 1.0, generator=generator)
+    return output_cpu if clean.device.type == "cpu" else output_cpu.to(device=clean.device)
 
 
 @contextmanager
@@ -114,7 +183,19 @@ class LinfPGD(AttackGenerator):
             raise ValueError("captured PGD step must be a strict positive prefix of the configured trajectory")
         delta = torch.zeros_like(clean)
         if self.config.random_start and bool((epsilon_tensor > 0).any()):
-            delta.uniform_(-1.0, 1.0, generator=request.generator)
+            if self.config.random_start_keying == "sample_keyed_v1":
+                if request.source_ids is None or request.epoch is None or request.attack_seed is None:
+                    raise ValueError("sample-keyed random starts require source_ids, epoch, and attack_seed")
+                delta = sample_keyed_random_start(
+                    clean,
+                    request.source_ids,
+                    attack_seed=request.attack_seed,
+                    epoch=request.epoch,
+                    stream_tag=request.stream_tag,
+                    restart_index=request.restart_index,
+                )
+            else:
+                delta.uniform_(-1.0, 1.0, generator=request.generator)
             delta = delta * epsilon_tensor
             delta = (clean + delta).clamp(0, 1) - clean
         initial_delta = delta.detach().clone()

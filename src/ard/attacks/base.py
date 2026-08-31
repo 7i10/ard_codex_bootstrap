@@ -17,6 +17,12 @@ class AttackRequest:
     teacher: nn.Module | None = None
     target_logits: torch.Tensor | None = None
     generator: torch.Generator | None = None
+    # Required only by the versioned sample-keyed random-start contract.
+    source_ids: torch.Tensor | None = None
+    epoch: int | None = None
+    attack_seed: int | None = None
+    stream_tag: str = "train_pgd"
+    restart_index: int = 0
     capture_step: int | None = None
     # Optional per-example treatment budget.  These are only used by an
     # explicitly registered mixed-budget screen; when absent the resolved

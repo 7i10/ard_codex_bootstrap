@@ -24,6 +24,7 @@ from ard.config.loader import resolved_config_dict
 from ard.config.schema import validate_global_batch_size
 from ard.data import (
     EpochShuffleSampler,
+    HistoryBalancedSampler,
     IndexedBatch,
     build_train_validation_views,
     collate_indexed,
@@ -89,6 +90,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, help="Override output_dir")
     parser.add_argument("--resume", type=Path, help="Resume an epoch-boundary checkpoint")
     parser.add_argument("--dry-run", action="store_true", help="Resolve and save config without constructing training")
+    parser.add_argument(
+        "--ordering-policy",
+        choices=("none", "history_balanced_v1"),
+        default="none",
+        help="Optional fork-only sample ordering policy; the default is canonical epoch shuffle.",
+    )
     return parser
 
 
@@ -754,40 +761,6 @@ def main(argv: list[str] | None = None) -> int:
                 if not bundle_path.is_file() or hashlib.sha256(bundle_path.read_bytes()).hexdigest() != bundle_sha:
                     raise ValueError("history-routing v2 selector bundle bytes do not match the registered SHA-256")
                 _attach_history_routing_v2_input_artifacts(tracker=active_tracker, config=config, resume=args.resume)
-        sampler = EpochShuffleSampler(
-            len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
-        )
-        validation_sampler = EpochShuffleSampler(
-            len(validation_dataset),
-            seed=config.seeds.data_order,
-            rank=get_rank(),
-            world_size=get_world_size(),
-            shuffle=False,
-        )
-        loader = cast(
-            DataLoader[IndexedBatch],
-            DataLoader(
-                train_dataset,
-                batch_size=config.training.per_rank_batch_size,
-                sampler=sampler,
-                num_workers=config.training.num_workers,
-                collate_fn=collate_indexed,
-                generator=data_loader_generator(config.seeds.data_order),
-                worker_init_fn=seed_data_loader_worker,
-            ),
-        )
-        validation_loader = cast(
-            DataLoader[IndexedBatch],
-            DataLoader(
-                validation_dataset,
-                batch_size=config.training.per_rank_batch_size,
-                sampler=validation_sampler,
-                num_workers=config.training.num_workers,
-                collate_fn=collate_indexed,
-                generator=data_loader_generator(config.seeds.data_order + 1),
-                worker_init_fn=seed_data_loader_worker,
-            ),
-        )
         student: nn.Module = build_student(config.student, tier=config.tier).to(device)
         if initialized_distributed:
             student = wrap_ddp(student, device)
@@ -823,6 +796,56 @@ def main(argv: list[str] | None = None) -> int:
         objective, policy, sample_store, target_policy = _build_method(config)
         if config.observation.records_student_history and sample_store is None:
             sample_store = SampleStateStore(ema_decay=config.method.student_ema_decay)
+        if args.ordering_policy == "history_balanced_v1":
+            if sample_store is None:
+                raise ValueError("history-balanced ordering requires student-history observations")
+            sampler = HistoryBalancedSampler(
+                len(train_dataset),
+                sample_ids=train_dataset.indices,
+                margin_ema_provider=lambda sample_id: sample_store.records[sample_id].margin_ema,
+                seed=config.seeds.data_order,
+                rank=get_rank(),
+                world_size=get_world_size(),
+            )
+        else:
+            sampler = EpochShuffleSampler(
+                len(train_dataset),
+                seed=config.seeds.data_order,
+                rank=get_rank(),
+                world_size=get_world_size(),
+                shuffle=True,
+            )
+        validation_sampler = EpochShuffleSampler(
+            len(validation_dataset),
+            seed=config.seeds.data_order,
+            rank=get_rank(),
+            world_size=get_world_size(),
+            shuffle=False,
+        )
+        loader = cast(
+            DataLoader[IndexedBatch],
+            DataLoader(
+                train_dataset,
+                batch_size=config.training.per_rank_batch_size,
+                sampler=sampler,
+                num_workers=config.training.num_workers,
+                collate_fn=collate_indexed,
+                generator=data_loader_generator(config.seeds.data_order),
+                worker_init_fn=seed_data_loader_worker,
+            ),
+        )
+        validation_loader = cast(
+            DataLoader[IndexedBatch],
+            DataLoader(
+                validation_dataset,
+                batch_size=config.training.per_rank_batch_size,
+                sampler=validation_sampler,
+                num_workers=config.training.num_workers,
+                collate_fn=collate_indexed,
+                generator=data_loader_generator(config.seeds.data_order + 1),
+                worker_init_fn=seed_data_loader_worker,
+            ),
+        )
         diagnostics = (
             None
             if config.tracking.diagnostics_mode == "off"

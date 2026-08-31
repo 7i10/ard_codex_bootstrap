@@ -13,11 +13,19 @@ from .datasets import (
     build_train_validation_views,
     stratified_train_validation_split,
 )
-from .indexed import EpochShuffleSampler, IndexedBatch, IndexedDataset, SampleRef, collate_indexed
+from .indexed import (
+    EpochShuffleSampler,
+    HistoryBalancedSampler,
+    IndexedBatch,
+    IndexedDataset,
+    SampleRef,
+    collate_indexed,
+)
 from .rng import data_loader_generator, seed_data_loader_worker
 
 __all__ = [
     "EpochShuffleSampler",
+    "HistoryBalancedSampler",
     "EpochSourceTransform",
     "EpochCropshiftTransform",
     "EpochCropReTransform",

@@ -185,6 +185,10 @@ class AttackConfig(StrictModel):
     step_size_value: float | None = None
     steps: int = Field(default=10, ge=1)
     random_start: bool = True
+    # ``batch`` preserves the historical stream.  ``sample_keyed_v1`` is a
+    # separately versioned contract for interventions that must not let
+    # DataLoader order decide which fixed source ID receives a random start.
+    random_start_keying: Literal["batch", "sample_keyed_v1"] = "batch"
     loss: Literal["ce", "kl"] = "ce"
     kl_target: Literal["student_clean", "teacher_clean"] | None = None
     temperature: float = Field(default=1.0, gt=0)
@@ -197,7 +201,7 @@ class AttackConfig(StrictModel):
 
     def identity(self) -> dict[str, object]:
         """JSON-safe complete attack identity; never omit a scientific field."""
-        return {
+        identity = {
             "norm": self.norm,
             "input_domain": self.input_domain,
             "epsilon": self.epsilon,
@@ -213,6 +217,12 @@ class AttackConfig(StrictModel):
             "student_mode": self.student_mode,
             "teacher_mode": self.teacher_mode,
         }
+        # Keep the historical 14-field identity byte-compatible for all
+        # existing batch-keyed runs.  The new algorithm is intentionally a
+        # distinct identity and is therefore explicit only for that mode.
+        if self.random_start_keying != "batch":
+            identity["random_start_keying"] = self.random_start_keying
+        return identity
 
     def identity_json(self) -> str:
         return json.dumps(self.identity(), sort_keys=True, separators=(",", ":"))
@@ -399,7 +409,13 @@ class MethodConfig(StrictModel):
         selection = self.selection_attack
         if selection is None:
             selection = self.attack.model_copy(
-                update={"loss": "ce", "kl_target": None, "student_mode": "eval", "teacher_mode": "eval"}
+                update={
+                    "loss": "ce",
+                    "kl_target": None,
+                    "student_mode": "eval",
+                    "teacher_mode": "eval",
+                    "random_start_keying": "batch",
+                }
             )
             object.__setattr__(self, "selection_attack", selection)
         if selection.loss != "ce":

@@ -682,6 +682,11 @@ class Trainer:
                             teacher=self.teacher,
                         target_logits=subset_target,
                         generator=self._attack_generator(),
+                        source_ids=batch.sample_ids.index_select(0, attack_indices),
+                        epoch=self.current_epoch,
+                        attack_seed=self.seed,
+                        stream_tag="train_pgd",
+                        restart_index=0,
                         epsilon_override=(
                             None if epsilon_override is None else epsilon_override.index_select(0, attack_indices)
                         ),
@@ -702,6 +707,11 @@ class Trainer:
                         teacher=self.teacher,
                         target_logits=teacher_clean_logits,
                         generator=self._attack_generator(),
+                        source_ids=batch.sample_ids,
+                        epoch=self.current_epoch,
+                        attack_seed=self.seed,
+                        stream_tag="train_pgd",
+                        restart_index=0,
                         epsilon_override=epsilon_override,
                         step_size_override=step_override,
                         capture_step=5

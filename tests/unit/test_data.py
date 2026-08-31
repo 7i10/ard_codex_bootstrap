@@ -14,6 +14,7 @@ from ard.data import (
     EpochIdbhWeakTransform,
     EpochShuffleSampler,
     EpochStagewiseAugmentationTransform,
+    HistoryBalancedSampler,
     IndexedDataset,
     SyntheticCIFAR,
     build_dataset,
@@ -160,6 +161,50 @@ def test_large_sampler_padding_has_linear_construction_contract() -> None:
     assert sum(reference.state_update_mask for reference in references) == 12_500
     assert references[-1].index == 4
     assert references[-1].multiplicity == 2
+
+
+def test_history_balanced_sampler_is_exact_once_and_interleaves_strata() -> None:
+    ids = list(range(20))
+    sampler = HistoryBalancedSampler(
+        len(ids),
+        sample_ids=ids,
+        margin_ema_provider=lambda sample_id: float(sample_id),
+        seed=13,
+    )
+    sampler.set_epoch(2)
+    references = list(sampler)
+    assert len(references) == len(ids)
+    assert sorted(reference.index for reference in references) == ids
+    assert sampler.last_metadata["strata_counts"] == {"high": 4, "mid": 12, "low": 4}
+    assert sampler.last_metadata["strata_pattern"] == ["high", "mid", "mid", "low", "mid"]
+    assert sampler.state_dict()["policy"] == "history_balanced_v1"
+
+
+def test_history_balanced_sampler_ties_use_stable_source_id_and_rank_slices() -> None:
+    ids = [40, 10, 30, 20, 0]
+    sampler = HistoryBalancedSampler(
+        len(ids),
+        sample_ids=ids,
+        margin_ema_provider=lambda _: 0.0,
+        seed=7,
+    )
+    sampler.set_epoch(0)
+    first = [ref.index for ref in sampler]
+    sampler.set_epoch(0)
+    assert first == [ref.index for ref in sampler]
+    slices = []
+    for rank in range(2):
+        rank_sampler = HistoryBalancedSampler(
+            len(ids),
+            sample_ids=ids,
+            margin_ema_provider=lambda _: 0.0,
+            seed=7,
+            rank=rank,
+            world_size=2,
+        )
+        rank_sampler.set_epoch(0)
+        slices.extend(ref.index for ref in rank_sampler)
+    assert sorted(slices) == sorted(first + [first[0]])
 
 
 def test_tiny_imagenet_validation_layout_adapter(tmp_path: Path) -> None:
