@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,11 @@ ROOT = Path(
 )
 ARMS = {"NEW_CONTROL": "epoch_shuffle_control", "NEW_HISTORY": "history_balanced_v1"}
 REPO = Path(__file__).resolve().parents[1]
+
+
+def current_source_sha() -> str:
+    """Record the source that actually generated this aggregate."""
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
 
 
 def sha256(path: Path) -> str:
@@ -93,6 +99,7 @@ def main() -> int:
     )
     parser.add_argument("--output-md", type=Path, default=REPO / "docs/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV_V2.md")
     args = parser.parse_args()
+    source_sha = current_source_sha()
     arms = [arm(seed, name) for seed in (1, 2) for name in ARMS]
     by_key = {(item["seed"], item["arm"]): item for item in arms}
     comparisons = []
@@ -118,7 +125,7 @@ def main() -> int:
         "schema_version": 1,
         "kind": "ert_rslad_history_balanced_ordering_dev_v2_results",
         "status": "complete",
-        "source_git_sha": "aafc5b7b18a557a027d9dcd4b0064bfcaf843404",
+        "source_git_sha": source_sha,
         "training_attack": {
             "keying": "sample_keyed_v1",
             "loss": "kl",
