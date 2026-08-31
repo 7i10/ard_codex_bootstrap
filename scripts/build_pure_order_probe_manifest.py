@@ -22,11 +22,19 @@ GPU_UUIDS = {
 ENV = {"PYTHONPATH": str(REPO / "src"), "PYTHONUNBUFFERED": "1", "WANDB_MODE": "online"}
 
 
-def train_job(schedule_id: str, offset: int, seed: int) -> dict[str, object]:
-    run = RUN_ROOT / f"{schedule_id.lower()}-s{seed}"
+def train_job(
+    schedule_id: str,
+    offset: int,
+    seed: int,
+    *,
+    run_root: Path,
+    run_id_prefix: str,
+) -> dict[str, object]:
+    run = run_root / f"{schedule_id.lower()}-s{seed}"
+    run_id = f"{run_id_prefix}-{schedule_id.lower()}-s{seed}"
     return {
         "job_id": f"train-{schedule_id.lower()}-s{seed}",
-        "run_id": f"ert-rslad-pure-order-{schedule_id.lower()}-s{seed}",
+        "run_id": run_id,
         "host": "hamster",
         "command": [
             PYTHON,
@@ -70,12 +78,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--run-root", type=Path, default=RUN_ROOT)
+    parser.add_argument("--registry", type=Path, default=REGISTRY)
+    parser.add_argument("--campaign-id", default="ert-rslad-ordering-mechanism-probe-v1")
+    parser.add_argument("--run-id-prefix", default="ert-rslad-pure-order")
     args = parser.parse_args()
-    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    run_root = args.run_root.resolve()
+    registry_path = args.registry.resolve()
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
     jobs: list[dict[str, object]] = []
     for seed in (1, 2):
         for item in registry["schedules"]:
-            jobs.append(train_job(str(item["schedule_id"]), int(item["order_seed_offset"]), seed))
+            jobs.append(
+                train_job(
+                    str(item["schedule_id"]),
+                    int(item["order_seed_offset"]),
+                    seed,
+                    run_root=run_root,
+                    run_id_prefix=args.run_id_prefix,
+                )
+            )
     aggregate_id = "aggregate-pure-order-probes"
     jobs.append(
         {
@@ -87,32 +109,32 @@ def main() -> int:
                 PYTHON,
                 "scripts/analysis/aggregate_ert_rslad_pure_order_probes.py",
                 "--registry",
-                str(REGISTRY),
+                str(registry_path),
                 "--root",
-                str(RUN_ROOT),
+                str(run_root),
                 "--output",
                 str(REPO / "docs/experiments/ert_rslad_pure_order_probe_results_v1.json"),
             ],
             "cwd": str(REPO),
             "env": {"PYTHONPATH": str(REPO / "src"), "PYTHONUNBUFFERED": "1"},
             "required_paths": [str(REGISTRY)],
-            "output_dir": str(RUN_ROOT / "aggregate"),
+            "output_dir": str(run_root / "aggregate"),
             "completion_marker": "orchestration/completion.json",
             "dependencies": [job["job_id"] for job in jobs],
             "estimated_work": 1,
             "retry_policy": {"max_attempts": 1},
             "scientific_identity": {
                 "method_id": "ert_rslad_pure_order_probe_aggregate_v1",
-                "registry_sha256": __import__("hashlib").sha256(REGISTRY.read_bytes()).hexdigest(),
+                "registry_sha256": __import__("hashlib").sha256(registry_path.read_bytes()).hexdigest(),
                 "probe_count": 16,
             },
         }
     )
     manifest = {
         "schema_version": 1,
-        "campaign_id": "ert-rslad-ordering-mechanism-probe-v1",
+        "campaign_id": args.campaign_id,
         "source": {"git_sha": args.source_sha},
-        "state_path": str(RUN_ROOT / "orchestration.state.json"),
+        "state_path": str(run_root / "orchestration.state.json"),
         "reservation_root": "/home/shunsukenaito/.cache/ard-experiment-orchestrator/reservations",
         "hosts": {
             "hamster": {

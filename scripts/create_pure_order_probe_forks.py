@@ -61,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument(
+        "--run-id-prefix",
+        default="ert-rslad-pure-order",
+        help="Prefix for the retry's distinct tracking run identity.",
+    )
     return parser
 
 
@@ -77,13 +82,14 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("parent checkpoint is incomplete: " + ", ".join(sorted(missing)))
     if parent.get("world_size") != 1 or parent.get("global_step") != 35_200:
         raise ValueError("parent world size/global step is inconsistent with the registered I100 parent")
+    run_id = f"{args.run_id_prefix}-{args.schedule_id.lower()}-s{args.seed}"
     config = load_config(
         args.config,
         [
             "training.epochs=115",
             "method.attack.random_start_keying=sample_keyed_v1",
-            f"tracking.run_id=ert-rslad-pure-order-{args.schedule_id.lower()}-s{args.seed}",
-            f"tracking.name=ert-rslad-pure-order-{args.schedule_id.lower()}-s{args.seed}",
+            f"tracking.run_id={run_id}",
+            f"tracking.name={run_id}",
             "tracking.artifact_retention=metrics_only",
             f"output_dir={args.output.resolve()}",
         ],
@@ -100,8 +106,8 @@ def main(argv: list[str] | None = None) -> int:
     if output.exists() and any(output.iterdir()):
         raise FileExistsError(f"refusing to overwrite probe fork output: {output}")
     config_hash = config_digest(resolved_config_dict(config))
-    run_id = config.tracking.run_id
-    if not isinstance(run_id, str) or run_id == parent.get("tracker_run_id"):
+    config_run_id = config.tracking.run_id
+    if not isinstance(config_run_id, str) or config_run_id != run_id or config_run_id == parent.get("tracker_run_id"):
         raise ValueError("probe child run identity must be distinct and explicit")
     metadata = parent.get("selection_metadata")
     if not isinstance(metadata, Mapping):
@@ -119,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
         child_metadata.pop(key, None)
     transformed = copy.deepcopy(parent)
     transformed["config_hash"] = config_hash
-    transformed["tracker_run_id"] = run_id
+    transformed["tracker_run_id"] = config_run_id
     transformed["best_metric"] = float("-inf")
     transformed["selection_metadata"] = child_metadata
     offset = SCHEDULES[args.schedule_id]
@@ -135,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
         # weakening the protocol-level fork guard.
         "kind": "stagewise_augmentation_fork_v1",
         "probe_kind": "ert_rslad_pure_order_probe_fork_v1",
-        "child_tracker_run_id": run_id,
+        "child_tracker_run_id": config_run_id,
         "child_config_sha256": config_hash,
         "parent_tracker_run_id": parent.get("tracker_run_id"),
         "parent_checkpoint_sha256": sha256(parent_path),
