@@ -1,0 +1,107 @@
+{
+  "config_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s1/resolved_config.yaml",
+  "config_sha256": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+  "contract": "ert_rslad_ordering_gradient_geometry_v1",
+  "epoch": 99,
+  "gradient_cancellation_high_low": 0.49304333913140763,
+  "group_summaries": {
+    "HIGH_ONLY": {
+      "adv_kd_gradient_norm": 1.2435824871063232,
+      "batch_adv_kd_gradient_norm_iqr": [
+        1.4154103100299835,
+        1.5759340524673462
+      ],
+      "batch_adv_kd_gradient_norm_median": 1.4553805589675903,
+      "batch_count": 8,
+      "batch_size": 128,
+      "batch_total_gradient_norm_iqr": [
+        4.524978876113892,
+        5.3292316198349
+      ],
+      "batch_total_gradient_norm_median": 4.7964818477630615,
+      "sample_ids_sha256": "21bc1af17577dd04ea8101d4ba672685b6a99ef574b61e6bc30d48c181480512",
+      "total_gradient_norm": 3.7453274726867676
+    },
+    "LOW_ONLY": {
+      "adv_kd_gradient_norm": 1.6181621551513672,
+      "batch_adv_kd_gradient_norm_iqr": [
+        1.6839288771152496,
+        1.9254888594150543
+      ],
+      "batch_adv_kd_gradient_norm_median": 1.8269336819648743,
+      "batch_count": 8,
+      "batch_size": 128,
+      "batch_total_gradient_norm_iqr": [
+        6.821239590644836,
+        7.455832123756409
+      ],
+      "batch_total_gradient_norm_median": 7.277146339416504,
+      "sample_ids_sha256": "7ec85a08503c49067df82e0db6fe59b8a5c0bf17d28510195a386d78c768e3d6",
+      "total_gradient_norm": 6.688538551330566
+    },
+    "MID_ONLY": {
+      "adv_kd_gradient_norm": 1.7980337142944336,
+      "batch_adv_kd_gradient_norm_iqr": [
+        1.7501492500305176,
+        2.23571115732193
+      ],
+      "batch_adv_kd_gradient_norm_median": 1.8472021222114563,
+      "batch_count": 8,
+      "batch_size": 128,
+      "batch_total_gradient_norm_iqr": [
+        4.260609269142151,
+        5.838591814041138
+      ],
+      "batch_total_gradient_norm_median": 5.369341611862183,
+      "sample_ids_sha256": "de4a657f4b69235469af4dc0261d0764124c1f5cb50067989ce582fa74c449ed",
+      "total_gradient_norm": 4.277066230773926
+    },
+    "MIXED_20_60_20": {
+      "adv_kd_gradient_norm": 1.4666961431503296,
+      "batch_adv_kd_gradient_norm_iqr": [
+        1.4632989168167114,
+        1.838946133852005
+      ],
+      "batch_adv_kd_gradient_norm_median": 1.6259642839431763,
+      "batch_count": 8,
+      "batch_size": 128,
+      "batch_total_gradient_norm_iqr": [
+        4.317487597465515,
+        5.094720840454102
+      ],
+      "batch_total_gradient_norm_median": 4.58161735534668,
+      "sample_ids_sha256": "bed4c791a36e30f9343e6d10b14389e795e7c576b529c87e9e2262b2235bd565",
+      "total_gradient_norm": 3.585524082183838
+    },
+    "RANDOM": {
+      "adv_kd_gradient_norm": 1.5622780323028564,
+      "batch_adv_kd_gradient_norm_iqr": [
+        1.5574716627597809,
+        1.9435743987560272
+      ],
+      "batch_adv_kd_gradient_norm_median": 1.8053967356681824,
+      "batch_count": 8,
+      "batch_size": 128,
+      "batch_total_gradient_norm_iqr": [
+        5.052128434181213,
+        5.888521790504456
+      ],
+      "batch_total_gradient_norm_median": 5.263750314712524,
+      "sample_ids_sha256": "488c1972e3bdcd3b106dc7140417d5a368f424610a97aeabdc5efedd9d3e1451",
+      "total_gradient_norm": 4.718388557434082
+    }
+  },
+  "no_update": true,
+  "pairwise_cosine_total": {
+    "BALANCED_vs_RANDOM": 0.8049782913944319,
+    "HIGH_vs_LOW": -0.6144526932856339,
+    "HIGH_vs_MID": 0.0357285541524554,
+    "MID_vs_LOW": 0.5339523222273382
+  },
+  "parent_checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+  "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+  "risk_definition": "-margin_ema; HIGH=lowest-margin top20%, LOW=highest-margin bottom20%",
+  "schema_version": 1,
+  "seed": 1,
+  "source_git_sha": "176440c93d59bbfb8e82fd5fc41fa636275d03eb"
+}

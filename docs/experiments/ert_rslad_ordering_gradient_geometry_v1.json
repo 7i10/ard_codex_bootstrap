@@ -1,0 +1,231 @@
+{
+  "contract": "ert_rslad_ordering_gradient_geometry_v1",
+  "epoch": 99,
+  "group_definition": "HIGH=lowest margin EMA top20%; MID=middle60%; LOW=highest margin EMA bottom20%",
+  "no_update": true,
+  "parents": {
+    "1": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+    "2": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+  },
+  "per_seed": {
+    "1": {
+      "config_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s1/resolved_config.yaml",
+      "config_sha256": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+      "contract": "ert_rslad_ordering_gradient_geometry_v1",
+      "epoch": 99,
+      "gradient_cancellation_high_low": 0.49304333913140763,
+      "group_summaries": {
+        "HIGH_ONLY": {
+          "adv_kd_gradient_norm": 1.2435824871063232,
+          "batch_adv_kd_gradient_norm_iqr": [
+            1.4154103100299835,
+            1.5759340524673462
+          ],
+          "batch_adv_kd_gradient_norm_median": 1.4553805589675903,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            4.524978876113892,
+            5.3292316198349
+          ],
+          "batch_total_gradient_norm_median": 4.7964818477630615,
+          "sample_ids_sha256": "21bc1af17577dd04ea8101d4ba672685b6a99ef574b61e6bc30d48c181480512",
+          "total_gradient_norm": 3.7453274726867676
+        },
+        "LOW_ONLY": {
+          "adv_kd_gradient_norm": 1.6181621551513672,
+          "batch_adv_kd_gradient_norm_iqr": [
+            1.6839288771152496,
+            1.9254888594150543
+          ],
+          "batch_adv_kd_gradient_norm_median": 1.8269336819648743,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            6.821239590644836,
+            7.455832123756409
+          ],
+          "batch_total_gradient_norm_median": 7.277146339416504,
+          "sample_ids_sha256": "7ec85a08503c49067df82e0db6fe59b8a5c0bf17d28510195a386d78c768e3d6",
+          "total_gradient_norm": 6.688538551330566
+        },
+        "MID_ONLY": {
+          "adv_kd_gradient_norm": 1.7980337142944336,
+          "batch_adv_kd_gradient_norm_iqr": [
+            1.7501492500305176,
+            2.23571115732193
+          ],
+          "batch_adv_kd_gradient_norm_median": 1.8472021222114563,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            4.260609269142151,
+            5.838591814041138
+          ],
+          "batch_total_gradient_norm_median": 5.369341611862183,
+          "sample_ids_sha256": "de4a657f4b69235469af4dc0261d0764124c1f5cb50067989ce582fa74c449ed",
+          "total_gradient_norm": 4.277066230773926
+        },
+        "MIXED_20_60_20": {
+          "adv_kd_gradient_norm": 1.4666961431503296,
+          "batch_adv_kd_gradient_norm_iqr": [
+            1.4632989168167114,
+            1.838946133852005
+          ],
+          "batch_adv_kd_gradient_norm_median": 1.6259642839431763,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            4.317487597465515,
+            5.094720840454102
+          ],
+          "batch_total_gradient_norm_median": 4.58161735534668,
+          "sample_ids_sha256": "bed4c791a36e30f9343e6d10b14389e795e7c576b529c87e9e2262b2235bd565",
+          "total_gradient_norm": 3.585524082183838
+        },
+        "RANDOM": {
+          "adv_kd_gradient_norm": 1.5622780323028564,
+          "batch_adv_kd_gradient_norm_iqr": [
+            1.5574716627597809,
+            1.9435743987560272
+          ],
+          "batch_adv_kd_gradient_norm_median": 1.8053967356681824,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            5.052128434181213,
+            5.888521790504456
+          ],
+          "batch_total_gradient_norm_median": 5.263750314712524,
+          "sample_ids_sha256": "488c1972e3bdcd3b106dc7140417d5a368f424610a97aeabdc5efedd9d3e1451",
+          "total_gradient_norm": 4.718388557434082
+        }
+      },
+      "no_update": true,
+      "pairwise_cosine_total": {
+        "BALANCED_vs_RANDOM": 0.8049782913944319,
+        "HIGH_vs_LOW": -0.6144526932856339,
+        "HIGH_vs_MID": 0.0357285541524554,
+        "MID_vs_LOW": 0.5339523222273382
+      },
+      "parent_checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+      "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "risk_definition": "-margin_ema; HIGH=lowest-margin top20%, LOW=highest-margin bottom20%",
+      "schema_version": 1,
+      "seed": 1,
+      "source_git_sha": "176440c93d59bbfb8e82fd5fc41fa636275d03eb"
+    },
+    "2": {
+      "config_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s2/resolved_config.yaml",
+      "config_sha256": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+      "contract": "ert_rslad_ordering_gradient_geometry_v1",
+      "epoch": 99,
+      "gradient_cancellation_high_low": 0.30680531194833593,
+      "group_summaries": {
+        "HIGH_ONLY": {
+          "adv_kd_gradient_norm": 2.8150763511657715,
+          "batch_adv_kd_gradient_norm_iqr": [
+            2.6411929726600647,
+            3.4624945521354675
+          ],
+          "batch_adv_kd_gradient_norm_median": 2.937045454978943,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            7.478710174560547,
+            8.042938113212585
+          ],
+          "batch_total_gradient_norm_median": 7.65920090675354,
+          "sample_ids_sha256": "fc2a44e563e8e12bff5d84c88fcbb906aab702c2677ae930d8b3c6baa6b09ac7",
+          "total_gradient_norm": 7.051329612731934
+        },
+        "LOW_ONLY": {
+          "adv_kd_gradient_norm": 1.4737718105316162,
+          "batch_adv_kd_gradient_norm_iqr": [
+            1.5428195297718048,
+            1.8229917883872986
+          ],
+          "batch_adv_kd_gradient_norm_median": 1.7328433990478516,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            5.240464925765991,
+            6.063555955886841
+          ],
+          "batch_total_gradient_norm_median": 5.455575942993164,
+          "sample_ids_sha256": "cdb8214daadc80091dcad4f37b61d14c71ba61629dfd20df73bf598f4a134e1a",
+          "total_gradient_norm": 5.044868469238281
+        },
+        "MID_ONLY": {
+          "adv_kd_gradient_norm": 3.6864609718322754,
+          "batch_adv_kd_gradient_norm_iqr": [
+            3.5128507018089294,
+            3.9498326778411865
+          ],
+          "batch_adv_kd_gradient_norm_median": 3.711342453956604,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            8.04962158203125,
+            9.754375219345093
+          ],
+          "batch_total_gradient_norm_median": 9.324687004089355,
+          "sample_ids_sha256": "ddb638dec872df0d99c9f59e1cd7a7c40d82d6483cd3a42e69bca94253519614",
+          "total_gradient_norm": 8.632845878601074
+        },
+        "MIXED_20_60_20": {
+          "adv_kd_gradient_norm": 2.727121353149414,
+          "batch_adv_kd_gradient_norm_iqr": [
+            2.7787731289863586,
+            2.9688443541526794
+          ],
+          "batch_adv_kd_gradient_norm_median": 2.899532914161682,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            7.084596157073975,
+            7.4878169298172
+          ],
+          "batch_total_gradient_norm_median": 7.21876859664917,
+          "sample_ids_sha256": "ef4180c3397f3d5f99ce58f125c16e089b32628c2443125d016a2800bb690bed",
+          "total_gradient_norm": 6.498551845550537
+        },
+        "RANDOM": {
+          "adv_kd_gradient_norm": 2.512047290802002,
+          "batch_adv_kd_gradient_norm_iqr": [
+            2.5783795714378357,
+            2.7788614630699158
+          ],
+          "batch_adv_kd_gradient_norm_median": 2.685691714286804,
+          "batch_count": 8,
+          "batch_size": 128,
+          "batch_total_gradient_norm_iqr": [
+            5.977143168449402,
+            6.72799026966095
+          ],
+          "batch_total_gradient_norm_median": 6.458030700683594,
+          "sample_ids_sha256": "97c2157f7f47ad74b0f18d451cd0f28f2b29d85a23a2d5bf5f6425ffa3c7a005",
+          "total_gradient_norm": 5.818916320800781
+        }
+      },
+      "no_update": true,
+      "pairwise_cosine_total": {
+        "BALANCED_vs_RANDOM": 0.8877192966688539,
+        "HIGH_vs_LOW": -0.06835751657430869,
+        "HIGH_vs_MID": 0.7966831192917303,
+        "MID_vs_LOW": 0.3490378945753856
+      },
+      "parent_checkpoint": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+      "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "risk_definition": "-margin_ema; HIGH=lowest-margin top20%, LOW=highest-margin bottom20%",
+      "schema_version": 1,
+      "seed": 2,
+      "source_git_sha": "176440c93d59bbfb8e82fd5fc41fa636275d03eb"
+    }
+  },
+  "schema_version": 1,
+  "selection_note": "descriptive diagnostic only; no optimizer/scheduler/sample-state update",
+  "source_git_shas": [
+    "176440c93d59bbfb8e82fd5fc41fa636275d03eb"
+  ]
+}
