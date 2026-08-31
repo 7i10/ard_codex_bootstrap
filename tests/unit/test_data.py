@@ -180,6 +180,22 @@ def test_history_balanced_sampler_is_exact_once_and_interleaves_strata() -> None
     assert sampler.state_dict()["policy"] == "history_balanced_v1"
 
 
+def test_history_balanced_sampler_high_stratum_is_low_margin_and_low_is_high_margin() -> None:
+    ids = list(range(5))
+    sampler = HistoryBalancedSampler(
+        len(ids),
+        sample_ids=ids,
+        margin_ema_provider=lambda sample_id: float(sample_id),
+        seed=13,
+    )
+    references = list(sampler)
+    # With one sample in each 20% stratum, the fixed HIGH/MID/MID/LOW/MID
+    # pattern exposes the lowest-margin ID first and the highest-margin ID at
+    # the LOW position.  This guards the semantic direction, not just counts.
+    assert references[0].index == 0
+    assert references[3].index == 4
+
+
 def test_history_balanced_sampler_ties_use_stable_source_id_and_rank_slices() -> None:
     ids = [40, 10, 30, 20, 0]
     sampler = HistoryBalancedSampler(

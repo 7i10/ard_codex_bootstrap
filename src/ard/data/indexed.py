@@ -255,7 +255,11 @@ class HistoryBalancedSampler(Sampler[SampleRef]):
                 raise ValueError("history sampler margin_ema must be finite")
             # High risk means low margin EMA.  Source ID is the deterministic
             # tie-break and is part of the scientific ordering contract.
-            scored.append((-margin, source_id))
+            # Sort by the raw margin so that low-margin samples (the highest
+            # risk) occupy the HIGH stratum.  The stored definition remains
+            # ``-margin_ema`` because it is the risk score represented by this
+            # ascending order.
+            scored.append((margin, source_id))
         scored.sort(key=lambda item: (item[0], item[1]))
         high_count = self.size // 5
         low_count = self.size // 5
