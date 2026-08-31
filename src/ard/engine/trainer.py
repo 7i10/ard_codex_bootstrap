@@ -586,7 +586,12 @@ class Trainer:
             joint_risk=joint_risk.to(device=logits.device, dtype=logits.dtype),
         )
 
-    def train_epoch(self, loader: DataLoader[IndexedBatch]) -> dict[str, float]:
+    def train_epoch(
+        self,
+        loader: DataLoader[IndexedBatch],
+        *,
+        on_batch_start: Callable[[int, IndexedBatch], None] | None = None,
+    ) -> dict[str, float]:
         self.model.train()
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
@@ -596,9 +601,11 @@ class Trainer:
         # detached clean/adv teacher forwards.  One final SUM makes the
         # count telemetry global without adding a hot-loop collective.
         totals = torch.zeros(6, dtype=torch.float64, device=self.device)
-        for batch in loader:
+        for batch_index, batch in enumerate(loader):
             if not isinstance(batch, IndexedBatch):
                 raise TypeError("trainer requires IndexedBatch batches")
+            if on_batch_start is not None:
+                on_batch_start(batch_index, batch)
             batch = batch.to(self.device)
             self._teacher_adversarial_logits = None
             self._teacher_adversarial_forward_calls = 0.0
@@ -1148,6 +1155,7 @@ class Trainer:
         epochs: int,
         start_epoch: int = 0,
         on_epoch_end: Callable[[Mapping[str, float], bool], None] | None = None,
+        on_batch_start: Callable[[int, int, IndexedBatch], None] | None = None,
     ) -> list[dict[str, float]]:
         history = []
         for epoch in range(start_epoch, epochs):
@@ -1161,7 +1169,15 @@ class Trainer:
                 sampler.set_epoch(epoch)
             if hasattr(loader.dataset, "set_epoch"):
                 loader.dataset.set_epoch(epoch)
-            train_metrics = self.train_epoch(loader)
+            if on_batch_start is None:
+                # Preserve the public call shape for lightweight test/mocking
+                # trainers and ordinary runs that do not request telemetry.
+                train_metrics = self.train_epoch(loader)
+            else:
+                train_metrics = self.train_epoch(
+                    loader,
+                    on_batch_start=lambda batch_index, batch, epoch=epoch: on_batch_start(epoch, batch_index, batch),
+                )
             self._flush_sample_store()
             if self.dynamic_s3_router is not None:
                 self.dynamic_s3_router.flush_epoch(epoch)

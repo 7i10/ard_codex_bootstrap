@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader
 from ard.analysis import write_sample_parquet
 from ard.analysis.epoch_metrics import EpochMetricStore, epoch_trajectory_summary, write_epoch_metrics_parquet
 from ard.analysis.frozen_oracle import FrozenRiskLookup, load_frozen_risk_lookup
+from ard.analysis.ordering_telemetry import OrderingTelemetry
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, load_config, save_resolved_config
 from ard.config.loader import resolved_config_dict
@@ -92,9 +93,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true", help="Resolve and save config without constructing training")
     parser.add_argument(
         "--ordering-policy",
-        choices=("none", "history_balanced_v1"),
+        choices=("none", "history_balanced_v1", "epoch_shuffle_offset"),
         default="none",
         help="Optional fork-only sample ordering policy; the default is canonical epoch shuffle.",
+    )
+    parser.add_argument(
+        "--ordering-seed-offset",
+        type=int,
+        default=0,
+        help="Deterministic offset added to the data-order seed for pure-order probes.",
     )
     return parser
 
@@ -807,6 +814,17 @@ def main(argv: list[str] | None = None) -> int:
                 rank=get_rank(),
                 world_size=get_world_size(),
             )
+        elif args.ordering_policy == "epoch_shuffle_offset":
+            if args.ordering_seed_offset < 0:
+                raise ValueError("ordering seed offset must be non-negative")
+            sampler_seed = config.seeds.data_order + args.ordering_seed_offset
+            sampler = EpochShuffleSampler(
+                len(train_dataset),
+                seed=sampler_seed,
+                rank=get_rank(),
+                world_size=get_world_size(),
+                shuffle=True,
+            )
         else:
             sampler = EpochShuffleSampler(
                 len(train_dataset),
@@ -937,6 +955,13 @@ def main(argv: list[str] | None = None) -> int:
             if args.ordering_policy == "history_balanced_v1" and is_rank_zero()
             else None
         )
+        ordering_telemetry = (
+            OrderingTelemetry(output_dir / "ordering-telemetry")
+            if args.ordering_policy == "epoch_shuffle_offset" and is_rank_zero()
+            else None
+        )
+        if args.ordering_policy == "epoch_shuffle_offset" and sample_store is None:
+            raise ValueError("pure-order telemetry requires student-history sample state")
         if epoch_store is not None and isinstance(active_tracker, LocalTracker):
             # A resumed process receives the complete prior local trajectory,
             # not merely the rows produced by this invocation.
@@ -950,6 +975,14 @@ def main(argv: list[str] | None = None) -> int:
                 values = dict(metrics)
                 values["epoch"] = trainer.current_epoch
                 values["global_step"] = trainer.global_step
+                if ordering_telemetry is not None and ordering_telemetry.last_descriptor is not None:
+                    values.update(
+                        {
+                            key: value
+                            for key, value in ordering_telemetry.last_descriptor.items()
+                            if key.startswith("D")
+                        }
+                    )
                 if epoch_store is not None:
                     epoch_store.merge((values,))
                 if ordering_log_path is not None:
@@ -1003,6 +1036,13 @@ def main(argv: list[str] | None = None) -> int:
             epochs=config.training.epochs,
             start_epoch=start_epoch,
             on_epoch_end=_record_epoch,
+            on_batch_start=(
+                None
+                if ordering_telemetry is None
+                else lambda epoch, batch_index, batch: ordering_telemetry.on_batch(
+                    epoch, batch_index, batch, sample_store
+                )
+            ),
         )
         stats_path: Path | None = None
         if diagnostics is not None:
@@ -1104,6 +1144,20 @@ def main(argv: list[str] | None = None) -> int:
                 }
             )
             bundle = output_dir / "run-bundle"
+            if ordering_telemetry is not None:
+                telemetry_manifest = {
+                    "schema_version": 1,
+                    "kind": "pure_order_probe_telemetry_v1",
+                    "batch_metrics": str(ordering_telemetry.batch_path),
+                    "descriptor_metrics": str(ordering_telemetry.descriptor_path),
+                    "batch_metrics_sha256": hashlib.sha256(ordering_telemetry.batch_path.read_bytes()).hexdigest(),
+                    "descriptor_metrics_sha256": hashlib.sha256(
+                        ordering_telemetry.descriptor_path.read_bytes()
+                    ).hexdigest(),
+                }
+                (output_dir / "ordering-telemetry-manifest.json").write_text(
+                    json.dumps(telemetry_manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+                )
             (bundle / "completion.json").write_text(
                 json.dumps({"status": "completed", "output_dir": str(output_dir)}) + "\n", encoding="utf-8"
             )

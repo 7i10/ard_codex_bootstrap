@@ -4,7 +4,7 @@
 
 - Owner: Codex `/root`
 - Branch / base SHA: `master` / `3592a57a9c70951d796bcf2d18c7edffc6263f59`
-- Current milestone: complete; M1 blocked the mechanism gate
+- Current milestone: M2--M3 in progress; corrected telemetry/probe implementation
 - Last updated: 2026-08-31
 
 ## Goal
@@ -47,10 +47,10 @@ contracts remain unchanged.
 - [x] M0: fix sampler direction and focused tests.
 - [x] M1: inventory existing trajectories and assess preregistered D1--D6
   descriptor availability.
-- [x] M2: not run because M1 did not permit probes.
-- [x] M3: stopped with no mechanism identified.
-- [x] M4: not run because the mechanism gate was blocked.
-- [x] M5: write immutable artifacts/report, review, commit, and push.
+- [ ] M2: e99 gradient geometry and eight-schedule pure-order probes.
+- [ ] M3: apply the preregistered mechanism association gate.
+- [ ] M4: at most one second intervention, only if M3 passes.
+- [ ] M5: write immutable artifacts/report and commit.
 
 ## Agent and review budget
 
@@ -81,11 +81,13 @@ explicitly deferred until their scientific gates pass.
   NEW_HISTORY artifacts expose only epoch-level permutation hashes and final
   sample state; no batch risk/order telemetry exists. Exact e99 I100 parents
   matched. Phase A therefore failed closed and no GPU work was started.
+- 2026-08-31: added the corrected pure-order telemetry path, e99 gradient
+  geometry runner, immutable eight-offset schedule registry, and detached-probe
+  aggregation. Production launch remains gated on focused tests, clean source,
+  and the e99 geometry result.
 
 ## Completion report
 
-The corrected direction regression and existing-run audit passed. The mechanism
-gate remains blocked by missing batch-level telemetry; gradient geometry, pure
-order probes, and the second intervention were not run. See
-`docs/experiments/ert_rslad_ordering_mechanism_existing_runs_v1.json` and
-`docs/ERT_RSLAD_ORDERING_MECHANISM_AND_SECOND_INTERVENTION.md`.
+The corrected direction regression and existing-run audit passed. The new
+telemetry/probe milestone is in progress; no corrected production result is
+claimed until the e99 geometry and all required probe artifacts are complete.
