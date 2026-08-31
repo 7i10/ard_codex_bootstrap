@@ -1,0 +1,86 @@
+{
+  "kind": "ert_rslad_pure_order_probe_registry_v1",
+  "parent_payload_epoch": 99,
+  "probe_epoch_end_exclusive": 115,
+  "probe_epoch_start": 100,
+  "risk_definition": "-margin_ema_snapshot_at_epoch_start",
+  "schedules": [
+    {
+      "description": "ordinary epoch shuffle with a pre-registered data-order seed offset",
+      "order_policy": "epoch_shuffle_offset",
+      "order_seed_offset": 0,
+      "schedule_id": "SHUFFLE_PLUS_0"
+    },
+    {
+      "description": "ordinary epoch shuffle with a pre-registered data-order seed offset",
+      "order_policy": "epoch_shuffle_offset",
+      "order_seed_offset": 1,
+      "schedule_id": "SHUFFLE_PLUS_1"
+    },
+    {
+      "description": "ordinary epoch shuffle with a pre-registered data-order seed offset",
+      "order_policy": "epoch_shuffle_offset",
+      "order_seed_offset": 2,
+      "schedule_id": "SHUFFLE_PLUS_2"
+    },
+    {
+      "description": "ordinary epoch shuffle with a pre-registered data-order seed offset",
+      "order_policy": "epoch_shuffle_offset",
+      "order_seed_offset": 3,
+      "schedule_id": "SHUFFLE_PLUS_3"
+    },
+    {
+      "description": "ordinary epoch shuffle with a pre-registered data-order seed offset",
+      "order_policy": "epoch_shuffle_offset",
+      "order_seed_offset": 4,
+      "schedule_id": "SHUFFLE_PLUS_4"
+    },
+    {
+      "description": "ordinary epoch shuffle with a pre-registered data-order seed offset",
+      "order_policy": "epoch_shuffle_offset",
+      "order_seed_offset": 5,
+      "schedule_id": "SHUFFLE_PLUS_5"
+    },
+    {
+      "description": "ordinary epoch shuffle with a pre-registered data-order seed offset",
+      "order_policy": "epoch_shuffle_offset",
+      "order_seed_offset": 6,
+      "schedule_id": "SHUFFLE_PLUS_6"
+    },
+    {
+      "description": "ordinary epoch shuffle with a pre-registered data-order seed offset",
+      "order_policy": "epoch_shuffle_offset",
+      "order_seed_offset": 7,
+      "schedule_id": "SHUFFLE_PLUS_7"
+    }
+  ],
+  "schema_version": 1,
+  "selection_rule": {
+    "eligible_same_sign_per_seed": true,
+    "mean_abs_rho_min": 0.5,
+    "metric": "probe_robust_auc_100_114",
+    "no_validation_accuracy_for_selection": true,
+    "per_seed_abs_rho_min": 0.4,
+    "tie_priority": [
+      "D1",
+      "D2",
+      "D3",
+      "D4",
+      "D5",
+      "D6"
+    ]
+  },
+  "source_git_sha": "240100d82644bb13616566ff7af1feb4f1e0bce7",
+  "status": "frozen_before_training",
+  "telemetry": {
+    "batch_stable_ids": true,
+    "descriptors": [
+      "D1_batch_mean_risk_sd",
+      "D2_within_batch_risk_sd_mean",
+      "D3_high_risk_fraction_sd",
+      "D4_lag1_batch_mean_risk_acf",
+      "D5_hard_batch_longest_run",
+      "D6_position_vs_batch_mean_risk_spearman"
+    ]
+  }
+}
