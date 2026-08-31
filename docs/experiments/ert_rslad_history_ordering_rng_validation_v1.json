@@ -1,0 +1,75 @@
+{
+  "history_predictor_artifact_sha256": "b6be23e7eaa31dd300ed21efb84746bba2270a4a044096c86d3be035c8abebbd",
+  "history_predictor_candidate": "H2",
+  "history_predictor_feature": "margin_ema",
+  "kind": "ert_rslad_history_ordering_rng_validation",
+  "ordering_contract": {
+    "exposure": "exactly_once_per_epoch",
+    "fractions": [
+      0.2,
+      0.6,
+      0.2
+    ],
+    "interleave": [
+      "HIGH",
+      "MID",
+      "MID",
+      "LOW",
+      "MID"
+    ],
+    "state_read": "previous_epoch_end_margin_ema_only",
+    "strata": [
+      "HIGH",
+      "MID",
+      "LOW"
+    ],
+    "teacher_oracle": "none"
+  },
+  "parents": {
+    "1": {
+      "config_hash": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+      "epoch": 99,
+      "global_step": 35200,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+      "sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835"
+    },
+    "2": {
+      "config_hash": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+      "epoch": 99,
+      "global_step": 35200,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+      "sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+    }
+  },
+  "rank_contract": "descending frozen Ridge risk with stable source-ID tie break equals descending -margin_ema",
+  "rank_equivalence": {
+    "1": {
+      "coefficient": -0.22528113377344341,
+      "direct_order_sha256": "1bd0eff9efa44adf3ab8e675cff5a143b6a767ad089ded0eaf22b19950c2a108",
+      "exact": true,
+      "mean": 0.10340601334567943,
+      "n": 45000,
+      "ridge_order_sha256": "1bd0eff9efa44adf3ab8e675cff5a143b6a767ad089ded0eaf22b19950c2a108",
+      "std": 0.2333534518072551,
+      "tie_count": 0
+    },
+    "2": {
+      "coefficient": -0.22528113377344341,
+      "direct_order_sha256": "b09f6cf08efa12b53d717839744b7e9dc3392ecc77c4ef7f7b2bad9247aec846",
+      "exact": true,
+      "mean": 0.10340601334567943,
+      "n": 45000,
+      "ridge_order_sha256": "b09f6cf08efa12b53d717839744b7e9dc3392ecc77c4ef7f7b2bad9247aec846",
+      "std": 0.2333534518072551,
+      "tie_count": 0
+    }
+  },
+  "schema_version": 1,
+  "source_git_sha": "aafc5b7b18a557a027d9dcd4b0064bfcaf843404",
+  "tests_passed": [
+    "sample_keyed_rng_unit",
+    "history_order_unit",
+    "data_sampler_unit",
+    "config_unit"
+  ]
+}

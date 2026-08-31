@@ -1,0 +1,615 @@
+{
+  "campaign_id": "ert-rslad-history-ordering-dev-v2",
+  "hosts": {
+    "hamster": {
+      "backend": "local",
+      "gpus": [
+        {
+          "index": 0,
+          "throughput": 679.0,
+          "uuid": "GPU-7ce112db-1ab9-ff86-9810-5bb92e222c2a"
+        },
+        {
+          "index": 1,
+          "throughput": 679.0,
+          "uuid": "GPU-9bb01a06-72d2-cc68-eeca-9c2c9daf37ce"
+        }
+      ],
+      "preflight_command": [
+        "nvidia-smi",
+        "-L"
+      ],
+      "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+        "/home/shunsukenaito/workspace-local/datasets/ard/torchvision",
+        "/home/shunsukenaito/workspace-local/ard_codex_bootstrap/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt"
+      ]
+    }
+  },
+  "jobs": [
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1",
+        "--ordering-policy",
+        "none"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 100,
+      "host": "hamster",
+      "job_id": "train-control-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-new-control-s1",
+      "scientific_identity": {
+        "arm": "NEW_CONTROL",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng",
+        "ordering_policy": "epoch_shuffle_control",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1",
+        "--ordering-policy",
+        "history_balanced_v1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 100,
+      "host": "hamster",
+      "job_id": "train-history-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-new-history-s1",
+      "scientific_identity": {
+        "arm": "NEW_HISTORY",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng",
+        "ordering_policy": "history_balanced_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2",
+        "--ordering-policy",
+        "none"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 100,
+      "host": "hamster",
+      "job_id": "train-control-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-new-control-s2",
+      "scientific_identity": {
+        "arm": "NEW_CONTROL",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng",
+        "ordering_policy": "epoch_shuffle_control",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2",
+        "--ordering-policy",
+        "history_balanced_v1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 100,
+      "host": "hamster",
+      "job_id": "train-history-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-new-history-s2",
+      "scientific_identity": {
+        "arm": "NEW_HISTORY",
+        "attack_random_start_keying": "sample_keyed_v1",
+        "method_id": "I100_sample_keyed_rng",
+        "ordering_policy": "history_balanced_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/epoch-149.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/endpoints/epoch-149/validation",
+        "--expected-epoch",
+        "148",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-control-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 10,
+      "host": "hamster",
+      "job_id": "endpoint-control-s1-e149",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/endpoints/epoch-149/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/epoch-149.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-endpoint-control-s1-e149",
+      "scientific_identity": {
+        "arm": "NEW_CONTROL",
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "endpoint_epoch": 149,
+        "method_id": "CE-PGD20",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/epoch-199.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/endpoints/epoch-199/validation",
+        "--expected-epoch",
+        "198",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-control-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 10,
+      "host": "hamster",
+      "job_id": "endpoint-control-s1-e199",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/endpoints/epoch-199/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s1/epoch-199.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-endpoint-control-s1-e199",
+      "scientific_identity": {
+        "arm": "NEW_CONTROL",
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "endpoint_epoch": 199,
+        "method_id": "CE-PGD20",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/epoch-149.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/endpoints/epoch-149/validation",
+        "--expected-epoch",
+        "148",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-history-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 10,
+      "host": "hamster",
+      "job_id": "endpoint-history-s1-e149",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/endpoints/epoch-149/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/epoch-149.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-endpoint-history-s1-e149",
+      "scientific_identity": {
+        "arm": "NEW_HISTORY",
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "endpoint_epoch": 149,
+        "method_id": "CE-PGD20",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/epoch-199.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/endpoints/epoch-199/validation",
+        "--expected-epoch",
+        "198",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-history-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 10,
+      "host": "hamster",
+      "job_id": "endpoint-history-s1-e199",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/endpoints/epoch-199/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s1/epoch-199.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-endpoint-history-s1-e199",
+      "scientific_identity": {
+        "arm": "NEW_HISTORY",
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "endpoint_epoch": 199,
+        "method_id": "CE-PGD20",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/epoch-149.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/endpoints/epoch-149/validation",
+        "--expected-epoch",
+        "148",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-control-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 10,
+      "host": "hamster",
+      "job_id": "endpoint-control-s2-e149",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/endpoints/epoch-149/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/epoch-149.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-endpoint-control-s2-e149",
+      "scientific_identity": {
+        "arm": "NEW_CONTROL",
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "endpoint_epoch": 149,
+        "method_id": "CE-PGD20",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/epoch-199.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/endpoints/epoch-199/validation",
+        "--expected-epoch",
+        "198",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-control-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 10,
+      "host": "hamster",
+      "job_id": "endpoint-control-s2-e199",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/endpoints/epoch-199/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-control-s2/epoch-199.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-endpoint-control-s2-e199",
+      "scientific_identity": {
+        "arm": "NEW_CONTROL",
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "endpoint_epoch": 199,
+        "method_id": "CE-PGD20",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/epoch-149.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/endpoints/epoch-149/validation",
+        "--expected-epoch",
+        "148",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-history-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 10,
+      "host": "hamster",
+      "job_id": "endpoint-history-s2-e149",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/endpoints/epoch-149/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/epoch-149.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-endpoint-history-s2-e149",
+      "scientific_identity": {
+        "arm": "NEW_HISTORY",
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "endpoint_epoch": 149,
+        "method_id": "CE-PGD20",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/epoch-199.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/endpoints/epoch-199/validation",
+        "--expected-epoch",
+        "198",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "train-history-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 10,
+      "host": "hamster",
+      "job_id": "endpoint-history-s2-e199",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/endpoints/epoch-199/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/new-history-s2/epoch-199.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 2
+      },
+      "run_id": "ert-rslad-history-ordering-endpoint-history-s2-e199",
+      "scientific_identity": {
+        "arm": "NEW_HISTORY",
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "endpoint_epoch": 199,
+        "method_id": "CE-PGD20",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "scripts/aggregate_history_ordering_campaign.py"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+      "dependencies": [
+        "endpoint-control-s1-e149",
+        "endpoint-control-s1-e199",
+        "endpoint-history-s1-e149",
+        "endpoint-history-s1-e199",
+        "endpoint-control-s2-e149",
+        "endpoint-control-s2-e199",
+        "endpoint-history-s2-e149",
+        "endpoint-history-s2-e199"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "estimated_work": 1,
+      "gpu_count": 0,
+      "host": "hamster",
+      "job_id": "aggregate-report",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/aggregate",
+      "run_id": "ert-rslad-history-ordering-aggregate-report",
+      "scientific_identity": {
+        "campaign": "ert-rslad-history-ordering-dev-v2",
+        "method_id": "aggregate_report"
+      }
+    }
+  ],
+  "reservation_root": "/home/shunsukenaito/.cache/ard-experiment-orchestrator/reservations",
+  "schema_version": 1,
+  "source": {
+    "git_sha": "aafc5b7b18a557a027d9dcd4b0064bfcaf843404",
+    "scientific_source_note": "Frozen implementation source commit; fork lineage records the exact clean source used for materialization."
+  },
+  "state_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final/orchestration.state.json"
+}

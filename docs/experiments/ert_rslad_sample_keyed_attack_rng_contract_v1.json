@@ -1,0 +1,101 @@
+{
+  "algorithm": "sample_keyed_v1",
+  "benchmark": {
+    "algorithm": "sample_keyed_v1",
+    "key_fields": [
+      "attack_seed",
+      "epoch",
+      "source_id",
+      "stream_tag",
+      "restart_index"
+    ],
+    "kind": "ert_rslad_sample_keyed_attack_rng_benchmark",
+    "rows": [
+      {
+        "batch": 128,
+        "device": "cuda",
+        "old_seconds": 0.00038592439765731495,
+        "overhead_fraction": 9.05077868751908,
+        "repeats": 3,
+        "resolution": 32,
+        "sample_keyed_seconds": 0.003878840710967779
+      },
+      {
+        "batch": 1,
+        "device": "cuda",
+        "old_seconds": 2.8281395013133686e-05,
+        "overhead_fraction": 27.575401409977417,
+        "repeats": 3,
+        "resolution": 224,
+        "sample_keyed_seconds": 0.0008081522149344286
+      }
+    ],
+    "schema_version": 1,
+    "torch_version": "2.11.0+cu128"
+  },
+  "benchmark_interpretation": "Random-start-only CUDA overhead exceeds 5%; this is reported, not hidden. Full attack overhead must be measured separately before interpreting training cost.",
+  "draw_device": "cpu_canonical_per_sample_torch_generator",
+  "forbidden_key_fields": [
+    "batch_position",
+    "batch_index",
+    "global_step",
+    "rank",
+    "worker",
+    "gpu"
+  ],
+  "invariance_tests": {
+    "arbitrary_resolution_224": true,
+    "arbitrary_resolution_32": true,
+    "batch_partition": true,
+    "epoch_variation": true,
+    "order": true,
+    "rank": true,
+    "seed_variation": true,
+    "source_variation": true
+  },
+  "key_fields": [
+    "attack_seed",
+    "epoch",
+    "source_id",
+    "stream_tag",
+    "restart_index"
+  ],
+  "kind": "ert_rslad_sample_keyed_attack_rng_contract",
+  "memory_contract": "batch_local_no_dataset_sized_cache",
+  "parent_lineage": {
+    "1": {
+      "config_hash": "43b58e2fe01ae99bd9a5afb9970243ba2720a1605aac3225535511684212c3ff",
+      "epoch": 99,
+      "global_step": 35200,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+      "sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835"
+    },
+    "2": {
+      "config_hash": "617e0ae4bce233dde1a822948e044179ff319554a04dd719827616e83e2ce1c0",
+      "epoch": 99,
+      "global_step": 35200,
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+      "sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+    }
+  },
+  "schema_version": 1,
+  "selection_attack_keying": "batch",
+  "source_git_sha": "aafc5b7b18a557a027d9dcd4b0064bfcaf843404",
+  "training_attack_identity": {
+    "epsilon": "8/255",
+    "epsilon_value": 0.03137254901960784,
+    "input_domain": "pixel_0_1",
+    "kl_target": "teacher_clean",
+    "loss": "kl",
+    "norm": "linf",
+    "random_start": true,
+    "random_start_keying": "sample_keyed_v1",
+    "step_size": "2/255",
+    "step_size_value": 0.00784313725490196,
+    "steps": 10,
+    "student_mode": "eval",
+    "teacher_mode": "eval",
+    "temperature": 1.0,
+    "temperature_squared": true
+  }
+}
