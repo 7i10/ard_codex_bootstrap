@@ -130,7 +130,11 @@ def main(argv: list[str] | None = None) -> int:
     child_sampler_state["seed"] = int(child_sampler_state["seed"]) + offset
     transformed["sampler_state"] = [child_sampler_state]
     transformed["fork_lineage"] = {
-        "kind": "ert_rslad_pure_order_probe_fork_v1",
+        # The stagewise protocol requires this generic resume kind.  The
+        # subtype below preserves the pure-order scientific identity without
+        # weakening the protocol-level fork guard.
+        "kind": "stagewise_augmentation_fork_v1",
+        "probe_kind": "ert_rslad_pure_order_probe_fork_v1",
         "child_tracker_run_id": run_id,
         "child_config_sha256": config_hash,
         "parent_tracker_run_id": parent.get("tracker_run_id"),
