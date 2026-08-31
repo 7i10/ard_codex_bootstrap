@@ -26,6 +26,23 @@ class StageAEndpointError(RuntimeError):
 EndpointSplit = Literal["train", "validation"]
 
 
+def _prepare_output_dir(output_dir: Path) -> None:
+    """Prepare an endpoint directory without allowing result overwrites.
+
+    The orchestration worker creates the declared output directory before it
+    starts the endpoint process so that its own logs and result markers have a
+    stable location.  Therefore an existing directory is valid when it only
+    contains orchestration metadata.  Endpoint result files remain immutable:
+    a rerun must use a fresh output directory rather than overwrite them.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if not output_dir.is_dir():
+        raise StageAEndpointError(f"endpoint output path is not a directory: {output_dir}")
+    for name in ("endpoint-sample-stats.parquet", "endpoint.json"):
+        if (output_dir / name).exists():
+            raise StageAEndpointError(f"endpoint result already exists; refusing overwrite: {output_dir / name}")
+
+
 def _probability_margin(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
     probabilities = torch.softmax(logits.float(), dim=1)
     true_probability = probabilities.gather(1, labels[:, None]).squeeze(1)
@@ -134,7 +151,7 @@ def evaluate_endpoint(
             )
     if not rows:
         raise StageAEndpointError("endpoint dataset produced no rows")
-    output_dir.mkdir(parents=True, exist_ok=False)
+    _prepare_output_dir(output_dir)
     rows_path = output_dir / "endpoint-sample-stats.parquet"
     write_sample_parquet(rows, rows_path)
     result = {
