@@ -106,6 +106,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _finish_ordering_telemetry_epoch(ordering_telemetry: OrderingTelemetry | None, epoch: int) -> None:
+    """Flush one completed probe epoch before its descriptor is consumed."""
+    if ordering_telemetry is not None:
+        ordering_telemetry.finish_epoch(epoch)
+
+
 def _seed_everything(seed: int) -> None:
     random.seed(seed)
     torch.manual_seed(seed)
@@ -968,6 +974,12 @@ def main(argv: list[str] | None = None) -> int:
             epoch_store.merge_tracker_jsonl(active_tracker.metrics_path)
 
         def _record_epoch(metrics: Mapping[str, float], improved: bool) -> None:
+            # Persist the observations accumulated by the batch callback before
+            # the tracker consumes the descriptor fields.  ``OrderingTelemetry``
+            # keeps the current epoch in memory so the risk snapshot remains
+            # pre-epoch; without this flush, probe runs reach the final epoch
+            # but fail during finalization because the JSONL files never exist.
+            _finish_ordering_telemetry_epoch(ordering_telemetry, trainer.current_epoch)
             # Every rank enters one phase after checkpoint writes.  The best
             # conditional lives inside the rank-zero closure, never around a
             # collective, preserving DDP progress and RNG parity.

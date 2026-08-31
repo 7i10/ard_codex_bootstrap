@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import torch
 
 from ard.analysis.ordering_telemetry import OrderingTelemetry, descriptor_summary
+from ard.cli.train import _finish_ordering_telemetry_epoch
 from ard.data import IndexedBatch
 
 
@@ -48,3 +49,17 @@ def test_ordering_telemetry_uses_valid_stable_ids_and_pre_epoch_snapshot(tmp_pat
     assert telemetry.last_descriptor is not None
     assert telemetry.last_descriptor["risk_snapshot_epoch"] == 99
     assert telemetry.last_descriptor["valid_sample_count"] == 2
+
+
+def test_train_epoch_finalization_flushes_ordering_telemetry() -> None:
+    class _Recorder:
+        def __init__(self) -> None:
+            self.epochs: list[int] = []
+
+        def finish_epoch(self, epoch: int) -> None:
+            self.epochs.append(epoch)
+
+    recorder = _Recorder()
+    _finish_ordering_telemetry_epoch(recorder, 114)
+    _finish_ordering_telemetry_epoch(None, 114)
+    assert recorder.epochs == [114]
