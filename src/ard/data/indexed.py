@@ -289,6 +289,7 @@ class HistoryBalancedSampler(Sampler[SampleRef]):
             "strata_counts": {"high": high_count, "mid": len(strata[self._MID]), "low": low_count},
             "strata_pattern": ["high", "mid", "mid", "low", "mid"],
             "risk_definition": "-margin_ema",
+            "permutation_sha256": hashlib.sha256(json.dumps(interleaved, separators=(",", ":")).encode()).hexdigest(),
         }
         return [self._position_by_source[source_id] for source_id in interleaved]
 

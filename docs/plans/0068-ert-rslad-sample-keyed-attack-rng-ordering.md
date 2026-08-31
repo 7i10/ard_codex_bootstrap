@@ -4,7 +4,7 @@
 
 - Owner: Codex root
 - Base SHA: `b4757cbe86a38402bc9f33e5d7186493fbd57c05`
-- Current milestone: RNG contract design and implementation audit
+- Current milestone: pre-production source freeze and detached campaign launch
 
 ## Goal
 
@@ -30,9 +30,9 @@ additional ordering policies, or ImageNet scientific training.
 
 ## Milestones
 
-- [ ] M0 reconcile and freeze plan/manifest
-- [ ] M1 implement reference and optimized sample-keyed random starts
-- [ ] M2 pass invariance/scalability tests and rank-equivalence gate
+- [x] M0 reconcile and freeze plan/manifest
+- [x] M1 implement reference and optimized sample-keyed random starts
+- [x] M2 pass invariance/scalability tests and rank-equivalence gate
 - [ ] M3 freeze source and run parent/control/history canaries
 - [ ] M4 launch four suffixes via detached marker DAG
 - [ ] M5 chain endpoints, aggregate, and report
@@ -52,3 +52,6 @@ additional ordering policies, or ImageNet scientific training.
 - 2026-08-31: previous audit showed batch-position coupling. Exact I100
   parents remain available and hash-verified. New contract prompt accepted for
   implementation review; no GPU production launched yet.
+- 2026-08-31: sample-keyed contract, history-balanced sampler, rank gate, and
+  invariance tests implemented. The bounded CUDA benchmark reports >5%
+  random-start-only overhead; this is retained as a documented limitation.

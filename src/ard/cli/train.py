@@ -932,6 +932,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         epoch_store = EpochMetricStore(output_dir / "epoch-metrics.jsonl") if is_rank_zero() else None
+        ordering_log_path = (
+            output_dir / "ordering-metrics.jsonl"
+            if args.ordering_policy == "history_balanced_v1" and is_rank_zero()
+            else None
+        )
         if epoch_store is not None and isinstance(active_tracker, LocalTracker):
             # A resumed process receives the complete prior local trajectory,
             # not merely the rows produced by this invocation.
@@ -947,6 +952,18 @@ def main(argv: list[str] | None = None) -> int:
                 values["global_step"] = trainer.global_step
                 if epoch_store is not None:
                     epoch_store.merge((values,))
+                if ordering_log_path is not None:
+                    metadata = getattr(sampler, "last_metadata", {})
+                    if metadata:
+                        with ordering_log_path.open("a", encoding="utf-8") as handle:
+                            handle.write(
+                                json.dumps(
+                                    {"epoch": trainer.current_epoch, "global_step": trainer.global_step, **metadata},
+                                    sort_keys=True,
+                                    separators=(",", ":"),
+                                )
+                                + "\n"
+                            )
                 # Reject a conflicting resumed epoch before the remote backend
                 # can receive a second row for that epoch.
                 active_tracker.log_metrics(values, step=trainer.global_step)
