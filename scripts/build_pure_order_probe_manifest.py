@@ -84,6 +84,7 @@ def main() -> int:
     parser.add_argument("--campaign-id", default="ert-rslad-ordering-mechanism-probe-v1")
     parser.add_argument("--run-id-prefix", default="ert-rslad-pure-order")
     parser.add_argument("--source-root", type=Path, default=REPO)
+    parser.add_argument("--state-path", type=Path)
     parser.add_argument(
         "--result-output",
         type=Path,
@@ -94,6 +95,7 @@ def main() -> int:
     run_root = args.run_root.resolve()
     registry_path = args.registry.resolve()
     source_root = args.source_root.resolve()
+    state_path = (args.state_path.resolve() if args.state_path is not None else run_root / "orchestration.state.json")
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     jobs: list[dict[str, object]] = []
     for seed in (1, 2):
@@ -144,7 +146,7 @@ def main() -> int:
         "schema_version": 1,
         "campaign_id": args.campaign_id,
         "source": {"git_sha": args.source_sha},
-        "state_path": str(run_root / "orchestration.state.json"),
+        "state_path": str(state_path),
         "reservation_root": "/home/shunsukenaito/.cache/ard-experiment-orchestrator/reservations",
         "hosts": {
             "hamster": {
