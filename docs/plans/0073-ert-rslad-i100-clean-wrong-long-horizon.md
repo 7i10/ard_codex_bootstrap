@@ -55,10 +55,10 @@ CE-PGD20 identity remain unchanged.
 ## Milestones
 
 - [x] Reconcile current source and read the long-horizon contract.
-- [ ] Audit six e114 checkpoint payloads, manifests, masks, and calibration.
-- [ ] Implement/validate the continuation and endpoint manifest.
-- [ ] Run bounded e114-resume canary and permutation/lineage checks.
-- [ ] Launch six detached continuations through epoch 199.
+- [x] Audit six e114 checkpoint payloads, manifests, masks, and calibration.
+- [x] Implement/validate the continuation and endpoint manifest.
+- [x] Run bounded e114-resume canary and permutation/lineage checks.
+- [x] Launch six detached continuations through epoch 199.
 - [ ] Chain e129/e149/e169/e189/e199 validation and e199 train endpoints.
 - [ ] Aggregate sparse trajectory, direct/spillover, and runtime results.
 - [ ] Write report, record CW1–CW6 decision, commit, push, and stop.
@@ -95,6 +95,10 @@ outside the automated test suite.
   present; campaign source `2522bc9` and manifest lineage retained.
 - 2026-09-02: Hamster preflight failed for this campaign (dataset missing,
   root filesystem 100%); Ferret GPU0/1 preflight passed.
+- 2026-09-02: Source `c6032f9` was pushed, Ferret worktree prepared, all six
+  e114 hashes matched, and the e115 resume canary passed. The detached
+  manifest controller launched the first two training jobs on Ferret GPU0/1;
+  no endpoint or long-running job was manually polled after the bounded check.
 
 ## Completion report
 
