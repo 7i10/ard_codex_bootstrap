@@ -69,7 +69,9 @@ def _auc(rows: list[dict[str, Any]], field: str) -> float:
     return (
         sum(
             (right_epoch - left_epoch) * (left_value + right_value) / 2.0
-            for (left_epoch, left_value), (right_epoch, right_value) in zip(points, points[1:], strict=True)
+            # Adjacent point lists intentionally differ in length by one.
+            # ``strict=True`` would reject every valid trajectory here.
+            for (left_epoch, left_value), (right_epoch, right_value) in zip(points, points[1:])
         )
         / 14.0
     )

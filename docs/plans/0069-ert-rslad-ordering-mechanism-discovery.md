@@ -4,8 +4,8 @@
 
 - Owner: Codex `/root`
 - Branch / base SHA: `master` / `3592a57a9c70951d796bcf2d18c7edffc6263f59`
-- Current milestone: M2--M3 in progress; corrected telemetry/probe implementation
-- Last updated: 2026-08-31
+- Current milestone: M5 complete; mechanism gate failed closed
+- Last updated: 2026-09-01
 
 ## Goal
 
@@ -47,10 +47,10 @@ contracts remain unchanged.
 - [x] M0: fix sampler direction and focused tests.
 - [x] M1: inventory existing trajectories and assess preregistered D1--D6
   descriptor availability.
-- [ ] M2: e99 gradient geometry and eight-schedule pure-order probes.
-- [ ] M3: apply the preregistered mechanism association gate.
-- [ ] M4: at most one second intervention, only if M3 passes.
-- [ ] M5: write immutable artifacts/report and commit.
+- [x] M2: e99 gradient geometry and eight-schedule pure-order probes.
+- [x] M3: apply the preregistered mechanism association gate (failed closed).
+- [x] M4: no second intervention because M3 failed.
+- [x] M5: write immutable artifacts/report and commit.
 
 ## Agent and review budget
 
@@ -85,9 +85,15 @@ explicitly deferred until their scientific gates pass.
   geometry runner, immutable eight-offset schedule registry, and detached-probe
   aggregation. Production launch remains gated on focused tests, clean source,
   and the e99 geometry result.
+- 2026-09-01: all 16 corrected pure-order forks completed with telemetry. The
+  detached aggregate hit an AUC helper bug (`zip(..., strict=True)` on
+  adjacent lists); the helper was fixed and the result recomputed from the
+  completed artifacts. All D1--D6 mechanism associations failed the frozen
+  cross-seed gate, so no second intervention was launched.
 
 ## Completion report
 
-The corrected direction regression and existing-run audit passed. The new
-telemetry/probe milestone is in progress; no corrected production result is
-claimed until the e99 geometry and all required probe artifacts are complete.
+The corrected direction regression and existing-run audit passed. The e99
+geometry and all 16 corrected pure-order probes completed, but the frozen
+mechanism association gate failed for every descriptor. The second intervention
+is therefore blocked and the campaign stops with the hash-bound result/report.
