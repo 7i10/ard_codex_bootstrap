@@ -1,6 +1,6 @@
 # 0072 — ERT/RSLAD I100 historical-action transfer screen
 
-Status: `in progress`
+Status: `complete`
 Date: 2026-09-01
 
 ## Objective
@@ -55,5 +55,15 @@ state, nonselected baseline parity fails, or the source tree is dirty.
 - [x] Historical pilot-S3/T1 and A2/A7 implementation audit started.
 - [x] I100 epoch-99 pre-treatment replay and masks.
 - [x] Pooled no-update calibration and artifact freeze.
-- [ ] Runtime parity/canary and orchestration manifest.
-- [ ] Eight continuations, endpoints, aggregation, and report.
+- [x] Runtime parity/canary and orchestration manifest.
+- [x] Eight continuations, endpoints, aggregation, and report.
+
+## Completion record
+
+The production manifest was frozen at source SHA
+`2522bc9a7a58b30135d85dfdeb33fdad0c23a313` (the inclusive epoch-114 launcher
+fix). All 8 training and 8 endpoint jobs completed with valid markers. The
+aggregated endpoint artifact is
+`docs/experiments/ert_rslad_i100_action_transfer_results_v1.json`, and the
+human-facing results are in
+`docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md`.
