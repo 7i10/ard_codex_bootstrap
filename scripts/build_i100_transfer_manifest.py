@@ -92,7 +92,10 @@ def main() -> int:
             jobs.append({
                 "job_id": endpoint_job_id, "run_id": f"ert-i100-endpoint-{seed}-{arm.lower()}", "host": "ferret",
                 "command": endpoint_cmd, "cwd": str(repo), "env": {"PYTHONPATH": "src", "WANDB_MODE": "online"},
-                "required_paths": [str(train_out / "checkpoints" / "epoch-114.pt")], "output_dir": str(endpoint_out),
+                # The checkpoint is a dependency-produced path and is
+                # intentionally checked by the endpoint command after the
+                # training marker, not by campaign preflight.
+                "required_paths": [], "output_dir": str(endpoint_out),
                 "completion_marker": "completion.json", "dependencies": [job_id], "estimated_work": 4 * 45000 * 20,
                 "scientific_identity": {"method_id": "i100-action-transfer-ce-pgd20", "seed_bundle": seed, "arm": arm,
                     "parent_job": job_id, "source_sha": args.source_sha, "attack": "CE-PGD20-8/255-2/255-random"},
