@@ -4,7 +4,7 @@
 
 - Owner: Codex `/root`
 - Branch / base SHA: `master` / `121c064efc32f47d40f9942d349ebeb1e7856733`
-- Current milestone: M0--M1 audit and implementation design
+- Current milestone: M1: registry and fork implementation frozen
 - Last updated: 2026-09-01
 
 ## Goal
@@ -38,7 +38,7 @@ best attack seed as a method and no automatic follow-up intervention.
 ## Milestones
 
 - [x] M0: audit parent/config/RNG isolation and existing artifacts.
-- [ ] M1: freeze attack-seed registry and add isolation/parity tests.
+- [x] M1: freeze attack-seed registry and add isolation/parity tests.
 - [ ] M2: implement fixed-model direct sensitivity replay.
 - [ ] M3: materialize and validate the 16 short attack-seed forks.
 - [ ] M4: run e114 endpoint and sample-level aggregation.

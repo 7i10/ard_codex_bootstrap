@@ -1,0 +1,87 @@
+{
+  "attack": {
+    "epsilon": "8/255",
+    "loss": "kl",
+    "random_start": true,
+    "random_start_distribution": "Uniform[-epsilon,+epsilon]",
+    "random_start_keying": "sample_keyed_v1",
+    "step_size": "2/255",
+    "steps": 10,
+    "target": "teacher_clean"
+  },
+  "domain": "ert_rslad_attack_seed_probe_v1",
+  "invariant_streams": [
+    "model_init",
+    "data_order",
+    "augmentation",
+    "evaluation_attack",
+    "python_numpy_torch_other_rng"
+  ],
+  "kind": "ert_rslad_attack_seed_probe_registry_v1",
+  "parent_payload_epoch": 99,
+  "parents": {
+    "seed1": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+    "seed2": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+  },
+  "phase_a": {
+    "fractions": [
+      0.2,
+      0.6,
+      0.2
+    ],
+    "risk": "-margin_ema_at_epoch_99",
+    "selection_rule": "descriptive_only_no_outcome_threshold_tuning",
+    "strata": [
+      "HIGH",
+      "MID",
+      "LOW"
+    ]
+  },
+  "probe_epoch_end_exclusive": 115,
+  "probe_epoch_start": 100,
+  "schema_version": 1,
+  "seeds": [
+    {
+      "index": 0,
+      "label": "ATTACK_SEED_0",
+      "value": 7627380109563657783
+    },
+    {
+      "index": 1,
+      "label": "ATTACK_SEED_1",
+      "value": 8480779665734580847
+    },
+    {
+      "index": 2,
+      "label": "ATTACK_SEED_2",
+      "value": 5107830115251535804
+    },
+    {
+      "index": 3,
+      "label": "ATTACK_SEED_3",
+      "value": 4502843134328618861
+    },
+    {
+      "index": 4,
+      "label": "ATTACK_SEED_4",
+      "value": 9186653202374592142
+    },
+    {
+      "index": 5,
+      "label": "ATTACK_SEED_5",
+      "value": 7572926927721735283
+    },
+    {
+      "index": 6,
+      "label": "ATTACK_SEED_6",
+      "value": 4813646949239090399
+    },
+    {
+      "index": 7,
+      "label": "ATTACK_SEED_7",
+      "value": 1118460328830420174
+    }
+  ],
+  "source_git_sha": "2cc3ae75f09c086bdd7c3af40525fa780195fc7d",
+  "status": "frozen_before_training"
+}
