@@ -19,12 +19,12 @@ from typing import Any
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 
 from ard.analysis import write_sample_parquet
 from ard.attacks import AttackRequest, LinfPGD
 from ard.config import load_config
-from ard.data import EpochShuffleSampler, build_train_validation_views, collate_indexed
+from ard.data import build_train_validation_views, collate_indexed
 from ard.engine.checkpoint import REQUIRED_KEYS
 from ard.models import build_student, build_teacher
 
@@ -145,12 +145,15 @@ def fixed_model_replay(
     )
     train_dataset.set_epoch(100)
     ids = _stratified_ids(train_dataset, count=limit)
-    positions = [train_dataset.indices.index(source_id) for source_id in ids]
-    subset = Subset(train_dataset, positions)
+    # ``EpochShuffleSampler`` yields ``SampleRef`` objects for state-aware
+    # training.  This read-only replay has no sample-state updates, so use a
+    # source-indexed view with ordinary integer indices instead of wrapping the
+    # view in ``torch.utils.data.Subset`` (which cannot consume ``SampleRef``).
+    subset = type(train_dataset)(train_dataset.dataset, ids)
     loader = DataLoader(
         subset,
         batch_size=config.training.per_rank_batch_size,
-        sampler=EpochShuffleSampler(len(subset), seed=0, shuffle=False),
+        shuffle=False,
         num_workers=0,
         collate_fn=collate_indexed,
     )
