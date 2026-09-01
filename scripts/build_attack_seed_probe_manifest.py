@@ -80,7 +80,11 @@ def build_manifest(
                 run_id=f"ert-rslad-attack-fixed-model-s{seed}",
                 command=[
                     PYTHON,
-                    str(source_root / "scripts/analysis/ert_rslad_attack_randomness.py"),
+                    # Fixed-model replay is read-only and uses the current
+                    # bug-fixed analysis helper.  Training jobs below still
+                    # execute from the immutable fork source_root so their
+                    # fork_git_sha contract remains exact.
+                    str(REPO / "scripts/analysis/ert_rslad_attack_randomness.py"),
                     "fixed-model",
                     "--config",
                     str(BASE_CONFIG[seed]),
