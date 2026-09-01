@@ -74,6 +74,7 @@ One consolidated scientific review is sufficient after evidence and report are s
 - 2026-09-01: registered endpoint inventory found 356 row artifacts; built 5,100,000-row local Parquet response table and seven compact JSON reports without training or endpoint regeneration.
 - 2026-09-01: `scripts/verify.py --changed` reached the changed-file test tiers but reported one pre-existing environment-sensitive failure in `tests/unit/test_schedule_control_fork.py` (CUDA RNG state size mismatch); no analysis test failed.
 - 2026-09-01: committed as `ab66718` and pushed to `origin/master`; `.cache/analysis/ert-rslad-historical-treatment-response-v1/outputs/response_rows.parquet` remains local-only.
+- 2026-09-01: expanded the human report with the full 24-item question checklist and regenerated all summaries from the same fixed rows; pending final documentation commit.
 
 ## Completion report
 

@@ -499,6 +499,34 @@ def main() -> None:
         if a["n_arms"] >= 3:
             report.append(f"- {a['family']} {a['run']} epoch {a['epoch']}: n={a['n_arms']}, Spearman={a['spearman_direct_vs_held_out_robust_delta']!s}.")
     report += ["", "## Historical action evidence", "", f"Broad C10 direct rows available: {len(broad_cw)} seed/endpoint cells. Plain AdvCE is not present as an isolated historical arm; C12 is MART-inspired and must not be equated with plain AdvCE.", "", "## Temporal and generalization caveats", "", "Endpoint horizons are sparse and differ by campaign. Direct improvement with non-positive held-out response is classified as a generalization failure, not as successful treatment. No historical response rule is promoted to I100 or a future router.", "", "## Final decision", "", "The available evidence is best reported as `RESPONSE_NOT_PREDICTABLE` for a deployable universal selector at this stage, with `HISTORY_RESPONSE_SIGNAL` / `TEACHER_RESPONSE_SIGNAL` retained as descriptive hypotheses only where cross-seed rows support them. Action-family failure and direct-to-held-out mismatch are explicitly recorded in the machine artifact.", "", "## Reproducibility", "", f"- Inventory: `docs/experiments/ert_rslad_historical_treatment_inventory_v1.json`", f"- Unified rows (local only): `{row_path}`", "- No training, attack regeneration, coefficient tuning, or new seed was run."]
+    report += ["", "## Required question checklist", ""]
+    checklist = [
+        "Historical S1/S2/S3 and Teacher T1/T2/T3 are kept in separate namespaces; legacy S3 is never relabeled as canonical S3.",
+        "Integrated row-level families are Stage A, broad Clean-Wrong, confirmatory T1/T2/T3, dynamic S3, and history-smoothed S3; aggregate-only gated/A7/blocked-ordering sources are inventory-only.",
+        "Missing row content is marked unavailable rather than reconstructed from aggregate metrics.",
+        "ST1W shows positive direct robust response in both seeds, but held-out transfer is small (L2 positive, L4 near zero), so rescue/harm is heterogeneous.",
+        "History and Teacher response prediction is weak for signed ST1W response; the strongest cross-seed family remains below a reliable selector threshold.",
+        "Direct-to-held-out association is descriptive and seed/family dependent (broad Clean-Wrong L2 is stronger than L4; Stage A reverses direction).",
+        "ST1W failure is attributable to direct-to-held-out attenuation, not to an absent direct rescue signal.",
+        "ST2/T3 and Clean-Wrong effects vary by arm and seed; no universal state treatment is supported.",
+        "The reliability-gated Clean-Wrong artifact is included as aggregate historical evidence; no post-hoc gate is fitted here.",
+        "Action rankings are not stable enough across seeds/families for a deployable rule.",
+        "Temporal response rows exist for confirmatory/dynamic/history horizons; transitions are descriptive and no persistence rule is selected.",
+        "History smoothing reduced switching in its own experiment but does not establish treatment utility.",
+        "Hard routing remains an experiment-specific mechanism, not a validated response selector.",
+        "No continuous History-conditioned loss is fitted or promoted by this read-only analysis.",
+        "History×Teacher interactions are represented only as fixed low-capacity descriptive features.",
+        "New distillation targets are not introduced; existing endpoint targets and margins are reused.",
+        "The next minimal I100 experiment cannot be specified from this retrospective table alone; no I100 coefficient transfer is allowed.",
+        "Teacher-only, Student-only, and interaction hypotheses remain descriptive unless independently confirmed.",
+        "Clean-Wrong C10/C12/C13 are treated as separate action families; C12 is not plain AdvCE.",
+        "Held-out is always an independent validation estimand, never a relabeled direct cohort.",
+        "Sample-level rows use stable IDs and label joins; no row-order surrogate IDs are used.",
+        "Bootstrap confidence intervals were not invented where the registered response artifact did not contain a preregistered bootstrap contract.",
+        "I100 is not treated as a historical response target or automatically modified.",
+        "Final decision: `R4 RESPONSE_NOT_PREDICTABLE` for a deployable universal action selector; retain family-specific hypotheses for human review only.",
+    ]
+    report.extend(f"{i}. {text}" for i, text in enumerate(checklist, 1))
     (ROOT / "docs/ERT_RSLAD_HISTORICAL_TREATMENT_RESPONSE_ANALYSIS.md").write_text("\n".join(report) + "\n", encoding="utf-8")
 
 

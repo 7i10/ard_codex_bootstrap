@@ -14,7 +14,7 @@
       "sha256": "808c6cca72490379005ef6dcb7533ee81fffbec4163422d5dbac4d92a1809e7c"
     }
   },
-  "git_sha": "bab6791f7116bf177bcd501d1a9588e4e7c190cb",
+  "git_sha": "3bcacd922d92455b7731ff2467f3a7c60eeb2bd2",
   "limitations": [
     "large sample-level response table is local-only",
     "W&B-only and absent row artifacts remain aggregate-only",

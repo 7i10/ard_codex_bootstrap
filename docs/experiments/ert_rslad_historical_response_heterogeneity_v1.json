@@ -14698,7 +14698,7 @@
       "temporal_failure": false
     }
   ],
-  "git_sha": "bab6791f7116bf177bcd501d1a9588e4e7c190cb",
+  "git_sha": "3bcacd922d92455b7731ff2467f3a7c60eeb2bd2",
   "metric_assertion": "accuracy_delta = rescue_rate - harm_rate",
   "row_table": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-rslad-historical-treatment-response-v1/outputs/response_rows.parquet",
   "schema_version": 1

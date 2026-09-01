@@ -164,7 +164,7 @@
     "P4_all": "concatenation of P0-P3; no stable ID or class"
   },
   "feature_source": "anchor79-state-table",
-  "git_sha": "bab6791f7116bf177bcd501d1a9588e4e7c190cb",
+  "git_sha": "3bcacd922d92455b7731ff2467f3a7c60eeb2bd2",
   "no_pooled_fit": true,
   "ridge_alpha": 1.0,
   "schema_version": 1,

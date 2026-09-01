@@ -6530,7 +6530,7 @@
     "held_out": "independent validation rows",
     "spillover": "train complement"
   },
-  "git_sha": "bab6791f7116bf177bcd501d1a9588e4e7c190cb",
+  "git_sha": "3bcacd922d92455b7731ff2467f3a7c60eeb2bd2",
   "held_out": [
     {
       "arm": "CW1",
