@@ -114,6 +114,7 @@ def build_manifest(
             )
         )
     train_job_ids: list[str] = []
+    cleanup_job_ids: list[str] = []
     for seed in (1, 2):
         for index in range(8):
             run = root / f"attack-seed-{index}-s{seed}"
@@ -192,7 +193,33 @@ def build_manifest(
                     source_root=source_root,
                 )
             )
-    endpoint_ids = [job["job_id"] for job in jobs if str(job["job_id"]).startswith("endpoint-")]
+            cleanup_id = f"cleanup-attack-{index}-s{seed}"
+            cleanup_job_ids.append(cleanup_id)
+            jobs.append(
+                _job(
+                    job_id=cleanup_id,
+                    run_id=f"ert-rslad-attack-cleanup-{index}-s{seed}",
+                    command=[
+                        PYTHON,
+                        str(REPO / "scripts/cleanup_attack_seed_probe_checkpoints.py"),
+                        "--run-dir",
+                        str(run),
+                    ],
+                    output=run / "cleanup",
+                    deps=[f"endpoint-attack-{index}-s{seed}"],
+                    gpu=-1,
+                    gpu_count=0,
+                    estimated_work=0.1,
+                    identity={
+                        "method_id": "ert_rslad_attack_seed_checkpoint_cleanup_v1",
+                        "seed": seed,
+                        "attack_index": index,
+                        "source_training_job": job_id,
+                    },
+                    required_paths=[str(run / "epoch-114.pt")],
+                    source_root=source_root,
+                )
+            )
     fixed_ids = [f"fixed-model-s{seed}" for seed in (1, 2)]
     aggregate_out = root / "aggregate"
     jobs.append(
@@ -216,7 +243,7 @@ def build_manifest(
                 str(REPO / "docs/ERT_RSLAD_ATTACK_RANDOMNESS_CHARACTERIZATION.md"),
             ],
             output=aggregate_out,
-            deps=fixed_ids + endpoint_ids,
+            deps=fixed_ids + cleanup_job_ids,
             gpu=0,
             gpu_count=0,
             estimated_work=1,
