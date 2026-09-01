@@ -1,0 +1,29 @@
+{
+  "cohorts": [
+    "direct",
+    "spillover",
+    "held_out"
+  ],
+  "features": {
+    "future_information": "excluded",
+    "historical_namespace": "historical_selection_state",
+    "state_namespace": "canonical_analysis_state"
+  },
+  "lineage": [
+    "source_git_sha",
+    "parent_checkpoint_sha256",
+    "endpoint_attack_identity_sha256",
+    "rows_sha256"
+  ],
+  "response": {
+    "clean": "treatment_clean_correct-control_clean_correct",
+    "robust": "treatment_robust_correct-control_robust_correct",
+    "values": [
+      -1,
+      0,
+      1
+    ]
+  },
+  "schema_version": 1,
+  "stable_id": "sample_id"
+}

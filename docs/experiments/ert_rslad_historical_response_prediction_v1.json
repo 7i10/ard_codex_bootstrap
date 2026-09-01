@@ -1,0 +1,173 @@
+{
+  "cross_seed": [
+    {
+      "evaluate": "L4",
+      "family": "P0_student_current",
+      "fit": "L2",
+      "n_test": 9368,
+      "n_train": 9889,
+      "rescue_vs_harm_brier": 0.24855073431841124,
+      "rescue_vs_harm_n": 1493,
+      "rescue_vs_harm_pr_auc": 0.5717949237171179,
+      "rescue_vs_harm_roc_auc": 0.5196505351751898,
+      "response_mean_test": 0.022096498719043553,
+      "response_mean_train": 0.044089392254019616,
+      "spearman_signed_response": 0.012737130723397707
+    },
+    {
+      "evaluate": "L4",
+      "family": "P1_history",
+      "fit": "L2",
+      "n_test": 9368,
+      "n_train": 9889,
+      "rescue_vs_harm_brier": 0.24730916068083678,
+      "rescue_vs_harm_n": 1493,
+      "rescue_vs_harm_pr_auc": 0.6399947309037662,
+      "rescue_vs_harm_roc_auc": 0.569682554203641,
+      "response_mean_test": 0.022096498719043553,
+      "response_mean_train": 0.044089392254019616,
+      "spearman_signed_response": 0.05760704401310325
+    },
+    {
+      "evaluate": "L4",
+      "family": "P2_teacher",
+      "fit": "L2",
+      "n_test": 9368,
+      "n_train": 9889,
+      "rescue_vs_harm_brier": 0.24839381028752852,
+      "rescue_vs_harm_n": 1493,
+      "rescue_vs_harm_pr_auc": 0.5910122489657663,
+      "rescue_vs_harm_roc_auc": 0.5198463086634343,
+      "response_mean_test": 0.022096498719043553,
+      "response_mean_train": 0.044089392254019616,
+      "spearman_signed_response": 0.023754517474933182
+    },
+    {
+      "evaluate": "L4",
+      "family": "P3_interaction",
+      "fit": "L2",
+      "n_test": 9368,
+      "n_train": 9889,
+      "rescue_vs_harm_brier": 0.24850500284831484,
+      "rescue_vs_harm_n": 1493,
+      "rescue_vs_harm_pr_auc": 0.5793761336137866,
+      "rescue_vs_harm_roc_auc": 0.522691428048669,
+      "response_mean_test": 0.022096498719043553,
+      "response_mean_train": 0.044089392254019616,
+      "spearman_signed_response": 0.020749681675635137
+    },
+    {
+      "evaluate": "L4",
+      "family": "P4_all",
+      "fit": "L2",
+      "n_test": 9368,
+      "n_train": 9889,
+      "rescue_vs_harm_brier": 0.24674063974549715,
+      "rescue_vs_harm_n": 1493,
+      "rescue_vs_harm_pr_auc": 0.6376327664616104,
+      "rescue_vs_harm_roc_auc": 0.5858988198700942,
+      "response_mean_test": 0.022096498719043553,
+      "response_mean_train": 0.044089392254019616,
+      "spearman_signed_response": 0.06944759792401249
+    },
+    {
+      "evaluate": "L2",
+      "family": "P0_student_current",
+      "fit": "L4",
+      "n_test": 9889,
+      "n_train": 9368,
+      "rescue_vs_harm_brier": 0.24849014196541122,
+      "rescue_vs_harm_n": 1584,
+      "rescue_vs_harm_pr_auc": 0.6659745366164148,
+      "rescue_vs_harm_roc_auc": 0.5354520992168903,
+      "response_mean_test": 0.044089392254019616,
+      "response_mean_train": 0.022096498719043553,
+      "spearman_signed_response": 0.009184998440424495
+    },
+    {
+      "evaluate": "L2",
+      "family": "P1_history",
+      "fit": "L4",
+      "n_test": 9889,
+      "n_train": 9368,
+      "rescue_vs_harm_brier": 0.2469051424787098,
+      "rescue_vs_harm_n": 1584,
+      "rescue_vs_harm_pr_auc": 0.7444513140317434,
+      "rescue_vs_harm_roc_auc": 0.6267102494221548,
+      "response_mean_test": 0.044089392254019616,
+      "response_mean_train": 0.022096498719043553,
+      "spearman_signed_response": 0.10181577921555024
+    },
+    {
+      "evaluate": "L2",
+      "family": "P2_teacher",
+      "fit": "L4",
+      "n_test": 9889,
+      "n_train": 9368,
+      "rescue_vs_harm_brier": 0.2482717896538326,
+      "rescue_vs_harm_n": 1584,
+      "rescue_vs_harm_pr_auc": 0.6785269153128802,
+      "rescue_vs_harm_roc_auc": 0.5487649636043743,
+      "response_mean_test": 0.044089392254019616,
+      "response_mean_train": 0.022096498719043553,
+      "spearman_signed_response": 0.03753390345422437
+    },
+    {
+      "evaluate": "L2",
+      "family": "P3_interaction",
+      "fit": "L4",
+      "n_test": 9889,
+      "n_train": 9368,
+      "rescue_vs_harm_brier": 0.2483903094735951,
+      "rescue_vs_harm_n": 1584,
+      "rescue_vs_harm_pr_auc": 0.709485808963037,
+      "rescue_vs_harm_roc_auc": 0.5891899817159416,
+      "response_mean_test": 0.044089392254019616,
+      "response_mean_train": 0.022096498719043553,
+      "spearman_signed_response": 0.05274022385935012
+    },
+    {
+      "evaluate": "L2",
+      "family": "P4_all",
+      "fit": "L4",
+      "n_test": 9889,
+      "n_train": 9368,
+      "rescue_vs_harm_brier": 0.24628694411367144,
+      "rescue_vs_harm_n": 1584,
+      "rescue_vs_harm_pr_auc": 0.760497515908367,
+      "rescue_vs_harm_roc_auc": 0.6514316762686722,
+      "response_mean_test": 0.044089392254019616,
+      "response_mean_train": 0.022096498719043553,
+      "spearman_signed_response": 0.11378782659527195
+    }
+  ],
+  "feature_families": {
+    "P0_student_current": [
+      "mS_clean",
+      "mS_adv"
+    ],
+    "P1_history": [
+      "online_frequency_risk",
+      "online_margin_risk",
+      "online_last_margin_risk"
+    ],
+    "P2_teacher": [
+      "mT_clean",
+      "mT_adv",
+      "DeltaT",
+      "signed_teacher_dominance"
+    ],
+    "P3_interaction": [
+      "mS_adv*mT_adv",
+      "mS_clean*mT_clean"
+    ],
+    "P4_all": "concatenation of P0-P3; no stable ID or class"
+  },
+  "feature_source": "anchor79-state-table",
+  "git_sha": "bab6791f7116bf177bcd501d1a9588e4e7c190cb",
+  "no_pooled_fit": true,
+  "ridge_alpha": 1.0,
+  "schema_version": 1,
+  "task": "ST1W_direct_robust_response",
+  "training_seed_primary": "cross-seed only"
+}

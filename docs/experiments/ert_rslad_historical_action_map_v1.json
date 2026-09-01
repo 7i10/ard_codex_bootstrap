@@ -1,0 +1,3686 @@
+{
+  "arms": [
+    "C0",
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "C15"
+  ],
+  "effects": [
+    {
+      "arm": "C1",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0009277513626348139,
+          "harm_count": 475,
+          "harm_rate": 0.05508523715644208,
+          "margin_delta": -0.00024956620034687093,
+          "n": 8623,
+          "net_rescue_rate": 0.0009277513626348139,
+          "rescue_count": 483,
+          "rescue_rate": 0.056012988519076885
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": -0.0006958135219761104,
+          "harm_count": 117,
+          "harm_rate": 0.013568363678534152,
+          "margin_delta": -0.004814586774418529,
+          "n": 8623,
+          "net_rescue_rate": -0.0006958135219761104,
+          "rescue_count": 111,
+          "rescue_rate": 0.012872550156558043
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "73a0704bfdaf06110b8d4eaf5e62cc5ba9e93777e279bdd7729d73d777bb648c"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.007339802622536218,
+          "harm_count": 1081,
+          "harm_rate": 0.029716579157159743,
+          "margin_delta": -0.003140483197469651,
+          "n": 36377,
+          "net_rescue_rate": -0.007339802622536218,
+          "rescue_count": 814,
+          "rescue_rate": 0.022376776534623527
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.00926409544492399,
+          "harm_count": 2135,
+          "harm_rate": 0.05869093108282706,
+          "margin_delta": -0.0031173423311124226,
+          "n": 36377,
+          "net_rescue_rate": -0.00926409544492399,
+          "rescue_count": 1798,
+          "rescue_rate": 0.04942683563790307
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C1",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0046,
+          "harm_count": 183,
+          "harm_rate": 0.0366,
+          "margin_delta": -0.0022975649669766426,
+          "n": 5000,
+          "net_rescue_rate": -0.0046,
+          "rescue_count": 160,
+          "rescue_rate": 0.032
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": 0.0008,
+          "harm_count": 231,
+          "harm_rate": 0.0462,
+          "margin_delta": -0.002058804912865162,
+          "n": 5000,
+          "net_rescue_rate": 0.0008,
+          "rescue_count": 235,
+          "rescue_rate": 0.047
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0046,
+          "harm_count": 183,
+          "harm_rate": 0.0366,
+          "margin_delta": -0.0022975649669766426,
+          "n": 5000,
+          "net_rescue_rate": -0.0046,
+          "rescue_count": 160,
+          "rescue_rate": 0.032
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": 0.0008,
+          "harm_count": 231,
+          "harm_rate": 0.0462,
+          "margin_delta": -0.002058804912865162,
+          "n": 5000,
+          "net_rescue_rate": 0.0008,
+          "rescue_count": 235,
+          "rescue_rate": 0.047
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "4c79ca2d05048de6ef078ecbed9470956f834c8b258fa205cf08cb9eb935a592"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C2",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.017279369129073407,
+          "harm_count": 607,
+          "harm_rate": 0.0703931346399165,
+          "margin_delta": -0.00844202745780582,
+          "n": 8623,
+          "net_rescue_rate": -0.017279369129073407,
+          "rescue_count": 458,
+          "rescue_rate": 0.0531137655108431
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": -0.007653948741737214,
+          "harm_count": 146,
+          "harm_rate": 0.01693146236808535,
+          "margin_delta": -0.026223594293639428,
+          "n": 8623,
+          "net_rescue_rate": -0.007653948741737214,
+          "rescue_count": 80,
+          "rescue_rate": 0.00927751362634814
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "427609dd861cc08e838bbb05f3018dc1ea73686ef66c55952c047f1e3c9c676b"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.0008521868213431564,
+          "harm_count": 1005,
+          "harm_rate": 0.027627346949995878,
+          "margin_delta": 0.013604135977352492,
+          "n": 36377,
+          "net_rescue_rate": -0.0008521868213431564,
+          "rescue_count": 974,
+          "rescue_rate": 0.02677516012865272
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.02254171591939962,
+          "harm_count": 2600,
+          "harm_rate": 0.0714737334029744,
+          "margin_delta": -0.005543006326236513,
+          "n": 36377,
+          "net_rescue_rate": -0.02254171591939962,
+          "rescue_count": 1780,
+          "rescue_rate": 0.048932017483574786
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C2",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0008,
+          "harm_count": 179,
+          "harm_rate": 0.0358,
+          "margin_delta": 0.009389895270764828,
+          "n": 5000,
+          "net_rescue_rate": 0.0008,
+          "rescue_count": 183,
+          "rescue_rate": 0.0366
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0158,
+          "harm_count": 289,
+          "harm_rate": 0.0578,
+          "margin_delta": -0.01173233694434166,
+          "n": 5000,
+          "net_rescue_rate": -0.0158,
+          "rescue_count": 210,
+          "rescue_rate": 0.042
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0008,
+          "harm_count": 179,
+          "harm_rate": 0.0358,
+          "margin_delta": 0.009389895270764828,
+          "n": 5000,
+          "net_rescue_rate": 0.0008,
+          "rescue_count": 183,
+          "rescue_rate": 0.0366
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0158,
+          "harm_count": 289,
+          "harm_rate": 0.0578,
+          "margin_delta": -0.01173233694434166,
+          "n": 5000,
+          "net_rescue_rate": -0.0158,
+          "rescue_count": 210,
+          "rescue_rate": 0.042
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "44894a6f64a602807c6ad20a507d40377e4f52786c1e213bbfc0db28326d7c08"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C3",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0,
+          "harm_count": 478,
+          "harm_rate": 0.05543314391743013,
+          "margin_delta": -0.00929975023450617,
+          "n": 8623,
+          "net_rescue_rate": 0.0,
+          "rescue_count": 478,
+          "rescue_rate": 0.05543314391743013
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": -0.00266728516757509,
+          "harm_count": 115,
+          "harm_rate": 0.013336425837875449,
+          "margin_delta": -0.02720393107908723,
+          "n": 8623,
+          "net_rescue_rate": -0.00266728516757509,
+          "rescue_count": 92,
+          "rescue_rate": 0.01066914067030036
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "9603afb0f6f4f63f96ca9ba2a2cf03ef3986b56361abd883500a5c3f17b853c1"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.0033537674904472606,
+          "harm_count": 913,
+          "harm_rate": 0.02509827638342909,
+          "margin_delta": 0.01613366274855865,
+          "n": 36377,
+          "net_rescue_rate": -0.0033537674904472606,
+          "rescue_count": 791,
+          "rescue_rate": 0.02174450889298183
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.008989196470297165,
+          "harm_count": 2117,
+          "harm_rate": 0.05819611292849878,
+          "margin_delta": 0.002678158570458983,
+          "n": 36377,
+          "net_rescue_rate": -0.008989196470297165,
+          "rescue_count": 1790,
+          "rescue_rate": 0.04920691645820161
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C3",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0032,
+          "harm_count": 151,
+          "harm_rate": 0.0302,
+          "margin_delta": 0.012778185257315635,
+          "n": 5000,
+          "net_rescue_rate": 0.0032,
+          "rescue_count": 167,
+          "rescue_rate": 0.0334
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0056,
+          "harm_count": 234,
+          "harm_rate": 0.0468,
+          "margin_delta": -0.003089665214717388,
+          "n": 5000,
+          "net_rescue_rate": -0.0056,
+          "rescue_count": 206,
+          "rescue_rate": 0.0412
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0032,
+          "harm_count": 151,
+          "harm_rate": 0.0302,
+          "margin_delta": 0.012778185257315635,
+          "n": 5000,
+          "net_rescue_rate": 0.0032,
+          "rescue_count": 167,
+          "rescue_rate": 0.0334
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0056,
+          "harm_count": 234,
+          "harm_rate": 0.0468,
+          "margin_delta": -0.003089665214717388,
+          "n": 5000,
+          "net_rescue_rate": -0.0056,
+          "rescue_count": 206,
+          "rescue_rate": 0.0412
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "d787bdfed7dd4c9c63985719d74ceade1130a3613af98cc6f571a574572214ac"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C4",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.02597703815377479,
+          "harm_count": 358,
+          "harm_rate": 0.04151687347790792,
+          "margin_delta": 0.007783599826882586,
+          "n": 8623,
+          "net_rescue_rate": 0.02597703815377479,
+          "rescue_count": 582,
+          "rescue_rate": 0.06749391163168271
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": 0.004058912211527311,
+          "harm_count": 94,
+          "harm_rate": 0.010901078510959063,
+          "margin_delta": 0.0031086153030105194,
+          "n": 8623,
+          "net_rescue_rate": 0.004058912211527311,
+          "rescue_count": 129,
+          "rescue_rate": 0.014959990722486374
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "fe516151f8cbdde094dcccfd4ed13f63c9e285d59fe1a4477333e152518fc882"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.0018143332325370426,
+          "harm_count": 807,
+          "harm_rate": 0.02218434725238475,
+          "margin_delta": -0.000508069008130823,
+          "n": 36377,
+          "net_rescue_rate": 0.0018143332325370426,
+          "rescue_count": 873,
+          "rescue_rate": 0.02399868048492179
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.0022266816944772794,
+          "harm_count": 1892,
+          "harm_rate": 0.05201088599939522,
+          "margin_delta": -0.0006217058413850011,
+          "n": 36377,
+          "net_rescue_rate": -0.0022266816944772794,
+          "rescue_count": 1811,
+          "rescue_rate": 0.049784204304917944
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C4",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0094,
+          "harm_count": 128,
+          "harm_rate": 0.0256,
+          "margin_delta": 0.001833177265524864,
+          "n": 5000,
+          "net_rescue_rate": 0.0094,
+          "rescue_count": 175,
+          "rescue_rate": 0.035
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0032,
+          "harm_count": 219,
+          "harm_rate": 0.0438,
+          "margin_delta": 0.0006702807530760765,
+          "n": 5000,
+          "net_rescue_rate": -0.0032,
+          "rescue_count": 203,
+          "rescue_rate": 0.0406
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0094,
+          "harm_count": 128,
+          "harm_rate": 0.0256,
+          "margin_delta": 0.001833177265524864,
+          "n": 5000,
+          "net_rescue_rate": 0.0094,
+          "rescue_count": 175,
+          "rescue_rate": 0.035
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0032,
+          "harm_count": 219,
+          "harm_rate": 0.0438,
+          "margin_delta": 0.0006702807530760765,
+          "n": 5000,
+          "net_rescue_rate": -0.0032,
+          "rescue_count": 203,
+          "rescue_rate": 0.0406
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "ee2f04abb0fc965ea79d4493a62ad48052cb959bae8a6af219f24db9b3df1ed6"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C5",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0367621477444045,
+          "harm_count": 316,
+          "harm_rate": 0.03664617882407515,
+          "margin_delta": 0.011199968252998486,
+          "n": 8623,
+          "net_rescue_rate": 0.0367621477444045,
+          "rescue_count": 633,
+          "rescue_rate": 0.07340832656847965
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": 0.0054505392554795315,
+          "harm_count": 97,
+          "harm_rate": 0.011248985271947119,
+          "margin_delta": -0.004797774037296778,
+          "n": 8623,
+          "net_rescue_rate": 0.0054505392554795315,
+          "rescue_count": 144,
+          "rescue_rate": 0.01669952452742665
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "7ed9f13399b6195d35ff9070489774658506ec8e4297151d628696181b03d98b"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.0008521868213431564,
+          "harm_count": 790,
+          "harm_rate": 0.021717018995519147,
+          "margin_delta": 0.004750755847255757,
+          "n": 36377,
+          "net_rescue_rate": 0.0008521868213431564,
+          "rescue_count": 821,
+          "rescue_rate": 0.022569205816862302
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.010611100420595432,
+          "harm_count": 2060,
+          "harm_rate": 0.05662918877312587,
+          "margin_delta": -0.004277481881859481,
+          "n": 36377,
+          "net_rescue_rate": -0.010611100420595432,
+          "rescue_count": 1674,
+          "rescue_rate": 0.04601808835253045
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C5",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0122,
+          "harm_count": 131,
+          "harm_rate": 0.0262,
+          "margin_delta": 0.006932737924158573,
+          "n": 5000,
+          "net_rescue_rate": 0.0122,
+          "rescue_count": 192,
+          "rescue_rate": 0.0384
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0052,
+          "harm_count": 219,
+          "harm_rate": 0.0438,
+          "margin_delta": -0.0031238344624638557,
+          "n": 5000,
+          "net_rescue_rate": -0.0052,
+          "rescue_count": 193,
+          "rescue_rate": 0.0386
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0122,
+          "harm_count": 131,
+          "harm_rate": 0.0262,
+          "margin_delta": 0.006932737924158573,
+          "n": 5000,
+          "net_rescue_rate": 0.0122,
+          "rescue_count": 192,
+          "rescue_rate": 0.0384
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0052,
+          "harm_count": 219,
+          "harm_rate": 0.0438,
+          "margin_delta": -0.0031238344624638557,
+          "n": 5000,
+          "net_rescue_rate": -0.0052,
+          "rescue_count": 193,
+          "rescue_rate": 0.0386
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "0921b1889499967d30e00f173a4d939d517557613e6a5713fa640cc0301c8763"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C6",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.010901078510959063,
+          "harm_count": 471,
+          "harm_rate": 0.05462136147512467,
+          "margin_delta": -0.003132137427933598,
+          "n": 8623,
+          "net_rescue_rate": 0.010901078510959063,
+          "rescue_count": 565,
+          "rescue_rate": 0.06552243998608373
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": 0.0010437202829641657,
+          "harm_count": 122,
+          "harm_rate": 0.014148208280180912,
+          "margin_delta": -0.014764609313213007,
+          "n": 8623,
+          "net_rescue_rate": 0.0010437202829641657,
+          "rescue_count": 131,
+          "rescue_rate": 0.015191928563145078
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "f60c0a9b12185de80e831fbbf390fbbef3e5d9ef7c16ab181b2a0088493f9e53"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.013607499244027819,
+          "harm_count": 1269,
+          "harm_rate": 0.03488467988014405,
+          "margin_delta": 0.004998201396770264,
+          "n": 36377,
+          "net_rescue_rate": -0.013607499244027819,
+          "rescue_count": 774,
+          "rescue_rate": 0.02127718063611623
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.012013085191192237,
+          "harm_count": 2377,
+          "harm_rate": 0.06534348626879621,
+          "margin_delta": -0.0023891572287586225,
+          "n": 36377,
+          "net_rescue_rate": -0.012013085191192237,
+          "rescue_count": 1940,
+          "rescue_rate": 0.05333040107760398
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C6",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0026,
+          "harm_count": 196,
+          "harm_rate": 0.0392,
+          "margin_delta": 0.0037687410652637483,
+          "n": 5000,
+          "net_rescue_rate": -0.0026,
+          "rescue_count": 183,
+          "rescue_rate": 0.0366
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0114,
+          "harm_count": 296,
+          "harm_rate": 0.0592,
+          "margin_delta": -0.003374675500392914,
+          "n": 5000,
+          "net_rescue_rate": -0.0114,
+          "rescue_count": 239,
+          "rescue_rate": 0.0478
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0026,
+          "harm_count": 196,
+          "harm_rate": 0.0392,
+          "margin_delta": 0.0037687410652637483,
+          "n": 5000,
+          "net_rescue_rate": -0.0026,
+          "rescue_count": 183,
+          "rescue_rate": 0.0366
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0114,
+          "harm_count": 296,
+          "harm_rate": 0.0592,
+          "margin_delta": -0.003374675500392914,
+          "n": 5000,
+          "net_rescue_rate": -0.0114,
+          "rescue_count": 239,
+          "rescue_rate": 0.0478
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "2b6df40b95039fabaad1692e309a2118da96ffd1c70b86ec005e6b8a4f8739ec"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C7",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.022729908384552938,
+          "harm_count": 531,
+          "harm_rate": 0.06157949669488577,
+          "margin_delta": -0.003761171936905883,
+          "n": 8623,
+          "net_rescue_rate": 0.022729908384552938,
+          "rescue_count": 727,
+          "rescue_rate": 0.08430940507943871
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": -0.00800185550272527,
+          "harm_count": 142,
+          "harm_rate": 0.016467586686767947,
+          "margin_delta": -0.035726467669563146,
+          "n": 8623,
+          "net_rescue_rate": -0.00800185550272527,
+          "rescue_count": 73,
+          "rescue_rate": 0.008465731184042676
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "f6be3a62d3cc1a66ac106ae86d7bb02404df692dffa535ade8b36d6d8ef7071f"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.0042334442092530995,
+          "harm_count": 1006,
+          "harm_rate": 0.02765483684745856,
+          "margin_delta": 0.024473855787815,
+          "n": 36377,
+          "net_rescue_rate": 0.0042334442092530995,
+          "rescue_count": 1160,
+          "rescue_rate": 0.03188828105671166
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.031640871979547514,
+          "harm_count": 2934,
+          "harm_rate": 0.08065535915551035,
+          "margin_delta": -0.007131099531135522,
+          "n": 36377,
+          "net_rescue_rate": -0.031640871979547514,
+          "rescue_count": 1783,
+          "rescue_rate": 0.04901448717596284
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C7",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0092,
+          "harm_count": 186,
+          "harm_rate": 0.0372,
+          "margin_delta": 0.020704491209983827,
+          "n": 5000,
+          "net_rescue_rate": 0.0092,
+          "rescue_count": 232,
+          "rescue_rate": 0.0464
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0202,
+          "harm_count": 300,
+          "harm_rate": 0.06,
+          "margin_delta": -0.013705315221846103,
+          "n": 5000,
+          "net_rescue_rate": -0.0202,
+          "rescue_count": 199,
+          "rescue_rate": 0.0398
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0092,
+          "harm_count": 186,
+          "harm_rate": 0.0372,
+          "margin_delta": 0.020704491209983827,
+          "n": 5000,
+          "net_rescue_rate": 0.0092,
+          "rescue_count": 232,
+          "rescue_rate": 0.0464
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0202,
+          "harm_count": 300,
+          "harm_rate": 0.06,
+          "margin_delta": -0.013705315221846103,
+          "n": 5000,
+          "net_rescue_rate": -0.0202,
+          "rescue_count": 199,
+          "rescue_rate": 0.0398
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "a832eb21dd25ad5f1dee3015b87bea74734eb5d51f6eb6966ec45f2b953f837d"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C8",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.016351617766438595,
+          "harm_count": 518,
+          "harm_rate": 0.0600719007306042,
+          "margin_delta": 0.002824104786658804,
+          "n": 8623,
+          "net_rescue_rate": 0.016351617766438595,
+          "rescue_count": 659,
+          "rescue_rate": 0.07642351849704279
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": -0.0018555027252696278,
+          "harm_count": 128,
+          "harm_rate": 0.014844021802157022,
+          "margin_delta": -0.01482938407942658,
+          "n": 8623,
+          "net_rescue_rate": -0.0018555027252696278,
+          "rescue_count": 112,
+          "rescue_rate": 0.012988519076887394
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "e19cfdb81163bf36708857621cc60ab3099ca6780a23ea7e34cd7e13e002fbb7"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.0003298787695521896,
+          "harm_count": 1039,
+          "harm_rate": 0.02856200346372708,
+          "margin_delta": 0.006246572513035283,
+          "n": 36377,
+          "net_rescue_rate": 0.0003298787695521896,
+          "rescue_count": 1051,
+          "rescue_rate": 0.02889188223327927
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.022074387662534018,
+          "harm_count": 2750,
+          "harm_rate": 0.07559721802237677,
+          "margin_delta": -0.009852391153858274,
+          "n": 36377,
+          "net_rescue_rate": -0.022074387662534018,
+          "rescue_count": 1947,
+          "rescue_rate": 0.05352283035984276
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C8",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0086,
+          "harm_count": 180,
+          "harm_rate": 0.036,
+          "margin_delta": 0.00687218160778284,
+          "n": 5000,
+          "net_rescue_rate": 0.0086,
+          "rescue_count": 223,
+          "rescue_rate": 0.0446
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0124,
+          "harm_count": 291,
+          "harm_rate": 0.0582,
+          "margin_delta": -0.011384004643559455,
+          "n": 5000,
+          "net_rescue_rate": -0.0124,
+          "rescue_count": 229,
+          "rescue_rate": 0.0458
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0086,
+          "harm_count": 180,
+          "harm_rate": 0.036,
+          "margin_delta": 0.00687218160778284,
+          "n": 5000,
+          "net_rescue_rate": 0.0086,
+          "rescue_count": 223,
+          "rescue_rate": 0.0446
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0124,
+          "harm_count": 291,
+          "harm_rate": 0.0582,
+          "margin_delta": -0.011384004643559455,
+          "n": 5000,
+          "net_rescue_rate": -0.0124,
+          "rescue_count": 229,
+          "rescue_rate": 0.0458
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "d7cd22a30c4b591b9996f18b054390aa3ca585d49a25c82f0c35f2f3f797a1b3"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C9",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.027136727357068305,
+          "harm_count": 625,
+          "harm_rate": 0.07248057520584483,
+          "margin_delta": -0.01832501502811501,
+          "n": 8623,
+          "net_rescue_rate": -0.027136727357068305,
+          "rescue_count": 391,
+          "rescue_rate": 0.04534384784877653
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": -0.007885886582395918,
+          "harm_count": 140,
+          "harm_rate": 0.016235648846109244,
+          "margin_delta": -0.02944100500328226,
+          "n": 8623,
+          "net_rescue_rate": -0.007885886582395918,
+          "rescue_count": 72,
+          "rescue_rate": 0.008349762263713326
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "6a94f7e8bba0b477cdcf3cb1491e95a0b7a53aad4690878e00b47f39115d028f"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.01025373175358056,
+          "harm_count": 1110,
+          "harm_rate": 0.030513786183577536,
+          "margin_delta": 0.006649077810324755,
+          "n": 36377,
+          "net_rescue_rate": -0.01025373175358056,
+          "rescue_count": 737,
+          "rescue_rate": 0.020260054429996975
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.02474090771641422,
+          "harm_count": 2470,
+          "harm_rate": 0.06790004673282568,
+          "margin_delta": -0.006990818485454194,
+          "n": 36377,
+          "net_rescue_rate": -0.02474090771641422,
+          "rescue_count": 1570,
+          "rescue_rate": 0.04315913901641147
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C9",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0082,
+          "harm_count": 194,
+          "harm_rate": 0.0388,
+          "margin_delta": 0.0013326666176319123,
+          "n": 5000,
+          "net_rescue_rate": -0.0082,
+          "rescue_count": 153,
+          "rescue_rate": 0.0306
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0178,
+          "harm_count": 281,
+          "harm_rate": 0.0562,
+          "margin_delta": -0.012410220293700695,
+          "n": 5000,
+          "net_rescue_rate": -0.0178,
+          "rescue_count": 192,
+          "rescue_rate": 0.0384
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0082,
+          "harm_count": 194,
+          "harm_rate": 0.0388,
+          "margin_delta": 0.0013326666176319123,
+          "n": 5000,
+          "net_rescue_rate": -0.0082,
+          "rescue_count": 153,
+          "rescue_rate": 0.0306
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0178,
+          "harm_count": 281,
+          "harm_rate": 0.0562,
+          "margin_delta": -0.012410220293700695,
+          "n": 5000,
+          "net_rescue_rate": -0.0178,
+          "rescue_count": 192,
+          "rescue_rate": 0.0384
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "87b3796590aaf061e22330c74366b7176a082e932a8aefbd01935e5785786226"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C10",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.054505392554795314,
+          "harm_count": 279,
+          "harm_rate": 0.03235532877188913,
+          "margin_delta": 0.016995549416246206,
+          "n": 8623,
+          "net_rescue_rate": 0.054505392554795314,
+          "rescue_count": 749,
+          "rescue_rate": 0.08686072132668445
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": 0.013104487997216746,
+          "harm_count": 80,
+          "harm_rate": 0.00927751362634814,
+          "margin_delta": 0.00787214893438583,
+          "n": 8623,
+          "net_rescue_rate": 0.013104487997216746,
+          "rescue_count": 193,
+          "rescue_rate": 0.022382001623564886
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "c82d44fdc191cfc61f1f53132c7217746afa1e552360cb78c34722745cfed65a"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.0037386260549248152,
+          "harm_count": 965,
+          "harm_rate": 0.02652775105148858,
+          "margin_delta": -0.006562303713304134,
+          "n": 36377,
+          "net_rescue_rate": -0.0037386260549248152,
+          "rescue_count": 829,
+          "rescue_rate": 0.022789124996563763
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.012178024575968331,
+          "harm_count": 2196,
+          "harm_rate": 0.06036781482805069,
+          "margin_delta": -0.006860580545711515,
+          "n": 36377,
+          "net_rescue_rate": -0.012178024575968331,
+          "rescue_count": 1753,
+          "rescue_rate": 0.04818979025208236
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C10",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0124,
+          "harm_count": 132,
+          "harm_rate": 0.0264,
+          "margin_delta": -0.0004232461929321289,
+          "n": 5000,
+          "net_rescue_rate": 0.0124,
+          "rescue_count": 194,
+          "rescue_rate": 0.0388
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": 0.0004,
+          "harm_count": 231,
+          "harm_rate": 0.0462,
+          "margin_delta": -0.0015708742395043373,
+          "n": 5000,
+          "net_rescue_rate": 0.0004,
+          "rescue_count": 233,
+          "rescue_rate": 0.0466
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0124,
+          "harm_count": 132,
+          "harm_rate": 0.0264,
+          "margin_delta": -0.0004232461929321289,
+          "n": 5000,
+          "net_rescue_rate": 0.0124,
+          "rescue_count": 194,
+          "rescue_rate": 0.0388
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": 0.0004,
+          "harm_count": 231,
+          "harm_rate": 0.0462,
+          "margin_delta": -0.0015708742395043373,
+          "n": 5000,
+          "net_rescue_rate": 0.0004,
+          "rescue_count": 233,
+          "rescue_rate": 0.0466
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "2e7f83d36779786ecf5873815d1bd84b1ab03b6f8c09d56b55be0d4c565c1e68"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C11",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.015075959642815726,
+          "harm_count": 421,
+          "harm_rate": 0.04882291545865708,
+          "margin_delta": 0.006032707554363919,
+          "n": 8623,
+          "net_rescue_rate": 0.015075959642815726,
+          "rescue_count": 551,
+          "rescue_rate": 0.06389887510147281
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": 0.006958135219761104,
+          "harm_count": 86,
+          "harm_rate": 0.00997332714832425,
+          "margin_delta": 0.0077455652704665244,
+          "n": 8623,
+          "net_rescue_rate": 0.006958135219761104,
+          "rescue_count": 146,
+          "rescue_rate": 0.01693146236808535
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "cda3dbe9bdeff8b66746bcdbf2a984547974f8633327ce3805a7a3cbd9fee598"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.0061302471341781895,
+          "harm_count": 1041,
+          "harm_rate": 0.028616983258652445,
+          "margin_delta": -0.006967286601558999,
+          "n": 36377,
+          "net_rescue_rate": -0.0061302471341781895,
+          "rescue_count": 818,
+          "rescue_rate": 0.022486736124474254
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.01204057508865492,
+          "harm_count": 2219,
+          "harm_rate": 0.061000082469692386,
+          "margin_delta": -0.006591364106396718,
+          "n": 36377,
+          "net_rescue_rate": -0.01204057508865492,
+          "rescue_count": 1781,
+          "rescue_rate": 0.04895950738103747
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C11",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0108,
+          "harm_count": 138,
+          "harm_rate": 0.0276,
+          "margin_delta": -0.005503935743868351,
+          "n": 5000,
+          "net_rescue_rate": 0.0108,
+          "rescue_count": 192,
+          "rescue_rate": 0.0384
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.006,
+          "harm_count": 244,
+          "harm_rate": 0.0488,
+          "margin_delta": -0.0010495349407196044,
+          "n": 5000,
+          "net_rescue_rate": -0.006,
+          "rescue_count": 214,
+          "rescue_rate": 0.0428
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0108,
+          "harm_count": 138,
+          "harm_rate": 0.0276,
+          "margin_delta": -0.005503935743868351,
+          "n": 5000,
+          "net_rescue_rate": 0.0108,
+          "rescue_count": 192,
+          "rescue_rate": 0.0384
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.006,
+          "harm_count": 244,
+          "harm_rate": 0.0488,
+          "margin_delta": -0.0010495349407196044,
+          "n": 5000,
+          "net_rescue_rate": -0.006,
+          "rescue_count": 214,
+          "rescue_rate": 0.0428
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "536e1813f58c88f4576ca85d2d3fda76bd2d8f4f3df32aac2d8968381488632a"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C12",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.02876029224167923,
+          "harm_count": 401,
+          "harm_rate": 0.04650353705207005,
+          "margin_delta": 0.009313843904142381,
+          "n": 8623,
+          "net_rescue_rate": 0.02876029224167923,
+          "rescue_count": 649,
+          "rescue_rate": 0.07526382929374928
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": 0.010321233909312305,
+          "harm_count": 86,
+          "harm_rate": 0.00997332714832425,
+          "margin_delta": 0.006011182950576524,
+          "n": 8623,
+          "net_rescue_rate": 0.010321233909312305,
+          "rescue_count": 175,
+          "rescue_rate": 0.020294561057636554
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "efcebe4b30294b711d4c25e90826191f7b7ceacfc1f14a617f4f1c80defc7c17"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.008494378315968882,
+          "harm_count": 1135,
+          "harm_rate": 0.0312010336201446,
+          "margin_delta": -0.005583648629764905,
+          "n": 36377,
+          "net_rescue_rate": -0.008494378315968882,
+          "rescue_count": 826,
+          "rescue_rate": 0.022706655304175715
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.014322236578057564,
+          "harm_count": 2346,
+          "harm_rate": 0.06449129944745306,
+          "margin_delta": -0.007915023854295499,
+          "n": 36377,
+          "net_rescue_rate": -0.014322236578057564,
+          "rescue_count": 1825,
+          "rescue_rate": 0.0501690628693955
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C12",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.004,
+          "harm_count": 171,
+          "harm_rate": 0.0342,
+          "margin_delta": -0.0014657166972756386,
+          "n": 5000,
+          "net_rescue_rate": 0.004,
+          "rescue_count": 191,
+          "rescue_rate": 0.0382
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0018,
+          "harm_count": 245,
+          "harm_rate": 0.049,
+          "margin_delta": -0.001955202154815197,
+          "n": 5000,
+          "net_rescue_rate": -0.0018,
+          "rescue_count": 236,
+          "rescue_rate": 0.0472
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.004,
+          "harm_count": 171,
+          "harm_rate": 0.0342,
+          "margin_delta": -0.0014657166972756386,
+          "n": 5000,
+          "net_rescue_rate": 0.004,
+          "rescue_count": 191,
+          "rescue_rate": 0.0382
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0018,
+          "harm_count": 245,
+          "harm_rate": 0.049,
+          "margin_delta": -0.001955202154815197,
+          "n": 5000,
+          "net_rescue_rate": -0.0018,
+          "rescue_count": 236,
+          "rescue_rate": 0.0472
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "e248d9f2afec2be9318eca7262b47186e4719fa08b6f69ce7356c887712f0cc3"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C13",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0005798446016467587,
+          "harm_count": 412,
+          "harm_rate": 0.047779195175692915,
+          "margin_delta": 0.0034697689120321306,
+          "n": 8623,
+          "net_rescue_rate": 0.0005798446016467587,
+          "rescue_count": 417,
+          "rescue_rate": 0.04835903977733967
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": 0.0057984460164675865,
+          "harm_count": 87,
+          "harm_rate": 0.010089296068653601,
+          "margin_delta": 0.008460944351472006,
+          "n": 8623,
+          "net_rescue_rate": 0.0057984460164675865,
+          "rescue_count": 137,
+          "rescue_rate": 0.015887742085121188
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "a2fdbcabfd6a4a90c5c1eb1d268458edba42d52e34c84f0676d7761bef42b6c8"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.005250570415372351,
+          "harm_count": 896,
+          "harm_rate": 0.02463094812656349,
+          "margin_delta": -0.0061002589966412096,
+          "n": 36377,
+          "net_rescue_rate": -0.005250570415372351,
+          "rescue_count": 705,
+          "rescue_rate": 0.019380377711191138
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.0006047777441790142,
+          "harm_count": 1787,
+          "harm_rate": 0.04912444676581356,
+          "margin_delta": -0.0017877801538781952,
+          "n": 36377,
+          "net_rescue_rate": -0.0006047777441790142,
+          "rescue_count": 1765,
+          "rescue_rate": 0.04851966902163455
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C13",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.001,
+          "harm_count": 146,
+          "harm_rate": 0.0292,
+          "margin_delta": -0.005860264806449413,
+          "n": 5000,
+          "net_rescue_rate": 0.001,
+          "rescue_count": 151,
+          "rescue_rate": 0.0302
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": 0.0034,
+          "harm_count": 187,
+          "harm_rate": 0.0374,
+          "margin_delta": 0.0016307539775967598,
+          "n": 5000,
+          "net_rescue_rate": 0.0034,
+          "rescue_count": 204,
+          "rescue_rate": 0.0408
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.001,
+          "harm_count": 146,
+          "harm_rate": 0.0292,
+          "margin_delta": -0.005860264806449413,
+          "n": 5000,
+          "net_rescue_rate": 0.001,
+          "rescue_count": 151,
+          "rescue_rate": 0.0302
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": 0.0034,
+          "harm_count": 187,
+          "harm_rate": 0.0374,
+          "margin_delta": 0.0016307539775967598,
+          "n": 5000,
+          "net_rescue_rate": 0.0034,
+          "rescue_count": 204,
+          "rescue_rate": 0.0408
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "271acba5218cbf2943650aaab448eeb95356b08e29dac31904f2e56915d93484"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C14",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.008117824423054622,
+          "harm_count": 535,
+          "harm_rate": 0.06204337237620318,
+          "margin_delta": -0.006642562944312861,
+          "n": 8623,
+          "net_rescue_rate": 0.008117824423054622,
+          "rescue_count": 605,
+          "rescue_rate": 0.0701611967992578
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": 0.00011596892032935173,
+          "harm_count": 113,
+          "harm_rate": 0.013104487997216746,
+          "margin_delta": -0.02315197302417137,
+          "n": 8623,
+          "net_rescue_rate": 0.00011596892032935173,
+          "rescue_count": 114,
+          "rescue_rate": 0.013220456917546098
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "8dc78e03b89444e1e4b0f417cda252b9650081d4b9a0569bb613721142db0f07"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.01127085795969981,
+          "harm_count": 1286,
+          "harm_rate": 0.03535200813700965,
+          "margin_delta": 0.004608806680337905,
+          "n": 36377,
+          "net_rescue_rate": -0.01127085795969981,
+          "rescue_count": 876,
+          "rescue_rate": 0.02408115017730984
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.03763366962641229,
+          "harm_count": 3048,
+          "harm_rate": 0.08378920746625615,
+          "margin_delta": -0.01462097157191348,
+          "n": 36377,
+          "net_rescue_rate": -0.03763366962641229,
+          "rescue_count": 1679,
+          "rescue_rate": 0.04615553783984386
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C14",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0016,
+          "harm_count": 211,
+          "harm_rate": 0.0422,
+          "margin_delta": 0.005158879718184471,
+          "n": 5000,
+          "net_rescue_rate": -0.0016,
+          "rescue_count": 203,
+          "rescue_rate": 0.0406
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.027,
+          "harm_count": 329,
+          "harm_rate": 0.0658,
+          "margin_delta": -0.016606728069484235,
+          "n": 5000,
+          "net_rescue_rate": -0.027,
+          "rescue_count": 194,
+          "rescue_rate": 0.0388
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0016,
+          "harm_count": 211,
+          "harm_rate": 0.0422,
+          "margin_delta": 0.005158879718184471,
+          "n": 5000,
+          "net_rescue_rate": -0.0016,
+          "rescue_count": 203,
+          "rescue_rate": 0.0406
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.027,
+          "harm_count": 329,
+          "harm_rate": 0.0658,
+          "margin_delta": -0.016606728069484235,
+          "n": 5000,
+          "net_rescue_rate": -0.027,
+          "rescue_count": 194,
+          "rescue_rate": 0.0388
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "f51b9ea97f7ae306da1c98d1c5a45ceb2feee6271365c6013376a12c2f234811"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C15",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.015771773164791836,
+          "harm_count": 619,
+          "harm_rate": 0.07178476168386873,
+          "margin_delta": -0.011850559798205491,
+          "n": 8623,
+          "net_rescue_rate": -0.015771773164791836,
+          "rescue_count": 483,
+          "rescue_rate": 0.056012988519076885
+        },
+        "n": 8623,
+        "robust": {
+          "accuracy_delta": -0.0067261973791024,
+          "harm_count": 138,
+          "harm_rate": 0.01600371100545054,
+          "margin_delta": -0.02329864141079938,
+          "n": 8623,
+          "net_rescue_rate": -0.0067261973791024,
+          "rescue_count": 80,
+          "rescue_rate": 0.00927751362634814
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "ba11826a28254999ef3bbb837be4d5c7b22d8e984b802a1bf9b5c65993df6296",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "629fc42a1ab2314ca72611efd21a72c6b35bced9ed1368e54db22c78597178d1"
+      },
+      "run": "L2",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.01404733760343074,
+          "harm_count": 1308,
+          "harm_rate": 0.03595678588118866,
+          "margin_delta": 0.002650030266770982,
+          "n": 36377,
+          "net_rescue_rate": -0.01404733760343074,
+          "rescue_count": 797,
+          "rescue_rate": 0.021909448277757922
+        },
+        "n": 36377,
+        "robust": {
+          "accuracy_delta": -0.029276740797756825,
+          "harm_count": 2778,
+          "harm_rate": 0.07636693515133189,
+          "margin_delta": -0.01299966331147884,
+          "n": 36377,
+          "net_rescue_rate": -0.029276740797756825,
+          "rescue_count": 1713,
+          "rescue_rate": 0.04709019435357506
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C15",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0066,
+          "harm_count": 203,
+          "harm_rate": 0.0406,
+          "margin_delta": 0.0011498496040701865,
+          "n": 5000,
+          "net_rescue_rate": -0.0066,
+          "rescue_count": 170,
+          "rescue_rate": 0.034
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.015,
+          "harm_count": 281,
+          "harm_rate": 0.0562,
+          "margin_delta": -0.012565419828891753,
+          "n": 5000,
+          "net_rescue_rate": -0.015,
+          "rescue_count": 206,
+          "rescue_rate": 0.0412
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0066,
+          "harm_count": 203,
+          "harm_rate": 0.0406,
+          "margin_delta": 0.0011498496040701865,
+          "n": 5000,
+          "net_rescue_rate": -0.0066,
+          "rescue_count": 170,
+          "rescue_rate": 0.034
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.015,
+          "harm_count": 281,
+          "harm_rate": 0.0562,
+          "margin_delta": -0.012565419828891753,
+          "n": 5000,
+          "net_rescue_rate": -0.015,
+          "rescue_count": 206,
+          "rescue_rate": 0.0412
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "f2764fc2d05c1050bd9941a80a1a90470436cfb7609f93659bbe2168cfa202ee",
+        "parent_checkpoint_sha256": "ad43d72da2a02f205c65b96485379c9acb5fc2b07d6823d09820439aedc8f78c",
+        "treatment_rows_sha256": "d301c709e8e071b62ddd07c6f598ba8d0436f0f7c2b530a2664bbccc636f07a2"
+      },
+      "run": "L2",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C1",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.021064425770308124,
+          "harm_count": 482,
+          "harm_rate": 0.05400560224089636,
+          "margin_delta": 0.0031428543209027844,
+          "n": 8925,
+          "net_rescue_rate": 0.021064425770308124,
+          "rescue_count": 670,
+          "rescue_rate": 0.07507002801120448
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.008627450980392156,
+          "harm_count": 160,
+          "harm_rate": 0.017927170868347338,
+          "margin_delta": -0.020099613334284443,
+          "n": 8925,
+          "net_rescue_rate": -0.008627450980392156,
+          "rescue_count": 83,
+          "rescue_rate": 0.009299719887955181
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "ea92be2f5581189f3be5c8c2ea45036924226d3a1878c364acf7022a1ae0a5e2"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.017796257796257795,
+          "harm_count": 451,
+          "harm_rate": 0.012501732501732503,
+          "margin_delta": 0.026919446254842248,
+          "n": 36075,
+          "net_rescue_rate": 0.017796257796257795,
+          "rescue_count": 1093,
+          "rescue_rate": 0.0302979902979903
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.002661122661122661,
+          "harm_count": 2076,
+          "harm_rate": 0.05754677754677755,
+          "margin_delta": 0.008303000308413185,
+          "n": 36075,
+          "net_rescue_rate": -0.002661122661122661,
+          "rescue_count": 1980,
+          "rescue_rate": 0.05488565488565489
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C1",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0104,
+          "harm_count": 129,
+          "harm_rate": 0.0258,
+          "margin_delta": 0.020046305343508722,
+          "n": 5000,
+          "net_rescue_rate": 0.0104,
+          "rescue_count": 181,
+          "rescue_rate": 0.0362
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.008,
+          "harm_count": 251,
+          "harm_rate": 0.0502,
+          "margin_delta": -0.00259548365175724,
+          "n": 5000,
+          "net_rescue_rate": -0.008,
+          "rescue_count": 211,
+          "rescue_rate": 0.0422
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0104,
+          "harm_count": 129,
+          "harm_rate": 0.0258,
+          "margin_delta": 0.020046305343508722,
+          "n": 5000,
+          "net_rescue_rate": 0.0104,
+          "rescue_count": 181,
+          "rescue_rate": 0.0362
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.008,
+          "harm_count": 251,
+          "harm_rate": 0.0502,
+          "margin_delta": -0.00259548365175724,
+          "n": 5000,
+          "net_rescue_rate": -0.008,
+          "rescue_count": 211,
+          "rescue_rate": 0.0422
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "47fe4f4305fff4e4401c037cf2ebf836d95485418cbd7b4deff54b7f7e435633"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C2",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.009747899159663866,
+          "harm_count": 521,
+          "harm_rate": 0.05837535014005602,
+          "margin_delta": -0.006947035966467122,
+          "n": 8925,
+          "net_rescue_rate": -0.009747899159663866,
+          "rescue_count": 434,
+          "rescue_rate": 0.04862745098039216
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.00907563025210084,
+          "harm_count": 158,
+          "harm_rate": 0.017703081232492996,
+          "margin_delta": -0.017173080524476636,
+          "n": 8925,
+          "net_rescue_rate": -0.00907563025210084,
+          "rescue_count": 77,
+          "rescue_rate": 0.008627450980392156
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "6d8f9d5d0531743dc7811efebcd01658c05cc900ab7b77fe6f1169077d780724"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.007207207207207207,
+          "harm_count": 608,
+          "harm_rate": 0.016853776853776852,
+          "margin_delta": 0.011523329785567395,
+          "n": 36075,
+          "net_rescue_rate": 0.007207207207207207,
+          "rescue_count": 868,
+          "rescue_rate": 0.024060984060984062
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.0027165627165627168,
+          "harm_count": 1923,
+          "harm_rate": 0.05330561330561331,
+          "margin_delta": 0.001292430210138309,
+          "n": 36075,
+          "net_rescue_rate": -0.0027165627165627168,
+          "rescue_count": 1825,
+          "rescue_rate": 0.05058905058905059
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C2",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0022,
+          "harm_count": 139,
+          "harm_rate": 0.0278,
+          "margin_delta": 0.0073014825358986854,
+          "n": 5000,
+          "net_rescue_rate": 0.0022,
+          "rescue_count": 150,
+          "rescue_rate": 0.03
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0036,
+          "harm_count": 212,
+          "harm_rate": 0.0424,
+          "margin_delta": -0.003610140822827816,
+          "n": 5000,
+          "net_rescue_rate": -0.0036,
+          "rescue_count": 194,
+          "rescue_rate": 0.0388
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0022,
+          "harm_count": 139,
+          "harm_rate": 0.0278,
+          "margin_delta": 0.0073014825358986854,
+          "n": 5000,
+          "net_rescue_rate": 0.0022,
+          "rescue_count": 150,
+          "rescue_rate": 0.03
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0036,
+          "harm_count": 212,
+          "harm_rate": 0.0424,
+          "margin_delta": -0.003610140822827816,
+          "n": 5000,
+          "net_rescue_rate": -0.0036,
+          "rescue_count": 194,
+          "rescue_rate": 0.0388
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "7e3d5c08cea462045b8528a57849386658d14f51a7fd27ce4eca41e6349fa2e2"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C3",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0020168067226890756,
+          "harm_count": 636,
+          "harm_rate": 0.07126050420168067,
+          "margin_delta": -0.005280254715297069,
+          "n": 8925,
+          "net_rescue_rate": -0.0020168067226890756,
+          "rescue_count": 618,
+          "rescue_rate": 0.0692436974789916
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.014453781512605042,
+          "harm_count": 200,
+          "harm_rate": 0.022408963585434174,
+          "margin_delta": -0.022172427516357573,
+          "n": 8925,
+          "net_rescue_rate": -0.014453781512605042,
+          "rescue_count": 71,
+          "rescue_rate": 0.007955182072829131
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "1fb9c0b2e1e2a6c855418df41fbe9d4ac510d957e258e7740fe6557e82ea82a1"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.01458073458073458,
+          "harm_count": 651,
+          "harm_rate": 0.018045738045738047,
+          "margin_delta": 0.020976545144845773,
+          "n": 36075,
+          "net_rescue_rate": 0.01458073458073458,
+          "rescue_count": 1177,
+          "rescue_rate": 0.03262647262647263
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.00607068607068607,
+          "harm_count": 2424,
+          "harm_rate": 0.0671933471933472,
+          "margin_delta": 0.005618320272271202,
+          "n": 36075,
+          "net_rescue_rate": -0.00607068607068607,
+          "rescue_count": 2205,
+          "rescue_rate": 0.061122661122661126
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C3",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.007,
+          "harm_count": 177,
+          "harm_rate": 0.0354,
+          "margin_delta": 0.015582636415958405,
+          "n": 5000,
+          "net_rescue_rate": 0.007,
+          "rescue_count": 212,
+          "rescue_rate": 0.0424
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0086,
+          "harm_count": 278,
+          "harm_rate": 0.0556,
+          "margin_delta": -0.002646740111708641,
+          "n": 5000,
+          "net_rescue_rate": -0.0086,
+          "rescue_count": 235,
+          "rescue_rate": 0.047
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.007,
+          "harm_count": 177,
+          "harm_rate": 0.0354,
+          "margin_delta": 0.015582636415958405,
+          "n": 5000,
+          "net_rescue_rate": 0.007,
+          "rescue_count": 212,
+          "rescue_rate": 0.0424
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0086,
+          "harm_count": 278,
+          "harm_rate": 0.0556,
+          "margin_delta": -0.002646740111708641,
+          "n": 5000,
+          "net_rescue_rate": -0.0086,
+          "rescue_count": 235,
+          "rescue_rate": 0.047
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "1562f24c97be407406847b7193a9bb807f440f097dfa9623d33929153813a9c1"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C4",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.027899159663865546,
+          "harm_count": 389,
+          "harm_rate": 0.04358543417366947,
+          "margin_delta": 0.008540157967922735,
+          "n": 8925,
+          "net_rescue_rate": 0.027899159663865546,
+          "rescue_count": 638,
+          "rescue_rate": 0.07148459383753501
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.00011204481792717087,
+          "harm_count": 124,
+          "harm_rate": 0.013893557422969188,
+          "margin_delta": 0.0028217535584914586,
+          "n": 8925,
+          "net_rescue_rate": -0.00011204481792717087,
+          "rescue_count": 123,
+          "rescue_rate": 0.013781512605042017
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "5355a60099cc09815e89c2d689a14d4d88d0d13043551eb07370f8f61748590d"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.003381843381843382,
+          "harm_count": 689,
+          "harm_rate": 0.0190990990990991,
+          "margin_delta": -0.00338203103754641,
+          "n": 36075,
+          "net_rescue_rate": 0.003381843381843382,
+          "rescue_count": 811,
+          "rescue_rate": 0.02248094248094248
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.0056548856548856545,
+          "harm_count": 1981,
+          "harm_rate": 0.05491337491337491,
+          "margin_delta": -0.006191141927357936,
+          "n": 36075,
+          "net_rescue_rate": -0.0056548856548856545,
+          "rescue_count": 1777,
+          "rescue_rate": 0.04925848925848926
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C4",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0052,
+          "harm_count": 158,
+          "harm_rate": 0.0316,
+          "margin_delta": -0.0036562809497117997,
+          "n": 5000,
+          "net_rescue_rate": -0.0052,
+          "rescue_count": 132,
+          "rescue_rate": 0.0264
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0062,
+          "harm_count": 237,
+          "harm_rate": 0.0474,
+          "margin_delta": -0.006800364533066749,
+          "n": 5000,
+          "net_rescue_rate": -0.0062,
+          "rescue_count": 206,
+          "rescue_rate": 0.0412
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0052,
+          "harm_count": 158,
+          "harm_rate": 0.0316,
+          "margin_delta": -0.0036562809497117997,
+          "n": 5000,
+          "net_rescue_rate": -0.0052,
+          "rescue_count": 132,
+          "rescue_rate": 0.0264
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0062,
+          "harm_count": 237,
+          "harm_rate": 0.0474,
+          "margin_delta": -0.006800364533066749,
+          "n": 5000,
+          "net_rescue_rate": -0.0062,
+          "rescue_count": 206,
+          "rescue_rate": 0.0412
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "e373f062e5912a256f00a30bea30edb6e0d5733f0e0f0ab29d03d7e4f15c508e"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C5",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.054901960784313725,
+          "harm_count": 317,
+          "harm_rate": 0.03551820728291317,
+          "margin_delta": 0.014643248645197443,
+          "n": 8925,
+          "net_rescue_rate": 0.054901960784313725,
+          "rescue_count": 807,
+          "rescue_rate": 0.09042016806722689
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.0038095238095238095,
+          "harm_count": 148,
+          "harm_rate": 0.016582633053221288,
+          "margin_delta": -0.013881940707272174,
+          "n": 8925,
+          "net_rescue_rate": -0.0038095238095238095,
+          "rescue_count": 114,
+          "rescue_rate": 0.012773109243697478
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "ed80c59bf3c70c1b7b95ad1cfcd827c8b434f8788412773b14dcc4b612231e60"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.008038808038808038,
+          "harm_count": 614,
+          "harm_rate": 0.01702009702009702,
+          "margin_delta": 0.011617369548529283,
+          "n": 36075,
+          "net_rescue_rate": 0.008038808038808038,
+          "rescue_count": 904,
+          "rescue_rate": 0.025058905058905057
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.030048510048510047,
+          "harm_count": 2650,
+          "harm_rate": 0.07345807345807345,
+          "margin_delta": -0.013698234835062603,
+          "n": 36075,
+          "net_rescue_rate": -0.030048510048510047,
+          "rescue_count": 1566,
+          "rescue_rate": 0.04340956340956341
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C5",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0118,
+          "harm_count": 134,
+          "harm_rate": 0.0268,
+          "margin_delta": 0.010724418787658214,
+          "n": 5000,
+          "net_rescue_rate": 0.0118,
+          "rescue_count": 193,
+          "rescue_rate": 0.0386
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.021,
+          "harm_count": 285,
+          "harm_rate": 0.057,
+          "margin_delta": -0.01795314944088459,
+          "n": 5000,
+          "net_rescue_rate": -0.021,
+          "rescue_count": 180,
+          "rescue_rate": 0.036
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0118,
+          "harm_count": 134,
+          "harm_rate": 0.0268,
+          "margin_delta": 0.010724418787658214,
+          "n": 5000,
+          "net_rescue_rate": 0.0118,
+          "rescue_count": 193,
+          "rescue_rate": 0.0386
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.021,
+          "harm_count": 285,
+          "harm_rate": 0.057,
+          "margin_delta": -0.01795314944088459,
+          "n": 5000,
+          "net_rescue_rate": -0.021,
+          "rescue_count": 180,
+          "rescue_rate": 0.036
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "f2474fb8e8f89f82c16a5d6752d13b5941e27c522c64f358b8d804fa2c6de001"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C6",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.020168067226890758,
+          "harm_count": 536,
+          "harm_rate": 0.060056022408963586,
+          "margin_delta": 0.0022059327055092286,
+          "n": 8925,
+          "net_rescue_rate": 0.020168067226890758,
+          "rescue_count": 716,
+          "rescue_rate": 0.08022408963585434
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.009747899159663866,
+          "harm_count": 181,
+          "harm_rate": 0.020280112044817927,
+          "margin_delta": -0.01780657507458321,
+          "n": 8925,
+          "net_rescue_rate": -0.009747899159663866,
+          "rescue_count": 94,
+          "rescue_rate": 0.010532212885154062
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "0654e2139889cfbb0f590375d498d2987da58e01f926923efcb4e00b2c6757db"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.016188496188496188,
+          "harm_count": 581,
+          "harm_rate": 0.016105336105336106,
+          "margin_delta": 0.02232575451282685,
+          "n": 36075,
+          "net_rescue_rate": 0.016188496188496188,
+          "rescue_count": 1165,
+          "rescue_rate": 0.03229383229383229
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.008205128205128205,
+          "harm_count": 2432,
+          "harm_rate": 0.06741510741510741,
+          "margin_delta": 0.005351088850223927,
+          "n": 36075,
+          "net_rescue_rate": -0.008205128205128205,
+          "rescue_count": 2136,
+          "rescue_rate": 0.05920997920997921
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C6",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.01,
+          "harm_count": 163,
+          "harm_rate": 0.0326,
+          "margin_delta": 0.012567837584018707,
+          "n": 5000,
+          "net_rescue_rate": 0.01,
+          "rescue_count": 213,
+          "rescue_rate": 0.0426
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0108,
+          "harm_count": 291,
+          "harm_rate": 0.0582,
+          "margin_delta": -0.006662040254473686,
+          "n": 5000,
+          "net_rescue_rate": -0.0108,
+          "rescue_count": 237,
+          "rescue_rate": 0.0474
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.01,
+          "harm_count": 163,
+          "harm_rate": 0.0326,
+          "margin_delta": 0.012567837584018707,
+          "n": 5000,
+          "net_rescue_rate": 0.01,
+          "rescue_count": 213,
+          "rescue_rate": 0.0426
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0108,
+          "harm_count": 291,
+          "harm_rate": 0.0582,
+          "margin_delta": -0.006662040254473686,
+          "n": 5000,
+          "net_rescue_rate": -0.0108,
+          "rescue_count": 237,
+          "rescue_rate": 0.0474
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "9b38c3d99e8c9a31d4b04043949242ad3100628162c49727b43864876d142402"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C7",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.040448179271708684,
+          "harm_count": 451,
+          "harm_rate": 0.05053221288515406,
+          "margin_delta": 0.004236100332743647,
+          "n": 8925,
+          "net_rescue_rate": 0.040448179271708684,
+          "rescue_count": 812,
+          "rescue_rate": 0.09098039215686274
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.00918767507002801,
+          "harm_count": 166,
+          "harm_rate": 0.018599439775910363,
+          "margin_delta": -0.021903236007490078,
+          "n": 8925,
+          "net_rescue_rate": -0.00918767507002801,
+          "rescue_count": 84,
+          "rescue_rate": 0.009411764705882352
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "a01e0973450d9b6b7f875f11ce0cf8ac3979136ab4ba5beb14d3d2180600e027"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.014164934164934164,
+          "harm_count": 576,
+          "harm_rate": 0.01596673596673597,
+          "margin_delta": 0.018553366476846748,
+          "n": 36075,
+          "net_rescue_rate": 0.014164934164934164,
+          "rescue_count": 1087,
+          "rescue_rate": 0.030131670131670132
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.006375606375606376,
+          "harm_count": 2253,
+          "harm_rate": 0.062453222453222455,
+          "margin_delta": 0.0009056314890036051,
+          "n": 36075,
+          "net_rescue_rate": -0.006375606375606376,
+          "rescue_count": 2023,
+          "rescue_rate": 0.05607761607761608
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C7",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0126,
+          "harm_count": 152,
+          "harm_rate": 0.0304,
+          "margin_delta": 0.014110458616912364,
+          "n": 5000,
+          "net_rescue_rate": 0.0126,
+          "rescue_count": 215,
+          "rescue_rate": 0.043
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0028,
+          "harm_count": 263,
+          "harm_rate": 0.0526,
+          "margin_delta": -0.008471584410965443,
+          "n": 5000,
+          "net_rescue_rate": -0.0028,
+          "rescue_count": 249,
+          "rescue_rate": 0.0498
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0126,
+          "harm_count": 152,
+          "harm_rate": 0.0304,
+          "margin_delta": 0.014110458616912364,
+          "n": 5000,
+          "net_rescue_rate": 0.0126,
+          "rescue_count": 215,
+          "rescue_rate": 0.043
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0028,
+          "harm_count": 263,
+          "harm_rate": 0.0526,
+          "margin_delta": -0.008471584410965443,
+          "n": 5000,
+          "net_rescue_rate": -0.0028,
+          "rescue_count": 249,
+          "rescue_rate": 0.0498
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "c375aadc3159569d324a41a67db756aff09d2bbe2b0e59ad6af9fa222a9839cf"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C8",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.03932773109243697,
+          "harm_count": 439,
+          "harm_rate": 0.04918767507002801,
+          "margin_delta": 0.006752756661226769,
+          "n": 8925,
+          "net_rescue_rate": 0.03932773109243697,
+          "rescue_count": 790,
+          "rescue_rate": 0.08851540616246499
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.005714285714285714,
+          "harm_count": 155,
+          "harm_rate": 0.017366946778711485,
+          "margin_delta": -0.01786717918907561,
+          "n": 8925,
+          "net_rescue_rate": -0.005714285714285714,
+          "rescue_count": 104,
+          "rescue_rate": 0.01165266106442577
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "84a89480e8c5c7b25d1b4c7a60c4c858f973934117143d39c61b9741484b1066"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.015273735273735274,
+          "harm_count": 552,
+          "harm_rate": 0.015301455301455302,
+          "margin_delta": 0.019007019366312588,
+          "n": 36075,
+          "net_rescue_rate": 0.015273735273735274,
+          "rescue_count": 1103,
+          "rescue_rate": 0.030575190575190574
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.0052668052668052665,
+          "harm_count": 2266,
+          "harm_rate": 0.06281358281358282,
+          "margin_delta": -0.00013334095601976042,
+          "n": 36075,
+          "net_rescue_rate": -0.0052668052668052665,
+          "rescue_count": 2076,
+          "rescue_rate": 0.05754677754677755
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C8",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0248,
+          "harm_count": 122,
+          "harm_rate": 0.0244,
+          "margin_delta": 0.0175394263535738,
+          "n": 5000,
+          "net_rescue_rate": 0.0248,
+          "rescue_count": 246,
+          "rescue_rate": 0.0492
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0066,
+          "harm_count": 265,
+          "harm_rate": 0.053,
+          "margin_delta": -0.00718268485814333,
+          "n": 5000,
+          "net_rescue_rate": -0.0066,
+          "rescue_count": 232,
+          "rescue_rate": 0.0464
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0248,
+          "harm_count": 122,
+          "harm_rate": 0.0244,
+          "margin_delta": 0.0175394263535738,
+          "n": 5000,
+          "net_rescue_rate": 0.0248,
+          "rescue_count": 246,
+          "rescue_rate": 0.0492
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0066,
+          "harm_count": 265,
+          "harm_rate": 0.053,
+          "margin_delta": -0.00718268485814333,
+          "n": 5000,
+          "net_rescue_rate": -0.0066,
+          "rescue_count": 232,
+          "rescue_rate": 0.0464
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "1b27f5d8be1f3f0cc98ead665ad29e6968f63ecb091559824653ed360b0125c7"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C9",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.03753501400560224,
+          "harm_count": 824,
+          "harm_rate": 0.0923249299719888,
+          "margin_delta": -0.019432785122835337,
+          "n": 8925,
+          "net_rescue_rate": -0.03753501400560224,
+          "rescue_count": 489,
+          "rescue_rate": 0.054789915966386556
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.013557422969187676,
+          "harm_count": 199,
+          "harm_rate": 0.022296918767507,
+          "margin_delta": -0.03835834360757128,
+          "n": 8925,
+          "net_rescue_rate": -0.013557422969187676,
+          "rescue_count": 78,
+          "rescue_rate": 0.008739495798319327
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "bc533864bab053b3f967a1aa5c9cfe5d32cc8c04ddf1930e894f3528e66c3337"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.008842688842688842,
+          "harm_count": 798,
+          "harm_rate": 0.02212058212058212,
+          "margin_delta": 0.026191791093399024,
+          "n": 36075,
+          "net_rescue_rate": 0.008842688842688842,
+          "rescue_count": 1117,
+          "rescue_rate": 0.030963270963270964
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.010478170478170477,
+          "harm_count": 2526,
+          "harm_rate": 0.07002079002079002,
+          "margin_delta": 0.008240090816572815,
+          "n": 36075,
+          "net_rescue_rate": -0.010478170478170477,
+          "rescue_count": 2148,
+          "rescue_rate": 0.059542619542619545
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C9",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.006,
+          "harm_count": 218,
+          "harm_rate": 0.0436,
+          "margin_delta": 0.01527291525155306,
+          "n": 5000,
+          "net_rescue_rate": -0.006,
+          "rescue_count": 188,
+          "rescue_rate": 0.0376
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0084,
+          "harm_count": 289,
+          "harm_rate": 0.0578,
+          "margin_delta": -0.006532312378287316,
+          "n": 5000,
+          "net_rescue_rate": -0.0084,
+          "rescue_count": 247,
+          "rescue_rate": 0.0494
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.006,
+          "harm_count": 218,
+          "harm_rate": 0.0436,
+          "margin_delta": 0.01527291525155306,
+          "n": 5000,
+          "net_rescue_rate": -0.006,
+          "rescue_count": 188,
+          "rescue_rate": 0.0376
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0084,
+          "harm_count": 289,
+          "harm_rate": 0.0578,
+          "margin_delta": -0.006532312378287316,
+          "n": 5000,
+          "net_rescue_rate": -0.0084,
+          "rescue_count": 247,
+          "rescue_rate": 0.0494
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "4e3db8432d3eb22ad743d30c0cbceb8e6656c68e3788a5d8cdafdd8811d21685"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C10",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.07708683473389356,
+          "harm_count": 277,
+          "harm_rate": 0.031036414565826332,
+          "margin_delta": 0.021936483804752178,
+          "n": 8925,
+          "net_rescue_rate": 0.07708683473389356,
+          "rescue_count": 965,
+          "rescue_rate": 0.10812324929971989
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": 0.005938375350140056,
+          "harm_count": 111,
+          "harm_rate": 0.012436974789915966,
+          "margin_delta": 0.007911355676604252,
+          "n": 8925,
+          "net_rescue_rate": 0.005938375350140056,
+          "rescue_count": 164,
+          "rescue_rate": 0.01837535014005602
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "68f0f0671c91db2fb65150be6a480ba4a843db5056aabaeb1a280a8da1afbc73"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.00961884961884962,
+          "harm_count": 611,
+          "harm_rate": 0.016936936936936937,
+          "margin_delta": 0.006356923131792395,
+          "n": 36075,
+          "net_rescue_rate": 0.00961884961884962,
+          "rescue_count": 958,
+          "rescue_rate": 0.026555786555786557
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.004213444213444213,
+          "harm_count": 2055,
+          "harm_rate": 0.05696465696465697,
+          "margin_delta": -0.0006113031624260663,
+          "n": 36075,
+          "net_rescue_rate": -0.004213444213444213,
+          "rescue_count": 1903,
+          "rescue_rate": 0.05275121275121275
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C10",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0142,
+          "harm_count": 132,
+          "harm_rate": 0.0264,
+          "margin_delta": 0.005021534514427185,
+          "n": 5000,
+          "net_rescue_rate": 0.0142,
+          "rescue_count": 203,
+          "rescue_rate": 0.0406
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0056,
+          "harm_count": 234,
+          "harm_rate": 0.0468,
+          "margin_delta": -0.0016167345374822617,
+          "n": 5000,
+          "net_rescue_rate": -0.0056,
+          "rescue_count": 206,
+          "rescue_rate": 0.0412
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0142,
+          "harm_count": 132,
+          "harm_rate": 0.0264,
+          "margin_delta": 0.005021534514427185,
+          "n": 5000,
+          "net_rescue_rate": 0.0142,
+          "rescue_count": 203,
+          "rescue_rate": 0.0406
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0056,
+          "harm_count": 234,
+          "harm_rate": 0.0468,
+          "margin_delta": -0.0016167345374822617,
+          "n": 5000,
+          "net_rescue_rate": -0.0056,
+          "rescue_count": 206,
+          "rescue_rate": 0.0412
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "440146202d96f96772f04b9db80d322a31ce2883e25f327bafccdf942ada6b98"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C11",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.012436974789915966,
+          "harm_count": 417,
+          "harm_rate": 0.04672268907563025,
+          "margin_delta": 0.006505042918089057,
+          "n": 8925,
+          "net_rescue_rate": 0.012436974789915966,
+          "rescue_count": 528,
+          "rescue_rate": 0.05915966386554622
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": 0.006274509803921568,
+          "harm_count": 108,
+          "harm_rate": 0.012100840336134453,
+          "margin_delta": 0.01783044668890181,
+          "n": 8925,
+          "net_rescue_rate": 0.006274509803921568,
+          "rescue_count": 164,
+          "rescue_rate": 0.01837535014005602
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "58da9a5142c11ecf6f751eb2af5a69f5083b3fba07cccbe4f1977862cbdc8713"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.009896049896049896,
+          "harm_count": 951,
+          "harm_rate": 0.02636174636174636,
+          "margin_delta": -0.014708816265572465,
+          "n": 36075,
+          "net_rescue_rate": -0.009896049896049896,
+          "rescue_count": 594,
+          "rescue_rate": 0.016465696465696466
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.002744282744282744,
+          "harm_count": 1925,
+          "harm_rate": 0.05336105336105336,
+          "margin_delta": -0.006316985092845462,
+          "n": 36075,
+          "net_rescue_rate": -0.002744282744282744,
+          "rescue_count": 1826,
+          "rescue_rate": 0.05061677061677062
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C11",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0144,
+          "harm_count": 200,
+          "harm_rate": 0.04,
+          "margin_delta": -0.014161399321258069,
+          "n": 5000,
+          "net_rescue_rate": -0.0144,
+          "rescue_count": 128,
+          "rescue_rate": 0.0256
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0056,
+          "harm_count": 231,
+          "harm_rate": 0.0462,
+          "margin_delta": -0.0027747476369142533,
+          "n": 5000,
+          "net_rescue_rate": -0.0056,
+          "rescue_count": 203,
+          "rescue_rate": 0.0406
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0144,
+          "harm_count": 200,
+          "harm_rate": 0.04,
+          "margin_delta": -0.014161399321258069,
+          "n": 5000,
+          "net_rescue_rate": -0.0144,
+          "rescue_count": 128,
+          "rescue_rate": 0.0256
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0056,
+          "harm_count": 231,
+          "harm_rate": 0.0462,
+          "margin_delta": -0.0027747476369142533,
+          "n": 5000,
+          "net_rescue_rate": -0.0056,
+          "rescue_count": 203,
+          "rescue_rate": 0.0406
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "041d13fca6736035890590026508f7eee325471e5372fff24567e69109892284"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C12",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.03764705882352941,
+          "harm_count": 343,
+          "harm_rate": 0.038431372549019606,
+          "margin_delta": 0.01052956244023908,
+          "n": 8925,
+          "net_rescue_rate": 0.03764705882352941,
+          "rescue_count": 679,
+          "rescue_rate": 0.07607843137254902
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": 0.009747899159663866,
+          "harm_count": 107,
+          "harm_rate": 0.011988795518207283,
+          "margin_delta": 0.012876867045875358,
+          "n": 8925,
+          "net_rescue_rate": 0.009747899159663866,
+          "rescue_count": 194,
+          "rescue_rate": 0.02173669467787115
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "cd56acd1122ea79bf1f14bcceb889aec117334497e03ddf3c89d8686a146bf01"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.006902286902286902,
+          "harm_count": 905,
+          "harm_rate": 0.025086625086625087,
+          "margin_delta": -0.009854239811727096,
+          "n": 36075,
+          "net_rescue_rate": -0.006902286902286902,
+          "rescue_count": 656,
+          "rescue_rate": 0.018184338184338185
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.012584892584892584,
+          "harm_count": 2188,
+          "harm_rate": 0.06065142065142065,
+          "margin_delta": -0.008927175114531527,
+          "n": 36075,
+          "net_rescue_rate": -0.012584892584892584,
+          "rescue_count": 1734,
+          "rescue_rate": 0.048066528066528065
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C12",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0034,
+          "harm_count": 173,
+          "harm_rate": 0.0346,
+          "margin_delta": -0.008924097304046153,
+          "n": 5000,
+          "net_rescue_rate": -0.0034,
+          "rescue_count": 156,
+          "rescue_rate": 0.0312
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0084,
+          "harm_count": 247,
+          "harm_rate": 0.0494,
+          "margin_delta": -0.004016380874812603,
+          "n": 5000,
+          "net_rescue_rate": -0.0084,
+          "rescue_count": 205,
+          "rescue_rate": 0.041
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0034,
+          "harm_count": 173,
+          "harm_rate": 0.0346,
+          "margin_delta": -0.008924097304046153,
+          "n": 5000,
+          "net_rescue_rate": -0.0034,
+          "rescue_count": 156,
+          "rescue_rate": 0.0312
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0084,
+          "harm_count": 247,
+          "harm_rate": 0.0494,
+          "margin_delta": -0.004016380874812603,
+          "n": 5000,
+          "net_rescue_rate": -0.0084,
+          "rescue_count": 205,
+          "rescue_rate": 0.041
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "8f59d11cbcce05b7d0b745555c2c7ab8846e7092e20ea3e0a7626dcd9ca00b93"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C13",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.015126050420168067,
+          "harm_count": 391,
+          "harm_rate": 0.04380952380952381,
+          "margin_delta": 0.002605201857430594,
+          "n": 8925,
+          "net_rescue_rate": 0.015126050420168067,
+          "rescue_count": 526,
+          "rescue_rate": 0.058935574229691874
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.001568627450980392,
+          "harm_count": 130,
+          "harm_rate": 0.014565826330532213,
+          "margin_delta": -5.5229309894123664e-05,
+          "n": 8925,
+          "net_rescue_rate": -0.001568627450980392,
+          "rescue_count": 116,
+          "rescue_rate": 0.01299719887955182
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "b61fbadac0c00df77f119f6b5d6616340e74bb3f83ee50c937e1f8e06c1406b0"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": -0.0008593208593208593,
+          "harm_count": 738,
+          "harm_rate": 0.020457380457380457,
+          "margin_delta": 0.002176875765548344,
+          "n": 36075,
+          "net_rescue_rate": -0.0008593208593208593,
+          "rescue_count": 707,
+          "rescue_rate": 0.0195980595980596
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.006763686763686764,
+          "harm_count": 1935,
+          "harm_rate": 0.05363825363825364,
+          "margin_delta": -0.0037503892528209437,
+          "n": 36075,
+          "net_rescue_rate": -0.006763686763686764,
+          "rescue_count": 1691,
+          "rescue_rate": 0.04687456687456688
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C13",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": 0.0014,
+          "harm_count": 143,
+          "harm_rate": 0.0286,
+          "margin_delta": 0.0005583709225058555,
+          "n": 5000,
+          "net_rescue_rate": 0.0014,
+          "rescue_count": 150,
+          "rescue_rate": 0.03
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.005,
+          "harm_count": 238,
+          "harm_rate": 0.0476,
+          "margin_delta": -0.0029840898916125296,
+          "n": 5000,
+          "net_rescue_rate": -0.005,
+          "rescue_count": 213,
+          "rescue_rate": 0.0426
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": 0.0014,
+          "harm_count": 143,
+          "harm_rate": 0.0286,
+          "margin_delta": 0.0005583709225058555,
+          "n": 5000,
+          "net_rescue_rate": 0.0014,
+          "rescue_count": 150,
+          "rescue_rate": 0.03
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.005,
+          "harm_count": 238,
+          "harm_rate": 0.0476,
+          "margin_delta": -0.0029840898916125296,
+          "n": 5000,
+          "net_rescue_rate": -0.005,
+          "rescue_count": 213,
+          "rescue_rate": 0.0426
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "c6bd0c9cf7b1411d6d80b2a24a50615e9b4dab3f80383c7ee93701bdafe2e04a"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C14",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.007058823529411765,
+          "harm_count": 535,
+          "harm_rate": 0.05994397759103642,
+          "margin_delta": -0.008139091867859624,
+          "n": 8925,
+          "net_rescue_rate": -0.007058823529411765,
+          "rescue_count": 472,
+          "rescue_rate": 0.05288515406162465
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.005490196078431373,
+          "harm_count": 142,
+          "harm_rate": 0.015910364145658263,
+          "margin_delta": -0.015597186647877306,
+          "n": 8925,
+          "net_rescue_rate": -0.005490196078431373,
+          "rescue_count": 93,
+          "rescue_rate": 0.010420168067226891
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "942bef796be67988f086de32ba477301e8f97a7f7399300b21545bcf2d4c099a"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.0005544005544005544,
+          "harm_count": 724,
+          "harm_rate": 0.02006930006930007,
+          "margin_delta": 0.012197734871550063,
+          "n": 36075,
+          "net_rescue_rate": 0.0005544005544005544,
+          "rescue_count": 744,
+          "rescue_rate": 0.020623700623700624
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.0021344421344421344,
+          "harm_count": 1963,
+          "harm_rate": 0.054414414414414414,
+          "margin_delta": 0.003140837432854058,
+          "n": 36075,
+          "net_rescue_rate": -0.0021344421344421344,
+          "rescue_count": 1886,
+          "rescue_rate": 0.05227997227997228
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C14",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0134,
+          "harm_count": 189,
+          "harm_rate": 0.0378,
+          "margin_delta": 0.0030685854345560075,
+          "n": 5000,
+          "net_rescue_rate": -0.0134,
+          "rescue_count": 122,
+          "rescue_rate": 0.0244
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": 0.0,
+          "harm_count": 218,
+          "harm_rate": 0.0436,
+          "margin_delta": -0.003465719100832939,
+          "n": 5000,
+          "net_rescue_rate": 0.0,
+          "rescue_count": 218,
+          "rescue_rate": 0.0436
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0134,
+          "harm_count": 189,
+          "harm_rate": 0.0378,
+          "margin_delta": 0.0030685854345560075,
+          "n": 5000,
+          "net_rescue_rate": -0.0134,
+          "rescue_count": 122,
+          "rescue_rate": 0.0244
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": 0.0,
+          "harm_count": 218,
+          "harm_rate": 0.0436,
+          "margin_delta": -0.003465719100832939,
+          "n": 5000,
+          "net_rescue_rate": 0.0,
+          "rescue_count": 218,
+          "rescue_rate": 0.0436
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "0ad77c4dfc753d01ee53f3cdce8dba5e2329ce9b91890e820a9612912fceb0c2"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    },
+    {
+      "arm": "C15",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.003585434173669468,
+          "harm_count": 587,
+          "harm_rate": 0.0657703081232493,
+          "margin_delta": -0.007914808623764027,
+          "n": 8925,
+          "net_rescue_rate": -0.003585434173669468,
+          "rescue_count": 555,
+          "rescue_rate": 0.06218487394957983
+        },
+        "n": 8925,
+        "robust": {
+          "accuracy_delta": -0.008067226890756302,
+          "harm_count": 155,
+          "harm_rate": 0.017366946778711485,
+          "margin_delta": -0.023584473189018688,
+          "n": 8925,
+          "net_rescue_rate": -0.008067226890756302,
+          "rescue_count": 83,
+          "rescue_rate": 0.009299719887955181
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": null,
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "d0a842cab6c0c81940632d9d0adbd62dc7b478529899b44894b7329d497479e8",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "71b4e4673c85d6a48853658428ebf7327a95360d20915ee97acc380155b2ed3e"
+      },
+      "run": "L4",
+      "spillover": {
+        "clean": {
+          "accuracy_delta": 0.0037422037422037424,
+          "harm_count": 734,
+          "harm_rate": 0.020346500346500346,
+          "margin_delta": 0.018717125053217407,
+          "n": 36075,
+          "net_rescue_rate": 0.0037422037422037424,
+          "rescue_count": 869,
+          "rescue_rate": 0.024088704088704088
+        },
+        "n": 36075,
+        "robust": {
+          "accuracy_delta": -0.012085932085932087,
+          "harm_count": 2282,
+          "harm_rate": 0.06325710325710325,
+          "margin_delta": 0.0002983884485496553,
+          "n": 36075,
+          "net_rescue_rate": -0.012085932085932087,
+          "rescue_count": 1846,
+          "rescue_rate": 0.05117117117117117
+        }
+      },
+      "split": "train"
+    },
+    {
+      "arm": "C15",
+      "control_arm": "C0",
+      "direct": {
+        "clean": {
+          "accuracy_delta": -0.0022,
+          "harm_count": 181,
+          "harm_rate": 0.0362,
+          "margin_delta": 0.010548118670284748,
+          "n": 5000,
+          "net_rescue_rate": -0.0022,
+          "rescue_count": 170,
+          "rescue_rate": 0.034
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0108,
+          "harm_count": 258,
+          "harm_rate": 0.0516,
+          "margin_delta": -0.007835202483832836,
+          "n": 5000,
+          "net_rescue_rate": -0.0108,
+          "rescue_count": 204,
+          "rescue_rate": 0.0408
+        }
+      },
+      "epoch": 84,
+      "family": "clean_wrong_broad",
+      "held_out": {
+        "clean": {
+          "accuracy_delta": -0.0022,
+          "harm_count": 181,
+          "harm_rate": 0.0362,
+          "margin_delta": 0.010548118670284748,
+          "n": 5000,
+          "net_rescue_rate": -0.0022,
+          "rescue_count": 170,
+          "rescue_rate": 0.034
+        },
+        "n": 5000,
+        "robust": {
+          "accuracy_delta": -0.0108,
+          "harm_count": 258,
+          "harm_rate": 0.0516,
+          "margin_delta": -0.007835202483832836,
+          "n": 5000,
+          "net_rescue_rate": -0.0108,
+          "rescue_count": 204,
+          "rescue_rate": 0.0408
+        }
+      },
+      "lineage": {
+        "attack_identity": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "base_rows_sha256": "c22ffc737db7f898fc816b5dc3021e6239704fc7f1fc83845f780966e0c863d3",
+        "parent_checkpoint_sha256": "026a36d3fe057386fe19225fed23b56625ab23da80be3dd42cf3e478e5080bf1",
+        "treatment_rows_sha256": "9b24f506569a0daba039e77fb75cb5aced463d1608623dc81c9fa8e18f28091c"
+      },
+      "run": "L4",
+      "spillover": null,
+      "split": "validation"
+    }
+  ],
+  "git_sha": "bab6791f7116bf177bcd501d1a9588e4e7c190cb",
+  "oracle_headroom": "descriptive only; not a deployable selector",
+  "plain_advce_present": false,
+  "schema_version": 1
+}
