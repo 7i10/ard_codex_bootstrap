@@ -43,6 +43,17 @@ class TransferReplayError(RuntimeError):
     """Raised when a fixed e99 replay contract cannot be proven."""
 
 
+def _prepare_output_dir(output_dir: Path) -> None:
+    """Allow the orchestrator's pre-created directory, but never overwrite results."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if not output_dir.is_dir():
+        raise TransferReplayError(f"replay output path is not a directory: {output_dir}")
+    allowed = {"orchestration"}
+    unexpected = {item.name for item in output_dir.iterdir() if item.name not in allowed}
+    if unexpected:
+        raise TransferReplayError(f"replay output is not empty: {sorted(unexpected)}")
+
+
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as handle:
@@ -222,7 +233,7 @@ def replay(
     rows = _replay_rows(config, student, teacher, _loader(config, batch_size), device_obj, max_batches=max_batches)
     if max_batches is None and len(rows) != 45000:
         raise TransferReplayError(f"expected 45000 train rows, got {len(rows)}")
-    output_dir.mkdir(parents=True, exist_ok=False)
+    _prepare_output_dir(output_dir)
     table = pa.Table.from_pylist(rows)
     row_path = output_dir / "e99-observations.parquet"
     pq.write_table(table, row_path, compression="zstd")

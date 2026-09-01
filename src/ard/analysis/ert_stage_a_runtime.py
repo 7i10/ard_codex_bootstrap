@@ -58,6 +58,17 @@ class StageARuntimeError(RuntimeError):
     """Raised when a Stage A parent or treatment contract is invalid."""
 
 
+def _prepare_stage_output_dir(output_dir: Path) -> None:
+    """Permit an orchestrator-created directory while refusing stale results."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if not output_dir.is_dir():
+        raise StageARuntimeError(f"Stage A output path is not a directory: {output_dir}")
+    allowed = {"orchestration"}
+    unexpected = {item.name for item in output_dir.iterdir() if item.name not in allowed}
+    if unexpected:
+        raise StageARuntimeError(f"Stage A output already contains results: {sorted(unexpected)}")
+
+
 def _validate_horizons(
     horizon_epochs: tuple[int, ...], end_epoch: int, *, first_epoch: int = 80
 ) -> None:
@@ -551,9 +562,7 @@ def run_stage_a_arm(
         temperature=config.method.temperature,
         temperature_squared=config.method.temperature_squared,
     )
-    if output_dir.exists():
-        raise StageARuntimeError(f"Stage A output already exists: {output_dir}")
-    output_dir.mkdir(parents=True)
+    _prepare_stage_output_dir(output_dir)
     shared_epoch80: dict[str, Any] | None = None
     if shared_prefix:
         if dynamic_s3_router is None:
