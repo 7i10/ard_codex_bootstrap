@@ -62,7 +62,10 @@ def main() -> int:
                 "/home/shunsukenaito/.conda/envs/adv/bin/python", "-m", "ard.cli.ert_stage_a_runtime",
                 "--parent-config", str(config), "--parent-checkpoint", str(root / "inputs" / parent_name),
                 "--calibration", str(calibration), "--output", str(train_out), "--arm", arm,
-                "--epochs", "114", "--horizon-epochs", "104", "109", "114",
+                # Trainer.fit uses an exclusive upper bound.  The scientific
+                # continuation is epochs 100--114 inclusive, so the runtime
+                # endpoint must be 115 while horizon labels remain 104/109/114.
+                "--epochs", "115", "--horizon-epochs", "104", "109", "114",
                 "--run-namespace", "ert-i100-action-transfer-v1", "--resume-epoch", "99",
                 "--mask-anchor-epoch", "99", "--expected-parent-sha256", parent_sha, "--device", "cuda",
                 *extra,
