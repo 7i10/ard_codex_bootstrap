@@ -3,7 +3,7 @@
   "contract": "ert_rslad_i100_action_transfer_v1",
   "status": "frozen_before_outcome",
   "preparation_source_sha": "41ba0e1568be9a93cdfd352afc1fcc25645b7be5",
-  "production_source_sha": "pending_manifest_freeze",
+  "production_source_sha": "633371fcab9aa09c1d3f07919d47679b49ccadba",
   "parent_epoch": 99,
   "parent_checkpoint_sha256": {
     "dev-1": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
