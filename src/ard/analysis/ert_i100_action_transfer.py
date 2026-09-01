@@ -421,6 +421,7 @@ def calibrate(*, config_paths: Mapping[str, Path], checkpoint_paths: Mapping[str
         "status": "complete_no_update",
         "source_git_sha": git_sha(Path(__file__).resolve().parents[3]),
         "parent_epoch": PARENT_EPOCH,
+        "tau": 2.0,
         "calibration_rule": "shared coefficient; target gradient ratio 0.25; pooled dev-1/dev-2; no outcome used",
         "beta_advce": beta,
         "margin_coefficient": margin_coeff,
