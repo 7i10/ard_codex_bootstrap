@@ -1,0 +1,1820 @@
+{
+  "campaign_id": "ert-rslad-attack-seed-randomness-v1",
+  "hosts": {
+    "hamster": {
+      "backend": "local",
+      "gpus": [
+        {
+          "index": 0,
+          "throughput": 679.0,
+          "uuid": "GPU-7ce112db-1ab9-ff86-9810-5bb92e222c2a"
+        },
+        {
+          "index": 1,
+          "throughput": 679.0,
+          "uuid": "GPU-9bb01a06-72d2-cc68-eeca-9c2c9daf37ce"
+        }
+      ],
+      "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/src",
+        "/home/islab/workspace-local/shunsuke.naito/datasets/ard/torchvision",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt"
+      ]
+    }
+  },
+  "jobs": [
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/scripts/analysis/ert_rslad_attack_randomness.py",
+        "fixed-model",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v1/shuffle_plus_0-s1/resolved_config.yaml",
+        "--parent",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+        "--registry",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_attack_seed_probe_registry_v1.json",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed1",
+        "--seed",
+        "1",
+        "--limit",
+        "8192"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 120,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "fixed-model-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v1/shuffle_plus_0-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_attack_seed_probe_registry_v1.json"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-fixed-model-s1",
+      "scientific_identity": {
+        "method_id": "ert_rslad_attack_seed_fixed_model_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/scripts/analysis/ert_rslad_attack_randomness.py",
+        "fixed-model",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v1/shuffle_plus_0-s2/resolved_config.yaml",
+        "--parent",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+        "--registry",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_attack_seed_probe_registry_v1.json",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed2",
+        "--seed",
+        "2",
+        "--limit",
+        "8192"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 120,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "fixed-model-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-ordering-probes-v1/shuffle_plus_0-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_attack_seed_probe_registry_v1.json"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-fixed-model-s2",
+      "scientific_identity": {
+        "method_id": "ert_rslad_attack_seed_fixed_model_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-0-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-0-s1",
+      "scientific_identity": {
+        "attack_index": 0,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-0-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-0-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-0-s1",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 0,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 1,
+        "source_training_job": "train-attack-0-s1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-1-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-1-s1",
+      "scientific_identity": {
+        "attack_index": 1,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-1-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-1-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-1-s1",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 1,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 1,
+        "source_training_job": "train-attack-1-s1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-2-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-2-s1",
+      "scientific_identity": {
+        "attack_index": 2,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-2-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-2-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-2-s1",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 2,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 1,
+        "source_training_job": "train-attack-2-s1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-3-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-3-s1",
+      "scientific_identity": {
+        "attack_index": 3,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-3-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-3-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-3-s1",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 3,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 1,
+        "source_training_job": "train-attack-3-s1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-4-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-4-s1",
+      "scientific_identity": {
+        "attack_index": 4,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-4-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-4-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-4-s1",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 4,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 1,
+        "source_training_job": "train-attack-4-s1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-5-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-5-s1",
+      "scientific_identity": {
+        "attack_index": 5,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-5-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-5-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-5-s1",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 5,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 1,
+        "source_training_job": "train-attack-5-s1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-6-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-6-s1",
+      "scientific_identity": {
+        "attack_index": 6,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-6-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-6-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-6-s1",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 6,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 1,
+        "source_training_job": "train-attack-6-s1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-7-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-7-s1",
+      "scientific_identity": {
+        "attack_index": 7,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 1
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-7-s1"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 0,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-7-s1",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-7-s1",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 7,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 1,
+        "source_training_job": "train-attack-7-s1"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-0-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-0-s2",
+      "scientific_identity": {
+        "attack_index": 0,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-0-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-0-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-0-s2",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 0,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 2,
+        "source_training_job": "train-attack-0-s2"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-1-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-1-s2",
+      "scientific_identity": {
+        "attack_index": 1,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-1-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-1-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-1-s2",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 1,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 2,
+        "source_training_job": "train-attack-1-s2"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-2-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-2-s2",
+      "scientific_identity": {
+        "attack_index": 2,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-2-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-2-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-2-s2",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 2,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 2,
+        "source_training_job": "train-attack-2-s2"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-3-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-3-s2",
+      "scientific_identity": {
+        "attack_index": 3,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-3-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-3-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-3-s2",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 3,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 2,
+        "source_training_job": "train-attack-3-s2"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-4-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-4-s2",
+      "scientific_identity": {
+        "attack_index": 4,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-4-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-4-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-4-s2",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 4,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 2,
+        "source_training_job": "train-attack-4-s2"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-5-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-5-s2",
+      "scientific_identity": {
+        "attack_index": 5,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-5-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-5-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-5-s2",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 5,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 2,
+        "source_training_job": "train-attack-5-s2"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-6-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-6-s2",
+      "scientific_identity": {
+        "attack_index": 6,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-6-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-6-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-6-s2",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 6,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 2,
+        "source_training_job": "train-attack-6-s2"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.train",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/resolved_config.yaml",
+        "--resume",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/last.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 15,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "train-attack-7-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/resolved_config.yaml",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/last.pt"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-7-s2",
+      "scientific_identity": {
+        "attack_index": 7,
+        "attack_random_start_keying": "sample_keyed_v1",
+        "epochs": "100-114",
+        "method_id": "ert_rslad_attack_seed_probe_v1",
+        "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+        "seed": 2
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "-m",
+        "ard.cli.ert_stage_a_endpoint",
+        "--config",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/resolved_config.yaml",
+        "--checkpoint",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/epoch-114.pt",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/endpoint/validation",
+        "--expected-epoch",
+        "113",
+        "--split",
+        "validation",
+        "--device",
+        "cuda"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "train-attack-7-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_MODE": "online"
+      },
+      "estimated_work": 25,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": 1,
+      "gpu_count": 1,
+      "host": "hamster",
+      "job_id": "endpoint-attack-7-s2",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/endpoint/validation",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/resolved_config.yaml"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-endpoint-7-s2",
+      "scientific_identity": {
+        "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+        "attack_index": 7,
+        "method_id": "ert_rslad_attack_seed_endpoint_v1",
+        "seed": 2,
+        "source_training_job": "train-attack-7-s2"
+      }
+    },
+    {
+      "command": [
+        "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "/tmp/ard-attack-source-v2-clean/scripts/analysis/aggregate_ert_rslad_attack_seed_probe.py",
+        "--registry",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_attack_seed_probe_registry_v1.json",
+        "--root",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2",
+        "--fixed-root",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model",
+        "--pure-order-results",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_pure_order_probe_results_v5.json",
+        "--output",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_attack_seed_probe_manifest_v1.json",
+        "--report",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/ERT_RSLAD_ATTACK_RANDOMNESS_CHARACTERIZATION.md"
+      ],
+      "completion_marker": "orchestration/completion.json",
+      "cwd": "/tmp/ard-attack-source-v2-clean",
+      "dependencies": [
+        "fixed-model-s1",
+        "fixed-model-s2",
+        "endpoint-attack-0-s1",
+        "endpoint-attack-1-s1",
+        "endpoint-attack-2-s1",
+        "endpoint-attack-3-s1",
+        "endpoint-attack-4-s1",
+        "endpoint-attack-5-s1",
+        "endpoint-attack-6-s1",
+        "endpoint-attack-7-s1",
+        "endpoint-attack-0-s2",
+        "endpoint-attack-1-s2",
+        "endpoint-attack-2-s2",
+        "endpoint-attack-3-s2",
+        "endpoint-attack-4-s2",
+        "endpoint-attack-5-s2",
+        "endpoint-attack-6-s2",
+        "endpoint-attack-7-s2"
+      ],
+      "env": {
+        "PYTHONPATH": "/tmp/ard-attack-source-v2-clean/src",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "estimated_work": 1,
+      "executor": {
+        "type": "local"
+      },
+      "gpu": null,
+      "gpu_count": 0,
+      "host": "hamster",
+      "job_id": "aggregate-attack-seed-probe",
+      "output_dir": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/aggregate",
+      "required_paths": [
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_attack_seed_probe_registry_v1.json",
+        "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/docs/experiments/ert_rslad_pure_order_probe_results_v5.json"
+      ],
+      "retry_policy": {
+        "max_attempts": 1
+      },
+      "run_id": "ert-rslad-attack-seed-probe-aggregate",
+      "scientific_identity": {
+        "endpoint_count": 16,
+        "method_id": "ert_rslad_attack_seed_probe_aggregate_v1",
+        "probe_count": 16,
+        "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b"
+      }
+    }
+  ],
+  "reservation_root": "/home/shunsukenaito/.cache/ard-experiment-orchestrator/reservations",
+  "schema_version": 1,
+  "source": {
+    "git_sha": "7f8a13fd1c2d8d266cd657b5fb42e9075f274655"
+  },
+  "state_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/orchestration.state.json"
+}
