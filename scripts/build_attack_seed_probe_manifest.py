@@ -184,7 +184,11 @@ def build_manifest(
                         "source_training_job": job_id,
                         "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
                     },
-                    required_paths=[str(run / "epoch-114.pt"), str(run / "resolved_config.yaml")],
+                    # The checkpoint is produced by the training dependency;
+                    # requiring it during campaign-wide preflight would make
+                    # a valid DAG impossible to launch.  The endpoint worker
+                    # still fails closed if it is absent when eligible.
+                    required_paths=[str(run / "resolved_config.yaml")],
                     source_root=source_root,
                 )
             )
