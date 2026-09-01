@@ -30,9 +30,12 @@ six exact e114 checkpoints are stored under the completed Ferret run root
 Teacher, and CE-PGD20 identities are inherited unchanged.
 
 Ferret has the required dataset, Teacher, disk, and two validated fast GPUs
-(GPU0/GPU1). The local Hamster GPUs are idle but the required dataset is not
-present and the root filesystem has only about 2.6 GB free, so Hamster is
-ineligible for this campaign until a safe data/storage profile exists.
+(GPU0/GPU1). The campaign was pinned to Ferret before launch. A later host
+re-audit found that Hamster also has the dataset at
+`/home/shunsukenaito/workspace-local/datasets/ard/torchvision` and now has
+about 2.3 TB free; an earlier Hamster exclusion was caused by checking the
+wrong `/home/islab/...` alias. The running campaign is not migrated because
+its immutable manifest and dependency state are already pinned to Ferret.
 
 ## Scientific contracts affected
 
@@ -93,8 +96,9 @@ outside the automated test suite.
 
 - 2026-09-02: short-screen e114 artifacts and all 32 endpoint cells verified
   present; campaign source `2522bc9` and manifest lineage retained.
-- 2026-09-02: Hamster preflight failed for this campaign (dataset missing,
-  root filesystem 100%); Ferret GPU0/1 preflight passed.
+- 2026-09-02: The initial Hamster check used an incorrect dataset alias and
+  incorrectly reported the dataset missing. Re-audit confirmed the canonical
+  dataset path and free disk on Hamster; no active campaign was changed.
 - 2026-09-02: Source `c6032f9` was pushed, Ferret worktree prepared, all six
   e114 hashes matched, and the e115 resume canary passed. The detached
   manifest controller launched the first two training jobs on Ferret GPU0/1;
