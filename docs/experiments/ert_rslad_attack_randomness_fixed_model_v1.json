@@ -1,0 +1,104 @@
+{
+  "fixed_model": {
+    "1": {
+      "attack_count": 8,
+      "attack_seed_rows": [
+        {
+          "index": 0,
+          "value": 7627380109563657783
+        },
+        {
+          "index": 1,
+          "value": 8480779665734580847
+        },
+        {
+          "index": 2,
+          "value": 5107830115251535804
+        },
+        {
+          "index": 3,
+          "value": 4502843134328618861
+        },
+        {
+          "index": 4,
+          "value": 9186653202374592142
+        },
+        {
+          "index": 5,
+          "value": 7572926927721735283
+        },
+        {
+          "index": 6,
+          "value": 4813646949239090399
+        },
+        {
+          "index": 7,
+          "value": 1118460328830420174
+        }
+      ],
+      "epoch": 100,
+      "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "parent_payload_epoch": 99,
+      "risk_attack_kl_sd_spearman": 0.1701108649604943,
+      "risk_margin_sd_spearman": 0.17833687249537553,
+      "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed1/fixed-model-seed1.parquet",
+      "rows_sha256": "aaddbccab7954303bba7f2d768d1a9179f8fdcbe8b6257b47547492919ed31e9",
+      "sample_count": 8192,
+      "sample_id_sha256": "aa55381890848c8e1db18816bd713efca3744288404b43b9b9f6614368d41766",
+      "seed": 1,
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed1/fixed-model-seed1-summary.json"
+    },
+    "2": {
+      "attack_count": 8,
+      "attack_seed_rows": [
+        {
+          "index": 0,
+          "value": 7627380109563657783
+        },
+        {
+          "index": 1,
+          "value": 8480779665734580847
+        },
+        {
+          "index": 2,
+          "value": 5107830115251535804
+        },
+        {
+          "index": 3,
+          "value": 4502843134328618861
+        },
+        {
+          "index": 4,
+          "value": 9186653202374592142
+        },
+        {
+          "index": 5,
+          "value": 7572926927721735283
+        },
+        {
+          "index": 6,
+          "value": 4813646949239090399
+        },
+        {
+          "index": 7,
+          "value": 1118460328830420174
+        }
+      ],
+      "epoch": 100,
+      "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "parent_payload_epoch": 99,
+      "risk_attack_kl_sd_spearman": 0.18289745540513824,
+      "risk_margin_sd_spearman": 0.16887184832630406,
+      "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed2/fixed-model-seed2.parquet",
+      "rows_sha256": "f10237019a5e93ce99c65663caf5d9ed598954f61be6badea6e91319fb61ac4e",
+      "sample_count": 8192,
+      "sample_id_sha256": "aa55381890848c8e1db18816bd713efca3744288404b43b9b9f6614368d41766",
+      "seed": 2,
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed2/fixed-model-seed2-summary.json"
+    }
+  },
+  "kind": "ert_rslad_attack_randomness_fixed_model_v1",
+  "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+  "schema_version": 1,
+  "status": "completed"
+}

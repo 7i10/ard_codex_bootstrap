@@ -1,0 +1,60 @@
+{
+  "kind": "ert_rslad_attack_seed_sample_sensitivity_v1",
+  "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+  "sample_sensitivity": {
+    "1": {
+      "frequency_histogram": {
+        "0": 2053,
+        "1": 26,
+        "2": 25,
+        "3": 15,
+        "4": 14,
+        "5": 17,
+        "6": 22,
+        "7": 36,
+        "8": 2792
+      },
+      "margin_sd_summary": {
+        "max": 0.041369583991585385,
+        "mean": 0.0067267867708583765,
+        "min": 0.0007035603912235435,
+        "n": 5000,
+        "sd": 0.0041999462529913245
+      },
+      "non_unanimous_fraction": 0.031,
+      "row_count": 5000,
+      "rows_compressed": true,
+      "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/aggregate/sample-sensitivity-rows-v1.json.gz",
+      "rows_sha256": "6fc92b4f50a441d28e1f0a0c6b92a6fbe06520643e3fc0345f70ba4b3a1f3103",
+      "sample_count": 5000
+    },
+    "2": {
+      "frequency_histogram": {
+        "0": 2061,
+        "1": 32,
+        "2": 23,
+        "3": 21,
+        "4": 15,
+        "5": 19,
+        "6": 21,
+        "7": 21,
+        "8": 2787
+      },
+      "margin_sd_summary": {
+        "max": 0.03652440322364705,
+        "mean": 0.006372407209848146,
+        "min": 0.0007784265371953531,
+        "n": 5000,
+        "sd": 0.0039339821268164045
+      },
+      "non_unanimous_fraction": 0.0304,
+      "row_count": 5000,
+      "rows_compressed": true,
+      "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/aggregate/sample-sensitivity-rows-v1.json.gz",
+      "rows_sha256": "6fc92b4f50a441d28e1f0a0c6b92a6fbe06520643e3fc0345f70ba4b3a1f3103",
+      "sample_count": 5000
+    }
+  },
+  "schema_version": 1,
+  "status": "completed"
+}

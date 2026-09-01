@@ -1,0 +1,539 @@
+{
+  "classification": {
+    "1": {
+      "attack_auc_range": 0.00031428571428560037,
+      "attack_vs_order_sd_ratio": 0.5917201882971633,
+      "classification": "WEAK",
+      "order_auc_range": 0.0005634920634920437
+    },
+    "2": {
+      "attack_auc_range": 0.0003920634920635546,
+      "attack_vs_order_sd_ratio": 0.4954045394460503,
+      "classification": "WEAK",
+      "order_auc_range": 0.0007928571428571507
+    }
+  },
+  "fixed_model": {
+    "1": {
+      "attack_count": 8,
+      "attack_seed_rows": [
+        {
+          "index": 0,
+          "value": 7627380109563657783
+        },
+        {
+          "index": 1,
+          "value": 8480779665734580847
+        },
+        {
+          "index": 2,
+          "value": 5107830115251535804
+        },
+        {
+          "index": 3,
+          "value": 4502843134328618861
+        },
+        {
+          "index": 4,
+          "value": 9186653202374592142
+        },
+        {
+          "index": 5,
+          "value": 7572926927721735283
+        },
+        {
+          "index": 6,
+          "value": 4813646949239090399
+        },
+        {
+          "index": 7,
+          "value": 1118460328830420174
+        }
+      ],
+      "epoch": 100,
+      "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "parent_payload_epoch": 99,
+      "risk_attack_kl_sd_spearman": 0.1701108649604943,
+      "risk_margin_sd_spearman": 0.17833687249537553,
+      "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed1/fixed-model-seed1.parquet",
+      "rows_sha256": "aaddbccab7954303bba7f2d768d1a9179f8fdcbe8b6257b47547492919ed31e9",
+      "sample_count": 8192,
+      "sample_id_sha256": "aa55381890848c8e1db18816bd713efca3744288404b43b9b9f6614368d41766",
+      "seed": 1,
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed1/fixed-model-seed1-summary.json"
+    },
+    "2": {
+      "attack_count": 8,
+      "attack_seed_rows": [
+        {
+          "index": 0,
+          "value": 7627380109563657783
+        },
+        {
+          "index": 1,
+          "value": 8480779665734580847
+        },
+        {
+          "index": 2,
+          "value": 5107830115251535804
+        },
+        {
+          "index": 3,
+          "value": 4502843134328618861
+        },
+        {
+          "index": 4,
+          "value": 9186653202374592142
+        },
+        {
+          "index": 5,
+          "value": 7572926927721735283
+        },
+        {
+          "index": 6,
+          "value": 4813646949239090399
+        },
+        {
+          "index": 7,
+          "value": 1118460328830420174
+        }
+      ],
+      "epoch": 100,
+      "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "parent_payload_epoch": 99,
+      "risk_attack_kl_sd_spearman": 0.18289745540513824,
+      "risk_margin_sd_spearman": 0.16887184832630406,
+      "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed2/fixed-model-seed2.parquet",
+      "rows_sha256": "f10237019a5e93ce99c65663caf5d9ed598954f61be6badea6e91319fb61ac4e",
+      "sample_count": 8192,
+      "sample_id_sha256": "aa55381890848c8e1db18816bd713efca3744288404b43b9b9f6614368d41766",
+      "seed": 2,
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model/seed2/fixed-model-seed2-summary.json"
+    }
+  },
+  "fixed_model_root": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/fixed-model",
+  "kind": "ert_rslad_attack_seed_probe_results_v1",
+  "no_intervention": true,
+  "per_seed": {
+    "1": {
+      "arms": {
+        "ATTACK_SEED_0": {
+          "attack_seed": 7627380109563657783,
+          "best_minus_last": 4.4444444444513564e-05,
+          "best_robust": 0.5255777777777778,
+          "clean_at_114": 0.6608888888888889,
+          "endpoint": {
+            "clean_accuracy": 0.8348,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5742,
+            "rows_sha256": "c9c714803c037eb8b5f3b2e56588bc8a96f83d57c7f5a5fba3dcf80900103cfe",
+            "sha256": "137e638310f3779f374132a4ae88a6fee823a45a603dd8183c8157caa299b5bd"
+          },
+          "gain_100_to_114": 0.045555555555555516,
+          "index": 0,
+          "metrics_sha256": "95826ca9d600b23b4191c1de99fd1ec1f56cb353202fd5ffbf379319956c7293",
+          "probe_auc_100_114": 0.5097539682539682,
+          "robust_at_114": 0.5255333333333333,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s1"
+        },
+        "ATTACK_SEED_1": {
+          "attack_seed": 8480779665734580847,
+          "best_minus_last": 0.0016000000000000458,
+          "best_robust": 0.5264888888888889,
+          "clean_at_114": 0.6610222222222222,
+          "endpoint": {
+            "clean_accuracy": 0.8372,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5732,
+            "rows_sha256": "30e9b3aacded6beaae5a50aabd472c246cdb4cf3b8b19725ddb62d18bebd976d",
+            "sha256": "7a7ed63f28f905fe097e6a23d2d4c45d88e90792800d9b8b0679fbeec4d82522"
+          },
+          "gain_100_to_114": 0.044022222222222185,
+          "index": 1,
+          "metrics_sha256": "23ce97fa0b33b2537796898bfb02744ad3bca58f5cddd115a78b5429d7cf2b56",
+          "probe_auc_100_114": 0.5098357142857143,
+          "robust_at_114": 0.5248888888888888,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s1"
+        },
+        "ATTACK_SEED_2": {
+          "attack_seed": 5107830115251535804,
+          "best_minus_last": 0.001377777777777811,
+          "best_robust": 0.5268,
+          "clean_at_114": 0.6610888888888888,
+          "endpoint": {
+            "clean_accuracy": 0.8364,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5734,
+            "rows_sha256": "6350abcc8e647033f8d41f9a7b1d1767c95d5326ebd55ece4c22841d6b54e654",
+            "sha256": "6c82fc921b8fffa0e364f7259a1ef74f4f49abaa492640d4f5e05ea21a68906c"
+          },
+          "gain_100_to_114": 0.045466666666666655,
+          "index": 2,
+          "metrics_sha256": "62ffd2433fcc02bebe9d566ac78ee6733c9242be1416ed2117cb83776ad3b77f",
+          "probe_auc_100_114": 0.5098349206349206,
+          "robust_at_114": 0.5254222222222222,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s1"
+        },
+        "ATTACK_SEED_3": {
+          "attack_seed": 4502843134328618861,
+          "best_minus_last": 0.0014666666666666162,
+          "best_robust": 0.5262444444444444,
+          "clean_at_114": 0.6609777777777778,
+          "endpoint": {
+            "clean_accuracy": 0.8354,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5752,
+            "rows_sha256": "927ac7efde72eb9e9553814b90a8d8e54d029dac8f696aa827651fe12021bbe8",
+            "sha256": "d19c132cc101c7d986525fdaa5a4640e3180d3f3eb63c71f7b6f9650ed48c348"
+          },
+          "gain_100_to_114": 0.04422222222222222,
+          "index": 3,
+          "metrics_sha256": "dcc3108f9e0fbabde405d05a198e83d0a08ac1990a9f84f1197c1b9df976c499",
+          "probe_auc_100_114": 0.5095809523809525,
+          "robust_at_114": 0.5247777777777778,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s1"
+        },
+        "ATTACK_SEED_4": {
+          "attack_seed": 9186653202374592142,
+          "best_minus_last": 0.001088888888888917,
+          "best_robust": 0.5264888888888889,
+          "clean_at_114": 0.6610888888888888,
+          "endpoint": {
+            "clean_accuracy": 0.8358,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5744,
+            "rows_sha256": "4a28463b8fc133fb98f80dad8a2855c96b8271b778ed4fca5dfb4b3b517ff323",
+            "sha256": "d099540037b74b546ee0d3df31abc101fab677d28e561873aaa6202d69649765"
+          },
+          "gain_100_to_114": 0.04497777777777778,
+          "index": 4,
+          "metrics_sha256": "9ca48b1bc3c09ef03671b241a6970dcc834a8a9f92077a40ab4ec248aa6b6c86",
+          "probe_auc_100_114": 0.5095904761904763,
+          "robust_at_114": 0.5254,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s1"
+        },
+        "ATTACK_SEED_5": {
+          "attack_seed": 7572926927721735283,
+          "best_minus_last": 0.00024444444444449154,
+          "best_robust": 0.5259333333333334,
+          "clean_at_114": 0.6610888888888888,
+          "endpoint": {
+            "clean_accuracy": 0.8344,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.575,
+            "rows_sha256": "0f73259443508e3a5a1f0f72f22dbb6a786abb734086572af8d4927bb68b43aa",
+            "sha256": "d72ddcdda025ad7faaa961be1a82bc275fbbb9214c12f9ddb27b577d3b2f5bc6"
+          },
+          "gain_100_to_114": 0.04535555555555554,
+          "index": 5,
+          "metrics_sha256": "ad836a209cc62a3f460cf99d5833296da7166407e8bad7d8963cdc1aadfc499d",
+          "probe_auc_100_114": 0.509818253968254,
+          "robust_at_114": 0.5256888888888889,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s1"
+        },
+        "ATTACK_SEED_6": {
+          "attack_seed": 4813646949239090399,
+          "best_minus_last": 0.0015333333333332755,
+          "best_robust": 0.5266888888888889,
+          "clean_at_114": 0.6610222222222222,
+          "endpoint": {
+            "clean_accuracy": 0.8372,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5764,
+            "rows_sha256": "40af28dd374d391e7c410cc9b19af1f1971ba279e95d0b88279d5f37a93d2038",
+            "sha256": "16b860548c6b8f6865957229b89d8650615dec0de071d686cec3a2d1339de6e9"
+          },
+          "gain_100_to_114": 0.0450444444444445,
+          "index": 6,
+          "metrics_sha256": "69b43da08ee3ab3c7c2e8454a57159baefd75b24e7a41042bee4ccaa97311060",
+          "probe_auc_100_114": 0.509713492063492,
+          "robust_at_114": 0.5251555555555556,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s1"
+        },
+        "ATTACK_SEED_7": {
+          "attack_seed": 1118460328830420174,
+          "best_minus_last": 0.0016666666666667052,
+          "best_robust": 0.5266444444444445,
+          "clean_at_114": 0.6608888888888889,
+          "endpoint": {
+            "clean_accuracy": 0.837,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5746,
+            "rows_sha256": "a6900f11924cec6adaac516444829d32d6ff7e35b0bc1b98c12e3bfef9669dfb",
+            "sha256": "e2d9e199791a68a0b0662aee9f45324c7180bda99b9f70aa25633f92134e4eac"
+          },
+          "gain_100_to_114": 0.04462222222222223,
+          "index": 7,
+          "metrics_sha256": "be4d24f4973807d6646fba860944015f0da2234274e7afac9d1dfecc773e5f5d",
+          "probe_auc_100_114": 0.5098952380952381,
+          "robust_at_114": 0.5249777777777778,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s1"
+        }
+      },
+      "probe_auc_summary": {
+        "max": 0.5098952380952381,
+        "mean": 0.509752876984127,
+        "min": 0.5095809523809525,
+        "n": 8,
+        "sd": 0.00011687506453995295
+      },
+      "robust_at_114_summary": {
+        "max": 0.5256888888888889,
+        "mean": 0.5252305555555555,
+        "min": 0.5247777777777778,
+        "n": 8,
+        "sd": 0.00032916708525858654
+      }
+    },
+    "2": {
+      "arms": {
+        "ATTACK_SEED_0": {
+          "attack_seed": 7627380109563657783,
+          "best_minus_last": 0.0,
+          "best_robust": 0.5222444444444444,
+          "clean_at_114": 0.6592,
+          "endpoint": {
+            "clean_accuracy": 0.8368,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5718,
+            "rows_sha256": "a8cce1fe0d6f2295cf08469a413dab2aaa6ce199cf476ca64657aae290ae1867",
+            "sha256": "10427988b4e28369557757a057dfe3d4c6bb9563d01fe5fe7d759581d7509646"
+          },
+          "gain_100_to_114": 0.03844444444444439,
+          "index": 0,
+          "metrics_sha256": "575a8d84f2bbdb89dcbd574b26c26d01fa6004457bddf50fe2c16fc02f47275f",
+          "probe_auc_100_114": 0.5092857142857143,
+          "robust_at_114": 0.5222444444444444,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-0-s2"
+        },
+        "ATTACK_SEED_1": {
+          "attack_seed": 8480779665734580847,
+          "best_minus_last": 0.0,
+          "best_robust": 0.5220888888888889,
+          "clean_at_114": 0.6589777777777778,
+          "endpoint": {
+            "clean_accuracy": 0.8356,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5724,
+            "rows_sha256": "068ed60514f5e4d3b3fe41843f0a853e38cdbca1e40ee7dcd3d1c581b3319964",
+            "sha256": "f124d0e469b36df9232f789e5b5c0857e753d8efcb85c55929d6b0d411373173"
+          },
+          "gain_100_to_114": 0.03835555555555559,
+          "index": 1,
+          "metrics_sha256": "2468eb2f92f14dc1985b1e8da0164144c9560d89b11c1f716ff7995a81cdcdbd",
+          "probe_auc_100_114": 0.5094873015873016,
+          "robust_at_114": 0.5220888888888889,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-1-s2"
+        },
+        "ATTACK_SEED_2": {
+          "attack_seed": 5107830115251535804,
+          "best_minus_last": 0.0,
+          "best_robust": 0.5219777777777778,
+          "clean_at_114": 0.6591555555555556,
+          "endpoint": {
+            "clean_accuracy": 0.8368,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5734,
+            "rows_sha256": "72681020be9a4c306790e595f7d314126903ecb1352a3e7ec477f1eab85ef498",
+            "sha256": "112b4f2b93d86f9751a69309b1d32fc9c772c754e3e0bd75c56b94acbb4a4b89"
+          },
+          "gain_100_to_114": 0.03799999999999998,
+          "index": 2,
+          "metrics_sha256": "7c87457375a081805d4b624219db5184e34ce13e35e8ab73f42cd2fa7431c6c7",
+          "probe_auc_100_114": 0.5091253968253967,
+          "robust_at_114": 0.5219777777777778,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-2-s2"
+        },
+        "ATTACK_SEED_3": {
+          "attack_seed": 4502843134328618861,
+          "best_minus_last": 0.0,
+          "best_robust": 0.522,
+          "clean_at_114": 0.6595555555555556,
+          "endpoint": {
+            "clean_accuracy": 0.8348,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.57,
+            "rows_sha256": "28c129ede83adc0a0c465b0862609364aa29b69fbd1773683498c4a9bb9bc199",
+            "sha256": "28155a6204f8acd73413de49f11cdcdf24186956396de548f3b2b67e6416625b"
+          },
+          "gain_100_to_114": 0.03806666666666669,
+          "index": 3,
+          "metrics_sha256": "f7c7b84221d872d8fc2dedd85f81f3198571454b2cc285098103425b9fdf4c7e",
+          "probe_auc_100_114": 0.5094166666666667,
+          "robust_at_114": 0.522,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-3-s2"
+        },
+        "ATTACK_SEED_4": {
+          "attack_seed": 9186653202374592142,
+          "best_minus_last": 0.0005777777777776771,
+          "best_robust": 0.5219555555555555,
+          "clean_at_114": 0.6587555555555555,
+          "endpoint": {
+            "clean_accuracy": 0.837,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5714,
+            "rows_sha256": "70c6cee0341ff3c9e3ccc47d61aee6833d8545b59c3ae70dff93a4eb521494eb",
+            "sha256": "7c39a9ee53a75228ff412cca9cae0dba7ca32b6bbda0f8c0ad121bc45f5e1263"
+          },
+          "gain_100_to_114": 0.037466666666666704,
+          "index": 4,
+          "metrics_sha256": "a3eaa2ebbb0480f1d6a9be9c334317c053bedcfff09cfbc24c13abc13667b1b8",
+          "probe_auc_100_114": 0.5094444444444445,
+          "robust_at_114": 0.5213777777777778,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-4-s2"
+        },
+        "ATTACK_SEED_5": {
+          "attack_seed": 7572926927721735283,
+          "best_minus_last": 0.0,
+          "best_robust": 0.5222222222222223,
+          "clean_at_114": 0.6592,
+          "endpoint": {
+            "clean_accuracy": 0.838,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5718,
+            "rows_sha256": "d32a1693ae5eda414fd70c137edf3cc8b162425dbd3883384cc44c9f398b80c7",
+            "sha256": "1eb2807c13bd025f466c86befb95e54e21dbd49fcff451b735d9636f1e24b04d"
+          },
+          "gain_100_to_114": 0.03760000000000002,
+          "index": 5,
+          "metrics_sha256": "b70c7a714b81b4881b5c9cedca95c22628ad78369dc8cf158f1fc36876490f70",
+          "probe_auc_100_114": 0.5095174603174603,
+          "robust_at_114": 0.5222222222222223,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-5-s2"
+        },
+        "ATTACK_SEED_6": {
+          "attack_seed": 4813646949239090399,
+          "best_minus_last": 0.0,
+          "best_robust": 0.5215777777777778,
+          "clean_at_114": 0.6588666666666667,
+          "endpoint": {
+            "clean_accuracy": 0.8362,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5716,
+            "rows_sha256": "d52484191cfb5f96568b19c86ffcd0cff6496c526c04993044036af59789f12a",
+            "sha256": "cd7f99cb49b21e1bbc4a620c07d3b020b20d2d8d22ed734ceb46ea3784efc2e6"
+          },
+          "gain_100_to_114": 0.03791111111111112,
+          "index": 6,
+          "metrics_sha256": "ac9879bf2ca44239b6e478a9e27cd87bab715d09b96b1e73f2688b37d6d87cba",
+          "probe_auc_100_114": 0.509326984126984,
+          "robust_at_114": 0.5215777777777778,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-6-s2"
+        },
+        "ATTACK_SEED_7": {
+          "attack_seed": 1118460328830420174,
+          "best_minus_last": 0.0,
+          "best_robust": 0.5214666666666666,
+          "clean_at_114": 0.6593777777777777,
+          "endpoint": {
+            "clean_accuracy": 0.8354,
+            "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2/endpoint/validation/endpoint.json",
+            "robust_accuracy": 0.5706,
+            "rows_sha256": "c299d473982460cd526391418c1e82abf5b9bc11e2e9766c8b3356650a4e51da",
+            "sha256": "7bf3c854d56ea79847bcd7ca6fcc7dc5a303daff481b139c60ba2fd25f43d36a"
+          },
+          "gain_100_to_114": 0.038111111111111096,
+          "index": 7,
+          "metrics_sha256": "f94c37e440be8305f3ba7ca6bab369c2e7d222c3075874c99420f1defe8b0357",
+          "probe_auc_100_114": 0.5092468253968254,
+          "robust_at_114": 0.5214666666666666,
+          "run": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/attack-seed-7-s2"
+        }
+      },
+      "probe_auc_summary": {
+        "max": 0.5095174603174603,
+        "mean": 0.5093563492063492,
+        "min": 0.5091253968253967,
+        "n": 8,
+        "sd": 0.00013399912058038272
+      },
+      "robust_at_114_summary": {
+        "max": 0.5222444444444444,
+        "mean": 0.5218694444444445,
+        "min": 0.5213777777777778,
+        "n": 8,
+        "sd": 0.00034455963255727287
+      }
+    }
+  },
+  "pure_order_reference": {
+    "1": {
+      "auc_summary": {
+        "max": 0.5098873015873017,
+        "mean": 0.5096506944444444,
+        "min": 0.5093238095238096,
+        "n": 8,
+        "sd": 0.00019751745309939977
+      },
+      "source_sha256": "bd6410f6c2aacb12b017f9300ca077e904400387545a9c267187c9f66e0c307c"
+    },
+    "2": {
+      "auc_summary": {
+        "max": 0.5097825396825397,
+        "mean": 0.5093675595238095,
+        "min": 0.5089896825396826,
+        "n": 8,
+        "sd": 0.0002704842404759096
+      },
+      "source_sha256": "bd6410f6c2aacb12b017f9300ca077e904400387545a9c267187c9f66e0c307c"
+    }
+  },
+  "registry_sha256": "6b114d3100c7e4949e64877f9360cbe847c108f6b75203111228eb032be3e26b",
+  "root": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2",
+  "sample_sensitivity": {
+    "1": {
+      "frequency_histogram": {
+        "0": 2053,
+        "1": 26,
+        "2": 25,
+        "3": 15,
+        "4": 14,
+        "5": 17,
+        "6": 22,
+        "7": 36,
+        "8": 2792
+      },
+      "margin_sd_summary": {
+        "max": 0.041369583991585385,
+        "mean": 0.0067267867708583765,
+        "min": 0.0007035603912235435,
+        "n": 5000,
+        "sd": 0.0041999462529913245
+      },
+      "non_unanimous_fraction": 0.031,
+      "row_count": 5000,
+      "rows_compressed": true,
+      "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/aggregate/sample-sensitivity-rows-v1.json.gz",
+      "rows_sha256": "6fc92b4f50a441d28e1f0a0c6b92a6fbe06520643e3fc0345f70ba4b3a1f3103",
+      "sample_count": 5000
+    },
+    "2": {
+      "frequency_histogram": {
+        "0": 2061,
+        "1": 32,
+        "2": 23,
+        "3": 21,
+        "4": 15,
+        "5": 19,
+        "6": 21,
+        "7": 21,
+        "8": 2787
+      },
+      "margin_sd_summary": {
+        "max": 0.03652440322364705,
+        "mean": 0.006372407209848146,
+        "min": 0.0007784265371953531,
+        "n": 5000,
+        "sd": 0.0039339821268164045
+      },
+      "non_unanimous_fraction": 0.0304,
+      "row_count": 5000,
+      "rows_compressed": true,
+      "rows_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-attack-seed-probe-v2/aggregate/sample-sensitivity-rows-v1.json.gz",
+      "rows_sha256": "6fc92b4f50a441d28e1f0a0c6b92a6fbe06520643e3fc0345f70ba4b3a1f3103",
+      "sample_count": 5000
+    }
+  },
+  "schema_version": 1,
+  "status": "completed"
+}

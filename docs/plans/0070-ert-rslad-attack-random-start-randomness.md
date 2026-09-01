@@ -4,7 +4,7 @@
 
 - Owner: Codex `/root`
 - Branch / base SHA: `master` / `121c064efc32f47d40f9942d349ebeb1e7856733`
-- Current milestone: M1: registry and fork implementation frozen
+- Current milestone: M6: completed characterization and report
 - Last updated: 2026-09-01
 
 ## Goal
@@ -39,11 +39,27 @@ best attack seed as a method and no automatic follow-up intervention.
 
 - [x] M0: audit parent/config/RNG isolation and existing artifacts.
 - [x] M1: freeze attack-seed registry and add isolation/parity tests.
-- [ ] M2: implement fixed-model direct sensitivity replay.
-- [ ] M3: materialize and validate the 16 short attack-seed forks.
-- [ ] M4: run e114 endpoint and sample-level aggregation.
-- [ ] M5: compare against pure-order reference and write report/artifacts.
-- [ ] M6: commit and push the completed characterization.
+- [x] M2: implement fixed-model direct sensitivity replay.
+- [x] M3: materialize and validate the 16 short attack-seed forks.
+- [x] M4: run e114 endpoint and sample-level aggregation.
+- [x] M5: compare against pure-order reference and write report/artifacts.
+- [x] M6: commit the completed characterization (push remains user-authorized only).
+
+## Completion evidence
+
+- The detached Hamster DAG completed 51/51 jobs: two fixed-model replays, 16
+  attack-seed training forks, 16 CE-PGD20 endpoints, 16 checkpoint cleanups,
+  and one aggregate.
+- Fixed-model replay used 8,192 deterministic stratified train IDs per
+  development seed; endpoint rows used the fixed 5,000-sample validation split.
+- The fixed replay smoke passed on the exact epoch-99 parents before launch.
+- The source tree used for the training forks was the clean registered
+  `7f8a13fd1c2d8d266cd657b5fb42e9075f274655` worktree.  The main branch also
+  contains a read-only replay indexing fix and manifest/preflight cleanup
+  improvements made after the registry was frozen.
+- Aggregate output is stored in the result artifact, separate from the frozen
+  manifest; the accidental same-path overwrite was recovered and recorded as
+  an orchestration issue, not a scientific change.
 
 ## Stop rules
 
