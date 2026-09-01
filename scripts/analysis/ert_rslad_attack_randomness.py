@@ -291,14 +291,19 @@ def _parser() -> argparse.ArgumentParser:
     fixed.add_argument("--output", type=Path, required=True)
     fixed.add_argument("--seed", type=int, choices=(1, 2), required=True)
     fixed.add_argument("--limit", type=int, default=8192)
+    fixed.add_argument(
+        "--smoke", action="store_true", help="Use a bounded real-checkpoint smoke subset (not a campaign result)."
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "fixed-model":
-        if args.limit < 8192:
+        if args.limit < 8192 and not args.smoke:
             raise ValueError("fixed-model replay limit must be at least 8192")
+        if args.smoke and not 1 <= args.limit <= 128:
+            raise ValueError("fixed-model smoke limit must be between 1 and 128")
         result = fixed_model_replay(
             config_path=args.config,
             parent_path=args.parent,

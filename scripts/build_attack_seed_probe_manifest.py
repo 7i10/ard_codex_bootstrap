@@ -43,6 +43,7 @@ def _job(
     estimated_work: float,
     identity: dict[str, object],
     required_paths: list[str],
+    source_root: Path,
     env: dict[str, str] | None = None,
     gpu_count: int = 1,
 ) -> dict[str, object]:
@@ -53,8 +54,8 @@ def _job(
         "gpu": gpu if gpu_count else None,
         "gpu_count": gpu_count,
         "command": command,
-        "cwd": str(REPO),
-        "env": env or {"PYTHONPATH": str(REPO / "src"), "PYTHONUNBUFFERED": "1", "WANDB_MODE": "online"},
+        "cwd": str(source_root),
+        "env": env or {"PYTHONPATH": str(source_root / "src"), "PYTHONUNBUFFERED": "1", "WANDB_MODE": "online"},
         "required_paths": required_paths,
         "output_dir": str(output),
         "completion_marker": "orchestration/completion.json",
@@ -66,7 +67,9 @@ def _job(
     }
 
 
-def build_manifest(*, source_sha: str, registry: Path, root: Path, fixed_root: Path, output: Path) -> dict[str, object]:
+def build_manifest(
+    *, source_sha: str, registry: Path, root: Path, fixed_root: Path, output: Path, source_root: Path
+) -> dict[str, object]:
     registry_sha = sha256(registry)
     jobs: list[dict[str, object]] = []
     for seed in (1, 2):
@@ -77,7 +80,7 @@ def build_manifest(*, source_sha: str, registry: Path, root: Path, fixed_root: P
                 run_id=f"ert-rslad-attack-fixed-model-s{seed}",
                 command=[
                     PYTHON,
-                    "scripts/analysis/ert_rslad_attack_randomness.py",
+                    str(source_root / "scripts/analysis/ert_rslad_attack_randomness.py"),
                     "fixed-model",
                     "--config",
                     str(BASE_CONFIG[seed]),
@@ -103,6 +106,7 @@ def build_manifest(*, source_sha: str, registry: Path, root: Path, fixed_root: P
                     "registry_sha256": registry_sha,
                 },
                 required_paths=[str(BASE_CONFIG[seed]), str(PARENT[seed]), str(registry)],
+                source_root=source_root,
             )
         )
     train_job_ids: list[str] = []
@@ -140,6 +144,7 @@ def build_manifest(*, source_sha: str, registry: Path, root: Path, fixed_root: P
                         "attack_random_start_keying": "sample_keyed_v1",
                     },
                     required_paths=[str(run / "resolved_config.yaml"), str(run / "last.pt")],
+                    source_root=source_root,
                 )
             )
             endpoint_out = run / "endpoint" / "validation"
@@ -176,6 +181,7 @@ def build_manifest(*, source_sha: str, registry: Path, root: Path, fixed_root: P
                         "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
                     },
                     required_paths=[str(run / "epoch-114.pt"), str(run / "resolved_config.yaml")],
+                    source_root=source_root,
                 )
             )
     endpoint_ids = [job["job_id"] for job in jobs if str(job["job_id"]).startswith("endpoint-")]
@@ -187,7 +193,7 @@ def build_manifest(*, source_sha: str, registry: Path, root: Path, fixed_root: P
             run_id="ert-rslad-attack-seed-probe-aggregate",
             command=[
                 PYTHON,
-                "scripts/analysis/aggregate_ert_rslad_attack_seed_probe.py",
+                str(source_root / "scripts/analysis/aggregate_ert_rslad_attack_seed_probe.py"),
                 "--registry",
                 str(registry),
                 "--root",
@@ -213,7 +219,8 @@ def build_manifest(*, source_sha: str, registry: Path, root: Path, fixed_root: P
                 "endpoint_count": 16,
             },
             required_paths=[str(registry), str(REPO / "docs/experiments/ert_rslad_pure_order_probe_results_v5.json")],
-            env={"PYTHONPATH": str(REPO / "src"), "PYTHONUNBUFFERED": "1"},
+            source_root=source_root,
+            env={"PYTHONPATH": str(source_root / "src"), "PYTHONUNBUFFERED": "1"},
         )
     )
     return {
@@ -241,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--fixed-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--source-root", type=Path, default=REPO)
     args = parser.parse_args(argv)
     manifest = build_manifest(
         source_sha=args.source_sha,
@@ -248,6 +256,7 @@ def main(argv: list[str] | None = None) -> int:
         root=args.root.resolve(),
         fixed_root=args.fixed_root.resolve(),
         output=args.output.resolve(),
+        source_root=args.source_root.resolve(),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
