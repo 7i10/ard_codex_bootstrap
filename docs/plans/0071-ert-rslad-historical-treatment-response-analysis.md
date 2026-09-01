@@ -46,7 +46,7 @@ optimizer, scheduler, RNG, W&B, or checkpoint state is modified.
 - [x] M1: freeze response schema; no replay was required because registered rows were available.
 - [x] M2: compute point estimates and response heterogeneity/prediction/temporal/action-map summaries.
 - [x] M3: write machine artifacts and human report with limitations and final R1–R5 decision.
-- [ ] M4: run impact-selected verification, review diff, and commit the read-only milestone.
+- [x] M4: run impact-selected verification, review diff, and commit the read-only milestone.
 
 ## Agent and review budget
 
@@ -73,7 +73,8 @@ One consolidated scientific review is sufficient after evidence and report are s
 - 2026-09-01: reconciled repository at `bab6791`; required docs read; started artifact/path inventory.
 - 2026-09-01: registered endpoint inventory found 356 row artifacts; built 5,100,000-row local Parquet response table and seven compact JSON reports without training or endpoint regeneration.
 - 2026-09-01: `scripts/verify.py --changed` reached the changed-file test tiers but reported one pre-existing environment-sensitive failure in `tests/unit/test_schedule_control_fork.py` (CUDA RNG state size mismatch); no analysis test failed.
+- 2026-09-01: committed as `ab66718` and pushed to `origin/master`; `.cache/analysis/ert-rslad-historical-treatment-response-v1/outputs/response_rows.parquet` remains local-only.
 
 ## Completion report
 
-Pending commit. Commands: `python scripts/analysis/ert_rslad_historical_treatment_response.py`, `python -m py_compile scripts/analysis/ert_rslad_historical_treatment_response.py`, and `scripts/verify.py --changed`. Coverage: Stage A, broad Clean-Wrong C0–C15, confirmatory T1/T2/T3, dynamic/history S3 endpoints, and registered aggregate-only sources. Limitations: no row-level data for some gated/ordering historical cells; no pooled prediction; direct-to-held-out associations are descriptive. Final decision is `RESPONSE_NOT_PREDICTABLE` for a deployable universal selector.
+Completed in `ab66718`. Commands: `python scripts/analysis/ert_rslad_historical_treatment_response.py`, `python -m py_compile scripts/analysis/ert_rslad_historical_treatment_response.py`, and `scripts/verify.py --changed`. Coverage: Stage A, broad Clean-Wrong C0–C15, confirmatory T1/T2/T3, dynamic/history S3 endpoints, and registered aggregate-only sources. Limitations: no row-level data for some gated/ordering historical cells; no pooled prediction; direct-to-held-out associations are descriptive. Final decision is `RESPONSE_NOT_PREDICTABLE` for a deployable universal selector.
