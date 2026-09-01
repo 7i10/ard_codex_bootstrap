@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 EXPECTED_PREFIX = "attack-seed-"
-CHECKPOINTS = ("last.pt", "epoch-114.pt")
+CHECKPOINTS = ("last.pt", "epoch-114.pt", "best.pt")
 
 
 def main() -> int:
