@@ -58,9 +58,13 @@ class StageARuntimeError(RuntimeError):
     """Raised when a Stage A parent or treatment contract is invalid."""
 
 
-def _validate_horizons(horizon_epochs: tuple[int, ...], end_epoch: int) -> None:
-    if not horizon_epochs or any(epoch <= 79 or epoch > end_epoch for epoch in horizon_epochs):
-        raise StageARuntimeError("horizon checkpoints must be after epoch 79 and no later than the endpoint")
+def _validate_horizons(
+    horizon_epochs: tuple[int, ...], end_epoch: int, *, first_epoch: int = 80
+) -> None:
+    if not horizon_epochs or any(epoch < first_epoch or epoch > end_epoch for epoch in horizon_epochs):
+        raise StageARuntimeError(
+            f"horizon checkpoints must be at or after first epoch {first_epoch} and no later than the endpoint"
+        )
     if len(set(horizon_epochs)) != len(horizon_epochs):
         raise StageARuntimeError("horizon checkpoints must be unique")
 
@@ -243,11 +247,11 @@ def _write_json_atomic(path: Path, value: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def _mask_from_overlay(path: Path, key: str) -> FixedInterventionMask:
+def _mask_from_overlay(path: Path, key: str, *, expected_anchor_epoch: int = 79) -> FixedInterventionMask:
     payload = _load_json(path)
     masks = payload.get("masks")
-    if payload.get("anchor_epoch") != 79 or not isinstance(masks, dict):
-        raise StageARuntimeError("Stage A mask artifact is not an epoch-79 overlay bundle")
+    if payload.get("anchor_epoch") != expected_anchor_epoch or not isinstance(masks, dict):
+        raise StageARuntimeError(f"Stage A mask artifact is not an epoch-{expected_anchor_epoch} overlay bundle")
     raw = masks.get(key)
     if not isinstance(raw, dict) or not isinstance(raw.get("selected_ids"), list):
         raise StageARuntimeError(f"Stage A mask key is missing: {key}")
@@ -311,6 +315,8 @@ def run_stage_a_arm(
     dynamic_s3_peer_epoch80_state: Path | None = None,
     dynamic_s3_shared_prefix_checkpoint: Path | None = None,
     dynamic_s3_experiment_parent_checkpoint: Path | None = None,
+    resume_epoch: int | None = None,
+    mask_anchor_epoch: int | None = None,
 ) -> dict[str, Any]:
     config = load_config(parent_config_path)
     if config.training.deterministic:
@@ -362,16 +368,27 @@ def run_stage_a_arm(
         start_epoch = 81
         experiment_parent_sha256 = _sha256(dynamic_s3_experiment_parent_checkpoint)
     else:
-        if not isinstance(payload, dict) or payload.get("epoch") != 79 or payload.get("epoch_boundary") != "end":
-            raise StageARuntimeError("Stage A requires an exact epoch-79 end-boundary parent")
-        start_epoch = 80
+        if not isinstance(payload, dict) or payload.get("epoch_boundary") != "end":
+            raise StageARuntimeError("Stage A requires an exact end-boundary parent")
+        payload_epoch = payload.get("epoch")
+        if isinstance(payload_epoch, bool) or not isinstance(payload_epoch, int):
+            raise StageARuntimeError("Stage A parent has no valid integer epoch")
+        if resume_epoch is None:
+            resume_epoch = 79
+        if resume_epoch != payload_epoch:
+            raise StageARuntimeError("resume_epoch does not match the parent checkpoint payload")
+        start_epoch = resume_epoch + 1
         experiment_parent_sha256 = _sha256(parent_checkpoint)
     parent_hash = payload.get("config_hash")
     if not isinstance(parent_hash, str) or len(parent_hash) != 64:
         raise StageARuntimeError("parent checkpoint lacks a valid config hash")
     if end_epoch <= start_epoch:
         raise StageARuntimeError("Stage A endpoint must leave at least one epoch after epoch 79")
-    _validate_horizons(horizon_epochs, end_epoch)
+    if mask_anchor_epoch is None:
+        mask_anchor_epoch = resume_epoch if not shared_prefix else 79
+    if mask_anchor_epoch < 0:
+        raise StageARuntimeError("mask anchor epoch must be non-negative")
+    _validate_horizons(horizon_epochs, end_epoch, first_epoch=start_epoch)
     if not run_namespace or any(char.isspace() for char in run_namespace):
         raise StageARuntimeError("run namespace must be a non-empty token")
     if calibration.get("tau") != 2.0:
@@ -518,9 +535,13 @@ def run_stage_a_arm(
     if treatment.mask_key is not None:
         if mask_path is None:
             raise StageARuntimeError("selected Stage A treatment requires a mask path")
-        mask = _mask_from_overlay(mask_path, treatment.mask_key)
+        mask = _mask_from_overlay(mask_path, treatment.mask_key, expected_anchor_epoch=mask_anchor_epoch)
         if treatment.teacher_reliability_gate:
-            teacher_reliability_mask = _mask_from_overlay(mask_path, "student_clean_wrong_teacher_clean_correct")
+            teacher_reliability_mask = _mask_from_overlay(
+                mask_path,
+                "student_clean_wrong_teacher_clean_correct",
+                expected_anchor_epoch=mask_anchor_epoch,
+            )
     target_policy = (
         TeacherOnlyTemperatureTargetPolicy(target_temperature=treatment.tau, baseline_temperature=1.0)
         if treatment.kind == "soft_advkd"

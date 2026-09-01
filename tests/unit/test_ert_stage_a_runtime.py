@@ -100,6 +100,9 @@ def test_horizon_contract_rejects_duplicate_or_pre_parent_epochs() -> None:
     with pytest.raises(StageARuntimeError, match="unique"):
         _validate_horizons((84, 84), 94)
     _validate_horizons((84, 89, 94), 94)
+    with pytest.raises(StageARuntimeError, match="first epoch 100"):
+        _validate_horizons((99, 104), 114, first_epoch=100)
+    _validate_horizons((104, 109, 114), 114, first_epoch=100)
 
 
 def test_continuation_seed_is_included_in_arm_identity() -> None:

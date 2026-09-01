@@ -23,7 +23,7 @@ def _parse_budget(raw: str | None) -> float | None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run one ERT Stage A treatment from an epoch-79 parent.")
+    parser = argparse.ArgumentParser(description="Run one ERT fixed-parent treatment continuation.")
     parser.add_argument("--parent-config", type=Path, required=True)
     parser.add_argument("--parent-checkpoint", type=Path, required=True)
     parser.add_argument("--mask", type=Path)
@@ -63,6 +63,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Epochs for immutable post-epoch checkpoint copies (all must be <= --epochs).",
     )
     parser.add_argument("--run-namespace", default="stage-a")
+    parser.add_argument(
+        "--resume-epoch",
+        type=int,
+        default=79,
+        help="Serialized epoch at the end boundary of the supplied parent checkpoint.",
+    )
+    parser.add_argument(
+        "--mask-anchor-epoch",
+        type=int,
+        help="Anchor epoch encoded by the fixed intervention mask (defaults to --resume-epoch).",
+    )
     parser.add_argument(
         "--continuation-seed",
         type=int,
@@ -158,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
         rng_source_seeds=rng_source_seeds,
         shuffle_augmentation_seeds=shuffle_augmentation_seeds,
         expected_parent_checkpoint_sha256=args.expected_parent_sha256,
+        resume_epoch=args.resume_epoch,
+        mask_anchor_epoch=args.mask_anchor_epoch,
     )
     print(json.dumps(result, sort_keys=True))
     return 0
