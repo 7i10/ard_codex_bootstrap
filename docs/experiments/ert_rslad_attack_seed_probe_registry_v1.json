@@ -20,8 +20,8 @@
   "kind": "ert_rslad_attack_seed_probe_registry_v1",
   "parent_payload_epoch": 99,
   "parents": {
-    "seed1": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
-    "seed2": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+    "seed1": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+    "seed2": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt"
   },
   "phase_a": {
     "fractions": [
