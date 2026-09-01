@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "contract": "ert_rslad_i100_action_transfer_v1",
+  "status": "frozen_before_outcome",
+  "preparation_source_sha": "41ba0e1568be9a93cdfd352afc1fcc25645b7be5",
+  "production_source_sha": "pending_manifest_freeze",
+  "parent_epoch": 99,
+  "parent_checkpoint_sha256": {
+    "dev-1": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+    "dev-2": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+  },
+  "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+  "attacks": {
+    "training": "KL-PGD10, epsilon=8/255, step=2/255, random_start=true, target=teacher_clean, random_start_keying=sample_keyed_v1",
+    "selector": "CE-PGD20, epsilon=8/255, step=2/255, random_start=true, random_start_keying=sample_keyed_v1",
+    "endpoint": "CE-PGD20, epsilon=8/255, step=2/255, 20 steps, random_start=true, eval mode"
+  },
+  "replay": {
+    "dev-1": {"rows": 45000, "rows_sha256": "7899a0f7473862b7d7edd35e6009794d8cb4feb8e485c2ad28708c8a6c933d17", "lineage_sha256": "669e46a12361ed5fa868b7ee806797d7bacb597342b58872e3b3c61134467f5c"},
+    "dev-2": {"rows": 45000, "rows_sha256": "66390e55cf32615e32f179d88b7b0c407cc8afc9efadbfa43944bb22a309ce60", "lineage_sha256": "636132aad49ced79fb617edcee582c1a76f2cce8762d3f787ccba024df307311"}
+  },
+  "masks": {
+    "dev-1": {"path": "ert_rslad_i100_action_transfer_masks_dev1_v1.json", "sha256": "6ec6a4aa97d53182f04a545e8a6576a44659e839109385699c919ae9bc216e94", "clean_wrong": 9263, "pilot_s3": 11192, "pilot_s3_t1": 7898},
+    "dev-2": {"path": "ert_rslad_i100_action_transfer_masks_dev2_v1.json", "sha256": "31860b5932d49c045d95f5cb23154aa03d02a15d24d0be72012e0fda46218039", "clean_wrong": 8709, "pilot_s3": 12701, "pilot_s3_t1": 8907}
+  },
+  "calibration": {
+    "path": "ert_rslad_i100_action_transfer_calibration_v1.json",
+    "sha256": "d2f0ad5194bac96a0e47ed247c07c08aba3476d23c4dbb154c12ac4d1d92fb2b",
+    "tau": 2.0,
+    "beta_advce": 0.11834514302628477,
+    "margin_coefficient": 0.316427398202933,
+    "margin_target_mode": "teacher_floor",
+    "margin_floor": 0.17963354289531708,
+    "margin_cap": 0.5595575273036957,
+    "achieved_gradient_ratios": {"advce": 0.2505913712382048, "margin": 0.250035619399616}
+  },
+  "arms": [
+    "I100_CONTROL",
+    "PILOT_S3_T1_WEAK_ADVCE",
+    "CLEAN_WRONG_PLAIN_ADVCE",
+    "CLEAN_WRONG_A7_MARGIN_ONLY"
+  ],
+  "horizon_epochs": [104, 109, 114],
+  "outcome_selection": "forbidden; no coefficient, threshold, arm, or seed changes after freeze"
+}

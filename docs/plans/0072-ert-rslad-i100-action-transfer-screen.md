@@ -53,7 +53,7 @@ state, nonselected baseline parity fails, or the source tree is dirty.
 - [x] Repo reconciliation and required contract documents read.
 - [x] Exact I100 epoch-99 parent files re-hashed and payload lineage inspected.
 - [x] Historical pilot-S3/T1 and A2/A7 implementation audit started.
-- [ ] I100 epoch-99 pre-treatment replay and masks.
-- [ ] Pooled no-update calibration and artifact freeze.
+- [x] I100 epoch-99 pre-treatment replay and masks.
+- [x] Pooled no-update calibration and artifact freeze.
 - [ ] Runtime parity/canary and orchestration manifest.
 - [ ] Eight continuations, endpoints, aggregation, and report.
