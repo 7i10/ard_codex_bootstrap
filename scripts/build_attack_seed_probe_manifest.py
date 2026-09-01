@@ -216,7 +216,10 @@ def build_manifest(
                         "attack_index": index,
                         "source_training_job": job_id,
                     },
-                    required_paths=[str(run / "epoch-114.pt")],
+                    # The endpoint dependency guarantees the checkpoint was
+                    # consumed before cleanup becomes eligible; no campaign
+                    # preflight requirement should target this generated file.
+                    required_paths=[],
                     source_root=source_root,
                 )
             )
