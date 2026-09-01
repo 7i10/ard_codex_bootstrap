@@ -57,7 +57,9 @@ def main() -> int:
     for seed in ("dev-1", "dev-2"):
         for arm in ("I100_CONTROL", "CLEAN_WRONG_PLAIN_ADVCE", "CLEAN_WRONG_TPFM"):
             source_arm = "CLEAN_WRONG_A7_MARGIN_ONLY" if arm == "CLEAN_WRONG_TPFM" else arm
-            parent = root / "inputs" / f"{seed}-{arm}.epoch-114.pt"
+            # TPFM is the stable long-horizon name for the historical A7
+            # checkpoint; its bytes remain the already accepted A7 e114 parent.
+            parent = root / "inputs" / f"{seed}-{source_arm}.epoch-114.pt"
             train_out = root / "runs" / seed / arm
             if arm == "I100_CONTROL":
                 extra = ["--kind", "baseline"]
