@@ -58,6 +58,9 @@ class StageARuntimeError(RuntimeError):
     """Raised when a Stage A parent or treatment contract is invalid."""
 
 
+SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256 = "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
+
+
 def _prepare_stage_output_dir(output_dir: Path) -> None:
     """Permit an orchestrator-created directory while refusing stale results."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -270,8 +273,29 @@ def _mask_from_overlay(path: Path, key: str, *, expected_anchor_epoch: int = 79)
     if len(ids) != len(raw["selected_ids"]) or len(set(ids)) != len(ids):
         raise StageARuntimeError("Stage A mask contains invalid or duplicate stable IDs")
     digest = hashlib.sha256(json.dumps(sorted(ids), separators=(",", ":")).encode()).hexdigest()
+    declared_digest = raw.get("selected_ids_sha256")
+    if declared_digest is not None and declared_digest != digest:
+        raise StageARuntimeError(f"Stage A mask stable-ID hash mismatch for {key}")
+    declared_count = raw.get("selected_count")
+    if declared_count is not None and declared_count != len(ids):
+        raise StageARuntimeError(f"Stage A mask selected-count mismatch for {key}")
     counts = {int(name): int(value) for name, value in raw.get("selected_class_counts", {}).items()}
+    if counts and sum(counts.values()) != len(ids):
+        raise StageARuntimeError(f"Stage A mask class-count total mismatch for {key}")
     return FixedInterventionMask(frozenset(ids), digest, counts)
+
+
+def _validate_mask_lineage(path: Path, *, parent_sha256: str, expected_anchor_epoch: int, key: str) -> None:
+    """Validate the campaign mask binding before any training batch is run."""
+    payload = _load_json(path)
+    if payload.get("contract") == "ert_rslad_i100_s2_rbp_masks_v1":
+        if payload.get("parent_checkpoint_sha256") != parent_sha256:
+            raise StageARuntimeError("S2 RBP mask parent checkpoint does not match the supplied parent")
+        if payload.get("anchor_epoch") != expected_anchor_epoch:
+            raise StageARuntimeError("S2 RBP mask anchor epoch does not match the supplied parent")
+        raw = payload.get("masks", {}).get(key)
+        if not isinstance(raw, dict) or raw.get("namespace") != "train":
+            raise StageARuntimeError("S2 RBP training mask namespace is not train")
 
 
 def _arm_hash(
@@ -328,8 +352,18 @@ def run_stage_a_arm(
     dynamic_s3_experiment_parent_checkpoint: Path | None = None,
     resume_epoch: int | None = None,
     mask_anchor_epoch: int | None = None,
+    force_sample_keyed_attack: bool = False,
 ) -> dict[str, Any]:
     config = load_config(parent_config_path)
+    if force_sample_keyed_attack:
+        # The historical parent config predates the sample-keyed random-start
+        # contract.  Keep the checkpoint/config hash as the parent identity,
+        # but explicitly bind this continuation's actual attack to the
+        # registered sample-keyed KL-PGD10 identity.
+        keyed_attack = config.method.attack.model_copy(update={"random_start_keying": "sample_keyed_v1"})
+        config = config.model_copy(update={"method": config.method.model_copy(update={"attack": keyed_attack})})
+        if keyed_attack.identity_sha256() != SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256:
+            raise StageARuntimeError("forced training attack does not match the registered sample-keyed KL10 identity")
     if config.training.deterministic:
         # Stage-A forks are compared at an exact parent boundary.  The
         # ordinary train CLI applies these flags, but this standalone runtime
@@ -546,6 +580,12 @@ def run_stage_a_arm(
     if treatment.mask_key is not None:
         if mask_path is None:
             raise StageARuntimeError("selected Stage A treatment requires a mask path")
+        _validate_mask_lineage(
+            mask_path,
+            parent_sha256=actual_parent_checkpoint_sha256,
+            expected_anchor_epoch=mask_anchor_epoch,
+            key=treatment.mask_key,
+        )
         mask = _mask_from_overlay(mask_path, treatment.mask_key, expected_anchor_epoch=mask_anchor_epoch)
         if treatment.teacher_reliability_gate:
             teacher_reliability_mask = _mask_from_overlay(
@@ -716,11 +756,13 @@ def run_stage_a_arm(
         "parent_config_hash": parent_hash,
         "parent_epoch": int(payload["epoch"]),
         "experiment_parent_checkpoint_sha256": experiment_parent_sha256,
-        "experiment_parent_epoch": 79,
+        "experiment_parent_epoch": 79 if shared_prefix else int(payload["epoch"]),
         "shared_prefix_checkpoint_sha256": _sha256(parent_checkpoint) if shared_prefix else None,
         "shared_prefix": shared_prefix,
         "child_config_hash": arm_hash,
         "calibration_sha256": calibration.get("artifact_sha256"),
+        "training_attack_identity_sha256": config.method.attack.identity_sha256(),
+        "training_attack_random_start_keying": config.method.attack.random_start_keying,
         "source_git_sha": source_sha,
         "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
         "shuffle_augmentation_seeds": (
@@ -743,6 +785,7 @@ def run_stage_a_arm(
                 "shared_prefix": shared_prefix,
                 "treatment": treatment.__dict__,
                 "calibration": calibration,
+                "training_attack_identity_sha256": config.method.attack.identity_sha256(),
                 "child_config_hash": arm_hash,
                 "run_namespace": run_namespace,
                 "continuation_seed": continuation_seed,

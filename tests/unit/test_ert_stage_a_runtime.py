@@ -8,6 +8,7 @@ import torch
 
 from ard.analysis.ert_rslad_rng_sources import RNGSourceSeeds
 from ard.analysis.ert_stage_a_runtime import (
+    SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256,
     StageARuntimeError,
     StageATreatment,
     _epoch80_equivalence,
@@ -15,6 +16,7 @@ from ard.analysis.ert_stage_a_runtime import (
     _mask_from_overlay,
     _validate_shared_prefix_lineage,
 )
+from ard.config.schema import AttackConfig
 
 
 def test_stage_a_treatment_requires_explicit_clean_wrong_mode() -> None:
@@ -192,3 +194,16 @@ def test_shared_prefix_rejects_a_capture_from_another_seed_parent() -> None:
             experiment_parent_payload=experiment_parent,
             experiment_parent_sha256="d" * 64,
         )
+
+
+def test_sample_keyed_kl10_identity_is_explicitly_bound() -> None:
+    attack = AttackConfig(
+        steps=10,
+        loss="kl",
+        kl_target="teacher_clean",
+        random_start=True,
+        student_mode="eval",
+        teacher_mode="eval",
+    )
+    keyed = attack.model_copy(update={"random_start_keying": "sample_keyed_v1"})
+    assert keyed.identity_sha256() == SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256

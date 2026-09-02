@@ -86,7 +86,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--augmentation-seed", type=int, help="Post-resume source-keyed augmentation seed.")
     parser.add_argument(
         "--expected-parent-sha256",
-        help="Fail closed unless the supplied epoch-79 parent has this exact SHA-256.",
+        help="Fail closed unless the supplied parent has this exact SHA-256.",
+    )
+    parser.add_argument(
+        "--force-sample-keyed-attack",
+        action="store_true",
+        help="Use the registered sample-keyed KL-PGD10 continuation contract.",
     )
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     return parser
@@ -171,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         expected_parent_checkpoint_sha256=args.expected_parent_sha256,
         resume_epoch=args.resume_epoch,
         mask_anchor_epoch=args.mask_anchor_epoch,
+        force_sample_keyed_attack=args.force_sample_keyed_attack,
     )
     print(json.dumps(result, sort_keys=True))
     return 0

@@ -36,6 +36,7 @@ PARENT_SHA = {
 }
 TEACHER_SHA = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
 ENDPOINT_ATTACK_ID = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
+SAMPLE_KEYED_KL10_ATTACK_IDENTITY = "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
 REPLAY_DIR = Path(".cache/analysis/ert-i100-cw-gap-completion-replay")
 VALIDATION_DIR = Path(".cache/analysis/ert-i100-cw-gap-e99")
 
@@ -230,6 +231,10 @@ def _calibrate_run(
     config = load_config(config_path)
     if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
         raise ValueError("calibration requires I100 KL-PGD10")
+    keyed_attack = config.method.attack.model_copy(update={"random_start_keying": "sample_keyed_v1"})
+    if keyed_attack.identity_sha256() != SAMPLE_KEYED_KL10_ATTACK_IDENTITY:
+        raise ValueError("calibration attack does not match the registered sample-keyed KL10 identity")
+    config = config.model_copy(update={"method": config.method.model_copy(update={"attack": keyed_attack})})
     rows = _rows(replay_path)
     mask = json.loads(mask_path.read_text(encoding="utf-8"))
     ids = set(mask["masks"]["s2_t1"]["selected_ids"])
@@ -361,6 +366,7 @@ def _calibrate_run(
         "sample_count": len(sample_ids),
         "sample_ids_sha256": ids_sha256(sample_ids),
         "student_q10_floor": float(mask["state_counts"]["train"]["student_q10_floor"]),
+        "training_attack_identity_sha256": keyed_attack.identity_sha256(),
     }
 
 
