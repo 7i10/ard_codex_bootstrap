@@ -23,7 +23,7 @@ This is a read-only e99 Train/Validation shift and canonical S2 harm-localizatio
 
 ## Contract and lineage
 
-Source SHA: `1752c1b7918507802edd7dcd7fd55191b742d05a` (working tree dirty only because the audit plan/analysis files are being added). Exact e99 parents: dev-1 `360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835`, dev-2 `bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7`. Endpoint attack identity: `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`.
+Source SHA at analysis invocation: `5adf6c045a2474152ed68fbb9fafdfc2f59014ab` (working-tree status is recorded in the contract artifact). Exact e99 parents: dev-1 `360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835`, dev-2 `bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7`. Endpoint attack identity: `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`.
 
 Canonical states use the registered positive-margin q10 contract: S1 = adversarial-correct outside the lowest positive Student-margin q10, S2 = adversarial-correct inside that q10, S3 = adversarial-wrong; T1/T2/T3 are analogous for Teacher. Legacy `ert_state_overlay_v1` labels are not reused.
 
