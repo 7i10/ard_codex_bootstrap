@@ -1,0 +1,1818 @@
+{
+  "contract": "ert_rslad_canonical_s2_harm_localization_v1",
+  "schema_version": 1,
+  "seeds": {
+    "dev-1": {
+      "effects": {
+        "CLEAN_WRONG_PLAIN_ADVCE": {
+          "129": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.02899824253075571,
+                "harm_count": 10,
+                "harm_rate": 0.008787346221441126,
+                "margin_delta": 0.008317539308004095,
+                "net_rescue_rate": 0.02899824253075571,
+                "rescue_count": 43,
+                "rescue_rate": 0.037785588752196834
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.014938488576449912,
+                "harm_count": 1,
+                "harm_rate": 0.0008787346221441124,
+                "margin_delta": 0.007194367353599813,
+                "net_rescue_rate": 0.014938488576449912,
+                "rescue_count": 18,
+                "rescue_rate": 0.015817223198594025
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0020714655618850335,
+                "harm_count": 14,
+                "harm_rate": 0.0036250647332988087,
+                "margin_delta": -0.0017236423409090088,
+                "net_rescue_rate": -0.0020714655618850335,
+                "rescue_count": 6,
+                "rescue_rate": 0.0015535991714137752
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": -0.0015535991714137748,
+                "harm_count": 76,
+                "harm_rate": 0.01967892283790782,
+                "margin_delta": -0.002244053096937306,
+                "net_rescue_rate": -0.0015535991714137748,
+                "rescue_count": 70,
+                "rescue_rate": 0.018125323666494046
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.005,
+                "harm_count": 24,
+                "harm_rate": 0.0048,
+                "margin_delta": 0.0005617306023836136,
+                "net_rescue_rate": 0.005,
+                "rescue_count": 49,
+                "rescue_rate": 0.0098
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0022000000000000006,
+                "harm_count": 77,
+                "harm_rate": 0.0154,
+                "margin_delta": -9.586860239505768e-05,
+                "net_rescue_rate": 0.0022000000000000006,
+                "rescue_count": 88,
+                "rescue_rate": 0.0176
+              }
+            }
+          },
+          "149": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.027240773286467485,
+                "harm_count": 25,
+                "harm_rate": 0.021968365553602813,
+                "margin_delta": 0.005657524086521883,
+                "net_rescue_rate": 0.027240773286467485,
+                "rescue_count": 56,
+                "rescue_rate": 0.0492091388400703
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.0,
+                "harm_count": 9,
+                "harm_rate": 0.007908611599297012,
+                "margin_delta": 0.0051338894976882396,
+                "net_rescue_rate": 0.0,
+                "rescue_count": 9,
+                "rescue_rate": 0.007908611599297012
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0015535991714137757,
+                "harm_count": 19,
+                "harm_rate": 0.004919730709476955,
+                "margin_delta": -0.006331076107606685,
+                "net_rescue_rate": -0.0015535991714137757,
+                "rescue_count": 13,
+                "rescue_rate": 0.0033661315380631796
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": -0.002071465561885033,
+                "harm_count": 101,
+                "harm_rate": 0.02615225271879855,
+                "margin_delta": -0.00653278142028618,
+                "net_rescue_rate": -0.002071465561885033,
+                "rescue_count": 93,
+                "rescue_rate": 0.024080787156913516
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.004999999999999999,
+                "harm_count": 44,
+                "harm_rate": 0.0088,
+                "margin_delta": -0.0036024707034230234,
+                "net_rescue_rate": 0.004999999999999999,
+                "rescue_count": 69,
+                "rescue_rate": 0.0138
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": -0.0015999999999999973,
+                "harm_count": 110,
+                "harm_rate": 0.022,
+                "margin_delta": -0.0038774471193552015,
+                "net_rescue_rate": -0.0015999999999999973,
+                "rescue_count": 102,
+                "rescue_rate": 0.0204
+              }
+            }
+          },
+          "169": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.02636203866432337,
+                "harm_count": 14,
+                "harm_rate": 0.012302284710017574,
+                "margin_delta": 0.008535212825702238,
+                "net_rescue_rate": 0.02636203866432337,
+                "rescue_count": 44,
+                "rescue_rate": 0.03866432337434095
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.0035149384885764506,
+                "harm_count": 6,
+                "harm_rate": 0.005272407732864675,
+                "margin_delta": 0.00366271027283635,
+                "net_rescue_rate": 0.0035149384885764506,
+                "rescue_count": 10,
+                "rescue_rate": 0.008787346221441126
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.001035732780942517,
+                "harm_count": 9,
+                "harm_rate": 0.002330398757120663,
+                "margin_delta": 0.00035604781117666454,
+                "net_rescue_rate": -0.001035732780942517,
+                "rescue_count": 5,
+                "rescue_rate": 0.001294665976178146
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": -0.003883997928534437,
+                "harm_count": 66,
+                "harm_rate": 0.017089590885551526,
+                "margin_delta": -0.002472556755139629,
+                "net_rescue_rate": -0.003883997928534437,
+                "rescue_count": 51,
+                "rescue_rate": 0.01320559295701709
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0052,
+                "harm_count": 23,
+                "harm_rate": 0.0046,
+                "margin_delta": 0.002217625768482685,
+                "net_rescue_rate": 0.0052,
+                "rescue_count": 49,
+                "rescue_rate": 0.0098
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": -0.002199999999999999,
+                "harm_count": 72,
+                "harm_rate": 0.0144,
+                "margin_delta": -0.0010761699795722962,
+                "net_rescue_rate": -0.002199999999999999,
+                "rescue_count": 61,
+                "rescue_rate": 0.0122
+              }
+            }
+          },
+          "189": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.02548330404217926,
+                "harm_count": 14,
+                "harm_rate": 0.012302284710017574,
+                "margin_delta": 0.008250406388396329,
+                "net_rescue_rate": 0.02548330404217926,
+                "rescue_count": 43,
+                "rescue_rate": 0.037785588752196834
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.007908611599297012,
+                "harm_count": 6,
+                "harm_rate": 0.005272407732864675,
+                "margin_delta": 0.002980022090495366,
+                "net_rescue_rate": 0.007908611599297012,
+                "rescue_count": 15,
+                "rescue_rate": 0.013181019332161687
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.001035732780942517,
+                "harm_count": 10,
+                "harm_rate": 0.002589331952356292,
+                "margin_delta": -0.00013674281302170085,
+                "net_rescue_rate": -0.001035732780942517,
+                "rescue_count": 6,
+                "rescue_rate": 0.0015535991714137752
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": -0.002071465561885033,
+                "harm_count": 53,
+                "harm_rate": 0.013723459347488347,
+                "margin_delta": -0.0022154391653052517,
+                "net_rescue_rate": -0.002071465561885033,
+                "rescue_count": 45,
+                "rescue_rate": 0.011651993785603314
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.005,
+                "harm_count": 24,
+                "harm_rate": 0.0048,
+                "margin_delta": 0.0017721723452210425,
+                "net_rescue_rate": 0.005,
+                "rescue_count": 49,
+                "rescue_rate": 0.0098
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.00020000000000000052,
+                "harm_count": 59,
+                "harm_rate": 0.0118,
+                "margin_delta": -0.0010329521834850312,
+                "net_rescue_rate": 0.00020000000000000052,
+                "rescue_count": 60,
+                "rescue_rate": 0.012
+              }
+            }
+          },
+          "199": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.03251318101933216,
+                "harm_count": 16,
+                "harm_rate": 0.014059753954305799,
+                "margin_delta": 0.00824618801762643,
+                "net_rescue_rate": 0.03251318101933216,
+                "rescue_count": 53,
+                "rescue_rate": 0.04657293497363796
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.009666080843585237,
+                "harm_count": 4,
+                "harm_rate": 0.0035149384885764497,
+                "margin_delta": 0.0027826454536252782,
+                "net_rescue_rate": 0.009666080843585237,
+                "rescue_count": 15,
+                "rescue_rate": 0.013181019332161687
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0007767995857068878,
+                "harm_count": 10,
+                "harm_rate": 0.002589331952356292,
+                "margin_delta": 0.0009416950502925312,
+                "net_rescue_rate": -0.0007767995857068878,
+                "rescue_count": 7,
+                "rescue_rate": 0.0018125323666494044
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": -0.0067322630761263574,
+                "harm_count": 68,
+                "harm_rate": 0.017607457276022784,
+                "margin_delta": -0.0018446560812113756,
+                "net_rescue_rate": -0.0067322630761263574,
+                "rescue_count": 42,
+                "rescue_rate": 0.010875194199896427
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0068000000000000005,
+                "harm_count": 26,
+                "harm_rate": 0.0052,
+                "margin_delta": 0.0026041976496577264,
+                "net_rescue_rate": 0.0068000000000000005,
+                "rescue_count": 60,
+                "rescue_rate": 0.012
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": -0.002999999999999999,
+                "harm_count": 72,
+                "harm_rate": 0.0144,
+                "margin_delta": -0.0007914822518825532,
+                "net_rescue_rate": -0.002999999999999999,
+                "rescue_count": 57,
+                "rescue_rate": 0.0114
+              }
+            }
+          }
+        },
+        "CLEAN_WRONG_TPFM": {
+          "129": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.03602811950790861,
+                "harm_count": 12,
+                "harm_rate": 0.01054481546572935,
+                "margin_delta": 0.008737380028766152,
+                "net_rescue_rate": 0.03602811950790861,
+                "rescue_count": 53,
+                "rescue_rate": 0.04657293497363796
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.012302284710017574,
+                "harm_count": 3,
+                "harm_rate": 0.0026362038664323375,
+                "margin_delta": 0.010586940622863954,
+                "net_rescue_rate": 0.012302284710017574,
+                "rescue_count": 17,
+                "rescue_rate": 0.014938488576449912
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.004142931123770068,
+                "harm_count": 18,
+                "harm_rate": 0.004660797514241326,
+                "margin_delta": -0.002953208986802894,
+                "net_rescue_rate": -0.004142931123770068,
+                "rescue_count": 2,
+                "rescue_rate": 0.0005178663904712584
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": 0.0005178663904712583,
+                "harm_count": 69,
+                "harm_rate": 0.017866390471258417,
+                "margin_delta": -0.0011500820926530937,
+                "net_rescue_rate": 0.0005178663904712583,
+                "rescue_count": 71,
+                "rescue_rate": 0.018384256861729675
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.004999999999999999,
+                "harm_count": 30,
+                "harm_rate": 0.006,
+                "margin_delta": -0.0002924309268593788,
+                "net_rescue_rate": 0.004999999999999999,
+                "rescue_count": 55,
+                "rescue_rate": 0.011
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0032000000000000015,
+                "harm_count": 72,
+                "harm_rate": 0.0144,
+                "margin_delta": 0.0015212642773985863,
+                "net_rescue_rate": 0.0032000000000000015,
+                "rescue_count": 88,
+                "rescue_rate": 0.0176
+              }
+            }
+          },
+          "149": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.0210896309314587,
+                "harm_count": 25,
+                "harm_rate": 0.021968365553602813,
+                "margin_delta": 0.007731263111681008,
+                "net_rescue_rate": 0.0210896309314587,
+                "rescue_count": 49,
+                "rescue_rate": 0.04305799648506151
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": -0.0026362038664323384,
+                "harm_count": 10,
+                "harm_rate": 0.008787346221441126,
+                "margin_delta": 0.009734795957489465,
+                "net_rescue_rate": -0.0026362038664323384,
+                "rescue_count": 7,
+                "rescue_rate": 0.006151142355008787
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0018125323666494048,
+                "harm_count": 21,
+                "harm_rate": 0.0054375970999482135,
+                "margin_delta": -0.0060252050687339504,
+                "net_rescue_rate": -0.0018125323666494048,
+                "rescue_count": 14,
+                "rescue_rate": 0.0036250647332988087
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": 0.005696530295183841,
+                "harm_count": 76,
+                "harm_rate": 0.01967892283790782,
+                "margin_delta": -0.0046560268083241,
+                "net_rescue_rate": 0.005696530295183841,
+                "rescue_count": 98,
+                "rescue_rate": 0.025375453133091662
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0034000000000000002,
+                "harm_count": 46,
+                "harm_rate": 0.0092,
+                "margin_delta": -0.002894232910871506,
+                "net_rescue_rate": 0.0034000000000000002,
+                "rescue_count": 63,
+                "rescue_rate": 0.0126
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0038000000000000013,
+                "harm_count": 86,
+                "harm_rate": 0.0172,
+                "margin_delta": -0.0013806755468249322,
+                "net_rescue_rate": 0.0038000000000000013,
+                "rescue_count": 105,
+                "rescue_rate": 0.021
+              }
+            }
+          },
+          "169": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.016695957820738135,
+                "harm_count": 15,
+                "harm_rate": 0.013181019332161687,
+                "margin_delta": 0.00766208122348534,
+                "net_rescue_rate": 0.016695957820738135,
+                "rescue_count": 34,
+                "rescue_rate": 0.029876977152899824
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.009666080843585239,
+                "harm_count": 2,
+                "harm_rate": 0.0017574692442882249,
+                "margin_delta": 0.008008803242591647,
+                "net_rescue_rate": 0.009666080843585239,
+                "rescue_count": 13,
+                "rescue_rate": 0.011423550087873463
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.00025893319523562913,
+                "harm_count": 11,
+                "harm_rate": 0.0028482651475919213,
+                "margin_delta": -0.0027524880092573683,
+                "net_rescue_rate": -0.00025893319523562913,
+                "rescue_count": 10,
+                "rescue_rate": 0.002589331952356292
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": 0.0005178663904712583,
+                "harm_count": 44,
+                "harm_rate": 0.011393060590367685,
+                "margin_delta": -0.0022396093059826984,
+                "net_rescue_rate": 0.0005178663904712583,
+                "rescue_count": 46,
+                "rescue_rate": 0.011910926980838944
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0036000000000000008,
+                "harm_count": 26,
+                "harm_rate": 0.0052,
+                "margin_delta": -0.000382132051885128,
+                "net_rescue_rate": 0.0036000000000000008,
+                "rescue_count": 44,
+                "rescue_rate": 0.0088
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0026,
+                "harm_count": 46,
+                "harm_rate": 0.0092,
+                "margin_delta": 9.292939007282257e-05,
+                "net_rescue_rate": 0.0026,
+                "rescue_count": 59,
+                "rescue_rate": 0.0118
+              }
+            }
+          },
+          "189": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.012302284710017576,
+                "harm_count": 12,
+                "harm_rate": 0.01054481546572935,
+                "margin_delta": 0.008652337870981236,
+                "net_rescue_rate": 0.012302284710017576,
+                "rescue_count": 26,
+                "rescue_rate": 0.022847100175746926
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.008787346221441124,
+                "harm_count": 5,
+                "harm_rate": 0.004393673110720563,
+                "margin_delta": 0.008874476309505623,
+                "net_rescue_rate": 0.008787346221441124,
+                "rescue_count": 15,
+                "rescue_rate": 0.013181019332161687
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0015535991714137754,
+                "harm_count": 10,
+                "harm_rate": 0.002589331952356292,
+                "margin_delta": -0.003499125865983074,
+                "net_rescue_rate": -0.0015535991714137754,
+                "rescue_count": 4,
+                "rescue_rate": 0.0010357327809425167
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": 0.004919730709476955,
+                "harm_count": 41,
+                "harm_rate": 0.010616261004660798,
+                "margin_delta": -0.0026295942513359944,
+                "net_rescue_rate": 0.004919730709476955,
+                "rescue_count": 60,
+                "rescue_rate": 0.015535991714137753
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0015999999999999999,
+                "harm_count": 22,
+                "harm_rate": 0.0044,
+                "margin_delta": -0.000733452719449997,
+                "net_rescue_rate": 0.0015999999999999999,
+                "rescue_count": 30,
+                "rescue_rate": 0.006
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0058,
+                "harm_count": 46,
+                "harm_rate": 0.0092,
+                "margin_delta": -1.126779168844223e-05,
+                "net_rescue_rate": 0.0058,
+                "rescue_count": 75,
+                "rescue_rate": 0.015
+              }
+            }
+          },
+          "199": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.02548330404217926,
+                "harm_count": 13,
+                "harm_rate": 0.011423550087873463,
+                "margin_delta": 0.008182547423458267,
+                "net_rescue_rate": 0.02548330404217926,
+                "rescue_count": 42,
+                "rescue_rate": 0.03690685413005272
+              },
+              "n": 1138,
+              "robust": {
+                "accuracy_delta": 0.009666080843585237,
+                "harm_count": 4,
+                "harm_rate": 0.0035149384885764497,
+                "margin_delta": 0.007979739359162604,
+                "net_rescue_rate": 0.009666080843585237,
+                "rescue_count": 15,
+                "rescue_rate": 0.013181019332161687
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0018125323666494044,
+                "harm_count": 13,
+                "harm_rate": 0.0033661315380631796,
+                "margin_delta": -0.0017887055082897766,
+                "net_rescue_rate": -0.0018125323666494044,
+                "rescue_count": 6,
+                "rescue_rate": 0.0015535991714137752
+              },
+              "n": 3862,
+              "robust": {
+                "accuracy_delta": -0.002330398757120662,
+                "harm_count": 53,
+                "harm_rate": 0.013723459347488347,
+                "margin_delta": -0.0015104957357056706,
+                "net_rescue_rate": -0.002330398757120662,
+                "rescue_count": 44,
+                "rescue_rate": 0.011393060590367685
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.004399999999999999,
+                "harm_count": 26,
+                "harm_rate": 0.0052,
+                "margin_delta": 0.00048075165897607804,
+                "net_rescue_rate": 0.004399999999999999,
+                "rescue_count": 48,
+                "rescue_rate": 0.0096
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0003999999999999993,
+                "harm_count": 57,
+                "harm_rate": 0.0114,
+                "margin_delta": 0.0006494817718863487,
+                "net_rescue_rate": 0.0003999999999999993,
+                "rescue_count": 59,
+                "rescue_rate": 0.0118
+              }
+            }
+          }
+        },
+        "I100_CONTROL": {}
+      },
+      "endpoint_lineage": {
+        "e129-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "cacc80b90cac519c1788c48ca052d77f62bce4878795af5f0c76eb2c9b4b3150",
+            "metadata_sha256": "f9a33326b627e36e63e616a405542af9423538bc1f703a07de6ea66ec7474497",
+            "rows_sha256": "33c9a65fb818023196c8da71ec9444e8f9a8dc501050848eff6bf40998bb8a6a"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "cea49567702c155e94f92418fb2843c1fde07de83120e85d6f08660ab4d6fb42",
+            "metadata_sha256": "88648283724cbfe98b4b966847459b0cc1d9823f86fc30b8949b53f51307b17a",
+            "rows_sha256": "849c72b1693faad3ac96b054e6b6bb2d12ef11ea6705df10c3749fc14028d032"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "64a2eb17b8443e40748506f809caecf302d79ca94878a0cf17b6bffa8401b400",
+            "metadata_sha256": "2dc77c2ef215dedf597763a9a35f9ec7cf574d406ecfb703c89765902102e9ff",
+            "rows_sha256": "897ec0d1639bee82d93d601480da0471278dbe7588de31d988761e694d65d32a"
+          }
+        },
+        "e149-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "ef4a90be5530441a1158f79058f26b926b2d8c88084cc8870958d0529f4ab436",
+            "metadata_sha256": "dd7a23b4928ff117e95f06bbb84b69e2f173a77f7522d4c4bae8df87e17f1e57",
+            "rows_sha256": "c03be2e5b344635af28799d0ca527c5a0b4e6cf2bfda1bf5504f483add6e6c5f"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "9c5d23ba2117bae816c2ab7fc0464047b5bccd4be3edaa3759bfcc89fbe8d47d",
+            "metadata_sha256": "c41f0fcf82fdce5fe1e4753abfe661c746e00bb13fc593c0dbc85aab872922b9",
+            "rows_sha256": "36dc1dd3aac316715f3cdee03076e90161f5892d4d0475818f80cfdf87b467a6"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "2d4d454621022848f38792eaa5e278e1fae27cb0e7b8114b0b89bec4550c6115",
+            "metadata_sha256": "de5bbc9d4c432e3e473e0becdbd630a6479ca932fc709a8ccc6fd430af707975",
+            "rows_sha256": "3dd18fdd65a907863a4192fd88711e7405c48c60d3e3593d790bd431aea4d211"
+          }
+        },
+        "e169-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "1a45a4cd0c7941cbac1b9aa799f4213977339551e405071ce9a2ac09a6d85484",
+            "metadata_sha256": "c6c01d4cc9544c3240c45ce041e659909f26601fee84ff427c818be43098e7ef",
+            "rows_sha256": "9701967811f9968e7b7cf3b3f1de66c813ce1946648a9ffd6038b70f219dc9cb"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "e0983c9a5415297d3bdf06152cd8b266d007ccbd8dfc7490b31aebd36578cd62",
+            "metadata_sha256": "1e62e9398d03d8e7a51c30bd38fd93f73589733ff1344792396f2efda30b703f",
+            "rows_sha256": "fa3288ef06afd9e691345f34de7c8316694493724a3576f37ee5e8a1950c435d"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "bc8247b4492bb2d85c154b83f794a6dff4dd9cbb0554f496666541b07f8f1cc9",
+            "metadata_sha256": "521579eeed959506a1ee2d3e3e6f4146dbd7967aca22e30902115bc83ce4297f",
+            "rows_sha256": "08a84b09e74f380106eaade9ef1b7a9d594103cd919104e5326096a762824423"
+          }
+        },
+        "e189-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "76a8e4ad2ee742763da7991bd7a47e84cb46a2eee3685a23cb15cbb7f031065a",
+            "metadata_sha256": "57de9d088128f43619601d31063a5cf5001b6034e2cd6a00ad9b3a02d423e6fe",
+            "rows_sha256": "f3e502f72b2a1cca9194deda4bf1fc0737024ba8b9834eca8bfe9a55eb7236f8"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "a82d607add49692098d48f71a5beb1364ecd3d62a8815c20154803711dcddb7e",
+            "metadata_sha256": "84a8c7394b5dd12a8091ca3c2f6fe2781e7493a2ed8098d9f6b71ba349efdb16",
+            "rows_sha256": "3ff6b1e9756dd0b60c78393441fb73bb09a6f89b0c46b0d4943d6c35eb3fecc4"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "3d7bc20e1d257c3afe10556e2f605ad258de5242cd608ccad6f9ca9b1b073e8b",
+            "metadata_sha256": "ab8e274d70da752473a0ed6715b1b9d6f68c046a1184e52c3a6fcbf376a9e8de",
+            "rows_sha256": "b80cf5b19636e5dfba0d04ea7465e90bf0619050b73e82737b6bf24b0a3482e5"
+          }
+        },
+        "e199-train": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "6bfc41a4f7c0dda96ace8e0fe7e6966d4a2a8f624f7b049cc1d5a3a4b785fb6c",
+            "metadata_sha256": "bedc9666dcc8eba6f0052ca3e9e57775bbfbaa78c038a8cdd5f02e80ea16d3b5",
+            "rows_sha256": "ffd4d6a6b04e2d5945040c102931b31d175191af5d1439485976d750ca1d5593"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "dd1e87d3c9d85f97095c7e52603d149d416bbba4cb5b5c62ff1260eaa3ba16d5",
+            "metadata_sha256": "6a2189be66b1d5c0ebdc3c56fb0a6f3bdf03cd8ee11bfcc3606592baa421157a",
+            "rows_sha256": "0d6f16c0c9f7c9e46daa2effb71196a1072de057f6b3fca89a567fd49cbff094"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "98464f0b3e79cfffa7b87d43710b06491d8d2e5e61ae1337c8c668d0030d65df",
+            "metadata_sha256": "9139c3380e09ac43694e6e442c965221e037d5ccaab8cdf15c873bca59eec18c",
+            "rows_sha256": "d27a2987705b99fe406392f288f70902c9a60d12e49e5aa7ed595ff04ea06c88"
+          }
+        },
+        "e199-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "6bfc41a4f7c0dda96ace8e0fe7e6966d4a2a8f624f7b049cc1d5a3a4b785fb6c",
+            "metadata_sha256": "62ea12a85fe6a70023986d5611e506fc7c3d472ec08b6cef120bb95d7fa375bb",
+            "rows_sha256": "4ed14e3a7084e8bb88fd2f4a5f9532f3f04606671b2c2c9432e929a5e99ca093"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "dd1e87d3c9d85f97095c7e52603d149d416bbba4cb5b5c62ff1260eaa3ba16d5",
+            "metadata_sha256": "b5d623b896f95143ab1d6b74b054b0cb32e288cf2f21576db9197d9e4b928376",
+            "rows_sha256": "c4436adef814f816ae5436d8ab7ac50d1be0c1c7b5405a5c7182933f8cd85a69"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "98464f0b3e79cfffa7b87d43710b06491d8d2e5e61ae1337c8c668d0030d65df",
+            "metadata_sha256": "8d4bc2777e5f72066195f58b2b6bdf558ac5419b126fa6486b259d6c985efa55",
+            "rows_sha256": "3a1d34c51f815ca4ad62d2edb8e12a4a63b9ccd16011e8dcaf2358ff1d906813"
+          }
+        }
+      },
+      "run": "L2",
+      "train_e199": {
+        "CLEAN_WRONG_PLAIN_ADVCE": {
+          "direct_cw": {
+            "clean": {
+              "accuracy_delta": 0.09435388103206305,
+              "harm_count": 3,
+              "harm_rate": 0.0003238691568606283,
+              "margin_delta": 0.028377033243243154,
+              "net_rescue_rate": 0.09435388103206305,
+              "rescue_count": 877,
+              "rescue_rate": 0.09467775018892367
+            },
+            "n": 9263,
+            "robust": {
+              "accuracy_delta": 0.04123933930692,
+              "harm_count": 7,
+              "harm_rate": 0.000755694699341466,
+              "margin_delta": 0.018284730444320732,
+              "net_rescue_rate": 0.04123933930692,
+              "rescue_count": 389,
+              "rescue_rate": 0.04199503400626147
+            }
+          },
+          "spillover_non_cw": {
+            "clean": {
+              "accuracy_delta": 0.0006435906763298544,
+              "harm_count": 79,
+              "harm_rate": 0.0022105940621764556,
+              "margin_delta": 0.0009688654235414924,
+              "net_rescue_rate": 0.0006435906763298544,
+              "rescue_count": 102,
+              "rescue_rate": 0.00285418473850631
+            },
+            "n": 35737,
+            "robust": {
+              "accuracy_delta": -0.0022105940621764564,
+              "harm_count": 406,
+              "harm_rate": 0.011360774547387861,
+              "margin_delta": -0.0013721384126621605,
+              "net_rescue_rate": -0.0022105940621764564,
+              "rescue_count": 327,
+              "rescue_rate": 0.009150180485211405
+            }
+          }
+        },
+        "CLEAN_WRONG_TPFM": {
+          "direct_cw": {
+            "clean": {
+              "accuracy_delta": 0.0698477814962755,
+              "harm_count": 8,
+              "harm_rate": 0.0008636510849616755,
+              "margin_delta": 0.021314954012551936,
+              "net_rescue_rate": 0.0698477814962755,
+              "rescue_count": 655,
+              "rescue_rate": 0.07071143258123717
+            },
+            "n": 9263,
+            "robust": {
+              "accuracy_delta": 0.03692108388211163,
+              "harm_count": 10,
+              "harm_rate": 0.0010795638562020944,
+              "margin_delta": 0.020128268301712184,
+              "net_rescue_rate": 0.03692108388211163,
+              "rescue_count": 352,
+              "rescue_rate": 0.03800064773831372
+            }
+          },
+          "spillover_non_cw": {
+            "clean": {
+              "accuracy_delta": 0.0003078042365055821,
+              "harm_count": 70,
+              "harm_rate": 0.001958754232308252,
+              "margin_delta": -0.0011690281913000085,
+              "net_rescue_rate": 0.0003078042365055821,
+              "rescue_count": 81,
+              "rescue_rate": 0.0022665584688138342
+            },
+            "n": 35737,
+            "robust": {
+              "accuracy_delta": 0.000867448302879369,
+              "harm_count": 345,
+              "harm_rate": 0.009653860144947813,
+              "margin_delta": -0.001294685697648609,
+              "net_rescue_rate": 0.000867448302879369,
+              "rescue_count": 376,
+              "rescue_rate": 0.010521308447827182
+            }
+          }
+        },
+        "I100_CONTROL": {
+          "direct_cw": {
+            "clean": {
+              "accuracy_delta": 0.0,
+              "harm_count": 0,
+              "harm_rate": 0.0,
+              "margin_delta": 0.0,
+              "net_rescue_rate": 0.0,
+              "rescue_count": 0,
+              "rescue_rate": 0.0
+            },
+            "n": 9263,
+            "robust": {
+              "accuracy_delta": 0.0,
+              "harm_count": 0,
+              "harm_rate": 0.0,
+              "margin_delta": 0.0,
+              "net_rescue_rate": 0.0,
+              "rescue_count": 0,
+              "rescue_rate": 0.0
+            }
+          },
+          "spillover_non_cw": {
+            "clean": {
+              "accuracy_delta": 0.0,
+              "harm_count": 0,
+              "harm_rate": 0.0,
+              "margin_delta": 0.0,
+              "net_rescue_rate": 0.0,
+              "rescue_count": 0,
+              "rescue_rate": 0.0
+            },
+            "n": 35737,
+            "robust": {
+              "accuracy_delta": 0.0,
+              "harm_count": 0,
+              "harm_rate": 0.0,
+              "margin_delta": 0.0,
+              "net_rescue_rate": 0.0,
+              "rescue_count": 0,
+              "rescue_rate": 0.0
+            }
+          }
+        }
+      },
+      "validation_cw": {
+        "ids_sha256": "415756e8e0eee5bb2bd5160aad42622257283ecf434553675fde7a9913b58f4a",
+        "n": 1138
+      },
+      "validation_non_cw": {
+        "ids_sha256": "f09e8006922bf7f055c166789d57687facf55ce0558437defb237e83dd4475c0",
+        "n": 3862
+      }
+    },
+    "dev-2": {
+      "effects": {
+        "CLEAN_WRONG_PLAIN_ADVCE": {
+          "129": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.019247594050743652,
+                "harm_count": 16,
+                "harm_rate": 0.01399825021872266,
+                "margin_delta": 0.008528790514091599,
+                "net_rescue_rate": 0.019247594050743652,
+                "rescue_count": 38,
+                "rescue_rate": 0.033245844269466314
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.006124234470691163,
+                "harm_count": 7,
+                "harm_rate": 0.006124234470691163,
+                "margin_delta": 0.005183667446423912,
+                "net_rescue_rate": 0.006124234470691163,
+                "rescue_count": 14,
+                "rescue_rate": 0.012248468941382326
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": 0.001296344309048483,
+                "harm_count": 11,
+                "harm_rate": 0.002851957479906663,
+                "margin_delta": -0.0016190533868877697,
+                "net_rescue_rate": 0.001296344309048483,
+                "rescue_count": 16,
+                "rescue_rate": 0.004148301788955146
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": -0.00544464609800363,
+                "harm_count": 79,
+                "harm_rate": 0.020482240082966036,
+                "margin_delta": -0.0025825672892823195,
+                "net_rescue_rate": -0.00544464609800363,
+                "rescue_count": 58,
+                "rescue_rate": 0.015037593984962405
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0054,
+                "harm_count": 27,
+                "harm_rate": 0.0054,
+                "margin_delta": 0.0007007437288761139,
+                "net_rescue_rate": 0.0054,
+                "rescue_count": 54,
+                "rescue_rate": 0.0108
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": -0.0028000000000000004,
+                "harm_count": 86,
+                "harm_rate": 0.0172,
+                "margin_delta": -0.0008072060286998749,
+                "net_rescue_rate": -0.0028000000000000004,
+                "rescue_count": 72,
+                "rescue_rate": 0.0144
+              }
+            }
+          },
+          "149": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.014873140857392827,
+                "harm_count": 29,
+                "harm_rate": 0.02537182852143482,
+                "margin_delta": 0.006597404248445365,
+                "net_rescue_rate": 0.014873140857392827,
+                "rescue_count": 46,
+                "rescue_rate": 0.04024496937882765
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.013123359580052492,
+                "harm_count": 10,
+                "harm_rate": 0.008748906386701663,
+                "margin_delta": 0.00536769603754696,
+                "net_rescue_rate": 0.013123359580052492,
+                "rescue_count": 25,
+                "rescue_rate": 0.021872265966754154
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": 0.000518537723619393,
+                "harm_count": 29,
+                "harm_rate": 0.007518796992481203,
+                "margin_delta": -0.0015356780404342343,
+                "net_rescue_rate": 0.000518537723619393,
+                "rescue_count": 31,
+                "rescue_rate": 0.008037334716100596
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": 0.0036297640653357513,
+                "harm_count": 68,
+                "harm_rate": 0.017630282603059374,
+                "margin_delta": -0.0030024501617967945,
+                "net_rescue_rate": 0.0036297640653357513,
+                "rescue_count": 82,
+                "rescue_rate": 0.021260046668395125
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0038000000000000013,
+                "harm_count": 58,
+                "harm_rate": 0.0116,
+                "margin_delta": 0.0003235445708036423,
+                "net_rescue_rate": 0.0038000000000000013,
+                "rescue_count": 77,
+                "rescue_rate": 0.0154
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0058,
+                "harm_count": 78,
+                "harm_rate": 0.0156,
+                "margin_delta": -0.001089034740626812,
+                "net_rescue_rate": 0.0058,
+                "rescue_count": 107,
+                "rescue_rate": 0.0214
+              }
+            }
+          },
+          "169": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.01924759405074366,
+                "harm_count": 15,
+                "harm_rate": 0.013123359580052493,
+                "margin_delta": 0.0058192124008506615,
+                "net_rescue_rate": 0.01924759405074366,
+                "rescue_count": 37,
+                "rescue_rate": 0.03237095363079615
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.0052493438320209964,
+                "harm_count": 8,
+                "harm_rate": 0.00699912510936133,
+                "margin_delta": 0.0027885952620577206,
+                "net_rescue_rate": 0.0052493438320209964,
+                "rescue_count": 14,
+                "rescue_rate": 0.012248468941382326
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": 0.00025926886180969696,
+                "harm_count": 8,
+                "harm_rate": 0.002074150894477573,
+                "margin_delta": 2.631613835479918e-06,
+                "net_rescue_rate": 0.00025926886180969696,
+                "rescue_count": 9,
+                "rescue_rate": 0.00233341975628727
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": -0.0012963443090484843,
+                "harm_count": 48,
+                "harm_rate": 0.01244490536686544,
+                "margin_delta": -0.00174163834577958,
+                "net_rescue_rate": -0.0012963443090484843,
+                "rescue_count": 43,
+                "rescue_rate": 0.011148561057816956
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0046,
+                "harm_count": 23,
+                "harm_rate": 0.0046,
+                "margin_delta": 0.0013323019817471505,
+                "net_rescue_rate": 0.0046,
+                "rescue_count": 46,
+                "rescue_rate": 0.0092
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.00020000000000000052,
+                "harm_count": 56,
+                "harm_rate": 0.0112,
+                "margin_delta": -0.0007060269430279732,
+                "net_rescue_rate": 0.00020000000000000052,
+                "rescue_count": 57,
+                "rescue_rate": 0.0114
+              }
+            }
+          },
+          "189": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.017497812773403322,
+                "harm_count": 14,
+                "harm_rate": 0.012248468941382326,
+                "margin_delta": 0.00618832693325253,
+                "net_rescue_rate": 0.017497812773403322,
+                "rescue_count": 34,
+                "rescue_rate": 0.02974628171478565
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.00699912510936133,
+                "harm_count": 5,
+                "harm_rate": 0.004374453193350831,
+                "margin_delta": 0.0026381737173698707,
+                "net_rescue_rate": 0.00699912510936133,
+                "rescue_count": 13,
+                "rescue_rate": 0.011373578302712161
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0018148820326678767,
+                "harm_count": 12,
+                "harm_rate": 0.00311122634171636,
+                "margin_delta": -0.00030931897243131835,
+                "net_rescue_rate": -0.0018148820326678767,
+                "rescue_count": 5,
+                "rescue_rate": 0.0012963443090484833
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": -0.005185377236193932,
+                "harm_count": 54,
+                "harm_rate": 0.014000518537723619,
+                "margin_delta": -0.0019182310528263143,
+                "net_rescue_rate": -0.005185377236193932,
+                "rescue_count": 34,
+                "rescue_rate": 0.008815141301529687
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0026,
+                "harm_count": 26,
+                "harm_rate": 0.0052,
+                "margin_delta": 0.0011760428816080094,
+                "net_rescue_rate": 0.0026,
+                "rescue_count": 39,
+                "rescue_rate": 0.0078
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": -0.0023999999999999994,
+                "harm_count": 59,
+                "harm_rate": 0.0118,
+                "margin_delta": -0.0008766369223594666,
+                "net_rescue_rate": -0.0023999999999999994,
+                "rescue_count": 47,
+                "rescue_rate": 0.0094
+              }
+            }
+          },
+          "199": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.021872265966754158,
+                "harm_count": 14,
+                "harm_rate": 0.012248468941382326,
+                "margin_delta": 0.006308791577190239,
+                "net_rescue_rate": 0.021872265966754158,
+                "rescue_count": 39,
+                "rescue_rate": 0.03412073490813648
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.01137357830271216,
+                "harm_count": 6,
+                "harm_rate": 0.005249343832020997,
+                "margin_delta": 0.002720752041640244,
+                "net_rescue_rate": 0.01137357830271216,
+                "rescue_count": 19,
+                "rescue_rate": 0.016622922134733157
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.001296344309048483,
+                "harm_count": 14,
+                "harm_rate": 0.003629764065335753,
+                "margin_delta": 0.0002831284720754883,
+                "net_rescue_rate": -0.001296344309048483,
+                "rescue_count": 9,
+                "rescue_rate": 0.00233341975628727
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": -0.0033704952035260565,
+                "harm_count": 45,
+                "harm_rate": 0.011667098781436349,
+                "margin_delta": -0.0018855466982815776,
+                "net_rescue_rate": -0.0033704952035260565,
+                "rescue_count": 32,
+                "rescue_rate": 0.008296603577910292
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.003999999999999999,
+                "harm_count": 28,
+                "harm_rate": 0.0056,
+                "margin_delta": 0.0016605950579047203,
+                "net_rescue_rate": 0.003999999999999999,
+                "rescue_count": 48,
+                "rescue_rate": 0.0096
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0,
+                "harm_count": 51,
+                "harm_rate": 0.0102,
+                "margin_delta": -0.0008325468063354492,
+                "net_rescue_rate": 0.0,
+                "rescue_count": 51,
+                "rescue_rate": 0.0102
+              }
+            }
+          }
+        },
+        "CLEAN_WRONG_TPFM": {
+          "129": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.02099737532808399,
+                "harm_count": 12,
+                "harm_rate": 0.010498687664041995,
+                "margin_delta": 0.006581890412255118,
+                "net_rescue_rate": 0.02099737532808399,
+                "rescue_count": 36,
+                "rescue_rate": 0.031496062992125984
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.007874015748031496,
+                "harm_count": 6,
+                "harm_rate": 0.005249343832020997,
+                "margin_delta": 0.01002577569071702,
+                "net_rescue_rate": 0.007874015748031496,
+                "rescue_count": 15,
+                "rescue_rate": 0.013123359580052493
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": 0.0010370754472387865,
+                "harm_count": 6,
+                "harm_rate": 0.00155561317085818,
+                "margin_delta": -0.0050945184721148075,
+                "net_rescue_rate": 0.0010370754472387865,
+                "rescue_count": 10,
+                "rescue_rate": 0.0025926886180969665
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": 0.0002592688618096965,
+                "harm_count": 53,
+                "harm_rate": 0.013741249675913923,
+                "margin_delta": -0.0031679139518663614,
+                "net_rescue_rate": 0.0002592688618096965,
+                "rescue_count": 54,
+                "rescue_rate": 0.014000518537723619
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0056,
+                "harm_count": 18,
+                "harm_rate": 0.0036,
+                "margin_delta": -0.0024252914011478424,
+                "net_rescue_rate": 0.0056,
+                "rescue_count": 46,
+                "rescue_rate": 0.0092
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.002,
+                "harm_count": 59,
+                "harm_rate": 0.0118,
+                "margin_delta": -0.00015183649957180024,
+                "net_rescue_rate": 0.002,
+                "rescue_count": 69,
+                "rescue_rate": 0.0138
+              }
+            }
+          },
+          "149": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.004374453193350832,
+                "harm_count": 34,
+                "harm_rate": 0.02974628171478565,
+                "margin_delta": 0.00525971681322847,
+                "net_rescue_rate": 0.004374453193350832,
+                "rescue_count": 39,
+                "rescue_rate": 0.03412073490813648
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.009623797025371826,
+                "harm_count": 8,
+                "harm_rate": 0.00699912510936133,
+                "margin_delta": 0.008825234671173028,
+                "net_rescue_rate": 0.009623797025371826,
+                "rescue_count": 19,
+                "rescue_rate": 0.016622922134733157
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.001037075447238786,
+                "harm_count": 29,
+                "harm_rate": 0.007518796992481203,
+                "margin_delta": -0.006351824244254916,
+                "net_rescue_rate": -0.001037075447238786,
+                "rescue_count": 25,
+                "rescue_rate": 0.0064817215452424165
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": 0.008555872439719992,
+                "harm_count": 61,
+                "harm_rate": 0.015815400570391495,
+                "margin_delta": -0.004624505987787358,
+                "net_rescue_rate": 0.008555872439719992,
+                "rescue_count": 94,
+                "rescue_rate": 0.024371273010111487
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.00020000000000000052,
+                "harm_count": 63,
+                "harm_rate": 0.0126,
+                "margin_delta": -0.0036974259585142136,
+                "net_rescue_rate": 0.00020000000000000052,
+                "rescue_count": 64,
+                "rescue_rate": 0.0128
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.008799999999999999,
+                "harm_count": 69,
+                "harm_rate": 0.0138,
+                "margin_delta": -0.0015498952731490135,
+                "net_rescue_rate": 0.008799999999999999,
+                "rescue_count": 113,
+                "rescue_rate": 0.0226
+              }
+            }
+          },
+          "169": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.007874015748031494,
+                "harm_count": 13,
+                "harm_rate": 0.011373578302712161,
+                "margin_delta": 0.005064481929635543,
+                "net_rescue_rate": 0.007874015748031494,
+                "rescue_count": 22,
+                "rescue_rate": 0.019247594050743656
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.0017497812773403327,
+                "harm_count": 8,
+                "harm_rate": 0.00699912510936133,
+                "margin_delta": 0.006051586759997791,
+                "net_rescue_rate": 0.0017497812773403327,
+                "rescue_count": 10,
+                "rescue_rate": 0.008748906386701663
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0002592688618096965,
+                "harm_count": 8,
+                "harm_rate": 0.002074150894477573,
+                "margin_delta": -0.0018815900130781263,
+                "net_rescue_rate": -0.0002592688618096965,
+                "rescue_count": 7,
+                "rescue_rate": 0.0018148820326678765
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": -0.001037075447238786,
+                "harm_count": 40,
+                "harm_rate": 0.010370754472387866,
+                "margin_delta": -0.0018058758512011829,
+                "net_rescue_rate": -0.001037075447238786,
+                "rescue_count": 36,
+                "rescue_rate": 0.00933367902514908
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0015999999999999999,
+                "harm_count": 21,
+                "harm_rate": 0.0042,
+                "margin_delta": -0.00029371796697378157,
+                "net_rescue_rate": 0.0015999999999999999,
+                "rescue_count": 29,
+                "rescue_rate": 0.0058
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": -0.0003999999999999993,
+                "harm_count": 48,
+                "harm_rate": 0.0096,
+                "margin_delta": -9.659898281097413e-06,
+                "net_rescue_rate": -0.0003999999999999993,
+                "rescue_count": 46,
+                "rescue_rate": 0.0092
+              }
+            }
+          },
+          "189": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.013123359580052492,
+                "harm_count": 10,
+                "harm_rate": 0.008748906386701663,
+                "margin_delta": 0.006223616063959851,
+                "net_rescue_rate": 0.013123359580052492,
+                "rescue_count": 25,
+                "rescue_rate": 0.021872265966754154
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.006124234470691164,
+                "harm_count": 6,
+                "harm_rate": 0.005249343832020997,
+                "margin_delta": 0.0063470772036521555,
+                "net_rescue_rate": 0.006124234470691164,
+                "rescue_count": 13,
+                "rescue_rate": 0.011373578302712161
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0015556131708581798,
+                "harm_count": 11,
+                "harm_rate": 0.002851957479906663,
+                "margin_delta": -0.001924180798280848,
+                "net_rescue_rate": -0.0015556131708581798,
+                "rescue_count": 5,
+                "rescue_rate": 0.0012963443090484833
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": 0.0015556131708581791,
+                "harm_count": 37,
+                "harm_rate": 0.009592947886958776,
+                "margin_delta": -0.001428853180515417,
+                "net_rescue_rate": 0.0015556131708581791,
+                "rescue_count": 43,
+                "rescue_rate": 0.011148561057816956
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0018000000000000004,
+                "harm_count": 21,
+                "harm_rate": 0.0042,
+                "margin_delta": -6.15944355726242e-05,
+                "net_rescue_rate": 0.0018000000000000004,
+                "rescue_count": 30,
+                "rescue_rate": 0.006
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.0026,
+                "harm_count": 43,
+                "harm_rate": 0.0086,
+                "margin_delta": 0.0003487245053052902,
+                "net_rescue_rate": 0.0026,
+                "rescue_count": 56,
+                "rescue_rate": 0.0112
+              }
+            }
+          },
+          "199": {
+            "validation_cw": {
+              "clean": {
+                "accuracy_delta": 0.017497812773403322,
+                "harm_count": 8,
+                "harm_rate": 0.00699912510936133,
+                "margin_delta": 0.005410495346977537,
+                "net_rescue_rate": 0.017497812773403322,
+                "rescue_count": 28,
+                "rescue_rate": 0.024496937882764653
+              },
+              "n": 1143,
+              "robust": {
+                "accuracy_delta": 0.005249343832020997,
+                "harm_count": 9,
+                "harm_rate": 0.007874015748031496,
+                "margin_delta": 0.0055432301389472275,
+                "net_rescue_rate": 0.005249343832020997,
+                "rescue_count": 15,
+                "rescue_rate": 0.013123359580052493
+              }
+            },
+            "validation_non_cw": {
+              "clean": {
+                "accuracy_delta": -0.0010370754472387865,
+                "harm_count": 13,
+                "harm_rate": 0.0033704952035260565,
+                "margin_delta": -0.0009845345381754558,
+                "net_rescue_rate": -0.0010370754472387865,
+                "rescue_count": 9,
+                "rescue_rate": 0.00233341975628727
+              },
+              "n": 3857,
+              "robust": {
+                "accuracy_delta": 0.001037075447238786,
+                "harm_count": 38,
+                "harm_rate": 0.009852216748768473,
+                "margin_delta": -0.0011426935178614787,
+                "net_rescue_rate": 0.001037075447238786,
+                "rescue_count": 42,
+                "rescue_rate": 0.010889292196007259
+              }
+            },
+            "validation_overall": {
+              "clean": {
+                "accuracy_delta": 0.0032000000000000006,
+                "harm_count": 21,
+                "harm_rate": 0.0042,
+                "margin_delta": 0.0004773692935705185,
+                "net_rescue_rate": 0.0032000000000000006,
+                "rescue_count": 37,
+                "rescue_rate": 0.0074
+              },
+              "n": 5000,
+              "robust": {
+                "accuracy_delta": 0.002,
+                "harm_count": 47,
+                "harm_rate": 0.0094,
+                "margin_delta": 0.00038570863008499147,
+                "net_rescue_rate": 0.002,
+                "rescue_count": 57,
+                "rescue_rate": 0.0114
+              }
+            }
+          }
+        },
+        "I100_CONTROL": {}
+      },
+      "endpoint_lineage": {
+        "e129-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "b183073c42c69ab19ea74698527f6592c7c46fe9d082346dcbbb36ab0a0cf936",
+            "metadata_sha256": "58466b10ab729e70f0f160a4a98c955f76bb5d15225a17789ee0685f8f1146e2",
+            "rows_sha256": "cc4dd21255d6794822a1959e6fc76615e8f4cc13d3604fb3b4a31f0aaf712a53"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "c9c68c4fbde00999b2db7868636b76ad166a1d3ff87f54f2ee09dbf681f767df",
+            "metadata_sha256": "47ee6ddfa6c10e3cd4f404a908499a429f2318fbd96442fa6067431e444319b1",
+            "rows_sha256": "5aa9b4dbb45e376b58d851c80d65781ef2661cd92783307772dcf503df422047"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "f6da7758d54a08820713afabb416002bf36f9e4abb7f34f1cd81bc4250cb16a7",
+            "metadata_sha256": "63a7f98a70fe91043c39af69a3aa8a1c8cc76a2319b8ad9d7b1491fbd62c1660",
+            "rows_sha256": "89b6a999d639fe14eba730e277ee34b5558a7d87f65412a8044e819d3c5fc957"
+          }
+        },
+        "e149-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "624b5849c0fee8de827a861b59e85c00cc30a9fcc8fe22dd3ea1dcbdb8a9fd9e",
+            "metadata_sha256": "a5e5ada3d33601e29b97e60aa45200de8e35892d5cc55f97a2376faf9d4857c8",
+            "rows_sha256": "2daaecdbd7f98efa775d289806af88bc09047f4d9ea60ecf9d51693a568e1bb1"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "34d8abdc499ea806a1915101ea71c931cf1a0d0f9fecbc2e9618959811ae6c07",
+            "metadata_sha256": "bdb9e0f35d1c32cb40bf11c6285e3021e2feb5cfa35de44cf279e65f79e792e7",
+            "rows_sha256": "0a6c9cbe9628a74254c2d527530bdb9526d9514c5df3c1a03cd443ca24efb3b2"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "6b33b132158acddd07e8404e1e0c7f542fa462d0f24ae74cbbdb5076e38c08f6",
+            "metadata_sha256": "c549da325f49a13f7359e1e45e749504351c3856e0d243aa84a61e2c13130ecf",
+            "rows_sha256": "c0c4df602af91e4e8b6a9039b47eaf865a71367e5988377d714be84106c9bf4a"
+          }
+        },
+        "e169-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "e37e55c4bf3f30af49ac5dff715171e57031e415790e5e3e98203fcb7668baca",
+            "metadata_sha256": "de6c14281172268dc45fc767d595e575110e75ec856dbf311a4b0c3524b16bf7",
+            "rows_sha256": "5cdc89fee8acc2147f78b9c5fddfbdc82e73594a23ec63bcf6029c87b52e0552"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "96e93fcb2cd2b70f38c17d84965b96f77924c388d06dbb0d3f60d2d1cbce47e9",
+            "metadata_sha256": "0c94655f00c02cd83e263d0c71053f2fc46240b1106107680086c405c4a54329",
+            "rows_sha256": "88bf4621d113e22454c00b0eab0531fc24480ae9680abf3a47fd1fc89e002214"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "26d61d26339c506187c6f1c1855f9d7c69b0cbfc317f2b20049950941dad4d1b",
+            "metadata_sha256": "59b4e70379dac58a58823d0b31862674b1e23ab0acac2a2d958747a0b2e68f38",
+            "rows_sha256": "f0dec394ea358eb5c4f82b6c8f2c3eac30a624dfb19e3dfd94511c590d7edc5f"
+          }
+        },
+        "e189-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "c46963a0779c315ff173067f9341fd0e84109727e4e927234d1421b84fcd4e62",
+            "metadata_sha256": "cc62294135042bc4b743d2b9ac3df1c294d95d8520564bf983a17151f143522d",
+            "rows_sha256": "89c783b35461f10aac08390b0aad7866267bc486fa6aea99e43cc38453ec1b40"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "f9d877906f67efbb77094c86f3c74d3aa762bb121255d81c0dfd078a5d5a18b5",
+            "metadata_sha256": "bbabf581548f39433b378d41f3735e313b6d26eac837fe0daa20c3f2b4f0d33d",
+            "rows_sha256": "96fd9ccc9fb9a08c51390408d0eb44dc0e6b1b31e421a28c588903b36a444c97"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "aa59c7ee2a761796367d82a9cbd2dcd182c1cd12ad90f00e183e2f6d569f5293",
+            "metadata_sha256": "319dc458b3407d6130a0be9062c176016ea8d3e01679e5c70a6bde6b2e3c1572",
+            "rows_sha256": "77f332aed3944375288a63678b899844d42d47206d5220075a24d3beef1a5afe"
+          }
+        },
+        "e199-train": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "70ed58027f28987f950f77d9e24872cacd90976499ab0bd61c3a624f9ee2fe6d",
+            "metadata_sha256": "1ac6747d9312d8c85f7db15627efea09b7c4ed10910e0434a0fd5a863c17866d",
+            "rows_sha256": "9f750179478546e0c765fce08b7a060c79a3bf1bf3aa0ecaa2af9b83b46a0de0"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "3233acb66245c2dc959e768a576b62f49fc8bc778a06e80f95238f9f8b699c08",
+            "metadata_sha256": "3e5d658ec236a22eca95f5ee7bf9d55ec74000f1fe2fcf4c2aed1af94ae1b00e",
+            "rows_sha256": "d0101a58654ed883cba5278f97612e4a49d656ade8e5bca849d2ceec1a85930a"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "bf2045748d16c3ae530851fe0110818223dd779a720d04b8dcd4c54ee85f52d8",
+            "metadata_sha256": "68ac01d1c547464af767e10086d0696f439f7e4caf1adfe76e8a4efc32ca83b9",
+            "rows_sha256": "d79419cf845832771775cf54722933bb0a2b408f678a6e698903c7237d41aaa3"
+          }
+        },
+        "e199-validation": {
+          "CLEAN_WRONG_PLAIN_ADVCE": {
+            "checkpoint_sha256": "70ed58027f28987f950f77d9e24872cacd90976499ab0bd61c3a624f9ee2fe6d",
+            "metadata_sha256": "f0db7ee6c8915352052c7bd941d8cae0b7ea8e4fa8b6f98f9eae469ecd6623fb",
+            "rows_sha256": "b8efa845823320e296feb2416817d6b64d58897c8a0dcd5ab15a86f60aeb548b"
+          },
+          "CLEAN_WRONG_TPFM": {
+            "checkpoint_sha256": "3233acb66245c2dc959e768a576b62f49fc8bc778a06e80f95238f9f8b699c08",
+            "metadata_sha256": "54e3e7787795178f4bd1cf496d39626c444f6785826fa0a23736b8d5d8442efb",
+            "rows_sha256": "7969dfff57f34a42ca224c4215f1a7879132e138594a294ff665c4957daedc2b"
+          },
+          "I100_CONTROL": {
+            "checkpoint_sha256": "bf2045748d16c3ae530851fe0110818223dd779a720d04b8dcd4c54ee85f52d8",
+            "metadata_sha256": "408de49fcfc1e0e7509688190500568a73fa627e7dbf1cbec86e01b07de621e9",
+            "rows_sha256": "9653d8dc26c621bf17a4d575172c5ee5ba5114ff00f7d632ff63ce12c66f5cf9"
+          }
+        }
+      },
+      "run": "L4",
+      "train_e199": {
+        "CLEAN_WRONG_PLAIN_ADVCE": {
+          "direct_cw": {
+            "clean": {
+              "accuracy_delta": 0.0843954529796762,
+              "harm_count": 5,
+              "harm_rate": 0.0005741187277528993,
+              "margin_delta": 0.028291225317856626,
+              "net_rescue_rate": 0.0843954529796762,
+              "rescue_count": 740,
+              "rescue_rate": 0.0849695717074291
+            },
+            "n": 8709,
+            "robust": {
+              "accuracy_delta": 0.04087725341600643,
+              "harm_count": 12,
+              "harm_rate": 0.0013778849466069584,
+              "margin_delta": 0.01902761213752621,
+              "net_rescue_rate": 0.04087725341600643,
+              "rescue_count": 368,
+              "rescue_rate": 0.04225513836261339
+            }
+          },
+          "spillover_non_cw": {
+            "clean": {
+              "accuracy_delta": 0.0006337659474800915,
+              "harm_count": 69,
+              "harm_rate": 0.0019012978424402744,
+              "margin_delta": 6.477012608261594e-05,
+              "net_rescue_rate": 0.0006337659474800915,
+              "rescue_count": 92,
+              "rescue_rate": 0.002535063789920366
+            },
+            "n": 36291,
+            "robust": {
+              "accuracy_delta": -0.002204403295582927,
+              "harm_count": 413,
+              "harm_rate": 0.01138023201344686,
+              "margin_delta": -0.0015620425454786662,
+              "net_rescue_rate": -0.002204403295582927,
+              "rescue_count": 333,
+              "rescue_rate": 0.009175828717863934
+            }
+          }
+        },
+        "CLEAN_WRONG_TPFM": {
+          "direct_cw": {
+            "clean": {
+              "accuracy_delta": 0.05787116775749225,
+              "harm_count": 8,
+              "harm_rate": 0.0009185899644046389,
+              "margin_delta": 0.02062416057154675,
+              "net_rescue_rate": 0.05787116775749225,
+              "rescue_count": 512,
+              "rescue_rate": 0.05878975772189689
+            },
+            "n": 8709,
+            "robust": {
+              "accuracy_delta": 0.03869560225054541,
+              "harm_count": 10,
+              "harm_rate": 0.0011482374555057985,
+              "margin_delta": 0.01940884036740776,
+              "net_rescue_rate": 0.03869560225054541,
+              "rescue_count": 347,
+              "rescue_rate": 0.03984383970605121
+            }
+          },
+          "spillover_non_cw": {
+            "clean": {
+              "accuracy_delta": 0.0007715411534540244,
+              "harm_count": 73,
+              "harm_rate": 0.0020115180072194207,
+              "margin_delta": -0.0005027195338914999,
+              "net_rescue_rate": 0.0007715411534540244,
+              "rescue_count": 101,
+              "rescue_rate": 0.002783059160673445
+            },
+            "n": 36291,
+            "robust": {
+              "accuracy_delta": 0.0007715411534540244,
+              "harm_count": 317,
+              "harm_rate": 0.008734948058747348,
+              "margin_delta": -0.0008465143211165608,
+              "net_rescue_rate": 0.0007715411534540244,
+              "rescue_count": 345,
+              "rescue_rate": 0.009506489212201373
+            }
+          }
+        },
+        "I100_CONTROL": {
+          "direct_cw": {
+            "clean": {
+              "accuracy_delta": 0.0,
+              "harm_count": 0,
+              "harm_rate": 0.0,
+              "margin_delta": 0.0,
+              "net_rescue_rate": 0.0,
+              "rescue_count": 0,
+              "rescue_rate": 0.0
+            },
+            "n": 8709,
+            "robust": {
+              "accuracy_delta": 0.0,
+              "harm_count": 0,
+              "harm_rate": 0.0,
+              "margin_delta": 0.0,
+              "net_rescue_rate": 0.0,
+              "rescue_count": 0,
+              "rescue_rate": 0.0
+            }
+          },
+          "spillover_non_cw": {
+            "clean": {
+              "accuracy_delta": 0.0,
+              "harm_count": 0,
+              "harm_rate": 0.0,
+              "margin_delta": 0.0,
+              "net_rescue_rate": 0.0,
+              "rescue_count": 0,
+              "rescue_rate": 0.0
+            },
+            "n": 36291,
+            "robust": {
+              "accuracy_delta": 0.0,
+              "harm_count": 0,
+              "harm_rate": 0.0,
+              "margin_delta": 0.0,
+              "net_rescue_rate": 0.0,
+              "rescue_count": 0,
+              "rescue_rate": 0.0
+            }
+          }
+        }
+      },
+      "validation_cw": {
+        "ids_sha256": "de488accadbeec257521358e7812344cfa522d6522c2ec193e81cde3d19c7904",
+        "n": 1143
+      },
+      "validation_non_cw": {
+        "ids_sha256": "5941a23895b90f62350822fb619d9e743d308b95933a1627aab36b6c396959b3",
+        "n": 3857
+      }
+    }
+  }
+}
