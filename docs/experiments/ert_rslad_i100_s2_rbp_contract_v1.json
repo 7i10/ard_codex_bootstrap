@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "contract": "ert_rslad_i100_s2_robust_boundary_preservation_v1",
+  "status": "frozen_pre_training",
+  "source_git_sha": "98189703ea59d74af2bb447fe20e886d471d08e3",
+  "parent_epoch": 99,
+  "parents": {
+    "dev-1": {
+      "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "config_sha256": "e87905b549f741de04576bc36c00c51c0ac464f832dd89d7b5c855349926c5a6",
+      "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+      "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4",
+      "train_s2_t1_count": 2212,
+      "validation_s2_t1_count": 226,
+      "train_s2_t1_ids_sha256": "ee9f9769acb64a125539d258a1fab33ac437f42407fca438892db9fc5d59933e",
+      "validation_s2_t1_ids_sha256": "048707beadfba2d679933137c330e120e267f0c3d0a94c26a739bbe46ad8fae2"
+    },
+    "dev-2": {
+      "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "config_sha256": "1ce45685583518a66872b92f40a23c62129b85c6a07c01f50c134b36481dcd5c",
+      "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+      "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056",
+      "train_s2_t1_count": 2141,
+      "validation_s2_t1_count": 209,
+      "train_s2_t1_ids_sha256": "0286c612350ad7fdcd8483de8dd131fce00652fa873774b00da3201b32d32ccc",
+      "validation_s2_t1_ids_sha256": "03a3c90b16b07076da16e82e8d9b83ad9ec602c49214c095249ed9b9f7a0ed48"
+    }
+  },
+  "attacks": {
+    "training": {
+      "name": "KL-PGD10",
+      "identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 10,
+      "random_start": true,
+      "random_start_keying": "sample_keyed_v1",
+      "kl_target": "teacher_clean"
+    },
+    "endpoint": {
+      "name": "CE-PGD20",
+      "identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 20,
+      "random_start": true,
+      "loss": "ce"
+    }
+  },
+  "calibration": {
+    "artifact": "docs/experiments/ert_rslad_i100_s2_rbp_calibration_v1.json",
+    "artifact_sha256": "f8eb224dd54e7b9c1400ad9793fff7c602adb6a24f515581e0a9d6f15d4898d0",
+    "target_gradient_ratio": 0.25,
+    "student_boundary_floor": {
+      "dev-1": 0.04177670180797577,
+      "dev-2": 0.03347739577293396
+    },
+    "sbf_coefficient": 0.23594490117507805,
+    "tpfm_floor": 0.16590790450572968,
+    "tpfm_cap": 0.32364362478256226,
+    "tpfm_coefficient": 0.16676844691071563
+  },
+  "arms": [
+    "I100_CONTROL",
+    "I100_S2T1_STUDENT_MARGIN_FLOOR",
+    "I100_S2T1_TEACHER_POSITIVE_FLOOR_MARGIN"
+  ],
+  "horizon": {
+    "start_epoch": 100,
+    "end_epoch_exclusive": 115,
+    "checkpoints": [104, 109, 114],
+    "no_extension": true
+  },
+  "runtime": {
+    "objective": "baseline RSLAD plus selected-only adversarial probability-margin hinge",
+    "full_batch_mean": true,
+    "teacher_frozen": true,
+    "fixed_mask": true,
+    "paired_rng_and_order": true,
+    "augmentation": "I100 IDBH_WEAK",
+    "wandb_artifact_retention": "metrics_only"
+  }
+}
