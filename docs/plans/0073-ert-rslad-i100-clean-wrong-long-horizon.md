@@ -4,7 +4,7 @@
 
 - Owner: Codex
 - Branch / base SHA: `master` / `53c85b88e306e9b5e559821789e26776b6c2bc93`
-- Current milestone: e114 lineage audit and continuation manifest preparation
+- Current milestone: completed continuation, endpoint aggregation, and decision record
 - Last updated: 2026-09-02
 
 ## Goal
@@ -30,12 +30,12 @@ six exact e114 checkpoints are stored under the completed Ferret run root
 Teacher, and CE-PGD20 identities are inherited unchanged.
 
 Ferret has the required dataset, Teacher, disk, and two validated fast GPUs
-(GPU0/GPU1). The campaign was pinned to Ferret before launch. A later host
-re-audit found that Hamster also has the dataset at
-`/home/shunsukenaito/workspace-local/datasets/ard/torchvision` and now has
-about 2.3 TB free; an earlier Hamster exclusion was caused by checking the
-wrong `/home/islab/...` alias. The running campaign is not migrated because
-its immutable manifest and dependency state are already pinned to Ferret.
+(GPU0/GPU1). The original campaign was pinned to Ferret before launch. A later
+host re-audit found that Hamster also has the dataset at
+`/home/shunsuke.naito/workspace-local/datasets/ard/torchvision` and about
+2.3 TB free. The running campaign was not migrated; only the failed dev-2
+TPFM child was technically recovered on Hamster after preserving its
+immutable scientific identity.
 
 ## Scientific contracts affected
 
@@ -52,8 +52,9 @@ CE-PGD20 identity remain unchanged.
   producing epochs 115–199 inclusive.
 - Use a detached completion-marker DAG with six training jobs followed by
   sparse validation and e199 train endpoints, aggregation, and report.
-- Use Ferret GPU0/1 only for this campaign. Hamster is not launched because
-  preflight currently fails on data locality and disk capacity.
+- Use Ferret GPU0/1 for the original campaign. If a technical recovery is
+  required, Hamster GPU0 may be used only after exact parent/config/hash
+  verification and without changing the scientific identity.
 
 ## Milestones
 
@@ -62,9 +63,9 @@ CE-PGD20 identity remain unchanged.
 - [x] Implement/validate the continuation and endpoint manifest.
 - [x] Run bounded e114-resume canary and permutation/lineage checks.
 - [x] Launch six detached continuations through epoch 199.
-- [ ] Chain e129/e149/e169/e189/e199 validation and e199 train endpoints.
-- [ ] Aggregate sparse trajectory, direct/spillover, and runtime results.
-- [ ] Write report, record CW1–CW6 decision, commit, push, and stop.
+- [x] Chain e129/e149/e169/e189/e199 validation and e199 train endpoints.
+- [x] Aggregate sparse trajectory, direct/spillover, and runtime results.
+- [x] Write report, record CW1–CW6 decision, commit, push, and stop.
 
 ## Agent and review budget
 
@@ -103,9 +104,22 @@ outside the automated test suite.
   e114 hashes matched, and the e115 resume canary passed. The detached
   manifest controller launched the first two training jobs on Ferret GPU0/1;
   no endpoint or long-running job was manually polled after the bounded check.
+- 2026-09-02: Ferret completed five arms. The dev-2 TPFM continuation was
+  recovered on Hamster GPU0 after repeated technical parent-SHA/path
+  validation failures; the exact e114 parent bytes and scientific identity
+  were retained. Epoch-199 training and all six sparse endpoint cells are
+  complete.
+- 2026-09-02: Aggregation produced the contract, results, direct/spillover,
+  and runtime artifacts. TPFM is directionally positive on held-out e199 in
+  both seeds (+0.04/+0.20 pp robust), while plain AdvCE is not (-0.30/0.00
+  pp). Direct gains do not transfer at the same magnitude. No automatic
+  follow-up was started.
 
 ## Completion report
 
 To be filled after the six continuations and all preregistered endpoints are
 complete. The report must distinguish long-horizon point estimates from
 training-seed uncertainty and must not start an automatic follow-up.
+
+Completion report: see `docs/ERT_RSLAD_I100_CLEAN_WRONG_LONG_HORIZON.md` and
+the four `docs/experiments/ert_rslad_i100_cw_long_horizon_*_v1.json` artifacts.

@@ -1,0 +1,36 @@
+{
+  "attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+  "coefficients": {
+    "beta_advce": 0.11834514302628477,
+    "margin_cap": 0.5595575273036957,
+    "margin_coefficient": 0.316427398202933,
+    "margin_floor": 0.17963354289531708
+  },
+  "contract": "ert_rslad_i100_cw_long_horizon_contract_v1",
+  "endpoint_attack": "CE-PGD20; eps=8/255; step=2/255; random_start=true; eval mode",
+  "endpoint_epochs": [
+    129,
+    149,
+    169,
+    189,
+    199
+  ],
+  "manifest_sha256": "2ebe1aa63a49b39c868d6f28d9dc19e52c44c5e92a9bb2ea7cdd3960cb040cb4",
+  "masks": {
+    "dev-1": {
+      "replay_lineage_sha256": "669e46a12361ed5fa868b7ee806797d7bacb597342b58872e3b3c61134467f5c",
+      "selected_count": 9263,
+      "selected_ids_sha256": "b85273ba6d97cedf3180b08c32e0d5fcd792a0d11aad4cec3e9567c3a94bc0e9"
+    },
+    "dev-2": {
+      "replay_lineage_sha256": "636132aad49ced79fb617edcee582c1a76f2cce8762d3f787ccba024df307311",
+      "selected_count": 8709,
+      "selected_ids_sha256": "91498aec2abe157674256104514441b5f90d73a77c4ddcd256be5a4c26a3a24a"
+    }
+  },
+  "parent_epoch": 114,
+  "recovery": "dev-2/CLEAN_WRONG_TPFM rerun on Hamster after Ferret technical SHA/path failures; scientific identity unchanged",
+  "schema_version": 1,
+  "source_git_sha": "c6032f9dc09f938fd0b9fb87379cf16c3f0f26bb",
+  "training_attack": "KL-PGD10; eps=8/255; step=2/255; random_start=true; Teacher-clean target"
+}
