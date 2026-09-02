@@ -1,0 +1,70 @@
+{
+  "contract": "ert_rslad_i100_cw_heldout_feature_shift_v1",
+  "reason": "e99 train feature parquet was not present; only registered e99 validation replay rows were available",
+  "schema_version": 1,
+  "seeds": {
+    "dev-1": {
+      "train_cw": "unavailable",
+      "validation_cw": {
+        "n": 1138,
+        "student_adv_margin": {
+          "mean": -0.25139382069763483,
+          "median": -0.2265360951423645,
+          "q20": -0.33914124965667725,
+          "q80": -0.153730571269989
+        },
+        "student_clean_margin": {
+          "mean": -0.12465045542205784,
+          "median": -0.10386742651462555,
+          "q20": -0.19955697655677795,
+          "q80": -0.03723666071891785
+        },
+        "teacher_adv_correct_rate": 0.4235500878734622,
+        "teacher_adv_margin": {
+          "mean": -0.020517204951999057,
+          "median": -0.02708221971988678,
+          "q20": -0.1424732804298401,
+          "q80": 0.09860861301422119
+        },
+        "teacher_clean_margin": {
+          "mean": 0.08911359248607566,
+          "median": 0.08774831891059875,
+          "q20": -0.03563790023326874,
+          "q80": 0.21097055077552795
+        }
+      }
+    },
+    "dev-2": {
+      "train_cw": "unavailable",
+      "validation_cw": {
+        "n": 1143,
+        "student_adv_margin": {
+          "mean": -0.25580567240141405,
+          "median": -0.22428357601165771,
+          "q20": -0.36707139015197754,
+          "q80": -0.1337786614894867
+        },
+        "student_clean_margin": {
+          "mean": -0.11867678385107328,
+          "median": -0.08918318152427673,
+          "q20": -0.19038815796375275,
+          "q80": -0.033291012048721313
+        },
+        "teacher_adv_correct_rate": 0.4715660542432196,
+        "teacher_adv_margin": {
+          "mean": 0.0037861100266820386,
+          "median": -0.012829720973968506,
+          "q20": -0.13025033473968506,
+          "q80": 0.13172663748264313
+        },
+        "teacher_clean_margin": {
+          "mean": 0.10669973143233819,
+          "median": 0.10349145531654358,
+          "q20": -0.03563790023326874,
+          "q80": 0.24428698420524597
+        }
+      }
+    }
+  },
+  "status": "unavailable"
+}

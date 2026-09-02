@@ -1,0 +1,162 @@
+{
+  "contract": "ert_rslad_i100_cw_heldout_action_overlap_v1",
+  "schema_version": 1,
+  "seeds": {
+    "dev-1": {
+      "plain_vs_tpfm": {
+        "train_cw": {
+          "harm": {
+            "a": 7,
+            "a_only": 6,
+            "b": 10,
+            "b_only": 9,
+            "intersection": 1,
+            "jaccard": 0.0625,
+            "union": 16
+          },
+          "opposite_response": 0,
+          "plain_only_rescue": 116,
+          "rescue": {
+            "a": 389,
+            "a_only": 116,
+            "b": 352,
+            "b_only": 79,
+            "intersection": 273,
+            "jaccard": 0.5833333333333334,
+            "union": 468
+          },
+          "tpfm_only_rescue": 79
+        },
+        "validation_cw": {
+          "harm": {
+            "a": 4,
+            "a_only": 2,
+            "b": 4,
+            "b_only": 2,
+            "intersection": 2,
+            "jaccard": 0.3333333333333333,
+            "union": 6
+          },
+          "opposite_response": 0,
+          "plain_only_rescue": 5,
+          "rescue": {
+            "a": 15,
+            "a_only": 5,
+            "b": 15,
+            "b_only": 5,
+            "intersection": 10,
+            "jaccard": 0.5,
+            "union": 20
+          },
+          "tpfm_only_rescue": 5
+        }
+      },
+      "train_cw": {
+        "CLEAN_WRONG_PLAIN_ADVCE": {
+          "harm_ids_sha256": "840cb9be0144c39f6344ea40f5d6fef71ef18403c5c5f7a8aa6a9582e53a24ab",
+          "harm_n": 7,
+          "rescue_ids_sha256": "5e8cd590acf4ac09961071d704f12cd9b6c5ceeab6debd19d74e18547ab841a2",
+          "rescue_n": 389
+        },
+        "CLEAN_WRONG_TPFM": {
+          "harm_ids_sha256": "4b90e38b259b636c4e95eb8d382664768d97c864477c429faceb3010cb89c614",
+          "harm_n": 10,
+          "rescue_ids_sha256": "319854393ac4d46f175b094926248d9e299e32ce3d128d5885b1aa60e4de381c",
+          "rescue_n": 352
+        }
+      },
+      "validation_cw": {
+        "CLEAN_WRONG_PLAIN_ADVCE": {
+          "harm_ids_sha256": "45873119a305e346e3e06b13e17bf973d26e6cd609cb6405c7b48204cf8ff86f",
+          "harm_n": 4,
+          "rescue_ids_sha256": "a26669c243856ca4ed8e862b582d2fed50fd8d1cc6ec6cc384983f3a123d189f",
+          "rescue_n": 15
+        },
+        "CLEAN_WRONG_TPFM": {
+          "harm_ids_sha256": "071f5dfa20b4e3944baa4a7676b07695dac7d8ca96953e72953336333e8a2bba",
+          "harm_n": 4,
+          "rescue_ids_sha256": "18a27e48b03e8d350d795f657e2e73cdc26eaf5b6d656a558ce942625ee033d5",
+          "rescue_n": 15
+        }
+      }
+    },
+    "dev-2": {
+      "plain_vs_tpfm": {
+        "train_cw": {
+          "harm": {
+            "a": 12,
+            "a_only": 8,
+            "b": 10,
+            "b_only": 6,
+            "intersection": 4,
+            "jaccard": 0.2222222222222222,
+            "union": 18
+          },
+          "opposite_response": 0,
+          "plain_only_rescue": 101,
+          "rescue": {
+            "a": 368,
+            "a_only": 101,
+            "b": 347,
+            "b_only": 80,
+            "intersection": 267,
+            "jaccard": 0.5959821428571429,
+            "union": 448
+          },
+          "tpfm_only_rescue": 80
+        },
+        "validation_cw": {
+          "harm": {
+            "a": 6,
+            "a_only": 0,
+            "b": 9,
+            "b_only": 3,
+            "intersection": 6,
+            "jaccard": 0.6666666666666666,
+            "union": 9
+          },
+          "opposite_response": 0,
+          "plain_only_rescue": 7,
+          "rescue": {
+            "a": 19,
+            "a_only": 7,
+            "b": 15,
+            "b_only": 3,
+            "intersection": 12,
+            "jaccard": 0.5454545454545454,
+            "union": 22
+          },
+          "tpfm_only_rescue": 3
+        }
+      },
+      "train_cw": {
+        "CLEAN_WRONG_PLAIN_ADVCE": {
+          "harm_ids_sha256": "25697dc26e480a9b197adcb4d1dc38b0ff6b264de47af6516aa530be8593cd74",
+          "harm_n": 12,
+          "rescue_ids_sha256": "1dfe8800266ef12cae7e61372e2d309e6c2880c80b8de4f132e57db0c3044c39",
+          "rescue_n": 368
+        },
+        "CLEAN_WRONG_TPFM": {
+          "harm_ids_sha256": "648075906aaa25b79bdc57d19221d7ff384a0aada7b8a7d9dcf0fa59d87669fe",
+          "harm_n": 10,
+          "rescue_ids_sha256": "2e6a60a4fdb50b084e05a8c749bdc286bb05cb862ba2c3973e30913f2106f729",
+          "rescue_n": 347
+        }
+      },
+      "validation_cw": {
+        "CLEAN_WRONG_PLAIN_ADVCE": {
+          "harm_ids_sha256": "f14158e5e45973986910b5f778b86fec0788efef9ccb94983c5a8b1d1ae923a5",
+          "harm_n": 6,
+          "rescue_ids_sha256": "4941fcf342dd927a9ed765dc713d2caedb1372644e3d50557ac216e6585fd3d9",
+          "rescue_n": 19
+        },
+        "CLEAN_WRONG_TPFM": {
+          "harm_ids_sha256": "446f566467a8e2dbe4fb44ef773751bcb73b0f46dba25290d6e8d3b8e4b13e16",
+          "harm_n": 9,
+          "rescue_ids_sha256": "03d8bd7fa471eb7368d3a3f337477221e4d80b2ecfcefb6842242c07afe23868",
+          "rescue_n": 15
+        }
+      }
+    }
+  }
+}

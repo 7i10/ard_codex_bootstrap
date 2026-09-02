@@ -1,0 +1,23 @@
+{
+  "analysis": "read-only; e99 pre-treatment validation state; e129-e199 outcomes",
+  "contract": "ert_rslad_i100_cw_heldout_gap_contract_v1",
+  "e114_row_artifact": "unavailable in current local artifact inventory; no imputation",
+  "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+  "no_threshold_tuning": true,
+  "no_training": true,
+  "outcome_epochs": [
+    129,
+    149,
+    169,
+    189,
+    199
+  ],
+  "parents": {
+    "dev-1": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+    "dev-2": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+  },
+  "schema_version": 1,
+  "source_git_sha": "89f17818a3ee7d899c9a45cee57606aa60e9c93f",
+  "state_epoch": 99,
+  "training": "KL-PGD10 eps=8/255 step=2/255 random_start Teacher-clean target"
+}
