@@ -14,6 +14,7 @@ from ard.analysis.ert_stage_a_runtime import (
     _epoch80_equivalence,
     _epoch80_gate,
     _mask_from_overlay,
+    _tracking_run_id,
     _validate_shared_prefix_lineage,
 )
 from ard.config.schema import AttackConfig
@@ -141,6 +142,26 @@ def test_rng_source_triplet_is_included_in_arm_identity() -> None:
         rng_source_seeds=RNGSourceSeeds(data_seed=1, attack_seed=4, other_seed=3),
     )
     assert first != second
+
+
+def test_orchestrator_retry_gets_unique_tracking_id_without_changing_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    kwargs = {
+        "run_namespace": "ert-i100-s2-rbp-v1",
+        "seed": "dev-1",
+        "arm": "sbf",
+        "source_sha": "a" * 64,
+    }
+    base = _tracking_run_id(**kwargs)
+    assert base == "ert-ert-i100-s2-rbp-v1-dev-1-sbf-aaaaaaa"
+
+    monkeypatch.setenv("ARD_ORCH_CAMPAIGN_ID", "ert-i100-s2-rbp-v1-recovery6")
+    first = _tracking_run_id(**kwargs)
+    monkeypatch.setenv("ARD_ORCH_ATTEMPT", "2")
+    monkeypatch.setenv("ARD_ORCH_ATTEMPT_ID", "job-attempt-2")
+    retry = _tracking_run_id(**kwargs)
+    assert first != base
+    assert retry != first
+    assert "-retry-" in retry
 
 
 def test_epoch80_gate_requires_full_state_parity_and_capture_identity(tmp_path: Path) -> None:

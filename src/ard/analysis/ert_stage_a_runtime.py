@@ -61,6 +61,31 @@ class StageARuntimeError(RuntimeError):
 SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256 = "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
 
 
+def _tracking_run_id(*, run_namespace: str, seed: str, arm: str, source_sha: str) -> str:
+    """Build a unique tracker ID without changing scientific identity.
+
+    The orchestrator may retry a job after W&B has already reserved the
+    deterministic ID.  A campaign/attempt suffix is therefore added only
+    for orchestrated launches; the manifest identity, checkpoint lineage,
+    seed, and treatment remain unchanged.  Non-orchestrated runs retain the
+    historical deterministic ID for resume compatibility.
+    """
+    run_id = f"ert-{run_namespace}-{seed}-{arm}-{source_sha[:7]}"
+    campaign_id = os.environ.get("ARD_ORCH_CAMPAIGN_ID")
+    if campaign_id:
+        campaign_hash = hashlib.sha256(campaign_id.encode("utf-8")).hexdigest()[:8]
+        run_id = f"{run_id}-orch-{campaign_hash}"
+    try:
+        attempt = int(os.environ.get("ARD_ORCH_ATTEMPT", "1"))
+    except ValueError:
+        attempt = 1
+    if attempt > 1:
+        attempt_id = os.environ.get("ARD_ORCH_ATTEMPT_ID", str(attempt))
+        retry_hash = hashlib.sha256(attempt_id.encode("utf-8")).hexdigest()[:8]
+        run_id = f"{run_id}-retry-{retry_hash}"
+    return run_id
+
+
 def _prepare_stage_output_dir(output_dir: Path) -> None:
     """Permit an orchestrator-created directory while refusing stale results."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -647,7 +672,12 @@ def run_stage_a_arm(
         _write_json_atomic(output_dir / "epoch80-routing-state.json", shared_epoch80)
     # Include the immutable source revision so a prior canary or interrupted
     # launch can never collide with a new production arm using the same label.
-    run_id = f"ert-{run_namespace}-{config.seeds.model_init}-{treatment.arm}-{source_sha[:7]}"
+    run_id = _tracking_run_id(
+        run_namespace=run_namespace,
+        seed=str(config.seeds.model_init),
+        arm=treatment.arm,
+        source_sha=source_sha,
+    )
     tracked_config = config.model_copy(
         update={
             "output_dir": output_dir,
