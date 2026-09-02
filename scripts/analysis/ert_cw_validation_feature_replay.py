@@ -57,6 +57,7 @@ def replay(
     run: str,
     attack_kind: str,
     device: torch.device,
+    feature_epoch: int = 79,
 ) -> dict[str, Any]:
     config = load_config(config_path)
     attack_config = config.method.selection_attack if attack_kind == "CE20" else config.method.attack
@@ -72,8 +73,8 @@ def replay(
     if source.get("dirty") is not False or not isinstance(source.get("sha"), str):
         raise ReplayError("validation replay requires a clean source tree")
     payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
-    if not isinstance(payload, dict) or payload.get("epoch") != 79 or payload.get("epoch_boundary") != "end":
-        raise ReplayError(f"{run}: checkpoint is not epoch-79 end")
+    if not isinstance(payload, dict) or payload.get("epoch") != feature_epoch or payload.get("epoch_boundary") != "end":
+        raise ReplayError(f"{run}: checkpoint is not epoch-{feature_epoch} end")
     student = build_student(config.student, tier=config.tier)
     load_saved_student_checkpoint(checkpoint, student)
     if config.teacher is None:
@@ -173,7 +174,7 @@ def replay(
         "schema_version": 1,
         "contract": CE_CONTRACT if attack_kind == "CE20" else KL_CONTRACT,
         "dataset_scope": "validation",
-        "feature_epoch": 79,
+        "feature_epoch": feature_epoch,
         "run": run,
         "checkpoint": str(checkpoint.resolve()),
         "checkpoint_epoch": 79,
@@ -208,6 +209,7 @@ def main() -> int:
     parser.add_argument("--run", choices=("L2", "L4"), required=True)
     parser.add_argument("--attack", choices=("CE20", "KL10"), required=True)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--feature-epoch", type=int, default=79)
     args = parser.parse_args()
     result = replay(
         config_path=args.config,
@@ -216,6 +218,7 @@ def main() -> int:
         run=args.run,
         attack_kind=args.attack,
         device=torch.device(args.device),
+        feature_epoch=args.feature_epoch,
     )
     print(json.dumps({"contract": result["contract"], "rows_sha256": result["rows_sha256"]}, sort_keys=True))
     return 0
