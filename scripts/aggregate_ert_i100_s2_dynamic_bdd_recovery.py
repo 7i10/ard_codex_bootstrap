@@ -11,18 +11,22 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import subprocess
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
 import pyarrow.parquet as pq
+import torch
 
 from ard.analysis.ert_i100_s2_dynamic_bdd_state import canonical_state_summary
 
 ROOT = Path(".cache/analysis/ert-i100-s2-dynamic-bdd-v1")
 ATTACK_SHA = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
 SPLIT_SHA = "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+TRAIN_SPLIT_SHA = "083045ab272059eeae54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
 TEACHER_SHA = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
 ARMS = ("control", "dpm", "dbdd")
 SEEDS = ("dev-1", "dev-2")
@@ -47,12 +51,31 @@ E99_ROWS = {
     "dev-2": Path(".cache/analysis/ert-i100-cw-gap-completion-replay/dev-2/e99-observations.parquet"),
 }
 STATE_ROOTS = {
-    ("dev-1", "control"): ROOT / "state-replay-v1/smoke-v2-dev1-control",
+    ("dev-1", "control"): ROOT / "state-replay-v1/smoke-v3-dev1-control",
     ("dev-1", "dpm"): ROOT / "state-replay-v1/jobs/dev1-dpm",
     ("dev-1", "dbdd"): ROOT / "state-replay-v1/jobs/dev1-dbdd",
     ("dev-2", "control"): ROOT / "state-replay-v1/ferret/dev2-control/outputs/state-replay",
     ("dev-2", "dpm"): ROOT / "state-replay-v1/ferret/dev2-dpm/outputs/state-replay",
     ("dev-2", "dbdd"): ROOT / "state-replay-v1/jobs/dev2-dbdd",
+}
+SBDD_CONFIGS = {
+    "dev-1": ROOT / "recovery-436c920-r2/jobs/dev1-sbdd/training/resolved_config.yaml",
+    "dev-2": Path(
+        "/home/shunsukenaito/workspace-local/ferret-results/ard_codex_bootstrap/"
+        "ert-i100-s2-bdd-recovery-dev2-sbdd-a1/outputs/training/resolved_config.yaml"
+    ),
+}
+SBDD_METRICS = {
+    "dev-1": ROOT / "recovery-436c920-r2/jobs/dev1-sbdd/training/epoch-metrics.jsonl",
+    "dev-2": Path(
+        "/home/shunsukenaito/workspace-local/ferret-results/ard_codex_bootstrap/"
+        "ert-i100-s2-bdd-recovery-dev2-sbdd-a1/outputs/training/epoch-metrics.jsonl"
+    ),
+}
+SBDD_HOSTS = {"dev-1": "Hamster GPU1", "dev-2": "Ferret GPU0"}
+SBDD_LAST_CHECKPOINTS = {
+    "dev-1": ROOT / "recovery-436c920-r2/jobs/dev1-sbdd/training/last.pt",
+    "dev-2": None,
 }
 
 
@@ -200,7 +223,7 @@ def read_metrics(path: Path) -> dict[str, Any]:
     row = next((item for item in rows if int(item["epoch"]) == 114), None)
     if row is None:
         raise AggregationError(f"e114 training telemetry missing: {path}")
-    return {
+    result = {
         key: row[key]
         for key in (
             "train_seconds",
@@ -212,6 +235,101 @@ def read_metrics(path: Path) -> dict[str, Any]:
         )
         if key in row
     }
+    for key, value in result.items():
+        if isinstance(value, (int, float)) and not math.isfinite(value):
+            raise AggregationError(f"non-finite e114 runtime telemetry {key}: {path}")
+    return result
+
+
+def validate_state_replay_metadata(
+    metadata: Mapping[str, Any], *, rows_path: Path, expected_epoch: int
+) -> None:
+    """Fail closed on state-replay lineage and train-split identity."""
+    split = metadata.get("split_identity", {})
+    if metadata.get("contract") != "ert_rslad_i100_s2_dynamic_bdd_state_replay_v1":
+        raise AggregationError(f"state replay contract differs: {rows_path}")
+    if metadata.get("attack_identity_sha256") != ATTACK_SHA:
+        raise AggregationError(f"state replay attack identity differs: {rows_path}")
+    if metadata.get("teacher_checkpoint_sha256") != TEACHER_SHA:
+        raise AggregationError(f"state replay Teacher differs: {rows_path}")
+    if metadata.get("checkpoint_epoch") != expected_epoch:
+        raise AggregationError(f"state replay checkpoint epoch differs: {rows_path}")
+    if (
+        not isinstance(split, Mapping)
+        or split.get("name") != "train"
+        or split.get("count") != 45_000
+        or split.get("sample_id_label_sha256") != TRAIN_SPLIT_SHA
+    ):
+        raise AggregationError(f"state replay train split identity differs: {rows_path}")
+    if metadata.get("row_count") != 45_000 or metadata.get("rows_sha256") != sha256(rows_path):
+        raise AggregationError(f"state replay row count or SHA differs: {rows_path}")
+
+
+def sbdd_numerical_evidence(calibration: Mapping[str, Any]) -> dict[str, Any]:
+    """Return only retained, source-backed evidence for the two v2 failures."""
+    calibration_path = Path("docs/experiments/ert_rslad_i100_s2_secant_boundary_distance_calibration_v2.json")
+    expected_calibration_sha = sha256(calibration_path)
+    output: dict[str, Any] = {}
+    for seed in SEEDS:
+        config_path = SBDD_CONFIGS[seed]
+        if not config_path.is_file():
+            raise AggregationError(f"missing S-BDD resolved config: {config_path}")
+        # The resolved config is YAML, but the relevant calibration block is
+        # emitted in a stable plain-text form.  Avoid making this aggregation
+        # depend on a YAML parser only to audit the frozen identity.
+        text = config_path.read_text(encoding="utf-8")
+        for required in (
+            "formula_version: student_parameter_graph_v2",
+            "contract: ert_rslad_i100_s2_secant_boundary_distance_calibration_v2",
+            f"artifact_sha256: {expected_calibration_sha}",
+            "secant_boundary_distance: 1.5219638832872224",
+            "boundary_epsilon: 1.0e-12",
+        ):
+            if required not in text:
+                raise AggregationError(f"S-BDD v2 identity differs ({required}): {config_path}")
+        rows = [
+            json.loads(line)
+            for line in SBDD_METRICS[seed].read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        if not rows:
+            raise AggregationError(f"missing S-BDD telemetry: {SBDD_METRICS[seed]}")
+        last = rows[-1]
+        if not math.isfinite(float(last["train_loss"])):
+            raise AggregationError(f"S-BDD retained telemetry is unexpectedly non-finite: {SBDD_METRICS[seed]}")
+        checkpoint_path = SBDD_LAST_CHECKPOINTS[seed]
+        model_max_abs: float | None = None
+        if checkpoint_path is not None:
+            payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+            state = payload.get("model")
+            if not isinstance(state, Mapping):
+                raise AggregationError(f"S-BDD last checkpoint has no model state: {checkpoint_path}")
+            maxima = [
+                float(value.detach().abs().max().item())
+                for value in state.values()
+                if isinstance(value, torch.Tensor) and value.numel()
+            ]
+            if not maxima or not math.isfinite(max(maxima)):
+                raise AggregationError(f"S-BDD last checkpoint tensors are invalid: {checkpoint_path}")
+            model_max_abs = max(maxima)
+        output[seed] = {
+            "host": SBDD_HOSTS[seed],
+            "formula_version": "student_parameter_graph_v2",
+            "calibration_sha256": expected_calibration_sha,
+            "coefficient": calibration["coefficients"]["secant_boundary_distance"],
+            "boundary_epsilon": calibration["boundary_epsilon"],
+            "last_retained_finite_epoch": int(last["epoch"]),
+            "last_retained_train_loss": float(last["train_loss"]),
+            "last_checkpoint_model_max_abs": model_max_abs,
+            "gradient_telemetry": "not retained at failure boundary",
+            "first_nonfinite_detection": (
+                "epoch 106: trainer raised FloatingPointError(non-finite training loss)"
+                if seed == "dev-1"
+                else "not retained locally; terminal run had no valid checkpoint or endpoint after e101"
+            ),
+            "no_valid_causal_endpoint": True,
+        }
+    return output
 
 
 def format_pp(value: float) -> str:
@@ -248,6 +366,22 @@ def report_markdown(result: Mapping[str, Any]) -> str:
                 )
     lines += [
         "",
+        "## Primary e114 held-out comparisons",
+        "",
+        "| seed | DPM − Control | D-BDD − Control | D-BDD − DPM |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    for seed in SEEDS:
+        e114 = result["held_out"][seed]
+        control_ra = e114["control"]["114"]["robust_accuracy"]
+        dpm_ra = e114["dpm"]["114"]["robust_accuracy"]
+        dbdd_ra = e114["dbdd"]["114"]["robust_accuracy"]
+        lines.append(
+            f"| {seed} | {format_pp(dpm_ra - control_ra)} | {format_pp(dbdd_ra - control_ra)} | "
+            f"{format_pp(dbdd_ra - dpm_ra)} |"
+        )
+    lines += [
+        "",
         "## e114 paired train effects",
         "",
         "| seed | comparison | scope | clean Δ | robust Δ |",
@@ -274,8 +408,23 @@ def report_markdown(result: Mapping[str, Any]) -> str:
     ]
     for seed in SEEDS:
         item = result["sbdd_numerics"][seed]
-        lines.append(f"| {seed} | {item['host']} | {item['summary']} |")
+        max_abs = item["last_checkpoint_model_max_abs"]
+        max_abs_text = f"; last checkpoint |w|max {max_abs:.3g}" if max_abs is not None else ""
+        lines.append(
+            f"| {seed} | {item['host']} | last retained finite e{item['last_retained_finite_epoch']}: "
+            f"loss {item['last_retained_train_loss']:.6g}{max_abs_text}; "
+            f"{item['first_nonfinite_detection']} |"
+        )
+    ratio = result["sbdd_calibration"]["achieved_ratio_summary"]["secant_boundary_distance"]
     lines += [
+        "",
+        "The frozen pooled v2 calibration targeted median 0.25 but had achieved ratios spanning "
+        f"{ratio['min']:.4g}–{ratio['max']:.4g} (IQR {ratio['iqr']:.4g}), which is retained as a pre-training "
+        "warning sign rather than an outcome-tuned basis for changing the coefficient.",
+        "",
+        "Control, DPM, and D-BDD each reached e114 with finite retained loss/throughput telemetry and registered "
+        "CE-PGD20 endpoints. Removing S-BDD therefore leaves the preregistered D-BDD vs DPM held-out comparison "
+        "fully evaluable.",
         "",
         "## Scope boundary",
         "",
@@ -324,34 +473,19 @@ def main() -> int:
             for epoch in (104, 109, 114):
                 replay = STATE_ROOTS[(seed, arm)] / f"e{epoch}"
                 metadata = read_json(replay / "state-replay.json")
-                if metadata.get("attack_identity_sha256") != ATTACK_SHA or metadata.get("split_identity", {}).get(
-                    "sample_id_label_sha256"
-                ) != read_json(MASK_PATHS[seed]).get("masks", {}).get("s2_t1", {}).get("namespace", "train"):
-                    # The train split hash differs from validation's public split hash;
-                    # row cardinality and replay contract are checked below instead.
-                    pass
                 rows = read_rows(replay / "state-rows.parquet")
-                if len(rows) != 45_000 or metadata.get("row_count") != 45_000:
+                validate_state_replay_metadata(metadata, rows_path=replay / "state-rows.parquet", expected_epoch=epoch)
+                if len(rows) != 45_000:
                     raise AggregationError(f"train state replay row count differs: {replay}")
                 state_transitions[seed][arm][str(epoch)] = current_state_transitions(
                     initial_rows=anchor_rows, selected=selected, current_rows=rows
                 )
     calibration = read_json(Path("docs/experiments/ert_rslad_i100_s2_secant_boundary_distance_calibration_v2.json"))
-    sbdd = {
-        "dev-1": {
-            "host": "Hamster GPU1",
-            "summary": "e106 non-finite training loss after e105 model maxabs 3.20e27; e101 loss 3.087e12.",
-        },
-        "dev-2": {
-            "host": "Ferret GPU0",
-            "summary": "nonzero terminal failure under the same corrected v2 source/calibration; "
-            "no valid causal endpoint.",
-        },
-    }
+    sbdd = sbdd_numerical_evidence(calibration)
     result = {
         "schema_version": 1,
         "contract": "ert_rslad_i100_s2_dynamic_bdd_recovery_results_v1",
-        "source_git_sha": __import__("subprocess").check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        "source_git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
         "endpoint_attack_identity_sha256": ATTACK_SHA,
         "teacher_checkpoint_sha256": TEACHER_SHA,
         "comparisons": ["DPM-Control", "D-BDD-Control", "D-BDD-DPM"],
