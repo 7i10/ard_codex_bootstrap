@@ -448,6 +448,7 @@ FEATURES = {
     "teacher_margin": ("teacher_adv_logit_margin",),
     "student_teacher_margins": ("student_adv_logit_margin", "teacher_adv_logit_margin"),
     "student_distance": ("student_distance_inf",),
+    "distance_gap": ("delta_distance_inf",),
     "normal_mismatch": ("normal_mismatch",),
     "geometry_minimal": ("student_distance_inf", "normal_mismatch", "delta_distance_inf"),
     "geometry_distance_relation": (
@@ -676,7 +677,7 @@ def analyze(
                 - predictors[str(epoch)]["student_margin"][direction]["auroc"],
                 "student_distance_minus_student_margin": predictors[str(epoch)]["student_distance"][direction]["auroc"]
                 - predictors[str(epoch)]["student_margin"][direction]["auroc"],
-                "delta_distance_minus_student_margin": predictors[str(epoch)]["geometry_minimal"][direction]["auroc"]
+                "delta_distance_minus_student_margin": predictors[str(epoch)]["distance_gap"][direction]["auroc"]
                 - predictors[str(epoch)]["student_margin"][direction]["auroc"],
                 "minimal_geometry_minus_student_margin": predictors[str(epoch)]["geometry_minimal"][direction]["auroc"]
                 - predictors[str(epoch)]["student_margin"][direction]["auroc"],
