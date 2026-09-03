@@ -89,6 +89,7 @@ def test_collect_includes_top_level_output_json_and_jsonl() -> None:
     collect = (SCRIPTS / "ferret-collect").read_text()
     assert "--include='/outputs/*.json'" in collect
     assert "--include='/outputs/*.jsonl'" in collect
+    assert "--include='/outputs/**/*.parquet'" in collect
 
 
 @pytest.mark.unit
@@ -114,6 +115,19 @@ def test_dynamic_bdd_launcher_materializes_hash_bound_parents_before_prepare() -
         "ARD_ORCH_ATTEMPT_ID",
     ):
         assert variable in launcher
+
+
+@pytest.mark.unit
+def test_dynamic_bdd_state_replay_remote_wrappers_require_hash_bound_inputs() -> None:
+    launcher = (ROOT / "scripts/launch_ferret_i100_dynamic_bdd_state_replay.sh").read_text()
+    probe = (ROOT / "scripts/probe_ferret_i100_dynamic_bdd_state_replay.sh").read_text()
+    for argument in ("--remote-config", "--remote-config-sha256", "--checkpoint", "--checkpoint-sha256"):
+        assert argument in launcher
+    assert "sha256sum" in launcher
+    assert "scripts/replay_ert_i100_s2_dynamic_bdd_states.py" in launcher
+    assert '"${FERRET_PYTHON}"' in launcher
+    assert "state-replay.json" in probe
+    assert "state-rows.parquet" in probe
 
 
 @pytest.mark.unit
