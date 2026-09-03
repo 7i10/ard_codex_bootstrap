@@ -56,15 +56,28 @@ official test, or AutoAttack.
 - [x] R2 — Prove control/DPM/D-BDD one-batch parity across the S-BDD-only
       source delta and harden launch-gate/Ferret parent materialization,
       completion-probe, and source-freeze checks.
-- [ ] R3 — Commit and push the recovery source, freeze one recovery manifest,
+- [x] R3 — Commit and push the recovery source, freeze one recovery manifest,
       and run gate preflight, dry-run, and bounded canary before any recovery
       job is launched.
-- [ ] R4 — Recover only the non-valid jobs, recover endpoints without
+- [x] R4 — Recover only the non-valid jobs, recover endpoints without
       retraining where permitted, then validate all final completion markers
       and endpoint lineage.
 - [ ] R5 — Reconstruct fixed e99 S2×T1 state transitions at e104/e109/e114,
       aggregate the registered BDI decision, write the human/machine reports,
       commit, push, and stop.
+
+R5 uses a new read-only CE-PGD20 state replay because the original endpoint
+rows retain Student predictions/margins but not the Student adversarial images
+or Teacher outputs, and train-split rows were registered only at epoch 114.
+The replay is checkpoint-only: it neither resumes nor modifies training.
+
+The corrected `student_parameter_graph_v2` S-BDD implementation was run once
+per development seed with its hash-bound v2 calibration and became non-finite
+in both runs.  It is therefore frozen as `NUMERICALLY_UNSUPPORTED`: no further
+technical retry or in-place floor/cap/smoothed-reciprocal change is permitted
+in this screen.  R5 reports Control, DPM, and D-BDD as the causal comparison;
+any stabilization proposal requires a separate contract, calibration, and
+experiment.
 
 ## Scientific decisions frozen for this milestone
 

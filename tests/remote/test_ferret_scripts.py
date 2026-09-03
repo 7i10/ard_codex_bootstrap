@@ -85,6 +85,13 @@ def test_prepare_serializes_shared_git_fetches() -> None:
 
 
 @pytest.mark.unit
+def test_collect_includes_top_level_output_json_and_jsonl() -> None:
+    collect = (SCRIPTS / "ferret-collect").read_text()
+    assert "--include='/outputs/*.json'" in collect
+    assert "--include='/outputs/*.jsonl'" in collect
+
+
+@pytest.mark.unit
 def test_dynamic_bdd_launcher_materializes_hash_bound_parents_before_prepare() -> None:
     launcher = (ROOT / "scripts/launch_ferret_dynamic_bdd_job.sh").read_text()
     for argument in (
