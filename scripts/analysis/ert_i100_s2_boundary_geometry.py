@@ -153,6 +153,10 @@ def _loader(config: Any, scope: str) -> tuple[Any, DataLoader]:
         augmentation_seed=config.seeds.augmentation,
     )
     dataset = train if scope == "train" else validation
+    if scope == "train":
+        # The secondary train replay must use the registered e99 augmentation
+        # view (CropShift prefix, before the I100 epoch-100 switch).
+        dataset.set_epoch(99)
     loader = DataLoader(
         dataset,
         batch_size=config.training.per_rank_batch_size,
@@ -261,6 +265,14 @@ def replay(
             s_adv = student(adv).detach().float()
             t_adv = teacher(adv).detach().float()
         labels = batch.labels.long()
+        selected_positions = [
+            i for i, sid in enumerate(batch.sample_ids.tolist()) if int(sid) in selected
+        ]
+        # The attack must still be replayed for every batch to preserve the
+        # registered batch-index random-start stream, but gradients are only
+        # needed for selected IDs in the secondary train scope.
+        if not selected_positions:
+            continue
         rivals = _rivals(s_adv, labels)
         s_adv_grad = _input_gradient(student, adv, labels, rivals)
         t_adv_grad = _input_gradient(teacher, adv, labels, rivals)
@@ -279,7 +291,6 @@ def replay(
         cosine_adv = F.cosine_similarity(s_adv_grad.flatten(1), t_adv_grad.flatten(1), dim=1, eps=EPS)
         cosine_clean_s = F.cosine_similarity(s_clean_grad.flatten(1), s_adv_grad.flatten(1), dim=1, eps=EPS)
         cosine_clean_t = F.cosine_similarity(t_clean_grad.flatten(1), t_adv_grad.flatten(1), dim=1, eps=EPS)
-        selected_positions = [i for i, sid in enumerate(batch.sample_ids.tolist()) if int(sid) in selected]
         for i in selected_positions:
             values = {
                 "scope": scope,
