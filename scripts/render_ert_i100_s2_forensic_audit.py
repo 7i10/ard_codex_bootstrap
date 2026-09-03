@@ -509,6 +509,7 @@ def main() -> int:
     parser.add_argument("--secant-report", type=Path, required=True)
     parser.add_argument("--secant-output", type=Path, required=True)
     parser.add_argument("--analysis-source-sha", required=True)
+    parser.add_argument("--secant-replay-source-sha", required=True)
     args = parser.parse_args()
 
     longitudinal = read_json(args.longitudinal)
@@ -517,7 +518,8 @@ def main() -> int:
     secant_output = {
         "schema_version": 1,
         "contract": "ert_rslad_i100_s2_secant_boundary_distance_forensic_v1",
-        "analysis_source_git_sha": args.analysis_source_sha,
+        "render_source_git_sha": args.analysis_source_sha,
+        "secant_replay_source_git_sha": args.secant_replay_source_sha,
         "classification": "SBPF2_FORMULA_SINGULARITY_SUPPORTED",
         "classification_scope": (
             "corrected v2 scalar/parameter gradients agree with finite differences; reciprocal secant "
