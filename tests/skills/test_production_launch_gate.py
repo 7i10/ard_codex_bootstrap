@@ -5,6 +5,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -17,6 +18,7 @@ def gate_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
 
 # Regression provenance: historical launch failures are summarized in
 # docs/ERT_RSLAD_UNSEEN_CONFIRMATION_ORCHESTRATION_AUDIT.md (source identifier
@@ -52,31 +54,25 @@ REGRESSION_CASES = {
         "tests/skills/test_multi_gpu_orchestrator.py::"
         "test_host_confirmation_requires_observed_remote_origin_when_registered"
     ),
-    "R25": (
-        "tests/skills/test_artifact_inventory.py::"
-        "test_collection_stages_remote_metadata_to_canonical_local_path"
-    ),
+    "R25": ("tests/skills/test_artifact_inventory.py::test_collection_stages_remote_metadata_to_canonical_local_path"),
     "R26": (
         "tests/skills/test_multi_gpu_orchestrator.py::"
         "test_launch_ledger_requires_full_prelaunch_evidence_and_measures_target"
     ),
     "R27": (
-        "tests/skills/test_multi_gpu_orchestrator.py::"
-        "test_strict_critical_path_ledger_records_automatic_slo_breach"
+        "tests/skills/test_multi_gpu_orchestrator.py::test_strict_critical_path_ledger_records_automatic_slo_breach"
     ),
     "R28": (
         "tests/skills/test_multi_gpu_orchestrator.py::"
         "test_workspace_contract_rejects_future_output_outside_registered_runtime"
     ),
     "R29": (
-        "tests/skills/test_multi_gpu_orchestrator.py::"
-        "test_controller_never_precreates_or_pollutes_scientific_output"
+        "tests/skills/test_multi_gpu_orchestrator.py::test_controller_never_precreates_or_pollutes_scientific_output"
     ),
     "R30": "test_static_cli_failure_blocks_before_manifest_freeze",
     "R31": "test_exact_public_cli_smoke_binds_source_command_config_parent_and_execution_class",
     "R32": (
-        "tests/skills/test_multi_gpu_orchestrator.py::"
-        "test_stale_result_from_prior_campaign_cannot_release_gpu_slot"
+        "tests/skills/test_multi_gpu_orchestrator.py::test_stale_result_from_prior_campaign_cannot_release_gpu_slot"
     ),
     "R33": (
         "docs/ARD_OPERATIONAL_FOUNDATION.md#layer-ownership-and-first-remediation "
@@ -92,6 +88,135 @@ REGRESSION_CASES = {
 
 def test_regression_case_registry_covers_r1_to_r35() -> None:
     assert set(REGRESSION_CASES) == {f"R{number}" for number in range(1, 36)}
+
+
+def test_distinct_remote_preflights_run_concurrently_and_render_in_host_order(monkeypatch) -> None:
+    module = gate_module()
+    barrier = threading.Barrier(2)
+
+    def fake_remote_preflight(*, host, profile, source_sha, bindings, errors):
+        del profile, source_sha, bindings, errors
+        barrier.wait(timeout=1)
+        return {"host": host, "status": "pass"}
+
+    monkeypatch.setattr(module, "run_remote_preflight", fake_remote_preflight)
+    errors: list[dict] = []
+    reports = module.run_remote_preflights(
+        hosts={"remote-b": {"backend": "external"}, "remote-a": {"backend": "external"}},
+        source_sha="a" * 40,
+        bindings_by_host={"remote-a": [], "remote-b": []},
+        errors=errors,
+    )
+
+    assert errors == []
+    assert list(reports) == ["remote-a", "remote-b"]
+
+
+def test_parallel_static_entries_are_concurrent_but_reported_in_manifest_order(monkeypatch, tmp_path: Path) -> None:
+    module = gate_module()
+    barrier = threading.Barrier(2)
+
+    def fake_static(manifest, gate_dir, entry):
+        del manifest, gate_dir
+        barrier.wait(timeout=1)
+        return {"job_id": entry["job_id"], "status": "pass"}
+
+    monkeypatch.setattr(module, "_run_static_cli_entry", fake_static)
+    manifest = {
+        "jobs": [{"job_id": "second"}, {"job_id": "first"}],
+        "launch_gate": {
+            "canary": {
+                "static_cli": [
+                    {"job_id": "second", "parallel_safe": True},
+                    {"job_id": "first", "parallel_safe": True},
+                ]
+            }
+        },
+    }
+
+    report = module.run_static_cli_smokes(manifest, tmp_path)
+
+    assert report["status"] == "pass"
+    assert report["parallel_entries"] == 2
+    assert [result["job_id"] for result in report["results"]] == ["second", "first"]
+
+
+def test_parallel_exact_smokes_require_distinct_fixed_resources(monkeypatch, tmp_path: Path) -> None:
+    module = gate_module()
+    barrier = threading.Barrier(2)
+
+    def fake_canary(manifest, gate_dir, entry, job, kind, binding, smoke_group):
+        del manifest, gate_dir, kind, binding, smoke_group
+        barrier.wait(timeout=1)
+        return {"job_id": job["job_id"], "status": "pass", "parallel_safe": entry["parallel_safe"]}
+
+    monkeypatch.setattr(module, "_run_canary_entry", fake_canary)
+    job_template = {
+        "host": "local",
+        "cwd": str(tmp_path),
+        "env": {},
+        "command": [sys.executable, "-c", "pass"],
+        "scientific_config": {"sha256": "c" * 64},
+        "parent": {"sha256": "p" * 64},
+    }
+    manifest = {
+        "schema_version": 1,
+        "campaign_id": "parallel-exact-fixture",
+        "source": {"git_sha": "a" * 40},
+        "hosts": {"local": {"backend": "local"}},
+        "jobs": [
+            {"job_id": "first", "gpu": 0, **job_template},
+            {"job_id": "second", "gpu": 1, **job_template},
+        ],
+        "launch_gate": {
+            "canary": {
+                "jobs": [
+                    {
+                        "job_id": "first",
+                        "kind": "exact_public_cli",
+                        "execution_class": "local",
+                        "command": [sys.executable, "-c", "pass"],
+                        "parallel_safe": True,
+                        "parallel_resource_key": "local-gpu0",
+                    },
+                    {
+                        "job_id": "second",
+                        "kind": "exact_public_cli",
+                        "execution_class": "local",
+                        "command": [sys.executable, "-c", "pass"],
+                        "parallel_safe": True,
+                        "parallel_resource_key": "local-gpu1",
+                    },
+                ]
+            }
+        },
+    }
+
+    report = module.run_canary(manifest, tmp_path)
+
+    assert report["status"] == "pass"
+    assert report["parallel_entries"] == 2
+    assert [result["job_id"] for result in report["results"]] == ["first", "second"]
+
+    collision = [
+        (
+            0,
+            {"parallel_safe": True, "parallel_resource_key": "shared"},
+            {"host": "local", "gpu": 0},
+            "exact_public_cli",
+            None,
+            None,
+        ),
+        (
+            1,
+            {"parallel_safe": True, "parallel_resource_key": "shared"},
+            {"host": "local", "gpu": 0},
+            "exact_public_cli",
+            None,
+            None,
+        ),
+    ]
+    assert module._parallel_canary_indexes(collision) == set()
 
 
 def sha(path: Path) -> str:

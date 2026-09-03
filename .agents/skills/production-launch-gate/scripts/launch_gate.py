@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,7 @@ FORBIDDEN_RETRY_FIELDS = {
 }
 REQUIRED_ATTACK_FIELDS = {"loss", "epsilon", "step_size", "steps", "random_start", "target"}
 REMOTE_PREFLIGHT_SCHEMA = 1
+MAX_PARALLEL_GATE_CHECKS = 4
 
 # Resolve one immutable input once per observed file state.  The cache key
 # deliberately includes path identity and stat evidence; a changed file (or a
@@ -796,6 +798,68 @@ def run_remote_preflight(
     return report
 
 
+def run_remote_preflights(
+    *,
+    hosts: dict[str, dict[str, Any]],
+    source_sha: str,
+    bindings_by_host: dict[str, list[dict[str, Any]]],
+    errors: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Run distinct external-host preflights concurrently and render in host order.
+
+    A remote preflight is host-scoped, read-only, and already bounded by its
+    contract timeout.  Running different hosts concurrently removes needless
+    control-plane serialization without relaxing any host/input validation.
+    Each worker owns a local error list; the caller merges those lists in
+    deterministic host order after every bounded command has returned.
+    """
+    tasks = [
+        (host, profile, bindings_by_host[host])
+        for host, profile in sorted(hosts.items())
+        if profile.get("backend", "local") == "external" and host in bindings_by_host
+    ]
+    if not tasks:
+        return {}
+
+    def execute(
+        host: str, profile: dict[str, Any], bindings: list[dict[str, Any]]
+    ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+        local_errors: list[dict[str, Any]] = []
+        try:
+            report = run_remote_preflight(
+                host=host,
+                profile=profile,
+                source_sha=source_sha,
+                bindings=bindings,
+                errors=local_errors,
+            )
+        except Exception as exc:  # pragma: no cover - defensive wrapper boundary
+            error(
+                local_errors,
+                host,
+                "remote_preflight.internal",
+                "bounded preflight result",
+                str(exc),
+                "repair the remote preflight implementation",
+            )
+            report = None
+        return report, local_errors
+
+    results: dict[str, tuple[dict[str, Any] | None, list[dict[str, Any]]]] = {}
+    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL_GATE_CHECKS, len(tasks))) as executor:
+        futures = {host: executor.submit(execute, host, profile, bindings) for host, profile, bindings in tasks}
+        for host, _, _ in tasks:
+            results[host] = futures[host].result()
+
+    reports: dict[str, Any] = {}
+    for host, _, _ in tasks:
+        report, local_errors = results[host]
+        errors.extend(local_errors)
+        if report is not None:
+            reports[host] = report
+    return reports
+
+
 def artifact_inventory_script() -> Path:
     return Path(__file__).with_name("artifact_inventory.py")
 
@@ -1373,25 +1437,25 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             wandb_ids,
             "use campaign/job/identity-specific run IDs",
         )
-    remote_preflights: dict[str, Any] = {}
+    remote_bindings: dict[str, list[dict[str, Any]]] = {}
     for host, profile in hosts.items():
-        host_jobs = [job for job in resolved_jobs if job.get("host") == host]
-        if profile.get("backend", "local") != "external" or not host_jobs:
+        if profile.get("backend", "local") != "external":
             continue
-        report = run_remote_preflight(
-            host=host,
-            profile=profile,
-            source_sha=str(source.get("git_sha", "")),
-            bindings=remote_artifact_bindings(
-                jobs=host_jobs,
-                dataset_identity=dataset_identity,
-                teacher_identity=teacher_spec.get("identity") if isinstance(teacher_spec, dict) else None,
-                teacher=teacher_spec,
-            ),
-            errors=errors,
+        host_jobs = [job for job in resolved_jobs if job.get("host") == host]
+        if not host_jobs:
+            continue
+        remote_bindings[host] = remote_artifact_bindings(
+            jobs=host_jobs,
+            dataset_identity=dataset_identity,
+            teacher_identity=teacher_spec.get("identity") if isinstance(teacher_spec, dict) else None,
+            teacher=teacher_spec,
         )
-        if report is not None:
-            remote_preflights[host] = report
+    remote_preflights = run_remote_preflights(
+        hosts=hosts,
+        source_sha=str(source.get("git_sha", "")),
+        bindings_by_host=remote_bindings,
+        errors=errors,
+    )
     artifact_collection = validate_artifact_collection_contract(
         spec.get("artifact_collection"),
         base=base,
@@ -1694,11 +1758,7 @@ def smoke_group_coverage(manifest: dict[str, Any], job: dict[str, Any]) -> list[
     group = job.get("smoke_group")
     if not isinstance(group, str) or not group:
         return [str(job["job_id"])]
-    return [
-        str(candidate["job_id"])
-        for candidate in manifest.get("jobs", [])
-        if candidate.get("smoke_group") == group
-    ]
+    return [str(candidate["job_id"]) for candidate in manifest.get("jobs", []) if candidate.get("smoke_group") == group]
 
 
 def requires_exact_smoke(job: dict[str, Any]) -> bool:
@@ -1734,60 +1794,106 @@ def exact_smoke_binding(manifest: dict[str, Any], job: dict[str, Any], command: 
     }
 
 
-def run_static_cli_smokes(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
-    """Run compile/import/--help checks before a controller can reserve a GPU."""
-    canary = manifest.get("launch_gate", {}).get("canary", {})
-    entries = canary.get("static_cli", []) if isinstance(canary, dict) else []
-    results: list[dict[str, Any]] = []
-    for entry in entries if isinstance(entries, list) else []:
-        job_id = entry.get("job_id") if isinstance(entry, dict) else None
-        commands = entry.get("commands") if isinstance(entry, dict) else None
-        job = next((item for item in manifest["jobs"] if item["job_id"] == job_id), None)
-        valid_commands = isinstance(commands, list) and commands and all(_argv(item) for item in commands)
-        if job is None or not valid_commands:
-            results.append(
+def _run_static_cli_entry(manifest: dict[str, Any], gate_dir: Path, entry: Any) -> dict[str, Any]:
+    """Run one static entry; commands inside an entry intentionally stay ordered."""
+    started_at = now()
+    job_id = entry.get("job_id") if isinstance(entry, dict) else None
+    commands = entry.get("commands") if isinstance(entry, dict) else None
+    job = next((item for item in manifest["jobs"] if item["job_id"] == job_id), None)
+    valid_commands = isinstance(commands, list) and commands and all(_argv(item) for item in commands)
+    if job is None or not valid_commands:
+        return {
+            "job_id": job_id,
+            "status": "fail",
+            "error": "static_cli requires known job_id and commands",
+            "started_at": started_at,
+            "finished_at": now(),
+        }
+    try:
+        timeout = float(entry.get("timeout_seconds", 30))
+    except (AttributeError, TypeError, ValueError):
+        timeout = 0
+    if timeout <= 0 or timeout > 120:
+        return {
+            "job_id": job_id,
+            "status": "fail",
+            "error": "static_cli timeout must be bounded",
+            "started_at": started_at,
+            "finished_at": now(),
+        }
+    command_results: list[dict[str, Any]] = []
+    for ordinal, command in enumerate(commands):
+        output = gate_dir / "static-cli" / str(job_id) / str(ordinal)
+        try:
+            output.mkdir(parents=True, exist_ok=True)
+            completed = subprocess.run(command, cwd=job["cwd"], text=True, capture_output=True, timeout=timeout)
+            (output / "stdout.txt").write_text(completed.stdout, encoding="utf-8")
+            (output / "stderr.txt").write_text(completed.stderr, encoding="utf-8")
+            command_results.append(
+                {"argv": command, "argv_sha256": digest(command), "returncode": completed.returncode}
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            command_results.append(
                 {
-                    "job_id": job_id,
-                    "status": "fail",
-                    "error": "static_cli requires known job_id and commands",
+                    "argv": command,
+                    "argv_sha256": digest(command),
+                    "error": str(exc),
+                    "returncode": 127,
                 }
             )
-            continue
-        timeout = float(entry.get("timeout_seconds", 30))
-        if timeout <= 0 or timeout > 120:
-            results.append({"job_id": job_id, "status": "fail", "error": "static_cli timeout must be bounded"})
-            continue
-        command_results: list[dict[str, Any]] = []
-        for ordinal, command in enumerate(commands):
-            output = gate_dir / "static-cli" / str(job_id) / str(ordinal)
-            output.mkdir(parents=True, exist_ok=True)
-            try:
-                completed = subprocess.run(command, cwd=job["cwd"], text=True, capture_output=True, timeout=timeout)
-                (output / "stdout.txt").write_text(completed.stdout, encoding="utf-8")
-                (output / "stderr.txt").write_text(completed.stderr, encoding="utf-8")
-                command_results.append(
-                    {"argv": command, "argv_sha256": digest(command), "returncode": completed.returncode}
-                )
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                command_results.append(
-                    {
-                        "argv": command,
-                        "argv_sha256": digest(command),
-                        "error": str(exc),
-                        "returncode": 127,
-                    }
-                )
-        results.append(
-            {
-                "job_id": job_id,
-                "status": "pass" if all(row["returncode"] == 0 for row in command_results) else "fail",
-                "commands": command_results,
-            }
-        )
+    return {
+        "job_id": job_id,
+        "status": "pass" if all(row["returncode"] == 0 for row in command_results) else "fail",
+        "commands": command_results,
+        "parallel_safe": bool(isinstance(entry, dict) and entry.get("parallel_safe") is True),
+        "started_at": started_at,
+        "finished_at": now(),
+    }
+
+
+def _parallel_static_indexes(entries: list[Any]) -> set[int]:
+    """Return explicitly isolated static checks with unique output namespaces."""
+    safe_job_ids = [
+        entry.get("job_id")
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("parallel_safe") is True and isinstance(entry.get("job_id"), str)
+    ]
+    return {
+        index
+        for index, entry in enumerate(entries)
+        if isinstance(entry, dict)
+        and entry.get("parallel_safe") is True
+        and isinstance(entry.get("job_id"), str)
+        and safe_job_ids.count(entry["job_id"]) == 1
+    }
+
+
+def run_static_cli_smokes(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
+    """Run static checks with opt-in concurrency and deterministic result order."""
+    canary = manifest.get("launch_gate", {}).get("canary", {})
+    entries = canary.get("static_cli", []) if isinstance(canary, dict) else []
+    entries = entries if isinstance(entries, list) else []
+    results: list[dict[str, Any] | None] = [None] * len(entries)
+    parallel_indexes = _parallel_static_indexes(entries)
+    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL_GATE_CHECKS, max(1, len(parallel_indexes)))) as executor:
+        futures = {
+            index: executor.submit(_run_static_cli_entry, manifest, gate_dir, entries[index])
+            for index in sorted(parallel_indexes)
+        }
+        for index, entry in enumerate(entries):
+            if index not in parallel_indexes:
+                results[index] = _run_static_cli_entry(manifest, gate_dir, entry)
+        for index in sorted(parallel_indexes):
+            results[index] = futures[index].result()
+    rendered = [item for item in results if item is not None]
     required = bool(manifest.get("launch_gate", {}).get("require_exact_smoke"))
-    if required and not results:
-        results.append({"status": "fail", "error": "static_cli checks are required before exact smoke/fan-out"})
-    return {"status": "pass" if all(row.get("status") == "pass" for row in results) else "fail", "results": results}
+    if required and not rendered:
+        rendered.append({"status": "fail", "error": "static_cli checks are required before exact smoke/fan-out"})
+    return {
+        "status": "pass" if all(row.get("status") == "pass" for row in rendered) else "fail",
+        "parallel_entries": len(parallel_indexes),
+        "results": rendered,
+    }
 
 
 def validate_exact_smoke_report(manifest: dict[str, Any], report: dict[str, Any]) -> list[str]:
@@ -1833,8 +1939,7 @@ def validate_exact_smoke_report(manifest: dict[str, Any], report: dict[str, Any]
         entries = [
             item
             for item in exact
-            if item.get("binding", {}).get("smoke_group") == group
-            and set(item.get("covered_job_ids", [])) == expected
+            if item.get("binding", {}).get("smoke_group") == group and set(item.get("covered_job_ids", [])) == expected
         ]
         if not entries:
             errors.append(f"smoke_group {group} has no exact public-CLI representative")
@@ -1853,138 +1958,216 @@ def validate_exact_smoke_report(manifest: dict[str, Any], report: dict[str, Any]
     return errors
 
 
+def _run_canary_entry(
+    manifest: dict[str, Any],
+    gate_dir: Path,
+    entry: dict[str, Any],
+    job: dict[str, Any],
+    kind: str,
+    binding: dict[str, Any] | None,
+    smoke_group: str | None,
+) -> dict[str, Any]:
+    """Execute one prevalidated canary entry in its isolated gate namespace."""
+    started_at = now()
+    output = gate_dir / "canary" / entry["job_id"]
+    try:
+        output.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return {
+            "job_id": job["job_id"],
+            "status": "fail",
+            "error": str(exc),
+            "started_at": started_at,
+            "finished_at": now(),
+        }
+    env = os.environ.copy()
+    env.update({str(k): str(v) for k, v in job.get("env", {}).items()})
+    env["ARD_LAUNCH_GATE_CANARY"] = "1"
+    env["ARD_ORCH_JOB_ID"] = job["job_id"]
+    env["ARD_ORCH_SOURCE_SHA"] = manifest["source"]["git_sha"]
+    env["ARD_LAUNCH_GATE_EXPECTED_HOST"] = job["host"]
+    env["ARD_LAUNCH_GATE_EXPECTED_EXECUTION_CLASS"] = execution_class(manifest, job)
+    if job.get("gpu") is not None:
+        env["CUDA_VISIBLE_DEVICES"] = str(job["gpu"])
+    try:
+        timeout = float(entry.get("timeout_seconds", 30))
+    except (TypeError, ValueError):
+        timeout = 0
+    if timeout <= 0 or timeout > 120:
+        return {
+            "job_id": job["job_id"],
+            "status": "fail",
+            "error": "canary timeout must be bounded",
+            "started_at": started_at,
+            "finished_at": now(),
+        }
+    try:
+        completed = subprocess.run(
+            entry["command"], cwd=job["cwd"], env=env, text=True, capture_output=True, timeout=timeout
+        )
+        (output / "stdout.txt").write_text(completed.stdout, encoding="utf-8")
+        (output / "stderr.txt").write_text(completed.stderr, encoding="utf-8")
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "job_id": job["job_id"],
+            "status": "fail",
+            "error": "canary timeout" if isinstance(exc, subprocess.TimeoutExpired) else str(exc),
+            "timeout_seconds": timeout,
+            "started_at": started_at,
+            "finished_at": now(),
+        }
+    result = {
+        "job_id": job["job_id"],
+        "kind": kind,
+        "command": entry["command"],
+        "binding": binding,
+        "smoke_group": smoke_group,
+        "covered_job_ids": smoke_group_coverage(manifest, job) if kind == "exact_public_cli" else [job["job_id"]],
+        "status": "pass" if completed.returncode == 0 else "fail",
+        "returncode": completed.returncode,
+        "timeout_seconds": timeout,
+        "parallel_safe": entry.get("parallel_safe") is True,
+        "parallel_resource_key": entry.get("parallel_resource_key"),
+        "started_at": started_at,
+        "finished_at": now(),
+    }
+    if (
+        result["status"] == "pass"
+        and kind == "exact_public_cli"
+        and execution_class(manifest, job) == "external"
+        and entry.get("subsumes_remote_lifecycle") is True
+    ):
+        try:
+            lifecycle_payload = json.loads(completed.stdout)
+        except json.JSONDecodeError:
+            lifecycle_payload = None
+        if not isinstance(lifecycle_payload, dict):
+            result.update(status="fail", error="exact remote smoke did not emit lifecycle JSON")
+        else:
+            lifecycle = stage_remote_lifecycle_payload(
+                manifest,
+                host=str(job["host"]),
+                payload=lifecycle_payload,
+                output=output,
+                timeout=timeout,
+            )
+            result["remote_lifecycle"] = lifecycle
+            if lifecycle["status"] != "pass":
+                result.update(status="fail", error="exact remote smoke lifecycle proof failed")
+            else:
+                result["subsumes_remote_lifecycle"] = True
+    return result
+
+
+def _parallel_canary_indexes(
+    entries: list[tuple[int, dict[str, Any], dict[str, Any], str, dict[str, Any] | None, str | None]],
+) -> set[int]:
+    """Allow only explicitly isolated exact-smoke entries to overlap.
+
+    Exact public-CLI smoke may touch a GPU or external runner.  A truthful
+    `parallel_safe` declaration therefore also needs a unique resource key and
+    a fixed, unique host/GPU assignment.  Bounded generic canaries stay
+    serial because the gate cannot infer their mutable-resource footprint.
+    """
+    candidates = [
+        item
+        for item in entries
+        if item[3] == "exact_public_cli"
+        and item[1].get("parallel_safe") is True
+        and isinstance(item[1].get("parallel_resource_key"), str)
+        and item[1]["parallel_resource_key"]
+        and isinstance(item[2].get("gpu"), int)
+    ]
+    resource_keys = [item[1]["parallel_resource_key"] for item in candidates]
+    slots = [(item[2]["host"], item[2]["gpu"]) for item in candidates]
+    return {
+        item[0]
+        for item in candidates
+        if resource_keys.count(item[1]["parallel_resource_key"]) == 1
+        and slots.count((item[2]["host"], item[2]["gpu"])) == 1
+    }
+
+
 def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
     started_at = now()
     canary = manifest.get("launch_gate", {}).get("canary", {})
     entries = canary.get("jobs", []) if isinstance(canary, dict) else []
-    results: list[dict[str, Any]] = []
+    entries = entries if isinstance(entries, list) else []
+    prefix_results: list[dict[str, Any]] = []
+    entry_results: dict[int, dict[str, Any]] = {}
     _, group_errors = smoke_group_contract(manifest)
     for message in group_errors:
-        results.append({"status": "fail", "kind": "smoke_group", "error": message})
+        prefix_results.append({"status": "fail", "kind": "smoke_group", "error": message})
     seen_groups: set[str] = set()
-    subsumed_hosts: set[str] = set()
-    for entry in entries:
+    prepared: list[tuple[int, dict[str, Any], dict[str, Any], str, dict[str, Any] | None, str | None]] = []
+    for index, entry in enumerate(entries):
         if (
             not isinstance(entry, dict)
             or not isinstance(entry.get("job_id"), str)
             or not isinstance(entry.get("command"), list)
         ):
-            results.append({"status": "fail", "error": "canary jobs require job_id and argv command"})
+            entry_results[index] = {"status": "fail", "error": "canary jobs require job_id and argv command"}
             continue
         job = next((item for item in manifest["jobs"] if item["job_id"] == entry["job_id"]), None)
         if job is None:
-            results.append({"job_id": entry["job_id"], "status": "fail", "error": "unknown production job"})
+            entry_results[index] = {"job_id": entry["job_id"], "status": "fail", "error": "unknown production job"}
             continue
         kind = entry.get("kind", "bounded_canary")
         if kind not in {"bounded_canary", "exact_public_cli"}:
-            results.append({"job_id": job["job_id"], "status": "fail", "error": "unknown canary kind"})
+            entry_results[index] = {"job_id": job["job_id"], "status": "fail", "error": "unknown canary kind"}
             continue
         smoke_group = job.get("smoke_group") if kind == "exact_public_cli" else None
         if entry.get("smoke_group") is not None and entry.get("smoke_group") != smoke_group:
-            results.append(
-                {
-                    "job_id": job["job_id"],
-                    "status": "fail",
-                    "error": "canary smoke_group differs from the resolved production job",
-                }
-            )
+            entry_results[index] = {
+                "job_id": job["job_id"],
+                "status": "fail",
+                "error": "canary smoke_group differs from the resolved production job",
+            }
             continue
         if isinstance(smoke_group, str) and smoke_group:
             if smoke_group in seen_groups:
-                results.append(
-                    {
-                        "job_id": job["job_id"],
-                        "kind": kind,
-                        "smoke_group": smoke_group,
-                        "status": "skipped_equivalent",
-                        "covered_by": smoke_group,
-                    }
-                )
+                entry_results[index] = {
+                    "job_id": job["job_id"],
+                    "kind": kind,
+                    "smoke_group": smoke_group,
+                    "status": "skipped_equivalent",
+                    "covered_by": smoke_group,
+                }
                 continue
             seen_groups.add(smoke_group)
         binding = exact_smoke_binding(manifest, job, entry["command"]) if kind == "exact_public_cli" else None
         if kind == "exact_public_cli" and (
             binding["config_sha256"] is None or binding["parent_checkpoint_sha256"] is None
         ):
-            results.append(
-                {
-                    "job_id": job["job_id"],
-                    "status": "fail",
-                    "error": "exact public-CLI smoke requires bound config and parent SHA-256",
-                }
-            )
+            entry_results[index] = {
+                "job_id": job["job_id"],
+                "status": "fail",
+                "error": "exact public-CLI smoke requires bound config and parent SHA-256",
+            }
             continue
         if kind == "exact_public_cli" and entry.get("execution_class") != binding["execution_class"]:
-            results.append(
-                {
-                    "job_id": job["job_id"],
-                    "status": "fail",
-                    "error": "exact public-CLI smoke execution_class differs from job host class",
-                }
-            )
-            continue
-        output = gate_dir / "canary" / entry["job_id"]
-        output.mkdir(parents=True, exist_ok=True)
-        env = os.environ.copy()
-        env.update({str(k): str(v) for k, v in job.get("env", {}).items()})
-        env["ARD_LAUNCH_GATE_CANARY"] = "1"
-        env["ARD_ORCH_JOB_ID"] = job["job_id"]
-        env["ARD_ORCH_SOURCE_SHA"] = manifest["source"]["git_sha"]
-        env["ARD_LAUNCH_GATE_EXPECTED_HOST"] = job["host"]
-        env["ARD_LAUNCH_GATE_EXPECTED_EXECUTION_CLASS"] = execution_class(manifest, job)
-        if job.get("gpu") is not None:
-            env["CUDA_VISIBLE_DEVICES"] = str(job["gpu"])
-        timeout = float(entry.get("timeout_seconds", 30))
-        try:
-            completed = subprocess.run(
-                entry["command"], cwd=job["cwd"], env=env, text=True, capture_output=True, timeout=timeout
-            )
-            (output / "stdout.txt").write_text(completed.stdout, encoding="utf-8")
-            (output / "stderr.txt").write_text(completed.stderr, encoding="utf-8")
-            result = {
+            entry_results[index] = {
                 "job_id": job["job_id"],
-                "kind": kind,
-                "command": entry["command"],
-                "binding": binding,
-                "smoke_group": smoke_group,
-                "covered_job_ids": smoke_group_coverage(manifest, job)
-                if kind == "exact_public_cli"
-                else [job["job_id"]],
-                "status": "pass" if completed.returncode == 0 else "fail",
-                "returncode": completed.returncode,
-                "timeout_seconds": timeout,
+                "status": "fail",
+                "error": "exact public-CLI smoke execution_class differs from job host class",
             }
-            if (
-                result["status"] == "pass"
-                and kind == "exact_public_cli"
-                and execution_class(manifest, job) == "external"
-                and entry.get("subsumes_remote_lifecycle") is True
-            ):
-                try:
-                    lifecycle_payload = json.loads(completed.stdout)
-                except json.JSONDecodeError:
-                    lifecycle_payload = None
-                if not isinstance(lifecycle_payload, dict):
-                    result.update(status="fail", error="exact remote smoke did not emit lifecycle JSON")
-                else:
-                    lifecycle = stage_remote_lifecycle_payload(
-                        manifest,
-                        host=str(job["host"]),
-                        payload=lifecycle_payload,
-                        output=output,
-                        timeout=timeout,
-                    )
-                    result["remote_lifecycle"] = lifecycle
-                    if lifecycle["status"] != "pass":
-                        result.update(status="fail", error="exact remote smoke lifecycle proof failed")
-                    else:
-                        result["subsumes_remote_lifecycle"] = True
-                        subsumed_hosts.add(str(job["host"]))
-            results.append(result)
-        except subprocess.TimeoutExpired:
-            results.append(
-                {"job_id": job["job_id"], "status": "fail", "error": "canary timeout", "timeout_seconds": timeout}
-            )
+            continue
+        prepared.append((index, entry, job, kind, binding, smoke_group))
+
+    parallel_indexes = _parallel_canary_indexes(prepared)
+    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL_GATE_CHECKS, max(1, len(parallel_indexes)))) as executor:
+        futures = {
+            index: executor.submit(_run_canary_entry, manifest, gate_dir, entry, job, kind, binding, smoke_group)
+            for index, entry, job, kind, binding, smoke_group in prepared
+            if index in parallel_indexes
+        }
+        for index, entry, job, kind, binding, smoke_group in prepared:
+            if index not in parallel_indexes:
+                entry_results[index] = _run_canary_entry(manifest, gate_dir, entry, job, kind, binding, smoke_group)
+        for index in sorted(parallel_indexes):
+            entry_results[index] = futures[index].result()
+
+    results = prefix_results + [entry_results[index] for index in range(len(entries))]
     if not entries:
         results.append(
             {
@@ -1992,13 +2175,22 @@ def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
                 "error": "no canary jobs declared; use --canary-only with a bounded non-scientific canary",
             }
         )
+    # Preserve the historical lifecycle rule: only a passed exact external
+    # smoke may suppress the generic host lifecycle proof.
+    jobs_by_id = {job["job_id"]: job for job in manifest["jobs"]}
+    subsumed_hosts = {
+        str(jobs_by_id[item["job_id"]]["host"])
+        for item in results
+        if item.get("status") == "pass"
+        and item.get("subsumes_remote_lifecycle") is True
+        and item.get("job_id") in jobs_by_id
+    }
     results.extend(run_remote_lifecycle_canaries(manifest, gate_dir, subsumed_hosts=subsumed_hosts))
     return {
-        "status": "pass"
-        if all(item.get("status") in {"pass", "skipped_equivalent"} for item in results)
-        else "fail",
+        "status": "pass" if all(item.get("status") in {"pass", "skipped_equivalent"} for item in results) else "fail",
         "started_at": started_at,
         "finished_at": now(),
+        "parallel_entries": len(parallel_indexes),
         "results": results,
     }
 
@@ -2070,24 +2262,30 @@ def revalidate_frozen(resolved_path: Path, freeze_path: Path) -> tuple[dict[str,
                     file_digest(config_path),
                     "restore the frozen config bytes",
                 )
-    for host, profile in manifest.get("hosts", {}).items():
+    remote_hosts = {
+        host: profile
+        for host, profile in manifest.get("hosts", {}).items()
+        if isinstance(profile, dict) and profile.get("backend", "local") == "external"
+    }
+    remote_bindings: dict[str, list[dict[str, Any]]] = {}
+    for host in remote_hosts:
         host_jobs = [job for job in manifest.get("jobs", []) if job.get("host") == host]
-        if not isinstance(profile, dict) or profile.get("backend", "local") != "external" or not host_jobs:
+        if not host_jobs:
             continue
         first_identity = host_jobs[0].get("scientific_identity", {})
         teacher = first_identity.get("teacher", {}) if isinstance(first_identity, dict) else {}
-        run_remote_preflight(
-            host=host,
-            profile=profile,
-            source_sha=str(expected_sha or ""),
-            bindings=remote_artifact_bindings(
-                jobs=host_jobs,
-                dataset_identity=manifest.get("launch_gate", {}).get("dataset_identity"),
-                teacher_identity=teacher.get("identity") if isinstance(teacher, dict) else None,
-                teacher=teacher if isinstance(teacher, dict) else {},
-            ),
-            errors=errors,
+        remote_bindings[host] = remote_artifact_bindings(
+            jobs=host_jobs,
+            dataset_identity=manifest.get("launch_gate", {}).get("dataset_identity"),
+            teacher_identity=teacher.get("identity") if isinstance(teacher, dict) else None,
+            teacher=teacher if isinstance(teacher, dict) else {},
         )
+    run_remote_preflights(
+        hosts=remote_hosts,
+        source_sha=str(expected_sha or ""),
+        bindings_by_host=remote_bindings,
+        errors=errors,
+    )
     return manifest, errors
 
 

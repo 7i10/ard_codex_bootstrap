@@ -33,6 +33,37 @@ def now() -> str:
     return dt.datetime.now(dt.UTC).isoformat()
 
 
+def elapsed_seconds(started_at: Any, finished_at: Any) -> float | None:
+    """Return a non-negative ISO-8601 duration, or ``None`` for legacy data."""
+    if not isinstance(started_at, str) or not isinstance(finished_at, str):
+        return None
+    try:
+        start = dt.datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        finish = dt.datetime.fromisoformat(finished_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if start.tzinfo is None or finish.tzinfo is None:
+        return None
+    seconds = (finish - start).total_seconds()
+    return seconds if seconds >= 0 else None
+
+
+def latest_timestamp(values: list[Any]) -> str | None:
+    parsed: list[tuple[dt.datetime, str]] = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        try:
+            timestamp = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if timestamp.tzinfo is not None:
+            parsed.append((timestamp.astimezone(dt.UTC), value))
+    if not parsed:
+        return None
+    return max(parsed, key=lambda item: item[0])[1]
+
+
 def canonical(value: Any) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
@@ -216,6 +247,10 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
     job["estimated_work"] = float(job.get("estimated_work", 1.0))
     if job["estimated_work"] < 0:
         raise ValueError(f"{job_id}: estimated_work must be non-negative")
+    work_unit = job.get("work_unit", "declared_work_units")
+    if not isinstance(work_unit, str) or not work_unit:
+        raise ValueError(f"{job_id}: work_unit must be a non-empty string when declared")
+    job["work_unit"] = work_unit
     job["gpu_count"] = int(job.get("gpu_count", 1))
     if job["gpu_count"] not in (0, 1):
         raise ValueError(f"{job_id}: only zero or one GPU per job is supported")
@@ -451,8 +486,15 @@ def save_state(manifest: dict[str, Any], state: dict[str, Any]) -> None:
     atomic_json(Path(manifest["_state_path"]), state)
 
 
-def marker_payload(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_id: str) -> dict[str, Any]:
-    return {
+def marker_payload(
+    manifest: dict[str, Any],
+    job: dict[str, Any],
+    attempt: int,
+    attempt_id: str,
+    *,
+    worker_started_at: str | None = None,
+) -> dict[str, Any]:
+    payload = {
         "schema_version": SCHEMA_VERSION,
         "status": "completed",
         "campaign_id": manifest["campaign_id"],
@@ -464,29 +506,47 @@ def marker_payload(manifest: dict[str, Any], job: dict[str, Any], attempt: int, 
         "output_dir": job["_output_dir"],
         "completed_at": now(),
     }
+    if worker_started_at is not None:
+        payload["worker_started_at"] = worker_started_at
+    return payload
 
 
-def valid_marker(manifest: dict[str, Any], job: dict[str, Any], path: Path) -> bool:
+def read_valid_marker(manifest: dict[str, Any], job: dict[str, Any], path: Path) -> dict[str, Any] | None:
     try:
         marker = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return False
-    return (
+        return None
+    if not isinstance(marker, dict):
+        return None
+    valid = (
         marker.get("status") == "completed"
         and marker.get("campaign_id") == manifest["campaign_id"]
         and marker.get("job_id") == job["job_id"]
         and marker.get("source_sha", "").lower() == manifest["source"]["git_sha"].lower()
         and marker.get("identity_hash") == job_identity(manifest, job)
     )
+    return marker if valid else None
 
 
-def valid_completion_marker(manifest: dict[str, Any], job: dict[str, Any]) -> bool:
-    """Accept a verified marker from either sidecar or pre-sidecar campaigns."""
+def valid_marker(manifest: dict[str, Any], job: dict[str, Any], path: Path) -> bool:
+    return read_valid_marker(manifest, job, path) is not None
+
+
+def completion_marker(manifest: dict[str, Any], job: dict[str, Any]) -> dict[str, Any] | None:
+    """Read a verified marker from either sidecar or pre-sidecar campaigns."""
     paths = [Path(job["_completion_marker"])]
     legacy = job.get("_legacy_completion_marker")
     if isinstance(legacy, str):
         paths.append(Path(legacy))
-    return any(valid_marker(manifest, job, path) for path in paths)
+    for path in paths:
+        marker = read_valid_marker(manifest, job, path)
+        if marker is not None:
+            return marker
+    return None
+
+
+def valid_completion_marker(manifest: dict[str, Any], job: dict[str, Any]) -> bool:
+    return completion_marker(manifest, job) is not None
 
 
 def failure_info(job: dict[str, Any]) -> dict[str, Any] | None:
@@ -681,6 +741,21 @@ def ready_jobs(manifest: dict[str, Any], state: dict[str, Any]) -> list[dict[str
             event(state, "dependency_blocked", job["job_id"], dependencies=job.get("dependencies", []))
             continue
         if all(status == "completed" for status in dependencies):
+            if "ready_at" not in record:
+                parent_completed = [
+                    state["jobs"][dependency].get("completed_at") for dependency in job.get("dependencies", [])
+                ]
+                parent_completed_at = latest_timestamp(parent_completed)
+                record["ready_at"] = now()
+                if parent_completed_at is not None:
+                    record["parent_completed_at"] = parent_completed_at
+                event(
+                    state,
+                    "dependencies_ready" if job.get("dependencies") else "root_ready",
+                    job["job_id"],
+                    dependencies=job.get("dependencies", []),
+                    parent_completed_at=record.get("parent_completed_at"),
+                )
             ready.append(job)
     return sorted(ready, key=lambda item: (-item["estimated_work"], item["job_id"]))
 
@@ -750,12 +825,101 @@ def start_worker(
         "gpu": slot[1],
         "gpu_uuid": slot[2],
         "launched_at": now(),
+        "estimated_work": job["estimated_work"],
+        "work_unit": job["work_unit"],
+        "planned_throughput": slot[3],
+        "planned_compute_seconds": job["estimated_work"] / slot[3],
         "log": str(log),
         "status": "running",
     }
     if job.get("_attempt_scoped_output"):
         record["attempt_output_dir"] = str(attempt_output_dir(manifest, job, attempt_id))
     return record
+
+
+def record_attempt_timing(
+    job: dict[str, Any],
+    attempt: dict[str, Any],
+    *,
+    worker_started_at: Any,
+    finished_at: Any,
+) -> None:
+    """Attach additive duration evidence without altering job lifecycle semantics."""
+    start = worker_started_at if isinstance(worker_started_at, str) else attempt.get("launched_at")
+    finish = finished_at if isinstance(finished_at, str) else None
+    if isinstance(start, str):
+        attempt["worker_started_at"] = start
+    if isinstance(finish, str):
+        attempt["finished_at"] = finish
+    seconds = elapsed_seconds(start, finish)
+    if seconds is None:
+        return
+    attempt["execution_seconds"] = seconds
+    if job["estimated_work"] > 0 and seconds > 0:
+        attempt["declared_work_rate_per_second"] = job["estimated_work"] / seconds
+
+
+def campaign_timing_summary(manifest: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+    """Summarize only timestamps already recorded by the detached controller.
+
+    ``estimated_work`` is intentionally a scheduler input rather than a claim
+    about images, batches, or FLOPs.  The derived rate therefore retains the
+    manifest's explicit ``work_unit`` and can calibrate future placement only
+    when the author supplied a meaningful unit.
+    """
+    rows: list[dict[str, Any]] = []
+    dependency_delays: list[float] = []
+    execution_durations: list[float] = []
+    for job in manifest["jobs"]:
+        record = state["jobs"][job["job_id"]]
+        attempt = record["attempts"][-1] if record.get("attempts") else {}
+        parent_completed_at = attempt.get("parent_completed_at", record.get("parent_completed_at"))
+        ready_at = attempt.get("ready_at", record.get("ready_at"))
+        launch_delay = elapsed_seconds(parent_completed_at, attempt.get("launched_at"))
+        if launch_delay is not None:
+            dependency_delays.append(launch_delay)
+        execution_seconds = attempt.get("execution_seconds")
+        if isinstance(execution_seconds, (int, float)):
+            execution_durations.append(float(execution_seconds))
+        rows.append(
+            {
+                "job_id": job["job_id"],
+                "job_type": job.get("job_type", "training"),
+                "status": record.get("status"),
+                "host": attempt.get("host"),
+                "gpu": attempt.get("gpu"),
+                "gpu_uuid": attempt.get("gpu_uuid"),
+                "dependencies": job.get("dependencies", []),
+                "parent_completed_at": parent_completed_at,
+                "ready_at": ready_at,
+                "launched_at": attempt.get("launched_at"),
+                "worker_started_at": attempt.get("worker_started_at"),
+                "completed_at": record.get("completed_at") or attempt.get("finished_at"),
+                "parent_to_launch_seconds": launch_delay,
+                "launch_to_worker_start_seconds": elapsed_seconds(
+                    attempt.get("launched_at"), attempt.get("worker_started_at")
+                ),
+                "execution_seconds": execution_seconds,
+                "estimated_work": attempt.get("estimated_work", job["estimated_work"]),
+                "work_unit": attempt.get("work_unit", job["work_unit"]),
+                "planned_throughput": attempt.get("planned_throughput"),
+                "planned_compute_seconds": attempt.get("planned_compute_seconds"),
+                "declared_work_rate_per_second": attempt.get("declared_work_rate_per_second"),
+            }
+        )
+    return {
+        "schema_version": 1,
+        "generated_at": now(),
+        "jobs": rows,
+        "summary": {
+            "completed_jobs_with_execution_seconds": len(execution_durations),
+            "total_execution_seconds": sum(execution_durations),
+            "max_dependency_to_launch_seconds": max(dependency_delays) if dependency_delays else None,
+            "mean_dependency_to_launch_seconds": (
+                sum(dependency_delays) / len(dependency_delays) if dependency_delays else None
+            ),
+        },
+    }
 
 
 def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
@@ -791,11 +955,27 @@ def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
                     gpu=attempt["gpu"],
                     gpu_uuid=attempt.get("gpu_uuid"),
                 )
-        if valid_completion_marker(manifest, job):
+        marker = completion_marker(manifest, job)
+        if marker is not None:
+            completed_at = marker.get("completed_at") if isinstance(marker.get("completed_at"), str) else now()
+            record_attempt_timing(
+                job,
+                attempt,
+                worker_started_at=marker.get("worker_started_at"),
+                finished_at=completed_at,
+            )
             attempt["status"] = "completed"
             record["status"] = "completed"
+            record["completed_at"] = completed_at
             release_slot((attempt["host"], attempt["gpu"]))
-            event(state, "completion_marker_seen", job["job_id"], attempt=attempt["attempt"])
+            event(
+                state,
+                "completion_marker_seen",
+                job["job_id"],
+                attempt=attempt["attempt"],
+                completed_at=completed_at,
+                execution_seconds=attempt.get("execution_seconds"),
+            )
             continue
         result_is_current = False
         if result_path.exists():
@@ -821,6 +1001,12 @@ def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
                 )
         if result_path.exists() and result_is_current:
             code = result.get("exit_code")
+            record_attempt_timing(
+                job,
+                attempt,
+                worker_started_at=result.get("worker_started_at"),
+                finished_at=result.get("finished_at"),
+            )
             info = valid_failure_marker(manifest, job)
             retryable = bool(info and info.get("retryable") is True)
             if code == 0 and result.get("status") == "completed":
@@ -831,6 +1017,8 @@ def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
             elif retryable and len(record["attempts"]) < job["retry_policy"]["max_attempts"]:
                 attempt["status"] = "technical_failed"
                 record["status"] = "pending"
+                record.pop("ready_at", None)
+                record.pop("parent_completed_at", None)
                 event(
                     state, "technical_retry", job["job_id"], attempt=attempt["attempt"], retry_of=attempt["attempt_id"]
                 )
@@ -856,9 +1044,12 @@ def controller_tick(manifest: dict[str, Any], state: dict[str, Any]) -> bool:
     reconcile_running(manifest, state)
     for job in manifest["jobs"]:
         record = state["jobs"][job["job_id"]]
-        if record["status"] == "pending" and valid_completion_marker(manifest, job):
+        marker = completion_marker(manifest, job)
+        if record["status"] == "pending" and marker is not None:
             record["status"] = "completed"
-            event(state, "completion_marker_recovered", job["job_id"])
+            completed_at = marker.get("completed_at") if isinstance(marker.get("completed_at"), str) else now()
+            record["completed_at"] = completed_at
+            event(state, "completion_marker_recovered", job["job_id"], completed_at=completed_at)
     occupied = {
         (record["attempts"][-1]["host"], record["attempts"][-1]["gpu"])
         for record in state["jobs"].values()
@@ -874,6 +1065,8 @@ def controller_tick(manifest: dict[str, Any], state: dict[str, Any]) -> bool:
         record = state["jobs"][job["job_id"]]
         attempt = len(record["attempts"]) + 1
         started = start_worker(manifest, job, attempt, slot)
+        started["ready_at"] = record.get("ready_at")
+        started["parent_completed_at"] = record.get("parent_completed_at")
         record["attempts"].append(started)
         record["status"] = "running"
         occupied.add((slot[0], slot[1]))
@@ -885,6 +1078,10 @@ def controller_tick(manifest: dict[str, Any], state: dict[str, Any]) -> bool:
             host=slot[0],
             gpu=slot[1],
             gpu_uuid=slot[2],
+            parent_completed_at=started.get("parent_completed_at"),
+            dependency_to_launch_seconds=elapsed_seconds(
+                started.get("parent_completed_at"), started.get("launched_at")
+            ),
         )
         if job.get("executor", {}).get("type", "local") == "local" and pid_alive(started["pid"]):
             event(state, "stable_confirmed", job["job_id"], attempt=attempt)
@@ -894,6 +1091,7 @@ def controller_tick(manifest: dict[str, Any], state: dict[str, Any]) -> bool:
         if not state.get("finished_at"):
             state["finished_at"] = now()
             event(state, "campaign_complete", status=state["status"])
+            state["timing_summary"] = campaign_timing_summary(manifest, state)
         return True
     state["status"] = "running" if any(status == "running" for status in statuses) else "pending"
     return False
@@ -962,6 +1160,7 @@ def run_controller(manifest: dict[str, Any], *, foreground: bool, once: bool, po
 
 
 def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_id: str) -> int:
+    worker_started_at = now()
     env = os.environ.copy()
     env.update({str(k): str(v) for k, v in job.get("env", {}).items()})
     env.update({"ARD_ORCH_ATTEMPT": str(attempt), "ARD_ORCH_ATTEMPT_ID": attempt_id})
@@ -1005,7 +1204,10 @@ def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_
         try:
             if staged_output is not None:
                 promote_attempt_output(manifest, job, attempt_id)
-            atomic_json(Path(job["_completion_marker"]), marker_payload(manifest, job, attempt, attempt_id))
+            atomic_json(
+                Path(job["_completion_marker"]),
+                marker_payload(manifest, job, attempt, attempt_id, worker_started_at=worker_started_at),
+            )
             status = "completed"
         except ValueError as exc:
             atomic_json(
@@ -1028,6 +1230,7 @@ def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_
         "host_confirmation": host_confirmation,
         "host_confirm_timed_out": host_confirm_timed_out,
         "probe_timed_out": probe_timed_out,
+        "worker_started_at": worker_started_at,
         "finished_at": now(),
     }
     atomic_json(
@@ -1044,6 +1247,8 @@ def status(manifest: dict[str, Any]) -> int:
         "status": state["status"],
         "jobs": {k: v["status"] for k, v in state["jobs"].items()},
     }
+    if isinstance(state.get("timing_summary"), dict):
+        summary["timing_summary"] = state["timing_summary"]
     print(json.dumps(summary, sort_keys=True))
     return 0
 

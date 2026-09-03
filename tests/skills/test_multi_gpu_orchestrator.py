@@ -296,6 +296,27 @@ def test_success_dag_chains_and_is_idempotent(tmp_path: Path) -> None:
     assert {key: len(value["attempts"]) for key, value in state_after["jobs"].items()} == attempts_before
 
 
+def test_completed_dag_records_dependency_delay_and_declared_work_rate(tmp_path: Path) -> None:
+    parent = job(tmp_path, "parent", "import time; time.sleep(0.03)", estimated_work=3)
+    child = job(tmp_path, "child", "pass", dependencies=["parent"], estimated_work=2)
+    child["work_unit"] = "epochs"
+    manifest = write_manifest(tmp_path, [parent, child])
+
+    result = invoke("run", manifest, "--foreground", "--poll-interval", "0.01")
+
+    assert result.returncode == 0, result.stderr
+    state = json.loads((tmp_path / "state.json").read_text())
+    timing = state["timing_summary"]
+    by_job = {row["job_id"]: row for row in timing["jobs"]}
+    assert by_job["parent"]["execution_seconds"] is not None
+    assert by_job["parent"]["declared_work_rate_per_second"] is not None
+    assert by_job["child"]["parent_completed_at"] is not None
+    assert by_job["child"]["parent_to_launch_seconds"] is not None
+    assert by_job["child"]["work_unit"] == "epochs"
+    status_payload = json.loads(invoke("status", manifest).stdout)
+    assert status_payload["timing_summary"]["summary"]["completed_jobs_with_execution_seconds"] == 2
+
+
 def test_valid_marker_recovers_without_relaunch(tmp_path: Path) -> None:
     manifest = write_manifest(
         tmp_path, [job(tmp_path, "root", "from pathlib import Path; Path('ran.txt').write_text('ok')")]
@@ -468,14 +489,7 @@ def test_stale_result_from_prior_campaign_cannot_release_gpu_slot(tmp_path: Path
     job_key = hashlib.sha256(
         (json.dumps({"job_id": "root"}, sort_keys=True, separators=(",", ":")) + "\n").encode()
     ).hexdigest()
-    stale = (
-        tmp_path
-        / "orchestration"
-        / "dummy-campaign"
-        / manifest_sha
-        / job_key
-        / "root.attempt-1.result.json"
-    )
+    stale = tmp_path / "orchestration" / "dummy-campaign" / manifest_sha / job_key / "root.attempt-1.result.json"
     stale.parent.mkdir(parents=True)
     stale.write_text(
         json.dumps(

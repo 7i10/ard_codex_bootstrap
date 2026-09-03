@@ -15,7 +15,8 @@ selector and not a replacement scheduler.
 1. Author a JSON (or YAML with PyYAML) campaign spec containing logical dataset
    and teacher identities, host profiles, scientific epoch bounds, attack and
    augmentation contracts, parent/mask/calibration descriptors, jobs, and a
-   bounded non-scientific canary.
+   bounded non-scientific canary.  Include every known endpoint, collection,
+   aggregation, and report node in that DAG before the first launch.
 2. Run the gate in `--preflight-only` or `--dry-run` mode. It resolves host
    paths, validates Git/source/config/parent/input hashes and metadata, checks
    dependencies/output collisions, and requires a bounded `remote_preflight`
@@ -55,8 +56,9 @@ For a bounded screen with an existing runtime, initialize the orchestrator
 skill's `launch_ledger.py` at request receipt and target controller launch in
 30 minutes.  Before `--launch`, the ledger must bind a complete host × job
 matrix: each resolved config's SHA, its permitted host-local path rebases, the
-frozen Teacher byte SHA, parent/checkpoint paths, output root, and execution
-class.  A generic host preflight alone is not evidence that a job-specific
+frozen Teacher byte SHA, parent/checkpoint paths, output root, execution
+class, estimated work, work unit, transfer cost, and selected GPU throughput.
+A generic host preflight alone is not evidence that a job-specific
 resolved config is valid on that host.
 
 If a single cell exposes a path or environment mismatch, stop the fan-out,
@@ -98,6 +100,14 @@ execution classes.  A successful exact external smoke may set
 `subsumes_remote_lifecycle: true` only when it also proves process, source,
 remote manifest, completion, and staged SHA-verified collection; that stronger
 proof suppresses the duplicate generic lifecycle canary for that host only.
+
+Distinct external-host preflights run concurrently. Static checks remain
+serial unless their entry declares `parallel_safe: true`; commands inside one
+entry always remain ordered. An exact public-CLI smoke may overlap another
+only when it also declares `parallel_safe: true`, a unique
+`parallel_resource_key`, and a distinct fixed host/GPU. These declarations
+mean the author has verified isolated output, GPU, remote-runner, and mutable
+resource ownership. Unmarked checks preserve serial behavior.
 
 New production specs should also carry the workspace-contract opt-in passed to
 the orchestrator. Future runtime writes outside the tracked canonical runtime

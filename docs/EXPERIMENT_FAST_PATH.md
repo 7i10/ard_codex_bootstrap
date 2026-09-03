@@ -29,8 +29,10 @@ One preparation pass resolves and records:
    output, and W&B identities;
 3. every host × job cell and planned GPU slot;
 4. static CLI checks and representative exact smoke groups;
-5. one immutable resolved manifest;
-6. the existing detached controller.
+5. every known terminal DAG node: endpoint, collection, aggregation, and
+   report as applicable;
+6. one immutable resolved manifest; and
+7. the existing detached controller.
 
 Run the thin gate mode:
 
@@ -51,6 +53,14 @@ job: source SHA, parent bytes, config SHA, Teacher SHA, dataset/split,
 attack, seed, arm, output identity, and applicable mask/calibration SHA.
 The resolved host × job matrix is written to `preflight.json`; job-specific
 host-local path rebases are validated before any GPU reservation.
+
+For placement, every schedulable job records `estimated_work`, `work_unit`,
+transfer cost, and the measured host/GPU throughput used for planning.  Long
+parents go to the fastest compatible device first; Ferret overflow is used
+only when transfer plus compute finishes sooner than waiting for the faster
+slot.  After completion, controller state contains parent-to-child launch
+delay and elapsed declared-work rate, so the next estimate uses evidence rather
+than an assumed host ordering.
 
 Each Fast spec must set `canary.require_exact_smoke: true` and define bounded
 `static_cli` checks.  A missing path, source/config/parent drift, conflicting
@@ -83,6 +93,12 @@ manifest, completion marker, and an artifact that passes the existing staged
 SHA-verified collection path.  In that case the gate skips the duplicate
 generic lifecycle canary for that host.  It does not skip remote preflight,
 identity, or collection validation.
+
+Distinct external-host preflights run concurrently. Static checks and exact
+smokes stay serial by default. A manifest may mark a static entry
+`parallel_safe: true`; an exact smoke additionally needs a unique
+`parallel_resource_key` and a distinct fixed host/GPU. This is opt-in because
+the declaration certifies isolated output, GPU, remote-runner, and lock use.
 
 ## Manifest annotations
 

@@ -31,7 +31,9 @@ detached workers, completion markers, retries, and resume.
 2. Run `validate`, then `preflight`, then `plan` (all are read-only). Resolve
    host-local Python, data, teacher, output, and GPU paths before reserving a
    resource.
-3. Run `run` once. By default it starts a detached controller and returns; use
+3. Put every known terminal node in the same manifest before launch:
+   training, endpoint evaluation, collection, aggregation, and report. Then
+   run `run` once. By default it starts a detached controller and returns; use
    `--foreground` only for a bounded CPU/dummy test. The controller launches
    every independent ready job, then advances children only after a validated
    completion marker. It also chains endpoint, aggregate, and report jobs when
@@ -67,8 +69,10 @@ Create a compact timing ledger before implementation with
 1. the complete input inventory (parent, config, Teacher, mask, attack, and
    output roots);
 2. the host × job config matrix, including every host-local path rebase;
-3. the frozen source SHA; and
-4. the immutable manifest.
+3. the frozen source SHA;
+4. host/GPU throughput, `estimated_work`, transfer cost, and a declared
+   `work_unit` for every schedulable job; and
+5. the immutable manifest.
 
 `ready` rejects a ledger missing any of those records.  This is not a second
 scientific gate; it prevents a late discovery of a host-only path mismatch.
@@ -104,7 +108,9 @@ argv position zero. Manifest validation rejects a locally present non-executable
 
 - Ready jobs are sorted longest-processing-time first. Candidate slots are
   scored by `transfer_seconds + estimated_work / throughput`; explicit host or
-  GPU constraints are honored. GPU UUIDs are recorded when supplied.
+  GPU constraints are honored. GPU UUIDs are recorded when supplied. Put long
+  parents on the fastest compatible GPU first; use a slower device for a short
+  endpoint/materialization job only when that lowers its expected finish time.
 - A campaign lock and in-state reservations prevent two controller processes
   from claiming one host/GPU. External processes are never killed; a busy
   resource must be rejected by the host executor/preflight.
@@ -132,6 +138,11 @@ argv position zero. Manifest validation rejects a locally present non-executable
   evidence additionally records `controller_spawned` and
   `host_confirmed_started`; an incomplete dependency blocks descendants rather
   than silently skipping it.
+- At terminal state, the controller adds a timing summary to its state:
+  parent-completion-to-child-launch delay, worker execution duration, planned
+  throughput, and declared-work rate. The rate retains the manifest's
+  `work_unit`; it is not implicitly an image/s claim. Read it with `status`;
+  this is a completed-state read, not active monitoring.
 - W&B settings are passed through the scientific command. The orchestrator
   does not enable model/run-bundle uploads or alter tracking policy.
 

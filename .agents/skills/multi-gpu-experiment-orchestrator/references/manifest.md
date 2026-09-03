@@ -41,6 +41,7 @@ resolved to this structure before launch.
       "completion_marker": "completion.json",
       "dependencies": [],
       "estimated_work": 200,
+      "work_unit": "epochs",
       "transfer_seconds": 0,
       "scientific_identity": {
         "method_id": "fixed-method",
@@ -55,6 +56,49 @@ resolved to this structure before launch.
   ]
 }
 ```
+
+`estimated_work` and host/GPU `throughput` must use the same declared unit
+within a scheduling comparison.  `work_unit` defaults to
+`declared_work_units`; use `images`, `batches`, `epochs`, or another truthful
+label when a post-campaign rate should be interpretable.  The controller stores
+the observed elapsed duration and `estimated_work / elapsed` as a
+declared-work rate; it never infers image/s from an arbitrary estimate.
+
+For multi-stage campaigns, declare all currently known terminal nodes in this
+one manifest: training, endpoint evaluation, remote collection, inventory,
+aggregation, and report.  A child becomes eligible from its producer's valid
+completion marker; do not plan a manual parent-complete → child launch gap.
+
+## Optional safe gate concurrency
+
+The production launch gate independently preflights distinct external hosts in
+parallel.  Static and exact public-CLI checks are serial by default.  Opt in
+only after establishing isolation:
+
+```json
+{
+  "canary": {
+    "static_cli": [
+      {"job_id": "local-check", "commands": [["python", "-m", "compileall", "src"]], "parallel_safe": true}
+    ],
+    "jobs": [
+      {
+        "job_id": "remote-smoke",
+        "kind": "exact_public_cli",
+        "command": ["bash", "scripts/exact-smoke.sh"],
+        "execution_class": "external",
+        "parallel_safe": true,
+        "parallel_resource_key": "ferret-gpu0-smoke"
+      }
+    ]
+  }
+}
+```
+
+An exact smoke is eligible for overlap only if its fixed job `host` and `gpu`
+are also unique among parallel checks. `parallel_safe` certifies that the
+check has no shared mutable output, GPU, remote runner, or lock with any other
+concurrently submitted gate check. Generic bounded canaries remain serial.
 
 Paths may be relative to the manifest directory. `completion_marker` and
 `technical_failure_marker` are relative to the job output directory unless

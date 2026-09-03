@@ -26,9 +26,12 @@ technical-only retries.
 
 Measured Hamster/Ferret speeds are not hard-coded. Host profiles may carry
 throughput and transfer metadata, and placement minimizes
-`transfer_seconds + estimated_work / throughput`. GPU UUIDs are recorded when
-available. Host/job `required_paths` and `required_env` are checked during
-local preflight. External user processes are never killed.
+`transfer_seconds + estimated_work / throughput`. Every comparable job declares
+the matching `work_unit`, so terminal controller state can report elapsed
+declared-work rate without falsely calling an arbitrary estimate image/s. GPU
+UUIDs are recorded when available. Host/job `required_paths` and
+`required_env` are checked during local preflight. External user processes are
+never killed.
 
 ## DAG and lifecycle
 
@@ -37,11 +40,15 @@ worker atomically writes a marker containing campaign, job, attempt, source
 SHA, and scientific identity hash. A child is eligible only after every
 dependency has a valid marker. Endpoint, aggregation, and report jobs are
 ordinary DAG nodes, so training completion alone does not complete a campaign.
+They must be declared in the original manifest whenever they are already known;
+the controller, not Codex, advances the full chain.
 
 State is locked and atomically updated. Re-running the same manifest recognizes
 completed/running jobs and does not launch duplicates. A detached controller
 survives the Codex session; `status` is a read-only state view and `run` resumes
-the controller when needed.
+the controller when needed. Terminal state includes parent-ready-to-child-launch
+delay, worker execution duration, planned throughput, and declared-work rate
+for the next campaign's scheduling estimate.
 
 Controller metadata is deliberately separated from scientific output. Logs,
 worker results, host-confirmation records, and default completion markers are
@@ -76,6 +83,12 @@ and output path on that host.  After any host/config mismatch, the whole
 equivalent matrix is revalidated before a fresh technical retry.  This avoids
 serial one-checkpoint fixes and keeps infrastructure changes off the active
 scientific critical path.
+
+Distinct external-host preflights run concurrently. Static and exact-smoke
+checks remain serial unless the manifest explicitly proves isolation with
+`parallel_safe`; exact public-CLI smoke additionally requires a unique
+resource key and fixed distinct host/GPU. This reduces safe preparation time
+without overlapping unclassified GPU or remote-wrapper work.
 
 ## Usage
 
