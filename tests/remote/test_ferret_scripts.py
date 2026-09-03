@@ -77,6 +77,13 @@ def test_prepare_links_only_named_shared_runtime_assets() -> None:
 
 
 @pytest.mark.unit
+def test_prepare_serializes_shared_git_fetches() -> None:
+    prepare = (SCRIPTS / "ferret-prepare").read_text()
+    assert 'exec 9>"/tmp/ard-codex-ferret-prepare.lock"' in prepare
+    assert "flock -x 9" in prepare
+
+
+@pytest.mark.unit
 def test_shared_runtime_asset_symlinks_are_gitignored(tmp_path: Path) -> None:
     root = Path(__file__).parents[2]
     repository = tmp_path / "repository"
