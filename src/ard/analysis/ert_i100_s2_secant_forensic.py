@@ -56,6 +56,7 @@ def secant_components(
     active = selected * teacher_pair_gate * nonzero_rho
     raw_loss = 0.5 * F.relu(hinge_gap).square() * active
     return {
+        "student_margin_delta_sign": torch.sign(student_adv_margin - student_clean_margin).detach(),
         "q_student": q_student,
         "q_teacher": q_teacher.detach(),
         "d_student": d_student,

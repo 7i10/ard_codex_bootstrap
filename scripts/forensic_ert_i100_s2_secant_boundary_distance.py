@@ -96,10 +96,26 @@ def _scalar_fd(row: dict[str, float]) -> dict[str, Any]:
     loss = scalar_secant_loss(adv, clean, rho=rho, d_teacher=d_teacher, epsilon=EPSILON).sum()
     grad_adv, grad_clean = torch.autograd.grad(loss, (adv, clean))
     output: dict[str, Any] = {"sample_id": int(row["sample_id"]), "kink_safe": False, "steps": []}
-    # The condition is evaluated before perturbing; each +/- point is checked
-    # again so an abs/ReLU kink cannot masquerade as a derivative mismatch.
-    base_delta = float(adv.detach() - clean.detach())
-    base_gap = float(d_teacher - adv.detach() / (abs(base_delta) / (float(rho) + EPSILON) + EPSILON))
+
+    # The two partial derivatives have distinct perturbation paths.  Check
+    # their abs and ReLU regions separately: a safe perturbation in m_adv does
+    # not imply that m_clean is safe (or vice versa).
+    def region(adv_value: float, clean_value: float) -> tuple[float, bool]:
+        delta = adv_value - clean_value
+        d_student = adv_value / (abs(delta) / (float(rho) + EPSILON) + EPSILON)
+        return math.copysign(1.0, delta), bool(float(d_teacher) - d_student > 0.0)
+
+    base_sign, base_hinge = region(float(adv.detach()), float(clean.detach()))
+
+    def partial_safe(*, perturb_adv: bool, step: float) -> bool:
+        for signed in (-step, step):
+            adv_value = float(adv.detach()) + signed if perturb_adv else float(adv.detach())
+            clean_value = float(clean.detach()) if perturb_adv else float(clean.detach()) + signed
+            sign, hinge = region(adv_value, clean_value)
+            if sign != base_sign or hinge != base_hinge:
+                return False
+        return True
+
     for step in (1e-4, 1e-5, 1e-6):
 
         def adv_fn(value: torch.Tensor) -> torch.Tensor:
@@ -108,26 +124,28 @@ def _scalar_fd(row: dict[str, float]) -> dict[str, Any]:
         def clean_fn(value: torch.Tensor) -> torch.Tensor:
             return scalar_secant_loss(adv.detach(), value, rho=rho, d_teacher=d_teacher, epsilon=EPSILON).sum()
 
-        signs = []
-        for signed in (-step, step):
-            shifted_delta = float((adv.detach() + signed) - clean.detach())
-            shifted_gap = float(
-                d_teacher - (adv.detach() + signed) / (abs(shifted_delta) / (float(rho) + EPSILON) + EPSILON)
-            )
-            signs.append((math.copysign(1.0, shifted_delta), shifted_gap > 0.0))
-        same_regions = all(
-            sign == math.copysign(1.0, base_delta) and hinge == (base_gap > 0.0) for sign, hinge in signs
-        )
-        safe = abs(base_delta) > 2.0 * step and same_regions
-        record: dict[str, Any] = {"step": step, "kink_safe": safe}
-        if safe:
+        safe_adv = partial_safe(perturb_adv=True, step=step)
+        safe_clean = partial_safe(perturb_adv=False, step=step)
+        safe = safe_adv and safe_clean
+        record: dict[str, Any] = {
+            "step": step,
+            "kink_safe_adv": safe_adv,
+            "kink_safe_clean": safe_clean,
+            "kink_safe": safe,
+        }
+        if safe_adv:
             fd_adv = central_difference(adv_fn, adv.detach(), step=step)
-            fd_clean = central_difference(clean_fn, clean.detach(), step=step)
             record.update(
                 {
                     "autograd_adv": float(grad_adv),
                     "finite_difference_adv": float(fd_adv),
                     "absolute_error_adv": float((grad_adv - fd_adv).abs()),
+                }
+            )
+        if safe_clean:
+            fd_clean = central_difference(clean_fn, clean.detach(), step=step)
+            record.update(
+                {
                     "autograd_clean": float(grad_clean),
                     "finite_difference_clean": float(fd_clean),
                     "absolute_error_clean": float((grad_clean - fd_clean).abs()),
@@ -150,22 +168,32 @@ def _parameter_fd(
     rho: torch.Tensor,
     selected: torch.Tensor,
 ) -> dict[str, Any]:
-    """Freeze all non-parameter quantities for a head-direction FD check."""
+    """Train-mode, state-restored head-direction finite-difference check.
+
+    The frozen adversarial tensor, rival, Teacher values, rho and selected
+    mask isolate the outer S-BDD formula.  Every forward begins from the same
+    complete Student state_dict, so BatchNorm buffers follow the production
+    train-mode path without contaminating the neighbouring +/- evaluations.
+    """
     name, parameter = _head_parameter(student)
     generator = torch.Generator(device=parameter.device).manual_seed(917_431)
     direction = torch.randn(parameter.shape, generator=generator, device=parameter.device, dtype=parameter.dtype)
     direction = direction / direction.norm()
-    snapshot = parameter.detach().clone()
-    before = state_tensor_hash({key: value.detach() for key, value in student.state_dict().items()})
+    parameter_snapshot = parameter.detach().clone()
+    full_snapshot = {key: value.detach().clone() for key, value in student.state_dict().items()}
+    before = state_tensor_hash(full_snapshot)
     original_mode = student.training
-    # Eval freezes BN running-stat effects.  The adversarial tensor/rival,
-    # Teacher values, active gate and selected mask are held fixed explicitly.
-    student.eval()
+    result: dict[str, Any] = {}
     try:
 
-        def loss_at(offset: float) -> torch.Tensor:
+        def restore(offset: float) -> None:
             with torch.no_grad():
-                parameter.copy_(snapshot + offset * direction)
+                student.load_state_dict(full_snapshot, strict=True)
+                parameter.copy_(parameter_snapshot + offset * direction)
+            student.train()
+
+        def loss_at(offset: float) -> torch.Tensor:
+            restore(offset)
             adv_logits = student(adversarial.float())
             clean_logits = student(images.float())
             adv_margin, observed_rival = dynamic_pair_margin(adv_logits, labels, rival)
@@ -183,8 +211,6 @@ def _parameter_fd(
             )
             return values["raw_loss"].mean(), values
 
-        with torch.no_grad():
-            parameter.copy_(snapshot)
         baseline, baseline_values = loss_at(0.0)
         gradient = torch.autograd.grad(baseline, parameter, retain_graph=False)[0]
         autograd_direction = float((gradient * direction).sum())
@@ -195,26 +221,52 @@ def _parameter_fd(
             same_hinge = bool(torch.equal(plus_values["hinge_positive"], baseline_values["hinge_positive"])) and bool(
                 torch.equal(minus_values["hinge_positive"], baseline_values["hinge_positive"])
             )
-            same_plus_gate = torch.equal(plus_values["teacher_pair_gate"], baseline_values["teacher_pair_gate"])
-            same_minus_gate = torch.equal(minus_values["teacher_pair_gate"], baseline_values["teacher_pair_gate"])
-            safe = same_hinge and bool(same_plus_gate) and bool(same_minus_gate)
-            checks.append(
-                {
-                    "step": step,
-                    "kink_safe": safe,
-                    "autograd_directional": autograd_direction,
-                    "central_difference": float((plus - minus) / (2.0 * step)),
-                    "absolute_error": float(abs(autograd_direction - float((plus - minus) / (2.0 * step)))),
-                }
+            same_abs_sign = bool(
+                torch.equal(plus_values["student_margin_delta_sign"], baseline_values["student_margin_delta_sign"])
+            ) and bool(
+                torch.equal(minus_values["student_margin_delta_sign"], baseline_values["student_margin_delta_sign"])
             )
-        return {"parameter": name, "state_hash_before": before, "checks": checks}
+            same_teacher_gate = bool(
+                torch.equal(plus_values["teacher_pair_gate"], baseline_values["teacher_pair_gate"])
+            ) and bool(torch.equal(minus_values["teacher_pair_gate"], baseline_values["teacher_pair_gate"]))
+            same_rho_gate = bool(torch.equal(plus_values["nonzero_rho"], baseline_values["nonzero_rho"])) and bool(
+                torch.equal(minus_values["nonzero_rho"], baseline_values["nonzero_rho"])
+            )
+            safe = same_abs_sign and same_hinge and same_teacher_gate and same_rho_gate
+            record: dict[str, Any] = {
+                "step": step,
+                "kink_safe": safe,
+                "abs_sign_preserved": same_abs_sign,
+                "hinge_preserved": same_hinge,
+                "teacher_pair_gate_preserved": same_teacher_gate,
+                "rho_gate_preserved": same_rho_gate,
+            }
+            if safe:
+                central = float((plus - minus) / (2.0 * step))
+                record.update(
+                    {
+                        "autograd_directional": autograd_direction,
+                        "central_difference": central,
+                        "absolute_error": float(abs(autograd_direction - central)),
+                    }
+                )
+            checks.append(record)
+        result = {
+            "parameter": name,
+            "student_mode": "train_with_full_state_restore",
+            "state_hash_before": before,
+            "checks": checks,
+        }
     finally:
         with torch.no_grad():
-            parameter.copy_(snapshot)
+            student.load_state_dict(full_snapshot, strict=True)
         student.train(original_mode)
         after = state_tensor_hash({key: value.detach() for key, value in student.state_dict().items()})
         if before != after:
             raise RuntimeError("parameter directional finite difference failed to restore Student state")
+        result["state_hash_after"] = after
+        result["state_hash_before_after"] = "identical"
+    return result
 
 
 def main() -> int:

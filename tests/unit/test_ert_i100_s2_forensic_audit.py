@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -19,6 +20,11 @@ from ard.analysis.ert_i100_s2_secant_forensic import (
     dynamic_pair_margin,
     scalar_secant_loss,
     secant_components,
+)
+from scripts.aggregate_ert_i100_s2_forensic_audit import (
+    entrant_summary,
+    fixed_cohort_trajectory,
+    runtime_proxy_payloads,
 )
 
 
@@ -45,6 +51,68 @@ def test_action_state_partition_gives_clean_wrong_precedence() -> None:
     assert states[2]["branch"] == "S3-non-CW"
     assert states[3]["branch"] == "S2"
     assert states[4]["branch"] == "S1"
+
+
+def test_fixed_cohort_trajectory_counts_adjacent_observed_transitions() -> None:
+    state_by_epoch = {
+        99: {7: {"branch": "S2", "teacher": "T1", "joint": "S2xT1"}},
+        104: {7: {"branch": "S1", "teacher": "T1", "joint": "S1xT1"}},
+        109: {7: {"branch": "S2", "teacher": "T1", "joint": "S2xT1"}},
+        114: {7: {"branch": "S2", "teacher": "T3", "joint": "S2xT3"}},
+    }
+
+    summary = fixed_cohort_trajectory(selected={7}, state_by_epoch=state_by_epoch)
+
+    assert summary["membership_patterns"] == {"1010": 1}
+    assert summary["overlapping_observed_indicators"]["P5_leave_then_reenter_S2xT1"] == 1
+    assert summary["explicit_observed_reentry_routes"]["S2_to_S1_to_S2"] == 1
+    assert summary["teacher_transitions_when_student_S2_at_either_endpoint"] == {
+        "T1_to_T1": 2,
+        "T1_to_T3": 1,
+    }
+    assert summary["observability"]["P6_multiple_exit_reentry"]["observable"] is False
+
+
+def test_entrant_persistence_uses_active_runs_not_first_entry() -> None:
+    patterns = ("000", "001", "010", "011", "100", "101", "110", "111")
+    initial = {
+        index: {
+            "branch": "S2" if index == 1 else "S1",
+            "teacher": "T2" if index == 1 else "T1",
+            "joint": "S2xT2" if index == 1 else "S1xT1",
+        }
+        for index in range(len(patterns))
+    }
+
+    def state(active: bool) -> dict[str, str]:
+        return {"branch": "S2" if active else "S1", "teacher": "T1", "joint": "S2xT1" if active else "S1xT1"}
+
+    state_by_epoch = {
+        epoch: {index: state(pattern[offset] == "1") for index, pattern in enumerate(patterns)}
+        for offset, epoch in enumerate((104, 109, 114))
+    }
+    summary = entrant_summary(initial=initial, state_by_epoch=state_by_epoch)
+
+    assert summary["n"] == 7
+    assert summary["e99_origin"] == {"e99_S1": 6, "e99_S2xT2T3": 1}
+    assert summary["persistence"] == {"one-endpoint-only": 3, "re-entry": 1, "repeated": 3}
+
+
+def test_runtime_proxy_payloads_discovers_nested_arm_epoch_artifacts(tmp_path: Path) -> None:
+    payload = {
+        "contract": "ert_rslad_i100_s2_checkpoint_no_update_runtime_activity_proxy_v1",
+        "seed": "dev-1",
+        "arm": "dpm",
+        "checkpoint_epoch": 104,
+    }
+    nested = tmp_path / "dev1" / "dpm" / "e104.json"
+    nested.parent.mkdir(parents=True)
+    nested.write_text(json.dumps(payload), encoding="utf-8")
+    (tmp_path / "orchestration.json").write_text("{}", encoding="utf-8")
+
+    loaded = runtime_proxy_payloads(tmp_path)
+
+    assert loaded == {("dev-1", "dpm", 104): payload}
 
 
 def test_secant_scalar_autograd_matches_central_difference_away_from_kinks() -> None:
