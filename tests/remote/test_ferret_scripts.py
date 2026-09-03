@@ -115,6 +115,14 @@ def test_collect_includes_top_level_output_json_and_jsonl() -> None:
 
 
 @pytest.mark.unit
+def test_status_emits_one_json_payload_with_host_confirmation_evidence() -> None:
+    status = (SCRIPTS / "ferret-status").read_text()
+    assert status.count("print(json.dumps(out") == 1
+    for field in ("'pid':pid if live else None", "'source_sha':d.get('git_sha')", "'physical_gpu_uuids'", "'command_argv'", "'remote_manifest'"):
+        assert field in status
+
+
+@pytest.mark.unit
 def test_dynamic_bdd_launcher_materializes_hash_bound_parents_before_prepare() -> None:
     launcher = (ROOT / "scripts/launch_ferret_dynamic_bdd_job.sh").read_text()
     for argument in (
