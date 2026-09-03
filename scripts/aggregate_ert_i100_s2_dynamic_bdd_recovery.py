@@ -51,12 +51,18 @@ E99_ROWS = {
     "dev-2": Path(".cache/analysis/ert-i100-cw-gap-completion-replay/dev-2/e99-observations.parquet"),
 }
 STATE_ROOTS = {
-    ("dev-1", "control"): ROOT / "state-replay-v1/smoke-v3-dev1-control",
+    ("dev-1", "control"): ROOT / "state-replay-v1/jobs/dev1-control",
     ("dev-1", "dpm"): ROOT / "state-replay-v1/jobs/dev1-dpm",
     ("dev-1", "dbdd"): ROOT / "state-replay-v1/jobs/dev1-dbdd",
     ("dev-2", "control"): ROOT / "state-replay-v1/ferret/dev2-control/outputs/state-replay",
     ("dev-2", "dpm"): ROOT / "state-replay-v1/ferret/dev2-dpm/outputs/state-replay",
     ("dev-2", "dbdd"): ROOT / "state-replay-v1/jobs/dev2-dbdd",
+}
+# The dev-1 Control e114 replay was the passed public-CLI smoke.  The later
+# recovery campaign replayed only its missing e104/e109 states, so each source
+# remains hash-bound without rerunning an identical e114 attack.
+STATE_REPLAY_OVERRIDES = {
+    ("dev-1", "control", 114): ROOT / "state-replay-v1/smoke-v3-dev1-control/e114",
 }
 SBDD_CONFIGS = {
     "dev-1": ROOT / "recovery-436c920-r2/jobs/dev1-sbdd/training/resolved_config.yaml",
@@ -121,11 +127,29 @@ def endpoint_entries(root: Path) -> dict[tuple[int, str], dict[str, Any]]:
         if scope == "validation":
             if row.get("split_identity", {}).get("sample_id_label_sha256") != SPLIT_SHA:
                 raise AggregationError(f"validation split identity differs: {root}, e{epoch}")
-        entries[(epoch, scope)] = row
+        expected_rows_sha = row.get("rows_sha256")
+        if not isinstance(expected_rows_sha, str) or len(expected_rows_sha) != 64:
+            raise AggregationError(f"endpoint row SHA missing: {root}, e{epoch}, {scope}")
+        declared = Path(str(row.get("rows_path", "")))
+        # Endpoint summaries retain their execution-host absolute path.  When a
+        # remote result has been hash-verified and collected locally, use its
+        # canonical relative location rather than requiring the old host mount.
+        local = root / "endpoints" / f"e{epoch}-{scope}" / "endpoint-sample-stats.parquet"
+        rows_path = declared if declared.is_file() else local
+        if not rows_path.is_file() or sha256(rows_path) != expected_rows_sha:
+            raise AggregationError(f"endpoint row artifact differs or is unavailable: {root}, e{epoch}, {scope}")
+        entry = dict(row)
+        entry["rows_path"] = str(rows_path)
+        entries[(epoch, scope)] = entry
     required = {(104, "validation"), (109, "validation"), (114, "validation"), (114, "train")}
     if set(entries) != required:
         raise AggregationError(f"endpoint set differs at {root}: {sorted(entries)}")
     return entries
+
+
+def state_replay_path(seed: str, arm: str, epoch: int) -> Path:
+    """Return the registered, non-duplicated state replay for one endpoint."""
+    return STATE_REPLAY_OVERRIDES.get((seed, arm, epoch), STATE_ROOTS[(seed, arm)] / f"e{epoch}")
 
 
 def paired_effect(
@@ -397,6 +421,38 @@ def report_markdown(result: Mapping[str, Any]) -> str:
                 )
     lines += [
         "",
+        "## e114 paired D-BDD − DPM train contrast",
+        "",
+        "| seed | scope | clean Δ | robust Δ |",
+        "| --- | --- | ---: | ---: |",
+    ]
+    for seed in SEEDS:
+        for scope in ("direct", "spillover", "global"):
+            effect = result["train_effects"][seed]["dbdd_minus_dpm"][scope]
+            lines.append(
+                f"| {seed} | {scope} | {format_pp(effect['clean']['accuracy_delta'])} | "
+                f"{format_pp(effect['robust']['accuracy_delta'])} |"
+            )
+    lines += [
+        "",
+        "## Fixed-mask state transitions at e114",
+        "",
+        "These are descriptive transitions from the fixed e99 S2×T1 mask, not an online selector.",
+        "",
+        "| seed | arm | fixed e99 n | S2→S1 | S2→S2 | S2→S3 | new current S2×T1 entrants |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for seed in SEEDS:
+        for arm in ARMS:
+            transition = result["state_transitions"][seed][arm]["114"]
+            student = transition["fixed_anchor_s2t1"]["student_transitions"]
+            lines.append(
+                f"| {seed} | {arm.upper()} | {transition['fixed_anchor_s2t1']['n']} | "
+                f"{student.get('S2->S1', 0)} | {student.get('S2->S2', 0)} | {student.get('S2->S3', 0)} | "
+                f"{transition['current_s2t1_new_entrants']['count']} |"
+            )
+    lines += [
+        "",
         "## S-BDD numerical evidence",
         "",
         "Both corrected v2 runs used `student_parameter_graph_v2`, the same frozen v2 coefficient, and the same "
@@ -421,6 +477,10 @@ def report_markdown(result: Mapping[str, Any]) -> str:
         "The frozen pooled v2 calibration targeted median 0.25 but had achieved ratios spanning "
         f"{ratio['min']:.4g}–{ratio['max']:.4g} (IQR {ratio['iqr']:.4g}), which is retained as a pre-training "
         "warning sign rather than an outcome-tuned basis for changing the coefficient.",
+        "",
+        "The two S-BDD failures occurred on Hamster GPU1 and Ferret GPU0 with the same corrected v2 scientific "
+        "identity; this is therefore not a host/GPU-specific failure. The exact dev-2 first non-finite worker "
+        "trace was not retained locally, but no valid checkpoint or endpoint exists after e101.",
         "",
         "Control, DPM, and D-BDD each reached e114 with finite retained loss/throughput telemetry and registered "
         "CE-PGD20 endpoints. Removing S-BDD therefore leaves the preregistered D-BDD vs DPM held-out comparison "
@@ -468,10 +528,13 @@ def main() -> int:
             inventory[seed][arm] = {"root": str(root), "endpoint_attack_sha256": ATTACK_SHA}
         for arm in ("dpm", "dbdd"):
             train_effects[seed][arm] = direct_spillover(endpoint_rows["control"], endpoint_rows[arm], selected)
+        train_effects[seed]["dbdd_minus_dpm"] = direct_spillover(
+            endpoint_rows["dpm"], endpoint_rows["dbdd"], selected
+        )
         for arm in ARMS:
             state_transitions[seed][arm] = {}
             for epoch in (104, 109, 114):
-                replay = STATE_ROOTS[(seed, arm)] / f"e{epoch}"
+                replay = state_replay_path(seed, arm, epoch)
                 metadata = read_json(replay / "state-replay.json")
                 rows = read_rows(replay / "state-rows.parquet")
                 validate_state_replay_metadata(metadata, rows_path=replay / "state-rows.parquet", expected_epoch=epoch)

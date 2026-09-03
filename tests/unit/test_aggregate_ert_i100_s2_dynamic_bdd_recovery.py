@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 SCRIPT = Path(__file__).parents[2] / "scripts/aggregate_ert_i100_s2_dynamic_bdd_recovery.py"
@@ -62,3 +65,48 @@ def test_state_replay_metadata_rejects_wrong_train_split(tmp_path: Path) -> None
     }
     with pytest.raises(MODULE.AggregationError, match="train split identity"):
         MODULE.validate_state_replay_metadata(metadata, rows_path=rows, expected_epoch=114)
+
+
+def test_dev1_control_uses_smoke_only_for_the_already_registered_e114_replay() -> None:
+    assert MODULE.state_replay_path("dev-1", "control", 104) == (
+        MODULE.ROOT / "state-replay-v1/jobs/dev1-control/e104"
+    )
+    assert MODULE.state_replay_path("dev-1", "control", 114) == (
+        MODULE.ROOT / "state-replay-v1/smoke-v3-dev1-control/e114"
+    )
+
+
+def test_endpoint_entries_materializes_hash_verified_remote_rows_locally(tmp_path: Path) -> None:
+    rows = tmp_path / "endpoints/e114-train/endpoint-sample-stats.parquet"
+    rows.parent.mkdir(parents=True)
+    pq.write_table(pa.table({"sample_id": [1]}), rows)
+    summary = {
+        "outputs": [
+            {
+                "checkpoint_epoch": 114,
+                "dataset_scope": "train",
+                "attack_identity_sha256": MODULE.ATTACK_SHA,
+                "rows_path": "/unmounted/remote/endpoint-sample-stats.parquet",
+                "rows_sha256": MODULE.sha256(rows),
+            }
+        ]
+    }
+    # Provide the other required endpoint rows with the same locally present
+    # content; their exact metric values are irrelevant to path resolution.
+    for epoch, scope in ((104, "validation"), (109, "validation"), (114, "validation")):
+        path = tmp_path / "endpoints" / f"e{epoch}-{scope}" / "endpoint-sample-stats.parquet"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(pa.table({"sample_id": [1]}), path)
+        summary["outputs"].append(
+            {
+                "checkpoint_epoch": epoch,
+                "dataset_scope": scope,
+                "attack_identity_sha256": MODULE.ATTACK_SHA,
+                "split_identity": {"sample_id_label_sha256": MODULE.SPLIT_SHA},
+                "rows_path": f"/unmounted/remote/e{epoch}-{scope}.parquet",
+                "rows_sha256": MODULE.sha256(path),
+            }
+        )
+    (tmp_path / "endpoints/summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    entries = MODULE.endpoint_entries(tmp_path)
+    assert entries[(114, "train")]["rows_path"] == str(rows)

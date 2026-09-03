@@ -62,7 +62,7 @@ official test, or AutoAttack.
 - [x] R4 — Recover only the non-valid jobs, recover endpoints without
       retraining where permitted, then validate all final completion markers
       and endpoint lineage.
-- [ ] R5 — Reconstruct fixed e99 S2×T1 state transitions at e104/e109/e114,
+- [x] R5 — Reconstruct fixed e99 S2×T1 state transitions at e104/e109/e114,
       aggregate the registered BDI decision, write the human/machine reports,
       commit, push, and stop.
 
