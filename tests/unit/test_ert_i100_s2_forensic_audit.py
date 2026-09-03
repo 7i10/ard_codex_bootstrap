@@ -24,6 +24,7 @@ from ard.analysis.ert_i100_s2_secant_forensic import (
 from scripts.aggregate_ert_i100_s2_forensic_audit import (
     endpoint_checkpoint,
     entrant_summary,
+    execution_config_lineage,
     fixed_cohort_trajectory,
     fixed_mask_ids,
     merged_runtime_proxy_payloads,
@@ -119,6 +120,29 @@ def test_fixed_mask_ids_are_loaded_from_the_requested_seed_file(tmp_path: Path) 
     dev2.write_text(json.dumps({"masks": {"s2_t1": {"selected_ids": [2, 4]}}}), encoding="utf-8")
     assert fixed_mask_ids(dev1) == {1, 3}
     assert fixed_mask_ids(dev2) == {2, 4}
+
+
+def test_execution_config_lineage_allows_only_teacher_path_rebase(tmp_path: Path) -> None:
+    teacher_sha = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+    first = tmp_path / "first.yaml"
+    second = tmp_path / "second.yaml"
+    first.write_text(
+        f"teacher:\n  checkpoint: /host-a/teacher.pt\n  checkpoint_sha256: {teacher_sha}\nmethod:\n  id: rslad\n",
+        encoding="utf-8",
+    )
+    second.write_text(
+        f"teacher:\n  checkpoint: /host-b/teacher.pt\n  checkpoint_sha256: {teacher_sha}\nmethod:\n  id: rslad\n",
+        encoding="utf-8",
+    )
+    lineage = execution_config_lineage((first, second), seed="dev-2")
+    assert len(lineage["configs"]) == 2
+    changed = tmp_path / "changed.yaml"
+    changed.write_text(
+        f"teacher:\n  checkpoint: /host-b/teacher.pt\n  checkpoint_sha256: {teacher_sha}\nmethod:\n  id: changed\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="permitted Teacher checkpoint path rebase"):
+        execution_config_lineage((first, changed), seed="dev-2")
 
 
 def test_runtime_proxy_payloads_discovers_nested_arm_epoch_artifacts(tmp_path: Path) -> None:

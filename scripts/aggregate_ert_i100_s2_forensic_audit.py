@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pyarrow.parquet as pq
+import yaml
 
 from ard.analysis.ert_i100_s2_longitudinal import canonical_action_states
 
@@ -255,7 +256,7 @@ def validate_runtime_proxy(
     expected_checkpoint_sha256: str,
     expected_mask_sha256: str,
     expected_mask_ids: set[int],
-    expected_config_sha256: str,
+    expected_config_sha256s: set[str],
 ) -> None:
     """Validate a no-update KL10 proxy before joining it to CE20 state rows."""
     prefix = f"runtime proxy {seed}/{arm}/e{epoch}"
@@ -267,7 +268,7 @@ def validate_runtime_proxy(
         raise ValueError(f"{prefix}: checkpoint differs from canonical/registered endpoint")
     if str(payload.get("mask_sha256")) != expected_mask_sha256:
         raise ValueError(f"{prefix}: fixed-mask SHA differs")
-    if str(payload.get("config_sha256")) != expected_config_sha256:
+    if str(payload.get("config_sha256")) not in expected_config_sha256s:
         raise ValueError(f"{prefix}: host-rebased execution config differs")
     if payload.get("scope") != "checkpoint no-update rank-local training proxy; not historical per-visit activity":
         raise ValueError(f"{prefix}: scope differs")
@@ -308,6 +309,43 @@ def endpoint_checkpoint(longitudinal_result: Mapping[str, Any], *, seed: str, ar
         raise ValueError(f"longitudinal result lacks {seed}/{arm}/e{epoch} endpoint metadata") from error
 
 
+def normalized_execution_config(path: Path) -> dict[str, Any]:
+    """Return an execution config with its permitted host-local Teacher path erased.
+
+    Runtime proxies may execute from distinct remote run roots.  The only
+    allowed cross-host difference is ``teacher.checkpoint``; the frozen
+    Teacher byte SHA is separately asserted in both the config and proxy.
+    """
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(payload.get("teacher"), dict):
+        raise ValueError(f"{path}: execution config has no teacher mapping")
+    teacher = dict(payload["teacher"])
+    checkpoint = teacher.get("checkpoint")
+    if not isinstance(checkpoint, str) or not checkpoint:
+        raise ValueError(f"{path}: execution config has no Teacher checkpoint path")
+    if teacher.get("checkpoint_sha256") != TEACHER_SHA256:
+        raise ValueError(f"{path}: execution config changes the frozen Teacher SHA")
+    teacher["checkpoint"] = "<host-local-teacher-checkpoint>"
+    normalized = dict(payload)
+    normalized["teacher"] = teacher
+    return normalized
+
+
+def execution_config_lineage(paths: tuple[Path, ...], *, seed: str) -> dict[str, Any]:
+    """Validate permitted host path rebases and retain all concrete config SHAs."""
+    if not paths:
+        raise ValueError(f"{seed}: no execution config supplied")
+    normalized = [normalized_execution_config(path) for path in paths]
+    reference = json.dumps(normalized[0], sort_keys=True, separators=(",", ":"))
+    if any(json.dumps(item, sort_keys=True, separators=(",", ":")) != reference for item in normalized[1:]):
+        raise ValueError(f"{seed}: execution configs differ beyond the permitted Teacher checkpoint path rebase")
+    return {
+        "allowed_difference": "teacher.checkpoint absolute path only",
+        "normalized_config_sha256": hashlib.sha256(reference.encode("utf-8")).hexdigest(),
+        "configs": [{"path": str(path), "sha256": sha256(path)} for path in paths],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--canonical-root", type=Path, required=True)
@@ -315,8 +353,8 @@ def main() -> int:
     parser.add_argument("--e99-dev2", type=Path, required=True)
     parser.add_argument("--mask-dev1", type=Path, required=True)
     parser.add_argument("--mask-dev2", type=Path, required=True)
-    parser.add_argument("--execution-config-dev1", type=Path, required=True)
-    parser.add_argument("--execution-config-dev2", type=Path, required=True)
+    parser.add_argument("--execution-config-dev1", type=Path, action="append", required=True)
+    parser.add_argument("--execution-config-dev2", type=Path, action="append", required=True)
     parser.add_argument("--registered-results", type=Path, required=True)
     parser.add_argument("--analysis-source-sha", required=True)
     parser.add_argument("--runtime-activity-dir", type=Path, action="append", default=[])
@@ -325,8 +363,17 @@ def main() -> int:
     args = parser.parse_args()
     e99_paths = {"dev-1": args.e99_dev1, "dev-2": args.e99_dev2}
     masks = {"dev-1": args.mask_dev1, "dev-2": args.mask_dev2}
-    execution_configs = {"dev-1": args.execution_config_dev1, "dev-2": args.execution_config_dev2}
-    execution_config_hashes = {seed: sha256(path) for seed, path in execution_configs.items()}
+    execution_configs = {
+        "dev-1": tuple(args.execution_config_dev1),
+        "dev-2": tuple(args.execution_config_dev2),
+    }
+    execution_config_contracts = {
+        seed: execution_config_lineage(paths, seed=seed) for seed, paths in execution_configs.items()
+    }
+    execution_config_hashes = {
+        seed: {entry["sha256"] for entry in contract["configs"]}
+        for seed, contract in execution_config_contracts.items()
+    }
     registered_results = json.loads(args.registered_results.read_text(encoding="utf-8"))
     if registered_results.get("contract") != "ert_rslad_i100_s2_dynamic_bdd_recovery_results_v1":
         raise ValueError("registered results are not the accepted Dynamic-BDD recovery artifact")
@@ -346,10 +393,7 @@ def main() -> int:
             "canonical_ce20_attack_identity_sha256": CANONICAL_CE20_ATTACK_SHA256,
             "runtime_kl10_attack_identity_sha256": RUNTIME_KL10_ATTACK_SHA256,
             "registered_results": {"path": str(args.registered_results), "sha256": sha256(args.registered_results)},
-            "execution_configs": {
-                seed: {"path": str(path), "sha256": execution_config_hashes[seed]}
-                for seed, path in execution_configs.items()
-            },
+            "execution_configs": execution_config_contracts,
         },
         "seeds": {},
     }
@@ -453,7 +497,7 @@ def main() -> int:
                         expected_checkpoint_sha256=expected_checkpoint,
                         expected_mask_sha256=sha256(masks[seed]),
                         expected_mask_ids=fixed_ids,
-                        expected_config_sha256=execution_config_hashes[seed],
+                        expected_config_sha256s=execution_config_hashes[seed],
                     )
                     # Rebuild the current action branch from the canonical rows
                     # so the activity proxy remains explicitly cross-view.
