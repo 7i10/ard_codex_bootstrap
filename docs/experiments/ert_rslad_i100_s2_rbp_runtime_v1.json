@@ -1,0 +1,187 @@
+{
+  "arms": [
+    {
+      "arm": "dev1-control",
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-i100-s2-rbp-v1/dev1-control/endpoints/summary.json",
+      "summary_sha256": "08eb78a5b93caf21b51c0202a0c399bffa7ff99e11ba50b09cb3ae061e0facb7",
+      "train_e114": {
+        "clean_accuracy": 0.834,
+        "robust_accuracy": 0.6088444444444444,
+        "rows_sha256": "6dc582645c0524c882a6a37a88cb05a0e4fc104cf5fd7f1c0b324a7870c52dae"
+      },
+      "validation": [
+        {
+          "clean_accuracy": 0.8294,
+          "epoch": 104,
+          "robust_accuracy": 0.5606,
+          "rows_sha256": "0a4703f444e8d4c15aa7152e807bebb77ff201fe7de78eda1c712587311f4b88"
+        },
+        {
+          "clean_accuracy": 0.8348,
+          "epoch": 109,
+          "robust_accuracy": 0.5694,
+          "rows_sha256": "ef230dbfe8a9c5a221aa2b4fa08de7cfc97e834328618a861da2b200f9bd4b9d"
+        },
+        {
+          "clean_accuracy": 0.8364,
+          "epoch": 114,
+          "robust_accuracy": 0.5732,
+          "rows_sha256": "477251cff7c5c29b723aa0562739a3c633d884b23461aac20db79d655059be6e"
+        }
+      ]
+    },
+    {
+      "arm": "dev1-sbf-r6",
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-i100-s2-rbp-v1/dev1-sbf-r6/endpoints/summary.json",
+      "summary_sha256": "1d86638839deed9763e795cec4e9c756372712f3f3f1755078971ec230ebad6c",
+      "train_e114": {
+        "clean_accuracy": 0.8341777777777778,
+        "robust_accuracy": 0.6085333333333334,
+        "rows_sha256": "6a3c0bd2f5e4d9315a1b0b0ff19c98fdfa5eafce640bfd3df0619650b1d3e832"
+      },
+      "validation": [
+        {
+          "clean_accuracy": 0.8298,
+          "epoch": 104,
+          "robust_accuracy": 0.5598,
+          "rows_sha256": "218dc2c4e54b68b02c76ea8447f8e52f283f14e21f4ae569272d917908dc5a3d"
+        },
+        {
+          "clean_accuracy": 0.8348,
+          "epoch": 109,
+          "robust_accuracy": 0.5688,
+          "rows_sha256": "4eef1ea9a8f4cc8c77d062c73e1581947876a8a0ad9dd7699111e99f96679a4e"
+        },
+        {
+          "clean_accuracy": 0.8376,
+          "epoch": 114,
+          "robust_accuracy": 0.5748,
+          "rows_sha256": "e77ec6a261380acca294999007232b84885928edaebe38c0d876ca5d203cbdb2"
+        }
+      ]
+    },
+    {
+      "arm": "dev1-tpfm-r6",
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-i100-s2-rbp-v1/dev1-tpfm-r6/endpoints/summary.json",
+      "summary_sha256": "f9ceb97274162e89df0d1be7040903acf1d711347b9d24528243acfa177e84cb",
+      "train_e114": {
+        "clean_accuracy": 0.8334666666666667,
+        "robust_accuracy": 0.6083555555555555,
+        "rows_sha256": "dae69059e3ff00b913963c71873d9f15737058976f66f3133615587b0ee2787a"
+      },
+      "validation": [
+        {
+          "clean_accuracy": 0.8292,
+          "epoch": 104,
+          "robust_accuracy": 0.5604,
+          "rows_sha256": "0d0f791eaed44593175cc6df9e34fe03d1f6afd3c37cef86b9a67108679afa95"
+        },
+        {
+          "clean_accuracy": 0.8334,
+          "epoch": 109,
+          "robust_accuracy": 0.5668,
+          "rows_sha256": "b14323a5302fc8e71a61a657e684bdc5eb5a5a564e72d0e57c97c7fde4189c76"
+        },
+        {
+          "clean_accuracy": 0.8386,
+          "epoch": 114,
+          "robust_accuracy": 0.5754,
+          "rows_sha256": "a5803892b9568e13d6f83669aad454b179ef5ba0f5e83eb408b05be6662a2fca"
+        }
+      ]
+    },
+    {
+      "arm": "dev2-control-r6",
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-i100-s2-rbp-v1/dev2-control-r6/endpoints/summary.json",
+      "summary_sha256": "8917ce978f6d9ce1316fd6ecd0bc03819905aca0b7d1951fb40625f2c4cae1e7",
+      "train_e114": {
+        "clean_accuracy": 0.8333111111111111,
+        "robust_accuracy": 0.6072444444444445,
+        "rows_sha256": "4f76d39cd11fa2abf8b80a56508d15108947a7985eed35dae5f85d6a99fc9073"
+      },
+      "validation": [
+        {
+          "clean_accuracy": 0.8276,
+          "epoch": 104,
+          "robust_accuracy": 0.558,
+          "rows_sha256": "bfd7a0d78f959380c95d070b154997a9116b164995cb45424b50f7a151ff123d"
+        },
+        {
+          "clean_accuracy": 0.8358,
+          "epoch": 109,
+          "robust_accuracy": 0.564,
+          "rows_sha256": "aa43563e268dffd0433662f0a9a241b82ead78630ee090d23a7da9261f460bc2"
+        },
+        {
+          "clean_accuracy": 0.8372,
+          "epoch": 114,
+          "robust_accuracy": 0.5696,
+          "rows_sha256": "067330ca6799314e732adfaf716ceb30e40bd3ff6f14f77b9c589ce89ecf5dd0"
+        }
+      ]
+    },
+    {
+      "arm": "dev2-sbf-r6",
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-i100-s2-rbp-v1/dev2-sbf-r6/endpoints/summary.json",
+      "summary_sha256": "673a5100bc9c77e37b6ffc719207848d4a27fd2746e13c51d732089dd4840b2a",
+      "train_e114": {
+        "clean_accuracy": 0.8333777777777778,
+        "robust_accuracy": 0.6079111111111111,
+        "rows_sha256": "ec9556a07f1838cfa6d6f49b4451810115af7fc6d1e752ba89e9e6673f56253d"
+      },
+      "validation": [
+        {
+          "clean_accuracy": 0.828,
+          "epoch": 104,
+          "robust_accuracy": 0.5588,
+          "rows_sha256": "98b2f8e2fd8a432b58fc55f5822f510c577dd5de7efd5f255590b08185dc63e1"
+        },
+        {
+          "clean_accuracy": 0.8352,
+          "epoch": 109,
+          "robust_accuracy": 0.5644,
+          "rows_sha256": "b937bb8f6fbde8306dbcb822aaefd3ff0cb13df95024ea6b800025e3603fd554"
+        },
+        {
+          "clean_accuracy": 0.837,
+          "epoch": 114,
+          "robust_accuracy": 0.57,
+          "rows_sha256": "a1434673f580f694cff75c7b0c8e57672710ec478d018df52c7816a26dc25103"
+        }
+      ]
+    },
+    {
+      "arm": "dev2-tpfm-r6",
+      "summary_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-i100-s2-rbp-v1/dev2-tpfm-r6/endpoints/summary.json",
+      "summary_sha256": "e84656450e54564feac47f3c99e556e13c8de3bb11589b75b6a81e14906773d7",
+      "train_e114": {
+        "clean_accuracy": 0.8329333333333333,
+        "robust_accuracy": 0.6082222222222222,
+        "rows_sha256": "9a7940478b61eadf913c93d6e01efebe66077840d4347de7c52c69ad04d54d7d"
+      },
+      "validation": [
+        {
+          "clean_accuracy": 0.8278,
+          "epoch": 104,
+          "robust_accuracy": 0.558,
+          "rows_sha256": "fd7c06f7f4b89e59f4f2411174ce7ded538cca46bba7b0ea1f69c6b8ac5a60ef"
+        },
+        {
+          "clean_accuracy": 0.835,
+          "epoch": 109,
+          "robust_accuracy": 0.5636,
+          "rows_sha256": "aeff5949a97ea011e57024585c83cbddc9fff6b9557d5d506205400496b97ab6"
+        },
+        {
+          "clean_accuracy": 0.8364,
+          "epoch": 114,
+          "robust_accuracy": 0.57,
+          "rows_sha256": "896f1bdfc91233470a21af4d47cc968b6435693ae193922bdd767151d644f13d"
+        }
+      ]
+    }
+  ],
+  "contract": "ert_rslad_i100_s2_rbp_runtime_aggregation_v1",
+  "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+  "schema_version": 1
+}

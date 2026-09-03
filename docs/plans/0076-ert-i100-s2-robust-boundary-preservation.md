@@ -3,9 +3,9 @@
 ## Status
 
 - Owner: Codex
-- Status: in progress
+- Status: complete
 - Branch / base SHA: `ada40aac96b1832fd14ca0ab046b71a0c7bb255a`
-- Current milestone: parent/state audit and fixed-mask preparation
+- Current milestone: completed; scientific decision recorded
 - Last updated: 2026-09-03
 
 ## Goal
@@ -55,14 +55,14 @@ W&B retention remain unchanged.
 
 ## Milestones
 
-- [ ] M0 audit parents, rows, config, attack, and canonical state counts.
-- [ ] M1 generate fixed train/validation S2×T1 masks and pooled no-update
+- [x] M0 audit parents, rows, config, attack, and canonical state counts.
+- [x] M1 generate fixed train/validation S2×T1 masks and pooled no-update
   calibration artifact.
-- [ ] M2 add/execute focused contract tests and CPU/fixed-batch canary; commit
+- [x] M2 add/execute focused contract tests and CPU/fixed-batch canary; commit
   the immutable source before GPU launch.
-- [ ] M3 validate/preflight/plan and launch six detached training jobs.
-- [ ] M4 chain e104/e109/e114 validation and e114 train CE-PGD20 endpoints.
-- [ ] M5 aggregate state effects/runtime, write human and machine reports,
+- [x] M3 validate/preflight/plan and launch six detached training jobs.
+- [x] M4 chain e104/e109/e114 validation and e114 train CE-PGD20 endpoints.
+- [x] M5 aggregate state effects/runtime, write human and machine reports,
   review, commit, push, and stop.
 
 ## Agent and review budget
@@ -97,8 +97,17 @@ all new files share one API and one campaign identity.
 ## Progress log
 
 - 2026-09-03: HEAD and exact source/replay contracts inspected; both e99 parent
-  checkpoint hashes are present locally.  No GPU job launched yet.
+  checkpoint hashes are present locally.
+- 2026-09-03: Fixed masks and pooled no-update calibration completed; focused
+  tests and Hamster GPU0/GPU1 canaries passed.
+- 2026-09-03: Recovery6 completed 5 treatment/control continuations, six
+  CE-PGD20 endpoint jobs, and runtime aggregation. A prior W&B-ID collision was
+  corrected at the tracking layer without changing scientific identity.
+- 2026-09-03: Fixed validation S2×T1 boundary effects and train direct effects
+  were aggregated. Both mechanisms were classified MIXED/descriptive; neither
+  was promoted and no extension was started.
 
 ## Completion report
 
-To be filled after the six short continuations and endpoint aggregation.
+Completion report: `docs/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md`.
+Machine result: `docs/experiments/ert_rslad_i100_s2_rbp_results_v1.json`.
