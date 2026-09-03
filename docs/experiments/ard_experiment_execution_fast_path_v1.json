@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "artifact_type": "operational_fast_path_verification",
+  "scope": "Operational-only Fast Path consolidation; no scientific training, endpoint evaluation, seed, attack, checkpoint, or W&B mutation.",
+  "baseline": {
+    "source_sha": "db7cca90f252aeaaad1fc20c2de1ee2427a55fcb",
+    "subject": "Close ARD operational foundation"
+  },
+  "implementation": {
+    "fast_path_commit": "3352c414e1cd3f95c08fc5bae395e16957b01eac",
+    "validated_runtime_source_sha": "46329e0382b834f28bf19ec1162fd868ab663bd3",
+    "profiles": [
+      "FAST_EXISTING_RUNTIME",
+      "FULL_NEW_INTEGRATION"
+    ],
+    "new_operational_concepts": [
+      "FAST_EXISTING_RUNTIME",
+      "FULL_NEW_INTEGRATION",
+      "smoke_group"
+    ],
+    "command": "python3 .agents/skills/production-launch-gate/scripts/launch_gate.py --campaign-spec <campaign.json> --fast-launch",
+    "runtime_change": "Preparation timestamps are persisted outside the immutable manifest so unchanged serial gate stages reuse one scientific freeze."
+  },
+  "cpu_dummy_benchmark": {
+    "fixture": "same CPU-only bounded controller/public-CLI dummy; no model, dataset, checkpoint, or GPU computation",
+    "baseline_db7cca9": {
+      "manual_commands": 3,
+      "separate_gate_preflight_passes": 3,
+      "static_cli_executions": 0,
+      "canary_executions": 2,
+      "manifest_freeze_cycles": 3,
+      "controller_launch_attempts": 1,
+      "workflow_overhead_seconds_to_controller": 0.35602579778060317,
+      "command_durations_seconds": [
+        0.0727055559400469,
+        0.08557586092501879,
+        0.19774438091553748
+      ],
+      "controller_completed_within_5s": true
+    },
+    "fast_46329e0": {
+      "manual_commands": 1,
+      "separate_gate_preflight_passes": 1,
+      "static_cli_executions": 1,
+      "exact_public_cli_smoke_executions": 1,
+      "manifest_freeze_cycles": 1,
+      "controller_launch_attempts": 1,
+      "workflow_overhead_seconds_to_controller": 0.2220216179266572,
+      "request_to_ready_seconds": 0.05825,
+      "request_to_controller_seconds": 0.16146,
+      "static_check_duration_seconds": 0.021929,
+      "smoke_duration_seconds": 0.022721,
+      "preflight_duration_seconds": 0.013182,
+      "manifest_duration_seconds": 0.000385,
+      "controller_completed_within_5s": true
+    },
+    "interpretation": "The comparison measures control-plane overhead only. It does not claim that a real scientific campaign launches within 30 minutes; real Fast launch still requires a complete known-input inventory, host-by-job matrix, exact smoke coverage, and frozen manifest."
+  },
+  "required_fast_proofs": {
+    "scientific_identity": "Retained per job: source, parent, config, Teacher, dataset/split, attack, seed, arm, output, and applicable mask/calibration identities.",
+    "smoke_groups": "One representative exact smoke covers only an explicitly equivalent public CLI group and never mixes local and external execution classes.",
+    "remote_subsumption": "An exact external smoke can suppress only its duplicate generic lifecycle canary after source, process, manifest, completion, collection, and SHA proof.",
+    "r1_r35": "Retained; focused regression registry remains R1-R35."
+  },
+  "bounded_runtime_verification": {
+    "hamster": {
+      "host": "islab-WS-C621E-SAGE-Series",
+      "command": "operational_non_overwrite_dummy.py",
+      "source_sha": "46329e0382b834f28bf19ec1162fd868ab663bd3",
+      "artifact_sha256": "2688fced8b12c2f809d172f94af96bfc0684a7fc082126da35256b348a8a9ca4",
+      "payload_sha256": "e02a50b7f6cd4c522677f179d46e4fe483e5bb70391166a5c51d905f8acc50c8",
+      "result": "pass"
+    },
+    "ferret": {
+      "run_id": "fast-path-46329e0-r5",
+      "host": "islab-3gpu",
+      "gpu_index": 0,
+      "gpu_uuid": "GPU-d6b53af2-a086-be46-30db-10976ef3b989",
+      "source_sha": "46329e0382b834f28bf19ec1162fd868ab663bd3",
+      "identity_hash": "96b61b1aca9bfb37327cd086bf9824cfcc89a0aa348a6b485d966b08ff561cf8",
+      "live_process_confirmed": true,
+      "terminal_exit_code": 0,
+      "collected_artifact_sha256": "6205453dc8461906baa38c45b931a1268e6d04b3b351e530f416183838179bc2",
+      "payload_sha256": "a533a394f971e7d9e7aac924f77ea7173eafa5cf1a6d823b748b79e48c7d3382",
+      "collection_path": "registered Ferret staging root",
+      "remote_run_cleaned": true,
+      "result": "pass"
+    },
+    "note": "The bounded public CLI used an assigned remote GPU only to prove launcher identity; it performed no GPU computation or scientific work."
+  },
+  "technical_test_recovery": [
+    {
+      "attempt": "fast-path-3352c41-r1",
+      "outcome": "completed before bounded live-process confirmation",
+      "scientific_identity_changed": false,
+      "resolution": "Use the documented maximum 10-second confirmation hold and confirm immediately after launch."
+    },
+    {
+      "attempt": "fast-path-3352c41-r2",
+      "outcome": "dummy CLI rejected hold_seconds=20 because its documented bounded range is [0, 10]",
+      "scientific_identity_changed": false,
+      "resolution": "Use the public CLI contract rather than extending a bounded dummy."
+    },
+    {
+      "attempt": "fast-path-3352c41-r3",
+      "outcome": "live confirmation passed, but the artifact was intentionally excluded because it was written beneath the prepared repo worktree",
+      "scientific_identity_changed": false,
+      "resolution": "Write collected outputs to the registered run output root; final r5 passed collection and SHA verification."
+    }
+  ],
+  "validation": {
+    "focused_suite": {
+      "command": "PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m pytest -q tests/skills/test_production_launch_gate.py tests/skills/test_multi_gpu_orchestrator.py",
+      "result": "61 passed in 20.15s"
+    },
+    "focused_fast_coverage": [
+      "F1 profile selection",
+      "F2 Full integration routing",
+      "F3 scientific identity retention",
+      "F4 smoke-group de-duplication",
+      "F5 local/external coverage separation",
+      "F6 external exact-smoke lifecycle subsumption",
+      "F7 source drift fail-closed",
+      "F8 one-command single-freeze detached launch",
+      "F9 no campaign-specific wrapper",
+      "F10 ledger duration fields"
+    ],
+    "additional_regression": "serial preflight/canary/launch reuses the immutable manifest despite changing operational timestamps",
+    "style_and_syntax": "adv Python ruff check and py_compile passed",
+    "changed_verification_preview": {
+      "command": "PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py --changed --non-scientific --dry-run",
+      "selection": "broad unrelated T0/T1 integration, regression, synthetic-training, and GPU fixtures because generic skill/document roots are globally mapped",
+      "decision": "not run; it cannot change this operational documentation/skill decision and would violate the task's no-scientific-execution scope. The exact affected 61-test focused suite already passed."
+    }
+  },
+  "self_audit": {
+    "no_new_gate_orchestrator_remote_executor_or_workspace_layer": true,
+    "no_r36_plus": true,
+    "no_scientific_execution": true,
+    "no_campaign_specific_shell_wrapper": true,
+    "exact_smoke_retained": true,
+    "host_matrix_and_hash_reuse_retained": true,
+    "detached_controller_not_polled_for_completion": true,
+    "bounded_remote_collection_sha_verified": true
+  },
+  "stop_rule": "Completed operational Fast Path consolidation. No scientific campaign was launched and no follow-on experiment is authorized by this artifact."
+}

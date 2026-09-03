@@ -54,6 +54,12 @@ completion. `ferret-collect` only transfers local result bytes; a production
 collection node must SHA-verify them into the canonical local inventory before
 aggregation consumes them.
 
+`ferret-launch` executes from the prepared `<run>/repo` worktree, while
+`ferret-collect` deliberately excludes that code tree. Therefore a public
+command's collected output must target the registered `<run>/outputs` area
+(for a relative invocation, typically `../outputs/...`), not `repo/outputs`.
+Writing artifacts under the code checkout is not a valid collected result.
+
 For a parameter matrix, prefer one tracked wrapper at the prepared SHA or one
 run bundle per cell. Do not embed a generated `bash -lc` loop in a launcher
 argument: local expansion can silently change `$` variables before the command

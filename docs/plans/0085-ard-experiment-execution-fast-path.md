@@ -4,7 +4,7 @@
 
 - Owner: Codex
 - Branch / base SHA: `master` / `db7cca90f252aeaaad1fc20c2de1ee2427a55fcb`
-- Current milestone: M1 — consolidate the existing launch gate
+- Current milestone: M3 — complete
 - Last updated: 2026-09-04
 
 ## Goal
@@ -61,28 +61,28 @@ contracts remain fail-closed.
 
 ## Milestones
 
-- [ ] M0 — Record baseline workflow and input evidence.
+- [x] M0 — Record baseline workflow and input evidence.
   - Files: this plan, task context, baseline benchmark artifact.
   - Tests: existing CPU dummy invocation only.
   - Acceptance: baseline command/check/freeze counts are recorded without a
     scientific run.
   - Rollback: no source changes.
 
-- [ ] M1 — Implement Fast/Full selection, smoke groups, and timing summary.
+- [x] M1 — Implement Fast/Full selection, smoke groups, and timing summary.
   - Files: launch gate, launch ledger, existing skill documentation.
   - Tests: F1–F10 focused tests.
   - Acceptance: Fast preserves exact identity and one manifest freeze;
     unsupported/new integration is routed to Full.
   - Rollback: ordinary `--launch` behavior remains unchanged.
 
-- [ ] M2 — Verify CPU and bounded existing Ferret dummy paths.
+- [x] M2 — Verify CPU and bounded existing Ferret dummy paths.
   - Files: tests and operational result artifact only.
   - Tests: one-command CPU dummy, one bounded existing remote dummy;
     no GPU scientific work.
   - Acceptance: remote exact-smoke proof is used once and collection succeeds.
   - Rollback: artifacts are outside scientific output roots.
 
-- [ ] M3 — Document, self-audit, commit, and push.
+- [x] M3 — Document, self-audit, commit, and push.
   - Files: launch discipline / one focused Fast Path document, `AGENTS.md`,
     experiment artifact, plan.
   - Tests: focused suite; one changed-test selection preview.
@@ -120,7 +120,18 @@ lineage, or results.
 - 2026-09-04: Reconciled baseline `db7cca9`; current tree was clean and no
   scientific controller/job was active.  Audited existing gate, controller,
   ledger, workspace contract, and prior operational incident documentation.
+- 2026-09-04: Implemented the thin `--fast-launch` mode at `3352c41`, then
+  corrected timestamp leakage from the immutable manifest at `46329e0`.
+  The regression proves that the ordinary serial gate stages can reuse one
+  unchanged scientific freeze.
+- 2026-09-04: The final runtime SHA passed the CPU dummy benchmark and bounded
+  Hamster/Ferret public-CLI checks.  Ferret proved fixed-SHA worktree, live
+  process/GPU identity, completion, collected bytes, and cleanup.  No
+  scientific process was started.
 
 ## Completion report
 
-Pending implementation and verification.
+Completed.  The machine-readable result is
+`docs/experiments/ard_experiment_execution_fast_path_v1.json`; the human
+contract is `docs/EXPERIMENT_FAST_PATH.md`.  A final documentation-only commit
+will record the result after focused verification.

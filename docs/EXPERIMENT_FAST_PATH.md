@@ -140,6 +140,38 @@ If the 30-minute target is at risk, state the blocker, owning layer, smallest
 resolution, and whether Full is actually required.  Do not silently expand
 the campaign into infrastructure work.
 
+Preparation timestamps are deliberately kept outside the immutable manifest.
+They are operational evidence in `preflight.json` and
+`fast-path-summary.json`, so an unchanged ordinary
+`preflight -> canary -> launch` sequence can reuse its scientific freeze
+instead of failing because wall-clock timestamps changed.
+
+## Bounded verification
+
+The operational Fast Path verification is recorded in
+[`ard_experiment_execution_fast_path_v1.json`](experiments/ard_experiment_execution_fast_path_v1.json).
+Its CPU-only bounded public-CLI dummy compared the former three-command
+workflow to `--fast-launch` on the same fixture:
+
+| Measure | Baseline `db7cca9` | Fast |
+| --- | ---: | ---: |
+| Operator commands | 3 | 1 |
+| Preparation passes | 3 | 1 |
+| Representative smoke executions | 2 generic | 1 exact |
+| Freeze cycles | 3 | 1 |
+| Controller launches | 1 | 1 |
+| CPU dummy request-to-controller overhead | 0.356 s | 0.222 s |
+
+This measures control-plane overhead only; it is not evidence that a real
+scientific campaign will launch in under 30 minutes.  The latter still depends
+on a complete known-input inventory, the host × job matrix, and the exact
+smoke for the frozen campaign identity.
+
+The bounded Hamster and Ferret checks used the final runtime source SHA,
+including a Ferret live-process confirmation and collected-artifact SHA
+round-trip.  They did not run a model, dataset, checkpoint, endpoint, or W&B
+job.
+
 ## What Fast deliberately does not do
 
 - It does not create campaign-specific shell wrappers.
@@ -149,6 +181,11 @@ the campaign into infrastructure work.
 - It does not add a new SSH executor, controller, or polling loop.
 - It does not turn a failed scientific outcome into a retry.
 - It does not auto-launch a follow-on scientific experiment after reporting.
+
+For remote runners whose collector excludes the prepared repository worktree,
+public commands must write to the registered run output root, not to a path
+inside the code checkout.  Collection is evidence only after those bytes enter
+the canonical local staging path and pass SHA verification.
 
 See [Experiment Launch Discipline](EXPERIMENT_LAUNCH_DISCIPLINE.md) for the
 incident evidence, escalation behavior, and estimate contract.
