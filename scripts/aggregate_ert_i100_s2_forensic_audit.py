@@ -43,6 +43,11 @@ def rows(path: Path) -> dict[int, dict[str, Any]]:
     return result
 
 
+def fixed_mask_ids(path: Path) -> set[int]:
+    """Load the registered fixed S2×T1 stable-ID set exactly once per use."""
+    return set(json.loads(path.read_text(encoding="utf-8"))["masks"]["s2_t1"]["selected_ids"])
+
+
 def target(state: Mapping[str, str]) -> bool:
     return state["branch"] == "S2" and state["teacher"] == "T1"
 
@@ -332,7 +337,7 @@ def main() -> int:
     for seed in SEEDS:
         initial_rows = rows(e99_paths[seed])
         initial = canonical_action_states(initial_rows.values())["state_by_id"]
-        mask = set(json.loads(masks[seed].read_text(encoding="utf-8"))["masks"]["s2_t1"]["selected_ids"])
+        mask = fixed_mask_ids(masks[seed])
         anchor_target = {sample_id for sample_id, state in initial.items() if target(state)}
         if mask != anchor_target:
             raise ValueError(f"{seed}: fixed S2xT1 mask does not equal canonical e99 action state")
@@ -347,7 +352,6 @@ def main() -> int:
             },
             "arms": {},
         }
-        fixed_ids = mask
         for arm in ARMS:
             by_epoch: dict[int, Mapping[int, Mapping[str, str]]] = {99: initial}
             metadata: dict[str, Any] = {}
@@ -394,6 +398,7 @@ def main() -> int:
             raise ValueError(f"runtime proxy matrix incomplete: missing={sorted(required - set(proxy_rows))}")
         activity_summary: dict[str, Any] = {}
         for seed in SEEDS:
+            fixed_ids = fixed_mask_ids(masks[seed])
             seed_summary: dict[str, Any] = {}
             for arm in ARMS:
                 arm_summary: dict[str, Any] = {}

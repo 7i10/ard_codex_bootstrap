@@ -25,6 +25,7 @@ from scripts.aggregate_ert_i100_s2_forensic_audit import (
     endpoint_checkpoint,
     entrant_summary,
     fixed_cohort_trajectory,
+    fixed_mask_ids,
     runtime_proxy_payloads,
 )
 
@@ -108,6 +109,15 @@ def test_runtime_proxy_uses_same_seed_canonical_checkpoint() -> None:
     }
     assert endpoint_checkpoint(result, seed="dev-1", arm="dpm", epoch=104) == "dev1"
     assert endpoint_checkpoint(result, seed="dev-2", arm="dpm", epoch=104) == "dev2"
+
+
+def test_fixed_mask_ids_are_loaded_from_the_requested_seed_file(tmp_path: Path) -> None:
+    dev1 = tmp_path / "dev1.json"
+    dev2 = tmp_path / "dev2.json"
+    dev1.write_text(json.dumps({"masks": {"s2_t1": {"selected_ids": [1, 3]}}}), encoding="utf-8")
+    dev2.write_text(json.dumps({"masks": {"s2_t1": {"selected_ids": [2, 4]}}}), encoding="utf-8")
+    assert fixed_mask_ids(dev1) == {1, 3}
+    assert fixed_mask_ids(dev2) == {2, 4}
 
 
 def test_runtime_proxy_payloads_discovers_nested_arm_epoch_artifacts(tmp_path: Path) -> None:
