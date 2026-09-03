@@ -2385,7 +2385,10 @@ def gate_main(args: argparse.Namespace) -> int:
             return 2
         ledger.append({"event_type": "integration_smoke_passed", "timestamp": now()})
     ledger.append({"event_type": "manifest_freeze_started", "timestamp": now()})
-    manifest["launch_gate"]["timing_ledger"] = ledger
+    # Preparation timestamps are operational evidence, not immutable campaign
+    # identity.  Keeping them out of the frozen manifest lets the ordinary
+    # preflight -> canary -> launch workflow reuse the same scientific freeze;
+    # they are persisted in preflight.json / fast-path-summary.json instead.
     report["dry_run"] = dry_rows
     try:
         frozen_path, manifest_sha = freeze(manifest, gate_dir)

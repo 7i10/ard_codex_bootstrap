@@ -875,6 +875,37 @@ def test_fast_path_f8_one_command_freezes_one_manifest_then_launches_detached(tm
     assert state.exists() and json.loads(state.read_text())["status"] == "completed"
 
 
+def test_serial_preflight_canary_launch_reuses_immutable_manifest(tmp_path: Path) -> None:
+    """Operational timestamps must not make an unchanged campaign unfreezable."""
+    spec, repo, _, _ = base_spec(tmp_path)
+    configure_fast_existing_runtime(spec, tmp_path)
+    output = tmp_path / "outputs" / "train"
+    code = (
+        "import json; from pathlib import Path; "
+        f"out=Path({str(output)!r}); out.mkdir(parents=True, exist_ok=True); "
+        "(out/'last.json').write_text(json.dumps({'epoch':2}))"
+    )
+    spec["jobs"][0]["command"] = [sys.executable, "-c", code, "--epochs", "999"]
+    spec["jobs"][0]["cwd"] = str(repo)
+    gate = tmp_path / "gate"
+    spec_path = write_spec(tmp_path, spec)
+
+    for flag in ("--preflight-only", "--canary-only", "--launch"):
+        result = invoke(spec_path, flag, output=gate)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    freeze = json.loads((gate / "freeze.json").read_text())
+    manifest = json.loads((gate / "resolved-manifest.json").read_text())
+    assert freeze["manifest_sha256"] == sha(gate / "resolved-manifest.json")
+    assert "timing_ledger" not in manifest["launch_gate"]
+    state = Path(manifest["state_path"])
+    for _ in range(200):
+        if state.exists() and json.loads(state.read_text()).get("status") == "completed":
+            break
+        time.sleep(0.01)
+    assert state.exists() and json.loads(state.read_text())["status"] == "completed"
+
+
 def test_fast_path_f9_never_generates_campaign_specific_shell_wrappers(tmp_path: Path) -> None:
     spec, _, _, _ = base_spec(tmp_path)
     configure_fast_existing_runtime(spec, tmp_path)
