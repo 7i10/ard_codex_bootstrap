@@ -4,12 +4,18 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from ard.cli.ert_stage_a_runtime import main as runtime_main
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN_ROOT = Path("/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1")
+RUN_ROOT = Path(
+    os.environ.get(
+        "ARD_STAGEWISE_RUN_ROOT",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1",
+    )
+).expanduser()
 CALIBRATION = ROOT / "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_calibration_v1.json"
 PARENTS = {
     "dev-1": {

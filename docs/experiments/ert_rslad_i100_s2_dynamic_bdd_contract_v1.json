@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "contract": "ert_rslad_i100_s2_dynamic_bdd_contract_v1",
+  "status": "frozen_pre_training",
+  "source_git_sha": "9b5cf132a0f2f7eff890854253d05257a95bdae9",
+  "parent_epoch": 99,
+  "training_epochs": {"start": 100, "end_exclusive": 115, "checkpoints": [104, 109, 114]},
+  "parents": {
+    "dev-1": {
+      "config_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s1/resolved_config.yaml",
+      "config_sha256": "e87905b549f741de04576bc36c00c51c0ac464f832dd89d7b5c855349926c5a6",
+      "checkpoint_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+      "checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "mask_path": "docs/experiments/ert_rslad_i100_s2_rbp_masks_dev1_v1.json",
+      "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4",
+      "train_selected_count": 2212,
+      "validation_selected_count": 226
+    },
+    "dev-2": {
+      "config_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/idbh-s100-s2/resolved_config.yaml",
+      "config_sha256": "1ce45685583518a66872b92f40a23c62129b85c6a07c01f50c134b36481dcd5c",
+      "checkpoint_path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed2/s100/epoch-100.pt",
+      "checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "mask_path": "docs/experiments/ert_rslad_i100_s2_rbp_masks_dev2_v1.json",
+      "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056",
+      "train_selected_count": 2141,
+      "validation_selected_count": 209
+    }
+  },
+  "teacher": {
+    "registry_id": "chen2021_ltd_wrn34_10",
+    "checkpoint_path": "/home/shunsukenaito/workspace-local/ard_codex_bootstrap/teacher_cache/robustbench/Chen2021LTD_WRN34_10.pt",
+    "checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+  },
+  "attacks": {
+    "training": {
+      "name": "KL-PGD10",
+      "identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 10,
+      "random_start": true,
+      "random_start_keying": "sample_keyed_v1",
+      "loss": "kl",
+      "kl_target": "teacher_clean",
+      "input_domain": "pixel_0_1"
+    },
+    "endpoint": {
+      "name": "CE-PGD20",
+      "identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+      "epsilon": "8/255",
+      "step_size": "2/255",
+      "steps": 20,
+      "random_start": true,
+      "loss": "ce",
+      "input_domain": "pixel_0_1"
+    }
+  },
+  "geometry": {
+    "pair_definition": "current Student strongest non-true logit on x_adv; shared with Teacher",
+    "teacher_positive_gate": "mT > 0",
+    "epsilon": 1e-12,
+    "dpm": "0.5*relu(mT-mS)^2",
+    "dbdd": "0.5*relu(mT/(||gT||_1+eps)-mS/(sg(||gS||_1)+eps))^2",
+    "sbdd": "0.5*relu(mT/(qT+eps)-mS/(sg(qS)+eps))^2",
+    "gradient_mode": "first_order_only_create_graph_false",
+    "model_mode": "eval_for_geometry",
+    "extra_pgd": 0
+  },
+  "calibration": {
+    "path": "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_calibration_v1.json",
+    "sha256": "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840",
+    "target_median_gradient_ratio": 0.25,
+    "epsilon": 1e-12,
+    "coefficients": {
+      "pair_margin": 0.05380932585058825,
+      "detached_boundary_distance": 31.649566509850324,
+      "secant_boundary_distance": 3.487387518680544
+    }
+  },
+  "arms": [
+    "I100_CONTROL",
+    "I100_S2T1_DYNAMIC_PAIR_MARGIN",
+    "I100_S2T1_DETACHED_BOUNDARY_DISTANCE",
+    "I100_S2T1_SECANT_BOUNDARY_DISTANCE"
+  ],
+  "runtime": {
+    "fixed_mask": true,
+    "full_batch_mean": true,
+    "teacher_frozen": true,
+    "same_step_dynamic_target": true,
+    "dynamic_routing": false,
+    "wandb_artifact_retention": "metrics_only"
+  }
+}
