@@ -158,12 +158,16 @@ def replay_train_states(
         batch = batch.to(device)
         with torch.no_grad():
             student_clean = student(batch.images)
-            teacher_clean = teacher(batch.images)
         adversarial = attack.generate(
             AttackRequest(inputs=batch.images, labels=batch.labels, student=student, teacher=None, generator=generator)
         ).adversarial
         with torch.no_grad():
             student_adv = student(adversarial)
+            # Preserve the existing endpoint's Student clean → attack →
+            # Student adversarial sequence before any diagnostic-only Teacher
+            # operation.  This makes the reconstructed Student rows identical
+            # to the registered endpoint under deterministic CUDA.
+            teacher_clean = teacher(batch.images)
             teacher_adv = teacher(adversarial)
         student_clean_margin = _probability_margin(student_clean, batch.labels)
         student_adv_margin = _probability_margin(student_adv, batch.labels)
