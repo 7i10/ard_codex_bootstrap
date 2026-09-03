@@ -1,0 +1,1000 @@
+{
+  "contract": {
+    "analysis_is_descriptive": true,
+    "anchor_attack": {
+      "epsilon": "8/255",
+      "identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+      "input_domain": "pixel_0_1",
+      "protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+      "random_start_keying": "batch",
+      "step_size": "2/255",
+      "steps": 20,
+      "student_mode": "eval",
+      "teacher_mode": "eval"
+    },
+    "anchor_epoch": 99,
+    "cohort": "canonical validation S2xT1 from fixed positive-margin q10 mask",
+    "contract": "ert_rslad_i100_s2_boundary_geometry_contract_v1",
+    "distance_proxy": "pair_logit_margin / input_gradient_l1",
+    "endpoint_root": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-i100-s2-rbp-v1",
+    "fixed_ridge": {
+      "alpha": 1.0,
+      "fit_seed_standardization": true,
+      "pooled_fit": false
+    },
+    "future_failure": "I100_CONTROL robust_wrong at existing CE-PGD20 e104/e109/e114",
+    "geometry_scalar_artifacts": {
+      "dev-1": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-i100-s2-boundary-geometry-v1/dev-1-validation.parquet",
+        "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+        "row_count": 226,
+        "rows_sha256": "16c2e8144e3de5c1b7c0121ddac3e218c9931e83c6bc0e4e92cf35355562a4b7"
+      },
+      "dev-2": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-i100-s2-boundary-geometry-v1/dev-2-validation.parquet",
+        "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+        "row_count": 209,
+        "rows_sha256": "70705b2ce05e0722ce3bea5a4e8164b620047715e74edc56bb3be9aa2bcb177b"
+      }
+    },
+    "mask_artifacts": {
+      "dev-1": {
+        "count": 226,
+        "ids_sha256": "048707beadfba2d679933137c330e120e267f0c3d0a94c26a739bbe46ad8fae2",
+        "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4"
+      },
+      "dev-2": {
+        "count": 209,
+        "ids_sha256": "03a3c90b16b07076da16e82e8d9b83ad9ec602c49214c095249ed9b9f7a0ed48",
+        "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056"
+      }
+    },
+    "mask_label_note": "Mask artifact descriptive label says sample_keyed_v1; registered replay metadata and regenerated anchor use batch-index CE seed stream.",
+    "no_update": true,
+    "parents": {
+      "dev-1": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "dev-2": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+    },
+    "raw_gradients_persisted": false,
+    "rival_definition": "Student strongest non-true logit on x_adv^S; shared with Teacher",
+    "schema_version": 1,
+    "secondary_train_geometry_artifacts": {
+      "dev-1": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-i100-s2-boundary-geometry-v1/dev-1-train.parquet",
+        "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+        "row_count": 2212,
+        "rows_sha256": "b637574fb6ade2a923d68fc2223287ebbd89a8a206236ab9c62b392447b46190"
+      },
+      "dev-2": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-i100-s2-boundary-geometry-v1/dev-2-train.parquet",
+        "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+        "row_count": 2141,
+        "rows_sha256": "b842bb748e948de047d8ebc98ad7a0f369329b2105533cc4cc4118b1c9adf6d5"
+      }
+    },
+    "source_git_sha": "958c8371b73af7c40222d61532c3eb1461792223",
+    "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+  },
+  "geometry_added_value": {
+    "104": {
+      "dev-1_to_dev-2": {
+        "delta_distance_minus_student_margin": 0.25441300084057156,
+        "minimal_geometry_minus_student_margin": 0.1875875595404875,
+        "normal_mismatch_minus_student_margin": -0.02451667133650881,
+        "student_distance_minus_student_margin": 0.015410479125805565
+      },
+      "dev-2_to_dev-1": {
+        "delta_distance_minus_student_margin": 0.2131132756132756,
+        "minimal_geometry_minus_student_margin": 0.18921356421356422,
+        "normal_mismatch_minus_student_margin": -0.05979437229437229,
+        "student_distance_minus_student_margin": 0.03183621933621933
+      }
+    },
+    "109": {
+      "dev-1_to_dev-2": {
+        "delta_distance_minus_student_margin": 0.11804733727810646,
+        "minimal_geometry_minus_student_margin": 0.08180473372781061,
+        "normal_mismatch_minus_student_margin": -0.06020710059171602,
+        "student_distance_minus_student_margin": -0.05162721893491129
+      },
+      "dev-2_to_dev-1": {
+        "delta_distance_minus_student_margin": 0.16922348484848493,
+        "minimal_geometry_minus_student_margin": 0.13873106060606066,
+        "normal_mismatch_minus_student_margin": -0.15312499999999996,
+        "student_distance_minus_student_margin": -0.04772727272727273
+      }
+    },
+    "114": {
+      "dev-1_to_dev-2": {
+        "delta_distance_minus_student_margin": 0.08772189349112425,
+        "minimal_geometry_minus_student_margin": 0.059911242603550297,
+        "normal_mismatch_minus_student_margin": -0.10029585798816565,
+        "student_distance_minus_student_margin": -0.17721893491124258
+      },
+      "dev-2_to_dev-1": {
+        "delta_distance_minus_student_margin": 0.2584154351395731,
+        "minimal_geometry_minus_student_margin": 0.243123973727422,
+        "normal_mismatch_minus_student_margin": 0.0892857142857143,
+        "student_distance_minus_student_margin": -0.0577791461412151
+      }
+    }
+  },
+  "predictors": {
+    "104": {
+      "distance_gap": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.7303166152984029,
+          "average_precision": 0.9093146513715549,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.32252460318051895,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.687049062049062,
+          "average_precision": 0.8110197490781682,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.30190379955467894,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "geometry_distance_relation": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.7263939478845615,
+          "average_precision": 0.9087109972218638,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "student_distance_inf",
+            "teacher_distance_inf",
+            "delta_distance_inf",
+            "distance_ratio"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.3170314834183204,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.6783008658008658,
+          "average_precision": 0.8002119204405355,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "student_distance_inf",
+            "teacher_distance_inf",
+            "delta_distance_inf",
+            "distance_ratio"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.28778390150414673,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "geometry_minimal": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6634911739983188,
+          "average_precision": 0.8912516058957055,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.22894538437449244,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.6631493506493507,
+          "average_precision": 0.7972256327435494,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.26332882034446203,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "margin_plus_geometry": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6787615578593443,
+          "average_precision": 0.898964134532144,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin",
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.25032931487733706,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.6682900432900433,
+          "average_precision": 0.8013059902341269,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin",
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.27162608002364075,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "normal_mismatch": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.4513869431213225,
+          "average_precision": 0.7796810068877497,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "normal_mismatch"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": -0.0680754484815329,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.41414141414141414,
+          "average_precision": 0.6299473852924051,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "normal_mismatch"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": -0.1385787932382133,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_distance": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.49131409358363687,
+          "average_precision": 0.7950834362280756,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "student_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": -0.012163336616296944,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.5057720057720058,
+          "average_precision": 0.6748677592265349,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "student_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.009316221394165599,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_margin": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.4759036144578313,
+          "average_precision": 0.7830130011018817,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "student_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": -0.03374344996779152,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.47393578643578643,
+          "average_precision": 0.6601883773392231,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "student_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": -0.04206856223302903,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_teacher_margins": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.7122443261417765,
+          "average_precision": 0.9014340068884859,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.29721701570467535,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.6718975468975469,
+          "average_precision": 0.7999207303268455,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.2774487183949943,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "teacher_margin": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.7149061361725974,
+          "average_precision": 0.9002414343587873,
+          "failure_eval": 166,
+          "failure_fit": 154,
+          "feature_columns": [
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.3009444898290244,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.670995670995671,
+          "average_precision": 0.797530081293444,
+          "failure_eval": 154,
+          "failure_fit": 166,
+          "feature_columns": [
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.2759930588021559,
+          "standardization": "fit-seed mean/std only"
+        }
+      }
+    },
+    "109": {
+      "distance_gap": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.646301775147929,
+          "average_precision": 0.8787536424546509,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.19937571221499562,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7261363636363637,
+          "average_precision": 0.8495051258112614,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.3561958036539016,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "geometry_distance_relation": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6427514792899408,
+          "average_precision": 0.8782019034062964,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "student_distance_inf",
+            "teacher_distance_inf",
+            "delta_distance_inf",
+            "distance_ratio"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.19453747450704828,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7115530303030303,
+          "average_precision": 0.8367671870808406,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_distance_inf",
+            "teacher_distance_inf",
+            "delta_distance_inf",
+            "distance_ratio"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.3332250524969917,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "geometry_minimal": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6100591715976331,
+          "average_precision": 0.8731816245629979,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.14998536894636677,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.6956439393939394,
+          "average_precision": 0.8310992844437806,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.30816605123490814,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "margin_plus_geometry": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6223372781065089,
+          "average_precision": 0.8799823476110695,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin",
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.16671760768635124,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.6837121212121212,
+          "average_precision": 0.8414603066120865,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin",
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.28937180028834547,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "normal_mismatch": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.4680473372781065,
+          "average_precision": 0.8035691527331115,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "normal_mismatch"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": -0.043544139371525833,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.4037878787878788,
+          "average_precision": 0.6547308793535748,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "normal_mismatch"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": -0.1515472933468861,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_distance": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.4766272189349112,
+          "average_precision": 0.7976992461901345,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "student_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": -0.031851731577319825,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.509185606060606,
+          "average_precision": 0.6915874618618574,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.014468590014417275,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_margin": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.5282544378698225,
+          "average_precision": 0.8228880077701165,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "student_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.03850430842574739,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.5569128787878788,
+          "average_precision": 0.7147762647808793,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.08964559380066786,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_teacher_margins": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6522189349112426,
+          "average_precision": 0.8896362146205792,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.20743944172824114,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7142992424242425,
+          "average_precision": 0.8558228616458766,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.337550713429137,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "teacher_margin": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6510355029585799,
+          "average_precision": 0.8895056161500458,
+          "failure_eval": 169,
+          "failure_fit": 160,
+          "feature_columns": [
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.20582669582559202,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7134469696969697,
+          "average_precision": 0.8571393133458016,
+          "failure_eval": 160,
+          "failure_fit": 169,
+          "feature_columns": [
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.33620826693295397,
+          "standardization": "fit-seed mean/std only"
+        }
+      }
+    },
+    "114": {
+      "distance_gap": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.693491124260355,
+          "average_precision": 0.8897031546984596,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.2636839550831287,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7766830870279147,
+          "average_precision": 0.9014980831341504,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.41863707330913946,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "geometry_distance_relation": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6724852071005917,
+          "average_precision": 0.8847576498839039,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "student_distance_inf",
+            "teacher_distance_inf",
+            "delta_distance_inf",
+            "distance_ratio"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.23505771531110706,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7273193760262726,
+          "average_precision": 0.8627808656638497,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_distance_inf",
+            "teacher_distance_inf",
+            "delta_distance_inf",
+            "distance_ratio"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.3439470019954539,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "geometry_minimal": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.665680473372781,
+          "average_precision": 0.8846689592734072,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.2257844263708747,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7613916256157636,
+          "average_precision": 0.8947747192741344,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.39550023209138657,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "margin_plus_geometry": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6745562130177515,
+          "average_precision": 0.8882596253000065,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin",
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.23788002064074298,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7176724137931034,
+          "average_precision": 0.874239610427549,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin",
+            "student_distance_inf",
+            "normal_mismatch",
+            "delta_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.32935060552250917,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "normal_mismatch": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.5054733727810651,
+          "average_precision": 0.8150495208243551,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "normal_mismatch"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.007458949799752112,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.6075533661740559,
+          "average_precision": 0.793058495331186,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "normal_mismatch"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.16273429259198,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_distance": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.42855029585798815,
+          "average_precision": 0.7753761854166129,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "student_distance_inf"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": -0.09736953387243971,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.46048850574712646,
+          "average_precision": 0.7069974968745069,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_distance_inf"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": -0.05978311321365678,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_margin": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6057692307692307,
+          "average_precision": 0.8603790363872404,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "student_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.14413916504926375,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.5182676518883416,
+          "average_precision": 0.737098830666247,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.02763998481046989,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "student_teacher_margins": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6738165680473372,
+          "average_precision": 0.8905799925918715,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.2368720544515873,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7266009852216748,
+          "average_precision": 0.8800972196886017,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "student_adv_logit_margin",
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.3428600363006602,
+          "standardization": "fit-seed mean/std only"
+        }
+      },
+      "teacher_margin": {
+        "dev-1_to_dev-2": {
+          "auroc": 0.6868343195266272,
+          "average_precision": 0.8943802497708054,
+          "failure_eval": 169,
+          "failure_fit": 168,
+          "feature_columns": [
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 209,
+          "n_fit": 226,
+          "ridge_alpha": 1.0,
+          "spearman": 0.25461225938072746,
+          "standardization": "fit-seed mean/std only"
+        },
+        "dev-2_to_dev-1": {
+          "auroc": 0.7601600985221675,
+          "average_precision": 0.9001675185184855,
+          "failure_eval": 168,
+          "failure_fit": 169,
+          "feature_columns": [
+            "teacher_adv_logit_margin"
+          ],
+          "n_eval": 226,
+          "n_fit": 209,
+          "ridge_alpha": 1.0,
+          "spearman": 0.393636862328883,
+          "standardization": "fit-seed mean/std only"
+        }
+      }
+    }
+  }
+}

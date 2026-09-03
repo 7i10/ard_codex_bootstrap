@@ -3,9 +3,9 @@
 ## Status
 
 - Owner: Codex
-- Status: in progress
+- Status: complete
 - Branch / base SHA: `3367c72cf9e20337bb94bec20ddb6052f180c7c2`
-- Current milestone: lineage and endpoint inventory
+- Current milestone: complete read-only replay, analysis, and report
 - Last updated: 2026-09-03
 
 ## Goal
@@ -52,14 +52,14 @@ existing I100_CONTROL endpoint rows.
 
 ## Milestones
 
-- [ ] M0 audit parents, masks, replay protocol, endpoint rows, and source.
-- [ ] M1 implement scalar-only geometry replay, canary, and fixed-contract
+- [x] M0 audit parents, masks, replay protocol, endpoint rows, and source.
+- [x] M1 implement scalar-only geometry replay, canary, and fixed-contract
   tests.
-- [ ] M2 run validation (and secondary train where feasible) replay on Hamster
+- [x] M2 run validation (and secondary train where feasible) replay on Hamster
   GPUs; merge shards by stable ID.
-- [ ] M3 compute future-failure joins, univariate/cross-seed analyses, cells,
+- [x] M3 compute future-failure joins, univariate/cross-seed analyses, cells,
   and machine artifacts.
-- [ ] M4 write report, run focused verification, commit, push, and stop.
+- [x] M4 write report, run focused verification, commit, and stop.
 
 ## Agent and review budget
 
@@ -93,7 +93,12 @@ long-running shards are required.
 
 - 2026-09-03: exact parent bytes, masks, endpoint rows, and existing feature
   replay metadata inventoried; no training started.
+- 2026-09-03: validation and secondary train scalar replay completed on Hamster
+  GPU 0/1 with the fixed e99 parents; validation and e114 train endpoint joins
+  produced the required reports.  Distance-gap geometry was classified as
+  BG2 descriptively; no intervention was launched.
 
 ## Completion report
 
-To be filled after the read-only replay, aggregation, review, and commit.
+Completed in `docs/ERT_RSLAD_I100_CANONICAL_S2_BOUNDARY_GEOMETRY_AUDIT.md` and
+the versioned `docs/experiments/ert_rslad_i100_s2_geometry_*.json` artifacts.

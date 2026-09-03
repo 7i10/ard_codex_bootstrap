@@ -1,0 +1,240 @@
+{
+  "contract": {
+    "analysis_is_descriptive": true,
+    "anchor_attack": {
+      "epsilon": "8/255",
+      "identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+      "input_domain": "pixel_0_1",
+      "protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+      "random_start_keying": "batch",
+      "step_size": "2/255",
+      "steps": 20,
+      "student_mode": "eval",
+      "teacher_mode": "eval"
+    },
+    "anchor_epoch": 99,
+    "cohort": "canonical validation S2xT1 from fixed positive-margin q10 mask",
+    "contract": "ert_rslad_i100_s2_boundary_geometry_contract_v1",
+    "distance_proxy": "pair_logit_margin / input_gradient_l1",
+    "endpoint_root": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-i100-s2-rbp-v1",
+    "fixed_ridge": {
+      "alpha": 1.0,
+      "fit_seed_standardization": true,
+      "pooled_fit": false
+    },
+    "future_failure": "I100_CONTROL robust_wrong at existing CE-PGD20 e104/e109/e114",
+    "geometry_scalar_artifacts": {
+      "dev-1": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-i100-s2-boundary-geometry-v1/dev-1-validation.parquet",
+        "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+        "row_count": 226,
+        "rows_sha256": "16c2e8144e3de5c1b7c0121ddac3e218c9931e83c6bc0e4e92cf35355562a4b7"
+      },
+      "dev-2": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-i100-s2-boundary-geometry-v1/dev-2-validation.parquet",
+        "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+        "row_count": 209,
+        "rows_sha256": "70705b2ce05e0722ce3bea5a4e8164b620047715e74edc56bb3be9aa2bcb177b"
+      }
+    },
+    "mask_artifacts": {
+      "dev-1": {
+        "count": 226,
+        "ids_sha256": "048707beadfba2d679933137c330e120e267f0c3d0a94c26a739bbe46ad8fae2",
+        "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4"
+      },
+      "dev-2": {
+        "count": 209,
+        "ids_sha256": "03a3c90b16b07076da16e82e8d9b83ad9ec602c49214c095249ed9b9f7a0ed48",
+        "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056"
+      }
+    },
+    "mask_label_note": "Mask artifact descriptive label says sample_keyed_v1; registered replay metadata and regenerated anchor use batch-index CE seed stream.",
+    "no_update": true,
+    "parents": {
+      "dev-1": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "dev-2": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7"
+    },
+    "raw_gradients_persisted": false,
+    "rival_definition": "Student strongest non-true logit on x_adv^S; shared with Teacher",
+    "schema_version": 1,
+    "secondary_train_geometry_artifacts": {
+      "dev-1": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-i100-s2-boundary-geometry-v1/dev-1-train.parquet",
+        "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+        "row_count": 2212,
+        "rows_sha256": "b637574fb6ade2a923d68fc2223287ebbd89a8a206236ab9c62b392447b46190"
+      },
+      "dev-2": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.cache/analysis/ert-i100-s2-boundary-geometry-v1/dev-2-train.parquet",
+        "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+        "row_count": 2141,
+        "rows_sha256": "b842bb748e948de047d8ebc98ad7a0f369329b2105533cc4cc4118b1c9adf6d5"
+      }
+    },
+    "source_git_sha": "958c8371b73af7c40222d61532c3eb1461792223",
+    "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+  },
+  "per_seed": {
+    "dev-1": {
+      "104": {
+        "cells": {
+          "high_alignment+adequate_distance": {
+            "failure_n": 35,
+            "failure_rate": 0.7291666666666666,
+            "n": 48
+          },
+          "high_alignment+low_student_distance": {
+            "failure_n": 50,
+            "failure_rate": 0.7692307692307693,
+            "n": 65
+          },
+          "low_alignment+adequate_distance": {
+            "failure_n": 42,
+            "failure_rate": 0.6461538461538462,
+            "n": 65
+          },
+          "low_alignment+low_student_distance": {
+            "failure_n": 27,
+            "failure_rate": 0.5625,
+            "n": 48
+          }
+        },
+        "median_normal_cosine": 0.6665539443492889,
+        "median_student_distance_inf": 0.00198681210167706
+      },
+      "109": {
+        "cells": {
+          "high_alignment+adequate_distance": {
+            "failure_n": 38,
+            "failure_rate": 0.7916666666666666,
+            "n": 48
+          },
+          "high_alignment+low_student_distance": {
+            "failure_n": 49,
+            "failure_rate": 0.7538461538461538,
+            "n": 65
+          },
+          "low_alignment+adequate_distance": {
+            "failure_n": 45,
+            "failure_rate": 0.6923076923076923,
+            "n": 65
+          },
+          "low_alignment+low_student_distance": {
+            "failure_n": 28,
+            "failure_rate": 0.5833333333333334,
+            "n": 48
+          }
+        },
+        "median_normal_cosine": 0.6665539443492889,
+        "median_student_distance_inf": 0.00198681210167706
+      },
+      "114": {
+        "cells": {
+          "high_alignment+adequate_distance": {
+            "failure_n": 39,
+            "failure_rate": 0.8125,
+            "n": 48
+          },
+          "high_alignment+low_student_distance": {
+            "failure_n": 53,
+            "failure_rate": 0.8153846153846154,
+            "n": 65
+          },
+          "low_alignment+adequate_distance": {
+            "failure_n": 44,
+            "failure_rate": 0.676923076923077,
+            "n": 65
+          },
+          "low_alignment+low_student_distance": {
+            "failure_n": 32,
+            "failure_rate": 0.6666666666666666,
+            "n": 48
+          }
+        },
+        "median_normal_cosine": 0.6665539443492889,
+        "median_student_distance_inf": 0.00198681210167706
+      }
+    },
+    "dev-2": {
+      "104": {
+        "cells": {
+          "high_alignment+adequate_distance": {
+            "failure_n": 36,
+            "failure_rate": 0.782608695652174,
+            "n": 46
+          },
+          "high_alignment+low_student_distance": {
+            "failure_n": 45,
+            "failure_rate": 0.7627118644067796,
+            "n": 59
+          },
+          "low_alignment+adequate_distance": {
+            "failure_n": 48,
+            "failure_rate": 0.8135593220338984,
+            "n": 59
+          },
+          "low_alignment+low_student_distance": {
+            "failure_n": 37,
+            "failure_rate": 0.8222222222222222,
+            "n": 45
+          }
+        },
+        "median_normal_cosine": 0.6357883810997009,
+        "median_student_distance_inf": 0.001810924499295652
+      },
+      "109": {
+        "cells": {
+          "high_alignment+adequate_distance": {
+            "failure_n": 36,
+            "failure_rate": 0.782608695652174,
+            "n": 46
+          },
+          "high_alignment+low_student_distance": {
+            "failure_n": 47,
+            "failure_rate": 0.7966101694915254,
+            "n": 59
+          },
+          "low_alignment+adequate_distance": {
+            "failure_n": 50,
+            "failure_rate": 0.847457627118644,
+            "n": 59
+          },
+          "low_alignment+low_student_distance": {
+            "failure_n": 36,
+            "failure_rate": 0.8,
+            "n": 45
+          }
+        },
+        "median_normal_cosine": 0.6357883810997009,
+        "median_student_distance_inf": 0.001810924499295652
+      },
+      "114": {
+        "cells": {
+          "high_alignment+adequate_distance": {
+            "failure_n": 41,
+            "failure_rate": 0.8913043478260869,
+            "n": 46
+          },
+          "high_alignment+low_student_distance": {
+            "failure_n": 44,
+            "failure_rate": 0.7457627118644068,
+            "n": 59
+          },
+          "low_alignment+adequate_distance": {
+            "failure_n": 47,
+            "failure_rate": 0.7966101694915254,
+            "n": 59
+          },
+          "low_alignment+low_student_distance": {
+            "failure_n": 37,
+            "failure_rate": 0.8222222222222222,
+            "n": 45
+          }
+        },
+        "median_normal_cosine": 0.6357883810997009,
+        "median_student_distance_inf": 0.001810924499295652
+      }
+    }
+  }
+}
