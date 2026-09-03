@@ -43,7 +43,7 @@ TEACHER_SHA = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
 ENDPOINT_ATTACK_SHA = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
 REPLAY_PROTOCOL = "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index"
 SPLIT_IDENTITY = "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
-TRAIN_SPLIT_IDENTITY = "083045ab272059ee54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
+TRAIN_SPLIT_IDENTITY = "083045ab272059eeae54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
 EPS = 1e-12
 
 
@@ -392,7 +392,8 @@ def _load_endpoints(
         if not endpoint_json.is_file() or not rows_path.is_file():
             raise FileNotFoundError(f"missing control endpoint e{epoch} for {seed}")
         meta = json.loads(endpoint_json.read_text(encoding="utf-8"))
-        if meta.get("attack_identity_sha256") != ENDPOINT_ATTACK_SHA or meta.get("row_count") != 5000:
+        expected_count = 5000 if scope == "validation" else 45000
+        if meta.get("attack_identity_sha256") != ENDPOINT_ATTACK_SHA or meta.get("row_count") != expected_count:
             raise ValueError(f"{seed} e{epoch}: endpoint identity mismatch")
         if meta.get("split_identity", {}).get("sample_id_label_sha256") != split_identity:
             raise ValueError(f"{seed} e{epoch}: {scope} split mismatch")
