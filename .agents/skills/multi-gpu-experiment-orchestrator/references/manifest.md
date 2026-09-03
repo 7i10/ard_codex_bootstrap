@@ -58,7 +58,10 @@ resolved to this structure before launch.
 
 Paths may be relative to the manifest directory. `completion_marker` and
 `technical_failure_marker` are relative to the job output directory unless
-absolute. A local job writes no marker itself: the worker writes a marker only
+absolute. When `completion_marker` is omitted, the controller writes its
+default marker in a state-sidecar path keyed by campaign, manifest hash, and
+job ID; it never pre-creates the scientific `output_dir` just to store control
+metadata. A local job writes no marker itself: the worker writes a marker only
 after its argv exits zero. A technical retry requires the job command to write
 the configured failure marker before exiting, for example:
 

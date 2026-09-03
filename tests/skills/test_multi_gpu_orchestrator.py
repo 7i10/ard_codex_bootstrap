@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -149,6 +151,24 @@ def test_valid_marker_recovers_without_relaunch(tmp_path: Path) -> None:
     assert any(event["event_type"] == "completion_marker_recovered" for event in state["events"])
 
 
+def test_legacy_output_marker_recovers_after_sidecar_upgrade(tmp_path: Path) -> None:
+    value = job(tmp_path, "root", "from pathlib import Path; Path('ran.txt').write_text('ok')")
+    manifest = write_manifest(tmp_path, [value])
+    assert invoke("run", manifest, "--foreground", "--poll-interval", "0.02").returncode == 0
+
+    sidecar_marker = next((tmp_path / "orchestration").rglob("completion.json"))
+    legacy_marker = Path(value["output_dir"]) / "completion.json"
+    legacy_marker.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(sidecar_marker, legacy_marker)
+    shutil.rmtree(tmp_path / "orchestration")
+    (tmp_path / "state.json").unlink()
+
+    assert invoke("run", manifest, "--foreground", "--poll-interval", "0.02").returncode == 0
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["jobs"]["root"]["status"] == "completed"
+    assert state["jobs"]["root"]["attempts"] == []
+
+
 def test_preflight_checks_job_paths_and_environment(tmp_path: Path) -> None:
     value = job(tmp_path, "root", "pass")
     value["required_paths"] = [str(tmp_path / "missing")]
@@ -245,7 +265,18 @@ def test_technical_retry_preserves_identity_and_unblocks_endpoint(tmp_path: Path
 def test_stale_result_from_prior_campaign_cannot_release_gpu_slot(tmp_path: Path) -> None:
     value = job(tmp_path, "root", "import time; time.sleep(0.08)", gpu=0)
     manifest = write_manifest(tmp_path, [value])
-    stale = Path(value["output_dir"]) / "orchestration" / "root.attempt-1.result.json"
+    manifest_sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    job_key = hashlib.sha256(
+        (json.dumps({"job_id": "root"}, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    ).hexdigest()
+    stale = (
+        tmp_path
+        / "orchestration"
+        / "dummy-campaign"
+        / manifest_sha
+        / job_key
+        / "root.attempt-1.result.json"
+    )
     stale.parent.mkdir(parents=True)
     stale.write_text(
         json.dumps(
@@ -267,6 +298,27 @@ def test_stale_result_from_prior_campaign_cannot_release_gpu_slot(tmp_path: Path
     state = json.loads((tmp_path / "state.json").read_text())
     assert state["jobs"]["root"]["status"] == "completed"
     assert [event["event_type"] for event in state["events"]].count("stale_result_ignored") == 1
+
+
+def test_controller_never_precreates_or_pollutes_scientific_output(tmp_path: Path) -> None:
+    output = tmp_path / "outputs" / "strict-public-cli"
+    code = (
+        "from pathlib import Path; import sys; output=Path(" + repr(str(output)) + "); "
+        "output.exists() and sys.exit('output must be absent before public CLI starts'); "
+        "output.mkdir(parents=True); (output/'science.json').write_text('ok')"
+    )
+    value = job(tmp_path, "strict-public-cli", code)
+    manifest = write_manifest(tmp_path, [value])
+
+    result = invoke("run", manifest, "--foreground", "--poll-interval", "0.02")
+
+    assert result.returncode == 0, result.stderr
+    assert (output / "science.json").read_text() == "ok"
+    assert not (output / "orchestration").exists()
+    state = json.loads((tmp_path / "state.json").read_text())
+    attempt = state["jobs"]["strict-public-cli"]["attempts"][0]
+    assert str(output) not in attempt["log"]
+    assert (tmp_path / "orchestration").is_dir()
 
 
 def test_detached_controller_finishes_without_caller_lifetime(tmp_path: Path) -> None:

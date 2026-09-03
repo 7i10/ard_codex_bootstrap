@@ -67,6 +67,10 @@ argv position zero. Manifest validation rejects a locally present non-executable
   resource must be rejected by the host executor/preflight.
 - Completion markers include campaign, job, attempt, source SHA, and identity
   hash. Stale or foreign markers do not unblock a dependency.
+- The controller does not create or write its own `orchestration/` directory
+  inside a scientific `output_dir`. Logs, worker results, and default
+  completion markers live in a manifest-hash-bound state sidecar, so a public
+  CLI may safely require an initially absent output path.
 - Only a job-emitted JSON marker with `failure_class: technical` and
   `retryable: true` can trigger a retry. Accuracy, loss, or a scientific
   outcome is never a retry reason. Retries get a new attempt ID and retain the

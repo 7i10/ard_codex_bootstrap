@@ -94,20 +94,29 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], str, Path]:
             values = profile.get(field, [])
             if not isinstance(values, list) or not all(isinstance(item, str) and item for item in values):
                 raise ValueError(f"{name}: {field} must be a list of non-empty strings")
+    state = abs_path(manifest.get("state_path"), path.parent)
+    if state is None:
+        state = (path.parent / ".orchestration" / f"{manifest['campaign_id']}.state.json").resolve()
+    manifest_sha256 = file_digest(path)
+    manifest["_manifest_path"] = str(path)
+    manifest["_state_path"] = str(state)
+    manifest["_manifest_sha256"] = manifest_sha256
+    orchestration_root = abs_path(manifest.get("orchestration_root"), path.parent)
+    if orchestration_root is None:
+        orchestration_root = state.parent / "orchestration"
+    manifest["_orchestration_root"] = str(
+        orchestration_root / manifest["campaign_id"] / manifest_sha256
+    )
+
     jobs = manifest.get("jobs")
     if not isinstance(jobs, list) or not jobs:
         raise ValueError("jobs must be a non-empty list")
     ids: set[str] = set()
     for job in jobs:
         _validate_job(job, ids, hosts, path.parent)
+        _bind_controller_paths(manifest, job)
     _check_dependencies(jobs)
-    state = abs_path(manifest.get("state_path"), path.parent)
-    if state is None:
-        state = (path.parent / ".orchestration" / f"{manifest['campaign_id']}.state.json").resolve()
-    manifest["_manifest_path"] = str(path)
-    manifest["_state_path"] = str(state)
-    manifest["_manifest_sha256"] = file_digest(path)
-    return manifest, manifest["_manifest_sha256"], path
+    return manifest, manifest_sha256, path
 
 
 def _is_sha(value: Any) -> bool:
@@ -167,12 +176,6 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
     if output is None:
         raise ValueError(f"{job_id}: output_dir is required")
     job["_output_dir"] = str(output)
-    marker = abs_path(job.get("completion_marker"), output)
-    job["_completion_marker"] = str(marker or output / "completion.json")
-    failure = abs_path(job.get("technical_failure_marker"), output)
-    job["_technical_failure_marker"] = str(failure or output / "technical-failure.json")
-    host_confirmation = abs_path(job.get("host_confirmation_marker"), output)
-    job["_host_confirmation_marker"] = str(host_confirmation or output / "orchestration" / "host-confirmed.json")
     job["estimated_work"] = float(job.get("estimated_work", 1.0))
     if job["estimated_work"] < 0:
         raise ValueError(f"{job_id}: estimated_work must be non-negative")
@@ -218,6 +221,33 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
             if numeric <= 0:
                 raise ValueError(f"{job_id}: {field} must be a positive number")
             job[field] = numeric
+
+
+def _bind_controller_paths(manifest: dict[str, Any], job: dict[str, Any]) -> None:
+    """Keep controller metadata outside the scientific output namespace.
+
+    A public scientific CLI may correctly fail closed when its requested
+    output directory already exists.  The controller must therefore never
+    pre-create the output directory merely to store logs, worker results, or
+    default completion markers.  Metadata is instead keyed by campaign,
+    immutable manifest bytes, and a hash of the job ID in a state-sidecar.
+
+    Explicit technical-failure markers remain in the job output namespace so
+    an argv can emit one without knowing controller internals.  They are not
+    created by the controller before the argv runs.
+    """
+    output = Path(job["_output_dir"])
+    job_key = digest({"job_id": job["job_id"]})
+    controller_dir = Path(manifest["_orchestration_root"]) / job_key
+    job["_controller_dir"] = str(controller_dir)
+    marker = abs_path(job.get("completion_marker"), output)
+    job["_completion_marker"] = str(marker or controller_dir / "completion.json")
+    job["_legacy_completion_marker"] = str(output / "completion.json") if marker is None else None
+    job["_legacy_result_dir"] = str(output / "orchestration")
+    failure = abs_path(job.get("technical_failure_marker"), output)
+    job["_technical_failure_marker"] = str(failure or output / "technical-failure.json")
+    host_confirmation = abs_path(job.get("host_confirmation_marker"), output)
+    job["_host_confirmation_marker"] = str(host_confirmation or controller_dir / "host-confirmed.json")
 
 
 def _validate_local_shell_argv(argv: list[str], *, cwd: Path, job_id: str, field: str) -> None:
@@ -393,6 +423,15 @@ def valid_marker(manifest: dict[str, Any], job: dict[str, Any], path: Path) -> b
     )
 
 
+def valid_completion_marker(manifest: dict[str, Any], job: dict[str, Any]) -> bool:
+    """Accept a verified marker from either sidecar or pre-sidecar campaigns."""
+    paths = [Path(job["_completion_marker"])]
+    legacy = job.get("_legacy_completion_marker")
+    if isinstance(legacy, str):
+        paths.append(Path(legacy))
+    return any(valid_marker(manifest, job, path) for path in paths)
+
+
 def failure_info(job: dict[str, Any]) -> dict[str, Any] | None:
     path = Path(job["_technical_failure_marker"])
     if not path.exists():
@@ -558,10 +597,8 @@ def ready_jobs(manifest: dict[str, Any], state: dict[str, Any]) -> list[dict[str
 def start_worker(
     manifest: dict[str, Any], job: dict[str, Any], attempt: int, slot: tuple[str, int, str | None, float]
 ) -> dict[str, Any]:
-    output = Path(job["_output_dir"])
-    output.mkdir(parents=True, exist_ok=True)
     attempt_id = f"{job.get('run_id', job['job_id'])}-attempt-{attempt}"
-    log = output / "orchestration" / f"{job['job_id']}.attempt-{attempt}.log"
+    log = Path(job["_controller_dir"]) / f"{job['job_id']}.attempt-{attempt}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     Path(job["_technical_failure_marker"]).unlink(missing_ok=True)
     env = os.environ.copy()
@@ -630,10 +667,11 @@ def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
         if record["status"] != "running" or not record["attempts"]:
             continue
         attempt = record["attempts"][-1]
-        result_path = (
-            Path(job["_output_dir"]) / "orchestration" / f"{job['job_id']}.attempt-{attempt['attempt']}.result.json"
-        )
-        marker = Path(job["_completion_marker"])
+        result_paths = [
+            Path(job["_controller_dir"]) / f"{job['job_id']}.attempt-{attempt['attempt']}.result.json",
+            Path(job["_legacy_result_dir"]) / f"{job['job_id']}.attempt-{attempt['attempt']}.result.json",
+        ]
+        result_path = next((path for path in result_paths if path.exists()), result_paths[0])
         confirmation_path = Path(job["_host_confirmation_marker"])
         if job.get("executor", {}).get("type", "local") == "external_probe" and "host_confirmation" not in attempt:
             try:
@@ -656,7 +694,7 @@ def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
                     gpu=attempt["gpu"],
                     gpu_uuid=attempt.get("gpu_uuid"),
                 )
-        if valid_marker(manifest, job, marker):
+        if valid_completion_marker(manifest, job):
             attempt["status"] = "completed"
             record["status"] = "completed"
             release_slot((attempt["host"], attempt["gpu"]))
@@ -721,7 +759,7 @@ def controller_tick(manifest: dict[str, Any], state: dict[str, Any]) -> bool:
     reconcile_running(manifest, state)
     for job in manifest["jobs"]:
         record = state["jobs"][job["job_id"]]
-        if record["status"] == "pending" and valid_marker(manifest, job, Path(job["_completion_marker"])):
+        if record["status"] == "pending" and valid_completion_marker(manifest, job):
             record["status"] = "completed"
             event(state, "completion_marker_recovered", job["job_id"])
     occupied = {
@@ -827,8 +865,6 @@ def run_controller(manifest: dict[str, Any], *, foreground: bool, once: bool, po
 
 
 def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_id: str) -> int:
-    output = Path(job["_output_dir"])
-    output.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env.update({str(k): str(v) for k, v in job.get("env", {}).items()})
     env.update({"ARD_ORCH_ATTEMPT": str(attempt), "ARD_ORCH_ATTEMPT_ID": attempt_id})
@@ -883,7 +919,10 @@ def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_
         "probe_timed_out": probe_timed_out,
         "finished_at": now(),
     }
-    atomic_json(output / "orchestration" / f"{job['job_id']}.attempt-{attempt}.result.json", result)
+    atomic_json(
+        Path(job["_controller_dir"]) / f"{job['job_id']}.attempt-{attempt}.result.json",
+        result,
+    )
     return code
 
 

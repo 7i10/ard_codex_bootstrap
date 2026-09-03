@@ -43,6 +43,12 @@ completed/running jobs and does not launch duplicates. A detached controller
 survives the Codex session; `status` is a read-only state view and `run` resumes
 the controller when needed.
 
+Controller metadata is deliberately separated from scientific output. Logs,
+worker results, host-confirmation records, and default completion markers are
+written to a state-sidecar keyed by campaign and manifest SHA. The controller
+does not pre-create `output_dir`, so a public CLI may own a fresh,
+non-overwriting scientific output namespace.
+
 Only an explicit JSON failure marker with `failure_class: technical` and
 `retryable: true` permits a retry. A retry receives a new attempt ID but the
 same source, config, seed, parent, attack, and method identity. Accuracy or a
@@ -78,8 +84,9 @@ Manifest details are in
 
 The skill has CPU-only dummy tests covering independent roots, dependency
 forks, endpoint/aggregation/report chaining, idempotency, technical retry,
-cycle/missing-dependency rejection, and unavailable GPU constraints. The
-repository's changed non-scientific gate also passes.
+cycle/missing-dependency rejection, unavailable GPU constraints, stale result
+isolation, and output-namespace ownership. The repository's changed
+non-scientific gate also passes.
 
 It does not infer parent equivalence, discover checkpoints, evaluate metrics,
 or select a scientific treatment. One-GPU-per-job is supported directly;
