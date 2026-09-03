@@ -74,12 +74,12 @@ artifact.
   - Acceptance: remote-observed identity/origin, manifest/attempt isolation,
     atomic collection, static CLI gate, source-invalidated smoke, and fan-out
     gate are regression-tested.
-- [ ] M3 — Add task-context and research-status navigation updates, complete
+- [x] M3 — Add task-context and research-status navigation updates, complete
   bounded Hamster/Ferret operational verification, and carry out only
   inventory-proven cleanup.
   - Acceptance: no scientific command; all actual deletions have pre/post
     evidence in the cleanup artifact.
-- [ ] M4 — Produce closure docs/artifacts, run impact-selected non-scientific
+- [x] M4 — Produce closure docs/artifacts, run impact-selected non-scientific
   verification, validate changed skills, commit/push, and stop.
 
 ## Agent and review budget
@@ -120,7 +120,14 @@ or result lineage contract; in that case work stops for targeted review.
   retained every historical referenced root, then removed only the clean,
   unreferenced stage-wise worktree, six untracked wrapper scripts, and empty
   legacy GPU lock root after process/cwd/open-file/worktree checks.
+- 2026-09-04: M3 completed with bounded CPU-only Hamster/Ferret lifecycle
+  checks against the frozen operational source.  Ferret collection was
+  hash-equal before atomic local promotion; no scientific CLI was invoked.
+- 2026-09-04: M4 completed with the R1–R35 registry closure, focused suite,
+  one changed non-scientific verification gate, closure artifact, and
+  human-facing operational report.
 
 ## Completion report
 
-Pending.
+Completed operational-only.  The result record `a8b9d4e` preceded this work;
+the foundation does not change its science or start a successor campaign.

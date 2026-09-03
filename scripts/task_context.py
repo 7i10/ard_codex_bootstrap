@@ -100,6 +100,22 @@ def append(args: argparse.Namespace) -> int:
     return 0
 
 
+def replace(args: argparse.Namespace) -> int:
+    path, _ = context_path(args)
+    payload = load(path)
+    field = args.field
+    if field not in LIST_FIELDS:
+        raise ValueError(f"unknown task-context list field: {field}")
+    value = json.loads(args.value)
+    if not isinstance(value, list):
+        raise ValueError("replacement task-context value must be a JSON list")
+    payload[field] = value
+    payload["updated_at"] = now()
+    atomic_json(path, payload)
+    print(json.dumps({"status": "replaced", "context": str(path), "field": field}, sort_keys=True))
+    return 0
+
+
 def show(args: argparse.Namespace) -> int:
     path, _ = context_path(args)
     print(json.dumps(load(path), indent=2, sort_keys=True))
@@ -126,6 +142,12 @@ def parser() -> argparse.ArgumentParser:
     update.add_argument("--value", required=True)
     update.add_argument("--json-value", action="store_true")
     update.set_defaults(handler=append)
+    replace_list = commands.add_parser("replace")
+    replace_list.add_argument("--task-id", required=True)
+    replace_list.add_argument("--output", type=Path)
+    replace_list.add_argument("--field", required=True)
+    replace_list.add_argument("--value", required=True)
+    replace_list.set_defaults(handler=replace)
     inspect = commands.add_parser("show")
     inspect.add_argument("--task-id", required=True)
     inspect.add_argument("--output", type=Path)

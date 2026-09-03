@@ -43,10 +43,54 @@ REGRESSION_CASES = {
     "R20": "test_remote_lifecycle_canary_requires_status_and_hash_roundtrip",
     "R21": "test_inventory_rejects_collected_hash_mismatch",
     "R22": "test_inventory_rejects_foreign_campaign_or_source_identity",
+    "R23": (
+        "tests/remote/test_ferret_scripts.py::"
+        "test_remote_confirmation_uses_remote_manifest_identity_and_origin_not_local_reinjection"
+    ),
+    "R24": (
+        "tests/skills/test_multi_gpu_orchestrator.py::"
+        "test_host_confirmation_requires_observed_remote_origin_when_registered"
+    ),
+    "R25": (
+        "tests/skills/test_artifact_inventory.py::"
+        "test_collection_stages_remote_metadata_to_canonical_local_path"
+    ),
+    "R26": (
+        "tests/skills/test_multi_gpu_orchestrator.py::"
+        "test_launch_ledger_requires_full_prelaunch_evidence_and_measures_target"
+    ),
+    "R27": (
+        "tests/skills/test_multi_gpu_orchestrator.py::"
+        "test_strict_critical_path_ledger_records_automatic_slo_breach"
+    ),
+    "R28": (
+        "tests/skills/test_multi_gpu_orchestrator.py::"
+        "test_workspace_contract_rejects_future_output_outside_registered_runtime"
+    ),
+    "R29": (
+        "tests/skills/test_multi_gpu_orchestrator.py::"
+        "test_controller_never_precreates_or_pollutes_scientific_output"
+    ),
     "R30": "test_static_cli_failure_blocks_before_manifest_freeze",
     "R31": "test_exact_public_cli_smoke_binds_source_command_config_parent_and_execution_class",
+    "R32": (
+        "tests/skills/test_multi_gpu_orchestrator.py::"
+        "test_stale_result_from_prior_campaign_cannot_release_gpu_slot"
+    ),
+    "R33": (
+        "docs/ARD_OPERATIONAL_FOUNDATION.md#layer-ownership-and-first-remediation "
+        "(policy; R29 regression proves the boundary)"
+    ),
+    "R34": (
+        "tests/skills/test_multi_gpu_orchestrator.py::"
+        "test_attempt_scoped_retry_keeps_partial_output_out_of_canonical_namespace"
+    ),
     "R35": "test_equivalent_fanout_requires_exact_public_cli_smoke",
 }
+
+
+def test_regression_case_registry_covers_r1_to_r35() -> None:
+    assert set(REGRESSION_CASES) == {f"R{number}" for number in range(1, 36)}
 
 
 def sha(path: Path) -> str:
@@ -551,7 +595,14 @@ def test_static_cli_failure_blocks_before_manifest_freeze(tmp_path: Path) -> Non
     spec["canary"] = {
         "require_exact_smoke": True,
         "static_cli": [{"job_id": "train", "commands": [[sys.executable, "-c", "raise SystemExit(2)"]]}],
-        "jobs": [{"job_id": "train", "kind": "exact_public_cli", "execution_class": "local", "command": [sys.executable, "-c", "pass"]}],
+        "jobs": [
+            {
+                "job_id": "train",
+                "kind": "exact_public_cli",
+                "execution_class": "local",
+                "command": [sys.executable, "-c", "pass"],
+            }
+        ],
     }
 
     gate = tmp_path / "gate"
@@ -605,7 +656,14 @@ def test_source_or_orchestrator_change_invalidates_exact_smoke_binding(tmp_path:
     spec["canary"] = {
         "require_exact_smoke": True,
         "static_cli": [{"job_id": "train", "commands": [[sys.executable, "-c", "pass"]]}],
-        "jobs": [{"job_id": "train", "kind": "exact_public_cli", "execution_class": "local", "command": [sys.executable, "-c", "pass"]}],
+        "jobs": [
+            {
+                "job_id": "train",
+                "kind": "exact_public_cli",
+                "execution_class": "local",
+                "command": [sys.executable, "-c", "pass"],
+            }
+        ],
     }
     gate = tmp_path / "gate"
     spec_path = write_spec(tmp_path, spec)

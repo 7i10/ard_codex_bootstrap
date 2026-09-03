@@ -67,6 +67,29 @@ def test_task_context_is_runtime_bound_non_overwriting_and_appendable(tmp_path: 
     )
     assert shown.returncode == 0, shown.stderr
     assert json.loads(shown.stdout)["completed_milestones"] == ["M0"]
+    replaced = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            *common,
+            "replace",
+            "--task-id",
+            "fixture",
+            "--field",
+            "pending_milestones",
+            "--value",
+            "[]",
+        ],
+        text=True,
+        capture_output=True,
+    )
+    assert replaced.returncode == 0, replaced.stderr
+    shown_after_replace = subprocess.run(
+        [sys.executable, str(SCRIPT), *common, "show", "--task-id", "fixture"],
+        text=True,
+        capture_output=True,
+    )
+    assert json.loads(shown_after_replace.stdout)["pending_milestones"] == []
     duplicate = subprocess.run(
         [
             sys.executable,

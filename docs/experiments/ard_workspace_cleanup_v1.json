@@ -114,5 +114,22 @@
       "legacy lock root is absent",
       "historical referenced roots were retained unchanged"
     ]
+  },
+  "remote_ferret_cleanup": {
+    "verified_at": "2026-09-04T06:25:00+09:00",
+    "host": "islab-3gpu",
+    "path": "/home/shunsukenaito/workspace-local/.ard-campaign-gpu-locks",
+    "classification": "LEGACY_UNUSED",
+    "pre_cleanup_files": [
+      "gpu-GPU-cf338b20-ad89-5bfd-bc79-74610aebc333.lock",
+      "gpu-GPU-d6b53af2-a086-be46-30db-10976ef3b989.lock",
+      "gpu-GPU-13e501b2-0ba0-3dd7-9859-e84d4a1d2af7.lock"
+    ],
+    "pre_cleanup_file_size_bytes": 0,
+    "pre_cleanup_file_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reference_evidence": "Only legacy campaign archive code references the retired root; current registry directs future locks to runtime_root/locks.",
+    "process_lock_worktree_evidence": "No matching process, lslocks entry, or stage-wise worktree was present on Ferret.",
+    "action": "removed exact empty lock files and root",
+    "final_state": "absent"
   }
 }

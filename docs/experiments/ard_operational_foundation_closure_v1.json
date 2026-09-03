@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "scope": "operational-only workspace standardization and orchestration hardening",
+  "scientific_mutation": false,
+  "scientific_result_precondition": {
+    "result_commit": "a8b9d4e089bf45977485b085d826fc06928c8959",
+    "result_subject": "Record I100 S2 forensic audit results",
+    "operational_baseline_commit": "67eff8ab8de1bb5fad497c5dd3e22f5fa515e6f1",
+    "statement": "The scientific result was committed and pushed before this operational foundation work began."
+  },
+  "implementation": {
+    "source_sha": "311efd9949a9d46d0723018fbcac967b6222bca8",
+    "workspace_contract": "configs/workspace/ard_workspace_v1.json",
+    "workspace_contract_sha256": "1dc1f22c512fba5248069fe922ec05a91c7991052fc4a0c3fbf1bffed1fa4cb9",
+    "human_report": "docs/ARD_OPERATIONAL_FOUNDATION.md",
+    "plan": "docs/plans/0084-ard-operational-foundation-finalization.md"
+  },
+  "workspace_policy": {
+    "future_runtime_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap",
+    "allowed_future_write_subtrees": [
+      "runs",
+      "analysis",
+      "staging",
+      "worktrees",
+      "orchestration",
+      "task-context",
+      "locks",
+      "tmp"
+    ],
+    "historical_roots": "read-only; inventory-first; ambiguity is keep"
+  },
+  "cleanup": {
+    "inventory": "docs/experiments/ard_workspace_cleanup_v1.json",
+    "inventory_sha256": "6b1dcc3751e8d91be8bceee4fe3f885655303ca9c8651d41babe523855697db9",
+    "retained": [
+      "ard-runs",
+      "ard-analysis",
+      "ard-campaign-runs",
+      "historical Ferret collection root"
+    ],
+    "removed_only_after_evidence": [
+      "clean unreferenced stage-wise detached worktree",
+      "six unreferenced temporary stage-wise wrapper scripts",
+      "empty local legacy GPU lock root",
+      "empty Ferret legacy GPU lock root"
+    ],
+    "evidence": "process, cwd, open-file, lock, reference, and worktree checks; post-removal absence verified"
+  },
+  "regression_guards": {
+    "registry": "tests/skills/test_production_launch_gate.py::REGRESSION_CASES",
+    "coverage": "R1-R35",
+    "r1_r22": {
+      "R1": "explicit inclusive runtime bound rejected",
+      "R2": "parent alias mismatch fails closed",
+      "R3": "dependency output is deferred but producer path is bound",
+      "R4": "explicit W&B IDs cannot collide",
+      "R5": "logical dataset path mismatch is rejected",
+      "R6": "mask metadata hash mismatch is rejected",
+      "R7": "dependency input binds to producer output",
+      "R8": "output collision and retry scientific mutation fail",
+      "R9": "source/config drift is detected after freeze",
+      "R10": "producer output is not required before producer completion",
+      "R11": "technical retry retains identity and gets a new execution ID",
+      "R12": "zero exit without required outputs is rejected",
+      "R13": "non-executable remote wrapper is rejected unless invoked via bash",
+      "R14": "external preflight requires every declared binding",
+      "R15": "external completion requires host confirmation",
+      "R16": "remote source drift is rechecked before launch",
+      "R17": "remote metadata collection stages to canonical local path",
+      "R18": "inventory rejects a missing required endpoint cell",
+      "R19": "prepare lock serializes concurrent mutations",
+      "R20": "remote lifecycle canary requires status and hash roundtrip",
+      "R21": "inventory rejects collected hash mismatch",
+      "R22": "inventory rejects foreign campaign or source identity"
+    },
+    "r23_r35": {
+      "R23": "remote prepared-manifest identity and origin cannot be locally reinjected",
+      "R24": "registered remote origin requires independent observation",
+      "R25": "remote collection stages locally before canonical promotion",
+      "R26": "launch ledger requires complete evidence and records timing",
+      "R27": "strict critical-path SLO breach is automatic",
+      "R28": "future output outside registered runtime root is rejected",
+      "R29": "controller sidecar does not pre-create or pollute scientific output",
+      "R30": "static public-CLI failure blocks manifest freeze",
+      "R31": "exact public-CLI smoke binds source, argv, config, parent, class, and fan-out",
+      "R32": "stale prior-campaign result cannot release current GPU reservation",
+      "R33": "owner-first remediation is documented; R29 proves its output-ownership boundary",
+      "R34": "attempt-scoped retry keeps partial data out of canonical output",
+      "R35": "equivalent fan-out requires exact source-bound public-CLI smoke"
+    }
+  },
+  "bounded_operational_verification": {
+    "mode": "CPU-only public non-overwriting dummy CLI; no training or endpoint evaluation",
+    "hamster": {
+      "workspace_doctor": "source clean at implementation SHA; expected historical-root warning only",
+      "teacher_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+      "known_parent": {
+        "path": "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",
+        "sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835"
+      },
+      "manifest_sha256": "f3664f03c35eea56a6ace9ca4531b6dde1fbf1a01904746471e117e070cae898",
+      "canonical_payload_sha256": "40efc446bc88742c09833b147116e42cb6480055bb16c81175903e6a1db4c7ff",
+      "verified": [
+        "workspace contract enforcement",
+        "controller sidecar ownership",
+        "attempt-scoped output",
+        "bounded foreground lifecycle"
+      ]
+    },
+    "ferret": {
+      "remote_source_sha": "311efd9949a9d46d0723018fbcac967b6222bca8",
+      "run_id": "operational-foundation-311efd9-r1",
+      "job_id": "ferret-operational-dummy",
+      "identity_hash": "21028dec25649512aaaf8ada64927362f9148f8a0b713d8a9342ed9be056b539",
+      "observed_origin_host": "islab-3gpu",
+      "gpu_uuid": "GPU-d6b53af2-a086-be46-30db-10976ef3b989",
+      "teacher_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+      "host_local_known_parent": {
+        "path": "/home/shunsukenaito/workspace-local/ard-runs/ard_codex_bootstrap/cw-margin-lambda-L4-010/outputs/cw-margin-lambda-L4-010/checkpoints/epoch-94.pt",
+        "sha256": "bdd1b8c13d18358d08763e3e50b20665ed4bcd4892cf68b860c4f745231273e1",
+        "lineage_note": "Matched the Ferret-local horizon-checkpoints.json. It was used only to prove remote hash-bound operational handling; no scientific parent substitution was made."
+      },
+      "remote_and_canonical_payload_sha256": "49ce9d22b38f4d2c3ef503fcc17a9d99a30c76d2e35d6c1958bad97e7d6b3fe4",
+      "verified": [
+        "fixed-SHA remote worktree",
+        "remote doctor",
+        "prepared-manifest identity and observed origin",
+        "argv, live PID, and assigned GPU UUID",
+        "staged collection",
+        "SHA-equal atomic local promotion",
+        "temporary remote run cleanup"
+      ]
+    }
+  },
+  "task_context": {
+    "task_id": "ard-operational-foundation-finalization-v1",
+    "location": "registered runtime task-context root",
+    "role": "navigation only; never an authority over reports, machine artifacts, checkpoints, or observed workspace state"
+  },
+  "validation": {
+    "focused_suite": {
+      "command": "PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m pytest -q tests/unit/test_workspace_contract.py tests/unit/test_task_context.py tests/unit/test_operational_non_overwrite_dummy.py tests/skills/test_multi_gpu_orchestrator.py tests/skills/test_production_launch_gate.py tests/skills/test_artifact_inventory.py tests/remote/test_ferret_scripts.py",
+      "result": "89 passed in 17.01s"
+    },
+    "changed_gate_preview": {
+      "initial": {
+        "command": "PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py --changed --non-scientific --dry-run",
+        "selection": "tests/skills/test_production_launch_gate.py -m not t4 and not t5"
+      },
+      "final": {
+        "command": "PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py --changed --non-scientific --dry-run",
+        "selection": "broad T0/T1 suite including unrelated synthetic-training/GPU fixtures because the generic task-context script is globally imported",
+        "decision": "not run: this operational-only task must not start unrelated synthetic-training/GPU test processes; the exact affected focused suite passed instead"
+      }
+    },
+    "changed_gate": {
+      "command": "PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py --changed --non-scientific",
+      "result": "31 passed in 7.99s before the final task-context close-helper correction; that correction is covered by the final 89-test focused suite"
+    },
+    "shell_and_diff_checks": "targeted ruff, remote shell syntax, JSON parsing, workspace-doctor command resolution, and git diff --check passed",
+    "mypy": {
+      "changed_source": "MYPYPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m mypy src/ard/workspace.py: success",
+      "repository_wide": "136 errors in 32 existing unrelated source files; no error was reported in src/ard/workspace.py, and this operational-only delta does not remediate the repository-wide typing backlog"
+    },
+    "skill_validation": "skill-creator quick_validate passed for multi-gpu-experiment-orchestrator, production-launch-gate, and run-on-ferret"
+  },
+  "self_review": {
+    "A_static_cli_import_error_blocks_before_gpu_reservation": "YES — R30",
+    "B_controller_does_not_precreate_scientific_output": "YES — R29",
+    "C_scientific_cli_does_not_need_controller_metadata_awareness": "YES — sidecar separation/R29",
+    "D_prior_result_metadata_cannot_affect_new_attempt": "YES — R32",
+    "E_fanout_requires_final_source_exact_smoke": "YES — R31/R35",
+    "F_source_change_invalidates_smoke": "YES — R31",
+    "G_partial_retry_output_cannot_mix_into_next_attempt": "YES — R34",
+    "H_remote_scientific_identity_is_independently_observed": "YES — R23",
+    "I_wrong_origin_host_is_rejected": "YES — R24",
+    "J_collection_is_atomic": "YES — R25",
+    "K_future_runtime_write_outside_registered_root_is_rejected": "YES — R28",
+    "L_context_compression_can_recover_authorities": "YES — runtime task context plus workspace doctor and research-status authority"
+  },
+  "remaining_manual_inputs": [
+    "For a future campaign, the researcher supplies the scientific contract and any genuine decision point; Codex supplies the source/input inventory, host matrix, manifest, ledger, and bounded launch verification.",
+    "A future real public scientific CLI must provide a representative permitted input for its exact R31 smoke; the operational foundation does not synthesize or weaken one."
+  ],
+  "residual_limitations": [
+    "Every real scientific campaign must still pass exact R30/R31 public-CLI smoke for its own frozen identity before fan-out.",
+    "The bounded dummy verification proves lifecycle and ownership only, not future scientific runtime compatibility.",
+    "Unknown or historically referenced roots remain retained unless a future inventory supplies stronger deletion evidence.",
+    "The Ferret verification did not and must not imply equivalence to the absent Hamster I100 parent."
+  ],
+  "stop_rule": "No scientific campaign, training, evaluation, seed, W&B policy change, or result reinterpretation was initiated by this operational milestone."
+}

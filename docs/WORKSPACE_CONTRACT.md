@@ -17,9 +17,15 @@ runs/  analysis/  staging/  worktrees/  orchestration/
 task-context/  locks/  tmp/
 ```
 
-Use `ard.workspace.load_workspace_contract()` in Python and
-`scripts/workspace_doctor.py --json` for the compact operational view.  The
-doctor is not a scientific launch gate: parent, Teacher, attack, mask, and
+Use `ard.workspace.load_workspace_contract()` in Python and the registered
+interpreter for the compact operational view:
+
+```bash
+ARD_PYTHON="$(python3 scripts/workspace_paths.py python)"
+"$ARD_PYTHON" scripts/workspace_doctor.py --json
+```
+
+The doctor is not a scientific launch gate: parent, Teacher, attack, mask, and
 checkpoint lineage are still checked by the production-launch gate.
 
 For long-task recovery, use the runtime-only [task-context protocol](TASK_CONTEXT_PROTOCOL.md).
