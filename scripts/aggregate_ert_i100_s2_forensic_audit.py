@@ -182,6 +182,24 @@ def runtime_proxy_payloads(activity_dir: Path) -> dict[tuple[str, str, int], dic
     return proxy_rows
 
 
+def merged_runtime_proxy_payloads(
+    *, primary_dirs: tuple[Path, ...], override_dirs: tuple[Path, ...]
+) -> dict[tuple[str, str, int], dict[str, Any]]:
+    """Merge immutable proxy collections, allowing only explicit overrides."""
+    merged: dict[tuple[str, str, int], dict[str, Any]] = {}
+    for directory in primary_dirs:
+        for key, payload in runtime_proxy_payloads(directory).items():
+            if key in merged:
+                raise ValueError(f"duplicate primary runtime activity proxy: {key}")
+            merged[key] = payload
+    for directory in override_dirs:
+        override = runtime_proxy_payloads(directory)
+        if not override:
+            raise ValueError(f"runtime activity override contains no proxy payload: {directory}")
+        merged.update(override)
+    return merged
+
+
 def _registered_checkpoint(registered_results: Mapping[str, Any], *, seed: str, arm: str, epoch: int) -> str:
     try:
         return str(registered_results["held_out"][seed][arm][str(epoch)]["checkpoint_sha256"])
@@ -301,7 +319,8 @@ def main() -> int:
     parser.add_argument("--execution-config-dev2", type=Path, required=True)
     parser.add_argument("--registered-results", type=Path, required=True)
     parser.add_argument("--analysis-source-sha", required=True)
-    parser.add_argument("--runtime-activity-dir", type=Path)
+    parser.add_argument("--runtime-activity-dir", type=Path, action="append", default=[])
+    parser.add_argument("--runtime-activity-override-dir", type=Path, action="append", default=[])
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     e99_paths = {"dev-1": args.e99_dev1, "dev-2": args.e99_dev2}
@@ -391,8 +410,10 @@ def main() -> int:
                 },
             }
         result["seeds"][seed] = seed_result
-    if args.runtime_activity_dir is not None:
-        proxy_rows = runtime_proxy_payloads(args.runtime_activity_dir)
+    if args.runtime_activity_dir:
+        proxy_rows = merged_runtime_proxy_payloads(
+            primary_dirs=tuple(args.runtime_activity_dir), override_dirs=tuple(args.runtime_activity_override_dir)
+        )
         required = {(seed, arm, epoch) for seed in SEEDS for arm in ("dpm", "dbdd") for epoch in (104, 109, 114)}
         if set(proxy_rows) != required:
             raise ValueError(f"runtime proxy matrix incomplete: missing={sorted(required - set(proxy_rows))}")

@@ -26,6 +26,7 @@ from scripts.aggregate_ert_i100_s2_forensic_audit import (
     entrant_summary,
     fixed_cohort_trajectory,
     fixed_mask_ids,
+    merged_runtime_proxy_payloads,
     runtime_proxy_payloads,
 )
 
@@ -135,6 +136,27 @@ def test_runtime_proxy_payloads_discovers_nested_arm_epoch_artifacts(tmp_path: P
     loaded = runtime_proxy_payloads(tmp_path)
 
     assert loaded == {("dev-1", "dpm", 104): payload}
+
+
+def test_explicit_runtime_proxy_override_replaces_only_the_matching_key(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    override = tmp_path / "override"
+    base = {
+        "contract": "ert_rslad_i100_s2_checkpoint_no_update_runtime_activity_proxy_v1",
+        "seed": "dev-1",
+        "arm": "dpm",
+        "checkpoint_epoch": 104,
+        "source": "old",
+    }
+    replacement = {**base, "source": "new"}
+    primary.mkdir()
+    override.mkdir()
+    (primary / "base.json").write_text(json.dumps(base), encoding="utf-8")
+    (override / "replacement.json").write_text(json.dumps(replacement), encoding="utf-8")
+
+    merged = merged_runtime_proxy_payloads(primary_dirs=(primary,), override_dirs=(override,))
+
+    assert merged[("dev-1", "dpm", 104)]["source"] == "new"
 
 
 def test_secant_scalar_autograd_matches_central_difference_away_from_kinks() -> None:
