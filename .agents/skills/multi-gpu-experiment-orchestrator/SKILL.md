@@ -11,6 +11,12 @@ preflight, resource placement, detached jobs, dependency transitions, retries,
 collection/finalization, and an audit trail. It must not edit model, loss,
 attack, dataset, sampler, or scientific configuration.
 
+For a human-authored campaign that needs source, parent, dataset, and config
+validation plus an immutable resolved manifest before scheduling, use the
+`production-launch-gate` wrapper. The gate delegates here after its preflight
+and bounded canary; this skill remains authoritative for reservations,
+detached workers, completion markers, retries, and resume.
+
 ## Workflow
 
 1. Freeze a full Git SHA and a JSON manifest. Put all scientific identity in

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Production Launch Gate"
+  short_description: "Freeze and validate campaigns before GPU launch"
+  default_prompt: "Use $production-launch-gate to preflight, freeze, canary, and launch a scientific campaign safely."

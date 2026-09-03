@@ -483,6 +483,13 @@ def start_worker(
             "ARD_ORCH_GPU_INDEX": str(slot[1]),
         }
     )
+    # A launch gate may provide an attempt-aware W&B template.  Keeping this
+    # in the execution layer means technical retries get distinct execution
+    # IDs while `job_identity` remains unchanged.
+    wandb_template = job.get("wandb_run_id_template")
+    if isinstance(wandb_template, str) and wandb_template:
+        env["WANDB_RUN_ID"] = wandb_template.format(attempt=attempt, attempt_id=attempt_id)
+        env.setdefault("WANDB_RESUME", "never")
     if slot[1] >= 0:
         env.setdefault("CUDA_VISIBLE_DEVICES", str(slot[1]))
     worker_command = [
