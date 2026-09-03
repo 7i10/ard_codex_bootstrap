@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "contract": "ert_rslad_i100_dynamic_bdd_execution_postmortem_v1",
+  "scope": "operational_only",
+  "scientific_result_commit": "5a45a41c3a9925c995ea52ec45fc44228cf2d41c",
+  "timeline": [
+    {
+      "timestamp": "2026-09-03T14:00:00+09:00",
+      "precision": "hour",
+      "event_type": "user_request_reported",
+      "evidence": "user report",
+      "is_artifact_backed": false
+    },
+    {
+      "timestamp": "2026-09-03T16:25:39+09:00",
+      "event_type": "implementation_commit",
+      "evidence": "git commit 9b5cf132a0f2f7eff890854253d05257a95bdae9"
+    },
+    {
+      "timestamp": "2026-09-03T16:53:13.730526+09:00",
+      "event_type": "first_production_controller_launch",
+      "evidence": ".cache/analysis/ert-i100-s2-dynamic-bdd-v1/orchestration.state.json",
+      "elapsed_since_user_reported_request_seconds": 10393.730526
+    },
+    {
+      "timestamp": "2026-09-03T18:10:27.480749+09:00",
+      "event_type": "technical_retry_controller_launch",
+      "evidence": ".cache/analysis/ert-i100-s2-dynamic-bdd-v1/orchestration-retry.state.json"
+    },
+    {
+      "timestamp": "2026-09-03T20:12:56.469512+09:00",
+      "event_type": "recovery_controller_launch",
+      "evidence": ".cache/analysis/ert-i100-s2-dynamic-bdd-v1/recovery-436c920-r2/orchestration.state.json"
+    },
+    {
+      "timestamp": "2026-09-03T23:37:51.330256+09:00",
+      "event_type": "ferret_state_replay_recovery_controller_launch",
+      "evidence": ".cache/analysis/ert-i100-s2-dynamic-bdd-v1/state-replay-v1/ferret-source21-recovery.orchestration.state.json"
+    },
+    {
+      "timestamp": "2026-09-03T23:54:56+09:00",
+      "event_type": "results_commit",
+      "evidence": "git commit 5a45a41c3a9925c995ea52ec45fc44228cf2d41c",
+      "elapsed_since_user_reported_request_seconds": 35696.0
+    }
+  ],
+  "technical_failures": [
+    {
+      "id": "direct_nonexecutable_shell_wrapper",
+      "classification": "technical",
+      "evidence": "PermissionError for scripts/launch_ferret_dynamic_bdd_job.sh and scripts/launch_ferret_i100_dynamic_bdd_state_replay.sh",
+      "gpu_compute_started": false,
+      "scientific_identity_changed": false,
+      "prevention": "manifest validation rejects a locally present direct non-executable .sh argv or completion probe"
+    },
+    {
+      "id": "remote_parent_material_unavailable",
+      "classification": "technical",
+      "evidence": "recovery audit: remote resolved config absent",
+      "gpu_compute_started": false,
+      "scientific_identity_changed": false,
+      "prevention": "host preflight checks config/checkpoint/Teacher/worktree paths and hashes before reservation"
+    },
+    {
+      "id": "shared_git_ref_lock_race",
+      "classification": "technical",
+      "evidence": "recovery audit: Ferret worktree preparation Git ref-lock race",
+      "gpu_compute_started": false,
+      "scientific_identity_changed": false,
+      "prevention": "serialize per-source remote worktree preparation before parallel roots"
+    },
+    {
+      "id": "stale_source_sha_in_state_replay_manifest",
+      "classification": "technical",
+      "evidence": "state replay log expected 772a3ef2b8d21292424e63bf687957f6cb6ff008 but workspace was 21c4e1e87927d236cf1b18c3c60861d2335f7c57",
+      "gpu_compute_started": false,
+      "scientific_identity_changed": false,
+      "prevention": "build a fresh manifest only after source freeze; record a source-delta proof for analysis-only changes"
+    },
+    {
+      "id": "remote_endpoint_row_locality",
+      "classification": "technical",
+      "evidence": "endpoint summaries retained Ferret absolute rows_path although matching rows were locally collected",
+      "gpu_compute_started": false,
+      "scientific_identity_changed": false,
+      "prevention": "resolve canonical local artifact path only after rows SHA-256 matches the registered summary"
+    }
+  ],
+  "scientific_nonretry": {
+    "id": "sbdd_nonfinite_v2",
+    "classification": "scientific_outcome",
+    "disposition": "NUMERICALLY_UNSUPPORTED; no in-screen stabilization or retry"
+  },
+  "unknown_or_not_recorded": [
+    "Exact user-message second is unavailable; request time is hour-precision.",
+    "A complete Codex command/status-check count was not persisted; this postmortem does not infer one."
+  ]
+}

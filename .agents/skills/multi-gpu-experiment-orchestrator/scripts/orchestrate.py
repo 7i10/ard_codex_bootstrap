@@ -145,6 +145,8 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
     command = job.get("command")
     if not isinstance(command, list) or not command or not all(isinstance(x, str) and x for x in command):
         raise ValueError(f"{job_id}: command must be a non-empty argv list")
+    command_cwd = abs_path(job.get("cwd"), base) or base
+    _validate_local_shell_argv(command, cwd=command_cwd, job_id=job_id, field="command")
     identity = job.get("scientific_identity")
     if not isinstance(identity, dict):
         raise ValueError(f"{job_id}: scientific_identity mapping is required")
@@ -189,8 +191,30 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
     executor = job.get("executor", {"type": "local"})
     if not isinstance(executor, dict) or executor.get("type", "local") not in {"local", "external_probe"}:
         raise ValueError(f"{job_id}: executor.type must be local or external_probe")
-    if executor.get("type") == "external_probe" and not isinstance(job.get("completion_probe"), list):
-        raise ValueError(f"{job_id}: external_probe requires completion_probe argv")
+    if executor.get("type") == "external_probe":
+        probe = job.get("completion_probe")
+        if not isinstance(probe, list) or not probe or not all(isinstance(x, str) and x for x in probe):
+            raise ValueError(f"{job_id}: external_probe requires completion_probe argv")
+        _validate_local_shell_argv(probe, cwd=command_cwd, job_id=job_id, field="completion_probe")
+
+
+def _validate_local_shell_argv(argv: list[str], *, cwd: Path, job_id: str, field: str) -> None:
+    """Reject a known non-executable shell wrapper before reserving a GPU.
+
+    The orchestrator executes argv without a shell.  A tracked/local `*.sh`
+    wrapper therefore needs either its executable bit or an explicit `bash`
+    interpreter.  Unknown remote-only paths remain the remote executor's
+    responsibility, so this only rejects a path that is present locally.
+    """
+    executable = Path(argv[0])
+    if executable.suffix != ".sh":
+        return
+    candidate = executable if executable.is_absolute() else cwd / executable
+    if candidate.is_file() and not os.access(candidate, os.X_OK):
+        raise ValueError(
+            f"{job_id}: {field} directly invokes non-executable shell wrapper {executable}; "
+            "use ['bash', '<script>.sh', ...] or set its executable bit"
+        )
 
 
 def _check_dependencies(jobs: list[dict[str, Any]]) -> None:

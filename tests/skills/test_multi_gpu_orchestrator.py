@@ -160,6 +160,22 @@ def test_preflight_checks_job_paths_and_environment(tmp_path: Path) -> None:
     assert "environment variable missing" in result.stdout
 
 
+def test_validate_rejects_direct_non_executable_shell_wrapper(tmp_path: Path) -> None:
+    wrapper = tmp_path / "launcher.sh"
+    wrapper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    wrapper.chmod(0o644)
+    value = job(tmp_path, "root", "pass")
+    value["command"] = [str(wrapper)]
+    manifest = write_manifest(tmp_path, [value])
+    rejected = invoke("validate", manifest)
+    assert rejected.returncode != 0
+    assert "non-executable shell wrapper" in rejected.stderr
+
+    value["command"] = ["bash", str(wrapper)]
+    manifest = write_manifest(tmp_path, [value])
+    assert invoke("validate", manifest).returncode == 0
+
+
 def test_technical_retry_preserves_identity_and_unblocks_endpoint(tmp_path: Path) -> None:
     output = tmp_path / "outputs" / "flaky"
     code = (

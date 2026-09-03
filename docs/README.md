@@ -30,6 +30,7 @@
 - [Ferret execution protocol](FERRET_EXECUTION_PROTOCOL.md): fixed-SHA remote GPU runs from Hamster
 - [Legacy campaign archive](../tools/internal/legacy_campaign/README.md): 完了済みHamster/Ferret運用コードの非公開・非runtimeアーカイブ
 - [Multi-GPU orchestration skill](MULTI_GPU_EXPERIMENT_ORCHESTRATION_SKILL.md): manifest-driven scheduling, DAG chaining, retry, and bounded monitoring
+- [I100 Dynamic BDD execution postmortem](ERT_RSLAD_I100_DYNAMIC_BDD_EXECUTION_POSTMORTEM.md): evidence-backed launch/recovery delays and reusable operational safeguards
 
 ## CLI entry points
 

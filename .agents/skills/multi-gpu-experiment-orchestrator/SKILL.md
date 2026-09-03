@@ -49,6 +49,11 @@ existing launcher (for example `run-on-ferret`) and provide a probe argv that
 returns zero only when the remote run is complete. The remote skill remains the
 authority for remote lifecycle and safety.
 
+Because argv is executed without a shell, write a non-executable shell wrapper
+as `['bash', 'scripts/wrapper.sh', ...]`; do not put the wrapper itself at
+argv position zero. Manifest validation rejects a locally present non-executable
+`*.sh` command or completion probe before any GPU reservation.
+
 ## Scheduling and safety
 
 - Ready jobs are sorted longest-processing-time first. Candidate slots are

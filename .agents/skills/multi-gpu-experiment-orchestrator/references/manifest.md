@@ -74,6 +74,11 @@ For remote wrappers use `executor.type: external_probe`, a launcher argv, and
 `completion_probe` that returns zero only for a successful terminal run. Do not
 make a probe that treats a failed remote run as successful.
 
+The controller executes argv without a shell. A wrapper without its executable
+bit must therefore be explicit, for example `['bash', 'scripts/launch.sh', ...]`.
+Validation rejects a locally present non-executable shell script used directly
+as the command or completion probe.
+
 The controller takes an advisory `flock` reservation for each local
 host/GPU UUID (or index) under `~/.cache/ard-experiment-orchestrator` so
 separate campaigns cannot claim the same slot. Set `reservation_root` to a
