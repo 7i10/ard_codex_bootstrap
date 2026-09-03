@@ -22,6 +22,7 @@ from ard.analysis.ert_i100_s2_secant_forensic import (
     secant_components,
 )
 from scripts.aggregate_ert_i100_s2_forensic_audit import (
+    endpoint_checkpoint,
     entrant_summary,
     fixed_cohort_trajectory,
     runtime_proxy_payloads,
@@ -96,6 +97,17 @@ def test_entrant_persistence_uses_active_runs_not_first_entry() -> None:
     assert summary["n"] == 7
     assert summary["e99_origin"] == {"e99_S1": 6, "e99_S2xT2T3": 1}
     assert summary["persistence"] == {"one-endpoint-only": 3, "re-entry": 1, "repeated": 3}
+
+
+def test_runtime_proxy_uses_same_seed_canonical_checkpoint() -> None:
+    result = {
+        "seeds": {
+            "dev-1": {"arms": {"dpm": {"endpoint_metadata": {"104": {"checkpoint_sha256": "dev1"}}}}},
+            "dev-2": {"arms": {"dpm": {"endpoint_metadata": {"104": {"checkpoint_sha256": "dev2"}}}}},
+        }
+    }
+    assert endpoint_checkpoint(result, seed="dev-1", arm="dpm", epoch=104) == "dev1"
+    assert endpoint_checkpoint(result, seed="dev-2", arm="dpm", epoch=104) == "dev2"
 
 
 def test_runtime_proxy_payloads_discovers_nested_arm_epoch_artifacts(tmp_path: Path) -> None:

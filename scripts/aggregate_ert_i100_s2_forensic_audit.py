@@ -275,6 +275,16 @@ def validate_runtime_proxy(
         raise ValueError(f"{prefix}: fixed mask was not covered exactly once")
 
 
+def endpoint_checkpoint(longitudinal_result: Mapping[str, Any], *, seed: str, arm: str, epoch: int) -> str:
+    """Return the same-seed canonical endpoint checkpoint for a KL10 proxy."""
+    try:
+        return str(
+            longitudinal_result["seeds"][seed]["arms"][arm]["endpoint_metadata"][str(epoch)]["checkpoint_sha256"]
+        )
+    except (KeyError, TypeError) as error:
+        raise ValueError(f"longitudinal result lacks {seed}/{arm}/e{epoch} endpoint metadata") from error
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--canonical-root", type=Path, required=True)
@@ -408,7 +418,7 @@ def main() -> int:
                         }
                         continue
                     payload = proxy_rows[(seed, arm, epoch)]
-                    expected_checkpoint = seed_result["arms"][arm]["endpoint_metadata"][str(epoch)]["checkpoint_sha256"]
+                    expected_checkpoint = endpoint_checkpoint(result, seed=seed, arm=arm, epoch=epoch)
                     validate_runtime_proxy(
                         payload=payload,
                         seed=seed,
