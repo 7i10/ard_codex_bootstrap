@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import torch
+import yaml
 
 from ard.analysis.ert_stage_a_endpoint import evaluate_endpoint
 
@@ -33,7 +34,16 @@ def main() -> int:
     completed = subprocess.run(command)
     if completed.returncode != 0:
         return completed.returncode
-    config = args.output / "training" / "resolved_config.yaml"
+    # The runtime's resolved_config.yaml is an immutable lineage snapshot,
+    # not a full ExperimentConfig.  Endpoint evaluation must reopen the
+    # exact parent config referenced by that snapshot.
+    lineage_config = args.output / "training" / "resolved_config.yaml"
+    metadata = yaml.safe_load(lineage_config.read_text(encoding="utf-8"))
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("parent_config"), str):
+        raise SystemExit("training lineage snapshot lacks parent_config for endpoint evaluation")
+    config = Path(metadata["parent_config"])
+    if not config.is_file():
+        raise SystemExit(f"parent config for endpoint evaluation is unavailable: {config}")
     checkpoint_root = args.output / "training" / "checkpoints"
     endpoint_root = args.output / "endpoints"
     endpoint_root.mkdir(parents=True, exist_ok=True)

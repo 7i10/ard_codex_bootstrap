@@ -16,6 +16,7 @@ from ard.analysis.ert_stage_a_runtime import (
     _mask_from_overlay,
     _tracking_run_id,
     _validate_shared_prefix_lineage,
+    _validate_stage_a_calibration,
 )
 from ard.config.schema import AttackConfig
 
@@ -64,6 +65,24 @@ def test_confirmatory_treatment_coefficients_are_explicit() -> None:
         advkd_multiplier=0.5,
     )
     assert t3.advkd_multiplier == 0.5
+
+
+def test_boundary_calibration_does_not_require_softening_tau() -> None:
+    treatment = StageATreatment(
+        arm="DBDD",
+        mask_key="s2_t1",
+        kind="broad",
+        boundary_intervention="detached_boundary_distance",
+        boundary_coefficient=3.0,
+    )
+    _validate_stage_a_calibration(
+        treatment,
+        {
+            "contract": "ert_rslad_i100_s2_dynamic_bdd_calibration_v1",
+            "boundary_epsilon": 1e-12,
+            "coefficients": {"detached_boundary_distance": 3.0},
+        },
+    )
 
 
 def test_margin_treatment_contracts_cover_fixed_and_teacher_targets() -> None:

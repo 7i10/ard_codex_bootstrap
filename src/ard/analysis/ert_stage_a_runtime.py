@@ -106,6 +106,27 @@ def _validate_horizons(horizon_epochs: tuple[int, ...], end_epoch: int, *, first
         raise StageARuntimeError("horizon checkpoints must be unique")
 
 
+def _validate_stage_a_calibration(treatment: StageATreatment, calibration: dict[str, Any]) -> None:
+    """Validate only the calibration contract required by this treatment.
+
+    Boundary-distance treatments use their own coefficient artifact and do
+    not require the unrelated teacher-softening ``tau`` field.
+    """
+    if treatment.boundary_intervention is not None:
+        if calibration.get("contract") != "ert_rslad_i100_s2_dynamic_bdd_calibration_v1":
+            raise StageARuntimeError("boundary treatment requires the frozen dynamic-BDD calibration artifact")
+        if calibration.get("boundary_epsilon") != treatment.boundary_epsilon:
+            raise StageARuntimeError("boundary treatment epsilon differs from calibration artifact")
+        coefficients = calibration.get("coefficients")
+        if (
+            not isinstance(coefficients, dict)
+            or coefficients.get(treatment.boundary_intervention) != treatment.boundary_coefficient
+        ):
+            raise StageARuntimeError("boundary treatment coefficient differs from calibration artifact")
+    elif treatment.kind == "soft_advkd" and calibration.get("tau") != 2.0:
+        raise StageARuntimeError("Stage A calibration tau is not frozen at 2.0")
+
+
 @dataclass(frozen=True)
 class StageATreatment:
     arm: str
@@ -479,19 +500,7 @@ def run_stage_a_arm(
     _validate_horizons(horizon_epochs, end_epoch, first_epoch=start_epoch)
     if not run_namespace or any(char.isspace() for char in run_namespace):
         raise StageARuntimeError("run namespace must be a non-empty token")
-    if treatment.boundary_intervention is not None:
-        if calibration.get("contract") != "ert_rslad_i100_s2_dynamic_bdd_calibration_v1":
-            raise StageARuntimeError("boundary treatment requires the frozen dynamic-BDD calibration artifact")
-        if calibration.get("boundary_epsilon") != treatment.boundary_epsilon:
-            raise StageARuntimeError("boundary treatment epsilon differs from calibration artifact")
-        coefficients = calibration.get("coefficients")
-        if (
-            not isinstance(coefficients, dict)
-            or coefficients.get(treatment.boundary_intervention) != treatment.boundary_coefficient
-        ):
-            raise StageARuntimeError("boundary treatment coefficient differs from calibration artifact")
-    elif calibration.get("tau") != 2.0:
-        raise StageARuntimeError("Stage A calibration tau is not frozen at 2.0")
+    _validate_stage_a_calibration(treatment, calibration)
     source_state = collect_git_state(Path.cwd())
     source_sha = source_state.get("sha")
     if source_state.get("dirty") is not False or not isinstance(source_sha, str):
