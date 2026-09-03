@@ -1,0 +1,2106 @@
+{
+  "analysis_source_git_sha": "d53dbc040c822200b2e5fc155a639ef7aff3f212",
+  "checkpoint_no_update_runtime_activity_proxy": {
+    "dev-1": {
+      "control": {
+        "104": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 1,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1
+            },
+            "S1": {
+              "current_state_n": 1426,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1426
+            },
+            "S2xT1": {
+              "current_state_n": 379,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 379
+            },
+            "S2xT2T3": {
+              "current_state_n": 9,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 9
+            },
+            "S3-non-CW": {
+              "current_state_n": 397,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 397
+            }
+          },
+          "scope": "Control has no extra intervention loss"
+        },
+        "109": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 1,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1
+            },
+            "S1": {
+              "current_state_n": 1492,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1492
+            },
+            "S2xT1": {
+              "current_state_n": 353,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 353
+            },
+            "S2xT2T3": {
+              "current_state_n": 12,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 12
+            },
+            "S3-non-CW": {
+              "current_state_n": 354,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 354
+            }
+          },
+          "scope": "Control has no extra intervention loss"
+        },
+        "114": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 3,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 3
+            },
+            "S1": {
+              "current_state_n": 1555,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1555
+            },
+            "S2xT1": {
+              "current_state_n": 335,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 335
+            },
+            "S2xT2T3": {
+              "current_state_n": 22,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 22
+            },
+            "S3-non-CW": {
+              "current_state_n": 297,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 297
+            }
+          },
+          "scope": "Control has no extra intervention loss"
+        }
+      },
+      "dbdd": {
+        "104": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 0,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 0
+            },
+            "S1": {
+              "current_state_n": 1450,
+              "extra_loss_active_fraction": 0.5282758620689655,
+              "extra_loss_active_n": 766,
+              "fixed_mask_n": 1450
+            },
+            "S2xT1": {
+              "current_state_n": 364,
+              "extra_loss_active_fraction": 0.5274725274725275,
+              "extra_loss_active_n": 192,
+              "fixed_mask_n": 364
+            },
+            "S2xT2T3": {
+              "current_state_n": 9,
+              "extra_loss_active_fraction": 0.5555555555555556,
+              "extra_loss_active_n": 5,
+              "fixed_mask_n": 9
+            },
+            "S3-non-CW": {
+              "current_state_n": 389,
+              "extra_loss_active_fraction": 0.493573264781491,
+              "extra_loss_active_n": 192,
+              "fixed_mask_n": 389
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 104
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        },
+        "109": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 1,
+              "extra_loss_active_fraction": 1.0,
+              "extra_loss_active_n": 1,
+              "fixed_mask_n": 1
+            },
+            "S1": {
+              "current_state_n": 1512,
+              "extra_loss_active_fraction": 0.5297619047619048,
+              "extra_loss_active_n": 801,
+              "fixed_mask_n": 1512
+            },
+            "S2xT1": {
+              "current_state_n": 354,
+              "extra_loss_active_fraction": 0.5,
+              "extra_loss_active_n": 177,
+              "fixed_mask_n": 354
+            },
+            "S2xT2T3": {
+              "current_state_n": 13,
+              "extra_loss_active_fraction": 0.5384615384615384,
+              "extra_loss_active_n": 7,
+              "fixed_mask_n": 13
+            },
+            "S3-non-CW": {
+              "current_state_n": 332,
+              "extra_loss_active_fraction": 0.4879518072289157,
+              "extra_loss_active_n": 162,
+              "fixed_mask_n": 332
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 109
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        },
+        "114": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 1,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1
+            },
+            "S1": {
+              "current_state_n": 1585,
+              "extra_loss_active_fraction": 0.5287066246056782,
+              "extra_loss_active_n": 838,
+              "fixed_mask_n": 1585
+            },
+            "S2xT1": {
+              "current_state_n": 329,
+              "extra_loss_active_fraction": 0.5106382978723404,
+              "extra_loss_active_n": 168,
+              "fixed_mask_n": 329
+            },
+            "S2xT2T3": {
+              "current_state_n": 22,
+              "extra_loss_active_fraction": 0.4090909090909091,
+              "extra_loss_active_n": 9,
+              "fixed_mask_n": 22
+            },
+            "S3-non-CW": {
+              "current_state_n": 275,
+              "extra_loss_active_fraction": 0.41818181818181815,
+              "extra_loss_active_n": 115,
+              "fixed_mask_n": 275
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 114
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        }
+      },
+      "dpm": {
+        "104": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 1,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1
+            },
+            "S1": {
+              "current_state_n": 1434,
+              "extra_loss_active_fraction": 0.5627615062761506,
+              "extra_loss_active_n": 807,
+              "fixed_mask_n": 1434
+            },
+            "S2xT1": {
+              "current_state_n": 379,
+              "extra_loss_active_fraction": 0.5672823218997362,
+              "extra_loss_active_n": 215,
+              "fixed_mask_n": 379
+            },
+            "S2xT2T3": {
+              "current_state_n": 9,
+              "extra_loss_active_fraction": 0.6666666666666666,
+              "extra_loss_active_n": 6,
+              "fixed_mask_n": 9
+            },
+            "S3-non-CW": {
+              "current_state_n": 389,
+              "extra_loss_active_fraction": 0.5295629820051414,
+              "extra_loss_active_n": 206,
+              "fixed_mask_n": 389
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 104
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        },
+        "109": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 1,
+              "extra_loss_active_fraction": 1.0,
+              "extra_loss_active_n": 1,
+              "fixed_mask_n": 1
+            },
+            "S1": {
+              "current_state_n": 1515,
+              "extra_loss_active_fraction": 0.563036303630363,
+              "extra_loss_active_n": 853,
+              "fixed_mask_n": 1515
+            },
+            "S2xT1": {
+              "current_state_n": 351,
+              "extra_loss_active_fraction": 0.5356125356125356,
+              "extra_loss_active_n": 188,
+              "fixed_mask_n": 351
+            },
+            "S2xT2T3": {
+              "current_state_n": 14,
+              "extra_loss_active_fraction": 0.6428571428571429,
+              "extra_loss_active_n": 9,
+              "fixed_mask_n": 14
+            },
+            "S3-non-CW": {
+              "current_state_n": 331,
+              "extra_loss_active_fraction": 0.5287009063444109,
+              "extra_loss_active_n": 175,
+              "fixed_mask_n": 331
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 109
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        },
+        "114": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 2,
+              "extra_loss_active_fraction": 0.5,
+              "extra_loss_active_n": 1,
+              "fixed_mask_n": 2
+            },
+            "S1": {
+              "current_state_n": 1575,
+              "extra_loss_active_fraction": 0.5777777777777777,
+              "extra_loss_active_n": 910,
+              "fixed_mask_n": 1575
+            },
+            "S2xT1": {
+              "current_state_n": 344,
+              "extra_loss_active_fraction": 0.5290697674418605,
+              "extra_loss_active_n": 182,
+              "fixed_mask_n": 344
+            },
+            "S2xT2T3": {
+              "current_state_n": 19,
+              "extra_loss_active_fraction": 0.3684210526315789,
+              "extra_loss_active_n": 7,
+              "fixed_mask_n": 19
+            },
+            "S3-non-CW": {
+              "current_state_n": 272,
+              "extra_loss_active_fraction": 0.5,
+              "extra_loss_active_n": 136,
+              "fixed_mask_n": 272
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 114
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        }
+      }
+    },
+    "dev-2": {
+      "control": {
+        "104": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 4,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 4
+            },
+            "S1": {
+              "current_state_n": 1305,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1305
+            },
+            "S2xT1": {
+              "current_state_n": 401,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 401
+            },
+            "S2xT2T3": {
+              "current_state_n": 16,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 16
+            },
+            "S3-non-CW": {
+              "current_state_n": 415,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 415
+            }
+          },
+          "scope": "Control has no extra intervention loss"
+        },
+        "109": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 4,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 4
+            },
+            "S1": {
+              "current_state_n": 1386,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1386
+            },
+            "S2xT1": {
+              "current_state_n": 370,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 370
+            },
+            "S2xT2T3": {
+              "current_state_n": 24,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 24
+            },
+            "S3-non-CW": {
+              "current_state_n": 357,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 357
+            }
+          },
+          "scope": "Control has no extra intervention loss"
+        },
+        "114": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 3,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 3
+            },
+            "S1": {
+              "current_state_n": 1402,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 1402
+            },
+            "S2xT1": {
+              "current_state_n": 363,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 363
+            },
+            "S2xT2T3": {
+              "current_state_n": 16,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 16
+            },
+            "S3-non-CW": {
+              "current_state_n": 357,
+              "extra_loss_active_fraction": 0.0,
+              "extra_loss_active_n": 0,
+              "fixed_mask_n": 357
+            }
+          },
+          "scope": "Control has no extra intervention loss"
+        }
+      },
+      "dbdd": {
+        "104": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 3,
+              "extra_loss_active_fraction": 0.3333333333333333,
+              "extra_loss_active_n": 1,
+              "fixed_mask_n": 3
+            },
+            "S1": {
+              "current_state_n": 1325,
+              "extra_loss_active_fraction": 0.5433962264150943,
+              "extra_loss_active_n": 720,
+              "fixed_mask_n": 1325
+            },
+            "S2xT1": {
+              "current_state_n": 389,
+              "extra_loss_active_fraction": 0.570694087403599,
+              "extra_loss_active_n": 222,
+              "fixed_mask_n": 389
+            },
+            "S2xT2T3": {
+              "current_state_n": 16,
+              "extra_loss_active_fraction": 0.5,
+              "extra_loss_active_n": 8,
+              "fixed_mask_n": 16
+            },
+            "S3-non-CW": {
+              "current_state_n": 408,
+              "extra_loss_active_fraction": 0.5049019607843137,
+              "extra_loss_active_n": 206,
+              "fixed_mask_n": 408
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 104
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        },
+        "109": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 3,
+              "extra_loss_active_fraction": 1.0,
+              "extra_loss_active_n": 3,
+              "fixed_mask_n": 3
+            },
+            "S1": {
+              "current_state_n": 1406,
+              "extra_loss_active_fraction": 0.5419630156472262,
+              "extra_loss_active_n": 762,
+              "fixed_mask_n": 1406
+            },
+            "S2xT1": {
+              "current_state_n": 362,
+              "extra_loss_active_fraction": 0.505524861878453,
+              "extra_loss_active_n": 183,
+              "fixed_mask_n": 362
+            },
+            "S2xT2T3": {
+              "current_state_n": 32,
+              "extra_loss_active_fraction": 0.53125,
+              "extra_loss_active_n": 17,
+              "fixed_mask_n": 32
+            },
+            "S3-non-CW": {
+              "current_state_n": 338,
+              "extra_loss_active_fraction": 0.5207100591715976,
+              "extra_loss_active_n": 176,
+              "fixed_mask_n": 338
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 109
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        },
+        "114": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 2,
+              "extra_loss_active_fraction": 1.0,
+              "extra_loss_active_n": 2,
+              "fixed_mask_n": 2
+            },
+            "S1": {
+              "current_state_n": 1425,
+              "extra_loss_active_fraction": 0.5347368421052632,
+              "extra_loss_active_n": 762,
+              "fixed_mask_n": 1425
+            },
+            "S2xT1": {
+              "current_state_n": 362,
+              "extra_loss_active_fraction": 0.5469613259668509,
+              "extra_loss_active_n": 198,
+              "fixed_mask_n": 362
+            },
+            "S2xT2T3": {
+              "current_state_n": 17,
+              "extra_loss_active_fraction": 0.5882352941176471,
+              "extra_loss_active_n": 10,
+              "fixed_mask_n": 17
+            },
+            "S3-non-CW": {
+              "current_state_n": 335,
+              "extra_loss_active_fraction": 0.43283582089552236,
+              "extra_loss_active_n": 145,
+              "fixed_mask_n": 335
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 114
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        }
+      },
+      "dpm": {
+        "104": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 4,
+              "extra_loss_active_fraction": 0.5,
+              "extra_loss_active_n": 2,
+              "fixed_mask_n": 4
+            },
+            "S1": {
+              "current_state_n": 1324,
+              "extra_loss_active_fraction": 0.5830815709969789,
+              "extra_loss_active_n": 772,
+              "fixed_mask_n": 1324
+            },
+            "S2xT1": {
+              "current_state_n": 385,
+              "extra_loss_active_fraction": 0.6077922077922078,
+              "extra_loss_active_n": 234,
+              "fixed_mask_n": 385
+            },
+            "S2xT2T3": {
+              "current_state_n": 16,
+              "extra_loss_active_fraction": 0.5625,
+              "extra_loss_active_n": 9,
+              "fixed_mask_n": 16
+            },
+            "S3-non-CW": {
+              "current_state_n": 412,
+              "extra_loss_active_fraction": 0.5194174757281553,
+              "extra_loss_active_n": 214,
+              "fixed_mask_n": 412
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 104
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        },
+        "109": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 4,
+              "extra_loss_active_fraction": 1.0,
+              "extra_loss_active_n": 4,
+              "fixed_mask_n": 4
+            },
+            "S1": {
+              "current_state_n": 1405,
+              "extra_loss_active_fraction": 0.594306049822064,
+              "extra_loss_active_n": 835,
+              "fixed_mask_n": 1405
+            },
+            "S2xT1": {
+              "current_state_n": 361,
+              "extra_loss_active_fraction": 0.5512465373961218,
+              "extra_loss_active_n": 199,
+              "fixed_mask_n": 361
+            },
+            "S2xT2T3": {
+              "current_state_n": 27,
+              "extra_loss_active_fraction": 0.6666666666666666,
+              "extra_loss_active_n": 18,
+              "fixed_mask_n": 27
+            },
+            "S3-non-CW": {
+              "current_state_n": 344,
+              "extra_loss_active_fraction": 0.563953488372093,
+              "extra_loss_active_n": 194,
+              "fixed_mask_n": 344
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 109
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        },
+        "114": {
+          "by_current_branch": {
+            "Clean-Wrong": {
+              "current_state_n": 2,
+              "extra_loss_active_fraction": 0.5,
+              "extra_loss_active_n": 1,
+              "fixed_mask_n": 2
+            },
+            "S1": {
+              "current_state_n": 1433,
+              "extra_loss_active_fraction": 0.578506629448709,
+              "extra_loss_active_n": 829,
+              "fixed_mask_n": 1433
+            },
+            "S2xT1": {
+              "current_state_n": 353,
+              "extra_loss_active_fraction": 0.6090651558073654,
+              "extra_loss_active_n": 215,
+              "fixed_mask_n": 353
+            },
+            "S2xT2T3": {
+              "current_state_n": 17,
+              "extra_loss_active_fraction": 0.5294117647058824,
+              "extra_loss_active_n": 9,
+              "fixed_mask_n": 17
+            },
+            "S3-non-CW": {
+              "current_state_n": 336,
+              "extra_loss_active_fraction": 0.4523809523809524,
+              "extra_loss_active_n": 152,
+              "fixed_mask_n": 336
+            }
+          },
+          "runtime_contract": {
+            "attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+            "ddp_peer_batch_unavailable": true,
+            "full_rank_batch_mean": true,
+            "rank_local_natural_batch_size": 128,
+            "selected_count_normalization": false,
+            "student_train_mode": true,
+            "teacher_eval_frozen": true,
+            "train_view_augmentation_epoch": 114
+          },
+          "scope": "checkpoint no-update rank-local training proxy; not historical per-visit activity"
+        }
+      }
+    }
+  },
+  "contract": "ert_rslad_i100_s2_longitudinal_state_audit_v1",
+  "lineage_contract": {
+    "canonical_ce20_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+    "execution_configs": {
+      "dev-1": {
+        "allowed_difference": "teacher.checkpoint absolute path only",
+        "configs": [
+          {
+            "path": ".cache/analysis/ert-i100-s2-forensic-v1/inputs/dev1-resolved_config.teacher-path-rebased.yaml",
+            "sha256": "ae621c5a62ef9b3b633586bd8b90d48a13757fa288ac42fee651e9298109d96b"
+          }
+        ],
+        "normalized_config_sha256": "86f2d8923256355649bc5bb11c1a6fa6112b9eb5cf17876064a58c9276caad66"
+      },
+      "dev-2": {
+        "allowed_difference": "teacher.checkpoint absolute path only",
+        "configs": [
+          {
+            "path": ".cache/analysis/ert-i100-s2-forensic-v1/inputs/dev2-resolved_config.teacher-path-rebased.yaml",
+            "sha256": "49e83880c3b34b92c8bc8cd92203d3a7314f949429b91a776ddf82a11ff74265"
+          },
+          {
+            "path": ".cache/analysis/ert-i100-s2-forensic-v1/inputs/ert-i100-s2-forensic-dev2-dpm-rerun-e104-v3.yaml",
+            "sha256": "318f11cb1286c791e965a87972e337d225b080ce7d604ca6bb6d4590bfc418fc"
+          },
+          {
+            "path": ".cache/analysis/ert-i100-s2-forensic-v1/inputs/ert-i100-s2-forensic-dev2-dpm-rerun-e109-v3.yaml",
+            "sha256": "f4eceed712241a78d090232fc36fd6613fe4ecec9f8ebc38fde90acb612d5d99"
+          },
+          {
+            "path": ".cache/analysis/ert-i100-s2-forensic-v1/inputs/ert-i100-s2-forensic-dev2-dpm-rerun-e114-v3.yaml",
+            "sha256": "a2064b04ff6bf80b37523fb019096153acf5807010fdafde5cf8240eb6217b26"
+          }
+        ],
+        "normalized_config_sha256": "c32e9c2f7604a1def750b4a113fe70c584931917d207bd206813a48d71318c96"
+      }
+    },
+    "registered_results": {
+      "path": "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_recovery_results_v1.json",
+      "sha256": "4678a8635512b1d4a956ebd5add2ff38391469bd9efeded18f013368e3a007db"
+    },
+    "runtime_kl10_attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+    "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+  },
+  "observation_contract": {
+    "continuity": "observed endpoints only; no continuous state claim",
+    "primary": "unaugmented raw train view + sample-keyed CE-PGD20 with fixed epoch-99 key",
+    "secondary_excluded": "historical augmented/batch-keyed state replays are not joined into primary trajectories"
+  },
+  "schema_version": 1,
+  "seeds": {
+    "dev-1": {
+      "arms": {
+        "control": {
+          "current_target_n_by_epoch": {
+            "104": 2598,
+            "109": 2632,
+            "114": 2623,
+            "99": 2212
+          },
+          "endpoint_metadata": {
+            "104": {
+              "checkpoint_sha256": "37f2ee86b36cc5802f31181d60cbbce7841f6c5f5d3eb9df070a4d564f4855eb",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "9de9e20c2997ca373272bfea8af4a54b6f86c892f26a668865612c68ad4fcc47",
+              "rows_sha256": "049c0100ac8d3f85be3e30916e1c4a482c432bcadcc2e42619b87e036488f00f",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 247,
+                  "Clean-WrongxT2": 548,
+                  "Clean-WrongxT3": 5948,
+                  "S1xT1": 25336,
+                  "S1xT2": 33,
+                  "S2xT1": 2598,
+                  "S2xT2": 214,
+                  "S2xT3": 7,
+                  "S3-non-CWxT1": 4606,
+                  "S3-non-CWxT2": 2848,
+                  "S3-non-CWxT3": 2615
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04367624223232269,
+                "teacher_q10_floor": 0.06569012999534607
+              }
+            },
+            "109": {
+              "checkpoint_sha256": "9f8d6cdb00e4a23277084b3d0a30425dfa5a98f8a900b1ae825a1e2d158d2b74",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "eade17750b31c58ac493526f70ccc667b07129e2d2ce2227893f128b89089f27",
+              "rows_sha256": "4959784a13a625b96cf6bb29eec0803e3d3a66c243fe322e864d03601effa46a",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 154,
+                  "Clean-WrongxT2": 426,
+                  "Clean-WrongxT3": 5826,
+                  "S1xT1": 25834,
+                  "S1xT2": 36,
+                  "S2xT1": 2632,
+                  "S2xT2": 228,
+                  "S2xT3": 15,
+                  "S3-non-CWxT1": 4053,
+                  "S3-non-CWxT2": 2941,
+                  "S3-non-CWxT3": 2855
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04671122133731842,
+                "teacher_q10_floor": 0.06497614085674286
+              }
+            },
+            "114": {
+              "checkpoint_sha256": "b0fc90346fbbf115b1841953bb9aef2fe271cc1b2c385e36efb2b1f69a1e6bef",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "06937ab6380fb3ccfe5e1a312b723503f3b1525a6431bddb5648f5ef3bf6ff0b",
+              "rows_sha256": "e896ea74a837b9fbed55c0a9d3c076b50b80073842c0c9ac701622436e19715e",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 120,
+                  "Clean-WrongxT2": 366,
+                  "Clean-WrongxT3": 5634,
+                  "S1xT1": 26209,
+                  "S1xT2": 35,
+                  "S1xT3": 1,
+                  "S2xT1": 2623,
+                  "S2xT2": 286,
+                  "S2xT3": 8,
+                  "S3-non-CWxT1": 3666,
+                  "S3-non-CWxT2": 2938,
+                  "S3-non-CWxT3": 3114
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.0482344925403595,
+                "teacher_q10_floor": 0.06502418220043182
+              }
+            }
+          },
+          "fixed_cohort": {
+            "branch_paths": {
+              "S2>Clean-Wrong>S3-non-CW>S3-non-CW": 1,
+              "S2>S1>S1>S1": 1272,
+              "S2>S1>S1>S2": 45,
+              "S2>S1>S1>S3-non-CW": 6,
+              "S2>S1>S2>S1": 50,
+              "S2>S1>S2>S2": 27,
+              "S2>S1>S2>S3-non-CW": 3,
+              "S2>S1>S3-non-CW>S1": 11,
+              "S2>S1>S3-non-CW>S2": 5,
+              "S2>S1>S3-non-CW>S3-non-CW": 7,
+              "S2>S2>S1>S1": 86,
+              "S2>S2>S1>S2": 40,
+              "S2>S2>S1>S3-non-CW": 10,
+              "S2>S2>S2>S1": 61,
+              "S2>S2>S2>S2": 108,
+              "S2>S2>S2>S3-non-CW": 23,
+              "S2>S2>S3-non-CW>S1": 12,
+              "S2>S2>S3-non-CW>S2": 33,
+              "S2>S2>S3-non-CW>S3-non-CW": 15,
+              "S2>S3-non-CW>Clean-Wrong>Clean-Wrong": 1,
+              "S2>S3-non-CW>S1>S1": 25,
+              "S2>S3-non-CW>S1>S2": 4,
+              "S2>S3-non-CW>S1>S3-non-CW": 4,
+              "S2>S3-non-CW>S2>S1": 21,
+              "S2>S3-non-CW>S2>S2": 39,
+              "S2>S3-non-CW>S2>S3-non-CW": 33,
+              "S2>S3-non-CW>S3-non-CW>Clean-Wrong": 2,
+              "S2>S3-non-CW>S3-non-CW>S1": 17,
+              "S2>S3-non-CW>S3-non-CW>S2": 56,
+              "S2>S3-non-CW>S3-non-CW>S3-non-CW": 195
+            },
+            "explicit_observed_reentry_routes": {
+              "S2_to_S1_to_S2": 119,
+              "S2_to_S3_nonCW_to_S2": 118,
+              "S2_to_other_to_S2": 1
+            },
+            "membership_patterns": {
+              "1000": 1559,
+              "1001": 105,
+              "1010": 107,
+              "1011": 62,
+              "1100": 126,
+              "1101": 69,
+              "1110": 85,
+              "1111": 99
+            },
+            "n": 2212,
+            "observability": {
+              "P6_multiple_exit_reentry": {
+                "observable": false,
+                "reason": "With four observations beginning in the target state, two leave-and-reenter cycles cannot be observed; this endpoint cadence cannot distinguish an unobserved second cycle from no second cycle."
+              }
+            },
+            "overlapping_observed_indicators": {
+              "P1_all_observed_S2xT1": 99,
+              "P2_S1_then_outside_S2_later": 1532,
+              "P3_observed_S3_nonCW": 523,
+              "P4_observed_CleanWrong": 4,
+              "P5_leave_then_reenter_S2xT1": 343
+            },
+            "teacher_transitions_when_student_S2_at_either_endpoint": {
+              "T1_to_T1": 3195,
+              "T1_to_T2": 82,
+              "T1_to_T3": 2,
+              "T2_to_T1": 11,
+              "T2_to_T2": 31
+            },
+            "terminology": "P1-P5 are overlapping observed-endpoint indicators; membership_patterns are the disjoint partition. P6 is not observable under this cadence."
+          },
+          "fixed_mask_current_branch_counts": {
+            "104": {
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1422,
+              "S1xT2": 4,
+              "S2xT1": 379,
+              "S2xT2": 9,
+              "S3-non-CWxT1": 346,
+              "S3-non-CWxT2": 49,
+              "S3-non-CWxT3": 2
+            },
+            "109": {
+              "Clean-WrongxT1": 1,
+              "S1xT1": 1487,
+              "S1xT2": 5,
+              "S2xT1": 353,
+              "S2xT2": 12,
+              "S3-non-CWxT1": 297,
+              "S3-non-CWxT2": 54,
+              "S3-non-CWxT3": 3
+            },
+            "114": {
+              "Clean-WrongxT1": 3,
+              "S1xT1": 1551,
+              "S1xT2": 4,
+              "S2xT1": 335,
+              "S2xT2": 22,
+              "S3-non-CWxT1": 248,
+              "S3-non-CWxT2": 47,
+              "S3-non-CWxT3": 2
+            },
+            "99": {
+              "S2xT1": 2212
+            }
+          },
+          "new_entrants": {
+            "e99_origin": {
+              "e99_Clean-Wrong": 318,
+              "e99_S1": 1171,
+              "e99_S2xT2T3": 8,
+              "e99_S3-non-CW": 2901
+            },
+            "n": 4398,
+            "persistence": {
+              "one-endpoint-only": 2510,
+              "re-entry": 388,
+              "repeated": 1500
+            }
+          }
+        },
+        "dbdd": {
+          "current_target_n_by_epoch": {
+            "104": 2616,
+            "109": 2644,
+            "114": 2606,
+            "99": 2212
+          },
+          "endpoint_metadata": {
+            "104": {
+              "checkpoint_sha256": "7b607a9589759ea5260e27016d3dc77fa39b73ba8dae28315aa1ece64f22848a",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "c3cc1c0338ae01030330aef907f3d3a27bf0db4cc2429817a12b8f5bac1bfb39",
+              "rows_sha256": "716f04ad20318480f53fb5a12ed0308a36a0e2679544576f2a289da4bc5002da",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 246,
+                  "Clean-WrongxT2": 538,
+                  "Clean-WrongxT3": 5934,
+                  "S1xT1": 25341,
+                  "S1xT2": 33,
+                  "S2xT1": 2616,
+                  "S2xT2": 197,
+                  "S2xT3": 7,
+                  "S3-non-CWxT1": 4591,
+                  "S3-non-CWxT2": 2876,
+                  "S3-non-CWxT3": 2621
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.044405460357666016,
+                "teacher_q10_floor": 0.06539455056190491
+              }
+            },
+            "109": {
+              "checkpoint_sha256": "4ac819a1ac829593649b17dd38f2dea8d1bcec0feaacf5226c2033a5a2f2398c",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "698c9e244653def25eca15f83968aa11df3df1cac28df126a3f0398a9c922fd0",
+              "rows_sha256": "1fc9ca5c92e9f103ea2acb451b40ba0dd6eabb4303457ea7de55fb787d488e65",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 163,
+                  "Clean-WrongxT2": 418,
+                  "Clean-WrongxT3": 5828,
+                  "S1xT1": 25844,
+                  "S1xT2": 30,
+                  "S1xT3": 1,
+                  "S2xT1": 2644,
+                  "S2xT2": 221,
+                  "S2xT3": 10,
+                  "S3-non-CWxT1": 4014,
+                  "S3-non-CWxT2": 2961,
+                  "S3-non-CWxT3": 2866
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.047041699290275574,
+                "teacher_q10_floor": 0.06520207226276398
+              }
+            },
+            "114": {
+              "checkpoint_sha256": "c26904dad87eb1a63b4d30b37c56dd759753b3d232eeb55c8dc23c5368dee7b3",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "212ca23d940546ae456118452cfcf53c362a80398dc6ae1b5e35e0eaf151c360",
+              "rows_sha256": "bb0cf1aa3c3397c0690bb54c100fc53311b8d9b82277e1f45478c5713cef0c89",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 124,
+                  "Clean-WrongxT2": 374,
+                  "Clean-WrongxT3": 5646,
+                  "S1xT1": 26191,
+                  "S1xT2": 36,
+                  "S1xT3": 1,
+                  "S2xT1": 2606,
+                  "S2xT2": 296,
+                  "S2xT3": 13,
+                  "S3-non-CWxT1": 3677,
+                  "S3-non-CWxT2": 2917,
+                  "S3-non-CWxT3": 3119
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04836086928844452,
+                "teacher_q10_floor": 0.0657503753900528
+              }
+            }
+          },
+          "fixed_cohort": {
+            "branch_paths": {
+              "S2>S1>S1>S1": 1287,
+              "S2>S1>S1>S2": 42,
+              "S2>S1>S1>S3-non-CW": 10,
+              "S2>S1>S2>S1": 56,
+              "S2>S1>S2>S2": 25,
+              "S2>S1>S2>S3-non-CW": 3,
+              "S2>S1>S3-non-CW>S1": 17,
+              "S2>S1>S3-non-CW>S2": 3,
+              "S2>S1>S3-non-CW>S3-non-CW": 7,
+              "S2>S2>S1>S1": 94,
+              "S2>S2>S1>S2": 37,
+              "S2>S2>S1>S3-non-CW": 7,
+              "S2>S2>S2>S1": 58,
+              "S2>S2>S2>S2": 96,
+              "S2>S2>S2>S3-non-CW": 24,
+              "S2>S2>S3-non-CW>S1": 14,
+              "S2>S2>S3-non-CW>S2": 27,
+              "S2>S2>S3-non-CW>S3-non-CW": 16,
+              "S2>S3-non-CW>Clean-Wrong>S3-non-CW": 1,
+              "S2>S3-non-CW>S1>S1": 23,
+              "S2>S3-non-CW>S1>S2": 6,
+              "S2>S3-non-CW>S1>S3-non-CW": 6,
+              "S2>S3-non-CW>S2>S1": 24,
+              "S2>S3-non-CW>S2>S2": 48,
+              "S2>S3-non-CW>S2>S3-non-CW": 33,
+              "S2>S3-non-CW>S3-non-CW>Clean-Wrong": 1,
+              "S2>S3-non-CW>S3-non-CW>S1": 12,
+              "S2>S3-non-CW>S3-non-CW>S2": 67,
+              "S2>S3-non-CW>S3-non-CW>S3-non-CW": 168
+            },
+            "explicit_observed_reentry_routes": {
+              "S2_to_S1_to_S2": 119,
+              "S2_to_S3_nonCW_to_S2": 127,
+              "S2_to_other_to_S2": 3
+            },
+            "membership_patterns": {
+              "1000": 1552,
+              "1001": 110,
+              "1010": 116,
+              "1011": 70,
+              "1100": 133,
+              "1101": 63,
+              "1110": 82,
+              "1111": 86
+            },
+            "n": 2212,
+            "observability": {
+              "P6_multiple_exit_reentry": {
+                "observable": false,
+                "reason": "With four observations beginning in the target state, two leave-and-reenter cycles cannot be observed; this endpoint cadence cannot distinguish an unobserved second cycle from no second cycle."
+              }
+            },
+            "overlapping_observed_indicators": {
+              "P1_all_observed_S2xT1": 86,
+              "P2_S1_then_outside_S2_later": 1559,
+              "P3_observed_S3_nonCW": 517,
+              "P4_observed_CleanWrong": 2,
+              "P5_leave_then_reenter_S2xT1": 359
+            },
+            "teacher_transitions_when_student_S2_at_either_endpoint": {
+              "T1_to_T1": 3194,
+              "T1_to_T2": 84,
+              "T1_to_T3": 2,
+              "T2_to_T1": 12,
+              "T2_to_T2": 30,
+              "T2_to_T3": 1
+            },
+            "terminology": "P1-P5 are overlapping observed-endpoint indicators; membership_patterns are the disjoint partition. P6 is not observable under this cadence."
+          },
+          "fixed_mask_current_branch_counts": {
+            "104": {
+              "S1xT1": 1446,
+              "S1xT2": 4,
+              "S2xT1": 364,
+              "S2xT2": 9,
+              "S3-non-CWxT1": 338,
+              "S3-non-CWxT2": 49,
+              "S3-non-CWxT3": 2
+            },
+            "109": {
+              "Clean-WrongxT1": 1,
+              "S1xT1": 1508,
+              "S1xT2": 4,
+              "S2xT1": 354,
+              "S2xT2": 13,
+              "S3-non-CWxT1": 278,
+              "S3-non-CWxT2": 52,
+              "S3-non-CWxT3": 2
+            },
+            "114": {
+              "Clean-WrongxT1": 1,
+              "S1xT1": 1580,
+              "S1xT2": 5,
+              "S2xT1": 329,
+              "S2xT2": 21,
+              "S2xT3": 1,
+              "S3-non-CWxT1": 227,
+              "S3-non-CWxT2": 47,
+              "S3-non-CWxT3": 1
+            },
+            "99": {
+              "S2xT1": 2212
+            }
+          },
+          "new_entrants": {
+            "e99_origin": {
+              "e99_Clean-Wrong": 306,
+              "e99_S1": 1182,
+              "e99_S2xT2T3": 5,
+              "e99_S3-non-CW": 2923
+            },
+            "n": 4416,
+            "persistence": {
+              "one-endpoint-only": 2533,
+              "re-entry": 384,
+              "repeated": 1499
+            }
+          }
+        },
+        "dpm": {
+          "current_target_n_by_epoch": {
+            "104": 2602,
+            "109": 2635,
+            "114": 2610,
+            "99": 2212
+          },
+          "endpoint_metadata": {
+            "104": {
+              "checkpoint_sha256": "d218a07c642f51680b9ec9616f7b682bbb4c9691666a0c426430a7d4f2690f87",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "b708ea33a48b4c8f7608c49987ec6cf1d9de9bf0ba9c475a2fb5301102e15626",
+              "rows_sha256": "c0679f3dbc2e37e1069f1a99306403bd0656086ccad95e5178ea723f27a824cf",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 245,
+                  "Clean-WrongxT2": 552,
+                  "Clean-WrongxT3": 5933,
+                  "S1xT1": 25332,
+                  "S1xT2": 29,
+                  "S2xT1": 2602,
+                  "S2xT2": 207,
+                  "S2xT3": 9,
+                  "S3-non-CWxT1": 4619,
+                  "S3-non-CWxT2": 2857,
+                  "S3-non-CWxT3": 2615
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.044402241706848145,
+                "teacher_q10_floor": 0.06558513641357422
+              }
+            },
+            "109": {
+              "checkpoint_sha256": "d0f815fda20e402250f2f18e734fa4305279060a21b4319b2630949c8678f8d0",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "afec1811ae6f30fd3adcf67bfb09de9fd6ce69b9da9987ba62f99763c2fc2c91",
+              "rows_sha256": "4607d5a82e4ec284e800591f1f5eef09472e179915998fd99220ecb69b459937",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 161,
+                  "Clean-WrongxT2": 417,
+                  "Clean-WrongxT3": 5832,
+                  "S1xT1": 25838,
+                  "S1xT2": 37,
+                  "S2xT1": 2635,
+                  "S2xT2": 226,
+                  "S2xT3": 15,
+                  "S3-non-CWxT1": 4029,
+                  "S3-non-CWxT2": 2950,
+                  "S3-non-CWxT3": 2860
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04707054793834686,
+                "teacher_q10_floor": 0.06509976089000702
+              }
+            },
+            "114": {
+              "checkpoint_sha256": "de8fbd4745c4117ed777df5c3afdd0fa2d665326bf3804f868978e5364f8fb57",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "ec4aa9b669076955bf17578d31d11da9a201c79ef9d268827721f7dbdcc2cb1c",
+              "rows_sha256": "10141c196e0735ec7241c2a0c3522f127110575dfe1ddad07b32e165e1335e3f",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 125,
+                  "Clean-WrongxT2": 377,
+                  "Clean-WrongxT3": 5643,
+                  "S1xT1": 26213,
+                  "S1xT2": 34,
+                  "S1xT3": 1,
+                  "S2xT1": 2610,
+                  "S2xT2": 294,
+                  "S2xT3": 13,
+                  "S3-non-CWxT1": 3668,
+                  "S3-non-CWxT2": 2920,
+                  "S3-non-CWxT3": 3102
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04826970398426056,
+                "teacher_q10_floor": 0.06538325548171997
+              }
+            }
+          },
+          "fixed_cohort": {
+            "branch_paths": {
+              "S2>Clean-Wrong>S3-non-CW>S3-non-CW": 1,
+              "S2>S1>S1>S1": 1283,
+              "S2>S1>S1>S2": 42,
+              "S2>S1>S1>S3-non-CW": 9,
+              "S2>S1>S2>S1": 50,
+              "S2>S1>S2>S2": 21,
+              "S2>S1>S2>S3-non-CW": 7,
+              "S2>S1>S3-non-CW>S1": 14,
+              "S2>S1>S3-non-CW>S2": 5,
+              "S2>S1>S3-non-CW>S3-non-CW": 3,
+              "S2>S2>S1>S1": 95,
+              "S2>S2>S1>S2": 41,
+              "S2>S2>S1>S3-non-CW": 7,
+              "S2>S2>S2>S1": 61,
+              "S2>S2>S2>S2": 108,
+              "S2>S2>S2>S3-non-CW": 18,
+              "S2>S2>S3-non-CW>S1": 12,
+              "S2>S2>S3-non-CW>S2": 30,
+              "S2>S2>S3-non-CW>S3-non-CW": 16,
+              "S2>S3-non-CW>Clean-Wrong>Clean-Wrong": 1,
+              "S2>S3-non-CW>S1>S1": 26,
+              "S2>S3-non-CW>S1>S2": 7,
+              "S2>S3-non-CW>S1>S3-non-CW": 5,
+              "S2>S3-non-CW>S2>S1": 19,
+              "S2>S3-non-CW>S2>S2": 44,
+              "S2>S3-non-CW>S2>S3-non-CW": 37,
+              "S2>S3-non-CW>S3-non-CW>Clean-Wrong": 1,
+              "S2>S3-non-CW>S3-non-CW>S1": 15,
+              "S2>S3-non-CW>S3-non-CW>S2": 65,
+              "S2>S3-non-CW>S3-non-CW>S3-non-CW": 169
+            },
+            "explicit_observed_reentry_routes": {
+              "S2_to_S1_to_S2": 118,
+              "S2_to_S3_nonCW_to_S2": 123,
+              "S2_to_other_to_S2": 3
+            },
+            "membership_patterns": {
+              "1000": 1545,
+              "1001": 113,
+              "1010": 111,
+              "1011": 64,
+              "1100": 134,
+              "1101": 69,
+              "1110": 78,
+              "1111": 98
+            },
+            "n": 2212,
+            "observability": {
+              "P6_multiple_exit_reentry": {
+                "observable": false,
+                "reason": "With four observations beginning in the target state, two leave-and-reenter cycles cannot be observed; this endpoint cadence cannot distinguish an unobserved second cycle from no second cycle."
+              }
+            },
+            "overlapping_observed_indicators": {
+              "P1_all_observed_S2xT1": 98,
+              "P2_S1_then_outside_S2_later": 1549,
+              "P3_observed_S3_nonCW": 511,
+              "P4_observed_CleanWrong": 3,
+              "P5_leave_then_reenter_S2xT1": 357
+            },
+            "teacher_transitions_when_student_S2_at_either_endpoint": {
+              "T1_to_T1": 3206,
+              "T1_to_T2": 81,
+              "T1_to_T3": 2,
+              "T2_to_T1": 12,
+              "T2_to_T2": 32
+            },
+            "terminology": "P1-P5 are overlapping observed-endpoint indicators; membership_patterns are the disjoint partition. P6 is not observable under this cadence."
+          },
+          "fixed_mask_current_branch_counts": {
+            "104": {
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1430,
+              "S1xT2": 4,
+              "S2xT1": 379,
+              "S2xT2": 9,
+              "S3-non-CWxT1": 339,
+              "S3-non-CWxT2": 48,
+              "S3-non-CWxT3": 2
+            },
+            "109": {
+              "Clean-WrongxT1": 1,
+              "S1xT1": 1511,
+              "S1xT2": 4,
+              "S2xT1": 351,
+              "S2xT2": 14,
+              "S3-non-CWxT1": 277,
+              "S3-non-CWxT2": 51,
+              "S3-non-CWxT3": 3
+            },
+            "114": {
+              "Clean-WrongxT1": 2,
+              "S1xT1": 1570,
+              "S1xT2": 5,
+              "S2xT1": 344,
+              "S2xT2": 19,
+              "S3-non-CWxT1": 226,
+              "S3-non-CWxT2": 44,
+              "S3-non-CWxT3": 2
+            },
+            "99": {
+              "S2xT1": 2212
+            }
+          },
+          "new_entrants": {
+            "e99_origin": {
+              "e99_Clean-Wrong": 310,
+              "e99_S1": 1173,
+              "e99_S2xT2T3": 6,
+              "e99_S3-non-CW": 2900
+            },
+            "n": 4389,
+            "persistence": {
+              "one-endpoint-only": 2504,
+              "re-entry": 398,
+              "repeated": 1487
+            }
+          }
+        }
+      },
+      "e99_rows": {
+        "path": ".cache/analysis/ert-i100-cw-gap-completion-replay/dev-1/e99-observations.parquet",
+        "sha256": "7899a0f7473862b7d7edd35e6009794d8cb4feb8e485c2ad28708c8a6c933d17"
+      },
+      "fixed_mask": {
+        "n": 2212,
+        "sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4",
+        "stable_id_set_sha256": "ee9f9769acb64a125539d258a1fab33ac437f42407fca438892db9fc5d59933e"
+      }
+    },
+    "dev-2": {
+      "arms": {
+        "control": {
+          "current_target_n_by_epoch": {
+            "104": 2599,
+            "109": 2595,
+            "114": 2630,
+            "99": 2141
+          },
+          "endpoint_metadata": {
+            "104": {
+              "checkpoint_sha256": "beb7bece9c88f4f5c7b67c1820b0d06d7a0bc55275ad6abe5656615ff5c6e353",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "a6887c4d8c9fbcf16ae20a63632fe82c4962378c6f8b7fbc7ec7e85173c27216",
+              "rows_sha256": "cd485c6ff3073fc24acf6861fc03ca12ed7e1a85d4ac03fb96e683cc1eb5baeb",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 222,
+                  "Clean-WrongxT2": 499,
+                  "Clean-WrongxT3": 5921,
+                  "S1xT1": 25312,
+                  "S1xT2": 26,
+                  "S2xT1": 2599,
+                  "S2xT2": 202,
+                  "S2xT3": 15,
+                  "S3-non-CWxT1": 4629,
+                  "S3-non-CWxT2": 2914,
+                  "S3-non-CWxT3": 2661
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04569891095161438,
+                "teacher_q10_floor": 0.06639839708805084
+              }
+            },
+            "109": {
+              "checkpoint_sha256": "5462b8df4c802efc6b66cc270bb324d5420d1a1cffaf682d2a509b3dfb121a48",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "5941beb1315526f131b431adef7ea4b0145f2fd26d1584e9d52c5f3e5dc8702c",
+              "rows_sha256": "e6ceaeb0dbd1ab8afadbb06e8430ff7d72aa82fd738920ce30306a28a42fbca5",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 160,
+                  "Clean-WrongxT2": 422,
+                  "Clean-WrongxT3": 5718,
+                  "S1xT1": 25788,
+                  "S1xT2": 44,
+                  "S1xT3": 1,
+                  "S2xT1": 2595,
+                  "S2xT2": 265,
+                  "S2xT3": 11,
+                  "S3-non-CWxT1": 4135,
+                  "S3-non-CWxT2": 2900,
+                  "S3-non-CWxT3": 2961
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04639950394630432,
+                "teacher_q10_floor": 0.0656258761882782
+              }
+            },
+            "114": {
+              "checkpoint_sha256": "ce616cb5e0f749aa41f3281201509086c96681e9634fd5ff651a07d9ebbe01b0",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "d48f7a6b3a27844b3bde50895c6781d09642dd451ccf358b1c0a2d8766d60c5c",
+              "rows_sha256": "722c8810862c5c4c4727ea20c0b3a97363363008bf9414ac4686a32e2312ee03",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 127,
+                  "Clean-WrongxT2": 371,
+                  "Clean-WrongxT3": 5755,
+                  "S1xT1": 26152,
+                  "S1xT2": 42,
+                  "S1xT3": 2,
+                  "S2xT1": 2630,
+                  "S2xT2": 266,
+                  "S2xT3": 15,
+                  "S3-non-CWxT1": 3681,
+                  "S3-non-CWxT2": 2943,
+                  "S3-non-CWxT3": 3016
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.048706814646720886,
+                "teacher_q10_floor": 0.06589542329311371
+              }
+            }
+          },
+          "fixed_cohort": {
+            "branch_paths": {
+              "S2>Clean-Wrong>Clean-Wrong>Clean-Wrong": 1,
+              "S2>Clean-Wrong>S3-non-CW>Clean-Wrong": 1,
+              "S2>Clean-Wrong>S3-non-CW>S3-non-CW": 2,
+              "S2>S1>S1>S1": 1141,
+              "S2>S1>S1>S2": 37,
+              "S2>S1>S1>S3-non-CW": 4,
+              "S2>S1>S2>S1": 68,
+              "S2>S1>S2>S2": 34,
+              "S2>S1>S2>S3-non-CW": 4,
+              "S2>S1>S3-non-CW>S1": 5,
+              "S2>S1>S3-non-CW>S2": 3,
+              "S2>S1>S3-non-CW>S3-non-CW": 9,
+              "S2>S2>S1>S1": 106,
+              "S2>S2>S1>S2": 48,
+              "S2>S2>S1>S3-non-CW": 10,
+              "S2>S2>S2>S1": 39,
+              "S2>S2>S2>S2": 119,
+              "S2>S2>S2>S3-non-CW": 32,
+              "S2>S2>S3-non-CW>S1": 6,
+              "S2>S2>S3-non-CW>S2": 32,
+              "S2>S2>S3-non-CW>S3-non-CW": 25,
+              "S2>S3-non-CW>Clean-Wrong>Clean-Wrong": 1,
+              "S2>S3-non-CW>Clean-Wrong>S3-non-CW": 2,
+              "S2>S3-non-CW>S1>S1": 18,
+              "S2>S3-non-CW>S1>S2": 14,
+              "S2>S3-non-CW>S1>S3-non-CW": 8,
+              "S2>S3-non-CW>S2>S1": 14,
+              "S2>S3-non-CW>S2>S2": 52,
+              "S2>S3-non-CW>S2>S3-non-CW": 32,
+              "S2>S3-non-CW>S3-non-CW>S1": 5,
+              "S2>S3-non-CW>S3-non-CW>S2": 40,
+              "S2>S3-non-CW>S3-non-CW>S3-non-CW": 229
+            },
+            "explicit_observed_reentry_routes": {
+              "S2_to_S1_to_S2": 153,
+              "S2_to_S3_nonCW_to_S2": 116,
+              "S2_to_other_to_S2": 3
+            },
+            "membership_patterns": {
+              "1000": 1452,
+              "1001": 93,
+              "1010": 113,
+              "1011": 82,
+              "1100": 149,
+              "1101": 77,
+              "1110": 64,
+              "1111": 111
+            },
+            "n": 2141,
+            "observability": {
+              "P6_multiple_exit_reentry": {
+                "observable": false,
+                "reason": "With four observations beginning in the target state, two leave-and-reenter cycles cannot be observed; this endpoint cadence cannot distinguish an unobserved second cycle from no second cycle."
+              }
+            },
+            "overlapping_observed_indicators": {
+              "P1_all_observed_S2xT1": 111,
+              "P2_S1_then_outside_S2_later": 1365,
+              "P3_observed_S3_nonCW": 548,
+              "P4_observed_CleanWrong": 7,
+              "P5_leave_then_reenter_S2xT1": 365
+            },
+            "teacher_transitions_when_student_S2_at_either_endpoint": {
+              "T1_to_T1": 3157,
+              "T1_to_T2": 114,
+              "T1_to_T3": 2,
+              "T2_to_T1": 9,
+              "T2_to_T2": 48
+            },
+            "terminology": "P1-P5 are overlapping observed-endpoint indicators; membership_patterns are the disjoint partition. P6 is not observable under this cadence."
+          },
+          "fixed_mask_current_branch_counts": {
+            "104": {
+              "Clean-WrongxT1": 3,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1304,
+              "S1xT2": 1,
+              "S2xT1": 401,
+              "S2xT2": 16,
+              "S3-non-CWxT1": 333,
+              "S3-non-CWxT2": 80,
+              "S3-non-CWxT3": 2
+            },
+            "109": {
+              "Clean-WrongxT1": 3,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1381,
+              "S1xT2": 5,
+              "S2xT1": 370,
+              "S2xT2": 24,
+              "S3-non-CWxT1": 279,
+              "S3-non-CWxT2": 76,
+              "S3-non-CWxT3": 2
+            },
+            "114": {
+              "Clean-WrongxT1": 2,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1396,
+              "S1xT2": 6,
+              "S2xT1": 363,
+              "S2xT2": 16,
+              "S3-non-CWxT1": 266,
+              "S3-non-CWxT2": 86,
+              "S3-non-CWxT3": 5
+            },
+            "99": {
+              "S2xT1": 2141
+            }
+          },
+          "new_entrants": {
+            "e99_origin": {
+              "e99_Clean-Wrong": 384,
+              "e99_S1": 1084,
+              "e99_S2xT2T3": 3,
+              "e99_S3-non-CW": 2911
+            },
+            "n": 4382,
+            "persistence": {
+              "one-endpoint-only": 2573,
+              "re-entry": 407,
+              "repeated": 1402
+            }
+          }
+        },
+        "dbdd": {
+          "current_target_n_by_epoch": {
+            "104": 2591,
+            "109": 2598,
+            "114": 2628,
+            "99": 2141
+          },
+          "endpoint_metadata": {
+            "104": {
+              "checkpoint_sha256": "7502f3d8729ba5a5d174ea73ac281810e8d7e4d8a46a14cb48de8e207d42eea7",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "0450fcc9500bc7e59fd930c5427d28b11382f8c5d78024d827c90456c88bc776",
+              "rows_sha256": "a8bcb9039d5e97972b6bb31b70f5554f641c0feb8150eeaaf6d80bc964dab98b",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 220,
+                  "Clean-WrongxT2": 499,
+                  "Clean-WrongxT3": 5908,
+                  "S1xT1": 25311,
+                  "S1xT2": 25,
+                  "S2xT1": 2591,
+                  "S2xT2": 209,
+                  "S2xT3": 16,
+                  "S3-non-CWxT1": 4645,
+                  "S3-non-CWxT2": 2908,
+                  "S3-non-CWxT3": 2668
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.045848846435546875,
+                "teacher_q10_floor": 0.06618829071521759
+              }
+            },
+            "109": {
+              "checkpoint_sha256": "cb76dfe48dfe9fda68a6ff2af05a071eb30ca68282ded1243f6806503a4d8f9b",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "12193b8e24587fb95a9c7c43f055a7e7558e7519b7af4a8396433dc12ba3f700",
+              "rows_sha256": "abf3a1e649d95a29eb38c527333786e99107542055530ef6ba3ca179144a0040",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 155,
+                  "Clean-WrongxT2": 430,
+                  "Clean-WrongxT3": 5708,
+                  "S1xT1": 25783,
+                  "S1xT2": 40,
+                  "S1xT3": 1,
+                  "S2xT1": 2598,
+                  "S2xT2": 261,
+                  "S2xT3": 11,
+                  "S3-non-CWxT1": 4128,
+                  "S3-non-CWxT2": 2899,
+                  "S3-non-CWxT3": 2986
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04676240682601929,
+                "teacher_q10_floor": 0.06594349443912506
+              }
+            },
+            "114": {
+              "checkpoint_sha256": "d080c0d33581032817fb2bbe6a3abcb568130e59cfd8e2e80c28f64ade9700a5",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "6476689784241d28e4f7a689d683697018b9285f59aa49e0135748837e5efd2b",
+              "rows_sha256": "b3da15bf3e06ff6c519ab69328679adb1b0800fda55a0be20122416ab8415981",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 127,
+                  "Clean-WrongxT2": 368,
+                  "Clean-WrongxT3": 5755,
+                  "S1xT1": 26174,
+                  "S1xT2": 48,
+                  "S1xT3": 2,
+                  "S2xT1": 2628,
+                  "S2xT2": 268,
+                  "S2xT3": 18,
+                  "S3-non-CWxT1": 3658,
+                  "S3-non-CWxT2": 2937,
+                  "S3-non-CWxT3": 3017
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04887671768665314,
+                "teacher_q10_floor": 0.06567904353141785
+              }
+            }
+          },
+          "fixed_cohort": {
+            "branch_paths": {
+              "S2>Clean-Wrong>Clean-Wrong>Clean-Wrong": 1,
+              "S2>Clean-Wrong>S3-non-CW>Clean-Wrong": 1,
+              "S2>Clean-Wrong>S3-non-CW>S3-non-CW": 1,
+              "S2>S1>S1>S1": 1160,
+              "S2>S1>S1>S2": 44,
+              "S2>S1>S1>S3-non-CW": 3,
+              "S2>S1>S2>S1": 66,
+              "S2>S1>S2>S2": 33,
+              "S2>S1>S2>S3-non-CW": 5,
+              "S2>S1>S3-non-CW>S1": 4,
+              "S2>S1>S3-non-CW>S2": 4,
+              "S2>S1>S3-non-CW>S3-non-CW": 6,
+              "S2>S2>S1>S1": 108,
+              "S2>S2>S1>S2": 49,
+              "S2>S2>S1>S3-non-CW": 6,
+              "S2>S2>S2>S1": 38,
+              "S2>S2>S2>S2": 110,
+              "S2>S2>S2>S3-non-CW": 29,
+              "S2>S2>S3-non-CW>S1": 9,
+              "S2>S2>S3-non-CW>S2": 29,
+              "S2>S2>S3-non-CW>S3-non-CW": 27,
+              "S2>S3-non-CW>Clean-Wrong>S3-non-CW": 2,
+              "S2>S3-non-CW>S1>S1": 19,
+              "S2>S3-non-CW>S1>S2": 14,
+              "S2>S3-non-CW>S1>S3-non-CW": 3,
+              "S2>S3-non-CW>S2>S1": 16,
+              "S2>S3-non-CW>S2>S2": 55,
+              "S2>S3-non-CW>S2>S3-non-CW": 42,
+              "S2>S3-non-CW>S3-non-CW>S1": 5,
+              "S2>S3-non-CW>S3-non-CW>S2": 41,
+              "S2>S3-non-CW>S3-non-CW>S3-non-CW": 211
+            },
+            "explicit_observed_reentry_routes": {
+              "S2_to_S1_to_S2": 150,
+              "S2_to_S3_nonCW_to_S2": 127,
+              "S2_to_other_to_S2": 1
+            },
+            "membership_patterns": {
+              "1000": 1448,
+              "1001": 102,
+              "1010": 119,
+              "1011": 83,
+              "1100": 153,
+              "1101": 76,
+              "1110": 59,
+              "1111": 101
+            },
+            "n": 2141,
+            "observability": {
+              "P6_multiple_exit_reentry": {
+                "observable": false,
+                "reason": "With four observations beginning in the target state, two leave-and-reenter cycles cannot be observed; this endpoint cadence cannot distinguish an unobserved second cycle from no second cycle."
+              }
+            },
+            "overlapping_observed_indicators": {
+              "P1_all_observed_S2xT1": 101,
+              "P2_S1_then_outside_S2_later": 1377,
+              "P3_observed_S3_nonCW": 532,
+              "P4_observed_CleanWrong": 5,
+              "P5_leave_then_reenter_S2xT1": 380
+            },
+            "teacher_transitions_when_student_S2_at_either_endpoint": {
+              "T1_to_T1": 3153,
+              "T1_to_T2": 115,
+              "T1_to_T3": 2,
+              "T2_to_T1": 7,
+              "T2_to_T2": 60,
+              "T3_to_T3": 1
+            },
+            "terminology": "P1-P5 are overlapping observed-endpoint indicators; membership_patterns are the disjoint partition. P6 is not observable under this cadence."
+          },
+          "fixed_mask_current_branch_counts": {
+            "104": {
+              "Clean-WrongxT1": 2,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1323,
+              "S1xT2": 2,
+              "S2xT1": 389,
+              "S2xT2": 15,
+              "S2xT3": 1,
+              "S3-non-CWxT1": 328,
+              "S3-non-CWxT2": 79,
+              "S3-non-CWxT3": 1
+            },
+            "109": {
+              "Clean-WrongxT1": 2,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1402,
+              "S1xT2": 4,
+              "S2xT1": 362,
+              "S2xT2": 32,
+              "S3-non-CWxT1": 264,
+              "S3-non-CWxT2": 72,
+              "S3-non-CWxT3": 2
+            },
+            "114": {
+              "Clean-WrongxT1": 1,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1416,
+              "S1xT2": 9,
+              "S2xT1": 362,
+              "S2xT2": 17,
+              "S3-non-CWxT1": 243,
+              "S3-non-CWxT2": 87,
+              "S3-non-CWxT3": 5
+            },
+            "99": {
+              "S2xT1": 2141
+            }
+          },
+          "new_entrants": {
+            "e99_origin": {
+              "e99_Clean-Wrong": 377,
+              "e99_S1": 1077,
+              "e99_S2xT2T3": 3,
+              "e99_S3-non-CW": 2908
+            },
+            "n": 4365,
+            "persistence": {
+              "one-endpoint-only": 2551,
+              "re-entry": 391,
+              "repeated": 1423
+            }
+          }
+        },
+        "dpm": {
+          "current_target_n_by_epoch": {
+            "104": 2596,
+            "109": 2605,
+            "114": 2633,
+            "99": 2141
+          },
+          "endpoint_metadata": {
+            "104": {
+              "checkpoint_sha256": "416c5e03c42ed1e35352c323d1778cb378837e29e847cd7b26015f38ae3c20e3",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "617c118054bd668b96d97ab9d31253fccb9d369014bd0c83b35236fe0db2a7b2",
+              "rows_sha256": "e5a6f3276c4caf47187c2b23da6107d06f0f2a8848dde7ceab1be1332fdb7066",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 216,
+                  "Clean-WrongxT2": 497,
+                  "Clean-WrongxT3": 5919,
+                  "S1xT1": 25320,
+                  "S1xT2": 25,
+                  "S2xT1": 2596,
+                  "S2xT2": 206,
+                  "S2xT3": 15,
+                  "S3-non-CWxT1": 4634,
+                  "S3-non-CWxT2": 2913,
+                  "S3-non-CWxT3": 2659
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04575662314891815,
+                "teacher_q10_floor": 0.06594878435134888
+              }
+            },
+            "109": {
+              "checkpoint_sha256": "51e790577b14ef10dcaca5d3e615bec892f87858ba1cb0abe7732f0f1f6bd190",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "a9f6e38157ccb49ef8bd3b9c2fb28e3282521d823033a1ac3b602ee53cfb201c",
+              "rows_sha256": "0ddb41eed7c45b098e9fbca6334e82e83d552a840f7a1ffa84c763f8d129cdc8",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 158,
+                  "Clean-WrongxT2": 420,
+                  "Clean-WrongxT3": 5715,
+                  "S1xT1": 25795,
+                  "S1xT2": 44,
+                  "S2xT1": 2605,
+                  "S2xT2": 251,
+                  "S2xT3": 16,
+                  "S3-non-CWxT1": 4100,
+                  "S3-non-CWxT2": 2914,
+                  "S3-non-CWxT3": 2982
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.046078696846961975,
+                "teacher_q10_floor": 0.06613950431346893
+              }
+            },
+            "114": {
+              "checkpoint_sha256": "04a70e390e4eebd4a7dd4f0063e5c825936737e9649b4dba39ef7bc659d38547",
+              "observation_attack_identity_sha256": "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6",
+              "replay_sha256": "59a442c3abe0285d6619683c640159c725fef5eea239549ebef8cc55a8b0fa21",
+              "rows_sha256": "d3adb5106eb19a7780011986682b7861360b43ea4b16b84796e64bcb0e6b3a96",
+              "state_summary": {
+                "joint_counts": {
+                  "Clean-WrongxT1": 123,
+                  "Clean-WrongxT2": 361,
+                  "Clean-WrongxT3": 5751,
+                  "S1xT1": 26170,
+                  "S1xT2": 49,
+                  "S1xT3": 2,
+                  "S2xT1": 2633,
+                  "S2xT2": 260,
+                  "S2xT3": 21,
+                  "S3-non-CWxT1": 3658,
+                  "S3-non-CWxT2": 2951,
+                  "S3-non-CWxT3": 3021
+                },
+                "q10_universe": "all CE20 adversarial-correct rows; action branch gives Clean-Wrong precedence",
+                "row_count": 45000,
+                "student_q10_floor": 0.04842761158943176,
+                "teacher_q10_floor": 0.06586185097694397
+              }
+            }
+          },
+          "fixed_cohort": {
+            "branch_paths": {
+              "S2>Clean-Wrong>Clean-Wrong>S3-non-CW": 1,
+              "S2>Clean-Wrong>S3-non-CW>Clean-Wrong": 1,
+              "S2>Clean-Wrong>S3-non-CW>S3-non-CW": 2,
+              "S2>S1>S1>S1": 1164,
+              "S2>S1>S1>S2": 39,
+              "S2>S1>S1>S3-non-CW": 4,
+              "S2>S1>S2>S1": 67,
+              "S2>S1>S2>S2": 28,
+              "S2>S1>S2>S3-non-CW": 3,
+              "S2>S1>S3-non-CW>S1": 7,
+              "S2>S1>S3-non-CW>S2": 5,
+              "S2>S1>S3-non-CW>S3-non-CW": 7,
+              "S2>S2>S1>S1": 102,
+              "S2>S2>S1>S2": 48,
+              "S2>S2>S1>S3-non-CW": 7,
+              "S2>S2>S2>S1": 46,
+              "S2>S2>S2>S2": 105,
+              "S2>S2>S2>S3-non-CW": 31,
+              "S2>S2>S3-non-CW>S1": 7,
+              "S2>S2>S3-non-CW>S2": 29,
+              "S2>S2>S3-non-CW>S3-non-CW": 26,
+              "S2>S3-non-CW>Clean-Wrong>Clean-Wrong": 1,
+              "S2>S3-non-CW>Clean-Wrong>S3-non-CW": 2,
+              "S2>S3-non-CW>S1>S1": 18,
+              "S2>S3-non-CW>S1>S2": 19,
+              "S2>S3-non-CW>S1>S3-non-CW": 4,
+              "S2>S3-non-CW>S2>S1": 16,
+              "S2>S3-non-CW>S2>S2": 58,
+              "S2>S3-non-CW>S2>S3-non-CW": 34,
+              "S2>S3-non-CW>S3-non-CW>S1": 6,
+              "S2>S3-non-CW>S3-non-CW>S2": 39,
+              "S2>S3-non-CW>S3-non-CW>S3-non-CW": 215
+            },
+            "explicit_observed_reentry_routes": {
+              "S2_to_S1_to_S2": 143,
+              "S2_to_S3_nonCW_to_S2": 122,
+              "S2_to_other_to_S2": 3
+            },
+            "membership_patterns": {
+              "1000": 1463,
+              "1001": 99,
+              "1010": 113,
+              "1011": 81,
+              "1100": 144,
+              "1101": 74,
+              "1110": 68,
+              "1111": 99
+            },
+            "n": 2141,
+            "observability": {
+              "P6_multiple_exit_reentry": {
+                "observable": false,
+                "reason": "With four observations beginning in the target state, two leave-and-reenter cycles cannot be observed; this endpoint cadence cannot distinguish an unobserved second cycle from no second cycle."
+              }
+            },
+            "overlapping_observed_indicators": {
+              "P1_all_observed_S2xT1": 99,
+              "P2_S1_then_outside_S2_later": 1388,
+              "P3_observed_S3_nonCW": 542,
+              "P4_observed_CleanWrong": 7,
+              "P5_leave_then_reenter_S2xT1": 367
+            },
+            "teacher_transitions_when_student_S2_at_either_endpoint": {
+              "T1_to_T1": 3136,
+              "T1_to_T2": 113,
+              "T1_to_T3": 2,
+              "T2_to_T1": 9,
+              "T2_to_T2": 54,
+              "T3_to_T3": 1
+            },
+            "terminology": "P1-P5 are overlapping observed-endpoint indicators; membership_patterns are the disjoint partition. P6 is not observable under this cadence."
+          },
+          "fixed_mask_current_branch_counts": {
+            "104": {
+              "Clean-WrongxT1": 3,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1323,
+              "S1xT2": 1,
+              "S2xT1": 385,
+              "S2xT2": 15,
+              "S2xT3": 1,
+              "S3-non-CWxT1": 331,
+              "S3-non-CWxT2": 80,
+              "S3-non-CWxT3": 1
+            },
+            "109": {
+              "Clean-WrongxT1": 3,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1399,
+              "S1xT2": 6,
+              "S2xT1": 361,
+              "S2xT2": 27,
+              "S3-non-CWxT1": 266,
+              "S3-non-CWxT2": 75,
+              "S3-non-CWxT3": 3
+            },
+            "114": {
+              "Clean-WrongxT1": 1,
+              "Clean-WrongxT2": 1,
+              "S1xT1": 1424,
+              "S1xT2": 9,
+              "S2xT1": 353,
+              "S2xT2": 17,
+              "S3-non-CWxT1": 244,
+              "S3-non-CWxT2": 87,
+              "S3-non-CWxT3": 5
+            },
+            "99": {
+              "S2xT1": 2141
+            }
+          },
+          "new_entrants": {
+            "e99_origin": {
+              "e99_Clean-Wrong": 372,
+              "e99_S1": 1073,
+              "e99_S2xT2T3": 3,
+              "e99_S3-non-CW": 2923
+            },
+            "n": 4371,
+            "persistence": {
+              "one-endpoint-only": 2529,
+              "re-entry": 416,
+              "repeated": 1426
+            }
+          }
+        }
+      },
+      "e99_rows": {
+        "path": ".cache/analysis/ert-i100-cw-gap-completion-replay/dev-2/e99-observations.parquet",
+        "sha256": "66390e55cf32615e32f179d88b7b0c407cc8afc9efadbfa43944bb22a309ce60"
+      },
+      "fixed_mask": {
+        "n": 2141,
+        "sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056",
+        "stable_id_set_sha256": "0286c612350ad7fdcd8483de8dd131fce00652fa873774b00da3201b32d32ccc"
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@
 
 - Owner: Codex
 - Branch / base SHA: master / `e4166b0897f3394c491f2f486e102e392ef9963d`
-- Current milestone: in progress
+- Current milestone: complete; reports, artifacts, verification, and delta review accepted
 - Last updated: 2026-09-04
 
 ## Goal
@@ -38,12 +38,14 @@ mutation.
 
 ## Milestones
 
-- [ ] Reconcile source, launch-gate regressions, lineage, and existing artifact availability.
-- [ ] Implement/test read-only longitudinal state aggregation and fixed-mask runtime-activity proxy.
-- [ ] Implement/test secant source/formula, scalar and parameter directional finite-difference forensic.
-- [ ] Run only the missing checkpoint replays/forensics through the frozen host-aware DAG.
-- [ ] Aggregate both seeds, write reports and machine artifacts, and obtain one scientific review.
-- [ ] Run impact-selected verification, commit/push, and stop.
+- [x] Reconcile source, launch-gate regressions, lineage, and existing artifact availability.
+- [x] Implement/test read-only longitudinal state aggregation and fixed-mask runtime-activity proxy.
+- [x] Implement/test secant source/formula, scalar and parameter directional finite-difference forensic.
+- [x] Run only the missing checkpoint replays/forensics through the frozen host-aware DAG.
+- [x] Aggregate both seeds and write provisional reports/machine artifacts; final review identified P1 reporting, finite-difference, and lineage gaps.
+- [x] Correct observed-membership/entrant accounting, no-update derivative safety, and replay/proxy lineage validation.
+- [x] Replace the one dev-2 DPM proxy whose execution-config hash did not match the registered host rebase; regenerate reports and obtain one delta review.
+- [x] Run impact-selected verification, commit/push, and stop.
 
 ## Evidence and decision rules
 

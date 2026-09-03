@@ -368,7 +368,7 @@ def secant_markdown(
         "",
         "Scalar partials are reported only after their own $m_S^{adv}$ or $m_S^{clean}$ abs/ReLU regions remain "
         "unchanged at both perturbations.  Parameter checks likewise require preserved Student-margin abs sign, "
-        "hinge, Teacher-pair gate, and $\rho$ gate, and restore the full Student parameter/buffer state before every "
+        "hinge, Teacher-pair gate, and $\\rho$ gate, and restore the full Student parameter/buffer state before every "
         "train-mode forward.  The finite-difference audit is an implementation check, not an optimizer update or a training replay.",
         "",
         "## Real-checkpoint tail diagnostics at coefficient 1",
