@@ -242,6 +242,33 @@ def test_technical_retry_preserves_identity_and_unblocks_endpoint(tmp_path: Path
     assert state["jobs"]["endpoint"]["status"] == "completed"
 
 
+def test_stale_result_from_prior_campaign_cannot_release_gpu_slot(tmp_path: Path) -> None:
+    value = job(tmp_path, "root", "import time; time.sleep(0.08)", gpu=0)
+    manifest = write_manifest(tmp_path, [value])
+    stale = Path(value["output_dir"]) / "orchestration" / "root.attempt-1.result.json"
+    stale.parent.mkdir(parents=True)
+    stale.write_text(
+        json.dumps(
+            {
+                "campaign_id": "prior-campaign",
+                "job_id": "root",
+                "attempt": 1,
+                "attempt_id": "root-attempt-1",
+                "identity_hash": "stale",
+                "exit_code": 1,
+                "status": "failed",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = invoke("run", manifest, "--foreground", "--poll-interval", "0.01")
+    assert result.returncode == 0, result.stderr
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["jobs"]["root"]["status"] == "completed"
+    assert [event["event_type"] for event in state["events"]].count("stale_result_ignored") == 1
+
+
 def test_detached_controller_finishes_without_caller_lifetime(tmp_path: Path) -> None:
     manifest = write_manifest(
         tmp_path,

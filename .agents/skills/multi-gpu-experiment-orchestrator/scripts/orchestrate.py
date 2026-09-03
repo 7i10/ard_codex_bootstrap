@@ -662,11 +662,29 @@ def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
             release_slot((attempt["host"], attempt["gpu"]))
             event(state, "completion_marker_seen", job["job_id"], attempt=attempt["attempt"])
             continue
+        result_is_current = False
         if result_path.exists():
             try:
                 result = json.loads(result_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 result = {}
+            result_is_current = (
+                result.get("campaign_id") == manifest["campaign_id"]
+                and result.get("job_id") == job["job_id"]
+                and result.get("attempt") == attempt["attempt"]
+                and result.get("attempt_id") == attempt["attempt_id"]
+                and result.get("identity_hash") == attempt["identity_hash"]
+            )
+            if not result_is_current and not attempt.get("stale_result_ignored"):
+                attempt["stale_result_ignored"] = True
+                event(
+                    state,
+                    "stale_result_ignored",
+                    job["job_id"],
+                    attempt=attempt["attempt"],
+                    result_path=str(result_path),
+                )
+        if result_path.exists() and result_is_current:
             code = result.get("exit_code")
             info = valid_failure_marker(manifest, job)
             retryable = bool(info and info.get("retryable") is True)
