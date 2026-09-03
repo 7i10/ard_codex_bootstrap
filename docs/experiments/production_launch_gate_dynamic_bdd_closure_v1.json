@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "artifact_type": "operational_postmortem_closure",
+  "campaign": "i100-dynamic-bdd",
+  "scope": "operational hardening only; no scientific experiment or endpoint evaluation",
+  "base_postmortem_commit": "8ddb7add56957dea27d1581021ff4a50c3cf70dc",
+  "implementation_commits": [
+    "4b3aad3f436920202e1df371b110dcc122d4266a",
+    "d8193ce1a4653126f52004f504a8080b9c340b23"
+  ],
+  "scientific_outcome": {
+    "s_bdd": "NUMERICALLY_UNSUPPORTED",
+    "operational_retry_applicable": false,
+    "note": "The reproducible non-finite S-BDD outcome is explicitly outside this operational regression suite."
+  },
+  "regression_closure": {
+    "R13": {
+      "failure": "direct non-executable remote launcher or completion probe",
+      "prevention": "remote wrapper argv/interpreter metadata validation",
+      "test": "test_remote_wrapper_metadata_rejects_non_executable_and_accepts_bash",
+      "status": "regression_protected"
+    },
+    "R14": {
+      "failure": "incomplete assigned-host preflight",
+      "prevention": "complete external source/Python/artifact/output/disk/GPU/wrapper record",
+      "test": "test_external_host_preflight_requires_every_declared_binding",
+      "status": "regression_protected"
+    },
+    "R15": {
+      "failure": "controller wrapper spawn falsely treated as remote launch",
+      "prevention": "bounded identity-bound live remote process confirmation",
+      "test": "test_external_probe_requires_host_confirmation_before_completion",
+      "status": "regression_protected"
+    },
+    "R16": {
+      "failure": "source drift after manifest freeze",
+      "prevention": "remote source recheck before launch and new-manifest requirement on drift",
+      "test": "test_remote_source_drift_is_rechecked_before_launch",
+      "status": "regression_protected"
+    },
+    "R17": {
+      "failure": "remote absolute artifact path consumed by aggregation",
+      "prevention": "staging-to-canonical local collection plus SHA verification",
+      "test": "test_collection_stages_remote_metadata_to_canonical_local_path",
+      "status": "regression_protected"
+    },
+    "R18": {
+      "failure": "incomplete registered endpoint matrix",
+      "prevention": "required identity-bound inventory cells before aggregation",
+      "test": "test_inventory_rejects_missing_required_endpoint_cell",
+      "status": "regression_protected"
+    },
+    "R19": {
+      "failure": "parallel Ferret prepare Git ref-lock race",
+      "prevention": "per-remote-repository flock around Git mutation",
+      "test": "test_prepare_lock_serializes_concurrent_mutations",
+      "status": "regression_protected"
+    },
+    "R20": {
+      "failure": "smoke exit did not prove lifecycle/collection usability",
+      "prevention": "required bounded remote lifecycle canary and hash round trip",
+      "test": "test_remote_lifecycle_canary_requires_status_and_hash_roundtrip",
+      "status": "regression_protected"
+    },
+    "R21": {
+      "failure": "collected bytes could differ from remote artifact",
+      "prevention": "post-collection SHA-256 equality validation",
+      "test": "test_inventory_rejects_collected_hash_mismatch",
+      "status": "regression_protected"
+    },
+    "R22": {
+      "failure": "wrong campaign/host artifact contamination",
+      "prevention": "campaign/source/job/seed/arm/epoch/split/attack-bound inventory",
+      "test": "test_inventory_rejects_foreign_campaign_or_source_identity",
+      "status": "regression_protected"
+    }
+  },
+  "verification": {
+    "focused_regression_tests": {
+      "command": "pytest -q tests/skills/test_artifact_inventory.py tests/skills/test_multi_gpu_orchestrator.py tests/skills/test_production_launch_gate.py tests/remote/test_ferret_scripts.py",
+      "result": "67 passed"
+    },
+    "changed_verification": {
+      "command": "python scripts/verify.py --changed --non-scientific",
+      "result": "24 passed"
+    },
+    "skill_validation": {
+      "skills": [
+        "production-launch-gate",
+        "multi-gpu-experiment-orchestrator",
+        "run-on-ferret"
+      ],
+      "result": "all valid"
+    },
+    "hamster_bounded_preflight": {
+      "source_sha": "4b3aad3f436920202e1df371b110dcc122d4266a",
+      "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+      "torch": "2.11.0+cu128",
+      "gpu_count": 2,
+      "gpu_uuids": [
+        "GPU-7ce112db-1ab9-ff86-9810-5bb92e222c2a",
+        "GPU-9bb01a06-72d2-cc68-eeca-9c2c9daf37ce"
+      ],
+      "teacher_chen2021_ltd_wrn34_10_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983",
+      "temporary_output_root_writable": true,
+      "dataset_path_status": "not evaluated because ARD_CIFAR10_ROOT was not declared in the current shell; a production remote preflight now requires the resolved dataset binding."
+    },
+    "ferret_bounded_lifecycle": {
+      "run_id": "launch-gate-r20-d8193ce",
+      "source_sha": "d8193ce1a4653126f52004f504a8080b9c340b23",
+      "command_argv": ["/bin/sleep", "6"],
+      "scientific_training": false,
+      "wandb_run": false,
+      "host_confirmation": {
+        "process_present": true,
+        "status": "running",
+        "gpu_index": 0,
+        "gpu_uuid": "GPU-d6b53af2-a086-be46-30db-10976ef3b989",
+        "identity_hash": "4f52f6e0a2af364f7b2ad427955f3a89c2d9e79aee6be51b2a2de28f82566e31"
+      },
+      "terminal_status": "completed",
+      "exit_code": 0,
+      "remote_manifest_sha256": "d34b41d46fea42f8e8faea6b7e353d6887b3a6df063dcd9862fb4a38c66b8069",
+      "canonical_local_manifest_sha256": "d34b41d46fea42f8e8faea6b7e353d6887b3a6df063dcd9862fb4a38c66b8069",
+      "collection_sha_match": true
+    }
+  },
+  "remaining_manual_inputs": [
+    "The scientific campaign author supplies exact source/parent/config/Teacher/dataset/mask/calibration descriptors and the bounded public-CLI lifecycle canary command.",
+    "The author supplies the required endpoint inventory matrix and canonical aggregation command; the gate rejects incomplete or foreign cells rather than discovering alternate paths."
+  ]
+}

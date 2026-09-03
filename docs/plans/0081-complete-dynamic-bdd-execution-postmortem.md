@@ -4,7 +4,7 @@
 
 - Owner: Codex
 - Branch / base SHA: master / `8ddb7add56957dea27d1581021ff4a50c3cf70dc`
-- Current milestone: in progress
+- Current milestone: complete
 - Last updated: 2026-09-04
 
 ## Goal
@@ -34,12 +34,12 @@ postmortem closure record without changing a scientific campaign.
 
 ## Milestones
 
-- [ ] Audit current Gate/orchestrator/Ferret contracts and record the R13–R22 design.
-- [ ] Implement remote preflight, source-freeze, wrapper, and host-confirmation contracts.
-- [ ] Implement canonical artifact collection/inventory validation and lock regression coverage.
-- [ ] Update skill/protocol/gate/postmortem documentation and closure states.
-- [ ] Run CPU-only unit/integration tests and bounded Hamster/Ferret verification.
-- [ ] Commit, push, and stop.
+- [x] Audit current Gate/orchestrator/Ferret contracts and record the R13–R22 design.
+- [x] Implement remote preflight, source-freeze, wrapper, and host-confirmation contracts.
+- [x] Implement canonical artifact collection/inventory validation and lock regression coverage.
+- [x] Update skill/protocol/gate/postmortem documentation and closure states.
+- [x] Run CPU-only unit/integration tests and bounded Hamster/Ferret verification.
+- [x] Commit, push, and stop.
 
 ## Test plan
 
@@ -47,4 +47,16 @@ postmortem closure record without changing a scientific campaign.
 - `pytest -q tests/skills/test_multi_gpu_orchestrator.py`
 - `pytest -q tests/remote/test_ferret_scripts.py`
 - `python scripts/verify.py --changed --non-scientific`
-- `bash -n` for changed Ferret scripts and a bounded `/bin/true` Ferret lifecycle run.
+- `bash -n` for changed Ferret scripts and a bounded no-training Ferret lifecycle run.
+
+## Completion record
+
+- Infrastructure source: `4b3aad3f436920202e1df371b110dcc122d4266a`
+  (`d8193ce1a4653126f52004f504a8080b9c340b23` corrects the emitted Ferret
+  status payload used by host confirmation).
+- Focused unit/integration regressions: `67 passed`.
+- Diff-selected non-scientific verification: `24 passed`.
+- Bounded Ferret lifecycle: fixed-SHA worktree, `/bin/sleep 6`, identity-bound
+  live host confirmation on GPU 0, terminal completion, collection, and
+  matching manifest SHA. No scientific training, endpoint evaluation, or W&B
+  run was performed.

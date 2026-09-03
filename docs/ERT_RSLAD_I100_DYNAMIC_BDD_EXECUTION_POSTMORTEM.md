@@ -68,6 +68,10 @@ S-BDD remains **not applicable** to this closure table: it was a reproducible
 scientific/numerical outcome, not a technical launch failure and not a retry
 candidate.
 
+The machine-readable closure, including focused-test results and the bounded
+Hamster/Ferret no-training lifecycle evidence, is
+[`production_launch_gate_dynamic_bdd_closure_v1.json`](experiments/production_launch_gate_dynamic_bdd_closure_v1.json).
+
 ## Agent-controlled changes
 
 1. The orchestrator now rejects a locally present, non-executable `*.sh`
