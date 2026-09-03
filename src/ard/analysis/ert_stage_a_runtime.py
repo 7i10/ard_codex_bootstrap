@@ -97,9 +97,7 @@ def _prepare_stage_output_dir(output_dir: Path) -> None:
         raise StageARuntimeError(f"Stage A output already contains results: {sorted(unexpected)}")
 
 
-def _validate_horizons(
-    horizon_epochs: tuple[int, ...], end_epoch: int, *, first_epoch: int = 80
-) -> None:
+def _validate_horizons(horizon_epochs: tuple[int, ...], end_epoch: int, *, first_epoch: int = 80) -> None:
     if not horizon_epochs or any(epoch < first_epoch or epoch > end_epoch for epoch in horizon_epochs):
         raise StageARuntimeError(
             f"horizon checkpoints must be at or after first epoch {first_epoch} and no later than the endpoint"
@@ -130,6 +128,9 @@ class StageATreatment:
     margin_cap: float | None = None
     teacher_reliability_gate: bool = False
     iad_inspired: bool = False
+    boundary_intervention: str | None = None
+    boundary_coefficient: float | None = None
+    boundary_epsilon: float = 1e-12
 
     def __post_init__(self) -> None:
         if self.kind not in {"baseline", "advce", "soft_advkd", "advkd_advce", "clean_wrong", "broad"}:
@@ -160,6 +161,21 @@ class StageATreatment:
             raise StageARuntimeError("Teacher floor treatment requires floor")
         if self.margin_floor is not None and self.margin_cap is not None and self.margin_floor > self.margin_cap:
             raise StageARuntimeError("margin floor cannot exceed cap")
+        if self.boundary_intervention not in {
+            None,
+            "pair_margin",
+            "detached_boundary_distance",
+            "secant_boundary_distance",
+        }:
+            raise StageARuntimeError("unknown boundary intervention")
+        if (self.boundary_intervention is None) != (self.boundary_coefficient is None):
+            raise StageARuntimeError("boundary intervention and coefficient must be supplied together")
+        if self.boundary_intervention is not None and self.mask_key is None:
+            raise StageARuntimeError("boundary intervention requires a fixed selected mask")
+        if self.boundary_coefficient is not None and self.boundary_coefficient < 0:
+            raise StageARuntimeError("boundary coefficient must be non-negative")
+        if self.boundary_epsilon <= 0:
+            raise StageARuntimeError("boundary epsilon must be positive")
         if self.kind == "advkd_advce" and (self.advkd_multiplier is None or not 0.0 <= self.advkd_multiplier <= 1.0):
             raise StageARuntimeError("AdvKD/AdvCE treatments require an AdvKD multiplier in [0, 1]")
         if self.kind == "baseline" and any(
@@ -170,6 +186,8 @@ class StageATreatment:
                 self.beta_cleance,
                 self.clean_wrong_mode,
                 self.tau,
+                self.boundary_intervention,
+                self.boundary_coefficient,
             )
         ):
             raise StageARuntimeError("baseline treatment cannot carry treatment coefficients")
@@ -461,7 +479,18 @@ def run_stage_a_arm(
     _validate_horizons(horizon_epochs, end_epoch, first_epoch=start_epoch)
     if not run_namespace or any(char.isspace() for char in run_namespace):
         raise StageARuntimeError("run namespace must be a non-empty token")
-    if calibration.get("tau") != 2.0:
+    if treatment.boundary_intervention is not None:
+        if calibration.get("contract") != "ert_rslad_i100_s2_dynamic_bdd_calibration_v1":
+            raise StageARuntimeError("boundary treatment requires the frozen dynamic-BDD calibration artifact")
+        if calibration.get("boundary_epsilon") != treatment.boundary_epsilon:
+            raise StageARuntimeError("boundary treatment epsilon differs from calibration artifact")
+        coefficients = calibration.get("coefficients")
+        if (
+            not isinstance(coefficients, dict)
+            or coefficients.get(treatment.boundary_intervention) != treatment.boundary_coefficient
+        ):
+            raise StageARuntimeError("boundary treatment coefficient differs from calibration artifact")
+    elif calibration.get("tau") != 2.0:
         raise StageARuntimeError("Stage A calibration tau is not frozen at 2.0")
     source_state = collect_git_state(Path.cwd())
     source_sha = source_state.get("sha")
@@ -726,6 +755,9 @@ def run_stage_a_arm(
         margin_cap=treatment.margin_cap,
         teacher_clean_reliability_mask=teacher_reliability_mask,
         iad_inspired=treatment.iad_inspired,
+        boundary_intervention=treatment.boundary_intervention,
+        boundary_coefficient=treatment.boundary_coefficient,
+        boundary_epsilon=treatment.boundary_epsilon,
         dynamic_s3_router=dynamic_s3_router,
         # The baseline diagnostic arm observes the exact same state but
         # deliberately ignores the decision, so it never receives AdvCE.

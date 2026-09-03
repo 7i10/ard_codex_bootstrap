@@ -54,6 +54,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--margin-cap", type=float)
     parser.add_argument("--teacher-reliability-gate", action="store_true")
     parser.add_argument("--iad-inspired", action="store_true")
+    parser.add_argument(
+        "--boundary-intervention",
+        choices=("pair_margin", "detached_boundary_distance", "secant_boundary_distance"),
+    )
+    parser.add_argument("--boundary-coefficient", type=float)
+    parser.add_argument("--boundary-epsilon", type=float, default=1e-12)
     parser.add_argument("--epochs", type=int, default=85)
     parser.add_argument(
         "--horizon-epochs",
@@ -124,6 +130,9 @@ def main(argv: list[str] | None = None) -> int:
         margin_cap=args.margin_cap,
         teacher_reliability_gate=args.teacher_reliability_gate,
         iad_inspired=args.iad_inspired,
+        boundary_intervention=args.boundary_intervention,
+        boundary_coefficient=args.boundary_coefficient,
+        boundary_epsilon=args.boundary_epsilon,
     )
     if treatment.mask_key is not None and args.mask is None:
         raise ValueError("selected treatment requires --mask")

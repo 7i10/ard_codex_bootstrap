@@ -165,6 +165,9 @@ class Trainer:
         margin_cap: float | None = None,
         teacher_clean_reliability_mask: FixedInterventionMask | None = None,
         iad_inspired: bool = False,
+        boundary_intervention: str | None = None,
+        boundary_coefficient: float | None = None,
+        boundary_epsilon: float = 1e-12,
         dynamic_s3_router: Any | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
@@ -217,6 +220,8 @@ class Trainer:
                 margin_cap,
                 teacher_clean_reliability_mask,
                 iad_inspired,
+                boundary_intervention,
+                boundary_coefficient,
             )
         )
         # A teacher target policy can be selected by an ordinary WeightPolicy
@@ -230,6 +235,7 @@ class Trainer:
                 adversarial_ce_coefficient,
                 clean_wrong_mode,
                 margin_coefficient,
+                boundary_intervention,
             )
         )
         if intervention_mask is not None and prescriptive_v3_route != "nr_prefix" and not has_treatment:
@@ -271,6 +277,18 @@ class Trainer:
             raise ValueError("selected attack epsilon and step size must be supplied together")
         if teacher_clean_reliability_mask is not None and intervention_mask is None:
             raise ValueError("teacher reliability mask requires a selected treatment mask")
+        if boundary_intervention not in {None, "pair_margin", "detached_boundary_distance", "secant_boundary_distance"}:
+            raise ValueError("unknown boundary intervention")
+        if boundary_intervention is not None and intervention_mask is None:
+            raise ValueError("boundary intervention requires a fixed intervention mask")
+        if (boundary_intervention is None) != (boundary_coefficient is None):
+            raise ValueError("boundary intervention and coefficient must be supplied together")
+        if boundary_coefficient is not None and (
+            not torch.isfinite(torch.as_tensor(boundary_coefficient)) or boundary_coefficient < 0
+        ):
+            raise ValueError("boundary coefficient must be finite and non-negative")
+        if not torch.isfinite(torch.as_tensor(boundary_epsilon)) or boundary_epsilon <= 0:
+            raise ValueError("boundary epsilon must be finite and positive")
         valid_margin_modes = {None, "fixed", "teacher_zero", "teacher_floor", "teacher_abstain"}
         if margin_target_mode not in valid_margin_modes:
             raise ValueError("unknown adversarial margin target mode")
@@ -321,6 +339,9 @@ class Trainer:
         self.margin_cap = margin_cap
         self.teacher_clean_reliability_mask = teacher_clean_reliability_mask
         self.iad_inspired = iad_inspired
+        self.boundary_intervention = boundary_intervention
+        self.boundary_coefficient = boundary_coefficient
+        self.boundary_epsilon = float(boundary_epsilon)
         self.dynamic_s3_router = dynamic_s3_router
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
@@ -358,6 +379,119 @@ class Trainer:
         # checkpoint state.
         self._teacher_adversarial_logits: torch.Tensor | None = None
         self._teacher_adversarial_forward_calls = 0.0
+        self._boundary_epoch_stats: dict[str, float] = {}
+
+    @staticmethod
+    def _dynamic_pair_margins(
+        logits: torch.Tensor, labels: torch.Tensor, rival: torch.Tensor | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return logit margins and the detached strongest non-true pair.
+
+        The rival is selected from the current Student adversarial logits and
+        then reused for both Student and Teacher.  It is a hard routing
+        quantity and never receives a gradient.
+        """
+        if logits.ndim != 2 or labels.ndim != 1 or logits.shape[0] != labels.shape[0]:
+            raise ValueError("dynamic pair logits/labels must be [batch, classes]/[batch]")
+        if rival is None:
+            masked = logits.detach().clone()
+            masked.scatter_(1, labels[:, None], float("-inf"))
+            rival = masked.argmax(dim=1)
+        else:
+            rival = rival.detach()
+        student_margin = logits.float().gather(1, labels[:, None]).squeeze(1) - logits.float().gather(
+            1, rival[:, None]
+        ).squeeze(1)
+        if not bool(torch.isfinite(student_margin).all()):
+            raise FloatingPointError("dynamic pair Student margin is non-finite")
+        return student_margin, rival
+
+    def _boundary_terms(
+        self,
+        *,
+        batch: IndexedBatch,
+        adversarial: torch.Tensor,
+        logits: torch.Tensor,
+        clean_student_logits: torch.Tensor,
+        teacher_clean_logits: torch.Tensor,
+        teacher_adversarial_logits: torch.Tensor,
+        treatment_risk: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute the selected-only dynamic pair/geometry intervention.
+
+        Teacher quantities are detached.  D-BDD's input gradients are first
+        derivatives only and use a separate Student forward; no graph is
+        retained for second-order differentiation.
+        """
+        if self.boundary_intervention is None or self.boundary_coefficient is None:
+            raise RuntimeError("boundary intervention is not configured")
+        student_adv_margin, rival = self._dynamic_pair_margins(logits, batch.labels)
+        with torch.no_grad():
+            teacher_adv_margin, _ = self._dynamic_pair_margins(teacher_adversarial_logits, batch.labels, rival)
+            teacher_clean_margin, _ = self._dynamic_pair_margins(teacher_clean_logits, batch.labels, rival)
+            student_clean_margin, _ = self._dynamic_pair_margins(clean_student_logits, batch.labels, rival)
+            teacher_gate = (teacher_adv_margin > 0).to(dtype=logits.dtype)
+        active = treatment_risk.to(dtype=logits.dtype) * teacher_gate
+        mode = self.boundary_intervention
+        if mode == "pair_margin":
+            self._boundary_epoch_stats["boundary_active_count"] += float(active.sum().item())
+            self._boundary_epoch_stats["boundary_gate_positive_count"] += float(teacher_gate.sum().item())
+            return 0.5 * F.relu(teacher_adv_margin - student_adv_margin).square() * active
+        if mode == "secant_boundary_distance":
+            rho = (adversarial.detach() - batch.images.detach()).abs().flatten(1).amax(dim=1)
+            denominator = rho + self.boundary_epsilon
+            q_student = (student_adv_margin - student_clean_margin).abs() / denominator
+            q_teacher = (teacher_adv_margin - teacher_clean_margin).abs() / denominator
+            d_student = student_adv_margin / (q_student.detach() + self.boundary_epsilon)
+            d_teacher = teacher_adv_margin / (q_teacher.detach() + self.boundary_epsilon)
+            zero_rho = rho <= self.boundary_epsilon
+            active = active * (~zero_rho).to(dtype=logits.dtype)
+            self._boundary_epoch_stats["boundary_active_count"] += float(active.sum().item())
+            self._boundary_epoch_stats["boundary_gate_positive_count"] += float(teacher_gate.sum().item())
+            self._boundary_epoch_stats["boundary_zero_rho_count"] += float(zero_rho.sum().item())
+            return 0.5 * F.relu(d_teacher - d_student).square() * active
+        if mode != "detached_boundary_distance":
+            raise RuntimeError(f"unsupported boundary intervention: {mode}")
+        # Compute input gradients on a detached adversarial view.  The Teacher
+        # remains frozen and in eval mode; gradients are with respect to input
+        # only.  ``create_graph=False`` is a hard no-second-order contract.
+        selected = active > 0
+        self._boundary_epoch_stats["boundary_active_count"] += float(active.sum().item())
+        self._boundary_epoch_stats["boundary_gate_positive_count"] += float(teacher_gate.sum().item())
+        self._boundary_epoch_stats["boundary_input_gradient_calls"] += float(2 * selected.sum().item())
+        if not bool(selected.any()):
+            return torch.zeros_like(student_adv_margin)
+        indices = torch.nonzero(selected, as_tuple=False).flatten()
+        x_geom = adversarial.detach().index_select(0, indices).requires_grad_(True)
+        pair = rival.index_select(0, indices)
+        labels = batch.labels.index_select(0, indices)
+        with _evaluation_mode(self.model), torch.enable_grad():
+            student_geom_logits = self.model(x_geom)
+            student_geom_margin, _ = self._dynamic_pair_margins(student_geom_logits, labels, pair)
+        grad_student = torch.autograd.grad(
+            student_geom_margin.sum(), x_geom, create_graph=False, retain_graph=False, allow_unused=False
+        )[0].detach()
+        if self.teacher is None:
+            raise RuntimeError("D-BDD requires a frozen Teacher")
+        with _evaluation_mode(self.teacher), torch.enable_grad():
+            teacher_geom_logits = self.teacher(x_geom.float())
+            teacher_geom_margin_geom, _ = self._dynamic_pair_margins(teacher_geom_logits, labels, pair)
+        grad_teacher = torch.autograd.grad(
+            teacher_geom_margin_geom.sum(), x_geom, create_graph=False, retain_graph=False, allow_unused=False
+        )[0].detach()
+        d_student = student_adv_margin.index_select(0, indices) / (
+            grad_student.abs().flatten(1).sum(dim=1) + self.boundary_epsilon
+        )
+        d_teacher = teacher_adv_margin.index_select(0, indices) / (
+            grad_teacher.abs().flatten(1).sum(dim=1) + self.boundary_epsilon
+        )
+        selected_loss = 0.5 * F.relu(d_teacher.detach() - d_student).square()
+        result = torch.zeros_like(student_adv_margin)
+        result.index_copy_(0, indices, selected_loss)
+        # A separate detached Teacher forward is intentionally counted in
+        # runtime telemetry; it is required for input-gradient geometry.
+        self._teacher_adversarial_forward_calls += 1.0
+        return result
 
     def _attack_generator(self) -> torch.Generator:
         seed = self.seed + 1_000_003 * self.global_step + 10_007 * get_rank()
@@ -593,6 +727,12 @@ class Trainer:
         on_batch_start: Callable[[int, IndexedBatch], None] | None = None,
     ) -> dict[str, float]:
         self.model.train()
+        self._boundary_epoch_stats = {
+            "boundary_active_count": 0.0,
+            "boundary_gate_positive_count": 0.0,
+            "boundary_zero_rho_count": 0.0,
+            "boundary_input_gradient_calls": 0.0,
+        }
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
             torch.cuda.reset_peak_memory_stats(self.device)
@@ -666,9 +806,7 @@ class Trainer:
                     torch.as_tensor(baseline_step, device=batch.images.device, dtype=batch.images.dtype),
                 )
             skip_selected = (
-                self.clean_wrong_attack_skip
-                and treatment_risk is not None
-                and bool((treatment_risk > 0).any())
+                self.clean_wrong_attack_skip and treatment_risk is not None and bool((treatment_risk > 0).any())
             )
             if skip_selected:
                 if treatment_risk is None:
@@ -677,9 +815,7 @@ class Trainer:
                 adversarial = batch.images.clone()
                 if attack_indices.numel() > 0:
                     subset_target = (
-                        None
-                        if teacher_clean_logits is None
-                        else teacher_clean_logits.index_select(0, attack_indices)
+                        None if teacher_clean_logits is None else teacher_clean_logits.index_select(0, attack_indices)
                     )
                     attack_result = self.attack.generate(
                         AttackRequest(
@@ -687,19 +823,19 @@ class Trainer:
                             labels=batch.labels.index_select(0, attack_indices),
                             student=self.model,
                             teacher=self.teacher,
-                        target_logits=subset_target,
-                        generator=self._attack_generator(),
-                        source_ids=batch.sample_ids.index_select(0, attack_indices),
-                        epoch=self.current_epoch,
-                        attack_seed=self.seed,
-                        stream_tag="train_pgd",
-                        restart_index=0,
-                        epsilon_override=(
-                            None if epsilon_override is None else epsilon_override.index_select(0, attack_indices)
-                        ),
-                        step_size_override=(
-                            None if step_override is None else step_override.index_select(0, attack_indices)
-                        ),
+                            target_logits=subset_target,
+                            generator=self._attack_generator(),
+                            source_ids=batch.sample_ids.index_select(0, attack_indices),
+                            epoch=self.current_epoch,
+                            attack_seed=self.seed,
+                            stream_tag="train_pgd",
+                            restart_index=0,
+                            epsilon_override=(
+                                None if epsilon_override is None else epsilon_override.index_select(0, attack_indices)
+                            ),
+                            step_size_override=(
+                                None if step_override is None else step_override.index_select(0, attack_indices)
+                            ),
                         )
                     )
                     adversarial.index_copy_(0, attack_indices, attack_result.adversarial)
@@ -845,9 +981,7 @@ class Trainer:
                 )
                 # The router decision is a detached hard current-step mask.
                 # It does not feed the PGD inner problem or any next-epoch state.
-                treatment_risk = dynamic_s3_decision.action_active.to(
-                    device=logits.device, dtype=logits.dtype
-                )
+                treatment_risk = dynamic_s3_decision.action_active.to(device=logits.device, dtype=logits.dtype)
             if self.iad_inspired:
                 if clean_student_logits is None or teacher_clean_logits is None or self.teacher is None:
                     raise ValueError("IAD-inspired branch requires clean Student and Teacher logits")
@@ -936,9 +1070,11 @@ class Trainer:
                 if clean_student_logits is None:
                     raise ValueError("adaptive AdvKD requires clean Student logits")
                 with torch.no_grad():
-                    probability = F.softmax(clean_student_logits.detach().float(), dim=1).gather(
-                        1, batch.labels[:, None]
-                    ).squeeze(1)
+                    probability = (
+                        F.softmax(clean_student_logits.detach().float(), dim=1)
+                        .gather(1, batch.labels[:, None])
+                        .squeeze(1)
+                    )
                     adaptive = 1.0 + self.adaptive_advkd_gamma * (1.0 - probability)
                 terms = terms.scale_adversarial_kd(
                     1.0 + intervention_risk * (adaptive - 1.0),
@@ -975,6 +1111,26 @@ class Trainer:
                     target_margin,
                     treatment_risk * target_active,
                     coefficient=float(self.margin_coefficient),
+                )
+            if treatment_risk is not None and self.boundary_intervention is not None:
+                if clean_student_logits is None or teacher_clean_logits is None:
+                    raise ValueError("boundary intervention requires clean Student/Teacher logits")
+                teacher_adversarial_logits = self._teacher_adversarial_response(adversarial)
+                boundary = self._boundary_terms(
+                    batch=batch,
+                    adversarial=adversarial,
+                    logits=logits,
+                    clean_student_logits=clean_student_logits,
+                    teacher_clean_logits=teacher_clean_logits,
+                    teacher_adversarial_logits=teacher_adversarial_logits,
+                    treatment_risk=treatment_risk,
+                )
+                terms = ObjectiveTerms(
+                    hard=terms.hard + float(self.boundary_coefficient) * boundary,
+                    kd=terms.kd,
+                    regularization=terms.regularization,
+                    adversarial_kd=terms.adversarial_kd,
+                    clean_kd=terms.clean_kd,
                 )
             if dynamic_s3_decision is not None and self.adversarial_ce_coefficient is not None:
                 if treatment_risk is None:
@@ -1109,6 +1265,7 @@ class Trainer:
             "clean_accuracy": float(totals[1].item()) / count,
             "robust_accuracy": float(totals[2].item()) / count,
             **observability,
+            **self._boundary_epoch_stats,
         }
 
     def validate_epoch(self, loader: DataLoader[IndexedBatch]) -> dict[str, float]:
