@@ -654,6 +654,16 @@ def analyze(
         train_rows_by_seed = {seed: _read_rows(path) for seed, path in train_geometry.items()}
         secondary_train = {"scope": "train", "endpoint_epoch": 114, "per_seed": {}}
         for seed, train_rows in train_rows_by_seed.items():
+            train_metadata_path = train_geometry[seed].with_name(train_geometry[seed].stem + ".json")
+            if not train_metadata_path.is_file():
+                raise FileNotFoundError(f"{seed}: missing train geometry metadata {train_metadata_path}")
+            train_metadata = json.loads(train_metadata_path.read_text(encoding="utf-8"))
+            if (
+                train_metadata.get("rows_sha256") != sha256(train_geometry[seed])
+                or train_metadata.get("row_count") != len(train_rows)
+                or train_metadata.get("endpoint_attack_identity_sha256") != ENDPOINT_ATTACK_SHA
+            ):
+                raise ValueError(f"{seed}: train geometry metadata/rows mismatch")
             ids, _ = _load_mask(mask_paths[seed], seed, "train")
             if set(ids) != set(train_rows):
                 raise ValueError(f"{seed}: train geometry/mask coverage mismatch")
@@ -673,6 +683,15 @@ def analyze(
                     )
                 ],
             }
+        secondary_train["geometry_artifacts"] = {
+            seed: {
+                "path": str(path.resolve()),
+                "rows_sha256": sha256(path),
+                "row_count": len(train_rows_by_seed[seed]),
+                "replay_protocol": "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index",
+            }
+            for seed, path in train_geometry.items()
+        }
     univariate: dict[str, Any] = {}
     predictors: dict[str, Any] = {}
     cells: dict[str, Any] = {}
@@ -752,6 +771,8 @@ def analyze(
     else:
         decision = "BG5_NOT_SUPPORTED"
     contract = _contract(geometry_paths=geometry, geometry_meta=geometry_meta, masks=masks, endpoint_root=endpoint_root)
+    if secondary_train is not None:
+        contract["secondary_train_geometry_artifacts"] = secondary_train["geometry_artifacts"]
     result = {
         "schema_version": 1,
         "contract": "ert_rslad_i100_s2_boundary_geometry_audit_v1",
