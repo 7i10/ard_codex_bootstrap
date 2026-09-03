@@ -33,10 +33,10 @@ file:
 <state-parent>/orchestration/<campaign>/<manifest-sha>/<job-hash>/
 ```
 
-It no longer creates `output_dir` before executing the argv. Explicit
-technical-failure markers remain configurable in the scientific output
-namespace so a job can emit them on failure; the controller does not precreate
-that path either.
+It no longer creates `output_dir` before executing the argv. Default technical
+failure markers also live in the manifest-bound controller sidecar. A legacy
+scientific-output failure marker is read only for backward-compatible recovery;
+new controller-owned metadata is never written there.
 
 This also makes controller metadata manifest-specific, rather than merely
 output-path-specific.
@@ -57,6 +57,24 @@ the controller log is stored in the sidecar.
 Existing stale-result protection remains covered by
 `test_stale_result_from_prior_campaign_cannot_release_gpu_slot`, now against
 the manifest-hash-bound sidecar result path.
+
+## Follow-up hardening
+
+The operational foundation adds four related protections without relaxing a
+scientific CLI:
+
+- static `compile`/import/`--help` checks run before any GPU reservation;
+- an exact public-CLI smoke is bound to source SHA, argv, config/parent hashes,
+  controller source, schema, and execution class, and fan-out is blocked until
+  it passes;
+- retries that use a non-overwriting public CLI receive an attempt-scoped
+  staging output and atomically promote it only after successful validation;
+- remote confirmation compares identity and origin host independently observed
+  in the remote prepared manifest with the controller expectation.
+
+These are controller/launch-gate responsibilities. The scientific CLI does not
+need to accept orchestration metadata or special-case a controller-created
+directory.
 
 ## Operational rule
 

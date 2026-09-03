@@ -13,7 +13,6 @@ import argparse
 import hashlib
 import json
 import os
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -200,8 +199,35 @@ def stage(payload: dict[str, Any], base: Path) -> dict[str, Any]:
         if collected is None:
             issue(errors, index, "collected_path", "path", raw.get("collected_path"))
             continue
+        expected = str(raw.get("sha256", "")).lower()
+        observed_staging = digest(staging)
+        if not is_sha(expected, 64) or observed_staging != expected:
+            issue(errors, index, "staging_path.sha256", expected, observed_staging)
+            continue
         collected.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(staging, collected)
+        if collected.exists():
+            observed_collected = digest(collected) if collected.is_file() else None
+            if observed_collected != expected:
+                issue(errors, index, "collected_path", "absent or matching immutable artifact", observed_collected)
+            continue
+        # The final path is intentionally untouched until the complete staged
+        # copy has been fsync'd and hash-verified.  The temporary lives in the
+        # target directory, so os.replace is a same-filesystem atomic commit.
+        temporary = collected.with_name(f".{collected.name}.{os.getpid()}.tmp")
+        try:
+            with staging.open("rb") as source, temporary.open("xb") as destination:
+                while chunk := source.read(1024 * 1024):
+                    destination.write(chunk)
+                destination.flush()
+                os.fsync(destination.fileno())
+            observed_temporary = digest(temporary)
+            if observed_temporary != expected:
+                issue(errors, index, "temporary_path.sha256", expected, observed_temporary)
+                temporary.unlink(missing_ok=True)
+                continue
+            os.replace(temporary, collected)
+        finally:
+            temporary.unlink(missing_ok=True)
     if errors:
         report["status"] = "fail"
         report["errors"].extend(errors)

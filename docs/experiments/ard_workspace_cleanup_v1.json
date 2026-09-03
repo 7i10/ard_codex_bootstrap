@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-04T06:10:39+09:00",
+  "scope": "operational workspace cleanup; no scientific artifact migration",
+  "pre_cleanup": [
+    {
+      "path": "/home/shunsukenaito/workspace-local/.ard-campaign-gpu-locks",
+      "classification": "LEGACY_UNUSED",
+      "size_bytes": 0,
+      "sha256": null,
+      "reference_evidence": [
+        "Only tools/internal/legacy_campaign references the root; no current orchestrator/launch-gate reference.",
+        "Two zero-byte lock files had SHA256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
+      ],
+      "process_evidence": "Hamster and Ferret process/cwd/open-file/flock scans were empty, excluding the inspection command itself.",
+      "worktree_evidence": "not a Git worktree",
+      "planned_action": "remove empty legacy lock files and root",
+      "reason": "Future locks are under the registered runtime_root/locks."
+    },
+    {
+      "path": "/home/shunsukenaito/workspace-local/ard-analysis",
+      "classification": "HISTORICAL_REFERENCED",
+      "size_bytes": 1772132437,
+      "sha256": null,
+      "reference_evidence": ["Historical reports and machine artifacts retain absolute provenance references."],
+      "process_evidence": "no active process/cwd/open-file evidence",
+      "worktree_evidence": "not a registered worktree",
+      "planned_action": "keep in place read-only",
+      "reason": "Historical scientific analysis root."
+    },
+    {
+      "path": "/home/shunsukenaito/workspace-local/ard-campaign-runs",
+      "classification": "HISTORICAL_REFERENCED",
+      "size_bytes": 29637692382,
+      "sha256": null,
+      "reference_evidence": [
+        "Tracked analysis configs point to artifacts below this root.",
+        "git worktree list reports four detached historical worktrees below this root."
+      ],
+      "process_evidence": "no active process/cwd/open-file evidence",
+      "worktree_evidence": "registered historical detached worktrees",
+      "planned_action": "keep in place read-only",
+      "reason": "Historical lineage and artifact root."
+    },
+    {
+      "path": "/home/shunsukenaito/workspace-local/ard-runs",
+      "classification": "HISTORICAL_REFERENCED",
+      "size_bytes": 40458596138,
+      "sha256": null,
+      "reference_evidence": [
+        "Tracked analysis configs point to manifests and parquet artifacts below this root.",
+        "git worktree list reports historical detached worktrees below this root."
+      ],
+      "process_evidence": "no active process/cwd/open-file evidence",
+      "worktree_evidence": "registered historical detached worktrees",
+      "planned_action": "keep in place read-only",
+      "reason": "Historical lineage and artifact root."
+    },
+    {
+      "path": "/home/shunsukenaito/workspace-local/ferret-results",
+      "classification": "HISTORICAL_REFERENCED",
+      "size_bytes": null,
+      "sha256": null,
+      "reference_evidence": ["Tracked provenance and aggregation scripts retain historical collection references."],
+      "process_evidence": "no active process/cwd/open-file evidence",
+      "worktree_evidence": "not a registered worktree",
+      "planned_action": "keep in place read-only",
+      "reason": "Historical Ferret collection root."
+    },
+    {
+      "path": "/home/shunsukenaito/workspace-local/ard-stagewise-source-bb68afc",
+      "classification": "EPHEMERAL_STALE",
+      "size_bytes": 15873821,
+      "git_head": "bb68afc0ff505248f84c0263179ec24f0b346bcd",
+      "reference_evidence": ["No current docs/config/manifest/repository reference to this exact path or basename."],
+      "process_evidence": "Hamster and Ferret process/cwd/open-file/flock scans were empty.",
+      "worktree_evidence": "registered detached worktree; git status was clean",
+      "planned_action": "git worktree remove",
+      "reason": "Superseded stage-wise source worktree; no active or historical artifact requires this checkout path."
+    },
+    {
+      "path": "/home/shunsukenaito/workspace-local/stagewise_*.sh",
+      "classification": "EPHEMERAL_STALE",
+      "files": [
+        {"name": "stagewise_endpoint_gpu0.sh", "size_bytes": 1312, "sha256": "15802232f619615d2a63c2c07d6aa53cddb01ba846251c62541ab7ffcef9a541"},
+        {"name": "stagewise_endpoint_gpu1.sh", "size_bytes": 1312, "sha256": "d5757cc417845627edc4f44cabcb3ee4f7633514dc9fc3e6e2edd30881108d90"},
+        {"name": "stagewise_eval_wait_gpu0.sh", "size_bytes": 953, "sha256": "7ecb19ac5028d7ae0ed3060882b7614e2fa06bdbd0373c93c406d9da40a9853d"},
+        {"name": "stagewise_eval_wait_gpu1.sh", "size_bytes": 953, "sha256": "f9e90f4473556d360141b62a14346ea35f6d014729ca561203c065b2c198060b"},
+        {"name": "stagewise_launch_gpu0.sh", "size_bytes": 702, "sha256": "2d4b93b738373c091b86a1d03d74de4c31e789a2aa8bfdb84b0da01cf6bb00bb"},
+        {"name": "stagewise_launch_gpu1.sh", "size_bytes": 702, "sha256": "8c726d61c38cb4ebb75686031aef7835d9a0ccebe8920611f637adaaf0aef154"}
+      ],
+      "reference_evidence": ["No current docs/config/manifest/repository reference to these exact wrapper names."],
+      "process_evidence": "Hamster and Ferret process/cwd/open-file scans were empty.",
+      "worktree_evidence": "untracked root-level temporary shell wrappers",
+      "planned_action": "remove files",
+      "reason": "Campaign-specific historical helpers; future generated helpers belong below runtime_root/runs/<campaign>/orchestration."
+    }
+  ],
+  "post_cleanup": {
+    "verified_at": "2026-09-04T06:13:00+09:00",
+    "removed": [
+      "/home/shunsukenaito/workspace-local/.ard-campaign-gpu-locks",
+      "/home/shunsukenaito/workspace-local/ard-stagewise-source-bb68afc",
+      "/home/shunsukenaito/workspace-local/stagewise_endpoint_gpu0.sh",
+      "/home/shunsukenaito/workspace-local/stagewise_endpoint_gpu1.sh",
+      "/home/shunsukenaito/workspace-local/stagewise_eval_wait_gpu0.sh",
+      "/home/shunsukenaito/workspace-local/stagewise_eval_wait_gpu1.sh",
+      "/home/shunsukenaito/workspace-local/stagewise_launch_gpu0.sh",
+      "/home/shunsukenaito/workspace-local/stagewise_launch_gpu1.sh"
+    ],
+    "verification": [
+      "git worktree remove completed for the clean registered stage-wise worktree",
+      "all six wrapper paths are absent",
+      "legacy lock root is absent",
+      "historical referenced roots were retained unchanged"
+    ]
+  }
+}

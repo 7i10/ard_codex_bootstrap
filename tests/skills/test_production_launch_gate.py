@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import subprocess
 import sys
 from pathlib import Path
 
 SCRIPT = Path(__file__).parents[2] / ".agents/skills/production-launch-gate/scripts/launch_gate.py"
+
+
+def gate_module():
+    spec = importlib.util.spec_from_file_location("launch_gate_fixture", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 # Regression provenance: historical launch failures are summarized in
 # docs/ERT_RSLAD_UNSEEN_CONFIRMATION_ORCHESTRATION_AUDIT.md (source identifier
@@ -34,6 +43,9 @@ REGRESSION_CASES = {
     "R20": "test_remote_lifecycle_canary_requires_status_and_hash_roundtrip",
     "R21": "test_inventory_rejects_collected_hash_mismatch",
     "R22": "test_inventory_rejects_foreign_campaign_or_source_identity",
+    "R30": "test_static_cli_failure_blocks_before_manifest_freeze",
+    "R31": "test_exact_public_cli_smoke_binds_source_command_config_parent_and_execution_class",
+    "R35": "test_equivalent_fanout_requires_exact_public_cli_smoke",
 }
 
 
@@ -532,6 +544,97 @@ def test_canary_is_bounded_and_uses_resolved_job_context(tmp_path: Path) -> None
     canary = json.loads((gate_dir / "canary.json").read_text())
     assert canary["status"] == "pass"
     assert canary["results"][0]["job_id"] == "train"
+
+
+def test_static_cli_failure_blocks_before_manifest_freeze(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    spec["canary"] = {
+        "require_exact_smoke": True,
+        "static_cli": [{"job_id": "train", "commands": [[sys.executable, "-c", "raise SystemExit(2)"]]}],
+        "jobs": [{"job_id": "train", "kind": "exact_public_cli", "execution_class": "local", "command": [sys.executable, "-c", "pass"]}],
+    }
+
+    gate = tmp_path / "gate"
+    result = invoke(write_spec(tmp_path, spec), "--canary-only", output=gate)
+
+    assert result.returncode == 2
+    assert not (gate / "resolved-manifest.json").exists()
+    assert json.loads((gate / "static-cli.json").read_text())["status"] == "fail"
+
+
+def test_exact_public_cli_smoke_binds_source_command_config_parent_and_execution_class(tmp_path: Path) -> None:
+    spec, repo, _, _ = base_spec(tmp_path)
+    config = tmp_path / "config.json"
+    config.write_text("{}\n", encoding="utf-8")
+    spec["jobs"][0]["scientific_config_path"] = str(config)
+    spec["jobs"][0]["config_sha256"] = sha(config)
+    spec["canary"] = {
+        "require_exact_smoke": True,
+        "static_cli": [{"job_id": "train", "commands": [[sys.executable, "-m", "py_compile", "train.py"]]}],
+        "jobs": [
+            {
+                "job_id": "train",
+                "kind": "exact_public_cli",
+                "execution_class": "local",
+                "command": [sys.executable, "-c", "pass"],
+            }
+        ],
+    }
+    gate = tmp_path / "gate"
+
+    result = invoke(write_spec(tmp_path, spec), "--canary-only", output=gate)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads((gate / "canary.json").read_text())
+    binding = report["results"][0]["binding"]
+    assert binding["source_sha"] == spec["source"]["git_sha"]
+    assert binding["config_sha256"] == sha(config)
+    assert binding["parent_checkpoint_sha256"] == spec["jobs"][0]["parent"]["sha256"]
+    assert binding["execution_class"] == "local"
+    assert binding["production_argv_sha256"]
+    assert binding["orchestrator_source_sha256"]
+    assert (repo / "train.py").is_file()
+
+
+def test_source_or_orchestrator_change_invalidates_exact_smoke_binding(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    config = tmp_path / "config.json"
+    config.write_text("{}\n", encoding="utf-8")
+    spec["jobs"][0]["scientific_config_path"] = str(config)
+    spec["jobs"][0]["config_sha256"] = sha(config)
+    spec["canary"] = {
+        "require_exact_smoke": True,
+        "static_cli": [{"job_id": "train", "commands": [[sys.executable, "-c", "pass"]]}],
+        "jobs": [{"job_id": "train", "kind": "exact_public_cli", "execution_class": "local", "command": [sys.executable, "-c", "pass"]}],
+    }
+    gate = tmp_path / "gate"
+    spec_path = write_spec(tmp_path, spec)
+    assert invoke(spec_path, "--canary-only", output=gate).returncode == 0
+    manifest = json.loads((gate / "resolved-manifest.json").read_text())
+    report = json.loads((gate / "canary.json").read_text())
+    report["results"][0]["binding"]["orchestrator_source_sha256"] = "0" * 64
+
+    errors = gate_module().validate_exact_smoke_report(manifest, report)
+
+    assert errors == ["exact smoke binding is stale for train"]
+
+
+def test_equivalent_fanout_requires_exact_public_cli_smoke(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    second = json.loads(json.dumps(spec["jobs"][0]))
+    second["job_id"] = "train-two"
+    second["output_dir"] = str(tmp_path / "outputs" / "train-two")
+    spec["jobs"].append(second)
+    spec["canary"] = {
+        "require_exact_smoke": True,
+        "static_cli": [{"job_id": "train", "commands": [[sys.executable, "-c", "pass"]]}],
+        "jobs": [{"job_id": "train", "kind": "bounded_canary", "command": [sys.executable, "-c", "pass"]}],
+    }
+
+    result = invoke(write_spec(tmp_path, spec), "--canary-only", output=tmp_path / "gate")
+
+    assert result.returncode == 2
+    assert "exact smoke" in result.stdout
 
 
 def test_launch_gate_rejects_unknown_schema_and_missing_epoch_bound(tmp_path: Path) -> None:

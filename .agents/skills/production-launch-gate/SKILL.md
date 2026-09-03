@@ -56,6 +56,27 @@ responsible for GPU reservations, host-aware scheduling, detached workers,
 completion-marker dependency transitions, endpoint chaining, and
 technical-only retries.
 
+## Exact-command smoke contract
+
+For a new or changed production/replay/forensic runtime, set
+`canary.require_exact_smoke: true`. Before a controller can reserve a GPU, the
+gate runs `canary.static_cli` argv entries (compile/import/`--help` as
+applicable). Then each equivalent fan-out group needs at least one
+`kind: exact_public_cli` representative smoke. The successful smoke record is
+bound to source SHA, production argv hash, smoke argv hash, config SHA, parent
+SHA, orchestrator source SHA, manifest schema, and execution class.
+
+Local and external execution classes require separate exact smoke coverage.
+The binding is recomputed immediately before launch, so a source/controller,
+command, parent, or config change invalidates the smoke and requires a new
+manifest/canary. This is a safety gate, not a shortened scientific run: use a
+registered bounded public interface rather than silently adding an ad-hoc
+one-epoch override.
+
+New production specs should also carry the workspace-contract opt-in passed to
+the orchestrator. Future runtime writes outside the tracked canonical runtime
+root are rejected; historical inputs remain readable.
+
 ## Safety rules
 
 - Scientific identity hashes include source, arm, seed, config, dataset/split,

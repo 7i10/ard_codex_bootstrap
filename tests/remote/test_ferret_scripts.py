@@ -77,6 +77,8 @@ def test_prepare_links_only_named_shared_runtime_assets() -> None:
     assert "required shared runtime asset is missing" in prepare
     assert 'ln -s "$REPO/$name" "$RUN/repo/$name"' in prepare
     assert "shared_runtime_assets" in prepare
+    assert "orchestration_identity" in prepare
+    assert "observed_origin_host" in prepare
 
 
 @pytest.mark.unit
@@ -120,6 +122,20 @@ def test_status_emits_one_json_payload_with_host_confirmation_evidence() -> None
     assert status.count("print(json.dumps(out") == 1
     for field in ("'pid':pid if live else None", "'source_sha':d.get('git_sha')", "'physical_gpu_uuids'", "'command_argv'", "'remote_manifest'"):
         assert field in status
+
+
+def test_remote_confirmation_uses_remote_manifest_identity_and_origin_not_local_reinjection() -> None:
+    confirm = (SCRIPTS / "ferret-host-confirm").read_text()
+    assert "identity=remote.get('orchestration_identity')" in confirm
+    assert "remote.get('observed_origin_host')" in confirm
+    assert "--expected-origin-host" in confirm
+
+
+def test_ferret_defaults_resolve_from_tracked_workspace_registry() -> None:
+    common = (SCRIPTS / "ferret-common").read_text()
+    assert "workspace_paths.py" in common
+    assert "workspace_value run_root" in common
+    assert "/home/shunsukenaito/workspace-local/ard-runs" not in common
 
 
 @pytest.mark.unit

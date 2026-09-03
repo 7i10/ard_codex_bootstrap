@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "repo_root": "/home/shunsukenaito/workspace-local/ard_codex_bootstrap",
+  "dataset_root": "/home/shunsukenaito/workspace-local/datasets",
+  "ard_dataset_root": "/home/shunsukenaito/workspace-local/datasets/ard",
+  "imagenet_root": "/home/shunsukenaito/workspace-local/datasets/imagenet",
+  "runtime_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap",
+  "run_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/runs",
+  "analysis_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/analysis",
+  "staging_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/staging",
+  "worktree_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/worktrees",
+  "orchestration_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/orchestration",
+  "task_context_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/task-context",
+  "lock_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/locks",
+  "temp_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/tmp",
+  "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+  "historical_roots": {
+    "legacy_lock_root": "/home/shunsukenaito/workspace-local/.ard-campaign-gpu-locks",
+    "analysis_root": "/home/shunsukenaito/workspace-local/ard-analysis",
+    "campaign_run_root": "/home/shunsukenaito/workspace-local/ard-campaign-runs",
+    "run_root": "/home/shunsukenaito/workspace-local/ard-runs",
+    "ferret_result_root": "/home/shunsukenaito/workspace-local/ferret-results"
+  },
+  "hosts": {
+    "hamster": {
+      "hostname": "islab-WS-C621E-SAGE-Series",
+      "execution_class": "local",
+      "remote_mechanism": "local",
+      "gpu_count": 2,
+      "gpus": [
+        {
+          "index": 0,
+          "uuid": "GPU-7ce112db-1ab9-ff86-9810-5bb92e222c2a",
+          "throughput_images_per_second": 679.1
+        },
+        {
+          "index": 1,
+          "uuid": "GPU-9bb01a06-72d2-cc68-eeca-9c2c9daf37ce",
+          "throughput_images_per_second": 679.1
+        }
+      ]
+    },
+    "ferret": {
+      "hostname": "islab-3gpu",
+      "execution_class": "external",
+      "remote_mechanism": "run-on-ferret",
+      "gpu_count": 3,
+      "gpus": [
+        {
+          "index": 0,
+          "uuid": "GPU-d6b53af2-a086-be46-30db-10976ef3b989",
+          "throughput_images_per_second": 599.65
+        },
+        {
+          "index": 1,
+          "uuid": "GPU-cf338b20-ad89-5bfd-bc79-74610aebc333",
+          "throughput_images_per_second": 607.05
+        },
+        {
+          "index": 2,
+          "uuid": "GPU-13e501b2-0ba0-3dd7-9859-e84d4a1d2af7",
+          "throughput_images_per_second": 424.99
+        }
+      ]
+    }
+  }
+}

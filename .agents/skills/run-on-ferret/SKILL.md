@@ -7,7 +7,7 @@ description: Safely prepare, launch, monitor, collect, cancel, and clean fixed-c
 
 Use this skill only through `$run-on-ferret`. Keep planning, edits, Git commits, and analysis on the local host; Ferret receives a detached worktree for one full SHA and executes the supplied argv only.
 
-Run scripts from the repository root. Configuration precedence is CLI arguments, environment, then the safe built-in defaults in `scripts/ferret-common`. Do not put credentials in command arguments or manifests.
+Run scripts from the repository root. Configuration precedence is CLI arguments, environment, then the tracked workspace registry read by `scripts/ferret-common`. Do not put credentials in command arguments or manifests.
 
 ```bash
 .agents/skills/run-on-ferret/scripts/ferret-preflight
@@ -18,6 +18,7 @@ Run scripts from the repository root. Configuration precedence is CLI arguments,
 .agents/skills/run-on-ferret/scripts/ferret-host-confirm \
   --run-id <id> --campaign-id <campaign> --job-id <job> \
   --identity-hash <64-hex> --source-sha <40-hex> --host ferret --gpu-index 0 \
+  --expected-origin-host <remote-hostname> \
   --expected-command-json '["/remote/python", "-m", "ard.cli.train"]'
 .agents/skills/run-on-ferret/scripts/ferret-logs --run-id <id> --tail 200 --both
 .agents/skills/run-on-ferret/scripts/ferret-collect --run-id <id>
@@ -32,9 +33,14 @@ Run scripts from the repository root. Configuration precedence is CLI arguments,
 2. Require an already-pushed, full 40-character SHA and run `prepare`. Git
    mutation in `prepare` is serialized by a per-repository lock, while
    independent prepared worktrees may run concurrently afterward.
+   For orchestrated work, pass `--campaign-id`, `--job-id`,
+   `--identity-hash`, `--execution-host`, and `--expected-origin-host` to
+   `prepare` together. The remote manifest records these values plus its
+   independently observed hostname.
 3. Launch only an explicit argv following `--`; the skill does not parse or `eval` a command string.
 4. For an external orchestrated job, use `ferret-host-confirm` once during the
-   bounded launch window. It converts `ferret-status` into the identity-bound
+   bounded launch window. It compares the remote-prepared manifest against
+   the expected identity/origin, then converts `ferret-status` into the identity-bound
    live-process/GPU/argv payload required for `host_confirmed_started`. Use
    `status` and bounded `logs`; collect small results before any cleanup.
 5. Use `cancel` only for the named run. Cleanup is dry-run unless `--execute` is explicit.

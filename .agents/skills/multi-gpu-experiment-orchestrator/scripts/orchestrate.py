@@ -104,9 +104,7 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], str, Path]:
     orchestration_root = abs_path(manifest.get("orchestration_root"), path.parent)
     if orchestration_root is None:
         orchestration_root = state.parent / "orchestration"
-    manifest["_orchestration_root"] = str(
-        orchestration_root / manifest["campaign_id"] / manifest_sha256
-    )
+    manifest["_orchestration_root"] = str(orchestration_root / manifest["campaign_id"] / manifest_sha256)
 
     jobs = manifest.get("jobs")
     if not isinstance(jobs, list) or not jobs:
@@ -115,8 +113,47 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], str, Path]:
     for job in jobs:
         _validate_job(job, ids, hosts, path.parent)
         _bind_controller_paths(manifest, job)
+    _enforce_workspace_runtime_writes(manifest, path.parent)
     _check_dependencies(jobs)
     return manifest, manifest_sha256, path
+
+
+def _enforce_workspace_runtime_writes(manifest: dict[str, Any], base: Path) -> None:
+    """Fail closed for manifests that opt into the tracked workspace contract.
+
+    The opt-in preserves read-only compatibility for frozen historical
+    manifests while making every newly authored production manifest prove that
+    its future ARD writes live below the registered runtime root.
+    """
+    setting = manifest.get("workspace_contract")
+    if setting is None:
+        return
+    if not isinstance(setting, dict) or setting.get("enforce_future_writes") is not True:
+        raise ValueError(
+            "workspace_contract.enforce_future_writes=true is required when workspace_contract is declared"
+        )
+    registry = abs_path(setting.get("registry"), base)
+    if registry is None:
+        raise ValueError("workspace_contract.registry is required")
+    repo_root = Path(__file__).resolve().parents[4]
+    src = repo_root / "src"
+    if str(src) not in sys.path:
+        sys.path.insert(0, str(src))
+    try:
+        from ard.workspace import load_workspace_contract
+
+        contract = load_workspace_contract(registry)
+    except (ImportError, ValueError) as exc:
+        raise ValueError(f"workspace contract is invalid: {exc}") from exc
+    paths = [Path(manifest["_state_path"]), Path(manifest["_orchestration_root"])]
+    reservation = abs_path(manifest.get("reservation_root"), base)
+    if reservation is not None:
+        paths.append(reservation)
+    paths.extend(Path(job["_output_dir"]) for job in manifest["jobs"])
+    for candidate in paths:
+        contract.require_runtime_write(candidate)
+    manifest["_workspace_registry"] = str(contract.registry_path)
+    manifest["_workspace_registry_sha256"] = contract.registry_sha256
 
 
 def _is_sha(value: Any) -> bool:
@@ -193,6 +230,17 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
         raise ValueError(f"{job_id}: max_attempts must be positive")
     retries["max_attempts"] = max_attempts
     job["retry_policy"] = retries
+    attempt_output = job.get("attempt_scoped_output")
+    if attempt_output is not None:
+        if not isinstance(attempt_output, dict) or attempt_output.get("enabled") is not True:
+            raise ValueError(f"{job_id}: attempt_scoped_output must be {{'enabled': true}} when declared")
+        template_present = any("{attempt_output_dir}" in item for item in command)
+        template_present = template_present or any(
+            isinstance(value, str) and "{attempt_output_dir}" in value for value in (job.get("env", {}) or {}).values()
+        )
+        if not template_present:
+            raise ValueError(f"{job_id}: attempt_scoped_output requires {{attempt_output_dir}} in command or env")
+        job["_attempt_scoped_output"] = True
     executor = job.get("executor", {"type": "local"})
     if not isinstance(executor, dict) or executor.get("type", "local") not in {"local", "external_probe"}:
         raise ValueError(f"{job_id}: executor.type must be local or external_probe")
@@ -221,6 +269,9 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
             if numeric <= 0:
                 raise ValueError(f"{job_id}: {field} must be a positive number")
             job[field] = numeric
+        expected_origin = job.get("expected_origin_host")
+        if expected_origin is not None and (not isinstance(expected_origin, str) or not expected_origin):
+            raise ValueError(f"{job_id}: expected_origin_host must be a non-empty string when declared")
 
 
 def _bind_controller_paths(manifest: dict[str, Any], job: dict[str, Any]) -> None:
@@ -232,9 +283,9 @@ def _bind_controller_paths(manifest: dict[str, Any], job: dict[str, Any]) -> Non
     default completion markers.  Metadata is instead keyed by campaign,
     immutable manifest bytes, and a hash of the job ID in a state-sidecar.
 
-    Explicit technical-failure markers remain in the job output namespace so
-    an argv can emit one without knowing controller internals.  They are not
-    created by the controller before the argv runs.
+    An explicit technical-failure marker may remain under the scientific
+    output for backwards-compatible public CLIs, but the controller default
+    is a sidecar marker.  Neither path is created before the argv runs.
     """
     output = Path(job["_output_dir"])
     job_key = digest({"job_id": job["job_id"]})
@@ -245,7 +296,8 @@ def _bind_controller_paths(manifest: dict[str, Any], job: dict[str, Any]) -> Non
     job["_legacy_completion_marker"] = str(output / "completion.json") if marker is None else None
     job["_legacy_result_dir"] = str(output / "orchestration")
     failure = abs_path(job.get("technical_failure_marker"), output)
-    job["_technical_failure_marker"] = str(failure or output / "technical-failure.json")
+    job["_technical_failure_marker"] = str(failure or controller_dir / "technical-failure.json")
+    job["_legacy_technical_failure_marker"] = str(output / "technical-failure.json") if failure is None else None
     host_confirmation = abs_path(job.get("host_confirmation_marker"), output)
     job["_host_confirmation_marker"] = str(host_confirmation or controller_dir / "host-confirmed.json")
 
@@ -279,6 +331,10 @@ def host_confirmation_valid(manifest: dict[str, Any], job: dict[str, Any], paylo
     if not isinstance(payload, dict):
         return False
     expected_uuid = env.get("ARD_ORCH_GPU_UUID") or None
+    origin_valid = job.get("expected_origin_host") is None or (
+        payload.get("expected_origin_host") == job["expected_origin_host"]
+        and payload.get("observed_origin_host") == job["expected_origin_host"]
+    )
     return (
         payload.get("schema_version") == SCHEMA_VERSION
         and payload.get("status") in {"starting", "running"}
@@ -295,6 +351,7 @@ def host_confirmation_valid(manifest: dict[str, Any], job: dict[str, Any], paylo
         and payload.get("command_argv") == job["remote_command"]
         and isinstance(payload.get("remote_manifest"), str)
         and bool(payload["remote_manifest"])
+        and origin_valid
     )
 
 
@@ -433,16 +490,50 @@ def valid_completion_marker(manifest: dict[str, Any], job: dict[str, Any]) -> bo
 
 
 def failure_info(job: dict[str, Any]) -> dict[str, Any] | None:
-    path = Path(job["_technical_failure_marker"])
-    if not path.exists():
-        return None
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(value, dict) or value.get("failure_class") != "technical":
-        return None
-    return value
+    paths = [Path(job["_technical_failure_marker"])]
+    legacy = job.get("_legacy_technical_failure_marker")
+    if isinstance(legacy, str):
+        paths.append(Path(legacy))
+    for path in paths:
+        if not path.exists():
+            continue
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(value, dict) and value.get("failure_class") == "technical":
+            return value
+    return None
+
+
+def attempt_output_dir(manifest: dict[str, Any], job: dict[str, Any], attempt_id: str) -> Path:
+    return Path(manifest["_orchestration_root"]) / "attempt-staging" / digest({"job_id": job["job_id"]}) / attempt_id
+
+
+def render_attempt_command(command: list[str], output: Path | None) -> list[str]:
+    if output is None:
+        return command
+    return [item.replace("{attempt_output_dir}", str(output)) for item in command]
+
+
+def promote_attempt_output(manifest: dict[str, Any], job: dict[str, Any], attempt_id: str) -> Path:
+    """Atomically promote a validated attempt-scoped scientific output.
+
+    The public CLI exclusively owns the fresh attempt directory.  Only after a
+    successful exit may the controller register it at the canonical output
+    path.  Canonical output paths are immutable and never overwritten.
+    """
+    staging = attempt_output_dir(manifest, job, attempt_id)
+    target = Path(job["_output_dir"])
+    if not staging.exists():
+        raise ValueError(f"attempt-scoped public CLI did not create output: {staging}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        raise ValueError(f"canonical output already exists and cannot be overwritten: {target}")
+    if os.stat(staging.parent).st_dev != os.stat(target.parent).st_dev:
+        raise ValueError("attempt output and canonical output must be on one filesystem for atomic promotion")
+    os.replace(staging, target)
+    return target
 
 
 def valid_failure_marker(manifest: dict[str, Any], job: dict[str, Any]) -> dict[str, Any] | None:
@@ -601,6 +692,9 @@ def start_worker(
     log = Path(job["_controller_dir"]) / f"{job['job_id']}.attempt-{attempt}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     Path(job["_technical_failure_marker"]).unlink(missing_ok=True)
+    legacy_failure = job.get("_legacy_technical_failure_marker")
+    if isinstance(legacy_failure, str):
+        Path(legacy_failure).unlink(missing_ok=True)
     env = os.environ.copy()
     env.update({str(k): str(v) for k, v in job.get("env", {}).items()})
     env.update(
@@ -647,7 +741,7 @@ def start_worker(
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
-    return {
+    record = {
         "attempt": attempt,
         "attempt_id": attempt_id,
         "identity_hash": job_identity(manifest, job),
@@ -659,6 +753,9 @@ def start_worker(
         "log": str(log),
         "status": "running",
     }
+    if job.get("_attempt_scoped_output"):
+        record["attempt_output_dir"] = str(attempt_output_dir(manifest, job, attempt_id))
+    return record
 
 
 def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
@@ -870,7 +967,11 @@ def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_
     env.update({"ARD_ORCH_ATTEMPT": str(attempt), "ARD_ORCH_ATTEMPT_ID": attempt_id})
     cwd = abs_path(job.get("cwd"), Path(manifest["_manifest_path"]).parent) or Path(manifest["_manifest_path"]).parent
     executor = job.get("executor", {"type": "local"}).get("type", "local")
-    command = [str(x) for x in job["command"]]
+    staged_output = attempt_output_dir(manifest, job, attempt_id) if job.get("_attempt_scoped_output") else None
+    if staged_output is not None:
+        env["ARD_ORCH_ATTEMPT_OUTPUT_DIR"] = str(staged_output)
+        env = {key: value.replace("{attempt_output_dir}", str(staged_output)) for key, value in env.items()}
+    command = render_attempt_command([str(x) for x in job["command"]], staged_output)
     code = subprocess.run(command, cwd=cwd, env=env).returncode
     host_confirm_timed_out = False
     host_confirmation: dict[str, Any] | None = None
@@ -901,8 +1002,18 @@ def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_
             delay = interval if deadline is None else min(interval, max(0.01, deadline - time.monotonic()))
             time.sleep(delay)
     if code == 0 and not probe_timed_out:
-        atomic_json(Path(job["_completion_marker"]), marker_payload(manifest, job, attempt, attempt_id))
-        status = "completed"
+        try:
+            if staged_output is not None:
+                promote_attempt_output(manifest, job, attempt_id)
+            atomic_json(Path(job["_completion_marker"]), marker_payload(manifest, job, attempt, attempt_id))
+            status = "completed"
+        except ValueError as exc:
+            atomic_json(
+                Path(job["_technical_failure_marker"]),
+                {"failure_class": "technical", "retryable": True, "reason": str(exc)},
+            )
+            code = 75
+            status = "failed"
     else:
         status = "failed"
     result = {

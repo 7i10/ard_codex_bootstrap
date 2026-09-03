@@ -22,6 +22,12 @@ detached workers, completion markers, retries, and resume.
 1. Freeze a full Git SHA and a JSON manifest. Put all scientific identity in
    each job's `scientific_identity`; the controller hashes it and preserves it
    across retries.
+   New production manifests must opt into the tracked workspace contract:
+   `workspace_contract: {registry: <.../ard_workspace_v1.json>,
+   enforce_future_writes: true}`. State, reservation, controller sidecar, and
+   every future output path then fail closed unless they are below the
+   canonical runtime root. Historical manifests may remain read-only without
+   this opt-in.
 2. Run `validate`, then `preflight`, then `plan` (all are read-only). Resolve
    host-local Python, data, teacher, output, and GPU paths before reserving a
    resource.
@@ -99,6 +105,15 @@ argv position zero. Manifest validation rejects a locally present non-executable
   inside a scientific `output_dir`. Logs, worker results, and default
   completion markers live in a manifest-hash-bound state sidecar, so a public
   CLI may safely require an initially absent output path.
+- For a non-overwriting public CLI that can leave partial output on a
+  technical failure, declare `attempt_scoped_output: {enabled: true}` and put
+  `{attempt_output_dir}` in argv or environment. Each attempt writes a fresh
+  staging namespace; only a successful attempt is atomically promoted to the
+  canonical output. The canonical path is never overwritten.
+- An external confirmation must be derived from the prepared remote manifest,
+  not from local values injected into the response. Declare and validate
+  `expected_origin_host` when the remote executor supports it; the controller
+  rejects a mismatching independently observed remote hostname.
 - Only a job-emitted JSON marker with `failure_class: technical` and
   `retryable: true` can trigger a retry. Accuracy, loss, or a scientific
   outcome is never a retry reason. Retries get a new attempt ID and retain the
@@ -136,6 +151,12 @@ non-scientific integration fixtures intentionally start synthetic training
 subprocesses. A second full invocation is not a status check and must not be
 used to make validation faster; run at most one selected full gate, or record
 why focused tests are the smallest sufficient verification.
+
+For request-to-launch evidence, use `launch_ledger.py init` with
+`--strict-critical-path`. Existing runtime integrations default to a
+30-minute controller-launch SLO; a new runtime/objective uses 90 minutes.
+The ledger records `launch_slo_breached` automatically once the target is
+missed, without weakening any source/lineage gate.
 
 ## Do not use / known limits
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -13,6 +14,14 @@ import pytest
 SCRIPT = Path(__file__).parents[2] / ".agents/skills/multi-gpu-experiment-orchestrator/scripts/orchestrate.py"
 LEDGER = Path(__file__).parents[2] / ".agents/skills/multi-gpu-experiment-orchestrator/scripts/launch_ledger.py"
 SHA = "a" * 40
+
+
+def orchestrator_module():
+    spec = importlib.util.spec_from_file_location("orchestrator_fixture", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def write_manifest(tmp_path: Path, jobs: list[dict], *, hosts: dict | None = None) -> Path:
@@ -117,6 +126,36 @@ def test_launch_ledger_requires_full_prelaunch_evidence_and_measures_target(tmp_
     result = json.loads(invoke_ledger("summary", "--output", str(ledger)).stdout)
     assert result["request_to_controller_minutes"] == pytest.approx(25.0)
     assert result["controller_launch_within_target"] is True
+
+
+def test_strict_critical_path_ledger_records_automatic_slo_breach(tmp_path: Path) -> None:
+    ledger = tmp_path / "strict-ledger.json"
+    initialized = invoke_ledger(
+        "init",
+        "--output",
+        str(ledger),
+        "--campaign-id",
+        "new-runtime",
+        "--requested-at",
+        "2026-08-01T01:00:00+09:00",
+        "--requested-at-precision",
+        "exact",
+        "--request-evidence",
+        "request.md",
+        "--execution-class",
+        "new-runtime",
+        "--strict-critical-path",
+    )
+    assert initialized.returncode == 0, initialized.stderr
+    payload = json.loads(ledger.read_text())
+    assert payload["target_controller_launch_minutes"] == 90
+    assert "integration_smoke_passed" in payload["required_prelaunch_events"]
+
+    rendered = invoke_ledger("summary", "--output", str(ledger))
+
+    assert rendered.returncode == 0
+    recorded = json.loads(ledger.read_text())
+    assert any(event["event"] == "launch_slo_breached" for event in recorded["events"])
 
 
 def test_validate_and_dry_plan_are_read_only(tmp_path: Path) -> None:
@@ -291,6 +330,47 @@ def test_external_probe_requires_host_confirmation_before_completion(tmp_path: P
     assert attempt["host_confirmation"]["remote_manifest"] == "/remote/run/manifest.json"
 
 
+def test_host_confirmation_requires_observed_remote_origin_when_registered(tmp_path: Path) -> None:
+    value = job(tmp_path, "remote", "pass")
+    value.update(
+        {
+            "host": "remote",
+            "executor": {"type": "external_probe"},
+            "completion_probe": [sys.executable, "-c", "pass"],
+            "host_confirm_probe": [sys.executable, "-c", "pass"],
+            "remote_command": ["remote-python", "train.py"],
+            "expected_origin_host": "ferret-node",
+        }
+    )
+    hosts = {"remote": {"backend": "external", "gpus": [{"index": 0, "uuid": "GPU-remote", "throughput": 10}]}}
+    manifest_path = write_manifest(tmp_path, [value], hosts=hosts)
+    module = orchestrator_module()
+    manifest, _, _ = module.load_manifest(manifest_path)
+    job_value = manifest["jobs"][0]
+    env = {"ARD_ORCH_HOST": "remote", "ARD_ORCH_GPU_INDEX": "0", "ARD_ORCH_GPU_UUID": "GPU-remote"}
+    payload = {
+        "schema_version": 1,
+        "status": "running",
+        "process_present": True,
+        "campaign_id": manifest["campaign_id"],
+        "job_id": job_value["job_id"],
+        "identity_hash": module.job_identity(manifest, job_value),
+        "source_sha": SHA,
+        "host": "remote",
+        "gpu_index": 0,
+        "gpu_uuid": "GPU-remote",
+        "pid": 123,
+        "command_argv": ["remote-python", "train.py"],
+        "remote_manifest": "/remote/manifest.json",
+        "expected_origin_host": "ferret-node",
+        "observed_origin_host": "wrong-node",
+    }
+
+    assert module.host_confirmation_valid(manifest, job_value, payload, env) is False
+    payload["observed_origin_host"] = "ferret-node"
+    assert module.host_confirmation_valid(manifest, job_value, payload, env) is True
+
+
 def test_technical_retry_preserves_identity_and_unblocks_endpoint(tmp_path: Path) -> None:
     output = tmp_path / "outputs" / "flaky"
     code = (
@@ -377,6 +457,68 @@ def test_controller_never_precreates_or_pollutes_scientific_output(tmp_path: Pat
     attempt = state["jobs"]["strict-public-cli"]["attempts"][0]
     assert str(output) not in attempt["log"]
     assert (tmp_path / "orchestration").is_dir()
+
+
+def test_attempt_scoped_retry_keeps_partial_output_out_of_canonical_namespace(tmp_path: Path) -> None:
+    failure = tmp_path / "controller-failure.json"
+    code = (
+        "import json,os; from pathlib import Path; out=Path(os.environ['TEST_ATTEMPT_OUT']); "
+        "out.mkdir(parents=True); (out/'payload.txt').write_text(os.environ['ARD_ORCH_ATTEMPT']); "
+        "\nif os.environ['ARD_ORCH_ATTEMPT']=='1':\n"
+        " Path(os.environ['TEST_FAILURE']).write_text(json.dumps({'failure_class':'technical','retryable':True})); "
+        " raise SystemExit(7)\n"
+    )
+    value = job(tmp_path, "attempt-output", code, retries=2)
+    value["attempt_scoped_output"] = {"enabled": True}
+    value["technical_failure_marker"] = str(failure)
+    value["env"] = {"TEST_ATTEMPT_OUT": "{attempt_output_dir}", "TEST_FAILURE": str(failure)}
+    output = Path(value["output_dir"])
+    manifest = write_manifest(tmp_path, [value])
+
+    result = invoke("run", manifest, "--foreground", "--poll-interval", "0.02")
+
+    assert result.returncode == 0, result.stderr
+    assert (output / "payload.txt").read_text() == "2"
+    staging = next((tmp_path / "orchestration").rglob("attempt-staging"))
+    assert any((path / "payload.txt").read_text() == "1" for path in staging.rglob("attempt-output-attempt-1"))
+
+
+def test_workspace_contract_rejects_future_output_outside_registered_runtime(tmp_path: Path) -> None:
+    runtime = tmp_path / "runtime"
+    fields = {
+        "schema_version": 1,
+        "repo_root": str(tmp_path),
+        "dataset_root": str(tmp_path / "dataset"),
+        "ard_dataset_root": str(tmp_path / "dataset" / "ard"),
+        "imagenet_root": str(tmp_path / "dataset" / "imagenet"),
+        "runtime_root": str(runtime),
+        "python": sys.executable,
+        "hosts": {"local": {"hostname": "fixture", "execution_class": "local"}},
+    }
+    for field in ("run_root", "analysis_root", "staging_root", "worktree_root", "orchestration_root", "task_context_root", "lock_root", "temp_root"):
+        fields[field] = str(runtime / field.removesuffix("_root"))
+    registry = tmp_path / "workspace.json"
+    registry.write_text(json.dumps(fields), encoding="utf-8")
+    value = job(tmp_path, "root", "pass")
+    value["output_dir"] = str(runtime / "runs" / "root")
+    manifest = write_manifest(tmp_path, [value])
+    payload = json.loads(manifest.read_text())
+    payload.update(
+        {
+            "state_path": str(runtime / "orchestration" / "state.json"),
+            "orchestration_root": str(runtime / "orchestration"),
+            "reservation_root": str(runtime / "locks"),
+            "workspace_contract": {"registry": str(registry), "enforce_future_writes": True},
+        }
+    )
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    assert invoke("validate", manifest).returncode == 0
+
+    payload["jobs"][0]["output_dir"] = str(tmp_path / "outside-runtime" / "root")
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    rejected = invoke("validate", manifest)
+    assert rejected.returncode != 0
+    assert "future ARD runtime write" in rejected.stderr
 
 
 def test_detached_controller_finishes_without_caller_lifetime(tmp_path: Path) -> None:

@@ -1,10 +1,25 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source "$(dirname "$0")/ferret-common"
-run_id= sha=
-while (($#)); do case "$1" in --run-id) run_id=$2; shift 2;; --sha) sha=$2; shift 2;; *) die "unknown argument $1";; esac; done
+run_id= sha= campaign_id= job_id= identity_hash= execution_host= expected_origin_host=
+while (($#)); do
+  case "$1" in
+    --run-id) run_id=$2; shift 2 ;;
+    --sha) sha=$2; shift 2 ;;
+    --campaign-id) campaign_id=$2; shift 2 ;;
+    --job-id) job_id=$2; shift 2 ;;
+    --identity-hash) identity_hash=$2; shift 2 ;;
+    --execution-host) execution_host=$2; shift 2 ;;
+    --expected-origin-host) expected_origin_host=$2; shift 2 ;;
+    *) die "unknown argument $1" ;;
+  esac
+done
 valid_run_id "$run_id"; valid_sha "$sha"; run=$(run_dir "$run_id")
-"${FERRET_SSH[@]}" "REPO=$(q "$FERRET_REPO_ROOT") EXPECTED=$(q "$FERRET_EXPECTED_REMOTE") ROOT=$(q "$FERRET_RUN_ROOT") RUN=$(q "$run") SHA=$(q "$sha") RID=$(q "$run_id") PYTHON=$(q "$FERRET_PYTHON") LOCK=$(q "$FERRET_PREPARE_LOCK") bash -s" <<'SH'
+identity_values=("$campaign_id" "$job_id" "$identity_hash" "$execution_host" "$expected_origin_host")
+identity_count=0; for value in "${identity_values[@]}"; do [[ -n $value ]] && ((identity_count+=1)); done
+((identity_count==0 || identity_count==${#identity_values[@]})) || die 'orchestration identity fields must be supplied together'
+if ((identity_count)); then [[ $identity_hash =~ ^[0-9a-fA-F]{64}$ ]] || die 'identity hash must be 64 hex characters'; fi
+"${FERRET_SSH[@]}" "REPO=$(q "$FERRET_REPO_ROOT") EXPECTED=$(q "$FERRET_EXPECTED_REMOTE") ROOT=$(q "$FERRET_RUN_ROOT") RUN=$(q "$run") SHA=$(q "$sha") RID=$(q "$run_id") PYTHON=$(q "$FERRET_PYTHON") LOCK=$(q "$FERRET_PREPARE_LOCK") CAMPAIGN=$(q "$campaign_id") JOB=$(q "$job_id") IDENTITY=$(q "$identity_hash") EXECUTION_HOST=$(q "$execution_host") EXPECTED_ORIGIN_HOST=$(q "$expected_origin_host") bash -s" <<'SH'
 set -Eeuo pipefail
 test -d "$REPO/.git"; test "$(git -C "$REPO" remote get-url origin)" = "$EXPECTED"; test ! -e "$RUN"; mkdir -p "$ROOT"; test "$(realpath -m "$(dirname "$RUN")")" = "$(realpath -m "$ROOT")"
 # Multiple external jobs may prepare worktrees concurrently.  Serialize the
@@ -21,9 +36,14 @@ for name in .external teacher_cache; do
   ln -s "$REPO/$name" "$RUN/repo/$name"
   shared+=("$name")
 done
-REPO="$REPO" RUN="$RUN" SHA="$SHA" RID="$RID" "$PYTHON" - <<'PY'
-import datetime,json,os,pathlib,subprocess
-repo=pathlib.Path(os.environ['REPO']); run=pathlib.Path(os.environ['RUN']); p=run/'manifest.json'; d={'schema_version':1,'run_id':os.environ['RID'],'host':'Ferret','requested_by_host':'Hamster','git_sha':os.environ['SHA'].lower(),'git_remote':subprocess.check_output(['git','-C',str(repo),'remote','get-url','origin'],text=True).strip(),'prepared_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'prepared','shared_runtime_assets':{name:str((repo/name).resolve()) for name in ('.external','teacher_cache') if (run/'repo'/name).is_symlink()}}; p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
+REPO="$REPO" RUN="$RUN" SHA="$SHA" RID="$RID" CAMPAIGN="$CAMPAIGN" JOB="$JOB" IDENTITY="$IDENTITY" EXECUTION_HOST="$EXECUTION_HOST" EXPECTED_ORIGIN_HOST="$EXPECTED_ORIGIN_HOST" "$PYTHON" - <<'PY'
+import datetime,json,os,pathlib,socket,subprocess
+repo=pathlib.Path(os.environ['REPO']); run=pathlib.Path(os.environ['RUN']); p=run/'manifest.json'
+d={'schema_version':1,'run_id':os.environ['RID'],'host':'Ferret','git_sha':os.environ['SHA'].lower(),'git_remote':subprocess.check_output(['git','-C',str(repo),'remote','get-url','origin'],text=True).strip(),'prepared_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'prepared','observed_origin_host':socket.gethostname(),'shared_runtime_assets':{name:str((repo/name).resolve()) for name in ('.external','teacher_cache') if (run/'repo'/name).is_symlink()}}
+if os.environ['CAMPAIGN']:
+ d['orchestration_identity']={'campaign_id':os.environ['CAMPAIGN'],'job_id':os.environ['JOB'],'identity_hash':os.environ['IDENTITY'].lower(),'execution_host':os.environ['EXECUTION_HOST']}
+ d['expected_origin_host']=os.environ['EXPECTED_ORIGIN_HOST']
+p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
 PY
 SH
 printf 'prepared %s at %s\n' "$run_id" "$sha"

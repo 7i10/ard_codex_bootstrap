@@ -28,6 +28,7 @@
 - [Experiment taxonomy](EXPERIMENT_PROTOCOL.md): audit, pilot, and canonical production separation
 - [Codex workflow](CODEX_WORKFLOW.md): Sol/Terra/Lunaの役割分担
 - [Ferret execution protocol](FERRET_EXECUTION_PROTOCOL.md): fixed-SHA remote GPU runs from Hamster
+- [Workspace contract](WORKSPACE_CONTRACT.md): canonical future runtime paths and historical-root policy
 - [Legacy campaign archive](../tools/internal/legacy_campaign/README.md): 完了済みHamster/Ferret運用コードの非公開・非runtimeアーカイブ
 - [Multi-GPU orchestration skill](MULTI_GPU_EXPERIMENT_ORCHESTRATION_SKILL.md): manifest-driven scheduling, DAG chaining, retry, and bounded monitoring
 - [I100 Dynamic BDD execution postmortem](ERT_RSLAD_I100_DYNAMIC_BDD_EXECUTION_POSTMORTEM.md): evidence-backed launch/recovery delays and reusable operational safeguards
