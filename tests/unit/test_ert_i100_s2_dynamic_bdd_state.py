@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ard.analysis.ert_i100_s2_dynamic_bdd_state import canonical_state_summary
+from ard.analysis.ert_i100_s2_dynamic_bdd_state import _matches_sha256, canonical_state_summary
 
 
 def _row(sample_id: int, student_correct: bool, student_margin: float, teacher_correct: bool, teacher_margin: float):
@@ -40,3 +40,9 @@ def test_canonical_state_summary_preserves_joint_count_total() -> None:
     result = canonical_state_summary(rows)
     assert result["row_count"] == 10
     assert sum(result["joint_counts"].values()) == 10
+
+
+def test_teacher_sha_check_accepts_a_path_object(tmp_path) -> None:
+    checkpoint = tmp_path / "teacher.pt"
+    checkpoint.write_bytes(b"frozen teacher")
+    assert _matches_sha256(checkpoint, "ba0c97e201a2ce05f581d231a550aa246286c3ac9ac618b482e9a4ac2629b68b")

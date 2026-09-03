@@ -35,6 +35,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _matches_sha256(path: str | Path | None, expected_sha256: str) -> bool:
+    if path is None:
+        return False
+    candidate = Path(path)
+    return candidate.is_file() and _sha256(candidate) == expected_sha256
+
+
 def _q10_fragile_ids(
     rows: Mapping[int, Mapping[str, Any]], *, correct_key: str, margin_key: str
 ) -> tuple[set[int], float]:
@@ -123,7 +130,7 @@ def replay_train_states(
     teacher = build_teacher(config.teacher, tier=config.tier)
     teacher_source = getattr(config.teacher, "checkpoint", None)
     if expected_teacher_sha256 is not None:
-        if not isinstance(teacher_source, str) or _sha256(Path(teacher_source)) != expected_teacher_sha256:
+        if not _matches_sha256(teacher_source, expected_teacher_sha256):
             raise DynamicBDDStateReplayError("Teacher checkpoint SHA-256 differs from frozen input")
 
     train_dataset, _ = build_train_validation_views(
