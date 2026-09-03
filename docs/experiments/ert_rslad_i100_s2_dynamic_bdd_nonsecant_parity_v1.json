@@ -1,0 +1,87 @@
+{
+  "contract": "ert_rslad_i100_s2_dynamic_bdd_nonsecant_parity_v1",
+  "reference_calibration_sha256": "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840",
+  "results": {
+    "dev-1": {
+      "checks": {
+        "base_advkd_norm": {
+          "match": true,
+          "observed": 1.835790991783142,
+          "reference": 1.835790991783142
+        },
+        "detached_boundary_distance_active_count": {
+          "match": true,
+          "observed": 40.0,
+          "reference": 40.0
+        },
+        "detached_boundary_distance_norm": {
+          "match": true,
+          "observed": 0.015213441103696823,
+          "reference": 0.015213447622954845
+        },
+        "pair_margin_active_count": {
+          "match": true,
+          "observed": 40.0,
+          "reference": 40.0
+        },
+        "pair_margin_norm": {
+          "match": true,
+          "observed": 6.615194320678711,
+          "reference": 6.615194320678711
+        }
+      },
+      "inputs": {
+        "checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+        "config_sha256": "e87905b549f741de04576bc36c00c51c0ac464f832dd89d7b5c855349926c5a6",
+        "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4",
+        "replay_sha256": "7899a0f7473862b7d7edd35e6009794d8cb4feb8e485c2ad28708c8a6c933d17",
+        "run": "dev-1",
+        "sample_count": 512,
+        "sample_ids_sha256": "ca7b364322382df9e8302b972710ec46bc4a8b3d9377c6363c2a8712e1a3d39e",
+        "training_attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
+      }
+    },
+    "dev-2": {
+      "checks": {
+        "base_advkd_norm": {
+          "match": true,
+          "observed": 2.781003952026367,
+          "reference": 2.781003952026367
+        },
+        "detached_boundary_distance_active_count": {
+          "match": true,
+          "observed": 41.0,
+          "reference": 41.0
+        },
+        "detached_boundary_distance_norm": {
+          "match": true,
+          "observed": 0.01760629005730152,
+          "reference": 0.01760629005730152
+        },
+        "pair_margin_active_count": {
+          "match": true,
+          "observed": 41.0,
+          "reference": 41.0
+        },
+        "pair_margin_norm": {
+          "match": true,
+          "observed": 11.899555206298828,
+          "reference": 11.899555206298828
+        }
+      },
+      "inputs": {
+        "checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+        "config_sha256": "1ce45685583518a66872b92f40a23c62129b85c6a07c01f50c134b36481dcd5c",
+        "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056",
+        "replay_sha256": "66390e55cf32615e32f179d88b7b0c407cc8afc9efadbfa43944bb22a309ce60",
+        "run": "dev-2",
+        "sample_count": 512,
+        "sample_ids_sha256": "68e6c9868d32eb86b410a70acef56ca9f622b712af57611b29fe2736bdcd9a10",
+        "training_attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
+      }
+    }
+  },
+  "schema_version": 1,
+  "scope": "one deterministic epoch-100 batch per seed; Control AdvKD, DPM, and D-BDD only",
+  "status": "pass"
+}

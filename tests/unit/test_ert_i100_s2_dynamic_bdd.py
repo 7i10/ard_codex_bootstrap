@@ -110,6 +110,83 @@ def test_secant_zero_radius_is_skipped_without_input_gradients() -> None:
     assert trainer._boundary_epoch_stats["boundary_input_gradient_calls"] == 0.0
 
 
+def _secant_loss(
+    trainer: Trainer,
+    batch: IndexedBatch,
+    adversarial: torch.Tensor,
+    *,
+    detach_student_q: bool,
+) -> torch.Tensor:
+    """Independent formula oracle for the Student secant graph regression."""
+    student_adv = trainer.model(adversarial)
+    student_clean = trainer.model(batch.images)
+    with torch.no_grad():
+        teacher_adv = trainer.teacher(adversarial)
+        teacher_clean = trainer.teacher(batch.images)
+        teacher_margin, rival = Trainer._dynamic_pair_margins(teacher_adv, batch.labels)
+        teacher_clean_margin, _ = Trainer._dynamic_pair_margins(teacher_clean, batch.labels, rival)
+    student_margin, _ = Trainer._dynamic_pair_margins(student_adv, batch.labels, rival)
+    student_clean_margin, _ = Trainer._dynamic_pair_margins(student_clean, batch.labels, rival)
+    rho = (adversarial.detach() - batch.images.detach()).abs().flatten(1).amax(dim=1)
+    q_student = (student_margin - student_clean_margin).abs() / (rho + trainer.boundary_epsilon)
+    q_teacher = (teacher_margin - teacher_clean_margin).abs() / (rho + trainer.boundary_epsilon)
+    if detach_student_q:
+        q_student = q_student.detach()
+    return (
+        0.5
+        * torch.relu(
+            teacher_margin / (q_teacher + trainer.boundary_epsilon)
+            - student_margin / (q_student + trainer.boundary_epsilon)
+        ).square()
+        * (teacher_margin > 0).to(dtype=student_margin.dtype)
+        * (rho > trainer.boundary_epsilon).to(dtype=student_margin.dtype)
+    )
+
+
+def test_secant_student_denominator_retains_parameter_graph() -> None:
+    """S-BDD must differ from the obsolete detached-qS approximation.
+
+    The test deliberately uses real forwards through a parameterized Student,
+    so matching values alone cannot hide an incorrect autograd graph.
+    """
+    trainer = _trainer("secant_boundary_distance")
+    images = torch.tensor([[[[1.0, 0.0]]], [[[0.0, 1.0]]]])
+    batch = IndexedBatch(images, torch.tensor([0, 1]), torch.tensor([10, 11]), torch.tensor([True, True]))
+    adversarial = images + 0.1
+
+    actual = trainer._boundary_terms(
+        batch=batch,
+        adversarial=adversarial,
+        logits=trainer.model(adversarial),
+        clean_student_logits=trainer.model(images),
+        teacher_clean_logits=trainer.teacher(images),
+        teacher_adversarial_logits=trainer.teacher(adversarial),
+        treatment_risk=torch.ones(2),
+    )
+    actual_gradient = torch.autograd.grad(actual.sum(), trainer.model.linear.weight)[0]
+
+    expected = _secant_loss(trainer, batch, adversarial, detach_student_q=False)
+    expected_gradient = torch.autograd.grad(expected.sum(), trainer.model.linear.weight)[0]
+    legacy = _secant_loss(trainer, batch, adversarial, detach_student_q=True)
+    legacy_gradient = torch.autograd.grad(legacy.sum(), trainer.model.linear.weight)[0]
+
+    assert torch.allclose(actual_gradient, expected_gradient, atol=1e-7, rtol=1e-6)
+    assert not torch.allclose(actual_gradient, legacy_gradient, atol=1e-7, rtol=1e-6)
+    assert trainer._boundary_epoch_stats["boundary_input_gradient_calls"] == 0.0
+    assert all(parameter.grad is None for parameter in trainer.teacher.parameters())
+
+
+def test_secant_calibration_uses_one_even_sample_median_convention() -> None:
+    """The frozen ratio must hit .25 under the same estimator it reports."""
+    from scripts.recalibrate_ert_i100_s2_secant_boundary_distance import _freeze_coefficient, _median
+
+    base = torch.ones(4, dtype=torch.float64)
+    secant = torch.tensor([1.0, 2.0, 4.0, 8.0], dtype=torch.float64)
+    coefficient = _freeze_coefficient(base, secant)
+    achieved = coefficient * secant / base
+    assert torch.isclose(_median(achieved), torch.tensor(0.25, dtype=torch.float64), atol=1e-12, rtol=0.0)
+
+
 def test_detached_bdd_uses_first_order_input_gradients_only() -> None:
     trainer = _trainer("detached_boundary_distance")
     batch, adv, student_adv, student_clean, teacher_clean, teacher_adv = _inputs()

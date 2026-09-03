@@ -13,6 +13,29 @@ from ard.analysis.ert_rslad_rng_sources import RNGSourceSeeds, ShuffleAugmentati
 from ard.analysis.ert_stage_a_runtime import StageATreatment, run_stage_a_arm
 
 
+def _load_calibration_artifact(path: Path, *, require_hash_sidecar: bool) -> dict[str, object]:
+    """Load an immutable calibration and bind its byte hash into lineage.
+
+    A JSON document cannot safely contain the hash of its own final bytes, so
+    boundary-intervention artifacts carry an adjacent ``.sha256`` sidecar.
+    The in-memory ``artifact_sha256`` is then written into the continuation
+    lineage without mutating the frozen calibration file.
+    """
+    raw = path.read_bytes()
+    calibration = json.loads(raw)
+    if not isinstance(calibration, dict):
+        raise ValueError("calibration artifact must be a JSON object")
+    digest = hashlib.sha256(raw).hexdigest()
+    if require_hash_sidecar:
+        sidecar = path.with_name(path.name + ".sha256")
+        if not sidecar.is_file():
+            raise ValueError(f"boundary calibration hash sidecar is missing: {sidecar}")
+        declared = sidecar.read_text(encoding="utf-8").strip()
+        if declared != digest:
+            raise ValueError(f"boundary calibration hash sidecar mismatch: {sidecar}")
+    return {**calibration, "artifact_sha256": digest}
+
+
 def _parse_budget(raw: str | None) -> float | None:
     if raw is None:
         return None
@@ -105,10 +128,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    calibration = json.loads(args.calibration.read_text(encoding="utf-8"))
-    if not isinstance(calibration, dict):
-        raise ValueError("calibration artifact must be a JSON object")
-    calibration["artifact_sha256"] = hashlib.sha256(args.calibration.read_bytes()).hexdigest()
     treatment = StageATreatment(
         arm=args.arm,
         mask_key=args.mask_key,
@@ -133,6 +152,10 @@ def main(argv: list[str] | None = None) -> int:
         boundary_intervention=args.boundary_intervention,
         boundary_coefficient=args.boundary_coefficient,
         boundary_epsilon=args.boundary_epsilon,
+    )
+    calibration = _load_calibration_artifact(
+        args.calibration,
+        require_hash_sidecar=treatment.boundary_intervention is not None,
     )
     if treatment.mask_key is not None and args.mask is None:
         raise ValueError("selected treatment requires --mask")

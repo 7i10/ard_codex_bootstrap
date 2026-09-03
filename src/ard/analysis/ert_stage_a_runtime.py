@@ -113,8 +113,18 @@ def _validate_stage_a_calibration(treatment: StageATreatment, calibration: dict[
     not require the unrelated teacher-softening ``tau`` field.
     """
     if treatment.boundary_intervention is not None:
-        if calibration.get("contract") != "ert_rslad_i100_s2_dynamic_bdd_calibration_v1":
+        required_contract = {
+            "pair_margin": "ert_rslad_i100_s2_dynamic_bdd_calibration_v1",
+            "detached_boundary_distance": "ert_rslad_i100_s2_dynamic_bdd_calibration_v1",
+            "secant_boundary_distance": "ert_rslad_i100_s2_secant_boundary_distance_calibration_v2",
+        }[treatment.boundary_intervention]
+        if calibration.get("contract") != required_contract:
             raise StageARuntimeError("boundary treatment requires the frozen dynamic-BDD calibration artifact")
+        if (
+            treatment.boundary_intervention == "secant_boundary_distance"
+            and calibration.get("formula_version") != "student_parameter_graph_v2"
+        ):
+            raise StageARuntimeError("S-BDD calibration does not bind the corrected Student parameter graph")
         if calibration.get("boundary_epsilon") != treatment.boundary_epsilon:
             raise StageARuntimeError("boundary treatment epsilon differs from calibration artifact")
         coefficients = calibration.get("coefficients")

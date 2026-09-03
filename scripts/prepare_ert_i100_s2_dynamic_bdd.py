@@ -71,6 +71,7 @@ def _geometry_losses(
     adversarial: torch.Tensor,
     labels: torch.Tensor,
     epsilon: float,
+    modes: tuple[str, ...] = ("pair_margin", "detached_boundary_distance", "secant_boundary_distance"),
 ) -> dict[str, torch.Tensor]:
     # Geometry views use eval mode to preserve BN buffers and avoid
     # batch-composition-dependent input gradients.
@@ -84,33 +85,40 @@ def _geometry_losses(
     teacher_margin, _ = _pair(teacher_adv, labels, rival)
     teacher_clean_margin, _ = _pair(teacher_clean, labels, rival)
     active = (teacher_margin > 0).to(dtype=student_adv.dtype)
-    dpm = 0.5 * F.relu(teacher_margin - student_margin).square() * active
     rho = (adversarial.detach() - images.detach()).abs().flatten(1).amax(dim=1)
-    q_student = (student_margin - student_clean_margin).abs() / (rho + epsilon)
-    q_teacher = (teacher_margin - teacher_clean_margin).abs() / (rho + epsilon)
-    s_bdd = (
-        0.5
-        * F.relu(teacher_margin / (q_teacher + epsilon) - student_margin / (q_student.detach() + epsilon)).square()
-        * active
-        * (rho > epsilon).to(dtype=active.dtype)
-    )
-    # D-BDD uses a fresh eval-mode Student/Teacher forward with input gradients.
-    x = adversarial.detach().requires_grad_(True)
-    with torch.enable_grad():
-        student_geom, _ = _pair(student(x), labels, rival)
-    grad_s = torch.autograd.grad(student_geom.sum(), x, create_graph=False, retain_graph=False)[0].detach()
-    with torch.enable_grad():
-        teacher_geom, _ = _pair(teacher(x), labels, rival)
-    grad_t = torch.autograd.grad(teacher_geom.sum(), x, create_graph=False, retain_graph=False)[0].detach()
-    d_bdd = (
-        0.5
-        * F.relu(
-            teacher_margin / (grad_t.abs().flatten(1).sum(dim=1) + epsilon)
-            - student_margin / (grad_s.abs().flatten(1).sum(dim=1).detach() + epsilon)
-        ).square()
-        * active
-    )
-    return {"pair_margin": dpm, "detached_boundary_distance": d_bdd, "secant_boundary_distance": s_bdd}
+    losses: dict[str, torch.Tensor] = {}
+    if "pair_margin" in modes:
+        losses["pair_margin"] = 0.5 * F.relu(teacher_margin - student_margin).square() * active
+    if "secant_boundary_distance" in modes:
+        # The Student denominator is intentionally graph-bearing.  This is
+        # the first-order S-BDD contract used by the runtime, not the prior
+        # detached-denominator approximation.
+        q_student = (student_margin - student_clean_margin).abs() / (rho + epsilon)
+        q_teacher = (teacher_margin - teacher_clean_margin).abs() / (rho + epsilon)
+        losses["secant_boundary_distance"] = (
+            0.5
+            * F.relu(teacher_margin / (q_teacher + epsilon) - student_margin / (q_student + epsilon)).square()
+            * active
+            * (rho > epsilon).to(dtype=active.dtype)
+        )
+    if "detached_boundary_distance" in modes:
+        # D-BDD uses a fresh eval-mode Student/Teacher forward with input gradients.
+        x = adversarial.detach().requires_grad_(True)
+        with torch.enable_grad():
+            student_geom, _ = _pair(student(x), labels, rival)
+        grad_s = torch.autograd.grad(student_geom.sum(), x, create_graph=False, retain_graph=False)[0].detach()
+        with torch.enable_grad():
+            teacher_geom, _ = _pair(teacher(x), labels, rival)
+        grad_t = torch.autograd.grad(teacher_geom.sum(), x, create_graph=False, retain_graph=False)[0].detach()
+        losses["detached_boundary_distance"] = (
+            0.5
+            * F.relu(
+                teacher_margin / (grad_t.abs().flatten(1).sum(dim=1) + epsilon)
+                - student_margin / (grad_s.abs().flatten(1).sum(dim=1).detach() + epsilon)
+            ).square()
+            * active
+        )
+    return losses
 
 
 def _run(
@@ -120,6 +128,8 @@ def _run(
     mask_path: Path,
     replay_path: Path,
     device: torch.device,
+    modes: tuple[str, ...] = ("pair_margin", "detached_boundary_distance", "secant_boundary_distance"),
+    max_batches: int | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if sha256(checkpoint) != PARENT_SHA[run]:
         raise ValueError(f"{run}: parent SHA mismatch")
@@ -157,6 +167,8 @@ def _run(
     measurements: list[dict[str, Any]] = []
     with _preserve_buffers(student), _preserve_buffers(teacher):
         for batch_index, batch in enumerate(loader):
+            if max_batches is not None and batch_index >= max_batches:
+                break
             batch = batch.to(device)
             with torch.no_grad():
                 teacher_clean = teacher(batch.images.float()).detach().float()
@@ -196,6 +208,7 @@ def _run(
                 adversarial=adversarial.float(),
                 labels=batch.labels,
                 epsilon=BOUNDARY_EPSILON,
+                modes=modes,
             )
             row: dict[str, Any] = {"run": run, "batch": batch_index, "n": int(batch.labels.numel())}
             base_norm = _norm(student, base)

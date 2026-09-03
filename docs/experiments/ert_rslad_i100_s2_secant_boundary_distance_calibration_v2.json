@@ -1,0 +1,212 @@
+{
+  "achieved_ratio_summary": {
+    "secant_boundary_distance": {
+      "iqr": 1.5621741985090305,
+      "max": 20.860330828485544,
+      "median": 0.25,
+      "min": 0.05194830236255509
+    }
+  },
+  "achieved_ratios": {
+    "secant_boundary_distance": [
+      0.21327338650969282,
+      0.17267189815941358,
+      5.159419909162159,
+      4.621197969120652,
+      0.8953723197851449,
+      0.16687489135867734,
+      0.15644287985448163,
+      0.2867266134903072,
+      0.0998345510052339,
+      4.161784751216611,
+      0.12863247411122736,
+      0.4072242254964568,
+      0.1298762769724779,
+      0.05194830236255509,
+      0.32191529335804964,
+      20.860330828485544
+    ]
+  },
+  "boundary_epsilon": 1e-12,
+  "calibration_view_epoch": 100,
+  "coefficients": {
+    "secant_boundary_distance": 1.5219638832872224
+  },
+  "contract": "ert_rslad_i100_s2_secant_boundary_distance_calibration_v2",
+  "formula": "0.5 * relu(dT_sec - dS_sec)^2; dS_sec=mS_adv/(abs(mS_adv-mS_clean)/(rho+eps)+eps); Student qS is not detached",
+  "formula_version": "student_parameter_graph_v2",
+  "inputs": {
+    "dev-1": {
+      "checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "config_sha256": "e87905b549f741de04576bc36c00c51c0ac464f832dd89d7b5c855349926c5a6",
+      "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4",
+      "replay_sha256": "7899a0f7473862b7d7edd35e6009794d8cb4feb8e485c2ad28708c8a6c933d17",
+      "run": "dev-1",
+      "sample_count": 512,
+      "sample_ids_sha256": "ca7b364322382df9e8302b972710ec46bc4a8b3d9377c6363c2a8712e1a3d39e",
+      "training_attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
+    },
+    "dev-2": {
+      "checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "config_sha256": "1ce45685583518a66872b92f40a23c62129b85c6a07c01f50c134b36481dcd5c",
+      "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056",
+      "replay_sha256": "66390e55cf32615e32f179d88b7b0c407cc8afc9efadbfa43944bb22a309ce60",
+      "run": "dev-2",
+      "sample_count": 512,
+      "sample_ids_sha256": "68e6c9868d32eb86b410a70acef56ca9f622b712af57611b29fe2736bdcd9a10",
+      "training_attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
+    }
+  },
+  "measurements": [
+    {
+      "base_advkd_norm": 1.835790991783142,
+      "batch": 0,
+      "n": 64,
+      "run": "dev-1",
+      "secant_boundary_distance_active_count": 47.0,
+      "secant_boundary_distance_norm": 0.2572501003742218,
+      "secant_boundary_distance_ratio_at_1": 0.14013038604375622
+    },
+    {
+      "base_advkd_norm": 1.6617857217788696,
+      "batch": 1,
+      "n": 64,
+      "run": "dev-1",
+      "secant_boundary_distance_active_count": 44.0,
+      "secant_boundary_distance_norm": 0.1885351538658142,
+      "secant_boundary_distance_ratio_at_1": 0.11345334804296879
+    },
+    {
+      "base_advkd_norm": 1.4563173055648804,
+      "batch": 2,
+      "n": 64,
+      "run": "dev-1",
+      "secant_boundary_distance_active_count": 39.0,
+      "secant_boundary_distance_norm": 4.936879634857178,
+      "secant_boundary_distance_ratio_at_1": 3.3899752588205683
+    },
+    {
+      "base_advkd_norm": 1.6384837627410889,
+      "batch": 3,
+      "n": 64,
+      "run": "dev-1",
+      "secant_boundary_distance_active_count": 43.0,
+      "secant_boundary_distance_norm": 4.974991798400879,
+      "secant_boundary_distance_ratio_at_1": 3.036338785608717
+    },
+    {
+      "base_advkd_norm": 1.6273705959320068,
+      "batch": 4,
+      "n": 64,
+      "run": "dev-1",
+      "secant_boundary_distance_active_count": 42.0,
+      "secant_boundary_distance_norm": 0.9573831558227539,
+      "secant_boundary_distance_ratio_at_1": 0.5883006355257719
+    },
+    {
+      "base_advkd_norm": 1.5348751544952393,
+      "batch": 5,
+      "n": 64,
+      "run": "dev-1",
+      "secant_boundary_distance_active_count": 42.0,
+      "secant_boundary_distance_norm": 0.16829054057598114,
+      "secant_boundary_distance_ratio_at_1": 0.10964444898538041
+    },
+    {
+      "base_advkd_norm": 1.6331956386566162,
+      "batch": 6,
+      "n": 64,
+      "run": "dev-1",
+      "secant_boundary_distance_active_count": 44.0,
+      "secant_boundary_distance_norm": 0.16787640750408173,
+      "secant_boundary_distance_ratio_at_1": 0.10279013948516806
+    },
+    {
+      "base_advkd_norm": 1.9542508125305176,
+      "batch": 7,
+      "n": 64,
+      "run": "dev-1",
+      "secant_boundary_distance_active_count": 43.0,
+      "secant_boundary_distance_norm": 0.3681662380695343,
+      "secant_boundary_distance_ratio_at_1": 0.1883925214250282
+    },
+    {
+      "base_advkd_norm": 2.781003952026367,
+      "batch": 0,
+      "n": 64,
+      "run": "dev-2",
+      "secant_boundary_distance_active_count": 43.0,
+      "secant_boundary_distance_norm": 0.18242238461971283,
+      "secant_boundary_distance_ratio_at_1": 0.06559587392416019
+    },
+    {
+      "base_advkd_norm": 1.641484260559082,
+      "batch": 1,
+      "n": 64,
+      "run": "dev-2",
+      "secant_boundary_distance_active_count": 43.0,
+      "secant_boundary_distance_norm": 4.488611221313477,
+      "secant_boundary_distance_ratio_at_1": 2.734483253457865
+    },
+    {
+      "base_advkd_norm": 2.327103614807129,
+      "batch": 2,
+      "n": 64,
+      "run": "dev-2",
+      "secant_boundary_distance_active_count": 44.0,
+      "secant_boundary_distance_norm": 0.19668081402778625,
+      "secant_boundary_distance_ratio_at_1": 0.0845174287798471
+    },
+    {
+      "base_advkd_norm": 2.315011978149414,
+      "batch": 3,
+      "n": 64,
+      "run": "dev-2",
+      "secant_boundary_distance_active_count": 46.0,
+      "secant_boundary_distance_norm": 0.6194161176681519,
+      "secant_boundary_distance_ratio_at_1": 0.26756497310363975
+    },
+    {
+      "base_advkd_norm": 2.3042995929718018,
+      "batch": 4,
+      "n": 64,
+      "run": "dev-2",
+      "secant_boundary_distance_active_count": 47.0,
+      "secant_boundary_distance_norm": 0.1966366320848465,
+      "secant_boundary_distance_ratio_at_1": 0.08533466424443915
+    },
+    {
+      "base_advkd_norm": 2.2827212810516357,
+      "batch": 5,
+      "n": 64,
+      "run": "dev-2",
+      "secant_boundary_distance_active_count": 46.0,
+      "secant_boundary_distance_norm": 0.07791478931903839,
+      "secant_boundary_distance_ratio_at_1": 0.03413241466042824
+    },
+    {
+      "base_advkd_norm": 2.2193450927734375,
+      "batch": 6,
+      "n": 64,
+      "run": "dev-2",
+      "secant_boundary_distance_active_count": 41.0,
+      "secant_boundary_distance_norm": 0.46942055225372314,
+      "secant_boundary_distance_ratio_at_1": 0.21151309626530626
+    },
+    {
+      "base_advkd_norm": 1.6658508777618408,
+      "batch": 7,
+      "n": 64,
+      "run": "dev-2",
+      "secant_boundary_distance_active_count": 50.0,
+      "secant_boundary_distance_norm": 22.832473754882812,
+      "secant_boundary_distance_ratio_at_1": 13.706193069069576
+    }
+  ],
+  "median_estimator": "torch.quantile(q=0.5, interpolation=linear)",
+  "parent_epoch": 99,
+  "reference_v1_calibration_sha256": "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840",
+  "schema_version": 2,
+  "status": "complete_no_update",
+  "target_gradient_ratio": 0.25
+}

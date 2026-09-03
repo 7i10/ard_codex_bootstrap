@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 SCRIPTS = Path(__file__).parents[2] / ".agents/skills/run-on-ferret/scripts"
+ROOT = Path(__file__).parents[2]
 
 
 @pytest.mark.unit
@@ -81,6 +82,31 @@ def test_prepare_serializes_shared_git_fetches() -> None:
     prepare = (SCRIPTS / "ferret-prepare").read_text()
     assert 'exec 9>"/tmp/ard-codex-ferret-prepare.lock"' in prepare
     assert "flock -x 9" in prepare
+
+
+@pytest.mark.unit
+def test_dynamic_bdd_launcher_materializes_hash_bound_parents_before_prepare() -> None:
+    launcher = (ROOT / "scripts/launch_ferret_dynamic_bdd_job.sh").read_text()
+    for argument in (
+        "--parent-config",
+        "--parent-config-sha",
+        "--parent-checkpoint",
+        "--parent-checkpoint-sha",
+        "--preflight",
+    ):
+        assert argument in launcher
+    assert 'exec 8>"/tmp/ard-i100-dynamic-bdd-parent-${seed}.lock"' in launcher
+    assert "flock -x 8" in launcher
+    assert "sha256sum" in launcher
+    assert "ARD_STAGEWISE_RUN_ROOT=\"$remote_parent_root\"" in launcher
+    assert "--expected-source-sha \"$source_sha\"" in launcher
+    for variable in (
+        "ARD_ORCH_CAMPAIGN_ID",
+        "ARD_ORCH_JOB_ID",
+        "ARD_ORCH_ATTEMPT",
+        "ARD_ORCH_ATTEMPT_ID",
+    ):
+        assert variable in launcher
 
 
 @pytest.mark.unit

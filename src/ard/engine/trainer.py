@@ -429,7 +429,6 @@ class Trainer:
         with torch.no_grad():
             teacher_adv_margin, _ = self._dynamic_pair_margins(teacher_adversarial_logits, batch.labels, rival)
             teacher_clean_margin, _ = self._dynamic_pair_margins(teacher_clean_logits, batch.labels, rival)
-            student_clean_margin, _ = self._dynamic_pair_margins(clean_student_logits, batch.labels, rival)
             teacher_gate = (teacher_adv_margin > 0).to(dtype=logits.dtype)
         active = treatment_risk.to(dtype=logits.dtype) * teacher_gate
         mode = self.boundary_intervention
@@ -438,11 +437,17 @@ class Trainer:
             self._boundary_epoch_stats["boundary_gate_positive_count"] += float(teacher_gate.sum().item())
             return 0.5 * F.relu(teacher_adv_margin - student_adv_margin).square() * active
         if mode == "secant_boundary_distance":
+            # S-BDD is a first-order Student geometry loss.  Unlike the
+            # Teacher quantities above, both Student margins deliberately
+            # retain their parameter graph.  Detaching ``q_student`` here
+            # would silently turn this into a different, denominator-frozen
+            # intervention.
+            student_clean_margin, _ = self._dynamic_pair_margins(clean_student_logits, batch.labels, rival)
             rho = (adversarial.detach() - batch.images.detach()).abs().flatten(1).amax(dim=1)
             denominator = rho + self.boundary_epsilon
             q_student = (student_adv_margin - student_clean_margin).abs() / denominator
             q_teacher = (teacher_adv_margin - teacher_clean_margin).abs() / denominator
-            d_student = student_adv_margin / (q_student.detach() + self.boundary_epsilon)
+            d_student = student_adv_margin / (q_student + self.boundary_epsilon)
             d_teacher = teacher_adv_margin / (q_teacher.detach() + self.boundary_epsilon)
             zero_rho = rho <= self.boundary_epsilon
             active = active * (~zero_rho).to(dtype=logits.dtype)

@@ -22,6 +22,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     parser.add_argument("--epochs", type=int, default=115)
+    parser.add_argument("--expected-source-sha")
     args = parser.parse_args()
     if args.epochs != 115:
         raise SystemExit("dynamic-BDD screen is frozen to runtime epochs=115")
@@ -31,6 +32,8 @@ def main() -> int:
         sys.executable, str(runner), "--seed", args.seed, "--arm", args.arm,
         "--output", str(args.output / "training"), "--device", args.device,
     ]
+    if args.expected_source_sha is not None:
+        command += ["--expected-source-sha", args.expected_source_sha]
     completed = subprocess.run(command)
     if completed.returncode != 0:
         return completed.returncode

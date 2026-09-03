@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 from pathlib import Path
 
 from ard.cli.ert_stage_a_runtime import main as runtime_main
@@ -16,7 +17,11 @@ RUN_ROOT = Path(
         "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1",
     )
 ).expanduser()
-CALIBRATION = ROOT / "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_calibration_v1.json"
+CALIBRATIONS = {
+    "dpm": ROOT / "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_calibration_v1.json",
+    "dbdd": ROOT / "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_calibration_v1.json",
+    "sbdd": ROOT / "docs/experiments/ert_rslad_i100_s2_secant_boundary_distance_calibration_v2.json",
+}
 PARENTS = {
     "dev-1": {
         "config": RUN_ROOT / "idbh-s100-s1/resolved_config.yaml",
@@ -45,16 +50,22 @@ def main() -> int:
     p.add_argument("--arm", choices=tuple(ARMS), required=True)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
+    p.add_argument("--expected-source-sha")
     args = p.parse_args()
+    if args.expected_source_sha is not None:
+        actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        if actual != args.expected_source_sha:
+            raise SystemExit(f"source SHA mismatch: expected {args.expected_source_sha}, got {actual}")
     parent = PARENTS[args.seed]
     arm, mode = ARMS[args.arm]
+    calibration_path = CALIBRATIONS.get(args.arm, CALIBRATIONS["dpm"])
     values = [
         "--parent-config",
         str(parent["config"]),
         "--parent-checkpoint",
         str(parent["checkpoint"]),
         "--calibration",
-        str(CALIBRATION),
+        str(calibration_path),
         "--output",
         str(args.output),
         "--epochs",
@@ -96,7 +107,7 @@ def main() -> int:
         ]
         import json
 
-        calibration = json.loads(CALIBRATION.read_text(encoding="utf-8"))
+        calibration = json.loads(calibration_path.read_text(encoding="utf-8"))
         values[values.index("__CALIBRATION__")] = str(calibration["coefficients"][mode])
     return runtime_main(values)
 

@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "contract": "ert_rslad_i100_s2_dynamic_bdd_recovery_contract_v2",
+  "status": "frozen_before_recovery_training",
+  "supersedes": {
+    "contract": "ert_rslad_i100_s2_dynamic_bdd_contract_v1",
+    "path": "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_contract_v1.json",
+    "secant_boundary_distance": "invalid because it detached the Student secant denominator"
+  },
+  "unchanged_contract": {
+    "parent_epoch": 99,
+    "training_epochs": [100, 114],
+    "arms": [
+      "I100_CONTROL",
+      "I100_S2T1_DYNAMIC_PAIR_MARGIN",
+      "I100_S2T1_DETACHED_BOUNDARY_DISTANCE",
+      "I100_S2T1_SECANT_BOUNDARY_DISTANCE"
+    ],
+    "fixed_mask": true,
+    "full_batch_mean": true,
+    "teacher_frozen": true,
+    "training_attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+    "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+    "teacher_checkpoint_sha256": "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
+  },
+  "geometry": {
+    "pair_definition": "current Student strongest non-true logit on x_adv; hard detached rival reused by Student and Teacher",
+    "teacher_terms": "mT_adv, mT_clean, qT, dT are detached/frozen",
+    "student_secant": {
+      "qS": "abs(mS_adv-mS_clean)/(rho+epsilon)",
+      "dS": "mS_adv/(qS+epsilon)",
+      "parameter_graph": "first_order_preserved; qS is not detached"
+    },
+    "loss": "0.5*relu(dT_sec-dS_sec)^2",
+    "epsilon": 1e-12,
+    "no_input_gradients": true,
+    "no_second_order_graph": true,
+    "extra_pgd": 0
+  },
+  "calibration": {
+    "scope": "secant_boundary_distance only",
+    "path": "docs/experiments/ert_rslad_i100_s2_secant_boundary_distance_calibration_v2.json",
+    "sha256": "9764521b1bb654bdb6833b11d5a7ed93670b901aadb8e53540f8e4bd097129fc",
+    "coefficient": 1.5219638832872224,
+    "target_median_gradient_ratio": 0.25,
+    "achieved_median_gradient_ratio": 0.25,
+    "median_estimator": "torch.quantile(q=0.5, interpolation=linear)",
+    "formula_version": "student_parameter_graph_v2"
+  },
+  "nonsecant_reuse": {
+    "calibration_contract": "ert_rslad_i100_s2_dynamic_bdd_calibration_v1",
+    "calibration_sha256": "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840",
+    "one_batch_parity": "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_nonsecant_parity_v1.json"
+  },
+  "recovery_jobs_only": [
+    "dev1-dbdd",
+    "dev1-sbdd",
+    "dev2-control",
+    "dev2-dpm",
+    "dev2-sbdd"
+  ]
+}

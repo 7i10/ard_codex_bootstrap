@@ -18,6 +18,7 @@ from ard.analysis.ert_stage_a_runtime import (
     _validate_shared_prefix_lineage,
     _validate_stage_a_calibration,
 )
+from ard.cli.ert_stage_a_runtime import _load_calibration_artifact
 from ard.config.schema import AttackConfig
 
 
@@ -83,6 +84,52 @@ def test_boundary_calibration_does_not_require_softening_tau() -> None:
             "coefficients": {"detached_boundary_distance": 3.0},
         },
     )
+
+
+def test_secant_boundary_requires_corrected_v2_calibration() -> None:
+    treatment = StageATreatment(
+        arm="SBDD",
+        mask_key="s2_t1",
+        kind="broad",
+        boundary_intervention="secant_boundary_distance",
+        boundary_coefficient=4.0,
+    )
+    with pytest.raises(StageARuntimeError, match="frozen dynamic-BDD calibration"):
+        _validate_stage_a_calibration(
+            treatment,
+            {
+                "contract": "ert_rslad_i100_s2_dynamic_bdd_calibration_v1",
+                "boundary_epsilon": 1e-12,
+                "coefficients": {"secant_boundary_distance": 4.0},
+            },
+        )
+    _validate_stage_a_calibration(
+        treatment,
+        {
+            "contract": "ert_rslad_i100_s2_secant_boundary_distance_calibration_v2",
+            "boundary_epsilon": 1e-12,
+            "formula_version": "student_parameter_graph_v2",
+            "coefficients": {"secant_boundary_distance": 4.0},
+        },
+    )
+
+
+def test_boundary_calibration_requires_matching_hash_sidecar(tmp_path: Path) -> None:
+    path = tmp_path / "calibration.json"
+    path.write_text(json.dumps({"contract": "boundary"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="sidecar is missing"):
+        _load_calibration_artifact(path, require_hash_sidecar=True)
+
+    import hashlib
+
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    path.with_name(path.name + ".sha256").write_text(digest + "\n", encoding="utf-8")
+    loaded = _load_calibration_artifact(path, require_hash_sidecar=True)
+    assert loaded["artifact_sha256"] == digest
+
+    path.with_name(path.name + ".sha256").write_text("0" * 64 + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="sidecar mismatch"):
+        _load_calibration_artifact(path, require_hash_sidecar=True)
 
 
 def test_margin_treatment_contracts_cover_fixed_and_teacher_targets() -> None:

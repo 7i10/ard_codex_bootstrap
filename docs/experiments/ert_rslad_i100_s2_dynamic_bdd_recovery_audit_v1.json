@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "contract": "ert_rslad_i100_s2_dynamic_bdd_recovery_audit_v1",
+  "audit_date": "2026-09-03",
+  "campaign_root": ".cache/analysis/ert-i100-s2-dynamic-bdd-v1",
+  "registered_parent_epoch": 99,
+  "registered_training_attack_identity_sha256": "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d",
+  "registered_endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+  "source_delta_reuse": {
+    "older_source": "1504e7b16e4c92099b15ce28b0f2907bc66411da",
+    "newer_source": "865567d932cd05493aabdde3422f1c869229589b",
+    "audited_diff": [
+      ".agents/skills/run-on-ferret/scripts/ferret-prepare",
+      "tests/remote/test_ferret_scripts.py"
+    ],
+    "scientific_runtime_changed": false,
+    "conditional_reuse": "VALID_COMPLETE reuse remains conditional on the recovery source-delta one-batch parity proof."
+  },
+  "jobs": [
+    {
+      "job_id": "dev1-control",
+      "seed": "dev-1",
+      "arm": "I100_CONTROL",
+      "classification": "VALID_COMPLETE",
+      "source_git_sha": "865567d932cd05493aabdde3422f1c869229589b",
+      "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "parent_epoch": 99,
+      "mask": null,
+      "calibration_sha256": "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840",
+      "completion_marker": "jobs/dev1-control/completion.json",
+      "final_checkpoint_sha256": "b0fc90346fbbf115b1841953bb9aef2fe271cc1b2c385e36efb2b1f69a1e6bef",
+      "endpoint_status": "e104/e109/e114 validation plus e114 train present; each validation endpoint has 5,000 rows and the train endpoint has 45,000 rows",
+      "disposition": "reuse; do not rerun"
+    },
+    {
+      "job_id": "dev1-dpm",
+      "seed": "dev-1",
+      "arm": "I100_S2T1_DYNAMIC_PAIR_MARGIN",
+      "classification": "VALID_COMPLETE",
+      "source_git_sha": "865567d932cd05493aabdde3422f1c869229589b",
+      "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "parent_epoch": 99,
+      "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4",
+      "calibration_sha256": "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840",
+      "completion_marker": "jobs/dev1-dpm/completion.json",
+      "final_checkpoint_sha256": "de8fbd4745c4117ed777df5c3afdd0fa2d665326bf3804f868978e5364f8fb57",
+      "endpoint_status": "e104/e109/e114 validation plus e114 train present; endpoint input checkpoint hashes and CE-PGD20 identity were verified",
+      "disposition": "reuse; do not rerun"
+    },
+    {
+      "job_id": "dev1-dbdd",
+      "seed": "dev-1",
+      "arm": "I100_S2T1_DETACHED_BOUNDARY_DISTANCE",
+      "classification": "NOT_STARTED",
+      "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "parent_epoch": 99,
+      "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4",
+      "reason": "Ferret launch failed before scientific compute because the remote parent resolved config was absent.",
+      "disposition": "launch once after hash-verified parent materialization"
+    },
+    {
+      "job_id": "dev1-sbdd",
+      "seed": "dev-1",
+      "arm": "I100_S2T1_SECANT_BOUNDARY_DISTANCE",
+      "classification": "NOT_STARTED",
+      "parent_checkpoint_sha256": "360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835",
+      "parent_epoch": 99,
+      "mask_sha256": "64ef6ba201ec093c5583cbac78a16e299c30a5e32d98cfcfe1b68c4c1de1b8a4",
+      "reason": "Ferret worktree preparation hit a shared Git ref-lock race before scientific compute.",
+      "disposition": "launch once with corrected S-BDD and v2 calibration"
+    },
+    {
+      "job_id": "dev2-control",
+      "seed": "dev-2",
+      "arm": "I100_CONTROL",
+      "classification": "NOT_STARTED",
+      "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "parent_epoch": 99,
+      "mask": null,
+      "reason": "No training, final checkpoint, or endpoint artifact exists.",
+      "disposition": "launch once"
+    },
+    {
+      "job_id": "dev2-dpm",
+      "seed": "dev-2",
+      "arm": "I100_S2T1_DYNAMIC_PAIR_MARGIN",
+      "classification": "NOT_STARTED",
+      "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "parent_epoch": 99,
+      "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056",
+      "reason": "Ferret launch failed before scientific compute because the remote parent resolved config was absent.",
+      "disposition": "launch once after hash-verified parent materialization"
+    },
+    {
+      "job_id": "dev2-dbdd",
+      "seed": "dev-2",
+      "arm": "I100_S2T1_DETACHED_BOUNDARY_DISTANCE",
+      "classification": "VALID_COMPLETE",
+      "source_git_sha": "1504e7b16e4c92099b15ce28b0f2907bc66411da",
+      "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "parent_epoch": 99,
+      "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056",
+      "calibration_sha256": "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840",
+      "completion_marker": "jobs/dev2-dbdd/completion.json",
+      "final_checkpoint_sha256": "d080c0d33581032817fb2bbe6a3abcb568130e59cfd8e2e80c28f64ade9700a5",
+      "endpoint_status": "e104/e109/e114 validation plus e114 train present; endpoint input checkpoint hashes and CE-PGD20 identity were verified",
+      "disposition": "reuse; do not rerun"
+    },
+    {
+      "job_id": "dev2-sbdd",
+      "seed": "dev-2",
+      "arm": "I100_S2T1_SECANT_BOUNDARY_DISTANCE",
+      "classification": "SCIENTIFICALLY_INVALID",
+      "parent_checkpoint_sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+      "parent_epoch": 99,
+      "mask_sha256": "0e4bbdd458f196bb0791490776a22d5534de7dba8add21e155e6fc9bccbfa056",
+      "calibration_sha256": "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840",
+      "reason": "The run used the detached-qS secant implementation and then became non-finite at epoch 107; it is not the registered S-BDD intervention.",
+      "disposition": "do not resume or reuse; rerun once from e99 with corrected S-BDD and v2 calibration"
+    }
+  ],
+  "counts": {
+    "VALID_COMPLETE": 3,
+    "VALID_TRAIN_ENDPOINT_MISSING": 0,
+    "NOT_STARTED": 4,
+    "TECHNICALLY_INTERRUPTED": 0,
+    "SCIENTIFICALLY_INVALID": 1,
+    "recovery_training_jobs": 5
+  }
+}

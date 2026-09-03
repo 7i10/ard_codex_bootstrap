@@ -8,6 +8,26 @@ interventions on the fixed canonical S2×T1 cohort.  The intervention must keep
 the KL-PGD10 inner attack, full-batch RSLAD reduction, frozen Teacher, and all
 paired RNG/order contracts unchanged.
 
+## Recovery status (2026-09-03)
+
+The first production attempts are under recovery rather than being blindly
+rerun.  The recovery contract is:
+
+- inventory every seed/arm from exact files before launching any GPU work;
+- retain only `VALID_COMPLETE` checkpoints plus their hash-bound endpoints;
+- repair the S-BDD parameter-gradient formula, recalibrate only S-BDD, and
+  treat prior S-BDD output as an invalid detached-secant variant;
+- repair host-local parent materialization and launch-state consistency before
+  launching only the jobs classified `NOT_STARTED`, `TECHNICALLY_INTERRUPTED`,
+  or `SCIENTIFICALLY_INVALID`;
+- add fixed-e99-mask longitudinal state-transition diagnostics from existing
+  and recovered endpoints without retraining merely to add logging.
+
+The recovery is bounded to the originally registered four arms, two
+development seeds, epoch-114 horizon, and CE-PGD20 endpoints.  It does not
+introduce an arm, coefficient sweep, threshold, seed, e199 continuation,
+official test, or AutoAttack.
+
 ## Gates and milestones
 
 - [ ] Reconcile exact e99 parents, masks, Teacher, attack identities, and host
@@ -23,6 +43,28 @@ paired RNG/order contracts unchanged.
       completion-marker DAG; run only the registered e104/e109/e114 endpoints.
 - [ ] Aggregate state effects, runtime cost, lineage, and the preregistered
       BDI1–BDI7 decision; do not extend the experiment.
+
+## Recovery milestones
+
+- [x] R0 — Write the per-job recovery inventory table and classify each job as
+      `VALID_COMPLETE`, `VALID_TRAIN_ENDPOINT_MISSING`, `NOT_STARTED`,
+      `TECHNICALLY_INTERRUPTED`, or `SCIENTIFICALLY_INVALID` from its files,
+      not its exit code alone.
+- [x] R1 — Correct the S-BDD Student secant parameter graph, add the
+      detached-vs-non-detached gradient regression, and calibrate only the
+      corrected S-BDD branch with the original no-update procedure.
+- [x] R2 — Prove control/DPM/D-BDD one-batch parity across the S-BDD-only
+      source delta and harden launch-gate/Ferret parent materialization,
+      completion-probe, and source-freeze checks.
+- [ ] R3 — Commit and push the recovery source, freeze one recovery manifest,
+      and run gate preflight, dry-run, and bounded canary before any recovery
+      job is launched.
+- [ ] R4 — Recover only the non-valid jobs, recover endpoints without
+      retraining where permitted, then validate all final completion markers
+      and endpoint lineage.
+- [ ] R5 — Reconstruct fixed e99 S2×T1 state transitions at e104/e109/e114,
+      aggregate the registered BDI decision, write the human/machine reports,
+      commit, push, and stop.
 
 ## Scientific decisions frozen for this milestone
 
