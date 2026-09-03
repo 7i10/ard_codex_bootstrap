@@ -132,7 +132,14 @@ def replay_canonical_state(
     batch_size: int = 128,
 ) -> dict[str, Any]:
     """Replay one saved checkpoint under the frozen e99 CE20 observation contract."""
-    if output_dir.exists() and any(output_dir.iterdir()):
+    # The detached orchestrator creates ``output_dir/orchestration`` before it
+    # invokes the read-only command.  That execution metadata is not a replay
+    # result and must not turn every otherwise immutable retry into a false
+    # overwrite error.  Any scientific payload remains fail-closed.
+    existing_payload = (
+        [entry for entry in output_dir.iterdir() if entry.name != "orchestration"] if output_dir.exists() else []
+    )
+    if existing_payload:
         raise LongitudinalStateError(f"refusing to overwrite replay output: {output_dir}")
     _deterministic_backend()
     config, payload, student, teacher = _load_checkpoint(

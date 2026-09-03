@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 import torch
 
-from ard.analysis.ert_i100_s2_longitudinal import canonical_action_states
+from ard.analysis.ert_i100_s2_longitudinal import (
+    LongitudinalStateError,
+    canonical_action_states,
+    replay_canonical_state,
+)
 from ard.analysis.ert_i100_s2_secant_forensic import (
     central_difference,
     dynamic_pair_margin,
@@ -82,3 +89,32 @@ def test_secant_student_q_retains_graph_and_teacher_pair_gate_is_not_teacher_arg
     assert values["teacher_pair_gate"].item() == 1.0
     gradient = torch.autograd.grad(values["raw_loss"].sum(), student_logits, allow_unused=False)[0]
     assert torch.isfinite(gradient).all()
+
+
+def test_replay_allows_orchestrator_metadata_but_not_scientific_overwrite(tmp_path: Path) -> None:
+    # Exercise the early output guard without loading a checkpoint: an
+    # orchestrator-side log directory is execution metadata, while a prior
+    # scientific result must fail closed.
+    output = tmp_path / "output"
+    (output / "orchestration").mkdir(parents=True)
+    with pytest.raises(FileNotFoundError):
+        # Passing invalid typed values reaches the checkpoint loader only after
+        # the output guard has accepted the metadata-only directory.
+        replay_canonical_state(  # type: ignore[arg-type]
+            config_path=Path("missing.yaml"),
+            checkpoint=Path("missing.pt"),
+            expected_checkpoint_sha256="0" * 64,
+            expected_epoch=104,
+            output_dir=output,
+            device=torch.device("cpu"),
+        )
+    (output / "state-replay.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(LongitudinalStateError):
+        replay_canonical_state(  # type: ignore[arg-type]
+            config_path=Path("missing.yaml"),
+            checkpoint=Path("missing.pt"),
+            expected_checkpoint_sha256="0" * 64,
+            expected_epoch=104,
+            output_dir=output,
+            device=torch.device("cpu"),
+        )
