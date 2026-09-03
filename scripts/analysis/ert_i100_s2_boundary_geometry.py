@@ -43,6 +43,7 @@ TEACHER_SHA = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
 ENDPOINT_ATTACK_SHA = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
 REPLAY_PROTOCOL = "registered_validation_ce20_batch_keyed_v1: evaluation_attack + batch_index"
 SPLIT_IDENTITY = "16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4"
+TRAIN_SPLIT_IDENTITY = "083045ab272059ee54597530cbc26695bc99c18c917c055842e8c2e1a5377b"
 EPS = 1e-12
 
 
@@ -377,19 +378,24 @@ def _read_rows(path: Path) -> dict[int, dict[str, Any]]:
     return result
 
 
-def _load_endpoints(root: Path, seed: str, ids: set[int]) -> dict[int, dict[int, bool]]:
+def _load_endpoints(
+    root: Path, seed: str, ids: set[int], *, scope: str = "validation"
+) -> dict[int, dict[int, bool]]:
     run_dir = root / ("dev1-control" if seed == "dev-1" else "dev2-control-r6") / "endpoints"
     result: dict[int, dict[int, bool]] = {}
-    for epoch in (104, 109, 114):
-        endpoint_json = run_dir / f"e{epoch}-validation" / "endpoint.json"
-        rows_path = run_dir / f"e{epoch}-validation" / "endpoint-sample-stats.parquet"
+    epochs = (104, 109, 114) if scope == "validation" else (114,)
+    suffix = "validation" if scope == "validation" else "train"
+    split_identity = SPLIT_IDENTITY if scope == "validation" else TRAIN_SPLIT_IDENTITY
+    for epoch in epochs:
+        endpoint_json = run_dir / f"e{epoch}-{suffix}" / "endpoint.json"
+        rows_path = run_dir / f"e{epoch}-{suffix}" / "endpoint-sample-stats.parquet"
         if not endpoint_json.is_file() or not rows_path.is_file():
             raise FileNotFoundError(f"missing control endpoint e{epoch} for {seed}")
         meta = json.loads(endpoint_json.read_text(encoding="utf-8"))
         if meta.get("attack_identity_sha256") != ENDPOINT_ATTACK_SHA or meta.get("row_count") != 5000:
             raise ValueError(f"{seed} e{epoch}: endpoint identity mismatch")
-        if meta.get("split_identity", {}).get("sample_id_label_sha256") != SPLIT_IDENTITY:
-            raise ValueError(f"{seed} e{epoch}: validation split mismatch")
+        if meta.get("split_identity", {}).get("sample_id_label_sha256") != split_identity:
+            raise ValueError(f"{seed} e{epoch}: {scope} split mismatch")
         if meta.get("rows_sha256") != sha256(rows_path):
             raise ValueError(f"{seed} e{epoch}: endpoint row SHA mismatch")
         rows = _read_rows(rows_path)
@@ -620,6 +626,7 @@ def analyze(
     endpoint_root: Path,
     output_json: Path,
     report: Path,
+    train_geometry: Mapping[str, Path] | None = None,
 ) -> dict[str, Any]:
     rows_by_seed = {seed: _read_rows(path) for seed, path in geometry.items()}
     geometry_meta: dict[str, Mapping[str, Any]] = {}
@@ -641,6 +648,30 @@ def analyze(
             raise ValueError(f"{seed}: geometry/mask coverage mismatch")
         masks[seed] = {"count": len(ids), "ids_sha256": ids_sha(ids), "mask_sha256": sha256(mask_path)}
         outcomes[seed] = _load_endpoints(endpoint_root, seed, set(ids))
+    secondary_train: dict[str, Any] | None = None
+    if train_geometry is not None:
+        train_rows_by_seed = {seed: _read_rows(path) for seed, path in train_geometry.items()}
+        secondary_train = {"scope": "train", "endpoint_epoch": 114, "per_seed": {}}
+        for seed, train_rows in train_rows_by_seed.items():
+            ids, _ = _load_mask(mask_paths[seed], seed, "train")
+            if set(ids) != set(train_rows):
+                raise ValueError(f"{seed}: train geometry/mask coverage mismatch")
+            train_outcome = _load_endpoints(endpoint_root, seed, set(ids), scope="train")[114]
+            secondary_train["per_seed"][seed] = {
+                "n": len(train_rows),
+                "endpoint_failure_n": int(sum(bool(train_outcome[sid]) for sid in train_rows)),
+                "univariate": [
+                    _univariate(train_rows, train_outcome, feature)
+                    for feature in (
+                        "student_adv_logit_margin",
+                        "teacher_adv_logit_margin",
+                        "student_distance_inf",
+                        "normal_mismatch",
+                        "delta_distance_inf",
+                        "distance_ratio",
+                    )
+                ],
+            }
     univariate: dict[str, Any] = {}
     predictors: dict[str, Any] = {}
     cells: dict[str, Any] = {}
@@ -737,6 +768,7 @@ def analyze(
         "cross_seed_predictors": predictors,
         "geometry_added_value": geometry_gain,
         "geometry_cells": cells,
+        "secondary_train": secondary_train,
         "history_comparator": "not used; no new History reconstruction",
         "decision": decision,
         "decision_rationale": (
@@ -807,6 +839,26 @@ def analyze(
                     else f"| {epoch} | {cell} | 0 | n/a |"
                 )
         lines.append("")
+    if secondary_train is not None:
+        lines.extend(
+            [
+                "## Secondary train S2×T1 replay",
+                "",
+                "The train replay uses the e99 CropShift view and joins only the existing e114 "
+                "train endpoint. It is secondary and descriptive.",
+                "",
+                "| seed | n | e114 future-failure n | distance-gap AUROC | normal-mismatch AUROC |",
+                "|---|---:|---:|---:|---:|",
+            ]
+        )
+        for seed in ("dev-1", "dev-2"):
+            record = secondary_train["per_seed"][seed]
+            values = {entry["feature"]: entry for entry in record["univariate"]}
+            lines.append(
+                f"| {seed} | {record['n']} | {record['endpoint_failure_n']} | "
+                f"{values['delta_distance_inf']['auroc']:.4f} | {values['normal_mismatch']['auroc']:.4f} |"
+            )
+        lines.append("")
     lines.extend(
         [
             "## Interpretation and stop boundary",
@@ -848,6 +900,8 @@ def main() -> int:
     analyze_parser.add_argument("--crossseed-json", type=Path)
     analyze_parser.add_argument("--cells-json", type=Path)
     analyze_parser.add_argument("--combined-scalars", type=Path)
+    analyze_parser.add_argument("--dev1-train-geometry", type=Path)
+    analyze_parser.add_argument("--dev2-train-geometry", type=Path)
     args = parser.parse_args()
     if args.command == "replay":
         result = replay(
@@ -872,12 +926,18 @@ def main() -> int:
             )
         )
     else:
+        train_geometry = None
+        if (args.dev1_train_geometry is None) != (args.dev2_train_geometry is None):
+            raise ValueError("both train geometry paths are required together")
+        if args.dev1_train_geometry is not None and args.dev2_train_geometry is not None:
+            train_geometry = {"dev-1": args.dev1_train_geometry, "dev-2": args.dev2_train_geometry}
         result = analyze(
             geometry={"dev-1": args.dev1_geometry, "dev-2": args.dev2_geometry},
             mask_paths={"dev-1": args.dev1_mask, "dev-2": args.dev2_mask},
             endpoint_root=args.endpoint_root,
             output_json=args.output_json,
             report=args.report,
+            train_geometry=train_geometry,
         )
         contract = result["contract_details"]
         for path, payload in (
@@ -901,6 +961,10 @@ def main() -> int:
             for seed, path in (("dev-1", args.dev1_geometry), ("dev-2", args.dev2_geometry)):
                 for row in _read_rows(path).values():
                     all_rows.append({"seed": seed, **row})
+            if train_geometry is not None:
+                for seed, path in train_geometry.items():
+                    for row in _read_rows(path).values():
+                        all_rows.append({"seed": seed, **row})
             args.combined_scalars.parent.mkdir(parents=True, exist_ok=True)
             pq.write_table(pa.Table.from_pylist(all_rows), args.combined_scalars, compression="zstd")
         print(json.dumps({"decision": result["decision"], "source_git_sha": result["source_git_sha"]}, sort_keys=True))
