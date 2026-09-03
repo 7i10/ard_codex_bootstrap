@@ -36,6 +36,16 @@ class LongitudinalStateError(RuntimeError):
     """A frozen longitudinal-observation invariant was violated."""
 
 
+def prepare_output_dir(output_dir: Path) -> None:
+    """Allow controller metadata while keeping scientific replay output immutable."""
+    existing_payload = (
+        [entry for entry in output_dir.iterdir() if entry.name != "orchestration"] if output_dir.exists() else []
+    )
+    if existing_payload:
+        raise LongitudinalStateError(f"refusing to overwrite replay output: {output_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+
 def _raw_train_loader(config: Any, *, batch_size: int) -> DataLoader:
     """Match the epoch-99 raw, unaugmented train observation exactly."""
     raw = build_dataset(config.dataset)
@@ -136,11 +146,7 @@ def replay_canonical_state(
     # invokes the read-only command.  That execution metadata is not a replay
     # result and must not turn every otherwise immutable retry into a false
     # overwrite error.  Any scientific payload remains fail-closed.
-    existing_payload = (
-        [entry for entry in output_dir.iterdir() if entry.name != "orchestration"] if output_dir.exists() else []
-    )
-    if existing_payload:
-        raise LongitudinalStateError(f"refusing to overwrite replay output: {output_dir}")
+    prepare_output_dir(output_dir)
     _deterministic_backend()
     config, payload, student, teacher = _load_checkpoint(
         config_path,
@@ -202,7 +208,6 @@ def replay_canonical_state(
     if len(rows) != 45_000 or len({int(row["sample_id"]) for row in rows}) != 45_000:
         raise LongitudinalStateError("canonical replay did not cover exactly the fixed 45,000-row train split")
     states = canonical_action_states(rows)
-    output_dir.mkdir(parents=True, exist_ok=False)
     rows_path = output_dir / "state-rows.parquet"
     pq.write_table(pa.Table.from_pylist(rows), rows_path, compression="zstd")
     result = {

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,6 +11,7 @@ import torch
 from ard.analysis.ert_i100_s2_longitudinal import (
     LongitudinalStateError,
     canonical_action_states,
+    prepare_output_dir,
     replay_canonical_state,
 )
 from ard.analysis.ert_i100_s2_secant_forensic import (
@@ -97,6 +101,8 @@ def test_replay_allows_orchestrator_metadata_but_not_scientific_overwrite(tmp_pa
     # scientific result must fail closed.
     output = tmp_path / "output"
     (output / "orchestration").mkdir(parents=True)
+    prepare_output_dir(output)
+    assert (output / "orchestration").is_dir()
     with pytest.raises(FileNotFoundError):
         # Passing invalid typed values reaches the checkpoint loader only after
         # the output guard has accepted the metadata-only directory.
@@ -118,3 +124,23 @@ def test_replay_allows_orchestrator_metadata_but_not_scientific_overwrite(tmp_pa
             output_dir=output,
             device=torch.device("cpu"),
         )
+
+
+@pytest.mark.parametrize(
+    "script_name",
+    (
+        "replay_ert_i100_s2_runtime_activity_proxy.py",
+        "forensic_ert_i100_s2_secant_boundary_distance.py",
+    ),
+)
+def test_forensic_cli_modules_import_before_gpu_launch(script_name: str) -> None:
+    repo = Path(__file__).parents[2]
+    environment = {**os.environ, "PYTHONPATH": str(repo / "src")}
+    completed = subprocess.run(
+        [sys.executable, str(repo / "scripts" / script_name), "--help"],
+        cwd=repo,
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+    assert completed.returncode == 0, completed.stderr
