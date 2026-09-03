@@ -5,6 +5,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 SCRIPT = Path(__file__).parents[2] / ".agents/skills/production-launch-gate/scripts/launch_gate.py"
@@ -307,6 +308,39 @@ def invoke(spec: Path, *flags: str, output: Path | None = None) -> subprocess.Co
         command += ["--output-dir", str(output)]
     command += list(flags)
     return subprocess.run(command, text=True, capture_output=True)
+
+
+def configure_fast_existing_runtime(spec: dict, tmp_path: Path, *, job_id: str = "train") -> Path:
+    """Bind a CPU-only fixture to the Fast existing-runtime proof set."""
+    config = tmp_path / f"{job_id}-config.json"
+    config.write_text("{}\n", encoding="utf-8")
+    job = next(item for item in spec["jobs"] if item["job_id"] == job_id)
+    job["scientific_config_path"] = str(config)
+    job["config_sha256"] = sha(config)
+    spec["operational_profile"] = "FAST_EXISTING_RUNTIME"
+    spec["canary"] = {
+        "require_exact_smoke": True,
+        "static_cli": [{"job_id": job_id, "commands": [[sys.executable, "-c", "pass"]]}],
+        "jobs": [
+            {
+                "job_id": job_id,
+                "kind": "exact_public_cli",
+                "execution_class": "local",
+                "command": [sys.executable, "-c", "pass"],
+            }
+        ],
+    }
+    return config
+
+
+def smoke_equivalence(branch: str = "base") -> dict[str, str]:
+    return {
+        "public_cli": "fixture-train-v1",
+        "output_semantics": "non-overwrite",
+        "config_schema": "fixture-config-v1",
+        "checkpoint_load_path": "resume-parent-v1",
+        "treatment_branch": branch,
+    }
 
 
 def test_good_spec_freezes_and_binds_inclusive_final_to_exclusive_runtime(tmp_path: Path) -> None:
@@ -645,6 +679,212 @@ def test_exact_public_cli_smoke_binds_source_command_config_parent_and_execution
     assert binding["production_argv_sha256"]
     assert binding["orchestrator_source_sha256"]
     assert (repo / "train.py").is_file()
+
+
+def test_fast_path_f1_eligible_existing_runtime_defaults_to_fast(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    errors: list[dict] = []
+
+    assert gate_module().classify_operational_profile(spec, errors) == "FAST_EXISTING_RUNTIME"
+    assert errors == []
+
+
+def test_fast_path_f2_new_runtime_integration_selects_full(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    spec["integration_changes"] = {"new_trainer_execution_path": True}
+    errors: list[dict] = []
+
+    assert gate_module().classify_operational_profile(spec, errors) == "FULL_NEW_INTEGRATION"
+    assert errors == []
+
+
+def test_fast_path_f3_retains_exact_scientific_identity_checks(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    config = configure_fast_existing_runtime(spec, tmp_path)
+    gate = tmp_path / "gate"
+
+    result = invoke(write_spec(tmp_path, spec), "--canary-only", output=gate)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    manifest = json.loads((gate / "resolved-manifest.json").read_text())
+    identity = manifest["jobs"][0]["scientific_identity"]
+    assert identity["source_sha"] == spec["source"]["git_sha"]
+    assert identity["scientific_config"]["sha256"] == sha(config)
+    assert identity["parent"]["sha256"] == spec["jobs"][0]["parent"]["sha256"]
+    assert manifest["launch_gate"]["operational_profile"] == "FAST_EXISTING_RUNTIME"
+
+
+def test_fast_path_f4_smoke_group_runs_one_representative_for_seed_fanout(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    configure_fast_existing_runtime(spec, tmp_path)
+    second = json.loads(json.dumps(spec["jobs"][0]))
+    second.update(job_id="train-s2", seed="s2", output_dir=str(tmp_path / "outputs" / "train-s2"))
+    spec["jobs"].append(second)
+    for job in spec["jobs"]:
+        job["smoke_group"] = "base-local"
+        job["smoke_equivalence"] = smoke_equivalence()
+    spec["canary"]["jobs"] = [
+        {
+            "job_id": "train",
+            "kind": "exact_public_cli",
+            "execution_class": "local",
+            "smoke_group": "base-local",
+            "command": [sys.executable, "-c", "pass"],
+        },
+        {
+            "job_id": "train-s2",
+            "kind": "exact_public_cli",
+            "execution_class": "local",
+            "smoke_group": "base-local",
+            "command": [sys.executable, "-c", "pass"],
+        },
+    ]
+
+    gate = tmp_path / "gate"
+    result = invoke(write_spec(tmp_path, spec), "--canary-only", output=gate)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    rows = json.loads((gate / "canary.json").read_text())["results"]
+    exact = [row for row in rows if row.get("kind") == "exact_public_cli" and row.get("status") == "pass"]
+    skipped = [row for row in rows if row.get("status") == "skipped_equivalent"]
+    assert len(exact) == 1
+    assert exact[0]["covered_job_ids"] == ["train", "train-s2"]
+    assert len(skipped) == 1
+
+
+def test_fast_path_f5_mixed_execution_classes_need_distinct_smoke_coverage(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    configure_fast_existing_runtime(spec, tmp_path)
+    add_external_host(spec, tmp_path)
+    configure_fast_existing_runtime(spec, tmp_path, job_id="remote-train")
+    local = json.loads(json.dumps(spec["jobs"][0]))
+    local.update(job_id="local-train", host="local", output_dir=str(tmp_path / "outputs" / "local-train"))
+    local["executor"] = {"type": "local"}
+    local["completion_probe"] = None
+    local["host_confirm_probe"] = None
+    local["remote_command"] = None
+    spec["jobs"].append(local)
+    spec["canary"]["jobs"] = [
+        {
+            "job_id": "remote-train",
+            "kind": "exact_public_cli",
+            "execution_class": "external",
+            "command": [sys.executable, "-c", "pass"],
+        }
+    ]
+    spec_path = write_spec(tmp_path, spec)
+    manifest, report = gate_module().resolve_campaign(spec, spec_path)
+    assert report["status"] == "pass", report["errors"]
+    remote = next(job for job in manifest["jobs"] if job["job_id"] == "remote-train")
+    command = [sys.executable, "-c", "pass"]
+    errors = gate_module().validate_exact_smoke_report(
+        manifest,
+        {
+            "results": [
+                {
+                    "job_id": "remote-train",
+                    "kind": "exact_public_cli",
+                    "status": "pass",
+                    "command": command,
+                    "binding": gate_module().exact_smoke_binding(manifest, remote, command),
+                    "covered_job_ids": ["remote-train"],
+                }
+            ]
+        },
+    )
+    assert errors == ["exact smoke does not cover every local/external execution class"]
+
+
+def test_fast_path_f6_exact_remote_smoke_subsumes_generic_lifecycle_canary(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    add_external_host(spec, tmp_path)
+    configure_fast_existing_runtime(spec, tmp_path, job_id="remote-train")
+    staging = tmp_path / "exact-remote-staging.bin"
+    collected = tmp_path / "exact-remote-canonical.bin"
+    code = (
+        "import hashlib,json,os; from pathlib import Path; "
+        f"staging=Path({str(staging)!r}); staging.write_bytes(b'exact-remote'); "
+        "identity={'campaign_id':'gate-fixture','source_sha':os.environ['ARD_ORCH_SOURCE_SHA'],"
+        "'job_id':'remote-train','seed':'s1','arm':'BASE','epoch':2,'split':'held-out','attack_identity':'train'}; "
+        f"artifact={{'origin':{{'host':'remote','path':'/remote/exact.bin'}},'staging_path':str(staging),'collected_path':{str(collected)!r},"
+        "'sha256':hashlib.sha256(staging.read_bytes()).hexdigest(),'identity':identity}; "
+        "print(json.dumps({'schema_version':1,'host':os.environ['ARD_LAUNCH_GATE_EXPECTED_HOST'],"
+        "'source_sha':os.environ['ARD_ORCH_SOURCE_SHA'],'process_confirmed':True,"
+        "'remote_manifest':'/remote/exact-manifest.json','completion_marker':True,'artifact':artifact}))"
+    )
+    spec["canary"]["jobs"] = [
+        {
+            "job_id": "remote-train",
+            "kind": "exact_public_cli",
+            "execution_class": "external",
+            "command": [sys.executable, "-c", code],
+            "subsumes_remote_lifecycle": True,
+        }
+    ]
+
+    gate = tmp_path / "gate"
+    result = invoke(write_spec(tmp_path, spec), "--canary-only", output=gate)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads((gate / "canary.json").read_text())
+    exact = report["results"][0]
+    assert exact["subsumes_remote_lifecycle"] is True
+    assert exact["remote_lifecycle"]["status"] == "pass"
+    assert collected.read_bytes() == b"exact-remote"
+
+
+def test_fast_path_f7_source_change_invalidates_representative_smoke(tmp_path: Path) -> None:
+    spec, repo, _, _ = base_spec(tmp_path)
+    configure_fast_existing_runtime(spec, tmp_path)
+    gate = tmp_path / "gate"
+    spec_path = write_spec(tmp_path, spec)
+    assert invoke(spec_path, "--canary-only", output=gate).returncode == 0
+    manifest = json.loads((gate / "resolved-manifest.json").read_text())
+    report = json.loads((gate / "canary.json").read_text())
+    (repo / "train.py").write_text("drift\n", encoding="utf-8")
+    assert gate_module().validate_exact_smoke_report(manifest, report) == []
+    assert invoke(spec_path, "--fast-launch", output=gate).returncode == 2
+
+
+def test_fast_path_f8_one_command_freezes_one_manifest_then_launches_detached(tmp_path: Path) -> None:
+    spec, repo, _, _ = base_spec(tmp_path)
+    configure_fast_existing_runtime(spec, tmp_path)
+    output = tmp_path / "outputs" / "train"
+    code = (
+        "import json; from pathlib import Path; "
+        f"out=Path({str(output)!r}); out.mkdir(parents=True, exist_ok=True); "
+        "(out/'last.json').write_text(json.dumps({'epoch':2}))"
+    )
+    spec["jobs"][0]["command"] = [sys.executable, "-c", code, "--epochs", "999"]
+    spec["jobs"][0]["cwd"] = str(repo)
+    gate = tmp_path / "gate"
+
+    result = invoke(write_spec(tmp_path, spec), "--fast-launch", output=gate)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    summary = json.loads((gate / "fast-path-summary.json").read_text())
+    assert summary["manifest_freeze_cycles"] == 1
+    assert summary["controller_launch_attempts"] == 1
+    assert summary["request_to_ready_seconds"] is not None
+    manifest = json.loads((gate / "resolved-manifest.json").read_text())
+    state = Path(manifest["state_path"])
+    for _ in range(200):
+        if state.exists() and json.loads(state.read_text()).get("status") == "completed":
+            break
+        time.sleep(0.01)
+    assert state.exists() and json.loads(state.read_text())["status"] == "completed"
+
+
+def test_fast_path_f9_never_generates_campaign_specific_shell_wrappers(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    configure_fast_existing_runtime(spec, tmp_path)
+    gate = tmp_path / "gate"
+
+    result = invoke(write_spec(tmp_path, spec), "--canary-only", output=gate)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not list(tmp_path.rglob("launch_gpu*.sh"))
+    assert not list(tmp_path.rglob("campaign-*.sh"))
 
 
 def test_source_or_orchestrator_change_invalidates_exact_smoke_binding(tmp_path: Path) -> None:

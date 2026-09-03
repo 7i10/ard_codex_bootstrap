@@ -30,6 +30,21 @@ have been prevented by a complete host × job config check before launch.
 
 These elapsed times are not an acceptable baseline for this class of work.
 
+## Fast Path
+
+For an already-integrated runtime, use the existing Production Launch Gate's
+`FAST_EXISTING_RUNTIME` mode rather than serial manual preparation.  It
+resolves one complete input and host × job matrix, executes static checks and
+representative exact public-CLI smoke groups, freezes one manifest, and starts
+the existing detached controller.  `FULL_NEW_INTEGRATION` is reserved for a
+new runtime/trainer/DDP/dataset/remote/checkpoint/artifact mechanism or real
+uncertainty.  Fast never omits scientific identity validation or the exact
+smoke; a stronger exact remote smoke can only subsume its duplicate generic
+lifecycle canary.
+
+The exact contract, campaign annotations, and one-command interface are in
+[Experiment Execution Fast Path](EXPERIMENT_FAST_PATH.md).
+
 ## Root causes owned by Codex
 
 1. **Infrastructure was put on the scientific critical path.**  I added and

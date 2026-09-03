@@ -17,18 +17,28 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
+FAST_EXISTING_RUNTIME = "FAST_EXISTING_RUNTIME"
+FULL_NEW_INTEGRATION = "FULL_NEW_INTEGRATION"
+OPERATIONAL_PROFILES = frozenset({FAST_EXISTING_RUNTIME, FULL_NEW_INTEGRATION})
 EVENTS = frozenset(
     {
         "request_received",
+        "preflight_started",
         "input_inventory_complete",
         "host_config_matrix_complete",
         "source_frozen",
         "source_ready",
+        "static_checks_started",
         "static_checks_passed",
+        "cli_smoke_started",
         "cli_smoke_passed",
         "remote_preflight_passed",
         "integration_smoke_passed",
+        "preflight_passed",
+        "manifest_freeze_started",
         "manifest_frozen",
+        "ready_to_launch",
+        "controller_launch_attempt",
         "controller_spawned",
         "controller_launched",
         "host_confirmed_started",
@@ -98,6 +108,17 @@ def event_times(payload: dict[str, Any], event: str) -> list[datetime]:
     return [parse_time(str(row["at"])) for row in payload["events"] if row.get("event") == event]
 
 
+def first_event_time(payload: dict[str, Any], event: str) -> datetime | None:
+    values = event_times(payload, event)
+    return values[0] if values else None
+
+
+def interval_seconds(payload: dict[str, Any], start: str, finish: str) -> float | None:
+    first = first_event_time(payload, start)
+    last = first_event_time(payload, finish)
+    return (last - first).total_seconds() if first is not None and last is not None else None
+
+
 def summary(payload: dict[str, Any], *, as_of: datetime | None = None) -> dict[str, Any]:
     requested = parse_time(str(payload["requested_at"]))
     launched = event_times(payload, "controller_launched")
@@ -107,12 +128,25 @@ def summary(payload: dict[str, Any], *, as_of: datetime | None = None) -> dict[s
     ready_events = set(payload.get("required_prelaunch_events", LEGACY_READY_EVENTS))
     result: dict[str, Any] = {
         "campaign_id": payload["campaign_id"],
+        "operational_profile": payload.get("operational_profile"),
         "requested_at": requested.isoformat(),
         "requested_at_precision": payload["requested_at_precision"],
         "target_controller_launch_minutes": payload["target_controller_launch_minutes"],
         "required_prelaunch_events_missing": sorted(ready_events - present),
         "launch_blocker_count": sum(row.get("event") == "launch_blocker" for row in payload["events"]),
+        "static_check_duration_seconds": interval_seconds(payload, "static_checks_started", "static_checks_passed"),
+        "smoke_duration_seconds": interval_seconds(payload, "cli_smoke_started", "integration_smoke_passed"),
+        "preflight_duration_seconds": interval_seconds(payload, "preflight_started", "preflight_passed"),
+        "manifest_duration_seconds": interval_seconds(payload, "manifest_freeze_started", "manifest_frozen"),
+        "manifest_freeze_cycles": sum(row.get("event") == "manifest_frozen" for row in payload["events"]),
+        "controller_launch_attempts": sum(
+            row.get("event") == "controller_launch_attempt" for row in payload["events"]
+        ),
     }
+    ready = first_event_time(payload, "ready_to_launch") or first_event_time(payload, "manifest_frozen")
+    if ready is not None:
+        ready_seconds = (ready - requested).total_seconds()
+        result.update(request_to_ready_seconds=ready_seconds, request_to_ready_minutes=ready_seconds / 60.0)
     if launched:
         seconds = (launched[0] - requested).total_seconds()
         result.update(
@@ -162,8 +196,11 @@ def cmd_init(args: argparse.Namespace) -> int:
         raise FileExistsError(f"refusing to overwrite existing launch ledger: {args.output}")
     requested = parse_time(args.requested_at)
     target = args.target_controller_launch_minutes
+    profile = args.operational_profile
+    if profile is None:
+        profile = FULL_NEW_INTEGRATION if args.execution_class == "new-runtime" else FAST_EXISTING_RUNTIME
     if target is None:
-        target = 90 if args.execution_class == "new-runtime" else 30
+        target = 90 if profile == FULL_NEW_INTEGRATION else 30
     if target <= 0:
         raise ValueError("target controller launch minutes must be positive")
     payload = {
@@ -173,6 +210,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         "requested_at_precision": args.requested_at_precision,
         "target_controller_launch_minutes": target,
         "execution_class": args.execution_class,
+        "operational_profile": profile,
         "required_prelaunch_events": sorted(STRICT_READY_EVENTS if args.strict_critical_path else LEGACY_READY_EVENTS),
         "events": [
             {
@@ -233,6 +271,7 @@ def parser() -> argparse.ArgumentParser:
     init.add_argument("--requested-at-precision", choices=("exact", "user-reported", "approximate"), required=True)
     init.add_argument("--request-evidence", required=True)
     init.add_argument("--execution-class", choices=("existing", "new-runtime"), default="existing")
+    init.add_argument("--operational-profile", choices=tuple(sorted(OPERATIONAL_PROFILES)))
     init.add_argument("--target-controller-launch-minutes", type=int)
     init.add_argument("--strict-critical-path", action="store_true")
     init.set_defaults(handler=cmd_init)

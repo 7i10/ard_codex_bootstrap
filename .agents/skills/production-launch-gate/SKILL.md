@@ -33,6 +33,22 @@ selector and not a replacement scheduler.
  --resolved-manifest <path>` to require valid completion markers, expected
  outputs, hashes, and final epochs.
 
+For an existing, already-audited public runtime, use the same gate's one-command
+Fast mode instead of running separate preparation commands:
+
+```bash
+python3 .agents/skills/production-launch-gate/scripts/launch_gate.py \
+  --campaign-spec campaign.json --fast-launch
+```
+
+`FAST_EXISTING_RUNTIME` is the default when no new integration mechanism is
+declared.  It still performs complete resolution, static CLI checks, exact
+public-CLI smoke, one immutable freeze, frozen revalidation, and detached
+orchestrator handoff.  `FULL_NEW_INTEGRATION` is required for a new
+objective/runtime, trainer, DDP, dataset loader, remote executor, checkpoint
+serialization, artifact schema, or genuine integration uncertainty; Fast
+refuses it rather than silently weakening validation.
+
 ## Launch timing and host matrix
 
 For a bounded screen with an existing runtime, initialize the orchestrator
@@ -72,6 +88,16 @@ command, parent, or config change invalidates the smoke and requires a new
 manifest/canary. This is a safety gate, not a shortened scientific run: use a
 registered bounded public interface rather than silently adding an ad-hoc
 one-epoch override.
+
+Use `smoke_group` only when every member declares an identical
+`smoke_equivalence` descriptor covering public CLI, output semantics, config
+schema, checkpoint-load path, and treatment branch.  This avoids duplicate
+per-seed smokes while keeping every job's source/parent/config/Teacher/input
+identity independently validated.  A group cannot mix local and external
+execution classes.  A successful exact external smoke may set
+`subsumes_remote_lifecycle: true` only when it also proves process, source,
+remote manifest, completion, and staged SHA-verified collection; that stronger
+proof suppresses the duplicate generic lifecycle canary for that host only.
 
 New production specs should also carry the workspace-contract opt-in passed to
 the orchestrator. Future runtime writes outside the tracked canonical runtime
@@ -116,6 +142,8 @@ python .agents/skills/production-launch-gate/scripts/launch_gate.py \
   --campaign-spec campaign.json --canary-only
 python .agents/skills/production-launch-gate/scripts/launch_gate.py \
   --campaign-spec campaign.json --launch
+python3 .agents/skills/production-launch-gate/scripts/launch_gate.py \
+  --campaign-spec campaign.json --fast-launch
 python .agents/skills/production-launch-gate/scripts/launch_gate.py \
   --validate-run --resolved-manifest .launch-gate/example/resolved-manifest.json
 ```

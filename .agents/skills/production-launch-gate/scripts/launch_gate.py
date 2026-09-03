@@ -22,6 +22,31 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
+FAST_EXISTING_RUNTIME = "FAST_EXISTING_RUNTIME"
+FULL_NEW_INTEGRATION = "FULL_NEW_INTEGRATION"
+OPERATIONAL_PROFILES = frozenset({FAST_EXISTING_RUNTIME, FULL_NEW_INTEGRATION})
+# A change in any of these integration layers is intentionally a Full-path
+# concern.  They are operational declarations, not scientific identity fields.
+FULL_INTEGRATION_INDICATORS = frozenset(
+    {
+        "new_objective_runtime",
+        "new_trainer_execution_path",
+        "new_ddp_process_model",
+        "new_dataset_loader",
+        "new_remote_execution_mechanism",
+        "new_checkpoint_serialization",
+        "new_artifact_schema",
+    }
+)
+SMOKE_EQUIVALENCE_FIELDS = frozenset(
+    {
+        "public_cli",
+        "output_semantics",
+        "config_schema",
+        "checkpoint_load_path",
+        "treatment_branch",
+    }
+)
 FORBIDDEN_RETRY_FIELDS = {
     "parent",
     "seed",
@@ -37,6 +62,13 @@ FORBIDDEN_RETRY_FIELDS = {
 REQUIRED_ATTACK_FIELDS = {"loss", "epsilon", "step_size", "steps", "random_start", "target"}
 REMOTE_PREFLIGHT_SCHEMA = 1
 
+# Resolve one immutable input once per observed file state.  The cache key
+# deliberately includes path identity and stat evidence; a changed file (or a
+# distinct host-local path) is rehashed.  Revalidation still invokes this
+# helper and therefore observes a changed stat instead of trusting an earlier
+# preparation pass.
+_FILE_DIGEST_CACHE: dict[tuple[str, int, int, int, int, int], str] = {}
+
 
 def now() -> str:
     return dt.datetime.now(dt.UTC).isoformat()
@@ -51,7 +83,80 @@ def digest(value: Any) -> str:
 
 
 def file_digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    resolved = path.resolve()
+    stat = resolved.stat()
+    key = (
+        str(resolved),
+        stat.st_dev,
+        stat.st_ino,
+        stat.st_size,
+        stat.st_mtime_ns,
+        stat.st_ctime_ns,
+    )
+    cached = _FILE_DIGEST_CACHE.get(key)
+    if cached is not None:
+        return cached
+    observed = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    _FILE_DIGEST_CACHE[key] = observed
+    return observed
+
+
+def classify_operational_profile(spec: dict[str, Any], errors: list[dict[str, Any]]) -> str:
+    """Classify only the two permitted operational execution profiles.
+
+    Existing public runtime integrations default to Fast.  An author can
+    explicitly select Full when integration uncertainty remains; any declared
+    new integration mechanism forces Full and rejects an unsafe Fast label.
+    """
+    declared = spec.get("operational_profile")
+    if declared is not None and declared not in OPERATIONAL_PROFILES:
+        error(
+            errors,
+            None,
+            "operational_profile",
+            sorted(OPERATIONAL_PROFILES),
+            declared,
+            "declare FAST_EXISTING_RUNTIME or FULL_NEW_INTEGRATION",
+        )
+    changes = spec.get("integration_changes", {})
+    if changes is None:
+        changes = {}
+    if not isinstance(changes, dict):
+        error(
+            errors,
+            None,
+            "integration_changes",
+            "mapping of known integration changes",
+            type(changes).__name__,
+            "declare new runtime mechanisms explicitly",
+        )
+        changes = {}
+    unknown_changes = sorted(name for name in changes if name not in FULL_INTEGRATION_INDICATORS)
+    if unknown_changes:
+        error(
+            errors,
+            None,
+            "integration_changes",
+            sorted(FULL_INTEGRATION_INDICATORS),
+            unknown_changes,
+            "classify an unknown integration change conservatively as Full outside the Fast contract",
+        )
+    active_changes = sorted(name for name, changed in changes.items() if bool(changed))
+    inferred = FULL_NEW_INTEGRATION if active_changes else FAST_EXISTING_RUNTIME
+    if declared == FAST_EXISTING_RUNTIME and active_changes:
+        error(
+            errors,
+            None,
+            "operational_profile",
+            FULL_NEW_INTEGRATION,
+            FAST_EXISTING_RUNTIME,
+            "new runtime integration cannot use the Fast profile",
+        )
+    # Explicit Full is a conservative decision and remains valid even when a
+    # currently known trigger is not machine-readable in the spec.
+    if declared == FULL_NEW_INTEGRATION:
+        return FULL_NEW_INTEGRATION
+    return inferred
 
 
 def atomic_json(path: Path, value: Any) -> None:
@@ -815,6 +920,7 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
     base = spec_path.parent.resolve()
     errors: list[dict[str, Any]] = []
     warnings: list[str] = []
+    operational_profile = classify_operational_profile(spec, errors)
     if spec.get("schema_version", SCHEMA_VERSION) != SCHEMA_VERSION:
         error(
             errors,
@@ -1200,6 +1306,8 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             "expected_origin_host": job.get("expected_origin_host"),
             "attempt_scoped_output": job.get("attempt_scoped_output"),
             "fanout_group": job.get("fanout_group"),
+            "smoke_group": job.get("smoke_group"),
+            "smoke_equivalence": job.get("smoke_equivalence"),
             "expected_outputs": expected_outputs,
             "expected_final_epoch": job.get("expected_final_epoch", final_epoch),
             "epoch_binding": {
@@ -1307,6 +1415,7 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
         "jobs": resolved_jobs,
         "launch_gate": {
             "schema_version": SCHEMA_VERSION,
+            "operational_profile": operational_profile,
             "scientific_identity_hashes": {job["job_id"]: job["identity_hash"] for job in resolved_jobs},
             "source_repo": source.get("repo_path"),
             "dataset_identity": dataset_identity,
@@ -1325,6 +1434,7 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
         "warnings": warnings,
         "resolved_jobs": resolved_jobs,
         "remote_preflight": remote_preflights,
+        "operational_profile": operational_profile,
     }
     return manifest, report
 
@@ -1427,8 +1537,57 @@ def plan_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         return [{"status": "plan_error", "error": str(exc)}]
 
 
-def run_remote_lifecycle_canaries(manifest: dict[str, Any], gate_dir: Path) -> list[dict[str, Any]]:
-    """Run one bounded launch/status/collection roundtrip per external host."""
+def stage_remote_lifecycle_payload(
+    manifest: dict[str, Any], *, host: str, payload: dict[str, Any], output: Path, timeout: float
+) -> dict[str, Any]:
+    """Validate and stage one remote lifecycle/collection proof.
+
+    Both the legacy generic probe and a stronger exact public-CLI smoke use
+    this same proof path.  The latter may therefore subsume the former without
+    dropping host, source, completion, or SHA-verified collection evidence.
+    """
+    required = (
+        payload.get("schema_version") == REMOTE_PREFLIGHT_SCHEMA
+        and payload.get("host") == host
+        and str(payload.get("source_sha", "")).lower() == manifest["source"]["git_sha"].lower()
+        and payload.get("process_confirmed") is True
+        and isinstance(payload.get("remote_manifest"), str)
+        and bool(payload["remote_manifest"])
+        and payload.get("completion_marker") is True
+    )
+    artifact = payload.get("artifact")
+    if not required or not isinstance(artifact, dict):
+        return {"host": host, "status": "fail", "error": "remote lifecycle evidence incomplete"}
+    inventory = {
+        "schema_version": 1,
+        "campaign_id": manifest["campaign_id"],
+        "source_sha": manifest["source"]["git_sha"],
+        "artifacts": [artifact],
+        "required_cells": [artifact.get("identity")],
+    }
+    inventory_path = output / "collection-manifest.json"
+    atomic_json(inventory_path, inventory)
+    staged = subprocess.run(
+        [sys.executable, str(artifact_inventory_script()), "stage", "--manifest", str(inventory_path)],
+        text=True,
+        capture_output=True,
+    )
+    (output / "collection.stdout.txt").write_text(staged.stdout, encoding="utf-8")
+    (output / "collection.stderr.txt").write_text(staged.stderr, encoding="utf-8")
+    return {
+        "host": host,
+        "status": "pass" if staged.returncode == 0 else "fail",
+        "returncode": staged.returncode,
+        "timeout_seconds": timeout,
+        "artifact_collection": str(inventory_path),
+    }
+
+
+def run_remote_lifecycle_canaries(
+    manifest: dict[str, Any], gate_dir: Path, *, subsumed_hosts: set[str] | None = None
+) -> list[dict[str, Any]]:
+    """Run one bounded launch/status/collection roundtrip per uncovered host."""
+    subsumed_hosts = subsumed_hosts or set()
     canary = manifest.get("launch_gate", {}).get("canary", {})
     entries = canary.get("remote_lifecycle", []) if isinstance(canary, dict) else []
     entries = entries if isinstance(entries, list) else []
@@ -1444,6 +1603,8 @@ def run_remote_lifecycle_canaries(manifest: dict[str, Any], gate_dir: Path) -> l
     }
     results: list[dict[str, Any]] = []
     for host in sorted(external_hosts):
+        if host in subsumed_hosts:
+            continue
         entry = by_host.get(host)
         if entry is None:
             results.append({"host": host, "status": "fail", "error": "remote lifecycle canary missing"})
@@ -1478,43 +1639,8 @@ def run_remote_lifecycle_canaries(manifest: dict[str, Any], gate_dir: Path) -> l
         if not isinstance(payload, dict):
             results.append({"host": host, "status": "fail", "error": "canary did not emit JSON"})
             continue
-        required = (
-            payload.get("schema_version") == REMOTE_PREFLIGHT_SCHEMA
-            and payload.get("host") == host
-            and str(payload.get("source_sha", "")).lower() == manifest["source"]["git_sha"].lower()
-            and payload.get("process_confirmed") is True
-            and isinstance(payload.get("remote_manifest"), str)
-            and bool(payload["remote_manifest"])
-            and payload.get("completion_marker") is True
-        )
-        artifact = payload.get("artifact")
-        if not required or not isinstance(artifact, dict):
-            results.append({"host": host, "status": "fail", "error": "remote lifecycle evidence incomplete"})
-            continue
-        inventory = {
-            "schema_version": 1,
-            "campaign_id": manifest["campaign_id"],
-            "source_sha": manifest["source"]["git_sha"],
-            "artifacts": [artifact],
-            "required_cells": [artifact.get("identity")],
-        }
-        inventory_path = output / "collection-manifest.json"
-        atomic_json(inventory_path, inventory)
-        staged = subprocess.run(
-            [sys.executable, str(artifact_inventory_script()), "stage", "--manifest", str(inventory_path)],
-            text=True,
-            capture_output=True,
-        )
-        (output / "collection.stdout.txt").write_text(staged.stdout, encoding="utf-8")
-        (output / "collection.stderr.txt").write_text(staged.stderr, encoding="utf-8")
         results.append(
-            {
-                "host": host,
-                "status": "pass" if staged.returncode == 0 else "fail",
-                "returncode": staged.returncode,
-                "timeout_seconds": timeout,
-                "artifact_collection": str(inventory_path),
-            }
+            stage_remote_lifecycle_payload(manifest, host=host, payload=payload, output=output, timeout=timeout)
         )
     return results
 
@@ -1522,6 +1648,68 @@ def run_remote_lifecycle_canaries(manifest: dict[str, Any], gate_dir: Path) -> l
 def execution_class(manifest: dict[str, Any], job: dict[str, Any]) -> str:
     profile = manifest["hosts"].get(job["host"], {})
     return "external" if profile.get("backend", "local") == "external" else "local"
+
+
+def smoke_group_contract(manifest: dict[str, Any]) -> tuple[dict[str, list[dict[str, Any]]], list[str]]:
+    """Return explicit smoke groups and reject unsafe equivalence claims.
+
+    A representative smoke proves an execution branch, not every seed's
+    scientific state.  Every member remains independently identity-validated
+    during campaign resolution; grouping is permitted only for a complete,
+    author-declared operational equivalence descriptor and one execution
+    class.
+    """
+    groups: dict[str, list[dict[str, Any]]] = {}
+    errors: list[str] = []
+    for job in manifest.get("jobs", []):
+        group = job.get("smoke_group")
+        if group is None:
+            continue
+        if not isinstance(group, str) or not group:
+            errors.append(f"job {job.get('job_id')} has an invalid smoke_group")
+            continue
+        groups.setdefault(group, []).append(job)
+    for group, jobs in groups.items():
+        descriptors: list[dict[str, Any]] = []
+        classes: set[str] = set()
+        for job in jobs:
+            descriptor = job.get("smoke_equivalence")
+            if not isinstance(descriptor, dict):
+                errors.append(f"smoke_group {group} requires smoke_equivalence for {job.get('job_id')}")
+                continue
+            missing = sorted(SMOKE_EQUIVALENCE_FIELDS - set(descriptor))
+            if missing:
+                errors.append(f"smoke_group {group} is missing equivalence fields: {', '.join(missing)}")
+                continue
+            descriptors.append({field: descriptor[field] for field in sorted(SMOKE_EQUIVALENCE_FIELDS)})
+            classes.add(execution_class(manifest, job))
+        if len(classes) > 1:
+            errors.append(f"smoke_group {group} mixes local and external execution classes")
+        if descriptors and any(value != descriptors[0] for value in descriptors[1:]):
+            errors.append(f"smoke_group {group} contains non-equivalent public runtime branches")
+    return groups, errors
+
+
+def smoke_group_coverage(manifest: dict[str, Any], job: dict[str, Any]) -> list[str]:
+    group = job.get("smoke_group")
+    if not isinstance(group, str) or not group:
+        return [str(job["job_id"])]
+    return [
+        str(candidate["job_id"])
+        for candidate in manifest.get("jobs", [])
+        if candidate.get("smoke_group") == group
+    ]
+
+
+def requires_exact_smoke(job: dict[str, Any]) -> bool:
+    """Keep public-runtime smoke coverage focused on executable method paths.
+
+    Collection, inventory, aggregation, and report nodes are protected by
+    their dependency/collection contracts.  Treating them as a second local
+    public-runtime class would force a duplicate unrelated smoke for every
+    remote scientific campaign.
+    """
+    return job.get("job_type", "training") not in {"collection", "inventory", "aggregation", "report", "finalization"}
 
 
 def orchestrator_source_sha256() -> str:
@@ -1542,6 +1730,7 @@ def exact_smoke_binding(manifest: dict[str, Any], job: dict[str, Any], command: 
         "manifest_schema_version": manifest["schema_version"],
         "execution_class": execution_class(manifest, job),
         "fanout_group": job.get("fanout_group") or "__all__",
+        "smoke_group": job.get("smoke_group"),
     }
 
 
@@ -1605,13 +1794,14 @@ def validate_exact_smoke_report(manifest: dict[str, Any], report: dict[str, Any]
     """Reject fan-out when a source/argv/parent/config-bound smoke is stale."""
     if not manifest.get("launch_gate", {}).get("require_exact_smoke"):
         return []
+    explicit_groups, errors = smoke_group_contract(manifest)
     exact = [
         item
         for item in report.get("results", [])
         if item.get("kind") == "exact_public_cli" and item.get("status") == "pass"
     ]
-    errors: list[str] = []
-    required_classes = {execution_class(manifest, job) for job in manifest["jobs"]}
+    smoke_jobs = [job for job in manifest["jobs"] if requires_exact_smoke(job)]
+    required_classes = {execution_class(manifest, job) for job in smoke_jobs}
     observed_classes = {item.get("binding", {}).get("execution_class") for item in exact}
     if not required_classes <= observed_classes:
         errors.append("exact smoke does not cover every local/external execution class")
@@ -1625,8 +1815,33 @@ def validate_exact_smoke_report(manifest: dict[str, Any], report: dict[str, Any]
         )
         if not valid_binding:
             errors.append(f"exact smoke binding is stale for {entry.get('job_id')}")
+        coverage = entry.get("covered_job_ids", [entry.get("job_id")])
+        if not isinstance(coverage, list) or not all(isinstance(value, str) for value in coverage):
+            errors.append(f"exact smoke coverage is malformed for {entry.get('job_id')}")
+            continue
+        group = job.get("smoke_group") if job is not None else None
+        if isinstance(group, str) and group:
+            expected_coverage = set(smoke_group_coverage(manifest, job))
+            if set(coverage) != expected_coverage:
+                errors.append(f"smoke_group {group} has incomplete representative coverage")
+            if entry.get("binding", {}).get("smoke_group") != group:
+                errors.append(f"smoke_group {group} binding is stale for {entry.get('job_id')}")
+        elif coverage != [entry.get("job_id")]:
+            errors.append(f"non-group exact smoke cannot cover other jobs: {entry.get('job_id')}")
+    for group, jobs in explicit_groups.items():
+        expected = {str(job["job_id"]) for job in jobs}
+        entries = [
+            item
+            for item in exact
+            if item.get("binding", {}).get("smoke_group") == group
+            and set(item.get("covered_job_ids", [])) == expected
+        ]
+        if not entries:
+            errors.append(f"smoke_group {group} has no exact public-CLI representative")
     groups: dict[str, list[dict[str, Any]]] = {}
-    for job in manifest["jobs"]:
+    for job in smoke_jobs:
+        if job.get("smoke_group") is not None:
+            continue
         groups.setdefault(job.get("fanout_group") or "__all__", []).append(job)
     for group, jobs in groups.items():
         if len(jobs) <= 1:
@@ -1643,6 +1858,11 @@ def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
     canary = manifest.get("launch_gate", {}).get("canary", {})
     entries = canary.get("jobs", []) if isinstance(canary, dict) else []
     results: list[dict[str, Any]] = []
+    _, group_errors = smoke_group_contract(manifest)
+    for message in group_errors:
+        results.append({"status": "fail", "kind": "smoke_group", "error": message})
+    seen_groups: set[str] = set()
+    subsumed_hosts: set[str] = set()
     for entry in entries:
         if (
             not isinstance(entry, dict)
@@ -1659,6 +1879,29 @@ def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
         if kind not in {"bounded_canary", "exact_public_cli"}:
             results.append({"job_id": job["job_id"], "status": "fail", "error": "unknown canary kind"})
             continue
+        smoke_group = job.get("smoke_group") if kind == "exact_public_cli" else None
+        if entry.get("smoke_group") is not None and entry.get("smoke_group") != smoke_group:
+            results.append(
+                {
+                    "job_id": job["job_id"],
+                    "status": "fail",
+                    "error": "canary smoke_group differs from the resolved production job",
+                }
+            )
+            continue
+        if isinstance(smoke_group, str) and smoke_group:
+            if smoke_group in seen_groups:
+                results.append(
+                    {
+                        "job_id": job["job_id"],
+                        "kind": kind,
+                        "smoke_group": smoke_group,
+                        "status": "skipped_equivalent",
+                        "covered_by": smoke_group,
+                    }
+                )
+                continue
+            seen_groups.add(smoke_group)
         binding = exact_smoke_binding(manifest, job, entry["command"]) if kind == "exact_public_cli" else None
         if kind == "exact_public_cli" and (
             binding["config_sha256"] is None or binding["parent_checkpoint_sha256"] is None
@@ -1687,6 +1930,8 @@ def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
         env["ARD_LAUNCH_GATE_CANARY"] = "1"
         env["ARD_ORCH_JOB_ID"] = job["job_id"]
         env["ARD_ORCH_SOURCE_SHA"] = manifest["source"]["git_sha"]
+        env["ARD_LAUNCH_GATE_EXPECTED_HOST"] = job["host"]
+        env["ARD_LAUNCH_GATE_EXPECTED_EXECUTION_CLASS"] = execution_class(manifest, job)
         if job.get("gpu") is not None:
             env["CUDA_VISIBLE_DEVICES"] = str(job["gpu"])
         timeout = float(entry.get("timeout_seconds", 30))
@@ -1696,17 +1941,46 @@ def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
             )
             (output / "stdout.txt").write_text(completed.stdout, encoding="utf-8")
             (output / "stderr.txt").write_text(completed.stderr, encoding="utf-8")
-            results.append(
-                {
-                    "job_id": job["job_id"],
-                    "kind": kind,
-                    "command": entry["command"],
-                    "binding": binding,
-                    "status": "pass" if completed.returncode == 0 else "fail",
-                    "returncode": completed.returncode,
-                    "timeout_seconds": timeout,
-                }
-            )
+            result = {
+                "job_id": job["job_id"],
+                "kind": kind,
+                "command": entry["command"],
+                "binding": binding,
+                "smoke_group": smoke_group,
+                "covered_job_ids": smoke_group_coverage(manifest, job)
+                if kind == "exact_public_cli"
+                else [job["job_id"]],
+                "status": "pass" if completed.returncode == 0 else "fail",
+                "returncode": completed.returncode,
+                "timeout_seconds": timeout,
+            }
+            if (
+                result["status"] == "pass"
+                and kind == "exact_public_cli"
+                and execution_class(manifest, job) == "external"
+                and entry.get("subsumes_remote_lifecycle") is True
+            ):
+                try:
+                    lifecycle_payload = json.loads(completed.stdout)
+                except json.JSONDecodeError:
+                    lifecycle_payload = None
+                if not isinstance(lifecycle_payload, dict):
+                    result.update(status="fail", error="exact remote smoke did not emit lifecycle JSON")
+                else:
+                    lifecycle = stage_remote_lifecycle_payload(
+                        manifest,
+                        host=str(job["host"]),
+                        payload=lifecycle_payload,
+                        output=output,
+                        timeout=timeout,
+                    )
+                    result["remote_lifecycle"] = lifecycle
+                    if lifecycle["status"] != "pass":
+                        result.update(status="fail", error="exact remote smoke lifecycle proof failed")
+                    else:
+                        result["subsumes_remote_lifecycle"] = True
+                        subsumed_hosts.add(str(job["host"]))
+            results.append(result)
         except subprocess.TimeoutExpired:
             results.append(
                 {"job_id": job["job_id"], "status": "fail", "error": "canary timeout", "timeout_seconds": timeout}
@@ -1718,9 +1992,11 @@ def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
                 "error": "no canary jobs declared; use --canary-only with a bounded non-scientific canary",
             }
         )
-    results.extend(run_remote_lifecycle_canaries(manifest, gate_dir))
+    results.extend(run_remote_lifecycle_canaries(manifest, gate_dir, subsumed_hosts=subsumed_hosts))
     return {
-        "status": "pass" if all(item.get("status") == "pass" for item in results) else "fail",
+        "status": "pass"
+        if all(item.get("status") in {"pass", "skipped_equivalent"} for item in results)
+        else "fail",
         "started_at": started_at,
         "finished_at": now(),
         "results": results,
@@ -1913,6 +2189,76 @@ def write_remote_preflight_record(gate_dir: Path, report: dict[str, Any]) -> Non
         atomic_json(gate_dir / "remote-preflight.json", {"schema_version": REMOTE_PREFLIGHT_SCHEMA, "hosts": records})
 
 
+def _timing_value(ledger: list[dict[str, Any]], event_type: str) -> dt.datetime | None:
+    for event in ledger:
+        if event.get("event_type") == event_type and isinstance(event.get("timestamp"), str):
+            try:
+                value = dt.datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            return value.astimezone(dt.UTC) if value.tzinfo is not None else None
+    return None
+
+
+def _timing_seconds(ledger: list[dict[str, Any]], start: str, finish: str) -> float | None:
+    first = _timing_value(ledger, start)
+    last = _timing_value(ledger, finish)
+    return (last - first).total_seconds() if first is not None and last is not None else None
+
+
+def preparation_summary(manifest: dict[str, Any], ledger: list[dict[str, Any]]) -> dict[str, Any]:
+    """Render the compact, non-scientific Fast preparation budget."""
+    requested = _timing_value(ledger, "request_received") or _timing_value(ledger, "gate_started")
+    ready = _timing_value(ledger, "ready_to_launch") or _timing_value(ledger, "manifest_frozen")
+    controller = _timing_value(ledger, "controller_launched")
+    return {
+        "schema_version": 1,
+        "operational_profile": manifest.get("launch_gate", {}).get("operational_profile"),
+        "request_to_ready_seconds": (ready - requested).total_seconds()
+        if requested is not None and ready is not None
+        else None,
+        "request_to_controller_seconds": (controller - requested).total_seconds()
+        if requested is not None and controller is not None
+        else None,
+        "static_check_duration_seconds": _timing_seconds(ledger, "static_checks_started", "static_checks_passed"),
+        "smoke_duration_seconds": _timing_seconds(ledger, "cli_smoke_started", "integration_smoke_passed"),
+        "preflight_duration_seconds": _timing_seconds(ledger, "preflight_started", "preflight_passed"),
+        "manifest_duration_seconds": _timing_seconds(ledger, "manifest_freeze_started", "manifest_frozen"),
+        "manifest_freeze_cycles": sum(event.get("event_type") == "manifest_frozen" for event in ledger),
+        "controller_launch_attempts": sum(event.get("event_type") == "controller_launch_attempt" for event in ledger),
+        "events": ledger,
+    }
+
+
+def fast_launch_errors(manifest: dict[str, Any]) -> list[str]:
+    """Require the existing safe proof set before accepting one-command Fast launch."""
+    errors: list[str] = []
+    profile = manifest.get("launch_gate", {}).get("operational_profile")
+    if profile != FAST_EXISTING_RUNTIME:
+        errors.append("fast launch requires FAST_EXISTING_RUNTIME; use the Full integration workflow")
+    canary = manifest.get("launch_gate", {}).get("canary", {})
+    if not isinstance(canary, dict) or not manifest.get("launch_gate", {}).get("require_exact_smoke"):
+        errors.append("fast launch requires canary.require_exact_smoke=true")
+    elif not isinstance(canary.get("static_cli"), list) or not canary["static_cli"]:
+        errors.append("fast launch requires at least one bounded static CLI check")
+    for job in manifest.get("jobs", []):
+        if job.get("gpu_count", 1) != 1:
+            errors.append(f"fast launch only supports the existing one-GPU-per-job contract: {job.get('job_id')}")
+    _, group_errors = smoke_group_contract(manifest)
+    errors.extend(group_errors)
+    return errors
+
+
+def write_preparation_summary(
+    manifest: dict[str, Any], ledger: list[dict[str, Any]], gate_dir: Path, report: dict[str, Any]
+) -> None:
+    summary = preparation_summary(manifest, ledger)
+    report["timing_ledger"] = ledger
+    report["preparation_summary"] = summary
+    if manifest.get("launch_gate", {}).get("operational_profile") == FAST_EXISTING_RUNTIME:
+        atomic_json(gate_dir / "fast-path-summary.json", summary)
+
+
 def gate_main(args: argparse.Namespace) -> int:
     gate_started_at = now()
     spec_path = args.campaign_spec.resolve()
@@ -1922,6 +2268,10 @@ def gate_main(args: argparse.Namespace) -> int:
         ok, report = validate_run(args.resolved_manifest.resolve())
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0 if ok else 2
+    ledger: list[dict[str, Any]] = [
+        {"event_type": "gate_started", "timestamp": gate_started_at},
+        {"event_type": "preflight_started", "timestamp": gate_started_at},
+    ]
     try:
         spec = load_document(spec_path)
         manifest, report = resolve_campaign(spec, spec_path)
@@ -1937,12 +2287,6 @@ def gate_main(args: argparse.Namespace) -> int:
         )
         return 2
     requested = spec.get("timing", {}) if isinstance(spec.get("timing", {}), dict) else {}
-    ledger = [
-        {
-            "event_type": "gate_started",
-            "timestamp": gate_started_at,
-        }
-    ]
     if isinstance(requested.get("request_received"), str):
         ledger.insert(
             0,
@@ -1952,10 +2296,10 @@ def gate_main(args: argparse.Namespace) -> int:
                 "precision": requested.get("request_precision", "unknown"),
             },
         )
+    ledger.append({"event_type": "input_inventory_complete", "timestamp": now()})
     ledger.append({"event_type": "source_ready", "timestamp": now()})
-    ledger.append({"event_type": "remote_preflight_passed", "timestamp": now()})
-    report["timing_ledger"] = ledger
     if report["status"] != "pass":
+        write_preparation_summary(manifest, ledger, gate_dir, report)
         write_remote_preflight_record(gate_dir, report)
         atomic_json(gate_dir / "preflight.json", report)
         print(json.dumps(report, indent=2, sort_keys=True))
@@ -1975,6 +2319,7 @@ def gate_main(args: argparse.Namespace) -> int:
             for row in plan_errors
         )
         report["dry_run"] = dry_rows
+        write_preparation_summary(manifest, ledger, gate_dir, report)
         write_remote_preflight_record(gate_dir, report)
         atomic_json(gate_dir / "preflight.json", report)
         print(json.dumps(report, indent=2, sort_keys=True))
@@ -1984,14 +2329,51 @@ def gate_main(args: argparse.Namespace) -> int:
         for row in dry_rows
         if row.get("status") != "resource_conflict" and "job_id" in row
     }
+    report["host_job_matrix"] = [
+        {
+            "job_id": row["job_id"],
+            "host": row.get("host"),
+            "gpu": row.get("gpu"),
+            "gpu_uuid": row.get("gpu_uuid"),
+            "scientific_identity_hash": row.get("scientific_identity_hash"),
+            "smoke_group": next(
+                (job.get("smoke_group") for job in manifest["jobs"] if job["job_id"] == row["job_id"]), None
+            ),
+        }
+        for row in dry_rows
+        if "job_id" in row
+    ]
+    ledger.append({"event_type": "host_config_matrix_complete", "timestamp": now()})
+    ledger.append({"event_type": "remote_preflight_passed", "timestamp": now()})
+    ledger.append({"event_type": "preflight_passed", "timestamp": now()})
+    if args.fast_launch:
+        errors = fast_launch_errors(manifest)
+        if errors:
+            report["status"] = "fail"
+            report["errors"].extend(
+                {
+                    "job": None,
+                    "field": "fast_launch",
+                    "expected": "eligible existing runtime with exact smoke coverage",
+                    "observed": message,
+                    "remediation": "use the Full integration workflow or repair the complete Fast contract",
+                }
+                for message in errors
+            )
+            write_preparation_summary(manifest, ledger, gate_dir, report)
+            write_remote_preflight_record(gate_dir, report)
+            atomic_json(gate_dir / "preflight.json", report)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 2
     if args.canary_only or args.launch:
+        ledger.append({"event_type": "static_checks_started", "timestamp": now()})
         static_report = run_static_cli_smokes(manifest, gate_dir)
         atomic_json(gate_dir / "static-cli.json", static_report)
         if static_report["status"] != "pass":
             print(json.dumps(static_report, indent=2, sort_keys=True))
             return 2
         ledger.append({"event_type": "static_checks_passed", "timestamp": now()})
-        ledger.append({"event_type": "cli_smoke_passed", "timestamp": now()})
+        ledger.append({"event_type": "cli_smoke_started", "timestamp": now()})
         canary_report = run_canary(manifest, gate_dir)
         atomic_json(gate_dir / "canary.json", canary_report)
         if canary_report["status"] != "pass":
@@ -2002,7 +2384,6 @@ def gate_main(args: argparse.Namespace) -> int:
             print(json.dumps({"status": "fail", "errors": exact_errors}, indent=2, sort_keys=True))
             return 2
         ledger.append({"event_type": "integration_smoke_passed", "timestamp": now()})
-    ledger.append({"event_type": "preflight_passed", "timestamp": now()})
     ledger.append({"event_type": "manifest_freeze_started", "timestamp": now()})
     manifest["launch_gate"]["timing_ledger"] = ledger
     report["dry_run"] = dry_rows
@@ -2019,6 +2400,8 @@ def gate_main(args: argparse.Namespace) -> int:
         return 2
     report["manifest_sha256"] = manifest_sha
     ledger.append({"event_type": "manifest_frozen", "timestamp": now(), "manifest_sha256": manifest_sha})
+    ledger.append({"event_type": "ready_to_launch", "timestamp": now()})
+    write_preparation_summary(manifest, ledger, gate_dir, report)
     write_remote_preflight_record(gate_dir, report)
     atomic_json(gate_dir / "preflight.json", report)
     if args.preflight_only:
@@ -2042,11 +2425,19 @@ def gate_main(args: argparse.Namespace) -> int:
         _, revalidation_errors = revalidate_frozen(frozen_path, freeze_path)
         revalidation_errors.extend(validate_exact_smoke_report(manifest, canary_report))
         if revalidation_errors:
+            write_preparation_summary(manifest, ledger, gate_dir, report)
+            atomic_json(gate_dir / "preflight.json", report)
             print(json.dumps({"status": "fail", "errors": revalidation_errors}, indent=2, sort_keys=True))
             return 2
         if invoke_orchestrator("preflight", frozen_path) != 0:
             return 2
-        return invoke_orchestrator("run", frozen_path, detached=True)
+        ledger.append({"event_type": "controller_launch_attempt", "timestamp": now()})
+        launched = invoke_orchestrator("run", frozen_path, detached=True)
+        if launched == 0:
+            ledger.append({"event_type": "controller_launched", "timestamp": now()})
+        write_preparation_summary(manifest, ledger, gate_dir, report)
+        atomic_json(gate_dir / "preflight.json", report)
+        return launched
     print(
         json.dumps(
             {
@@ -2070,6 +2461,11 @@ def parser() -> argparse.ArgumentParser:
     parser_obj.add_argument("--dry-run", action="store_true")
     parser_obj.add_argument("--canary-only", action="store_true")
     parser_obj.add_argument("--launch", action="store_true")
+    parser_obj.add_argument(
+        "--fast-launch",
+        action="store_true",
+        help="one-command Fast existing-runtime prepare -> exact smoke -> freeze -> detached launch",
+    )
     parser_obj.add_argument("--validate-run", action="store_true")
     parser_obj.add_argument("--resolved-manifest", type=Path)
     return parser_obj
@@ -2077,6 +2473,21 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
+    if args.fast_launch:
+        incompatible = [
+            flag
+            for flag, selected in (
+                ("--preflight-only", args.preflight_only),
+                ("--dry-run", args.dry_run),
+                ("--canary-only", args.canary_only),
+                ("--launch", args.launch),
+                ("--validate-run", args.validate_run),
+            )
+            if selected
+        ]
+        if incompatible:
+            parser().error("--fast-launch cannot be combined with " + ", ".join(incompatible))
+        args.launch = True
     if args.validate_run:
         if args.resolved_manifest is None:
             parser().error("--validate-run requires --resolved-manifest")

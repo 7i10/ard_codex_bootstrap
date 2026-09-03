@@ -158,6 +158,67 @@ def test_strict_critical_path_ledger_records_automatic_slo_breach(tmp_path: Path
     assert any(event["event"] == "launch_slo_breached" for event in recorded["events"])
 
 
+def test_fast_path_f10_launch_ledger_records_total_preparation_durations(tmp_path: Path) -> None:
+    ledger = tmp_path / "fast-ledger.json"
+    initialized = invoke_ledger(
+        "init",
+        "--output",
+        str(ledger),
+        "--campaign-id",
+        "fast-existing",
+        "--requested-at",
+        "2026-09-04T01:00:00+09:00",
+        "--requested-at-precision",
+        "exact",
+        "--request-evidence",
+        "prompt.md",
+        "--operational-profile",
+        "FAST_EXISTING_RUNTIME",
+        "--strict-critical-path",
+    )
+    assert initialized.returncode == 0, initialized.stderr
+    for event, timestamp in (
+        ("preflight_started", "2026-09-04T01:00:00+09:00"),
+        ("input_inventory_complete", "2026-09-04T01:02:00+09:00"),
+        ("host_config_matrix_complete", "2026-09-04T01:03:00+09:00"),
+        ("source_ready", "2026-09-04T01:04:00+09:00"),
+        ("remote_preflight_passed", "2026-09-04T01:05:00+09:00"),
+        ("preflight_passed", "2026-09-04T01:06:00+09:00"),
+        ("static_checks_started", "2026-09-04T01:06:00+09:00"),
+        ("static_checks_passed", "2026-09-04T01:07:00+09:00"),
+        ("cli_smoke_started", "2026-09-04T01:07:00+09:00"),
+        ("cli_smoke_passed", "2026-09-04T01:08:00+09:00"),
+        ("integration_smoke_passed", "2026-09-04T01:09:00+09:00"),
+        ("manifest_freeze_started", "2026-09-04T01:09:00+09:00"),
+        ("manifest_frozen", "2026-09-04T01:10:00+09:00"),
+        ("ready_to_launch", "2026-09-04T01:10:00+09:00"),
+        ("controller_launch_attempt", "2026-09-04T01:10:00+09:00"),
+        ("controller_launched", "2026-09-04T01:11:00+09:00"),
+    ):
+        marked = invoke_ledger(
+            "mark",
+            "--output",
+            str(ledger),
+            "--event",
+            event,
+            "--at",
+            timestamp,
+            "--evidence",
+            f"{event}.json",
+        )
+        assert marked.returncode == 0, marked.stderr
+    result = json.loads(invoke_ledger("summary", "--output", str(ledger)).stdout)
+    assert result["operational_profile"] == "FAST_EXISTING_RUNTIME"
+    assert result["request_to_ready_seconds"] == pytest.approx(600.0)
+    assert result["request_to_controller_seconds"] == pytest.approx(660.0)
+    assert result["preflight_duration_seconds"] == pytest.approx(360.0)
+    assert result["static_check_duration_seconds"] == pytest.approx(60.0)
+    assert result["smoke_duration_seconds"] == pytest.approx(120.0)
+    assert result["manifest_duration_seconds"] == pytest.approx(60.0)
+    assert result["manifest_freeze_cycles"] == 1
+    assert result["controller_launch_attempts"] == 1
+
+
 def test_validate_and_dry_plan_are_read_only(tmp_path: Path) -> None:
     manifest = write_manifest(tmp_path, [job(tmp_path, "root", "pass")])
     assert invoke("validate", manifest).returncode == 0
@@ -495,7 +556,16 @@ def test_workspace_contract_rejects_future_output_outside_registered_runtime(tmp
         "python": sys.executable,
         "hosts": {"local": {"hostname": "fixture", "execution_class": "local"}},
     }
-    for field in ("run_root", "analysis_root", "staging_root", "worktree_root", "orchestration_root", "task_context_root", "lock_root", "temp_root"):
+    for field in (
+        "run_root",
+        "analysis_root",
+        "staging_root",
+        "worktree_root",
+        "orchestration_root",
+        "task_context_root",
+        "lock_root",
+        "temp_root",
+    ):
         fields[field] = str(runtime / field.removesuffix("_root"))
     registry = tmp_path / "workspace.json"
     registry.write_text(json.dumps(fields), encoding="utf-8")

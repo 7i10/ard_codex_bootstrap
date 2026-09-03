@@ -8,6 +8,8 @@ multi-GPU orchestrator.
 {
   "schema_version": 1,
   "campaign_id": "example-v1",
+  "operational_profile": "FAST_EXISTING_RUNTIME",
+  "integration_changes": {"new_trainer_execution_path": false},
   "source": {
     "git_sha": "<40 hex>",
     "repo_path": "/work/repo"
@@ -58,6 +60,11 @@ multi-GPU orchestrator.
   }]
 }
 ```
+
+`operational_profile` is operational metadata only.  The only supported values
+are `FAST_EXISTING_RUNTIME` and `FULL_NEW_INTEGRATION`.  Existing public
+runtimes default to Fast; any true value in `integration_changes` forces Full
+and cannot use `--fast-launch`.
 
 `scientific_final_epoch` is inclusive and the runtime `--epochs` value is
 exclusive. The gate resolves the latter from the former and records both.
@@ -117,3 +124,40 @@ local `staging_path`, canonical local `collected_path`, expected `sha256`, and
 identity fields `campaign_id`, `source_sha`, `job_id`, `seed`, `arm`, `epoch`,
 `split`, and `attack_identity`. The collection job copies only bytes; the
 inventory job validates the required matrix before any aggregate job runs.
+
+## Fast representative smokes
+
+For a Fast campaign, set `canary.require_exact_smoke: true`, provide a bounded
+`static_cli` entry, and group only genuinely equivalent seed fan-out:
+
+```json
+{
+  "canary": {
+    "require_exact_smoke": true,
+    "static_cli": [{"job_id": "dev1-control", "commands": [["python3", "-m", "ard.cli.train", "--help"]]}],
+    "jobs": [{
+      "job_id": "dev1-control",
+      "kind": "exact_public_cli",
+      "execution_class": "local",
+      "smoke_group": "control-local",
+      "command": ["python3", "-m", "ard.cli.train", "--registered-bounded-smoke"]
+    }]
+  },
+  "jobs": [{
+    "job_id": "dev1-control",
+    "smoke_group": "control-local",
+    "smoke_equivalence": {
+      "public_cli": "ard.cli.train/v3",
+      "output_semantics": "non-overwrite-attempt-scoped",
+      "config_schema": "rslad-v5",
+      "checkpoint_load_path": "resume-checkpoint-v2",
+      "treatment_branch": "control"
+    }
+  }]
+}
+```
+
+Every member of a `smoke_group` must carry the same equivalence descriptor and
+execution class.  The exact smoke result covers the group but not its
+per-job scientific identity; source, config, parent, Teacher, dataset, attack,
+seed, and output validation still happen for every resolved job.

@@ -29,6 +29,10 @@ Read `docs/README.md`, `docs/SCIENTIFIC_INVARIANTS.md`, `docs/TEST_STRATEGY.md`,
 - Freeze lineage, resume, cache invalidation, and external-API inputs before handing work to the writer. Aim for one implementation turn; a follow-up requires new live evidence or a concrete review finding.
 - A bounded non-GPU operational change should normally reach focused verification within 15 minutes. If it does not, stop adding scope, report the serial bottleneck, and choose the smallest remaining completion path.
 - Parallelize only independent read-only discovery or independent jobs. Extra writers/reviewers on one dependency chain increase integration time and token use and are not a latency strategy.
+- Classify a campaign as `FAST_EXISTING_RUNTIME` by default when its public runtime and inputs already exist; use `FULL_NEW_INTEGRATION` only for a genuinely new runtime/trainer/DDP/dataset/remote/checkpoint/artifact mechanism. Fast retains every scientific identity check and the exact public-CLI smoke.
+- Resolve the complete host × job matrix once before launch. Reuse an unchanged artifact hash within that preparation pass; if one cell is wrong, repair and revalidate the equivalent matrix rather than discovering host mismatches serially.
+- Use one representative `smoke_group` only for an explicitly equivalent public CLI, execution class, output semantics, config schema, checkpoint-load path, and treatment branch. A stronger exact remote smoke may subsume its duplicate generic lifecycle canary, never source/identity/collection proof.
+- Keep non-critical infrastructure work outside a frozen scientific campaign's critical path, and batch one complete review finding set before the correction wave instead of serial one-finding reruns.
 
 ## Critical evaluation of proposed procedures
 

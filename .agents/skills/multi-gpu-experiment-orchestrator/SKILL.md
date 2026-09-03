@@ -52,6 +52,15 @@ new runtime integration may need more time, but state the estimate and the
 specific blocker before the target is exceeded; never hide the delay behind
 routine status updates.
 
+The production launch gate labels this `FAST_EXISTING_RUNTIME`; it is the
+default for a known public CLI and known input forms.  A new runtime/trainer,
+DDP, dataset loader, remote mechanism, checkpoint serialization, artifact
+schema, or genuine uncertainty is `FULL_NEW_INTEGRATION` and uses the
+90-minute integration target.  These are the only two operational profiles.
+Fast is not a weaker profile: it retains exact source/input identity, static
+CLI validation, representative exact smoke coverage, immutable freeze, and
+this controller's preflight/run handoff.
+
 Create a compact timing ledger before implementation with
 `scripts/launch_ledger.py`.  Before controller launch, record evidence for:
 
@@ -157,6 +166,10 @@ For request-to-launch evidence, use `launch_ledger.py init` with
 30-minute controller-launch SLO; a new runtime/objective uses 90 minutes.
 The ledger records `launch_slo_breached` automatically once the target is
 missed, without weakening any source/lineage gate.
+It also records request-to-ready, request-to-controller, static-check, smoke,
+preflight, and manifest durations plus the number of freezes and controller
+launch attempts.  One unchanged Fast preparation should have one freeze and
+one launch attempt.
 
 ## Do not use / known limits
 
