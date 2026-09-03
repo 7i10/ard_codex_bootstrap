@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 SCRIPT = Path(__file__).parents[2] / ".agents/skills/multi-gpu-experiment-orchestrator/scripts/orchestrate.py"
+LEDGER = Path(__file__).parents[2] / ".agents/skills/multi-gpu-experiment-orchestrator/scripts/launch_ledger.py"
 SHA = "a" * 40
 
 
@@ -59,6 +60,63 @@ def invoke(command: str, manifest: Path, *extra: str) -> subprocess.CompletedPro
     return subprocess.run(
         [sys.executable, str(SCRIPT), command, "--manifest", str(manifest), *extra], text=True, capture_output=True
     )
+
+
+def invoke_ledger(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run([sys.executable, str(LEDGER), *args], text=True, capture_output=True)
+
+
+def test_launch_ledger_requires_full_prelaunch_evidence_and_measures_target(tmp_path: Path) -> None:
+    ledger = tmp_path / "launch-ledger.json"
+    initialized = invoke_ledger(
+        "init",
+        "--output",
+        str(ledger),
+        "--campaign-id",
+        "bounded-screen",
+        "--requested-at",
+        "2026-09-04T01:00:00+09:00",
+        "--requested-at-precision",
+        "exact",
+        "--request-evidence",
+        "user request",
+    )
+    assert initialized.returncode == 0, initialized.stderr
+    assert invoke_ledger("ready", "--output", str(ledger)).returncode == 2
+    for event, timestamp in (
+        ("input_inventory_complete", "2026-09-04T01:05:00+09:00"),
+        ("host_config_matrix_complete", "2026-09-04T01:10:00+09:00"),
+        ("source_frozen", "2026-09-04T01:15:00+09:00"),
+        ("manifest_frozen", "2026-09-04T01:20:00+09:00"),
+    ):
+        marked = invoke_ledger(
+            "mark",
+            "--output",
+            str(ledger),
+            "--event",
+            event,
+            "--at",
+            timestamp,
+            "--evidence",
+            f"{event}.json",
+        )
+        assert marked.returncode == 0, marked.stderr
+    assert invoke_ledger("ready", "--output", str(ledger)).returncode == 0
+    launched = invoke_ledger(
+        "mark",
+        "--output",
+        str(ledger),
+        "--event",
+        "controller_launched",
+        "--at",
+        "2026-09-04T01:25:00+09:00",
+        "--evidence",
+        "controller.json",
+    )
+    assert launched.returncode == 0, launched.stderr
+    result = json.loads(invoke_ledger("summary", "--output", str(ledger)).stdout)
+    assert result["request_to_controller_minutes"] == pytest.approx(25.0)
+    assert result["controller_launch_within_target"] is True
 
 
 def test_validate_and_dry_plan_are_read_only(tmp_path: Path) -> None:

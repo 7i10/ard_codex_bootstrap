@@ -30,8 +30,22 @@ selector and not a replacement scheduler.
    `multi-gpu-experiment-orchestrator`, and returns after the detached
    controller is launched. Do not poll a stable long-running job from Codex.
 5. After the detached DAG is done, run `--validate-run
-   --resolved-manifest <path>` to require valid completion markers, expected
-   outputs, hashes, and final epochs.
+ --resolved-manifest <path>` to require valid completion markers, expected
+ outputs, hashes, and final epochs.
+
+## Launch timing and host matrix
+
+For a bounded screen with an existing runtime, initialize the orchestrator
+skill's `launch_ledger.py` at request receipt and target controller launch in
+30 minutes.  Before `--launch`, the ledger must bind a complete host × job
+matrix: each resolved config's SHA, its permitted host-local path rebases, the
+frozen Teacher byte SHA, parent/checkpoint paths, output root, and execution
+class.  A generic host preflight alone is not evidence that a job-specific
+resolved config is valid on that host.
+
+If a single cell exposes a path or environment mismatch, stop the fan-out,
+repair the whole matrix, and create a fresh manifest/attempt namespace.  Do
+not discover equivalent host errors one checkpoint at a time.
 
 The implementation is [scripts/launch_gate.py](scripts/launch_gate.py). It
 emits the orchestrator schema-v1 `resolved-manifest.json`, `freeze.json`,

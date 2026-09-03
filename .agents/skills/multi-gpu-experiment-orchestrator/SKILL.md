@@ -35,8 +35,36 @@ detached workers, completion markers, retries, and resume.
    The detached controller is the data plane and may reconcile its own worker
    state. `status` reads the persisted state without polling.
 5. Use `run` again to resume an interrupted controller. Existing completed or
-   running jobs are not relaunched. Collect remote artifacts through the
-   existing `run-on-ferret` skill; do not duplicate its SSH/rsync logic here.
+running jobs are not relaunched. Collect remote artifacts through the
+existing `run-on-ferret` skill; do not duplicate its SSH/rsync logic here.
+
+## Rapid-launch discipline
+
+For a short campaign whose scientific implementation and inputs already
+exist, target controller launch within 30 minutes of a recorded request.  A
+new runtime integration may need more time, but state the estimate and the
+specific blocker before the target is exceeded; never hide the delay behind
+routine status updates.
+
+Create a compact timing ledger before implementation with
+`scripts/launch_ledger.py`.  Before controller launch, record evidence for:
+
+1. the complete input inventory (parent, config, Teacher, mask, attack, and
+   output roots);
+2. the host × job config matrix, including every host-local path rebase;
+3. the frozen source SHA; and
+4. the immutable manifest.
+
+`ready` rejects a ledger missing any of those records.  This is not a second
+scientific gate; it prevents a late discovery of a host-only path mismatch.
+Use `summary` in the launch handoff to report request-to-controller time and
+the estimate's assumptions.
+
+If one host/config cell fails, do not repair and launch the remaining cells
+serially.  Revalidate the entire equivalent host × job matrix first, then
+make one technical retry with a new attempt/run namespace.  Keep unrelated
+infrastructure work out of the scientific critical path: improve it after a
+stable launch or as a separate operational task.
 
 ## Manifest contract
 
@@ -101,6 +129,13 @@ python .agents/skills/multi-gpu-experiment-orchestrator/scripts/orchestrate.py \
 `run --foreground --poll-interval 0.5` is intended for a bounded local test.
 `--once` executes one reconciliation tick and is useful for diagnostics, not
 for a Codex completion loop.
+
+Before asking the repository changed-test gate to run, preview its selection
+once with `scripts/verify.py --changed --non-scientific --dry-run`. Some
+non-scientific integration fixtures intentionally start synthetic training
+subprocesses. A second full invocation is not a status check and must not be
+used to make validation faster; run at most one selected full gate, or record
+why focused tests are the smallest sufficient verification.
 
 ## Do not use / known limits
 

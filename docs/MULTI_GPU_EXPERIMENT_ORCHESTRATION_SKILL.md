@@ -61,6 +61,22 @@ The detached controller reconciles its own worker state; there is no Codex
 `sleep`/`watch`/W&B completion loop. Existing `run-on-ferret` commands remain
 the authority for remote status and process safety.
 
+## Timing and complete host configuration
+
+For an existing short runtime, the operational target is controller launch
+within 30 minutes of a recorded request.  The skill's `launch_ledger.py`
+records request, complete input inventory, host × job config matrix, frozen
+source, manifest, controller, and host-confirmed timestamps.  `ready` fails
+if the pre-launch evidence is incomplete, and `summary` reports the actual
+request-to-controller delay.
+
+The matrix is intentionally job-specific: a generic remote host preflight
+does not prove that every resolved config can open its Teacher, parent, data,
+and output path on that host.  After any host/config mismatch, the whole
+equivalent matrix is revalidated before a fresh technical retry.  This avoids
+serial one-checkpoint fixes and keeps infrastructure changes off the active
+scientific critical path.
+
 ## Usage
 
 ```bash

@@ -31,6 +31,7 @@
 - [Legacy campaign archive](../tools/internal/legacy_campaign/README.md): 完了済みHamster/Ferret運用コードの非公開・非runtimeアーカイブ
 - [Multi-GPU orchestration skill](MULTI_GPU_EXPERIMENT_ORCHESTRATION_SKILL.md): manifest-driven scheduling, DAG chaining, retry, and bounded monitoring
 - [I100 Dynamic BDD execution postmortem](ERT_RSLAD_I100_DYNAMIC_BDD_EXECUTION_POSTMORTEM.md): evidence-backed launch/recovery delays and reusable operational safeguards
+- [Experiment launch discipline](EXPERIMENT_LAUNCH_DISCIPLINE.md): request-to-controller SLO, host-config matrix, and estimate discipline for bounded GPU campaigns
 - [Orchestrator scientific-output ownership](debugging/0025-orchestrator-scientific-output-ownership.md): controller-sidecar fix for public CLIs that require a fresh output directory
 
 ## CLI entry points
