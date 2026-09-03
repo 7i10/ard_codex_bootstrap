@@ -799,6 +799,15 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             "wandb_run_id_template": f"{base_run}-attempt-{{attempt}}",
             "retry_policy": job.get("retry_policy", {"max_attempts": 1}),
             "executor": job.get("executor", {"type": "local"}),
+            # Preserve external completion-probe fields when freezing the
+            # resolved manifest.  The orchestrator validates these fields for
+            # external jobs; dropping them here makes an otherwise valid
+            # campaign fail only after the gate has frozen its manifest.
+            "completion_probe": list(job["completion_probe"])
+            if isinstance(job.get("completion_probe"), list)
+            else None,
+            "probe_interval_seconds": job.get("probe_interval_seconds", 30),
+            "probe_timeout_seconds": job.get("probe_timeout_seconds"),
             "expected_outputs": expected_outputs,
             "expected_final_epoch": job.get("expected_final_epoch", final_epoch),
             "epoch_binding": {

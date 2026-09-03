@@ -141,6 +141,22 @@ def test_good_spec_freezes_and_binds_inclusive_final_to_exclusive_runtime(tmp_pa
     assert json.loads(result.stdout)["jobs"][0]["scientific_identity_hash"]
 
 
+def test_external_probe_fields_survive_resolved_manifest_freeze(tmp_path: Path) -> None:
+    """Regression for the gate dropping probe argv before orchestrator validation."""
+    spec, _, _, _ = base_spec(tmp_path)
+    spec["jobs"][0]["executor"] = {"type": "external_probe"}
+    spec["jobs"][0]["completion_probe"] = [sys.executable, "probe.py", "--output", "last.json"]
+    spec["jobs"][0]["probe_interval_seconds"] = 7
+    spec["jobs"][0]["probe_timeout_seconds"] = 31
+    gate_dir = tmp_path / "gate"
+    result = invoke(write_spec(tmp_path, spec), "--dry-run", output=gate_dir)
+    assert result.returncode == 0, result.stdout + result.stderr
+    job = json.loads((gate_dir / "resolved-manifest.json").read_text())["jobs"][0]
+    assert job["completion_probe"] == [sys.executable, "probe.py", "--output", "last.json"]
+    assert job["probe_interval_seconds"] == 7
+    assert job["probe_timeout_seconds"] == 31
+
+
 def test_preflight_requires_full_source_binding_and_clean_tree(tmp_path: Path) -> None:
     spec, repo, _, _ = base_spec(tmp_path)
     (repo / "uncommitted.txt").write_text("dirty", encoding="utf-8")
