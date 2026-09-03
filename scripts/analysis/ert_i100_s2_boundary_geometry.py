@@ -832,6 +832,26 @@ def analyze(
     lines.extend(
         [
             "",
+            "The registered machine replay metadata is authoritative for the random-start stream: "
+            "`evaluation_attack + batch_index`. The mask JSON's descriptive `sample_keyed_v1` label "
+            "is retained as a provenance discrepancy and was not silently rewritten.",
+            "",
+            "## Replay integrity",
+            "",
+            "| seed | validation rows | scalar rows SHA | batched/single max error |",
+            "|---|---:|---|---:|",
+        ]
+    )
+    for seed in ("dev-1", "dev-2"):
+        metadata = geometry_meta[seed]
+        canary = metadata["batched_single_canary"]
+        lines.append(
+            f"| {seed} | {metadata['row_count']} | `{metadata['rows_sha256']}` | "
+            f"{max(canary['student_max_abs_error'], canary['teacher_max_abs_error']):.3e} |"
+        )
+    lines.extend(
+        [
+            "",
             "## Cross-seed predictor AUROC",
             "",
             "AUROC is descriptive; fit uses one seed and evaluates the other with fixed ridge "
@@ -848,6 +868,23 @@ def analyze(
                 f"| {name} | {a:.4f} | {b:.4f} |" if a is not None and b is not None else f"| {name} | n/a | n/a |"
             )
         lines.append("")
+    lines.extend(
+        [
+            "## Geometry added-value contrasts",
+            "",
+            "Values are AUROC(feature/predictor) minus AUROC(Student margin), using fixed cross-seed directions.",
+            "",
+            "| epoch | direction | normal mismatch | Teacher−Student distance gap |",
+            "|---:|---|---:|---:|",
+        ]
+    )
+    for epoch in (104, 109, 114):
+        for direction in ("dev-1_to_dev-2", "dev-2_to_dev-1"):
+            gain = geometry_gain[str(epoch)][direction]
+            lines.append(
+                f"| {epoch} | {direction} | {gain['normal_mismatch_minus_student_margin']:+.4f} | "
+                f"{gain['delta_distance_minus_student_margin']:+.4f} |"
+            )
     lines.extend(
         ["## Geometry cells", "", "Cells use within-seed medians descriptively only; they are not selectors.", ""]
     )
