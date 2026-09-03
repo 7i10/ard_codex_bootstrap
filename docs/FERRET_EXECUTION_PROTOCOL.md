@@ -8,6 +8,21 @@ Hamster repository --commit/push--> GitHub --fetch SHA--> Ferret detached worktr
        +---------------- selective rsync ------------------+
 ```
 
+## Production responsibility boundary
+
+| Layer | Owns | Must not do |
+| --- | --- | --- |
+| Production Launch Gate | frozen scientific identity, per-host remote prerequisite proof, lifecycle-canary and collection/inventory contracts | SSH lifecycle, scheduling, or scientific method selection |
+| multi-GPU orchestrator | reservations, detached dependency DAG, technical-only retry, `controller_spawned` versus `host_confirmed_started` evidence | remote Git/worktree mutation or aggregation path discovery |
+| run-on-ferret | SSH, serialized fixed-SHA worktree preparation, detached process/status, and rsync collection | source edits, scientific retries, or automatic aggregation |
+
+For an external job, the launcher process alone is never launch success. The
+orchestrator needs a bounded `ferret-host-confirm` payload binding the live PID,
+source SHA, campaign/job/identity, physical GPU index/UUID, exact argv, and
+remote manifest. Terminal success is still established only by the completion
+probe/marker. Remote absolute paths are provenance; aggregation consumes only
+canonical local, SHA-verified collection inventory paths.
+
 ## Prerequisites and configuration
 
 Hamster needs OpenSSH and rsync; Ferret needs Git, `nohup`, `setsid`, Python, CUDA, and the experiment dependencies. BatchMode public-key authentication and host-key verification must work before mutation. Do not enable agent forwarding or store keys, tokens, checkpoints, datasets, or W&B offline data in Git.
@@ -35,11 +50,11 @@ The source clone owns one verified, Git-ignored `.external` checkout and `teache
 Invoke `$run-on-ferret` explicitly; implicit invocation is disabled. The skill maps each operation to the executable of the same name in `.agents/skills/run-on-ferret/scripts/`.
 
 1. `ferret-preflight` performs read-only identity, tools, GPU, disk, repository, worktree, run-root, W&B-variable-name, dataset, and checkpoint checks and emits JSON. A false readiness result blocks prepare/launch.
-2. `ferret-prepare --sha <40-hex> --run-id <id>` fetches origin, verifies the commit, creates a new run directory and detached worktree, and writes the initial manifest. It does not launch.
+2. `ferret-prepare --sha <40-hex> --run-id <id>` fetches origin, verifies the commit, creates a new run directory and detached worktree, and writes the initial manifest. It does not launch. Its per-repository `flock` serializes Git fetch/worktree/ref mutation so parallel preparation cannot race on ref locks.
 3. `ferret-launch --run-id <id> --gpus 0,1 --launcher direct -- <argv...>` records argv and GPUs, refuses busy GPUs and duplicate launch, then starts one detached `nohup setsid` process group. User argv is never passed through `eval`.
-4. `ferret-status --run-id <id>` combines the manifest, verified process identity, exit code, GPU state, logs, and output inventory into a normalized state.
+4. `ferret-status --run-id <id>` combines the manifest, verified process identity, exit code, GPU state, logs, and output inventory into a normalized state. It includes source SHA, PID, physical GPU UUIDs, argv, and remote manifest path. `ferret-host-confirm` converts a live matching status into the schema-v1 payload required by an external orchestrator job.
 5. `ferret-logs --run-id <id> --tail 200 --both` returns bounded logs. Follow mode is explicit and intended for a human terminal, not indefinite agent monitoring.
-6. `ferret-collect --run-id <id>` rsyncs small lineage/results by default. Checkpoints, W&B offline files, or all files require their explicit include flag.
+6. `ferret-collect --run-id <id>` rsyncs small lineage/results by default. Checkpoints, W&B offline files, or all files require their explicit include flag. The production collection node then copies the local staging file to a canonical local path and checks SHA-256 plus campaign/source/job/seed/arm/epoch/split/attack identity before aggregation.
 7. `ferret-cancel --run-id <id>` targets only the recorded process group after PID, owner, start marker, cwd, and command checks; it sends TERM first and never kills unrelated user processes.
 8. `ferret-cleanup --run-id <id>` is a dry-run by default. Execution requires a terminal run, collection evidence, and an explicit execute option; paths must resolve below the configured run root.
 

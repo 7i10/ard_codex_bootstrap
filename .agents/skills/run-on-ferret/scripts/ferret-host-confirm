@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source "$(dirname "$0")/ferret-common"
+
+run_id= campaign_id= job_id= identity_hash= source_sha= host= gpu_index= expected_command=
+while (($#)); do
+  case "$1" in
+    --run-id) run_id=$2; shift 2 ;;
+    --campaign-id) campaign_id=$2; shift 2 ;;
+    --job-id) job_id=$2; shift 2 ;;
+    --identity-hash) identity_hash=$2; shift 2 ;;
+    --source-sha) source_sha=$2; shift 2 ;;
+    --host) host=$2; shift 2 ;;
+    --gpu-index) gpu_index=$2; shift 2 ;;
+    --expected-command-json) expected_command=$2; shift 2 ;;
+    *) die "unknown argument $1" ;;
+  esac
+done
+valid_run_id "$run_id"; valid_sha "$source_sha"
+[[ $identity_hash =~ ^[0-9a-fA-F]{64}$ ]] || die 'identity hash must be 64 hex characters'
+[[ $gpu_index =~ ^[0-9]+$ ]] || die 'GPU index must be a non-negative integer'
+[[ -n $campaign_id && -n $job_id && -n $host && -n $expected_command ]] || die 'campaign/job/host/expected command are required'
+status=$("$(dirname "$0")/ferret-status" --run-id "$run_id")
+STATUS="$status" CAMPAIGN="$campaign_id" JOB="$job_id" IDENTITY="$identity_hash" SOURCE="$source_sha" HOST_LABEL="$host" GPU_INDEX="$gpu_index" EXPECTED_COMMAND="$expected_command" "$FERRET_PYTHON" - <<'PY'
+import json, os, sys
+try:
+    status=json.loads(os.environ['STATUS']); expected=json.loads(os.environ['EXPECTED_COMMAND'])
+except json.JSONDecodeError as exc:
+    print(json.dumps({'status':'fail','reason':f'invalid status/command JSON: {exc}'})); raise SystemExit(2)
+gpu=int(os.environ['GPU_INDEX']); indices=status.get('physical_gpu_indices',[]); uuids=status.get('physical_gpu_uuids',[])
+try:
+    position=indices.index(gpu); uuid=uuids[position]
+except (ValueError, IndexError):
+    print(json.dumps({'status':'fail','reason':'expected GPU not present in remote run'})); raise SystemExit(2)
+if not (status.get('process_present') is True and status.get('status') in {'starting','running'} and status.get('source_sha','').lower()==os.environ['SOURCE'].lower() and status.get('command_argv')==expected and isinstance(status.get('remote_manifest'),str)):
+    print(json.dumps({'status':'fail','reason':'remote status does not match expected live process'})); raise SystemExit(2)
+print(json.dumps({'schema_version':1,'status':status['status'],'process_present':True,'campaign_id':os.environ['CAMPAIGN'],'job_id':os.environ['JOB'],'identity_hash':os.environ['IDENTITY'],'source_sha':status['source_sha'].lower(),'host':os.environ['HOST_LABEL'],'gpu_index':gpu,'gpu_uuid':uuid,'pid':status['pid'],'command_argv':status['command_argv'],'remote_manifest':status['remote_manifest']},sort_keys=True))
+PY

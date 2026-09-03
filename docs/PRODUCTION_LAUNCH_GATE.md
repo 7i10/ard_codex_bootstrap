@@ -8,13 +8,16 @@ It does not train a model, choose a method, or implement remote SSH/rsync.
 
 ```text
 campaign spec
-    -> source/host/input preflight
-    -> deterministic resolved manifest
+    -> local + every-assigned-host preflight
+    -> source freeze and deterministic resolved manifest
     -> atomic freeze + manifest SHA
-    -> bounded non-scientific canary
+    -> local + remote lifecycle canary
     -> detached orchestrator DAG
-    -> completion-marker endpoints/aggregation
-    -> post-run output and lineage validator
+    -> host-confirmed remote start
+    -> completion-marker endpoints
+    -> canonical collection + hash verification
+    -> complete aggregation inventory validation
+    -> aggregation/report + post-run lineage validator
 ```
 
 Use the gate script from the repository root:
@@ -38,7 +41,9 @@ and `preflight.json` in the gate output directory. A different resolution may
 not overwrite an existing frozen manifest. `--launch` rechecks the manifest
 SHA and source checkout before delegating to the detached controller. A stable
 long-running process is not polled by Codex; later status/resume uses the
-orchestrator state file.
+orchestrator state file. A controller spawning a local remote wrapper is not a
+remote launch success: external jobs must emit bounded, identity-bound host
+confirmation before their completion probe is eligible.
 
 ## Campaign spec boundary
 
@@ -74,6 +79,31 @@ teacher descriptors can bind SHA-256 and metadata. `kind: dependency_output`
 inputs are checked against a declared producer and are intentionally deferred
 until that producer's marker is valid.
 
+### External-host contract
+
+Every host assigned an `external_probe` job must declare `remote_preflight`.
+Its bounded command receives the expected frozen source, resolved artifact
+bindings, output root, GPU inventory, launcher, and completion probe through
+`ARD_LAUNCH_GATE_REMOTE_EXPECTED`, then returns schema-v1 JSON proving:
+
+- frozen source SHA and usable Python;
+- every resolved dataset, Teacher, parent, config, mask, and calibration
+  binding required on that host;
+- output-root writability, minimum free disk, and assigned GPU index/UUID;
+- valid remote launcher and completion-probe invocation.
+
+Unknown is failure: a passing Hamster record cannot substitute for a missing
+Ferret record. Remote launcher metadata is `{ "argv": [...], "executable":
+true|false }`; direct non-executable `foo.sh` is rejected, while `bash foo.sh`
+is valid. The gate re-runs this remote source/host proof when `--launch` is
+requested, after manifest-source validation; a changed source requires a newly
+resolved manifest rather than an old-manifest retry.
+
+For external jobs, `remote_command`, `host_confirm_probe`, and bounded
+`host_confirm_timeout_seconds`/`host_confirm_interval_seconds` are required.
+The confirmation payload binds campaign, job, scientific identity, source,
+host, GPU index/UUID, live PID, remote manifest path, and exact remote argv.
+
 ## What fails before GPU launch
 
 - missing/dirty/wrong Git source, registered source-file hash, or frozen-source
@@ -86,6 +116,12 @@ until that producer's marker is valid.
 - dependency cycles, missing producers, producer-path/root mismatch, output
   or completion-marker collisions;
 - duplicate W&B execution IDs.
+- a direct non-executable remote wrapper/probe, incomplete remote
+  parent/config/Teacher/data binding, inaccessible output root, insufficient
+  disk, or wrong remote GPU UUID/index;
+- source drift between freeze and external launch, a controller spawn without a
+  matching live remote process, or an external campaign without collection and
+  inventory DAG nodes.
 
 Errors include job, field, expected value, observed value, and remediation.
 Preflight is campaign-wide: one error launches zero jobs.
@@ -104,7 +140,7 @@ of it. The orchestrator receives an attempt-aware W&B template, so a technical
 retry gets a new W&B execution ID while retaining the same scientific identity.
 Accuracy and endpoint outcomes are never retry reasons.
 
-## Canary and completion
+## Canary, collection, and completion
 
 Canaries are explicit, bounded, non-scientific commands under the same resolved
 job context and a separate temporary gate output. They are not a shortened
@@ -114,15 +150,44 @@ post-run validator additionally requires every job to be completed, every
 marker to match campaign/source/identity, and every declared output/hash/final
 epoch to be present. Exit code zero alone is insufficient.
 
+External campaigns add one bounded remote lifecycle canary per assigned host.
+It demonstrates host process evidence, a completion marker, a local staging
+copy, canonical collection, and matching SHA-256 bytes. It is a technical
+canary, not scientific training or a W&B run.
+
+Aggregation never consumes a remote absolute path. An external campaign must
+declare `artifact_collection` with a schema-v1 inventory manifest plus explicit
+`collection` and `inventory` job IDs. The DAG order is:
+
+```text
+train -> endpoint -> collection + SHA verify -> inventory validate -> aggregate -> report
+```
+
+[`artifact_inventory.py`](../.agents/skills/production-launch-gate/scripts/artifact_inventory.py)
+copies already-collected local staging bytes to canonical local paths and
+rejects missing or duplicate required cells, byte/hash mismatch, or foreign
+campaign/source/job/seed/arm/epoch/split/attack identity before aggregation.
+An aggregator may consume only these validated canonical paths; it must not
+search alternate directories heuristically.
+
+## Timing ledger
+
+The gate records a best-evidence ledger in `preflight.json` and the frozen
+manifest: `request_received` (including declared precision if available),
+`gate_started`, source/remote-preflight resolution, `preflight_passed`, and
+manifest freeze/SHA. The controller and collection/finalization nodes append
+their own evidence for `controller_spawned`, `host_confirmed_started`, training
+completion, endpoints, collection, aggregation, and report commit. Missing
+evidence stays `unknown`; the ledger never fabricates minute-level precision.
+
 ## Regression coverage
 
-`tests/skills/test_production_launch_gate.py` covers the twelve historical
-launch failures: exclusive epoch bounds, parent aliases, deferred dependency
-outputs, W&B retry IDs, host dataset mapping, mask hashes, output collisions,
-source drift, retry scientific mutations, and false completion. It also runs a
-CPU-only canary, a detached success DAG, and a technical retry. The existing
-orchestrator tests remain authoritative for GPU reservations, marker DAG
-transitions, detached resume, and technical retry state.
+`tests/skills/test_production_launch_gate.py` keeps the historical launch
+failure IDs explicit. It also runs CPU-only canaries, a detached success DAG,
+a technical retry, artifact-inventory fixtures, and fake external lifecycle
+coverage. The existing orchestrator tests remain authoritative for GPU
+reservations, marker DAG transitions, detached resume, technical retry state,
+and host-confirmed external starts.
 
 The requested regression names are kept explicit so future failures remain
 traceable. Their originating historical event is recorded in the unseen
@@ -143,12 +208,24 @@ there); the prevention is exercised by the corresponding gate test.
 | R10 | dependency checkpoint required before producer ran | `dependency_output` is deferred until marker completion |
 | R11 | technical retry changed scientific identity | forbidden retry-mutation check and stable identity hash |
 | R12 | exit 0 mistaken for completion | marker, state, output, hash, and final-epoch validator |
+| R13 | direct non-executable remote wrapper/probe | remote wrapper argv/interpreter metadata validator |
+| R14 | one host passed while Ferret inputs were unknown | required per-host remote preflight with complete bindings |
+| R15 | local wrapper spawn called a remote launch | bounded live remote process/argv/GPU identity confirmation |
+| R16 | frozen manifest was launched from a newer source | source recheck before external launch; new manifest on drift |
+| R17 | aggregation read a Ferret absolute path | canonical local staging/collection with SHA verification |
+| R18 | endpoint cells were split across directories | fail-closed required-cell inventory before aggregation |
+| R19 | parallel Ferret prepare hit Git ref locks | per-remote-repo `flock` around Git mutation |
+| R20 | replay smoke exited but did not prove the full path | mandatory remote lifecycle/collection/hash canary |
+| R21 | collection could alter artifact bytes | collected SHA-256 equality validator |
+| R22 | foreign host/campaign rows entered an aggregate | campaign/source/job/seed/arm/epoch/split/attack-bound inventory |
 
 ## Limitations
 
 The gate validates checkpoint metadata supplied as JSON/sidecar descriptors; a
-format-specific model loader is intentionally not embedded. Remote host
-lifecycle remains delegated to `run-on-ferret`/the orchestrator's external
-executor. W&B network access is not performed by the gate. A campaign author
-must provide a bounded canary and expected output descriptors; scientific
-commands remain responsible for their own metrics-only tracking policy.
+format-specific model loader is intentionally not embedded. `run-on-ferret`
+remains the SSH/rsync lifecycle authority and the orchestrator remains the
+detached DAG controller; the gate validates their contracts instead of
+duplicating either. W&B network access is not performed by the gate. A campaign
+author must provide bounded remote preflight/canary commands and expected output
+descriptors; scientific commands remain responsible for their metrics-only
+tracking policy.

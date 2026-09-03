@@ -26,8 +26,12 @@ code=\$?; set -e; printf '%s\n' "\$code" > $(printf '%q' "$RUN/control/exit_code
 EOF
 chmod 700 "$RUN/control/launch.sh"; : >"$RUN/control/launched"
 RUN="$RUN" GPUS="$GPUS" ARGV="$ARGV" "$PYTHON" - <<'PY'
-import json,os,pathlib
-p=pathlib.Path(os.environ['RUN'])/'manifest.json'; d=json.loads(p.read_text()); ids=[int(x) for x in os.environ['GPUS'].split(',')]; d.update(status='starting',physical_gpu_indices=ids,world_size=len(ids),launch_backend='nohup-setsid',command_argv=json.loads(os.environ['ARGV']),launcher='direct'); p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
+import json,os,pathlib,subprocess
+p=pathlib.Path(os.environ['RUN'])/'manifest.json'; d=json.loads(p.read_text()); ids=[int(x) for x in os.environ['GPUS'].split(',')]
+uuids=[]
+for index in ids:
+    uuids.append(subprocess.check_output(['nvidia-smi',f'--id={index}','--query-gpu=uuid','--format=csv,noheader'],text=True).strip())
+d.update(status='starting',physical_gpu_indices=ids,physical_gpu_uuids=uuids,world_size=len(ids),launch_backend='nohup-setsid',command_argv=json.loads(os.environ['ARGV']),launcher='direct'); p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
 PY
 nohup setsid bash "$RUN/control/launch.sh" </dev/null >"$RUN/control/supervisor.log" 2>&1 &
 printf '%s\n' "$!" >"$RUN/control/submitted_pid"

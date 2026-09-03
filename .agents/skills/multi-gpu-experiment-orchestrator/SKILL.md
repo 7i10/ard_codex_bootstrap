@@ -45,9 +45,12 @@ campaign ID, full source SHA, host profiles, jobs, dependencies, output paths,
 and retry policy. Commands are argv arrays, never shell strings. Host profiles
 may expose measured throughput, GPU UUIDs, and required paths; values are
 metadata, not scientific hyperparameters. `external_probe` jobs wrap an
-existing launcher (for example `run-on-ferret`) and provide a probe argv that
-returns zero only when the remote run is complete. The remote skill remains the
-authority for remote lifecycle and safety.
+existing launcher (for example `run-on-ferret`), a bounded
+`host_confirm_probe`, an exact `remote_command`, and a completion probe. The
+remote skill remains the authority for remote lifecycle and safety. The worker
+distinguishes `controller_spawned` from `host_confirmed_started`: the latter
+requires a matching live remote PID, source, scientific identity, GPU
+index/UUID, remote manifest, and argv before the terminal probe can run.
 
 Because argv is executed without a shell, write a non-executable shell wrapper
 as `['bash', 'scripts/wrapper.sh', ...]`; do not put the wrapper itself at
@@ -69,8 +72,10 @@ argv position zero. Manifest validation rejects a locally present non-executable
   outcome is never a retry reason. Retries get a new attempt ID and retain the
   exact scientific identity; the first valid completion wins.
 - State and events are atomically written. `status` values include `pending`,
-  `running`, `completed`, `failed`, `blocked`, and `orphaned`. An incomplete
-  dependency blocks descendants rather than silently skipping it.
+  `running`, `completed`, `failed`, `blocked`, and `orphaned`. External event
+  evidence additionally records `controller_spawned` and
+  `host_confirmed_started`; an incomplete dependency blocks descendants rather
+  than silently skipping it.
 - W&B settings are passed through the scientific command. The orchestrator
   does not enable model/run-bundle uploads or alter tracking policy.
 
@@ -98,7 +103,7 @@ for a Codex completion loop.
 Do not use this skill for a single short command or to choose a scientific
 winner. It does not discover checkpoints, infer parent equivalence, evaluate
 metrics, or select thresholds. A remote command must be made safe by its
-existing executor (normally `run-on-ferret`), and a remote completion probe
-must be supplied explicitly. This initial implementation supports one GPU per
-job; multi-GPU/DDP jobs should be represented by the existing fixed-SHA remote
-launcher as one externally managed job.
+existing executor (normally `run-on-ferret`), and needs both host confirmation
+and a terminal completion probe. This initial implementation supports one GPU
+per job; multi-GPU/DDP jobs should be represented by the existing fixed-SHA
+remote launcher as one externally managed job.

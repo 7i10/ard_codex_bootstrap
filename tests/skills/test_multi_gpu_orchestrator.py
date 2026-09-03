@@ -176,6 +176,43 @@ def test_validate_rejects_direct_non_executable_shell_wrapper(tmp_path: Path) ->
     assert invoke("validate", manifest).returncode == 0
 
 
+def test_external_probe_requires_host_confirmation_before_completion(tmp_path: Path) -> None:
+    remote_command = ["remote-python", "train.py", "--epochs", "3"]
+    confirmation = (
+        "import json,os; print(json.dumps({'schema_version':1,'status':'running','process_present':True,"
+        "'campaign_id':os.environ['ARD_ORCH_CAMPAIGN_ID'],'job_id':os.environ['ARD_ORCH_JOB_ID'],"
+        "'identity_hash':os.environ['ARD_ORCH_IDENTITY_HASH'],'source_sha':os.environ['ARD_ORCH_SOURCE_SHA'],"
+        "'host':os.environ['ARD_ORCH_HOST'],'gpu_index':int(os.environ['ARD_ORCH_GPU_INDEX']),"
+        "'gpu_uuid':os.environ['ARD_ORCH_GPU_UUID'],'pid':123,'command_argv':"
+        + repr(remote_command)
+        + ",'remote_manifest':'/remote/run/manifest.json'}))"
+    )
+    value = job(tmp_path, "remote", "pass")
+    value.update(
+        {
+            "host": "remote",
+            "command": [sys.executable, "-c", "pass"],
+            "executor": {"type": "external_probe"},
+            "completion_probe": [sys.executable, "-c", "pass"],
+            "host_confirm_probe": [sys.executable, "-c", confirmation],
+            "host_confirm_timeout_seconds": 1,
+            "host_confirm_interval_seconds": 0.01,
+            "remote_command": remote_command,
+        }
+    )
+    hosts = {"remote": {"backend": "external", "gpus": [{"index": 0, "uuid": "GPU-remote", "throughput": 10}]}}
+    manifest = write_manifest(tmp_path, [value], hosts=hosts)
+    result = invoke("run", manifest, "--foreground", "--poll-interval", "0.02")
+    assert result.returncode == 0, result.stderr
+    state = json.loads((tmp_path / "state.json").read_text())
+    events = [event["event_type"] for event in state["events"]]
+    assert "controller_spawned" in events
+    assert "host_confirmed_started" in events
+    assert "stable_confirmed" not in events
+    attempt = state["jobs"]["remote"]["attempts"][0]
+    assert attempt["host_confirmation"]["remote_manifest"] == "/remote/run/manifest.json"
+
+
 def test_technical_retry_preserves_identity_and_unblocks_endpoint(tmp_path: Path) -> None:
     output = tmp_path / "outputs" / "flaky"
     code = (

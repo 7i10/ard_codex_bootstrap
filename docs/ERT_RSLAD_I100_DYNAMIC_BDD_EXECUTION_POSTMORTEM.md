@@ -42,6 +42,32 @@ BDD scientific interpretation.
 | State-replay inventory was incomplete | dev1 Control e104/e109 and e114 came from distinct registered artifacts. | Aggregator initially looked for all three under the smoke directory. | Preventable inventory failure |
 | S-BDD became non-finite in both seeds | Corrected v2 run evidence in the results artifact. | No causal endpoint for S-BDD. | Scientific outcome, not an orchestration retry |
 
+## Closure status
+
+The original postmortem was documentation-heavy: it named the failures but did
+not yet bind each one to a machine-enforced contract and executable regression.
+The generic hardening recorded at the follow-up infrastructure commit closes the
+operational findings below. `regression_protected` means the failure now blocks
+before expensive compute or aggregation; it does not claim that scientific
+inputs can never be missing.
+
+| Failure | Root cause | Automatic prevention | Regression | Status |
+| --- | --- | --- | --- | --- |
+| Non-executable wrapper | Direct remote `*.sh` argv had no execute bit. | Remote launcher/probe metadata requires an executable wrapper or explicit interpreter. | R13 `test_remote_wrapper_metadata_rejects_non_executable_and_accepts_bash` | `regression_protected` |
+| Incomplete Ferret preflight | Remote parent/config/Teacher/data/output evidence was partial. | Every assigned external host returns a complete source/Python/artifact/GPU/disk/output/wrapper record; unknown fails campaign preflight. | R14 `test_external_host_preflight_requires_every_declared_binding` | `regression_protected` |
+| Local spawn mistaken for remote start | Controller observed a local wrapper process only. | Bounded remote PID/source/identity/GPU/argv/manifest confirmation is required before terminal probing. | R15 `test_external_probe_requires_host_confirmation_before_completion` | `regression_protected` |
+| Stale source SHA | Manifest expectations were created before final source freeze. | Freeze/recheck source before external launch; drift requires a new manifest. | R16 `test_remote_source_drift_is_rechecked_before_launch` | `regression_protected` |
+| Ferret ref-lock race | Concurrent prepare mutated one remote Git repository. | Per-repository prepare `flock` serializes Git mutation. | R19 `test_prepare_lock_serializes_concurrent_mutations` | `regression_protected` |
+| Remote absolute artifact path | Aggregator consumed Ferret-only paths. | Collect into canonical local path, then verify SHA before inventory/aggregation. | R17 `test_collection_stages_remote_metadata_to_canonical_local_path` | `regression_protected` |
+| Incomplete replay inventory | Required e104/e109/e114 cells were distributed across artifacts. | Required identity-bound matrix must be complete before aggregation. | R18 `test_inventory_rejects_missing_required_endpoint_cell` | `regression_protected` |
+| Repeated replay smoke | Exit zero did not establish public replay/output/collection usability. | External campaigns require a bounded lifecycle canary with process, completion, collection, and SHA round trip before fan-out. | R20 `test_remote_lifecycle_canary_requires_status_and_hash_roundtrip` | `regression_protected` |
+| Collection/hash uncertainty | A local copy could differ from remote bytes. | SHA equality is validated for every collected artifact. | R21 `test_inventory_rejects_collected_hash_mismatch` | `regression_protected` |
+| Host/campaign artifact contamination | Artifacts lacked complete identity binding. | Inventory binds campaign/source/job/seed/arm/epoch/split/attack and rejects foreign cells. | R22 `test_inventory_rejects_foreign_campaign_or_source_identity` | `regression_protected` |
+
+S-BDD remains **not applicable** to this closure table: it was a reproducible
+scientific/numerical outcome, not a technical launch failure and not a retry
+candidate.
+
 ## Agent-controlled changes
 
 1. The orchestrator now rejects a locally present, non-executable `*.sh`

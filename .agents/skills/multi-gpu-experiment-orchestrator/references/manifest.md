@@ -70,9 +70,14 @@ the configured failure marker before exiting, for example:
 }
 ```
 
-For remote wrappers use `executor.type: external_probe`, a launcher argv, and
-`completion_probe` that returns zero only for a successful terminal run. Do not
-make a probe that treats a failed remote run as successful.
+For remote wrappers use `executor.type: external_probe`, a launcher argv,
+`remote_command`, a bounded `host_confirm_probe`, and `completion_probe` that
+returns zero only for a successful terminal run. Do not make a probe that
+treats a failed remote run as successful. `host_confirm_probe` returns
+schema-v1 JSON binding the live remote PID, campaign/job/identity/source, host,
+GPU index/UUID, exact `remote_command`, and remote manifest path. The worker
+emits `controller_spawned` first and only emits `host_confirmed_started` after
+this proof; the terminal probe is not run sooner.
 
 The controller executes argv without a shell. A wrapper without its executable
 bit must therefore be explicit, for example `['bash', 'scripts/launch.sh', ...]`.
@@ -86,4 +91,6 @@ shared, host-visible directory when a remote executor needs the same lock
 domain. Host/job `required_env` and `required_paths` are checked by
 `preflight` for local profiles. An external probe may set
 `probe_timeout_seconds`; without a timeout, a nonzero probe is intentionally
-treated as "still running" and must be bounded by the remote executor.
+treated as "still running" and must be bounded by the remote executor. The
+production launch gate supplies strict remote-host preflight and
+collection/inventory validation before this manifest is launched.

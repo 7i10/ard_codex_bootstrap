@@ -171,6 +171,8 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
     job["_completion_marker"] = str(marker or output / "completion.json")
     failure = abs_path(job.get("technical_failure_marker"), output)
     job["_technical_failure_marker"] = str(failure or output / "technical-failure.json")
+    host_confirmation = abs_path(job.get("host_confirmation_marker"), output)
+    job["_host_confirmation_marker"] = str(host_confirmation or output / "orchestration" / "host-confirmed.json")
     job["estimated_work"] = float(job.get("estimated_work", 1.0))
     if job["estimated_work"] < 0:
         raise ValueError(f"{job_id}: estimated_work must be non-negative")
@@ -196,6 +198,26 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
         if not isinstance(probe, list) or not probe or not all(isinstance(x, str) and x for x in probe):
             raise ValueError(f"{job_id}: external_probe requires completion_probe argv")
         _validate_local_shell_argv(probe, cwd=command_cwd, job_id=job_id, field="completion_probe")
+        host_probe = job.get("host_confirm_probe")
+        if not isinstance(host_probe, list) or not host_probe or not all(isinstance(x, str) and x for x in host_probe):
+            raise ValueError(f"{job_id}: external_probe requires host_confirm_probe argv")
+        _validate_local_shell_argv(host_probe, cwd=command_cwd, job_id=job_id, field="host_confirm_probe")
+        remote_command = job.get("remote_command")
+        if (
+            not isinstance(remote_command, list)
+            or not remote_command
+            or not all(isinstance(x, str) and x for x in remote_command)
+        ):
+            raise ValueError(f"{job_id}: external_probe requires expected remote_command argv")
+        for field in ("host_confirm_timeout_seconds", "host_confirm_interval_seconds"):
+            value = job.get(field, 30 if field.endswith("timeout_seconds") else 1)
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{job_id}: {field} must be a positive number") from exc
+            if numeric <= 0:
+                raise ValueError(f"{job_id}: {field} must be a positive number")
+            job[field] = numeric
 
 
 def _validate_local_shell_argv(argv: list[str], *, cwd: Path, job_id: str, field: str) -> None:
@@ -215,6 +237,55 @@ def _validate_local_shell_argv(argv: list[str], *, cwd: Path, job_id: str, field
             f"{job_id}: {field} directly invokes non-executable shell wrapper {executable}; "
             "use ['bash', '<script>.sh', ...] or set its executable bit"
         )
+
+
+def host_confirmation_valid(manifest: dict[str, Any], job: dict[str, Any], payload: Any, env: dict[str, str]) -> bool:
+    """Validate bounded evidence from the actual remote executor, not its wrapper.
+
+    `external_probe` launchers normally return after handing work to a remote
+    detached process.  The controller may call that a *spawn*, but it cannot
+    call it a started run without this evidence payload.
+    """
+    if not isinstance(payload, dict):
+        return False
+    expected_uuid = env.get("ARD_ORCH_GPU_UUID") or None
+    return (
+        payload.get("schema_version") == SCHEMA_VERSION
+        and payload.get("status") in {"starting", "running"}
+        and payload.get("process_present") is True
+        and payload.get("campaign_id") == manifest["campaign_id"]
+        and payload.get("job_id") == job["job_id"]
+        and payload.get("identity_hash") == job_identity(manifest, job)
+        and str(payload.get("source_sha", "")).lower() == manifest["source"]["git_sha"].lower()
+        and payload.get("host") == env.get("ARD_ORCH_HOST")
+        and payload.get("gpu_index") == int(env["ARD_ORCH_GPU_INDEX"])
+        and (expected_uuid is None or payload.get("gpu_uuid") == expected_uuid)
+        and isinstance(payload.get("pid"), int)
+        and payload["pid"] > 0
+        and payload.get("command_argv") == job["remote_command"]
+        and isinstance(payload.get("remote_manifest"), str)
+        and bool(payload["remote_manifest"])
+    )
+
+
+def wait_for_host_confirmation(
+    manifest: dict[str, Any], job: dict[str, Any], *, env: dict[str, str], cwd: Path
+) -> tuple[dict[str, Any] | None, bool]:
+    """Run a bounded remote-status probe until it proves a remote process exists."""
+    probe = [str(x) for x in job["host_confirm_probe"]]
+    interval = float(job["host_confirm_interval_seconds"])
+    deadline = time.monotonic() + float(job["host_confirm_timeout_seconds"])
+    while True:
+        result = subprocess.run(probe, cwd=cwd, env=env, text=True, capture_output=True)
+        try:
+            payload = json.loads(result.stdout) if result.returncode == 0 else None
+        except json.JSONDecodeError:
+            payload = None
+        if host_confirmation_valid(manifest, job, payload, env):
+            return payload, False
+        if time.monotonic() >= deadline:
+            return None, True
+        time.sleep(min(interval, max(0.01, deadline - time.monotonic())))
 
 
 def _check_dependencies(jobs: list[dict[str, Any]]) -> None:
@@ -505,6 +576,7 @@ def start_worker(
             "ARD_ORCH_SOURCE_SHA": manifest["source"]["git_sha"].lower(),
             "ARD_ORCH_HOST": slot[0],
             "ARD_ORCH_GPU_INDEX": str(slot[1]),
+            "ARD_ORCH_GPU_UUID": slot[2] or "",
         }
     )
     # A launch gate may provide an attempt-aware W&B template.  Keeping this
@@ -562,6 +634,28 @@ def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
             Path(job["_output_dir"]) / "orchestration" / f"{job['job_id']}.attempt-{attempt['attempt']}.result.json"
         )
         marker = Path(job["_completion_marker"])
+        confirmation_path = Path(job["_host_confirmation_marker"])
+        if job.get("executor", {}).get("type", "local") == "external_probe" and "host_confirmation" not in attempt:
+            try:
+                confirmation = json.loads(confirmation_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                confirmation = None
+            confirmation_env = {
+                "ARD_ORCH_HOST": str(attempt["host"]),
+                "ARD_ORCH_GPU_INDEX": str(attempt["gpu"]),
+                "ARD_ORCH_GPU_UUID": attempt.get("gpu_uuid") or "",
+            }
+            if host_confirmation_valid(manifest, job, confirmation, confirmation_env):
+                attempt["host_confirmation"] = confirmation
+                event(
+                    state,
+                    "host_confirmed_started",
+                    job["job_id"],
+                    attempt=attempt["attempt"],
+                    host=attempt["host"],
+                    gpu=attempt["gpu"],
+                    gpu_uuid=attempt.get("gpu_uuid"),
+                )
         if valid_marker(manifest, job, marker):
             attempt["status"] = "completed"
             record["status"] = "completed"
@@ -630,8 +724,16 @@ def controller_tick(manifest: dict[str, Any], state: dict[str, Any]) -> bool:
         record["attempts"].append(started)
         record["status"] = "running"
         occupied.add((slot[0], slot[1]))
-        event(state, "launch_success", job["job_id"], attempt=attempt, host=slot[0], gpu=slot[1], gpu_uuid=slot[2])
-        if pid_alive(started["pid"]):
+        event(
+            state,
+            "controller_spawned",
+            job["job_id"],
+            attempt=attempt,
+            host=slot[0],
+            gpu=slot[1],
+            gpu_uuid=slot[2],
+        )
+        if job.get("executor", {}).get("type", "local") == "local" and pid_alive(started["pid"]):
             event(state, "stable_confirmed", job["job_id"], attempt=attempt)
     statuses = [record["status"] for record in state["jobs"].values()]
     if all(status in TERMINAL for status in statuses):
@@ -716,6 +818,22 @@ def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_
     executor = job.get("executor", {"type": "local"}).get("type", "local")
     command = [str(x) for x in job["command"]]
     code = subprocess.run(command, cwd=cwd, env=env).returncode
+    host_confirm_timed_out = False
+    host_confirmation: dict[str, Any] | None = None
+    if code == 0 and executor == "external_probe":
+        host_confirmation, host_confirm_timed_out = wait_for_host_confirmation(manifest, job, env=env, cwd=cwd)
+        if host_confirmation is None:
+            atomic_json(
+                Path(job["_technical_failure_marker"]),
+                {
+                    "failure_class": "technical",
+                    "retryable": True,
+                    "reason": "bounded remote host confirmation did not prove the expected process identity",
+                },
+            )
+            code = 75
+        else:
+            atomic_json(Path(job["_host_confirmation_marker"]), host_confirmation)
     probe_timed_out = False
     if code == 0 and executor == "external_probe":
         probe = [str(x) for x in job["completion_probe"]]
@@ -742,6 +860,8 @@ def worker(manifest: dict[str, Any], job: dict[str, Any], attempt: int, attempt_
         "attempt_id": attempt_id,
         "identity_hash": job_identity(manifest, job),
         "exit_code": code,
+        "host_confirmation": host_confirmation,
+        "host_confirm_timed_out": host_confirm_timed_out,
         "probe_timed_out": probe_timed_out,
         "finished_at": now(),
     }

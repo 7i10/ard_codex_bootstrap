@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,7 @@ ROOT = Path(__file__).parents[2]
         "ferret-prepare",
         "ferret-launch",
         "ferret-status",
+        "ferret-host-confirm",
         "ferret-logs",
         "ferret-collect",
         "ferret-cancel",
@@ -80,8 +82,28 @@ def test_prepare_links_only_named_shared_runtime_assets() -> None:
 @pytest.mark.unit
 def test_prepare_serializes_shared_git_fetches() -> None:
     prepare = (SCRIPTS / "ferret-prepare").read_text()
-    assert 'exec 9>"/tmp/ard-codex-ferret-prepare.lock"' in prepare
+    assert 'LOCK=$(q "$FERRET_PREPARE_LOCK")' in prepare
+    assert 'exec 9>"$LOCK"' in prepare
     assert "flock -x 9" in prepare
+
+
+@pytest.mark.unit
+def test_prepare_lock_serializes_concurrent_mutations(tmp_path: Path) -> None:
+    lock = tmp_path / "prepare.lock"
+    timeline = tmp_path / "timeline.txt"
+    command = (
+        f'exec 9>"{lock}"; flock -x 9; '
+        f'printf "start-%s\\n" "$1" >> "{timeline}"; '
+        "sleep 0.08; "
+        f'printf "end-%s\\n" "$1" >> "{timeline}"'
+    )
+    first = subprocess.Popen(["bash", "-c", command, "--", "a"])
+    time.sleep(0.01)
+    second = subprocess.Popen(["bash", "-c", command, "--", "b"])
+    assert first.wait(timeout=2) == 0
+    assert second.wait(timeout=2) == 0
+    events = timeline.read_text().splitlines()
+    assert events in (["start-a", "end-a", "start-b", "end-b"], ["start-b", "end-b", "start-a", "end-a"])
 
 
 @pytest.mark.unit
@@ -106,8 +128,8 @@ def test_dynamic_bdd_launcher_materializes_hash_bound_parents_before_prepare() -
     assert 'exec 8>"/tmp/ard-i100-dynamic-bdd-parent-${seed}.lock"' in launcher
     assert "flock -x 8" in launcher
     assert "sha256sum" in launcher
-    assert "ARD_STAGEWISE_RUN_ROOT=\"$remote_parent_root\"" in launcher
-    assert "--expected-source-sha \"$source_sha\"" in launcher
+    assert 'ARD_STAGEWISE_RUN_ROOT="$remote_parent_root"' in launcher
+    assert '--expected-source-sha "$source_sha"' in launcher
     for variable in (
         "ARD_ORCH_CAMPAIGN_ID",
         "ARD_ORCH_JOB_ID",

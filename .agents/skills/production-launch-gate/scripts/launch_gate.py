@@ -10,6 +10,7 @@ canonical interchange format; YAML is accepted when PyYAML is installed.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import hashlib
 import importlib.util
 import json
@@ -34,6 +35,11 @@ FORBIDDEN_RETRY_FIELDS = {
     "teacher",
 }
 REQUIRED_ATTACK_FIELDS = {"loss", "epsilon", "step_size", "steps", "random_start", "target"}
+REMOTE_PREFLIGHT_SCHEMA = 1
+
+
+def now() -> str:
+    return dt.datetime.now(dt.UTC).isoformat()
 
 
 def canonical(value: Any) -> bytes:
@@ -411,6 +417,380 @@ def _replace_epoch_bound(command: list[str], final_epoch: int, errors: list[dict
     return result
 
 
+def _argv(value: Any) -> list[str] | None:
+    if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
+        return None
+    return list(value)
+
+
+def validate_remote_wrapper(value: Any, *, host: str, role: str, errors: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Require executable proof for direct remote shell wrappers.
+
+    Remote files cannot be inspected locally.  A remote preflight report must
+    therefore attest to the executable bit for a direct ``*.sh`` argv.  An
+    explicit shell interpreter is self-describing and does not need that bit.
+    """
+    if not isinstance(value, dict):
+        error(errors, host, role, "{argv, executable}", value, "declare remote launcher metadata")
+        return None
+    argv = _argv(value.get("argv"))
+    if argv is None:
+        error(errors, host, role + ".argv", "non-empty argv", value.get("argv"), "use structured argv metadata")
+        return None
+    direct_shell = argv[0].endswith(".sh")
+    if direct_shell and value.get("executable") is not True:
+        error(
+            errors,
+            host,
+            role + ".executable",
+            True,
+            value.get("executable"),
+            "invoke the wrapper as ['bash', 'wrapper.sh', ...] or report an executable remote wrapper",
+        )
+    return {"argv": argv, "executable": bool(value.get("executable", False))}
+
+
+def remote_artifact_bindings(
+    *, jobs: list[dict[str, Any]], dataset_identity: Any, teacher_identity: Any, teacher: Any
+) -> list[dict[str, Any]]:
+    """Build path-free identity expectations for one remote-host preflight."""
+    bindings: list[dict[str, Any]] = []
+    teacher_sha = None
+    if isinstance(teacher, dict):
+        checkpoint = teacher.get("checkpoint")
+        if isinstance(checkpoint, dict):
+            teacher_sha = checkpoint.get("sha256")
+        teacher_sha = teacher_sha or teacher.get("sha256")
+    for job in jobs:
+        bindings.append({"role": "dataset", "job_id": job["job_id"], "identity": dataset_identity, "available": True})
+        bindings.append(
+            {
+                "role": "teacher",
+                "job_id": job["job_id"],
+                "identity": teacher_identity,
+                "sha256": teacher_sha,
+                "available": True,
+            }
+        )
+        for role, item in (("parent", job.get("parent")), ("scientific_config", job.get("scientific_config"))):
+            if isinstance(item, dict):
+                bindings.append(
+                    {
+                        "role": role,
+                        "job_id": job["job_id"],
+                        "sha256": item.get("sha256") or item.get("parent_checkpoint_sha256"),
+                        "available": True,
+                    }
+                )
+        for role, items in (("mask", job.get("masks", [])), ("calibration", job.get("calibration", []))):
+            for item in items if isinstance(items, list) else []:
+                if isinstance(item, dict):
+                    bindings.append(
+                        {"role": role, "job_id": job["job_id"], "sha256": item.get("sha256"), "available": True}
+                    )
+    return bindings
+
+
+def _binding_key(item: dict[str, Any]) -> tuple[Any, ...]:
+    return (item.get("role"), item.get("job_id"), item.get("identity"), item.get("sha256"))
+
+
+def run_remote_preflight(
+    *, host: str, profile: dict[str, Any], source_sha: str, bindings: list[dict[str, Any]], errors: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Execute and validate the host executor's bounded JSON preflight.
+
+    The command is normally a thin SSH wrapper supplied by ``run-on-ferret``.
+    The gate validates its result but deliberately does not implement a second
+    SSH or worktree manager.
+    """
+    contract = profile.get("remote_preflight")
+    if not isinstance(contract, dict):
+        error(errors, host, "remote_preflight", "mapping", contract, "declare a bounded remote preflight contract")
+        return None
+    command = _argv(contract.get("command"))
+    if command is None:
+        error(
+            errors,
+            host,
+            "remote_preflight.command",
+            "non-empty argv",
+            contract.get("command"),
+            "provide an SSH/status argv",
+        )
+        return None
+    launcher = validate_remote_wrapper(
+        contract.get("launcher"), host=host, role="remote_preflight.launcher", errors=errors
+    )
+    completion_probe = validate_remote_wrapper(
+        contract.get("completion_probe"), host=host, role="remote_preflight.completion_probe", errors=errors
+    )
+    timeout = contract.get("timeout_seconds", 30)
+    try:
+        timeout = float(timeout)
+    except (TypeError, ValueError):
+        timeout = 0
+    if timeout <= 0 or timeout > 120:
+        error(
+            errors,
+            host,
+            "remote_preflight.timeout_seconds",
+            "0 < seconds <= 120",
+            contract.get("timeout_seconds"),
+            "use a bounded preflight",
+        )
+        return None
+    minimum_disk = contract.get("minimum_disk_free_bytes", 0)
+    if not isinstance(minimum_disk, int) or minimum_disk < 0:
+        error(
+            errors,
+            host,
+            "remote_preflight.minimum_disk_free_bytes",
+            "non-negative integer",
+            minimum_disk,
+            "declare disk minimum",
+        )
+        return None
+    output_root = contract.get("output_root")
+    if not isinstance(output_root, str) or not output_root:
+        error(
+            errors,
+            host,
+            "remote_preflight.output_root",
+            "non-empty remote path",
+            output_root,
+            "declare the remote output root",
+        )
+        return None
+    expected = {
+        "schema_version": REMOTE_PREFLIGHT_SCHEMA,
+        "host": host,
+        "source_sha": source_sha.lower(),
+        "python": profile.get("python"),
+        "gpus": [{"index": gpu["index"], "uuid": gpu.get("uuid")} for gpu in profile.get("gpus", [])],
+        "artifacts": bindings,
+        "output_root": output_root,
+        "launcher": launcher,
+        "completion_probe": completion_probe,
+    }
+    env = os.environ.copy()
+    env["ARD_LAUNCH_GATE_REMOTE_EXPECTED"] = json.dumps(expected, sort_keys=True)
+    try:
+        completed = subprocess.run(command, text=True, capture_output=True, env=env, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        error(
+            errors,
+            host,
+            "remote_preflight.command",
+            "successful bounded command",
+            str(exc),
+            "repair the remote executor",
+        )
+        return None
+    try:
+        report = json.loads(completed.stdout) if completed.returncode == 0 else None
+    except json.JSONDecodeError:
+        report = None
+    if not isinstance(report, dict):
+        error(
+            errors,
+            host,
+            "remote_preflight.report",
+            "JSON report with exit 0",
+            completed.stderr or completed.stdout or completed.returncode,
+            "make the remote preflight emit the contract report",
+        )
+        return None
+    for field, expected_value in (
+        ("schema_version", REMOTE_PREFLIGHT_SCHEMA),
+        ("host", host),
+        ("source_sha", source_sha.lower()),
+    ):
+        observed = report.get(field)
+        if str(observed).lower() != str(expected_value).lower():
+            error(
+                errors, host, "remote_preflight." + field, expected_value, observed, "repair the remote source binding"
+            )
+    python_report = report.get("python")
+    if (
+        not isinstance(python_report, dict)
+        or python_report.get("path") != profile.get("python")
+        or python_report.get("available") is not True
+    ):
+        error(
+            errors,
+            host,
+            "remote_preflight.python",
+            {"path": profile.get("python"), "available": True},
+            python_report,
+            "repair the remote Python environment",
+        )
+    output_report = report.get("output")
+    if (
+        not isinstance(output_report, dict)
+        or output_report.get("path") != output_root
+        or output_report.get("writable") is not True
+    ):
+        error(
+            errors,
+            host,
+            "remote_preflight.output",
+            {"path": output_root, "writable": True},
+            output_report,
+            "repair remote output storage",
+        )
+    disk = report.get("disk_free_bytes")
+    if not isinstance(disk, int) or disk < minimum_disk:
+        error(
+            errors,
+            host,
+            "remote_preflight.disk_free_bytes",
+            f">= {minimum_disk}",
+            disk,
+            "free remote disk before launch",
+        )
+    reported_gpus = report.get("gpus")
+    if not isinstance(reported_gpus, list):
+        reported_gpus = []
+    by_index = {item.get("index"): item for item in reported_gpus if isinstance(item, dict)}
+    for gpu in expected["gpus"]:
+        seen = by_index.get(gpu["index"])
+        if not isinstance(seen, dict) or (gpu.get("uuid") and seen.get("uuid") != gpu["uuid"]):
+            error(errors, host, "remote_preflight.gpus", gpu, seen, "repair GPU UUID/index binding")
+    reported_bindings = report.get("artifacts")
+    if not isinstance(reported_bindings, list):
+        reported_bindings = []
+    reported = {
+        _binding_key(item) for item in reported_bindings if isinstance(item, dict) and item.get("available") is True
+    }
+    missing = [_binding_key(item) for item in bindings if _binding_key(item) not in reported]
+    if missing:
+        error(
+            errors,
+            host,
+            "remote_preflight.artifacts",
+            "all declared remote inputs",
+            missing,
+            "materialize and hash-bind remote inputs",
+        )
+    for role, metadata in (("launcher", launcher), ("completion_probe", completion_probe)):
+        observed = report.get(role)
+        if (
+            not isinstance(observed, dict)
+            or observed.get("argv") != metadata["argv"]
+            or observed.get("valid") is not True
+        ):
+            error(
+                errors,
+                host,
+                "remote_preflight." + role,
+                {"argv": metadata["argv"], "valid": True},
+                observed,
+                "repair remote wrapper/probe",
+            )
+    return report
+
+
+def artifact_inventory_script() -> Path:
+    return Path(__file__).with_name("artifact_inventory.py")
+
+
+def validate_artifact_collection_contract(
+    value: Any,
+    *,
+    base: Path,
+    jobs: list[dict[str, Any]],
+    external_hosts_used: bool,
+    errors: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Require a collection -> inventory barrier before remote aggregation."""
+    if not external_hosts_used and value is None:
+        return None
+    if not isinstance(value, dict):
+        error(
+            errors,
+            None,
+            "artifact_collection",
+            "mapping with manifest_path, collection_job_id, inventory_job_id",
+            value,
+            "declare canonical collection for every remote campaign",
+        )
+        return None
+    raw_path = value.get("manifest_path")
+    path = resolve_path(raw_path, base)
+    if path is None or not path.is_file():
+        error(
+            errors,
+            None,
+            "artifact_collection.manifest_path",
+            "existing inventory manifest",
+            str(path),
+            "materialize the inventory schema",
+        )
+        return None
+    inspected = subprocess.run(
+        [sys.executable, str(artifact_inventory_script()), "inspect", "--manifest", str(path)],
+        text=True,
+        capture_output=True,
+    )
+    if inspected.returncode != 0:
+        error(
+            errors,
+            None,
+            "artifact_collection.manifest",
+            "valid identity-bound inventory schema",
+            inspected.stdout or inspected.stderr,
+            "repair the required artifact matrix before launch",
+        )
+    collection_id = value.get("collection_job_id")
+    inventory_id = value.get("inventory_job_id")
+    by_id = {job["job_id"]: job for job in jobs}
+    collection = by_id.get(collection_id)
+    inventory = by_id.get(inventory_id)
+    if collection is None or collection.get("job_type") != "collection":
+        error(
+            errors,
+            None,
+            "artifact_collection.collection_job_id",
+            "declared collection job",
+            collection_id,
+            "add a collection DAG node",
+        )
+    if inventory is None or inventory.get("job_type") != "inventory":
+        error(
+            errors,
+            None,
+            "artifact_collection.inventory_job_id",
+            "declared inventory job",
+            inventory_id,
+            "add an inventory DAG node",
+        )
+    elif collection_id not in inventory.get("dependencies", []):
+        error(
+            errors,
+            inventory_id,
+            "dependencies",
+            f"includes {collection_id}",
+            inventory.get("dependencies"),
+            "make inventory wait for canonical collection",
+        )
+    for job in jobs:
+        if job.get("job_type") == "aggregation" and inventory_id not in job.get("dependencies", []):
+            error(
+                errors,
+                job["job_id"],
+                "dependencies",
+                f"includes {inventory_id}",
+                job.get("dependencies"),
+                "make aggregation wait for the validated inventory",
+            )
+    return {
+        "manifest_path": str(path),
+        "collection_job_id": collection_id,
+        "inventory_job_id": inventory_id,
+    }
+
+
 def _logical_host_path(
     spec: dict[str, Any],
     host_profile: dict[str, Any],
@@ -645,33 +1025,34 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
                         str(specified),
                         "use the selected host's logical dataset path",
                     )
-                required_files = dataset.get("required_files", [])
-                for relative in required_files if isinstance(required_files, list) else []:
-                    candidate = dataset_path / str(relative)
-                    if not candidate.exists():
-                        error(
-                            errors,
-                            job_id,
-                            "dataset.required_file",
-                            "existing path",
-                            str(candidate),
-                            "materialize the host-local dataset",
+                if profile.get("backend", "local") == "local":
+                    required_files = dataset.get("required_files", [])
+                    for relative in required_files if isinstance(required_files, list) else []:
+                        candidate = dataset_path / str(relative)
+                        if not candidate.exists():
+                            error(
+                                errors,
+                                job_id,
+                                "dataset.required_file",
+                                "existing path",
+                                str(candidate),
+                                "materialize the host-local dataset",
+                            )
+                    identity_file = dataset.get("identity_file")
+                    if identity_file is not None:
+                        identity_descriptor = {
+                            "path": str(dataset_path / str(identity_file))
+                            if not Path(str(identity_file)).is_absolute()
+                            else str(identity_file),
+                            "sha256": dataset.get("sha256"),
+                        }
+                        validate_artifact(
+                            identity_descriptor,
+                            base=base,
+                            errors=errors,
+                            job_id=job_id,
+                            role="dataset.identity_file",
                         )
-                identity_file = dataset.get("identity_file")
-                if identity_file is not None:
-                    identity_descriptor = {
-                        "path": str(dataset_path / str(identity_file))
-                        if not Path(str(identity_file)).is_absolute()
-                        else str(identity_file),
-                        "sha256": dataset.get("sha256"),
-                    }
-                    validate_artifact(
-                        identity_descriptor,
-                        base=base,
-                        errors=errors,
-                        job_id=job_id,
-                        role="dataset.identity_file",
-                    )
         if split_identity is not None and job.get("split_identity", split_identity) != split_identity:
             error(
                 errors, job_id, "split_identity", split_identity, job.get("split_identity"), "bind the registered split"
@@ -799,6 +1180,7 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             "wandb_run_id_template": f"{base_run}-attempt-{{attempt}}",
             "retry_policy": job.get("retry_policy", {"max_attempts": 1}),
             "executor": job.get("executor", {"type": "local"}),
+            "job_type": job.get("job_type", "training"),
             # Preserve external completion-probe fields when freezing the
             # resolved manifest.  The orchestrator validates these fields for
             # external jobs; dropping them here makes an otherwise valid
@@ -808,6 +1190,13 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             else None,
             "probe_interval_seconds": job.get("probe_interval_seconds", 30),
             "probe_timeout_seconds": job.get("probe_timeout_seconds"),
+            "host_confirm_probe": list(job["host_confirm_probe"])
+            if isinstance(job.get("host_confirm_probe"), list)
+            else None,
+            "host_confirm_timeout_seconds": job.get("host_confirm_timeout_seconds", 30),
+            "host_confirm_interval_seconds": job.get("host_confirm_interval_seconds", 1),
+            "remote_command": list(job["remote_command"]) if isinstance(job.get("remote_command"), list) else None,
+            "host_confirmation_marker": job.get("host_confirmation_marker"),
             "expected_outputs": expected_outputs,
             "expected_final_epoch": job.get("expected_final_epoch", final_epoch),
             "epoch_binding": {
@@ -821,6 +1210,8 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             },
             "parent": parent,
             "scientific_config": config_item,
+            "masks": masks,
+            "calibration": calibrations,
             "inputs": inputs,
         }
         retry_mutations = job.get("retry_mutations", {})
@@ -871,6 +1262,36 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             wandb_ids,
             "use campaign/job/identity-specific run IDs",
         )
+    remote_preflights: dict[str, Any] = {}
+    for host, profile in hosts.items():
+        host_jobs = [job for job in resolved_jobs if job.get("host") == host]
+        if profile.get("backend", "local") != "external" or not host_jobs:
+            continue
+        report = run_remote_preflight(
+            host=host,
+            profile=profile,
+            source_sha=str(source.get("git_sha", "")),
+            bindings=remote_artifact_bindings(
+                jobs=host_jobs,
+                dataset_identity=dataset_identity,
+                teacher_identity=teacher_spec.get("identity") if isinstance(teacher_spec, dict) else None,
+                teacher=teacher_spec,
+            ),
+            errors=errors,
+        )
+        if report is not None:
+            remote_preflights[host] = report
+    artifact_collection = validate_artifact_collection_contract(
+        spec.get("artifact_collection"),
+        base=base,
+        jobs=resolved_jobs,
+        external_hosts_used=bool(remote_preflights)
+        or any(
+            profile.get("backend", "local") == "external" and any(job.get("host") == host for job in resolved_jobs)
+            for host, profile in hosts.items()
+        ),
+        errors=errors,
+    )
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "campaign_id": campaign_id,
@@ -886,6 +1307,8 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             "dataset_identity": dataset_identity,
             "split_identity": split_identity,
             "canary": spec.get("canary", {}),
+            "remote_preflight": remote_preflights,
+            "artifact_collection": artifact_collection,
         },
     }
     report = {
@@ -893,6 +1316,7 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
         "errors": errors,
         "warnings": warnings,
         "resolved_jobs": resolved_jobs,
+        "remote_preflight": remote_preflights,
     }
     return manifest, report
 
@@ -995,7 +1419,100 @@ def plan_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         return [{"status": "plan_error", "error": str(exc)}]
 
 
+def run_remote_lifecycle_canaries(manifest: dict[str, Any], gate_dir: Path) -> list[dict[str, Any]]:
+    """Run one bounded launch/status/collection roundtrip per external host."""
+    canary = manifest.get("launch_gate", {}).get("canary", {})
+    entries = canary.get("remote_lifecycle", []) if isinstance(canary, dict) else []
+    entries = entries if isinstance(entries, list) else []
+    external_hosts = {
+        host
+        for host, profile in manifest.get("hosts", {}).items()
+        if isinstance(profile, dict)
+        and profile.get("backend", "local") == "external"
+        and any(job.get("host") == host for job in manifest.get("jobs", []))
+    }
+    by_host = {
+        entry.get("host"): entry for entry in entries if isinstance(entry, dict) and isinstance(entry.get("host"), str)
+    }
+    results: list[dict[str, Any]] = []
+    for host in sorted(external_hosts):
+        entry = by_host.get(host)
+        if entry is None:
+            results.append({"host": host, "status": "fail", "error": "remote lifecycle canary missing"})
+            continue
+        command = _argv(entry.get("command"))
+        timeout = entry.get("timeout_seconds", 30)
+        try:
+            timeout = float(timeout)
+        except (TypeError, ValueError):
+            timeout = 0
+        if command is None or timeout <= 0 or timeout > 120:
+            results.append({"host": host, "status": "fail", "error": "remote lifecycle canary requires bounded argv"})
+            continue
+        output = gate_dir / "canary" / f"remote-{host}"
+        output.mkdir(parents=True, exist_ok=True)
+        env = os.environ.copy()
+        env.update(
+            {
+                "ARD_LAUNCH_GATE_CANARY": "1",
+                "ARD_LAUNCH_GATE_EXPECTED_SOURCE_SHA": manifest["source"]["git_sha"],
+                "ARD_LAUNCH_GATE_EXPECTED_HOST": host,
+            }
+        )
+        try:
+            completed = subprocess.run(command, text=True, capture_output=True, env=env, timeout=timeout)
+            (output / "stdout.txt").write_text(completed.stdout, encoding="utf-8")
+            (output / "stderr.txt").write_text(completed.stderr, encoding="utf-8")
+            payload = json.loads(completed.stdout) if completed.returncode == 0 else None
+        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
+            results.append({"host": host, "status": "fail", "error": str(exc)})
+            continue
+        if not isinstance(payload, dict):
+            results.append({"host": host, "status": "fail", "error": "canary did not emit JSON"})
+            continue
+        required = (
+            payload.get("schema_version") == REMOTE_PREFLIGHT_SCHEMA
+            and payload.get("host") == host
+            and str(payload.get("source_sha", "")).lower() == manifest["source"]["git_sha"].lower()
+            and payload.get("process_confirmed") is True
+            and isinstance(payload.get("remote_manifest"), str)
+            and bool(payload["remote_manifest"])
+            and payload.get("completion_marker") is True
+        )
+        artifact = payload.get("artifact")
+        if not required or not isinstance(artifact, dict):
+            results.append({"host": host, "status": "fail", "error": "remote lifecycle evidence incomplete"})
+            continue
+        inventory = {
+            "schema_version": 1,
+            "campaign_id": manifest["campaign_id"],
+            "source_sha": manifest["source"]["git_sha"],
+            "artifacts": [artifact],
+            "required_cells": [artifact.get("identity")],
+        }
+        inventory_path = output / "collection-manifest.json"
+        atomic_json(inventory_path, inventory)
+        staged = subprocess.run(
+            [sys.executable, str(artifact_inventory_script()), "stage", "--manifest", str(inventory_path)],
+            text=True,
+            capture_output=True,
+        )
+        (output / "collection.stdout.txt").write_text(staged.stdout, encoding="utf-8")
+        (output / "collection.stderr.txt").write_text(staged.stderr, encoding="utf-8")
+        results.append(
+            {
+                "host": host,
+                "status": "pass" if staged.returncode == 0 else "fail",
+                "returncode": staged.returncode,
+                "timeout_seconds": timeout,
+                "artifact_collection": str(inventory_path),
+            }
+        )
+    return results
+
+
 def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
+    started_at = now()
     canary = manifest.get("launch_gate", {}).get("canary", {})
     entries = canary.get("jobs", []) if isinstance(canary, dict) else []
     results: list[dict[str, Any]] = []
@@ -1046,7 +1563,13 @@ def run_canary(manifest: dict[str, Any], gate_dir: Path) -> dict[str, Any]:
                 "error": "no canary jobs declared; use --canary-only with a bounded non-scientific canary",
             }
         )
-    return {"status": "pass" if all(item.get("status") == "pass" for item in results) else "fail", "results": results}
+    results.extend(run_remote_lifecycle_canaries(manifest, gate_dir))
+    return {
+        "status": "pass" if all(item.get("status") == "pass" for item in results) else "fail",
+        "started_at": started_at,
+        "finished_at": now(),
+        "results": results,
+    }
 
 
 def revalidate_frozen(resolved_path: Path, freeze_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -1116,6 +1639,24 @@ def revalidate_frozen(resolved_path: Path, freeze_path: Path) -> tuple[dict[str,
                     file_digest(config_path),
                     "restore the frozen config bytes",
                 )
+    for host, profile in manifest.get("hosts", {}).items():
+        host_jobs = [job for job in manifest.get("jobs", []) if job.get("host") == host]
+        if not isinstance(profile, dict) or profile.get("backend", "local") != "external" or not host_jobs:
+            continue
+        first_identity = host_jobs[0].get("scientific_identity", {})
+        teacher = first_identity.get("teacher", {}) if isinstance(first_identity, dict) else {}
+        run_remote_preflight(
+            host=host,
+            profile=profile,
+            source_sha=str(expected_sha or ""),
+            bindings=remote_artifact_bindings(
+                jobs=host_jobs,
+                dataset_identity=manifest.get("launch_gate", {}).get("dataset_identity"),
+                teacher_identity=teacher.get("identity") if isinstance(teacher, dict) else None,
+                teacher=teacher if isinstance(teacher, dict) else {},
+            ),
+            errors=errors,
+        )
     return manifest, errors
 
 
@@ -1180,6 +1721,23 @@ def validate_run(resolved_path: Path) -> tuple[bool, dict[str, Any]]:
                     file_digest(path),
                     "restore the expected output bytes",
                 )
+    collection = manifest.get("launch_gate", {}).get("artifact_collection")
+    if isinstance(collection, dict) and isinstance(collection.get("manifest_path"), str):
+        inventory = Path(collection["manifest_path"])
+        checked = subprocess.run(
+            [sys.executable, str(artifact_inventory_script()), "validate", "--manifest", str(inventory)],
+            text=True,
+            capture_output=True,
+        )
+        if checked.returncode != 0:
+            error(
+                errors,
+                None,
+                "artifact_collection",
+                "complete canonical SHA-verified inventory",
+                checked.stdout or checked.stderr,
+                "run collection/inventory before aggregation completion",
+            )
     return not errors, {"status": "pass" if not errors else "fail", "errors": errors, "state": state}
 
 
@@ -1193,7 +1751,15 @@ def invoke_orchestrator(command: str, manifest_path: Path, *, detached: bool = F
     return result.returncode
 
 
+def write_remote_preflight_record(gate_dir: Path, report: dict[str, Any]) -> None:
+    """Persist one host-indexed bounded-preflight record beside the freeze."""
+    records = report.get("remote_preflight", {})
+    if isinstance(records, dict):
+        atomic_json(gate_dir / "remote-preflight.json", {"schema_version": REMOTE_PREFLIGHT_SCHEMA, "hosts": records})
+
+
 def gate_main(args: argparse.Namespace) -> int:
+    gate_started_at = now()
     spec_path = args.campaign_spec.resolve()
     gate_dir = (args.output_dir or spec_path.parent / ".launch-gate" / spec_path.stem).resolve()
     freeze_path = gate_dir / "freeze.json"
@@ -1215,7 +1781,26 @@ def gate_main(args: argparse.Namespace) -> int:
             )
         )
         return 2
+    requested = spec.get("timing", {}) if isinstance(spec.get("timing", {}), dict) else {}
+    ledger = [
+        {
+            "event_type": "gate_started",
+            "timestamp": gate_started_at,
+        }
+    ]
+    if isinstance(requested.get("request_received"), str):
+        ledger.insert(
+            0,
+            {
+                "event_type": "request_received",
+                "timestamp": requested["request_received"],
+                "precision": requested.get("request_precision", "unknown"),
+            },
+        )
+    ledger.append({"event_type": "source_and_remote_preflight_resolved", "timestamp": now()})
+    report["timing_ledger"] = ledger
     if report["status"] != "pass":
+        write_remote_preflight_record(gate_dir, report)
         atomic_json(gate_dir / "preflight.json", report)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 2
@@ -1234,6 +1819,7 @@ def gate_main(args: argparse.Namespace) -> int:
             for row in plan_errors
         )
         report["dry_run"] = dry_rows
+        write_remote_preflight_record(gate_dir, report)
         atomic_json(gate_dir / "preflight.json", report)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 2
@@ -1242,6 +1828,9 @@ def gate_main(args: argparse.Namespace) -> int:
         for row in dry_rows
         if row.get("status") != "resource_conflict" and "job_id" in row
     }
+    ledger.append({"event_type": "preflight_passed", "timestamp": now()})
+    ledger.append({"event_type": "manifest_freeze_started", "timestamp": now()})
+    manifest["launch_gate"]["timing_ledger"] = ledger
     report["dry_run"] = dry_rows
     try:
         frozen_path, manifest_sha = freeze(manifest, gate_dir)
@@ -1255,6 +1844,8 @@ def gate_main(args: argparse.Namespace) -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
         return 2
     report["manifest_sha256"] = manifest_sha
+    ledger.append({"event_type": "manifest_frozen", "timestamp": now(), "manifest_sha256": manifest_sha})
+    write_remote_preflight_record(gate_dir, report)
     atomic_json(gate_dir / "preflight.json", report)
     if args.preflight_only:
         print(json.dumps(report, indent=2, sort_keys=True))

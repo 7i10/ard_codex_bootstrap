@@ -24,6 +24,16 @@ REGRESSION_CASES = {
     "R10": "test_dependency_output_is_not_required_before_producer_completion",
     "R11": "test_technical_retry_keeps_identity_and_gets_new_execution_id",
     "R12": "test_validate_run_rejects_exit_zero_without_required_outputs",
+    "R13": "test_remote_wrapper_metadata_rejects_non_executable_and_accepts_bash",
+    "R14": "test_external_host_preflight_requires_every_declared_binding",
+    "R15": "test_external_probe_requires_host_confirmation_before_completion",
+    "R16": "test_remote_source_drift_is_rechecked_before_launch",
+    "R17": "test_collection_stages_remote_metadata_to_canonical_local_path",
+    "R18": "test_inventory_rejects_missing_required_endpoint_cell",
+    "R19": "test_prepare_lock_serializes_concurrent_mutations",
+    "R20": "test_remote_lifecycle_canary_requires_status_and_hash_roundtrip",
+    "R21": "test_inventory_rejects_collected_hash_mismatch",
+    "R22": "test_inventory_rejects_foreign_campaign_or_source_identity",
 }
 
 
@@ -117,6 +127,124 @@ def write_spec(tmp_path: Path, spec: dict) -> Path:
     return path
 
 
+def remote_preflight_command(*, source_override: Path | None = None, omit_artifacts: bool = False) -> list[str]:
+    source = (
+        "source=Path(" + repr(str(source_override)) + ").read_text().strip()"
+        if source_override is not None
+        else "source=e['source_sha']"
+    )
+    artifacts = "[]" if omit_artifacts else "e['artifacts']"
+    code = (
+        "import json,os; from pathlib import Path; e=json.loads(os.environ['ARD_LAUNCH_GATE_REMOTE_EXPECTED']); "
+        + source
+        + "; print(json.dumps({'schema_version':1,'host':e['host'],'source_sha':source,"
+        "'python':{'path':e['python'],'available':True},'gpus':e['gpus'],'artifacts':"
+        + artifacts
+        + ",'output':{'path':e['output_root'],'writable':True},'disk_free_bytes':999999999,"
+        "'launcher':{'argv':e['launcher']['argv'],'valid':True},"
+        "'completion_probe':{'argv':e['completion_probe']['argv'],'valid':True}}))"
+    )
+    return [sys.executable, "-c", code]
+
+
+def artifact_inventory_manifest(tmp_path: Path, *, campaign_id: str = "gate-fixture", source_sha: str) -> Path:
+    identity = {
+        "campaign_id": campaign_id,
+        "source_sha": source_sha,
+        "job_id": "remote-train",
+        "seed": "s1",
+        "arm": "BASE",
+        "epoch": 2,
+        "split": "held-out",
+        "attack_identity": "train",
+    }
+    payload = {
+        "schema_version": 1,
+        "campaign_id": campaign_id,
+        "source_sha": source_sha,
+        "artifacts": [
+            {
+                "origin": {"host": "remote", "path": "/remote/rows.json"},
+                "staging_path": str(tmp_path / "staging" / "rows.json"),
+                "collected_path": str(tmp_path / "canonical" / "rows.json"),
+                "sha256": "b" * 64,
+                "identity": identity,
+            }
+        ],
+        "required_cells": [identity],
+    }
+    path = tmp_path / "artifact-inventory.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def add_external_host(
+    spec: dict, tmp_path: Path, *, launcher: dict | None = None, omit_artifacts: bool = False
+) -> None:
+    source_sha = spec["source"]["git_sha"]
+    inventory = artifact_inventory_manifest(tmp_path, source_sha=source_sha)
+    launcher = launcher or {"argv": ["bash", "launch.sh"], "executable": False}
+    profile = {
+        "backend": "external",
+        "repo_path": "/remote/repo",
+        "python": sys.executable,
+        "dataset_paths": {"toy-v1": "/remote/data"},
+        "teacher_paths": {},
+        "gpus": [{"index": 0, "uuid": "GPU-remote", "throughput": 10}],
+        "remote_preflight": {
+            "command": remote_preflight_command(omit_artifacts=omit_artifacts),
+            "timeout_seconds": 10,
+            "minimum_disk_free_bytes": 1,
+            "output_root": "/remote/outputs",
+            "launcher": launcher,
+            "completion_probe": {"argv": ["bash", "probe.sh"], "executable": False},
+        },
+    }
+    spec["hosts"]["remote"] = profile
+    spec["jobs"][0].update(
+        {
+            "job_id": "remote-train",
+            "host": "remote",
+            "command": [sys.executable, "-c", "pass", "--epochs", "999"],
+            "executor": {"type": "external_probe"},
+            "completion_probe": [sys.executable, "-c", "pass"],
+            "host_confirm_probe": [sys.executable, "-c", "pass"],
+            "remote_command": ["remote-python", "train.py", "--epochs", "3"],
+        }
+    )
+    spec["canary"]["jobs"] = [{"job_id": "remote-train", "command": [sys.executable, "-c", "pass"]}]
+    collection = {
+        "job_id": "collect",
+        "job_type": "collection",
+        "arm": "COLLECT",
+        "seed": "s1",
+        "host": "local",
+        "gpu_count": 0,
+        "command": [sys.executable, "-c", "pass"],
+        "cwd": spec["source"]["repo_path"],
+        "output_dir": str(tmp_path / "outputs" / "collect"),
+        "dependencies": ["remote-train"],
+    }
+    inventory_job = {
+        "job_id": "inventory",
+        "job_type": "inventory",
+        "arm": "INVENTORY",
+        "seed": "s1",
+        "host": "local",
+        "gpu_count": 0,
+        "command": [sys.executable, "-c", "pass"],
+        "cwd": spec["source"]["repo_path"],
+        "output_dir": str(tmp_path / "outputs" / "inventory"),
+        "dependencies": ["collect"],
+    }
+    spec["jobs"].extend([collection, inventory_job])
+    spec["artifact_collection"] = {
+        "manifest_path": str(inventory),
+        "collection_job_id": "collect",
+        "inventory_job_id": "inventory",
+    }
+
+
 def invoke(spec: Path, *flags: str, output: Path | None = None) -> subprocess.CompletedProcess[str]:
     command = [sys.executable, str(SCRIPT), "--campaign-spec", str(spec)]
     if output is not None:
@@ -146,6 +274,8 @@ def test_external_probe_fields_survive_resolved_manifest_freeze(tmp_path: Path) 
     spec, _, _, _ = base_spec(tmp_path)
     spec["jobs"][0]["executor"] = {"type": "external_probe"}
     spec["jobs"][0]["completion_probe"] = [sys.executable, "probe.py", "--output", "last.json"]
+    spec["jobs"][0]["host_confirm_probe"] = [sys.executable, "host-confirm.py", "--output", "status.json"]
+    spec["jobs"][0]["remote_command"] = ["remote-python", "train.py", "--epochs", "3"]
     spec["jobs"][0]["probe_interval_seconds"] = 7
     spec["jobs"][0]["probe_timeout_seconds"] = 31
     gate_dir = tmp_path / "gate"
@@ -153,8 +283,71 @@ def test_external_probe_fields_survive_resolved_manifest_freeze(tmp_path: Path) 
     assert result.returncode == 0, result.stdout + result.stderr
     job = json.loads((gate_dir / "resolved-manifest.json").read_text())["jobs"][0]
     assert job["completion_probe"] == [sys.executable, "probe.py", "--output", "last.json"]
+    assert job["host_confirm_probe"] == [sys.executable, "host-confirm.py", "--output", "status.json"]
+    assert job["remote_command"] == ["remote-python", "train.py", "--epochs", "3"]
     assert job["probe_interval_seconds"] == 7
     assert job["probe_timeout_seconds"] == 31
+
+
+def test_remote_wrapper_metadata_rejects_non_executable_and_accepts_bash(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    add_external_host(spec, tmp_path, launcher={"argv": ["launch.sh"], "executable": False})
+    rejected = invoke(write_spec(tmp_path, spec), "--preflight-only", output=tmp_path / "bad-gate")
+    assert rejected.returncode == 2
+    assert "remote_preflight.launcher.executable" in rejected.stdout
+
+    spec["hosts"]["remote"]["remote_preflight"]["launcher"] = {"argv": ["bash", "launch.sh"], "executable": False}
+    accepted = invoke(write_spec(tmp_path, spec), "--dry-run", output=tmp_path / "good-gate")
+    assert accepted.returncode == 0, accepted.stdout + accepted.stderr
+    assert (tmp_path / "good-gate" / "remote-preflight.json").is_file()
+
+
+def test_external_host_preflight_requires_every_declared_binding(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    add_external_host(spec, tmp_path, omit_artifacts=True)
+    result = invoke(write_spec(tmp_path, spec), "--preflight-only", output=tmp_path / "gate")
+    assert result.returncode == 2
+    assert "remote_preflight.artifacts" in result.stdout
+
+
+def test_remote_source_drift_is_rechecked_before_launch(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    remote_source = tmp_path / "remote-source.txt"
+    remote_source.write_text(spec["source"]["git_sha"], encoding="utf-8")
+    add_external_host(spec, tmp_path)
+    spec["hosts"]["remote"]["remote_preflight"]["command"] = remote_preflight_command(source_override=remote_source)
+    spec_path = write_spec(tmp_path, spec)
+    gate_dir = tmp_path / "gate"
+    assert invoke(spec_path, "--dry-run", output=gate_dir).returncode == 0
+    remote_source.write_text("b" * 40, encoding="utf-8")
+    result = invoke(spec_path, "--launch", output=gate_dir)
+    assert result.returncode == 2
+    assert "remote_preflight.source_sha" in result.stdout
+
+
+def test_remote_lifecycle_canary_requires_status_and_hash_roundtrip(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    add_external_host(spec, tmp_path)
+    staging = tmp_path / "remote-canary-staging.bin"
+    collected = tmp_path / "remote-canary-canonical.bin"
+    canary_code = (
+        "import hashlib,json,os; from pathlib import Path; "
+        f"staging=Path({str(staging)!r}); staging.write_bytes(b'canary-bytes'); "
+        "identity={'campaign_id':'gate-fixture','source_sha':os.environ['ARD_LAUNCH_GATE_EXPECTED_SOURCE_SHA'],"
+        "'job_id':'remote-train','seed':'s1','arm':'BASE','epoch':2,'split':'held-out','attack_identity':'train'}; "
+        f"artifact={{'origin':{{'host':'remote','path':'/remote/canary.bin'}},'staging_path':str(staging),'collected_path':{str(collected)!r},"
+        "'sha256':hashlib.sha256(staging.read_bytes()).hexdigest(),'identity':identity}; "
+        "payload={'schema_version':1,'host':os.environ['ARD_LAUNCH_GATE_EXPECTED_HOST'],"
+        "'source_sha':os.environ['ARD_LAUNCH_GATE_EXPECTED_SOURCE_SHA'],'process_confirmed':True,"
+        "'remote_manifest':'/remote/manifest.json','completion_marker':True,'artifact':artifact}; "
+        "print(json.dumps(payload))"
+    )
+    spec["canary"]["remote_lifecycle"] = [
+        {"host": "remote", "command": [sys.executable, "-c", canary_code], "timeout_seconds": 10}
+    ]
+    result = invoke(write_spec(tmp_path, spec), "--canary-only", output=tmp_path / "gate")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert collected.read_bytes() == b"canary-bytes"
 
 
 def test_preflight_requires_full_source_binding_and_clean_tree(tmp_path: Path) -> None:
