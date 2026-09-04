@@ -874,8 +874,16 @@ def freeze_online_thresholds(
     output_path: Path,
     source_git_sha: str,
     training_attack_identity_sha256: str,
+    prefix_state_materialized_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Freeze seed-specific e100 q10 thresholds from a hash-bound prefix state."""
+    """Freeze seed-specific e100 q10 thresholds from a hash-bound prefix state.
+
+    ``prefix_state_materialized_path`` permits the controller to atomically
+    promote a completed prefix from an attempt-scoped staging directory to its
+    canonical output directory.  The original checkpoint path remains the
+    lineage record; the replacement is accepted only when its bytes match the
+    SHA-256 sealed in that checkpoint.
+    """
     if output_path.exists() or output_path.with_name(output_path.name + ".sha256").exists():
         raise OnlineStateS2RoutingError(f"refusing to overwrite frozen online thresholds: {output_path}")
     required = {
@@ -898,7 +906,8 @@ def freeze_online_thresholds(
         import pyarrow.parquet as pq
     except ImportError as exc:  # pragma: no cover
         raise OnlineStateS2RoutingError("threshold freeze requires pyarrow") from exc
-    state_path = Path(raw["path"])
+    original_state_path = Path(raw["path"])
+    state_path = original_state_path if prefix_state_materialized_path is None else prefix_state_materialized_path
     if not state_path.is_file() or _sha256(state_path) != raw["sha256"]:
         raise OnlineStateS2RoutingError("prefix state artifact bytes do not match checkpoint lineage")
     rows = pq.read_table(state_path).to_pylist()
@@ -919,6 +928,7 @@ def freeze_online_thresholds(
         "prefix_epoch": epoch,
         "prefix_checkpoint": str(prefix_checkpoint.resolve()),
         "prefix_checkpoint_sha256": _sha256(prefix_checkpoint),
+        "prefix_state_original_path": str(original_state_path.resolve()),
         "prefix_state_path": str(state_path.resolve()),
         "prefix_state_sha256": _sha256(state_path),
         "original_parent_checkpoint_sha256": prefix_router_state.get("original_parent_checkpoint_sha256"),

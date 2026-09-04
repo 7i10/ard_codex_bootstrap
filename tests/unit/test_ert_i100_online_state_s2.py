@@ -364,6 +364,52 @@ def test_child_accepts_only_sha_verified_materialized_prefix_state(tmp_path: Pat
         rejected.adopt_prefix_state(prefix.state_dict(), materialized_state_path=materialized)
 
 
+def test_threshold_freeze_accepts_only_sha_verified_promoted_prefix_state(tmp_path: Path) -> None:
+    """Attempt-scoped prefix promotion must not invalidate its sealed state."""
+    pytest.importorskip("pyarrow")
+    prefix, _, _ = _write_prefix_and_thresholds(tmp_path)
+    state = json.loads(json.dumps(prefix.state_dict()))
+    original = tmp_path / "prefix" / "online-state" / "epoch-100.parquet"
+    promoted = tmp_path / "promoted" / "online-state" / "epoch-100.parquet"
+    promoted.parent.mkdir(parents=True)
+    promoted.write_bytes(original.read_bytes())
+    state["state_paths"]["100"]["path"] = str(tmp_path / "attempt-staging" / "epoch-100.parquet")
+    checkpoint = tmp_path / "prefix-e100-promoted.pt"
+    checkpoint.write_bytes(b"frozen-promoted-prefix-checkpoint")
+
+    with pytest.raises(OnlineStateS2RoutingError, match="bytes do not match"):
+        freeze_online_thresholds(
+            prefix_router_state=state,
+            prefix_checkpoint=checkpoint,
+            output_path=tmp_path / "thresholds-without-materialization.json",
+            source_git_sha="b" * 40,
+            training_attack_identity_sha256="c" * 64,
+        )
+
+    artifact = freeze_online_thresholds(
+        prefix_router_state=state,
+        prefix_checkpoint=checkpoint,
+        output_path=tmp_path / "thresholds-with-materialization.json",
+        source_git_sha="b" * 40,
+        training_attack_identity_sha256="c" * 64,
+        prefix_state_materialized_path=promoted,
+    )
+    assert artifact["prefix_state_original_path"].endswith("attempt-staging/epoch-100.parquet")
+    assert artifact["prefix_state_path"] == str(promoted.resolve())
+    assert artifact["prefix_state_sha256"] == hashlib.sha256(original.read_bytes()).hexdigest()
+
+    promoted.write_bytes(b"wrong-promoted-state")
+    with pytest.raises(OnlineStateS2RoutingError, match="bytes do not match"):
+        freeze_online_thresholds(
+            prefix_router_state=state,
+            prefix_checkpoint=checkpoint,
+            output_path=tmp_path / "thresholds-corrupt-materialization.json",
+            source_git_sha="b" * 40,
+            training_attack_identity_sha256="c" * 64,
+            prefix_state_materialized_path=promoted,
+        )
+
+
 def test_child_checkpoint_state_preserves_prior_online_action_for_resume(tmp_path: Path) -> None:
     pytest.importorskip("pyarrow")
     prefix, thresholds, labels = _write_prefix_and_thresholds(tmp_path)

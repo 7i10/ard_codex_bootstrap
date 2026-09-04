@@ -214,12 +214,18 @@ def _run_freeze(args: argparse.Namespace) -> dict[str, Any]:
         raise SystemExit("threshold freeze rejects an e100 prefix from a different source Git SHA")
     if lineage.get("training_attack_identity_sha256") != SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256:
         raise SystemExit("threshold freeze rejects an e100 prefix with a different training attack identity")
+    # A DAG-managed prefix is written in attempt-scoped staging and atomically
+    # promoted to ``prefix_output``.  Its checkpoint deliberately retains the
+    # staging path as provenance, so bind the promoted local file only by the
+    # state SHA sealed in that checkpoint.
+    promoted_state = args.prefix_output / "training" / "online-state" / "epoch-100.parquet"
     result = freeze_online_thresholds(
         prefix_router_state=lineage["online_state_s2_state"],
         prefix_checkpoint=checkpoint,
         output_path=args.output,
         source_git_sha=source_sha,
         training_attack_identity_sha256=SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256,
+        prefix_state_materialized_path=promoted_state,
     )
     _write_json(
         args.output.with_name(args.output.name + ".summary.json"),

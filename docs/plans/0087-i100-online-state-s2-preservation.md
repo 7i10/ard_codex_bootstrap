@@ -122,6 +122,13 @@ Online-S2×T1 branch during epochs 101–114.
   paths now bind the production parent to `offline_sync` (W&B offline) while
   production remains online.  A regression covers this mode conversion;
   re-freeze and rerun the bounded canary before launch.
+- 2026-09-04: attempt8 completed both exact e100 common prefixes, then both
+  seed-local threshold nodes stopped before any child arm because atomic
+  attempt-output promotion left the checkpoint's provenance path in its
+  staging namespace.  The promoted canonical e100 Parquet bytes match the
+  checkpoint-sealed SHA for both seeds.  Repair only the SHA-verified local
+  materialization used for threshold freeze; do not alter scientific inputs,
+  thresholds, or the branch contract.
 
 ## Completion report
 
