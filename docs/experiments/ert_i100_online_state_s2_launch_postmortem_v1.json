@@ -1,0 +1,134 @@
+{
+  "schema": "ert_i100_online_state_s2_launch_postmortem_v1",
+  "experiment": "ert-i100-online-state-s2-v1",
+  "campaign_attempt": "attempt11",
+  "source_sha": "bcb09a7",
+  "manifest_sha256": "5c9220f3ff246f156d7bd075eac2035e21663c358bd33297722a492d21c5130c",
+  "controller": {
+    "pid": 58117,
+    "state_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/ert-i100-online-state-s2-v1-attempt11/orchestration/state.json",
+    "launch_status": "success",
+    "production_status_at_audit": "running"
+  },
+  "timing": {
+    "timezone": "UTC",
+    "original_user_request_timestamp": null,
+    "original_user_request_timestamp_status": "unknown_not_recorded",
+    "recorded_request_marker": "2026-09-04T04:56:39.862570+00:00",
+    "gate_started": "2026-09-04T05:00:24.634761+00:00",
+    "static_checks_passed": "2026-09-04T05:00:28.165383+00:00",
+    "canary_started": "2026-09-04T05:00:28.165416+00:00",
+    "canary_finished": "2026-09-04T05:01:34.151298+00:00",
+    "manifest_frozen": "2026-09-04T05:01:34.154847+00:00",
+    "controller_launched": "2026-09-04T05:01:34.333353+00:00",
+    "recorded_request_to_controller_seconds": 294.470783,
+    "gate_to_controller_seconds": 69.698592,
+    "canary_seconds": 65.985882,
+    "controller_to_first_root_spawn_seconds": 0.055567,
+    "latency_interpretation": "recorded lower bound; not full user-request latency"
+  },
+  "timeline_events": [
+    {
+      "event_type": "recorded_request_marker",
+      "timestamp": "2026-09-04T04:56:39.862570+00:00",
+      "evidence": "attempt11/launch-gate/preflight.json timing_ledger"
+    },
+    {
+      "event_type": "gate_started",
+      "timestamp": "2026-09-04T05:00:24.634761+00:00",
+      "evidence": "attempt11/launch-gate/preflight.json timing_ledger"
+    },
+    {
+      "event_type": "canary_passed",
+      "timestamp": "2026-09-04T05:01:34.151298+00:00",
+      "evidence": "attempt11/launch-gate/canary.json"
+    },
+    {
+      "event_type": "manifest_frozen",
+      "timestamp": "2026-09-04T05:01:34.154847+00:00",
+      "evidence": "attempt11/launch-gate/preflight.json timing_ledger"
+    },
+    {
+      "event_type": "controller_launched",
+      "timestamp": "2026-09-04T05:01:34.333353+00:00",
+      "evidence": "attempt11/launch-gate/preflight.json timing_ledger"
+    }
+  ],
+  "failures_and_retries": [
+    {
+      "attempt": "attempt10",
+      "type": "technical_lineage_failure",
+      "reason": "child command omitted canonical --prefix-state after prefix promotion",
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": false,
+      "corrective_action": "add canonical --prefix-state and regression test; rebuild immutable attempt11 manifest"
+    },
+    {
+      "attempt": "attempt11-first-launch",
+      "type": "technical_canary_output_collision",
+      "reason": "--launch reran canary into existing non-overwritable canary output",
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": false,
+      "corrective_action": "archive own prior canary output under a unique directory and relaunch unchanged manifest"
+    },
+    {
+      "attempt": "preflight-command",
+      "type": "operator_path_error",
+      "reason": "typed /home/islab/workspace-local/ard-runtime instead of host-resolved .shunsuke.naito path",
+      "scientific_config_changed": false,
+      "seed_changed": false,
+      "gpu_compute_started": false,
+      "corrective_action": "use canonical runtime root from host profile"
+    }
+  ],
+  "resource": {
+    "host": "Hamster",
+    "gpus": [
+      {
+        "index": 0,
+        "utilization_snapshot_percent": 96,
+        "assignment": "dev1 prefix"
+      },
+      {
+        "index": 1,
+        "utilization_snapshot_percent": 93,
+        "assignment": "dev2 prefix"
+      }
+    ],
+    "double_booking_observed": false,
+    "ferret_used": false,
+    "ferret_exclusion_reason": "plan contract and external output SHA-binding/locality constraints"
+  },
+  "dependency_delays_seconds": {
+    "prefix_to_threshold_dev1": 1.571337,
+    "prefix_to_threshold_dev2": 0.295370,
+    "threshold_to_dbdp_dev1": 0.938312,
+    "threshold_to_dbdp_dev2": 0.899758
+  },
+  "monitoring": {
+    "bounded_early_verification_performed": true,
+    "routine_completion_polling": false,
+    "active_wait_or_sleep_loop": false,
+    "post_stable_status_checks": "not_recorded_as_routine; no additional polling performed"
+  },
+  "improvements": {
+    "landed_commit": "bcb09a7",
+    "focused_regression": {
+      "command": "pytest -q tests/unit/test_ert_i100_online_state_s2.py",
+      "result": "18 passed in 2.61s"
+    },
+    "next_operational_patch": [
+      "unique canary namespace or explicit successful-canary adoption",
+      "canonical host-profile runtime root resolution",
+      "producer-output validation for every child argv dependency",
+      "record request event at control-plane boundary"
+    ]
+  },
+  "limitations": [
+    "full original user-request-to-controller latency is unavailable",
+    "production result and endpoint completion are not part of this launch postmortem",
+    "no claim is made that source bcb09a7 and attempt10 are scientifically interchangeable"
+  ]
+}
