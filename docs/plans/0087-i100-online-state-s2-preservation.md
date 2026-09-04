@@ -4,7 +4,7 @@
 
 - Owner: Codex
 - Base SHA: `fcbebc6`
-- Current milestone: source freeze and launch-gate preparation
+- Current milestone: re-frozen public canary after telemetry-lineage repair
 - Last updated: 2026-09-04
 
 ## Goal
@@ -104,6 +104,13 @@ Online-S2×T1 branch during epochs 101–114.
   `static_cli` entry before any GPU reservation.  Bound the check to the
   representative prefix job and added a manifest-schema regression test;
   re-freeze is required because this changes the production source SHA.
+- 2026-09-04: the first bounded runtime canary reached 17 active OS-PMP
+  examples, then correctly stopped because Trainer-computed boundary
+  telemetry was omitted from both epoch metrics and the checkpointed online
+  router state.  Bound those already-computed finite diagnostics to the
+  router lineage and callback/W&B metrics, added a regression, and require a
+  fresh immutable manifest plus canary.  No production prefix or child arm
+  was launched from this rejected canary.
 
 ## Completion report
 
