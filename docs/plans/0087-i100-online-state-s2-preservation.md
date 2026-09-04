@@ -100,6 +100,10 @@ Online-S2×T1 branch during epochs 101–114.
   bound.  Added identity-bound job-local epoch contracts so the shared e100
   prefix remains exactly one epoch while children remain exactly e101–114;
   no GPU job was launched from the rejected manifest.
+- 2026-09-04: bounded canary static validation rejected an incomplete
+  `static_cli` entry before any GPU reservation.  Bound the check to the
+  representative prefix job and added a manifest-schema regression test;
+  re-freeze is required because this changes the production source SHA.
 
 ## Completion report
 

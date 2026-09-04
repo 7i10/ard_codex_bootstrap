@@ -493,7 +493,8 @@ def build_manifest(*, source_sha: str, campaign_root: Path, requested_at: str) -
             "require_exact_smoke": False,
             "static_cli": [
                 {
-                    "command": _command(str(script), "--help"),
+                    "job_id": "prefix-dev-1",
+                    "commands": [_command(str(script), "--help")],
                     "timeout_seconds": 30,
                     "parallel_safe": False,
                 }

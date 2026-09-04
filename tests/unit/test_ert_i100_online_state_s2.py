@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 
@@ -25,6 +26,15 @@ from ard.data.datasets import SourceIndexedSubset
 from ard.engine import Trainer
 from ard.objectives import RSLADObjective
 from ard.policies import RSLADBaselinePolicy
+
+
+def _manifest_builder_module():
+    path = Path(__file__).parents[2] / "scripts" / "build_ert_i100_online_state_s2_manifest.py"
+    spec = importlib.util.spec_from_file_location("ert_i100_online_state_manifest_builder", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _logits(margins: list[float], *, wrong: set[int] | None = None) -> torch.Tensor:
@@ -111,6 +121,40 @@ def test_canary_subset_maps_sampler_positions_to_noncontiguous_stable_ids() -> N
     assert [item[2] for item in items] == [11, 9]
     assert [item[3] for item in items] == [True, True]
     assert [item[4] for item in items] == [1, 1]
+
+
+def test_online_state_manifest_binds_phase_epochs_and_static_cli_to_a_real_job(tmp_path: Path) -> None:
+    builder = _manifest_builder_module()
+    manifest = builder.build_manifest(
+        source_sha="a" * 40,
+        campaign_root=tmp_path / "campaign",
+        requested_at="2026-09-04T00:00:00+00:00",
+    )
+    static = manifest["canary"]["static_cli"]
+    static_command = [
+        str(builder.PYTHON),
+        str(builder.ROOT / "scripts/run_ert_i100_online_state_s2.py"),
+        "--help",
+    ]
+    assert static == [
+        {
+            "job_id": "prefix-dev-1",
+            "commands": [static_command],
+            "timeout_seconds": 30,
+            "parallel_safe": False,
+        }
+    ]
+    jobs = {job["job_id"]: job for job in manifest["jobs"]}
+    assert jobs["prefix-dev-1"]["epoch_binding"] == {
+        "scientific_start_epoch": 100,
+        "scientific_final_epoch": 100,
+    }
+    assert jobs["prefix-dev-1"]["command"][-1] == "101"
+    assert jobs["arm-dev-1-control"]["epoch_binding"] == {
+        "scientific_start_epoch": 101,
+        "scientific_final_epoch": 114,
+    }
+    assert jobs["arm-dev-1-control"]["command"][-1] == "115"
 
 
 def test_canary_subset_label_recovery_is_independent_of_wrapper_depth() -> None:
