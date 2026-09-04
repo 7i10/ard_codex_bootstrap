@@ -340,6 +340,40 @@ def make_trainer(output: Path, *, seed: int = 4) -> Trainer:
     )
 
 
+# Boundary telemetry is universal epoch observability, not treatment-only output.
+# `Trainer.train_epoch` initialises the complete counter schema to 0.0 for every
+# run, and the online-state S2 `prefix`/`control` arms are baselines with
+# `boundary_intervention=None` whose router still demands these diagnostics
+# (`OnlineStateS2Router.record_runtime_metrics` fails on a metrics mapping that
+# carries no `boundary_*` key).  The keys therefore belong to the epoch-metric
+# contract; what an intervention-free run must guarantee is that every one of
+# them stays exactly zero, which is what makes "no boundary work happened"
+# checkable for a control arm from the epoch-metrics artifact alone.
+BOUNDARY_TELEMETRY_KEYS = frozenset(
+    {
+        "train_boundary_active_count",
+        "train_boundary_gate_positive_count",
+        "train_boundary_zero_rho_count",
+        "train_boundary_input_gradient_calls",
+        "train_boundary_loss_count",
+        "train_boundary_unscaled_loss_sum",
+        "train_boundary_unscaled_loss_max",
+        "train_boundary_weighted_loss_sum",
+        "train_boundary_weighted_loss_max",
+        "train_boundary_hinge_sum",
+        "train_boundary_hinge_max",
+        "train_boundary_student_distance_sum",
+        "train_boundary_student_distance_max",
+        "train_boundary_teacher_distance_sum",
+        "train_boundary_teacher_distance_max",
+        "train_boundary_student_input_grad_l1_sum",
+        "train_boundary_student_input_grad_l1_max",
+        "train_boundary_teacher_input_grad_l1_sum",
+        "train_boundary_teacher_input_grad_l1_max",
+    }
+)
+
+
 def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> None:
     trainer = make_trainer(tmp_path)
     trainer.sample_state = {"placeholder_version": 1}
@@ -374,7 +408,13 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
         "val_pgd_accuracy",
         "learning_rate",
         "next_learning_rate",
+        *BOUNDARY_TELEMETRY_KEYS,
     }
+    # This trainer configures no boundary intervention, so the telemetry block is
+    # present but must remain identically zero in every epoch row: the schema is
+    # universal, the treatment values are not.
+    for row in history:
+        assert {row[key] for key in BOUNDARY_TELEMETRY_KEYS} == {0.0}
     assert history[0]["train_valid_examples"] == float(len(cast(Sized, loader.dataset)))
     assert history[0]["train_teacher_clean_forward_calls"] == 0.0
     assert history[0]["train_teacher_adversarial_forward_calls"] == 0.0
