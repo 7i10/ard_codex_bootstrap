@@ -3,7 +3,8 @@
   "milestone": "experiment_automation_last_mile_hardening",
   "scope": "operational_control_plane_only",
   "base_source_sha": "2aa855454ef0f4e01e6f32072b47e2152b5e9937",
-  "implementation_commit": "recorded by the Git commit containing this artifact",
+  "implementation_commit": "e2b9a2f145847799c727e63d8f02277c8d3c7e8f",
+  "integration_commit": "1de2c5d1d044fd98c821bb48f20a6c16061a14d1",
   "scientific_campaign_mutated": false,
   "runtime_fingerprint": {
     "version": 1,
