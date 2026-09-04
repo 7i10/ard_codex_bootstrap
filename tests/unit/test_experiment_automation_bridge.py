@@ -296,6 +296,48 @@ def test_production_manifest_requires_explicit_job_roles(tmp_path: Path) -> None
         orchestrator.load_manifest(path)
 
 
+def test_runtime_signature_promotion_requires_passed_exact_smoke(tmp_path: Path) -> None:
+    gate = load_module(GATE, "bridge_gate_promotion")
+    manifest_path = tmp_path / "resolved.json"
+    smoke_path = tmp_path / "smoke.json"
+    registry_path = tmp_path / "registry.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "source": {"git_sha": "a" * 40},
+                "jobs": [
+                    {
+                        "job_id": "collect",
+                        "job_type": "collection",
+                        "command": ["python", "collect.py"],
+                        "dependencies": [],
+                    }
+                ],
+                "launch_gate": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    smoke_path.write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "results": [
+                    {
+                        "kind": "exact_public_cli",
+                        "status": "pass",
+                        "binding": {"source_sha": "a" * 40, "execution_class": "local"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    promoted = gate.promote_runtime_signature(manifest_path, smoke_path, "fixture-runtime", registry_path)
+    assert promoted["status"] == "PROMOTED"
+    assert json.loads(registry_path.read_text())["signatures"][0]["id"] == "fixture-runtime"
+
+
 def test_campaign_failure_class_allows_retry_only_when_every_failure_is_retryable() -> None:
     reconciler = load_module(ROOT / "scripts/reconcile_experiment.py", "bridge_reconcile_retry_aggregate")
     state = {"required_training_jobs": ["a", "b"]}

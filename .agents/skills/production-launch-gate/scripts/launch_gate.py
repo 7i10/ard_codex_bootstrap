@@ -2114,7 +2114,17 @@ def promote_runtime_signature(
     ]
     if not exact:
         raise ValueError("promotion requires at least one passed exact_public_cli smoke")
-    expected_classes = {execution_class(manifest, job) for job in manifest.get("jobs", []) if requires_exact_smoke(job)}
+    expected_classes = set()
+    for job in manifest.get("jobs", []):
+        if not requires_exact_smoke(job):
+            continue
+        try:
+            expected_classes.add(execution_class(manifest, job))
+        except (KeyError, TypeError):
+            executor = job.get("executor") if isinstance(job, dict) else {}
+            expected_classes.add(
+                "external" if isinstance(executor, dict) and executor.get("type") == "external_probe" else "local"
+            )
     observed_classes = {item.get("binding", {}).get("execution_class") for item in exact}
     if not expected_classes <= observed_classes:
         raise ValueError("exact smoke does not cover every execution class in the resolved campaign")
