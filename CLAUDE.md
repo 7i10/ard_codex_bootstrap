@@ -48,7 +48,8 @@ Path-scoped rules load automatically from `.claude/rules/`. The Codex-era rulebo
 
 ## Models and effort
 
-Default main thread: Opus / xhigh. Switch to Fable / xhigh only for new scientific contracts, the consolidated scientific
+Default main thread: Opus / high. Raise to xhigh for design work, scientific review and unexplained failures.
+Switch to Fable / xhigh only for new scientific contracts, the consolidated scientific
 review of a milestone, and unexplained failures. Subagents: reviewer and bug-investigator on Opus, mechanical work on Sonnet.
 Headless postrun: Opus / high with bounded turns. Claude chat and Claude Code share one quota; separate sessions only for
 context hygiene (new campaign → new session, `/compact` when long).

@@ -146,7 +146,7 @@ Claude は `chosen` が埋まるまで新しい科学 job を起動しない。�
 | 用途 | モデル / effort | 理由 |
 |---|---|---|
 | 新しい科学的契約の設計、consolidated scientific review、原因不明の失敗 | Fable 5.1 / xhigh | 判断の質が結果を左右する。頻度は週数回 |
-| 日常の実装・集計・launch・postrun（対話） | Opus 5 / xhigh（Claude Code 既定） | 単価は Fable の約 1/2。ほとんどの作業はこれで足りる |
+| 日常の実装・集計・launch・postrun（対話） | Opus 5 / high（設計・レビュー・原因不明の失敗では xhigh に上げる） | 単価は Fable の約 1/2。thinking 量が使用量に直結するので既定は high |
 | ヘッドレス postrun hook | Opus 5 / high, `--max-turns` 上限あり | 無人。手順が skill で固定されている |
 | docs/config 同期、fixture、定型テスト | Sonnet 5 / medium（subagent） | 単価は Opus の約 0.4 |
 | 大量読解（コード地図、文献棚卸し） | Opus または Sonnet の並列 subagent | 主スレッドの文脈を汚さない |
@@ -154,7 +154,8 @@ Claude は `chosen` が埋まるまで新しい科学 job を起動しない。�
 - Claude チャットと Claude Code は同じ枠。**壁打ちを別セッションに分ける理由はコストではなく文脈衛生**。
   同じ campaign の議論は同じセッションで続け、campaign が変わったら新しいセッションを開く。長くなったら `/compact`。
 - 主スレッドは `/model opus` を既定にし、上表の場面だけ `/model fable` に切り替える。
-  `~/.claude/settings.json` の既定は現在 `claude-fable-5-1[1m]` / `xhigh` なので、日常は `opus` に下げる。
+  `~/.claude/settings.json` の既定は `opus` / `high` にし、必要な場面だけ `/model fable` `/effort xhigh` に上げる。
+- W&B の identity（entity / project）は `configs/tracking/production.env` にあり、launch skill が全 job の env に注入する。
 - 外出先からは Remote Control（claude.ai/code またはスマホ）で同じセッションに入る。
   クラウドの Routines はローカル GPU に届かないので使わない。
 - `/loop` と `CronCreate` はセッションが閉じると消える（最長 7 日）。耐久が必要な監視は watcher に置く。

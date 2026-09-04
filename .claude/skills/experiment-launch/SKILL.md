@@ -28,7 +28,8 @@ as `$WT`; every later path points there.
 
 ## 3. Author or refresh the campaign spec
 
-For every job: `command[1]`, `cwd` and `env.PYTHONPATH` resolve inside `$WT`;
+For every job: `env` carries `WANDB_ENTITY` and `WANDB_PROJECT` from `configs/tracking/production.env` plus the
+campaign's `WANDB_GROUP_*` (a detached controller inherits nothing from your shell); `command[1]`, `cwd` and `env.PYTHONPATH` resolve inside `$WT`;
 `source.repo_path` and every `hosts.*.repo_path` also point at `$WT`. Declare
 `operational_profile: FULL_NEW_INTEGRATION` unless the plan says otherwise. Put
 every terminal node — training, endpoint evaluation, collection, aggregation,
