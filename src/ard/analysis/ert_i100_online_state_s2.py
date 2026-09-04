@@ -786,6 +786,33 @@ class OnlineStateS2Router:
         pq.write_table(pa.Table.from_pylist(public_rows), path, compression="zstd")
         self._state_paths[epoch] = path
 
+    def record_runtime_metrics(self, *, epoch: int, metrics: Mapping[str, float]) -> None:
+        """Bind already-computed boundary telemetry to the router checkpoint.
+
+        ``flush_epoch`` deliberately runs before the common checkpoint write so
+        that the per-ID state and its aggregate runtime diagnostics are saved
+        atomically in the same continuation lineage.  This method only copies
+        detached metrics that the Trainer has already computed; it neither
+        changes the routing state nor performs any model work.
+        """
+        if epoch not in self.epoch_statistics:
+            raise OnlineStateS2RoutingError("runtime telemetry arrived before the online state was flushed")
+        boundary = {
+            str(key): float(value)
+            for key, value in metrics.items()
+            if str(key).startswith("boundary_")
+        }
+        if not boundary:
+            raise OnlineStateS2RoutingError("online runtime telemetry lacks boundary diagnostics")
+        if not all(torch.isfinite(torch.tensor(value, dtype=torch.float64)).item() for value in boundary.values()):
+            raise OnlineStateS2RoutingError("online runtime telemetry contains a non-finite boundary diagnostic")
+        overlap = set(boundary) & set(self.epoch_statistics[epoch])
+        if overlap:
+            raise OnlineStateS2RoutingError(
+                f"online runtime telemetry would overwrite router statistics: {sorted(overlap)}"
+            )
+        self.epoch_statistics[epoch].update(boundary)
+
     def finalize(self) -> dict[str, Any]:
         if self.is_prefix:
             if set(self._state_paths) != {self.prefix_epoch}:

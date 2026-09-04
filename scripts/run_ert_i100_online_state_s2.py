@@ -380,6 +380,10 @@ def _run_canary(args: argparse.Namespace) -> dict[str, Any]:
                 raise SystemExit(f"public canary did not exercise Online-S2×T1 action for {arm}")
             if float(statistics.get("boundary_active_count", 0.0)) <= 0.0:
                 raise SystemExit(f"public canary did not exercise pair-gated boundary loss for {arm}")
+            if float(statistics.get("boundary_loss_count", 0.0)) <= 0.0:
+                raise SystemExit(f"public canary did not record a boundary loss input for {arm}")
+            if arm == "dbdp" and float(statistics.get("boundary_input_gradient_calls", 0.0)) <= 0.0:
+                raise SystemExit("public canary did not exercise detached boundary input gradients")
         branches[arm] = {
             "result": branch,
             "checkpoint": str(horizon),

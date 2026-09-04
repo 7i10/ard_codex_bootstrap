@@ -223,6 +223,37 @@ def test_control_observes_same_state_but_never_activates_loss(tmp_path: Path) ->
     assert control.epoch_statistics[101]["active_treatment_count"] == 0
 
 
+def test_online_router_binds_finite_boundary_runtime_metrics_into_checkpoint_state(tmp_path: Path) -> None:
+    pytest.importorskip("pyarrow")
+    prefix, thresholds, labels = _write_prefix_and_thresholds(tmp_path)
+    child = OnlineStateS2Router(
+        arm="dbdp",
+        train_labels=labels,
+        output_dir=tmp_path / "dbdp",
+        original_parent_checkpoint_sha256="a" * 64,
+        thresholds_path=thresholds,
+    )
+    child.adopt_prefix_state(prefix.state_dict())
+    _observe_child(child)
+    child.flush_epoch(101)
+    child.record_runtime_metrics(
+        epoch=101,
+        metrics={
+            "boundary_active_count": 1.0,
+            "boundary_loss_count": 1.0,
+            "boundary_input_gradient_calls": 2.0,
+            "loss": 0.5,
+        },
+    )
+    state = child.state_dict()["epoch_statistics"]["101"]
+    assert state["boundary_active_count"] == 1.0
+    assert state["boundary_loss_count"] == 1.0
+    assert state["boundary_input_gradient_calls"] == 2.0
+    assert "loss" not in state
+    with pytest.raises(OnlineStateS2RoutingError, match="non-finite"):
+        child.record_runtime_metrics(epoch=101, metrics={"boundary_active_count": float("nan")})
+
+
 def test_control_records_state_reentry_independently_of_action(tmp_path: Path) -> None:
     pytest.importorskip("pyarrow")
     prefix, thresholds, labels = _write_prefix_and_thresholds(tmp_path)

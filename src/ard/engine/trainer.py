@@ -1491,6 +1491,10 @@ class Trainer:
                 }
             if self.online_state_s2_router is not None:
                 self.online_state_s2_router.flush_epoch(epoch)
+                record_runtime_metrics = getattr(self.online_state_s2_router, "record_runtime_metrics", None)
+                if not callable(record_runtime_metrics):
+                    raise RuntimeError("online S2 router does not support required runtime telemetry binding")
+                record_runtime_metrics(epoch=epoch, metrics=train_metrics)
                 # The e100 raw state artifact and all subsequent compact
                 # transition state are checkpoint lineage.  A resumed child
                 # must restore them rather than rebuilding a threshold from a
@@ -1550,6 +1554,17 @@ class Trainer:
                 "learning_rate": epoch_learning_rate,
                 "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
             }
+            # Boundary diagnostics are computed in the common training loop
+            # and must survive into the metrics callback/W&B path.  This is
+            # observability only: the full-batch objective and checkpoint
+            # state above are already final at this point.
+            epoch_metrics.update(
+                {
+                    f"train_{key}": value
+                    for key, value in train_metrics.items()
+                    if key.startswith("boundary_")
+                }
+            )
             history.append(epoch_metrics)
             # The callback is deliberately after both atomic checkpoints; it
             # is observational only and cannot alter model/state selection.
