@@ -9,7 +9,7 @@ single-teacher ARDにおけるbaseline再現、per-sample診断、sample-wise po
 ```text
 .
 ├── .agents/skills/
-├── .codex/agents/
+├── .claude/                 # Claude Code rules, skills, agents, settings
 ├── .external/                 # gitignore
 ├── configs/
 │   ├── datasets/
@@ -44,7 +44,7 @@ single-teacher ARDにおけるbaseline再現、per-sample診断、sample-wise po
 │   ├── smoke/
 │   └── integration/
 ├── external.lock.yaml
-├── AGENTS.md
+├── CLAUDE.md
 ├── PLANS.md
 ├── Makefile
 └── pyproject.toml

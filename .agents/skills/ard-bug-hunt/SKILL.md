@@ -11,7 +11,7 @@ Find the smallest evidence-backed root cause without repeatedly running expensiv
 
 ## Workflow
 
-1. Read `AGENTS.md`, `docs/SCIENTIFIC_INVARIANTS.md`, and `docs/TEST_STRATEGY.md`.
+1. Read `CLAUDE.md`, `docs/SCIENTIFIC_INVARIANTS.md`, and `docs/TEST_STRATEGY.md`.
 2. State the observed failure precisely: expected, actual, first known bad state, config, seed, hardware, checkpoint, and W&B run ID if relevant.
 3. Check the test ledger. Do not repeat an exact successful command whose source, test, config, environment, external commit, and fixtures are unchanged.
 4. Build at most five hypotheses, ranked by plausibility and discriminating evidence.

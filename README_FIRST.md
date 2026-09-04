@@ -26,6 +26,8 @@ python scripts/sync_wandb.py --root <outputs>
 - CIFAR/Tiny-ImageNet本訓練、real full AutoAttack、T4/T5は自動testの対象外です。
 - Tiny-ImageNetのpaper aggregationはobserved training split identityの永続化が完了するまでdeferredです。
 
-`AGENTS.md`、`PLANS.md`、`.codex/`、`.agents/`、`IMPLEMENTATION_PROMPT.md`は、継続開発と科学レビューの
-規則・履歴としてrepository内に残しています。現時点で主張できる検証範囲と未実行項目は
+エージェント向けの契約は`CLAUDE.md`と`.claude/`（rules / skills / agents）にあり、運用設計は
+[`docs/CLAUDE_CODE_WORKFLOW.md`](docs/CLAUDE_CODE_WORKFLOW.md)です。Codex時代の`AGENTS.md`・`.codex/`・
+`IMPLEMENTATION_PROMPT.md`は2026-09-05に削除しました（git履歴で参照可）。`.agents/skills/*/scripts`は
+launch gateとorchestratorの本体で、引き続き使用します。現時点で主張できる検証範囲と未実行項目は
 [`docs/REPRODUCTION_STATUS.md`](docs/REPRODUCTION_STATUS.md)を確認してください。

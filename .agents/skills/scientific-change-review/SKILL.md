@@ -5,7 +5,7 @@ description: Review adversarial robustness code changes for threat-model drift, 
 
 # Scientific change review
 
-1. Read the plan, diff, `AGENTS.md`, and affected scientific contracts.
+1. Read the plan, diff, `CLAUDE.md`, and affected scientific contracts.
 2. Map each changed file to possible effects on inputs, attacks, objectives, state, checkpoints, evaluation, tracking, and reported metrics.
 3. Inspect the real execution path, not only the edited function.
 4. Verify that any behavior change is explicit in config and documented.

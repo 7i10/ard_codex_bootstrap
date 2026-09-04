@@ -27,7 +27,7 @@
 - [Upstream baselines](UPSTREAM_BASELINES.md): pinned SAAD/TRADES SHA、ライセンス証拠、既知差分
 - [Teacher config fragments](../configs/teachers/): strict RobustBench teacher configs; checkpoints are registered explicitly
 - [Experiment taxonomy](EXPERIMENT_PROTOCOL.md): audit, pilot, and canonical production separation
-- [Codex workflow](CODEX_WORKFLOW.md): Sol/Terra/Lunaの役割分担
+- [Claude Code workflow](CLAUDE_CODE_WORKFLOW.md): 3プレーン構成、完了検知→headless postrun、decision packet、モデル方針
 - [Ferret execution protocol](FERRET_EXECUTION_PROTOCOL.md): fixed-SHA remote GPU runs from Hamster
 - [Workspace contract](WORKSPACE_CONTRACT.md): canonical future runtime paths and historical-root policy
 - [Task-context protocol](TASK_CONTEXT_PROTOCOL.md): compact runtime-only recovery context for long work

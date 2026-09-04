@@ -3,7 +3,8 @@
 Single-teacher Adversarial Robustness Distillation (RSLAD family, CIFAR-10, robust WRN teachers).
 Scientific correctness, traceability and fair evaluation outrank speed and headline numbers.
 Design rationale and runbook: `docs/CLAUDE_CODE_WORKFLOW.md`. Full invariants: `docs/SCIENTIFIC_INVARIANTS.md`.
-Path-scoped rules load automatically from `.claude/rules/`. `AGENTS.md` is the Codex-era rulebook, kept for history only.
+Path-scoped rules load automatically from `.claude/rules/`. The Codex-era rulebook (`AGENTS.md`, `docs/CODEX_WORKFLOW.md`,
+`IMPLEMENTATION_PROMPT.md`, `.codex/`) was removed on 2026-09-05; read it from git history before commit d1c0053 if needed.
 
 ## Three planes
 
