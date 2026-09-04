@@ -599,6 +599,10 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1", "T2", "T3"),
     ),
     (("docs/",), (), ("T0",)),
+    # Agent-plane files (Claude Code settings, rules, skills, decision packets)
+    # carry no importable code, so an edit there must not fall back to the
+    # full suite.
+    ((".claude/", "CLAUDE.md", "docs/decisions/"), (), ("T0",)),
 )
 
 

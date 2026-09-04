@@ -38,7 +38,17 @@ def workspace(tmp_path):
     state(
         "camp-failed",
         {
-            "a": {"status": "failed", "attempts": [{"attempt": 1, "failure_class": "scientific", "retryable": False, "finished_at": "2026-09-04T05:00:00+00:00"}]},
+            "a": {
+                "status": "failed",
+                "attempts": [
+                    {
+                        "attempt": 1,
+                        "failure_class": "scientific",
+                        "retryable": False,
+                        "finished_at": "2026-09-04T05:00:00+00:00",
+                    }
+                ],
+            },
             "b": {"status": "blocked", "attempts": []},
         },
         "failed",
@@ -65,6 +75,12 @@ def workspace(tmp_path):
         json.dumps({"result": "recorded"}), encoding="utf-8"
     )
 
+    # Inventory roots: two present (one local mirror, one historical), one absent.
+    (repo / "outputs" / "scientific" / "0087").mkdir(parents=True)
+    (runtime / "staging" / "ferret-results" / "run-a").mkdir(parents=True)
+    (tmp_path / "legacy-runs" / "old-1").mkdir(parents=True)
+    (tmp_path / "legacy-runs" / "old-2").mkdir(parents=True)
+
     registry = tmp_path / "registry.json"
     registry.write_text(
         json.dumps(
@@ -74,9 +90,16 @@ def workspace(tmp_path):
                 "runtime_root": str(runtime),
                 "run_root": str(runtime / "runs"),
                 "orchestration_root": str(runtime / "orchestration"),
+                "staging_root": str(runtime / "staging"),
                 "worktree_root": str(runtime / "worktrees"),
                 "lock_root": str(runtime / "locks"),
                 "python": sys.executable,
+                "historical_roots": {
+                    "run_root": str(tmp_path / "legacy-runs"),
+                    "campaign_run_root": str(tmp_path / "legacy-campaign-runs"),
+                    "analysis_root": str(tmp_path / "legacy-analysis"),
+                    "ferret_result_root": str(tmp_path / "ferret-results"),
+                },
             }
         ),
         encoding="utf-8",
@@ -129,10 +152,63 @@ def test_status_brief_is_at_most_fifteen_lines(workspace):
 def test_status_markdown_lists_bundles_and_decisions(workspace):
     result = run_status(workspace)
     assert result.returncode == 0, result.stderr
-    for heading in ("## Hosts", "## Watcher", "## Campaigns", "## Hand-run bundles", "## Pending decisions", "## Recent postruns"):
+    for heading in (
+        "## Hosts",
+        "## Watcher",
+        "## Campaigns",
+        "## Hand-run bundles",
+        "## Pending decisions",
+        "## Recent postruns",
+    ):
         assert heading in result.stdout
     assert "hand-1" in result.stdout
     assert "which arm next" in result.stdout
+
+
+def test_status_inventory_lists_every_root_per_host(workspace, tmp_path):
+    result = run_status(workspace, "--inventory")
+    assert result.returncode == 0, result.stderr
+    assert str(tmp_path / "legacy-runs") in result.stdout
+    assert "missing" in result.stdout  # legacy-campaign-runs was never created
+
+    payload = run_status(workspace, "--json")
+    assert payload.returncode == 0, payload.stderr
+    rows = {(row["host"], row["label"]): row for row in json.loads(payload.stdout)["inventory"]}
+    assert rows[("hamster", "run_root")]["entries"] == 2  # camp-failed, camp-live
+    assert rows[("hamster", "run_root")]["newest_mtime"] is not None
+    assert rows[("hamster", "repo outputs/scientific")]["entries"] == 1
+    assert rows[("hamster", "historical run_root")]["entries"] == 2
+    assert rows[("hamster", "historical campaign_run_root")]["note"] == "missing"
+    assert rows[("hamster", "historical campaign_run_root")]["entries"] is None
+    assert rows[("ferret", "staging mirror")]["entries"] == 1
+    remote = rows[("ferret", "remote run_root")]
+    assert remote["location"] == "remote"
+    assert remote["note"] == "skipped (ARDX_SKIP_REMOTE)"
+
+
+def test_status_brief_reports_incomplete_bundles(workspace):
+    registry = json.loads(workspace.read_text(encoding="utf-8"))
+    bundle = Path(registry["repo_root"]) / "outputs" / "hand-2" / "run-bundle"
+    bundle.mkdir(parents=True)
+    # Declared terminal without the completion triple: the `incomplete` anomaly.
+    bundle.joinpath("manifest.json").write_text(
+        json.dumps({"schema_version": 1, "run_id": "hand-2", "status": "completed"}), encoding="utf-8"
+    )
+    result = run_status(workspace, "--brief")
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert len(lines) <= 15
+    assert "- bundles: 0 stale, 1 incomplete" in lines
+
+
+def test_postrun_fallback_allowlist_matches_settings_json():
+    """The fallback only runs when settings.json is gone; keep it a literal copy."""
+    settings = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    text = POSTRUN.read_text(encoding="utf-8")
+    snippet = text[text.index("DEFAULT_TOOLS=(") : text.index("allowed_tools() {")] + "\ndefault_tools\n"
+    result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True, check=False, timeout=60)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.split(",") == settings["permissions"]["allow"]
 
 
 def test_status_survives_a_malformed_state_file(workspace, tmp_path):

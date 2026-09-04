@@ -76,8 +76,8 @@ Status: design + runbook. 2026-09-05 に Codex 運用から移行するにあた
 | ファイル | 役割 |
 |---|---|
 | `pin_source.py` | `<runtime>/worktrees/source-<sha>` を作成/再利用（clean 検証、`.external`・`teacher_cache` symlink）。全 job の `command[1]`/`cwd`/`PYTHONPATH` はここを指す |
-| `campaign_watch.py` | `state.json`（campaign）と `run-bundle/manifest.json`（hand-run）を走査し、遷移ごとに 1 行 JSON を出力。cursor は `<runtime>/ardx/watch-state.json`。`--once` と `--follow`。`--on-event CMD` で終端イベント時にコマンド実行 |
-| `postrun_hook.sh` | watcher から呼ばれ、`claude -p` を起動。モデル・turn 上限・allowedTools を固定。ログは `<runtime>/ardx/claude-runs/` |
+| `campaign_watch.py` | `state.json`（campaign）と `run-bundle/manifest.json`（hand-run）を走査し、遷移ごとに 1 行 JSON を出力。cursor は `<runtime>/orchestration/ardx/watch-state.json`。`--once` と `--follow`。`--on-event CMD` で終端イベント時にコマンド実行 |
+| `postrun_hook.sh` | watcher から呼ばれ、`claude -p` を起動。モデル・turn 上限・allowedTools を固定。ログは `<runtime>/orchestration/ardx/claude-runs/` |
 | `status.py` | 両ホストの GPU、campaign 状態、hand-run 状態、pending decision、直近 postrun を 1 画面の Markdown に |
 | `systemd/ardx-watch.service` + `install_units.sh` | 常駐 watcher。`Restart=always`、Linger 確認付き |
 
@@ -97,9 +97,9 @@ Status: design + runbook. 2026-09-05 に Codex 運用から移行するにあた
 | パス | 内容 |
 |---|---|
 | `CLAUDE.md` | 80 行以内。使命、3 プレーン、日常コマンド、決定プロトコル、モデル方針、コミット方針 |
-| `.claude/rules/scientific-core.md` (`paths: src/ard/**, configs/**`) | 攻撃/正規化/checkpoint/評価の不変条件の短縮版 |
-| `.claude/rules/execution-plane.md` (`paths: scripts/**, .agents/**, tools/**`) | pinned worktree、fresh attempt dir、単一完了契約、セッション内ポーリング禁止 |
-| `.claude/rules/results-records.md` (`paths: src/ard/analysis/**, scripts/aggregate_*.py, docs/**`) | record/report/plan/decision の書式と非上書き |
+| `.claude/rules/scientific-core.md`（paths: frontmatter 参照） | 攻撃/正規化/checkpoint/評価の不変条件の短縮版 |
+| `.claude/rules/execution-plane.md`（paths: frontmatter 参照） | pinned worktree、fresh attempt dir、単一完了契約、セッション内ポーリング禁止 |
+| `.claude/rules/results-records.md`（paths: frontmatter 参照） | record/report/plan/decision の書式と非上書き |
 | `.claude/agents/scientific-reviewer.md` | opus, read-only。差分の科学的正しさを 1 回でまとめて指摘 |
 | `.claude/agents/bug-investigator.md` | opus, read-only + Bash。`ard-bug-hunt` skill を使う |
 | `.claude/agents/mechanical-worker.md` | sonnet, medium。config/docs 同期、fixture、定型 |
@@ -169,6 +169,7 @@ Claude は `chosen` が埋まるまで新しい科学 job を起動しない。�
   hook と deny ルールは trust 前でも効く。
 - **W0（本セッション）**: `.claude/` 一式、`scripts/ardx/` 一式、本書、0087 の記録取り込み
   （aggregator の 2 バグ修正 + 出自記録）、GPU 結合の RNG 復元バグ修正、plan 0087 の完了。
+  0087 の取り込みは完了（be29a93）。
 - **W1**: ダミー campaign を watcher → headless postrun → decision packet まで通す（CPU のみ、数分）。
 - **W2**: 人間が選んだ次の科学 campaign を新ループで実行。
 - **後続（別 plan）**: 集計/レポートの共通化（`aggregate_*.py` 13 本が各自 markdown を組み立てている）、
@@ -179,7 +180,9 @@ Claude は `chosen` が埋まるまで新しい科学 job を起動しない。�
 ## 7. ユーザー確認が必要な項目
 
 1. §0-5 の凍結対象を実際に削除してよいか（本セッションでは削除しない。ルールからは外す）。
-2. `AGENTS.md` を `CLAUDE.md` に置き換えるか、履歴として残すか（本セッションでは残し、先頭に注記を付ける）。
+   凍結した制御プレーンは W1 パイロットの完了後に物理削除する予定。
+2. 決定済み: 2026-09-05 に `AGENTS.md` / `docs/CODEX_WORKFLOW.md` / `IMPLEMENTATION_PROMPT.md` / `.codex/`
+   を削除（git 履歴 d1c0053 以前で参照可）。
 3. `ruff format` を全 78 ファイルに一括適用する 1 コミットを許可するか。
 4. ワークスペース掃除（worktree prune、`.cache/analysis` の整理）の可否。
 5. 0087 の次の一手（decision packet 0001 として提示する）。

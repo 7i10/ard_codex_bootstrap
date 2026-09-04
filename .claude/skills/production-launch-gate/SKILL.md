@@ -41,8 +41,7 @@ python3 $G --validate-run --resolved-manifest "$GATE/resolved-manifest.json"
 
 ## Outputs to check
 
-Under the immutable gate directory: `resolved-manifest.json`, `freeze.json`, `preflight.json`, `canary.json`. On a
-real `--launch`, also a schema-v2 `experiment-state.json` bridge (not emitted by dry-run/preflight-only).
+Under the immutable gate directory: `resolved-manifest.json`, `freeze.json`, `preflight.json`, `canary.json`.
 
 ## Hard limits
 

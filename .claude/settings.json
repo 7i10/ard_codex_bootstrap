@@ -49,13 +49,14 @@
     "deny": [
       "Bash(git push *)",
       "Bash(git reset --hard *)",
-      "Bash(rm -rf /home/shunsukenaito/workspace-local/shunsuke.naito/ard-runtime/*)",
-      "Bash(rm -rf /home/islab/workspace-local/shunsuke.naito/ard-runtime/*)",
-      "Bash(rm -rf /home/shunsukenaito/workspace-local/shunsuke.naito/ard_codex_bootstrap/*)",
-      "Bash(rm -rf /home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/*)",
       "Edit(.external/**)",
       "Edit(//home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.external/**)",
-      "Edit(//home/shunsukenaito/workspace-local/shunsuke.naito/ard_codex_bootstrap/.external/**)"
+      "Edit(//home/shunsukenaito/workspace-local/ard_codex_bootstrap/.external/**)",
+      "Edit(//home/islab/workspace-local/shunsuke.naito/ard-runtime/**)",
+      "Edit(//home/shunsukenaito/workspace-local/ard-runtime/**)",
+      "Edit(/.claude/settings.json)",
+      "Edit(/.claude/settings.local.json)",
+      "Edit(/.claude/agents/**)"
     ]
   },
   "hooks": {

@@ -29,6 +29,10 @@ human fills it). Body = evidence, numbers, links. No new scientific job launches
 ## What docs may be
 Documents are **generated** (aggregate output) or **decisions** (packets, plans). There is no third category:
 no process narration, no "what I did today", no rule accretion. Retire a doc with its subsystem.
+- **Plain language**: write for a reader who did not run the experiment. Documents addressed to the user
+  (decision packets) are Japanese; design/runbook and plan completion reports may be either language.
+  Generated reports are plain English and define each term on first use. No jargon chains, no untranslated
+  postmortem prose, one idea per sentence.
 
 ## Claims discipline
 - Two seeds give a directional verdict for those seeds. Never phrase it as a population or "method X is better"

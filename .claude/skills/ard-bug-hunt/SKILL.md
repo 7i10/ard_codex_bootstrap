@@ -19,7 +19,7 @@ Find the smallest evidence-backed root cause without repeatedly running expensiv
 6. Choose the next action by information gain. Inspect code or tensors before launching another GPU run when possible.
 7. Compare against `.external/saad` for baseline parity when the upstream commit is present.
 8. Once the cause is identified, specify a minimal regression test that fails before the fix and passes after it.
-9. Hand the bounded fix to an implementation agent (or a `bug-investigator`/`mechanical-worker` subagent). Re-run only the failed/affected tests with `/home/shunsukenaito/.conda/envs/adv/bin/python -m pytest`, then the impact-selected milestone checks.
+9. Hand the bounded fix to an implementation agent — the parent session, or a `mechanical-worker` subagent for a mechanical one. `bug-investigator` is read-only: it diagnoses and specifies the fix, it never applies it. Re-run only the failed/affected tests with `/home/shunsukenaito/.conda/envs/adv/bin/python -m pytest`, then the impact-selected milestone checks.
 10. For scientifically consequential bugs, write a debug note under `docs/debugging/NNNN-<slug>.md` using the next free number (check `ls docs/debugging` for the current max; do not reuse a gap).
 
 ## Mandatory checks

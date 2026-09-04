@@ -30,12 +30,64 @@ resolve_claude() {
   return 1
 }
 
-# Tool allowlist: mirror .claude/settings.json when it exists, else the fixed
-# prefixes below.  `--permission-mode acceptEdits` alone cannot run Bash in
-# headless mode (anything that would prompt is denied), so the allowlist is
-# what actually lets the postrun verify, aggregate and commit.
+# Tool allowlist: mirror .claude/settings.json when it exists, else the literal
+# copy of its `permissions.allow` below.  Keep the two in the same spelling --
+# Claude Code matches an allowlist entry against the literal command text, so a
+# drifted fallback such as `Bash(python3 scripts/ardx/:*)` (a `:*` after a
+# slash asks for a space there) silently matches nothing.  `--permission-mode
+# acceptEdits` alone cannot run Bash in headless mode (anything that would
+# prompt is denied), so the allowlist is what actually lets the postrun verify,
+# aggregate and commit.
+DEFAULT_TOOLS=(
+  Read
+  Edit
+  Write
+  Glob
+  Grep
+  'Bash(/home/shunsukenaito/.conda/envs/adv/bin/python -m pytest *)'
+  'Bash(/home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.status *)'
+  'Bash(/home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py *)'
+  'Bash(/home/shunsukenaito/.conda/envs/adv/bin/python scripts/aggregate_*)'
+  'Bash(PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m pytest *)'
+  'Bash(PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.status *)'
+  'Bash(PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py *)'
+  'Bash(PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python scripts/aggregate_*)'
+  'Bash(/home/shunsukenaito/.conda/envs/adv/bin/python scripts/ardx/*)'
+  'Bash(python3 scripts/ardx/*)'
+  'Bash(/usr/bin/python3 scripts/ardx/*)'
+  'Bash(git status *)'
+  'Bash(git diff *)'
+  'Bash(git log *)'
+  'Bash(git show *)'
+  'Bash(git branch *)'
+  'Bash(git worktree list *)'
+  'Bash(git rev-parse *)'
+  'Bash(git merge-base *)'
+  'Bash(git add *)'
+  'Bash(git commit *)'
+  'Bash(sha256sum *)'
+  'Bash(ls *)'
+  'Bash(cat *)'
+  'Bash(head *)'
+  'Bash(tail *)'
+  'Bash(wc *)'
+  'Bash(find *)'
+  'Bash(grep *)'
+  'Bash(rg *)'
+  'Bash(nvidia-smi *)'
+  'Bash(ssh Ferret nvidia-smi *)'
+  'Bash(ssh Ferret uptime *)'
+  'Bash(systemctl --user status *)'
+  'Bash(systemctl --user is-active *)'
+  'Bash(systemctl --user list-units *)'
+  'Bash(loginctl show-user *)'
+  'Bash(timeout 5 notify-send *)'
+  'Bash(notify-send *)'
+)
+
 default_tools() {
-  printf '%s' 'Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(/home/shunsukenaito/.conda/envs/adv/bin/python:*),Bash(python3 scripts/ardx/:*),Bash(sha256sum:*),Bash(ls:*),Bash(cat:*),Bash(systemctl --user status:*),Bash(systemctl --user is-active:*),Read,Write,Edit,Glob,Grep'
+  local IFS=,
+  printf '%s' "${DEFAULT_TOOLS[*]}"
 }
 
 allowed_tools() {
