@@ -83,8 +83,23 @@ def capture_rng_state() -> dict[str, Any]:
 def restore_rng_state(state: Mapping[str, Any]) -> None:
     random.setstate(state["python"])
     torch.set_rng_state(state["torch_cpu"])
-    if state.get("torch_cuda") is not None and torch.cuda.is_available():
-        torch.cuda.set_rng_state_all(state["torch_cuda"])
+    cuda_state = state.get("torch_cuda")
+    if cuda_state is not None and torch.cuda.is_available():
+        # A checkpoint owns exactly the CUDA devices that were visible when it
+        # was written, which need not be the devices visible now: a world_size-1
+        # run saves one state when pinned with CUDA_VISIBLE_DEVICES and every
+        # visible device otherwise.  Restore the saved devices by ordinal.
+        # Fewer saved states than visible devices is legitimate; more saved
+        # states than devices cannot be restored, so fail closed instead of
+        # resuming with a partially restored RNG stream.
+        visible_devices = torch.cuda.device_count()
+        if len(cuda_state) > visible_devices:
+            raise RuntimeError(
+                f"checkpoint holds {len(cuda_state)} CUDA RNG states but only {visible_devices} "
+                "CUDA device(s) are visible; exact resume cannot restore the saved RNG state"
+            )
+        for index, device_state in enumerate(cuda_state):
+            torch.cuda.set_rng_state(device_state, device=index)
     if state.get("numpy") is not None:
         try:
             import numpy as np

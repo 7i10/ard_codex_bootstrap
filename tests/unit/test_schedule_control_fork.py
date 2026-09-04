@@ -151,7 +151,13 @@ def _inputs(
         config_hash=config_hash,
     )
     payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
-    payload["rng"][0]["torch_cuda"] = [torch.tensor([0], dtype=torch.uint8)]
+    # The fork validators require a non-None CUDA RNG entry, which a CPU-only
+    # host never captures.  On a CUDA host the states must be real generator
+    # states: this checkpoint is resumed below, and a placeholder byte would be
+    # rejected by torch as a wrong-size RNG state.
+    payload["rng"][0]["torch_cuda"] = (
+        torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [torch.tensor([0], dtype=torch.uint8)]
+    )
     torch.save(payload, checkpoint)
     rows = [[index, 0] for index in range(45_000)]
     rows_hash = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
