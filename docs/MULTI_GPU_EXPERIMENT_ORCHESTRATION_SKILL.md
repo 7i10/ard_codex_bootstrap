@@ -68,6 +68,14 @@ The detached controller reconciles its own worker state; there is no Codex
 `sleep`/`watch`/W&B completion loop. Existing `run-on-ferret` commands remain
 the authority for remote status and process safety.
 
+For a scheduled wake on one already-registered campaign, use the compact
+[`scripts/reconcile_experiment.py`](../scripts/reconcile_experiment.py) helper
+with the canonical runtime `experiment-state.json`. It reads only that state
+and its registered terminal evidence: live training is an immediate `NO_OP`,
+and a valid terminal marker can hand off to the existing postprocess DAG under
+one durable lease. It is not a second orchestrator and does not scan Git,
+download W&B data, evaluate, commit, or push during a normal running wake.
+
 ## Timing and complete host configuration
 
 For an existing short runtime, the operational target is controller launch
