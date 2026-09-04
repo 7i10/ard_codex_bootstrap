@@ -2,7 +2,7 @@
   "schema_version": 1,
   "milestone": "experiment_automation_bridge_hardening",
   "base_source_sha": "0b553d531409f0215546ee0391d3215c58ca9949",
-  "implementation_commit": "recorded_at_integration",
+  "implementation_commit": "c8e5cd0dd4aafbec871659df97aa9bd3395f9ab6",
   "scope": "operational_control_plane_only",
   "active_scientific_campaign_touched": false,
   "state_bridge": {
