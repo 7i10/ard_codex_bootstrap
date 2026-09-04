@@ -18,9 +18,11 @@ from ard.analysis.ert_stage_a_runtime import (
     StageARuntimeError,
     StageATreatment,
     _CanaryEpochSubset,
+    _offline_canary_tracking,
     _stable_train_labels,
     _validate_online_state_s2_treatment,
 )
+from ard.config.schema import TrackingConfig
 from ard.data import EpochShuffleSampler, IndexedDataset, SampleRef, SyntheticCIFAR
 from ard.data.datasets import SourceIndexedSubset
 from ard.engine import Trainer
@@ -172,6 +174,14 @@ def test_canary_subset_label_recovery_is_independent_of_wrapper_depth() -> None:
     full_view = SourceIndexedSubset(IndexedDataset(TargetsDataset()), [5, 1, 4])
     bounded = _CanaryEpochSubset(full_view, positions=[2, 0], source_ids=[4, 5])
     assert _stable_train_labels(bounded) == {4: 7, 5: 8}
+
+
+def test_public_canary_tracking_is_offline_without_changing_tracking_identity() -> None:
+    online = TrackingConfig(mode="online", project="ard", entity="entity", group="group")
+    offline = _offline_canary_tracking(online)
+    assert online.mode == "online"
+    assert offline.mode == "offline_sync"
+    assert (offline.project, offline.entity, offline.group) == ("ard", "entity", "group")
 
 
 def test_frozen_q10_ties_and_branch_priority_are_explicit(tmp_path: Path) -> None:

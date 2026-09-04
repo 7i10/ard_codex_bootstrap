@@ -116,6 +116,12 @@ Online-S2×T1 branch during epochs 101–114.
   lacked `PYTHONPATH=src`.  The manifest now binds that import root explicitly
   through `/usr/bin/env`; this is an execution-wrapper repair only, so a fresh
   source freeze and canary are required before any GPU reservation.
+- 2026-09-04: a fresh bounded canary then exposed a pre-existing online W&B
+  run-ID collision across isolated canary attempts.  The experiment contract
+  already requires disabled/offline smoke tracking, so canary-only runtime
+  paths now bind the production parent to `offline_sync` (W&B offline) while
+  production remains online.  A regression covers this mode conversion;
+  re-freeze and rerun the bounded canary before launch.
 
 ## Completion report
 

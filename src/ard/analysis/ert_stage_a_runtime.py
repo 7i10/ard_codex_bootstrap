@@ -59,6 +59,17 @@ class StageARuntimeError(RuntimeError):
     """Raised when a Stage A parent or treatment contract is invalid."""
 
 
+def _offline_canary_tracking(tracking: Any) -> Any:
+    """Return the registered offline-only tracking view for a public canary.
+
+    The parent is a production configuration, so ``offline_sync`` is the
+    only locally durable mode that preserves its schema-level tracking
+    contract.  The adapter maps it to W&B's offline mode; the production
+    command path never calls this helper.
+    """
+    return tracking.model_copy(update={"mode": "offline_sync"})
+
+
 class _CanaryEpochSubset(Dataset[Any]):
     """A bounded real-data view that preserves source-ID/epoch semantics.
 
@@ -642,6 +653,10 @@ def run_stage_a_arm(
             or canary_max_validation_batches > 2
         ):
             raise StageARuntimeError("public online canary requires bounded 1–8 train and 1–2 validation batches")
+        # A bounded public smoke must not create or resume an online
+        # production run.  ``offline_sync`` produces an offline W&B segment
+        # while remaining valid for the production-tier parent schema.
+        config = config.model_copy(update={"tracking": _offline_canary_tracking(config.tracking)})
     if force_sample_keyed_attack:
         # The historical parent config predates the sample-keyed random-start
         # contract.  Keep the checkpoint/config hash as the parent identity,
