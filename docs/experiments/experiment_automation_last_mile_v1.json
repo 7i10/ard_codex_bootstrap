@@ -6,7 +6,7 @@
   "implementation_commit": "e2b9a2f145847799c727e63d8f02277c8d3c7e8f",
   "integration_commit": "1de2c5d1d044fd98c821bb48f20a6c16061a14d1",
   "hardening_followup_commit": "bb7b74e12eb4fd970dca2fd2b75a0eb299212156",
-  "latest_integrated_commit": "6dae02b42250f9798380cc1c707c844b26cd40eb",
+  "latest_integrated_commit": "06dd388905724183ba4e7575416088de8f4e64db",
   "scientific_campaign_mutated": false,
   "runtime_fingerprint": {
     "version": 1,
@@ -37,7 +37,7 @@
     "pull_request_title": "Automated Experiment Results"
   },
   "verification": {
-    "focused_tests": "92 passed (including publisher remote/collision regression)",
+    "focused_tests": "93 passed (including publisher remote/collision and signature-promotion regressions)",
     "dummy_dag": "existing orchestrator success/failure/retry fixtures passed",
     "real_runtime_validation": "bounded operational public CLI evidence only; no training or endpoint",
     "changed_test_preview": "scripts/verify.py --changed --non-scientific --dry-run",
