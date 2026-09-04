@@ -1,0 +1,73 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash(/home/shunsukenaito/.conda/envs/adv/bin/python -m pytest *)",
+      "Bash(/home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.status *)",
+      "Bash(/home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py *)",
+      "Bash(/home/shunsukenaito/.conda/envs/adv/bin/python scripts/aggregate_*)",
+      "Bash(PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m pytest *)",
+      "Bash(PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.status *)",
+      "Bash(PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py *)",
+      "Bash(PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python scripts/aggregate_*)",
+      "Bash(/home/shunsukenaito/.conda/envs/adv/bin/python scripts/ardx/*)",
+      "Bash(python3 scripts/ardx/*)",
+      "Bash(/usr/bin/python3 scripts/ardx/*)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git worktree list *)",
+      "Bash(git rev-parse *)",
+      "Bash(git merge-base *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(sha256sum *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(nvidia-smi *)",
+      "Bash(ssh Ferret nvidia-smi *)",
+      "Bash(ssh Ferret uptime *)",
+      "Bash(systemctl --user status *)",
+      "Bash(systemctl --user is-active *)",
+      "Bash(systemctl --user list-units *)",
+      "Bash(loginctl show-user *)",
+      "Bash(timeout 5 notify-send *)",
+      "Bash(notify-send *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Bash(rm -rf /home/shunsukenaito/workspace-local/shunsuke.naito/ard-runtime/*)",
+      "Bash(rm -rf /home/islab/workspace-local/shunsuke.naito/ard-runtime/*)",
+      "Bash(rm -rf /home/shunsukenaito/workspace-local/shunsuke.naito/ard_codex_bootstrap/*)",
+      "Bash(rm -rf /home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/*)",
+      "Edit(.external/**)",
+      "Edit(//home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/.external/**)",
+      "Edit(//home/shunsukenaito/workspace-local/shunsuke.naito/ard_codex_bootstrap/.external/**)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/scripts/ardx/status.py --brief 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

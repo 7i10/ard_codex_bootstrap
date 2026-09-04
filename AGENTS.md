@@ -1,3 +1,5 @@
+> Historical Codex-era rulebook (2026-07 → 2026-09-05). Claude Code reads CLAUDE.md and .claude/rules/ instead; this file is kept for provenance and is not maintained.
+
 # Repository mission
 
 Build a reproducible single-teacher adversarial robustness distillation research platform. Scientific correctness, traceability, and fair evaluation take priority over code brevity or headline metrics.

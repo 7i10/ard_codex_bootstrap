@@ -1,0 +1,17 @@
+[Unit]
+Description=ARD campaign watcher (ardx): emit terminal campaign/run events and run the headless postrun
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap
+Environment=HOME=/home/shunsukenaito
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 /home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/scripts/ardx/campaign_watch.py --follow --include-hand-run --on-event /home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/scripts/ardx/postrun_hook.sh
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/orchestration/ardx/watch.log
+StandardError=append:/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/orchestration/ardx/watch.err.log
+
+[Install]
+WantedBy=default.target

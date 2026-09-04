@@ -204,6 +204,15 @@ RULES: tuple[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...] = (
         ("T0", "T1"),
     ),
     (
+        ("scripts/ardx/",),
+        (
+            "tests/unit/test_ardx_campaign_watch.py",
+            "tests/unit/test_ardx_pin_source.py",
+            "tests/unit/test_ardx_status_and_hooks.py",
+        ),
+        ("T0", "T1"),
+    ),
+    (
         (
             "src/ard/analysis/rslad_signal_replay.py",
             "src/ard/cli/rslad_signal_replay.py",
