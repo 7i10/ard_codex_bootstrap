@@ -24,7 +24,9 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
-JOB_TYPES = frozenset({"training", "evaluation", "collection", "inventory", "aggregation", "report", "finalization", "publish"})
+JOB_TYPES = frozenset(
+    {"training", "evaluation", "collection", "inventory", "aggregation", "report", "finalization", "publish"}
+)
 TERMINAL = {"completed", "failed", "blocked", "orphaned"}
 ACTIVE = {"running", "retrying"}
 RESERVATION_HANDLES: dict[tuple[str, int], Any] = {}
@@ -143,7 +145,9 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], str, Path]:
         raise ValueError("jobs must be a non-empty list")
     ids: set[str] = set()
     for job in jobs:
-        if manifest.get("production_schema_version") == 2 and (not isinstance(job, dict) or not isinstance(job.get("job_type"), str)):
+        if manifest.get("production_schema_version") == 2 and (
+            not isinstance(job, dict) or not isinstance(job.get("job_type"), str)
+        ):
             raise ValueError("production schema-v2 jobs require an explicit job_type")
         _validate_job(job, ids, hosts, path.parent)
         _bind_controller_paths(manifest, job)
