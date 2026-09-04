@@ -1,0 +1,96 @@
+{
+  "schema": "ert_i100_online_state_s2_request_to_launch_retro_v1",
+  "experiment": "ert-i100-online-state-s2-v1",
+  "scope": "operational_only",
+  "scientific_source_sha": "bcb09a73814e7788026b287309d148b7791ccf75",
+  "manifest_sha256": "5c9220f3ff246f156d7bd075eac2035e21663c358bd33297722a492d21c5130c",
+  "attempt": "attempt11",
+  "timing": {
+    "timezone": "Asia/Tokyo",
+    "user_reported_request_time_approx": "2026-09-04T07:00:00+09:00",
+    "user_reported_request_time_exact": false,
+    "user_report_evidence": "current user message; approximate hour only",
+    "first_machine_evidence": {
+      "timestamp": "2026-09-04T07:05:45+09:00",
+      "evidence": "git reflog commit 3352c41"
+    },
+    "controller_launched": "2026-09-04T14:01:34.333353+09:00",
+    "user_reported_request_to_controller_seconds_approx": 25294.333353,
+    "first_machine_evidence_to_controller_seconds": 24949.333353,
+    "launch_ledger_marker": "2026-09-04T13:56:39.862570+09:00",
+    "marker_to_controller_seconds": 294.470783,
+    "marker_interpretation": "lower bound after reconciliation, not full request latency",
+    "unaccounted_interval": {
+      "start": "2026-09-04T10:12:45+09:00",
+      "end": "2026-09-04T13:27:01+09:00",
+      "seconds": 11656.0,
+      "status": "not_fully_recorded"
+    }
+  },
+  "launch_evidence": {
+    "gate_to_controller_seconds": 69.698592,
+    "public_canary_seconds": 65.985882,
+    "controller_to_first_root_spawn_seconds": 0.055567,
+    "dependency_delays_seconds": {
+      "prefix_to_threshold_dev1": 1.571337,
+      "prefix_to_threshold_dev2": 0.295370,
+      "threshold_to_dbdp_dev1": 0.938312,
+      "threshold_to_dbdp_dev2": 0.899758
+    },
+    "source": "attempt11 launch-gate/preflight.json and orchestration/state.json"
+  },
+  "timeline": [
+    {"timestamp": "2026-09-04T07:05:45+09:00", "event": "first_machine_evidence", "evidence": "git reflog 3352c41"},
+    {"timestamp": "2026-09-04T07:15:43+09:00", "event": "manifest_reuse_work", "evidence": "git reflog 46329e0"},
+    {"timestamp": "2026-09-04T07:23:02+09:00", "event": "fast_path_verification", "evidence": "git reflog 39a6e7c"},
+    {"timestamp": "2026-09-04T07:50:59+09:00", "event": "parallel_gate_work", "evidence": "git reflog fcbebc6"},
+    {"timestamp": "2026-09-04T09:40:25+09:00", "event": "screen_implementation", "evidence": "git reflog 265855c"},
+    {"timestamp": "2026-09-04T10:12:45+09:00", "event": "canary_source_ready", "evidence": "git reflog 196b88b"},
+    {"timestamp": "2026-09-04T13:27:01+09:00", "event": "prefix_lineage_fix", "evidence": "git reflog 7096a03"},
+    {"timestamp": "2026-09-04T13:56:17+09:00", "event": "child_prefix_binding_fix", "evidence": "git reflog bcb09a7"},
+    {"timestamp": "2026-09-04T14:01:34.333353+09:00", "event": "controller_launched", "evidence": "attempt11 preflight timing ledger"}
+  ],
+  "technical_failures": [
+    {
+      "attempt": "attempt10",
+      "failure": "missing canonical --prefix-state in child command",
+      "scientific_identity_changed": false,
+      "gpu_compute_started": false,
+      "source": "docs/ERT_I100_ONLINE_STATE_S2_LAUNCH_POSTMORTEM.md"
+    },
+    {
+      "attempt": "attempt11-first-launch",
+      "failure": "canary output collision under non-overwrite guard",
+      "scientific_identity_changed": false,
+      "gpu_compute_started": false,
+      "source": "docs/ERT_I100_ONLINE_STATE_S2_LAUNCH_POSTMORTEM.md"
+    },
+    {
+      "attempt": "preflight-command",
+      "failure": "hand-typed host runtime path mismatch",
+      "scientific_identity_changed": false,
+      "gpu_compute_started": false,
+      "source": "docs/ERT_I100_ONLINE_STATE_S2_LAUNCH_POSTMORTEM.md"
+    }
+  ],
+  "revert_decision": {
+    "bcb09a7": "retain; required causal-lineage fix",
+    "d438642": "retain; documentation-only postmortem",
+    "history_rewrite_or_revert": false,
+    "reason": "revert would reintroduce attempt-10 child lineage failure"
+  },
+  "improvements": [
+    "capture request event before reconciliation",
+    "canonical host-profile path resolution",
+    "producer-output validation in child argv",
+    "unique canary namespace or explicit canary adoption",
+    "one freeze and one detached launch attempt",
+    "30-minute known-runtime controller SLO",
+    "bounded stable check with no completion polling"
+  ],
+  "limitations": [
+    "original user request timestamp is approximate and not machine-recorded",
+    "10:12:45-13:27:01 interval is not fully explained",
+    "production completion is outside this startup retrospective"
+  ]
+}
