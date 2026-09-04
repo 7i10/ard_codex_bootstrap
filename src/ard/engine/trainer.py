@@ -169,6 +169,7 @@ class Trainer:
         boundary_coefficient: float | None = None,
         boundary_epsilon: float = 1e-12,
         dynamic_s3_router: Any | None = None,
+        online_state_s2_router: Any | None = None,
         policy_warmup_epochs: int = 0,
         oracle_mask: bool = False,
         frozen_risk_lookup: FrozenRiskLookup | None = None,
@@ -240,10 +241,19 @@ class Trainer:
         )
         if intervention_mask is not None and prescriptive_v3_route != "nr_prefix" and not has_treatment:
             raise ValueError("an intervention mask requires at least one registered treatment")
-        if intervention_mask is None and requires_explicit_mask and dynamic_s3_router is None:
+        if (
+            intervention_mask is None
+            and requires_explicit_mask
+            and dynamic_s3_router is None
+            and online_state_s2_router is None
+        ):
             raise ValueError("a registered treatment requires a fixed intervention mask")
         if dynamic_s3_router is not None and intervention_mask is not None:
             raise ValueError("dynamic S3 routing cannot be combined with a fixed intervention mask")
+        if online_state_s2_router is not None and intervention_mask is not None:
+            raise ValueError("online S2 routing cannot be combined with a fixed intervention mask")
+        if dynamic_s3_router is not None and online_state_s2_router is not None:
+            raise ValueError("dynamic S3 and online S2 routers are mutually exclusive")
         if adversarial_kd_multiplier is not None and (
             not torch.isfinite(torch.as_tensor(adversarial_kd_multiplier)) or adversarial_kd_multiplier < 0
         ):
@@ -279,8 +289,8 @@ class Trainer:
             raise ValueError("teacher reliability mask requires a selected treatment mask")
         if boundary_intervention not in {None, "pair_margin", "detached_boundary_distance", "secant_boundary_distance"}:
             raise ValueError("unknown boundary intervention")
-        if boundary_intervention is not None and intervention_mask is None:
-            raise ValueError("boundary intervention requires a fixed intervention mask")
+        if boundary_intervention is not None and intervention_mask is None and online_state_s2_router is None:
+            raise ValueError("boundary intervention requires a fixed intervention mask or online S2 router")
         if (boundary_intervention is None) != (boundary_coefficient is None):
             raise ValueError("boundary intervention and coefficient must be supplied together")
         if boundary_coefficient is not None and (
@@ -343,6 +353,7 @@ class Trainer:
         self.boundary_coefficient = boundary_coefficient
         self.boundary_epsilon = float(boundary_epsilon)
         self.dynamic_s3_router = dynamic_s3_router
+        self.online_state_s2_router = online_state_s2_router
         if target_policy is not None and self.teacher is None:
             raise ValueError("teacher target policy requires a frozen teacher")
         if policy_warmup_epochs < 0:
@@ -406,6 +417,63 @@ class Trainer:
             raise FloatingPointError("dynamic pair Student margin is non-finite")
         return student_margin, rival
 
+    def _record_boundary_values(
+        self,
+        *,
+        unscaled_loss: torch.Tensor,
+        selected: torch.Tensor,
+        hinge: torch.Tensor | None = None,
+        student_distance: torch.Tensor | None = None,
+        teacher_distance: torch.Tensor | None = None,
+        student_grad_l1: torch.Tensor | None = None,
+        teacher_grad_l1: torch.Tensor | None = None,
+    ) -> None:
+        """Accumulate detached numerical diagnostics without new forwards.
+
+        These quantities are deliberately *not* reductions used by the
+        objective: full-batch reduction remains owned by ``ObjectiveTerms``.
+        They make the registered PMP/D-BDP geometry observable at epoch
+        granularity and fail closed if the already-computed terms are
+        non-finite.
+        """
+
+        mask = selected.detach().bool()
+        if not bool(mask.any()):
+            return
+
+        def record(name: str, values: torch.Tensor) -> None:
+            detached = values.detach().float()
+            if not bool(torch.isfinite(detached).all()):
+                raise FloatingPointError(f"boundary diagnostic {name} is non-finite")
+            self._boundary_epoch_stats[f"{name}_sum"] = self._boundary_epoch_stats.get(f"{name}_sum", 0.0) + float(
+                detached.sum().item()
+            )
+            self._boundary_epoch_stats[f"{name}_max"] = max(
+                self._boundary_epoch_stats.get(f"{name}_max", 0.0), float(detached.max().item())
+            )
+
+        def selected_values(values: torch.Tensor) -> torch.Tensor:
+            # Pair losses are batch-shaped, whereas D-BDD geometry is already
+            # compacted to the selected rows.  Accept both representations
+            # without ever changing the objective tensor itself.
+            return values[mask] if values.shape[0] == mask.shape[0] else values
+
+        selected_loss = selected_values(unscaled_loss)
+        record("boundary_unscaled_loss", selected_loss)
+        record("boundary_weighted_loss", selected_loss * float(self.boundary_coefficient))
+        self._boundary_epoch_stats["boundary_loss_count"] = self._boundary_epoch_stats.get(
+            "boundary_loss_count", 0.0
+        ) + float(selected_loss.numel())
+        for name, values in (
+            ("boundary_hinge", hinge),
+            ("boundary_student_distance", student_distance),
+            ("boundary_teacher_distance", teacher_distance),
+            ("boundary_student_input_grad_l1", student_grad_l1),
+            ("boundary_teacher_input_grad_l1", teacher_grad_l1),
+        ):
+            if values is not None:
+                record(name, selected_values(values))
+
     def _boundary_terms(
         self,
         *,
@@ -435,7 +503,14 @@ class Trainer:
         if mode == "pair_margin":
             self._boundary_epoch_stats["boundary_active_count"] += float(active.sum().item())
             self._boundary_epoch_stats["boundary_gate_positive_count"] += float(teacher_gate.sum().item())
-            return 0.5 * F.relu(teacher_adv_margin - student_adv_margin).square() * active
+            hinge = F.relu(teacher_adv_margin - student_adv_margin)
+            result = 0.5 * hinge.square() * active
+            self._record_boundary_values(
+                unscaled_loss=result,
+                selected=active > 0,
+                hinge=hinge.index_select(0, torch.nonzero(active > 0, as_tuple=False).flatten()),
+            )
+            return result
         if mode == "secant_boundary_distance":
             # S-BDD is a first-order Student geometry loss.  Unlike the
             # Teacher quantities above, both Student margins deliberately
@@ -454,7 +529,16 @@ class Trainer:
             self._boundary_epoch_stats["boundary_active_count"] += float(active.sum().item())
             self._boundary_epoch_stats["boundary_gate_positive_count"] += float(teacher_gate.sum().item())
             self._boundary_epoch_stats["boundary_zero_rho_count"] += float(zero_rho.sum().item())
-            return 0.5 * F.relu(d_teacher - d_student).square() * active
+            hinge = F.relu(d_teacher - d_student)
+            result = 0.5 * hinge.square() * active
+            self._record_boundary_values(
+                unscaled_loss=result,
+                selected=active > 0,
+                hinge=hinge.index_select(0, torch.nonzero(active > 0, as_tuple=False).flatten()),
+                student_distance=d_student.index_select(0, torch.nonzero(active > 0, as_tuple=False).flatten()),
+                teacher_distance=d_teacher.index_select(0, torch.nonzero(active > 0, as_tuple=False).flatten()),
+            )
+            return result
         if mode != "detached_boundary_distance":
             raise RuntimeError(f"unsupported boundary intervention: {mode}")
         # Compute input gradients on a detached adversarial view.  The Teacher
@@ -484,15 +568,23 @@ class Trainer:
         grad_teacher = torch.autograd.grad(
             teacher_geom_margin_geom.sum(), x_geom, create_graph=False, retain_graph=False, allow_unused=False
         )[0].detach()
-        d_student = student_adv_margin.index_select(0, indices) / (
-            grad_student.abs().flatten(1).sum(dim=1) + self.boundary_epsilon
-        )
-        d_teacher = teacher_adv_margin.index_select(0, indices) / (
-            grad_teacher.abs().flatten(1).sum(dim=1) + self.boundary_epsilon
-        )
-        selected_loss = 0.5 * F.relu(d_teacher.detach() - d_student).square()
+        student_grad_l1 = grad_student.abs().flatten(1).sum(dim=1)
+        teacher_grad_l1 = grad_teacher.abs().flatten(1).sum(dim=1)
+        d_student = student_adv_margin.index_select(0, indices) / (student_grad_l1 + self.boundary_epsilon)
+        d_teacher = teacher_adv_margin.index_select(0, indices) / (teacher_grad_l1 + self.boundary_epsilon)
+        hinge = F.relu(d_teacher.detach() - d_student)
+        selected_loss = 0.5 * hinge.square()
         result = torch.zeros_like(student_adv_margin)
         result.index_copy_(0, indices, selected_loss)
+        self._record_boundary_values(
+            unscaled_loss=result,
+            selected=selected,
+            hinge=hinge,
+            student_distance=d_student,
+            teacher_distance=d_teacher,
+            student_grad_l1=student_grad_l1,
+            teacher_grad_l1=teacher_grad_l1,
+        )
         # A separate detached Teacher forward is intentionally counted in
         # runtime telemetry; it is required for input-gradient geometry.
         self._teacher_adversarial_forward_calls += 1.0
@@ -737,6 +829,21 @@ class Trainer:
             "boundary_gate_positive_count": 0.0,
             "boundary_zero_rho_count": 0.0,
             "boundary_input_gradient_calls": 0.0,
+            "boundary_loss_count": 0.0,
+            "boundary_unscaled_loss_sum": 0.0,
+            "boundary_unscaled_loss_max": 0.0,
+            "boundary_weighted_loss_sum": 0.0,
+            "boundary_weighted_loss_max": 0.0,
+            "boundary_hinge_sum": 0.0,
+            "boundary_hinge_max": 0.0,
+            "boundary_student_distance_sum": 0.0,
+            "boundary_student_distance_max": 0.0,
+            "boundary_teacher_distance_sum": 0.0,
+            "boundary_teacher_distance_max": 0.0,
+            "boundary_student_input_grad_l1_sum": 0.0,
+            "boundary_student_input_grad_l1_max": 0.0,
+            "boundary_teacher_input_grad_l1_sum": 0.0,
+            "boundary_teacher_input_grad_l1_max": 0.0,
         }
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
@@ -756,8 +863,17 @@ class Trainer:
             self._teacher_adversarial_forward_calls = 0.0
             mask = self._mask(batch)
             self.optimizer.zero_grad(set_to_none=True)
-            requires_clean_student = getattr(self.objective, "requires_clean_student_logits", False)
-            requires_teacher_clean = getattr(self.objective, "requires_teacher_clean_logits", False)
+            # Online-S2 routing uses the existing pre-update clean Student
+            # view plus the ordinary detached Teacher clean target and one
+            # cached Teacher adversarial response.  It must not cause a new
+            # inner attack or a second copy of either forward.
+            requires_online_state = self.online_state_s2_router is not None
+            requires_clean_student = (
+                getattr(self.objective, "requires_clean_student_logits", False) or requires_online_state
+            )
+            requires_teacher_clean = (
+                getattr(self.objective, "requires_teacher_clean_logits", False) or requires_online_state
+            )
             attack_requires_teacher_clean = bool(getattr(self.attack, "requires_teacher_clean_target", False))
             teacher_clean_logits = None
             teacher_clean_forward_calls = 0.0
@@ -987,6 +1103,24 @@ class Trainer:
                 # The router decision is a detached hard current-step mask.
                 # It does not feed the PGD inner problem or any next-epoch state.
                 treatment_risk = dynamic_s3_decision.action_active.to(device=logits.device, dtype=logits.dtype)
+            online_state_s2_decision = None
+            if self.online_state_s2_router is not None:
+                if clean_student_logits is None or self.teacher is None:
+                    raise ValueError("online S2 routing requires RSLAD clean Student logits and a frozen Teacher")
+                online_state_s2_decision = self.online_state_s2_router.observe(
+                    epoch=self.current_epoch,
+                    sample_ids=batch.sample_ids,
+                    labels=batch.labels,
+                    valid_mask=valid_mask,
+                    student_clean_logits=clean_student_logits,
+                    student_adversarial_logits=logits,
+                    teacher_adversarial_logits=self._teacher_adversarial_response(adversarial),
+                )
+                # The state/action routing decision is detached and therefore
+                # cannot enter the KL-PGD10 inner objective or its graph.
+                treatment_risk = online_state_s2_decision.action_active.to(device=logits.device, dtype=logits.dtype)
+                if bool((online_state_s2_decision.action_active & ~online_state_s2_decision.eligible_s2_t1).any()):
+                    raise RuntimeError("online S2 action escaped its Online-S2×T1 eligibility predicate")
             if self.iad_inspired:
                 if clean_student_logits is None or teacher_clean_logits is None or self.teacher is None:
                     raise ValueError("IAD-inspired branch requires clean Student and Teacher logits")
@@ -1231,9 +1365,13 @@ class Trainer:
                 raise FloatingPointError("non-finite training loss")
             if self.scaler is None:
                 loss.backward()
-                self.optimizer.step()
             else:
                 self.scaler.scale(loss).backward()
+            if self.teacher is not None and any(parameter.grad is not None for parameter in self.teacher.parameters()):
+                raise RuntimeError("frozen Teacher unexpectedly received a parameter gradient")
+            if self.scaler is None:
+                self.optimizer.step()
+            else:
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
             with _evaluation_mode(self.model), torch.no_grad():
@@ -1351,6 +1489,16 @@ class Trainer:
                     **({} if self.fork_lineage is None else self.fork_lineage),
                     "dynamic_s3_state": self.dynamic_s3_router.state_dict(),
                 }
+            if self.online_state_s2_router is not None:
+                self.online_state_s2_router.flush_epoch(epoch)
+                # The e100 raw state artifact and all subsequent compact
+                # transition state are checkpoint lineage.  A resumed child
+                # must restore them rather than rebuilding a threshold from a
+                # later model state.
+                self.fork_lineage = {
+                    **({} if self.fork_lineage is None else self.fork_lineage),
+                    "online_state_s2_state": self.online_state_s2_router.state_dict(),
+                }
             if self.diagnostics is not None:
                 self.diagnostics.flush()
             validation_metrics = self.validate_epoch(validation_loader)
@@ -1431,6 +1579,12 @@ class Trainer:
             ):
                 raise ValueError("dynamic S3 resume checkpoint lacks immutable routing state")
             self.dynamic_s3_router.load_state_dict(self.fork_lineage["dynamic_s3_state"])
+        if self.online_state_s2_router is not None:
+            if not isinstance(self.fork_lineage, dict) or not isinstance(
+                self.fork_lineage.get("online_state_s2_state"), dict
+            ):
+                raise ValueError("online S2 resume checkpoint lacks immutable routing state")
+            self.online_state_s2_router.load_state_dict(self.fork_lineage["online_state_s2_state"])
         if self.sample_store is not None:
             self.sample_store.load_state_dict(state.sample_state)
             self.sample_state = self.sample_store.state_dict()

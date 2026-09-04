@@ -15,6 +15,7 @@ from ard.analysis.ert_stage_a_runtime import (
     _epoch80_gate,
     _mask_from_overlay,
     _tracking_run_id,
+    _validate_online_state_prefix_lineage,
     _validate_shared_prefix_lineage,
     _validate_stage_a_calibration,
 )
@@ -172,6 +173,44 @@ def test_horizon_contract_rejects_duplicate_or_pre_parent_epochs() -> None:
     with pytest.raises(StageARuntimeError, match="first epoch 100"):
         _validate_horizons((99, 104), 114, first_epoch=100)
     _validate_horizons((104, 109, 114), 114, first_epoch=100)
+
+
+def test_online_prefix_lineage_rejects_source_or_attack_relabeling() -> None:
+    parent = {"config_hash": "a" * 64}
+    prefix = {
+        "config_hash": "b" * 64,
+        "fork_lineage": {
+            "parent_checkpoint_sha256": "c" * 64,
+            "parent_config_hash": "a" * 64,
+            "child_config_hash": "b" * 64,
+            "source_git_sha": "d" * 40,
+            "training_attack_identity_sha256": "e" * 64,
+            "online_state_s2": {
+                "arm": "prefix",
+                "prefix_epoch": 100,
+                "original_parent_checkpoint_sha256": "c" * 64,
+            },
+            "online_state_s2_state": {},
+        },
+    }
+    with pytest.raises(StageARuntimeError, match="source Git SHA"):
+        _validate_online_state_prefix_lineage(
+            prefix_payload=prefix,
+            experiment_parent_payload=parent,
+            experiment_parent_sha256="c" * 64,
+            prefix_epoch=100,
+            expected_source_git_sha="f" * 40,
+            expected_training_attack_identity_sha256="e" * 64,
+        )
+    with pytest.raises(StageARuntimeError, match="training attack"):
+        _validate_online_state_prefix_lineage(
+            prefix_payload=prefix,
+            experiment_parent_payload=parent,
+            experiment_parent_sha256="c" * 64,
+            prefix_epoch=100,
+            expected_source_git_sha="d" * 40,
+            expected_training_attack_identity_sha256="f" * 64,
+        )
 
 
 def test_continuation_seed_is_included_in_arm_identity() -> None:

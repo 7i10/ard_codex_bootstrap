@@ -20,7 +20,7 @@ from typing import Any
 import torch
 import yaml
 from torch.optim import SGD
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from ard.analysis.ert_rslad_rng_sources import (
     RNGSourceSeeds,
@@ -33,6 +33,7 @@ from ard.attacks import LinfPGD
 from ard.config import load_config
 from ard.data import (
     EpochShuffleSampler,
+    SampleRef,
     build_train_validation_views,
     collate_indexed,
     data_loader_generator,
@@ -56,6 +57,95 @@ from ard.tracking.adapter import (
 
 class StageARuntimeError(RuntimeError):
     """Raised when a Stage A parent or treatment contract is invalid."""
+
+
+class _CanaryEpochSubset(Dataset[Any]):
+    """A bounded real-data view that preserves source-ID/epoch semantics.
+
+    It exists only for the registered public-runtime canary.  Production
+    calls never pass the corresponding ``canary_*`` arguments.  Keeping this
+    adapter here lets the canary use the same loader, objective, optimizer,
+    checkpoint, and router path rather than a private formula reconstruction.
+    """
+
+    def __init__(self, dataset: Any, positions: list[int], source_ids: list[int]) -> None:
+        if len(positions) != len(source_ids) or not positions:
+            raise ValueError("canary positions and source IDs must be non-empty and aligned")
+        if len(set(positions)) != len(positions) or len(set(source_ids)) != len(source_ids):
+            raise ValueError("canary positions and source IDs must be unique")
+        if any(position < 0 or position >= len(dataset) for position in positions):
+            raise ValueError("canary position is outside the wrapped dataset")
+        self.dataset = dataset
+        # ``positions`` are indices in the full SourceIndexedSubset; they
+        # must not be replaced by source IDs.  EpochShuffleSampler emits a
+        # SampleRef whose index is a position in this bounded view, so
+        # ``__getitem__`` maps that position back to the full view while
+        # preserving state-update/multiplicity metadata.
+        self._positions = tuple(positions)
+        # Routing code intentionally discovers this attribute to recover the
+        # stable universe.  These IDs remain original train-set source IDs.
+        self.indices = tuple(source_ids)
+
+    def __len__(self) -> int:
+        return len(self._positions)
+
+    def __getitem__(self, index: int | SampleRef) -> Any:
+        reference = index if isinstance(index, SampleRef) else None
+        bounded_position = int(index) if reference is None else reference.index
+        if bounded_position < 0 or bounded_position >= len(self._positions):
+            raise IndexError(f"canary position {bounded_position} is outside the bounded view")
+        full_position = self._positions[bounded_position]
+        if reference is None:
+            return self.dataset[full_position]
+        return self.dataset[
+            SampleRef(
+                index=full_position,
+                state_update_mask=reference.state_update_mask,
+                multiplicity=reference.multiplicity,
+            )
+        ]
+
+    def set_epoch(self, epoch: int) -> None:
+        setter = getattr(self.dataset, "set_epoch", None)
+        if callable(setter):
+            setter(epoch)
+
+    def set_augmentation_seed(self, seed: int) -> None:
+        setter = getattr(self.dataset, "set_augmentation_seed", None)
+        if callable(setter):
+            setter(seed)
+
+
+def _stable_train_labels(dataset: Any) -> dict[int, int]:
+    """Recover labels by stable source ID through normal or bounded views.
+
+    ``SourceIndexedSubset`` has two dataset layers above torchvision's
+    ``targets``.  The bounded public canary adds one more.  Routing must never
+    depend on either incidental wrapper depth or the position-space sampler.
+    """
+
+    try:
+        source_ids = [int(value) for value in dataset.indices]
+    except (AttributeError, TypeError) as exc:
+        raise StageARuntimeError("dynamic routing cannot recover the stable train ID universe") from exc
+    base = dataset
+    seen: set[int] = set()
+    while hasattr(base, "dataset"):
+        identity = id(base)
+        if identity in seen:
+            raise StageARuntimeError("dynamic routing dataset wrappers contain a cycle")
+        seen.add(identity)
+        base = base.dataset
+    targets = getattr(base, "targets", None)
+    if not isinstance(targets, (list, tuple)):
+        raise StageARuntimeError("dynamic routing cannot recover base train labels")
+    try:
+        labels = {sample_id: int(targets[sample_id]) for sample_id in source_ids}
+    except (IndexError, TypeError) as exc:
+        raise StageARuntimeError("dynamic routing stable train labels do not join the source universe") from exc
+    if len(labels) != len(source_ids):
+        raise StageARuntimeError("dynamic routing found duplicate stable train IDs")
+    return labels
 
 
 SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256 = "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
@@ -162,6 +252,10 @@ class StageATreatment:
     boundary_intervention: str | None = None
     boundary_coefficient: float | None = None
     boundary_epsilon: float = 1e-12
+    # This is deliberately a narrow opt-in for the registered I100 online
+    # state screen.  Ordinary Stage-A boundary treatments remain fixed-mask
+    # only; the dedicated runtime supplies the checkpointable current router.
+    online_state_s2: bool = False
 
     def __post_init__(self) -> None:
         if self.kind not in {"baseline", "advce", "soft_advkd", "advkd_advce", "clean_wrong", "broad"}:
@@ -201,7 +295,7 @@ class StageATreatment:
             raise StageARuntimeError("unknown boundary intervention")
         if (self.boundary_intervention is None) != (self.boundary_coefficient is None):
             raise StageARuntimeError("boundary intervention and coefficient must be supplied together")
-        if self.boundary_intervention is not None and self.mask_key is None:
+        if self.boundary_intervention is not None and self.mask_key is None and not self.online_state_s2:
             raise StageARuntimeError("boundary intervention requires a fixed selected mask")
         if self.boundary_coefficient is not None and self.boundary_coefficient < 0:
             raise StageARuntimeError("boundary coefficient must be non-negative")
@@ -291,11 +385,113 @@ def _validate_shared_prefix_lineage(
     return prefix_lineage
 
 
+def _checkpoint_component_equivalence(payload: dict[str, Any], *, epoch: int) -> dict[str, str]:
+    """Hash the complete resumable state at one shared fork boundary."""
+    required = (
+        "model",
+        "optimizer",
+        "scheduler",
+        "scaler",
+        "rng",
+        "sampler_epoch",
+        "sampler_state",
+        "sample_state",
+        "global_step",
+    )
+    if any(key not in payload for key in required):
+        raise StageARuntimeError(f"epoch-{epoch} checkpoint lacks a parity component")
+    return {key: _state_component_sha256(payload[key]) for key in required}
+
+
+def _validate_online_state_prefix_lineage(
+    *,
+    prefix_payload: dict[str, Any],
+    experiment_parent_payload: dict[str, Any],
+    experiment_parent_sha256: str,
+    prefix_epoch: int,
+    expected_source_git_sha: str | None = None,
+    expected_training_attack_identity_sha256: str | None = None,
+) -> dict[str, Any]:
+    """Prove an e100 prefix derives from this exact e99 causal parent."""
+    lineage = prefix_payload.get("fork_lineage")
+    parent_config_hash = experiment_parent_payload.get("config_hash")
+    if (
+        not isinstance(lineage, dict)
+        or not isinstance(parent_config_hash, str)
+        or lineage.get("parent_checkpoint_sha256") != experiment_parent_sha256
+        or lineage.get("parent_config_hash") != parent_config_hash
+        or lineage.get("child_config_hash") != prefix_payload.get("config_hash")
+    ):
+        raise StageARuntimeError("online shared prefix does not belong to the requested e99 parent")
+    identity = lineage.get("online_state_s2")
+    state = lineage.get("online_state_s2_state")
+    if (
+        not isinstance(identity, dict)
+        or identity.get("arm") != "prefix"
+        or identity.get("prefix_epoch") != prefix_epoch
+        or identity.get("original_parent_checkpoint_sha256") != experiment_parent_sha256
+        or not isinstance(state, dict)
+    ):
+        raise StageARuntimeError("online shared prefix lacks immutable e100 router state")
+    if expected_source_git_sha is not None and lineage.get("source_git_sha") != expected_source_git_sha:
+        raise StageARuntimeError("online shared prefix source Git SHA differs from the frozen child source")
+    if (
+        expected_training_attack_identity_sha256 is not None
+        and lineage.get("training_attack_identity_sha256") != expected_training_attack_identity_sha256
+    ):
+        raise StageARuntimeError("online shared prefix training attack differs from the frozen child attack")
+    return lineage
+
+
+def _validate_online_state_s2_treatment(*, arm: str, treatment: StageATreatment) -> None:
+    """Reject every treatment component outside the registered online screen.
+
+    The public launcher constructs these objects itself, but the runtime is the
+    last scientific boundary before an optimizer step.  In particular, an
+    online preservation arm may not accidentally inherit a Clean-Wrong, S3,
+    margin-floor, or adversarial-KD modifier from a generic Stage-A caller.
+    """
+    inactive = (
+        treatment.beta_advce,
+        treatment.advkd_multiplier,
+        treatment.beta_cleance,
+        treatment.clean_wrong_mode,
+        treatment.tau,
+        treatment.selected_attack_epsilon,
+        treatment.selected_attack_step_size,
+        treatment.extra_clean_ce,
+        treatment.bce_adv,
+        treatment.adaptive_advkd_gamma,
+        treatment.margin_coefficient,
+        treatment.margin_target_mode,
+        treatment.margin_gamma,
+        treatment.margin_floor,
+        treatment.margin_cap,
+    )
+    if any(value is not None for value in inactive) or treatment.teacher_reliability_gate or treatment.iad_inspired:
+        raise StageARuntimeError("online S2 screen may not stack another Stage-A treatment component")
+    if arm in {"prefix", "control"}:
+        if treatment.kind != "baseline" or treatment.boundary_intervention is not None:
+            raise StageARuntimeError("online prefix/control must be a baseline treatment with router telemetry only")
+        return
+    expected = {"pmp": "pair_margin", "dbdp": "detached_boundary_distance"}.get(arm)
+    expected_coefficient = {"pmp": 0.05380932585058825, "dbdp": 31.649566509850324}.get(arm)
+    if (
+        expected is None
+        or expected_coefficient is None
+        or treatment.kind != "broad"
+        or treatment.boundary_intervention != expected
+        or treatment.boundary_coefficient != expected_coefficient
+        or treatment.boundary_epsilon != 1e-12
+    ):
+        raise StageARuntimeError("online preservation arm does not match its registered boundary treatment")
+
+
 def _require_attack_identity(actual: dict[str, object], expected: object, *, label: str) -> None:
     if not isinstance(expected, dict) or set(expected) != set(actual):
-        raise StageARuntimeError(f"dynamic S3 {label} attack contract must contain the complete exact identity")
+        raise StageARuntimeError(f"dynamic routing {label} attack contract must contain the complete exact identity")
     if expected != actual:
-        raise StageARuntimeError(f"dynamic S3 {label} attack contract differs from the parent")
+        raise StageARuntimeError(f"dynamic routing {label} attack contract differs from the parent")
 
 
 def _epoch80_gate(*, own: dict[str, Any], peer_path: Path, timeout_seconds: float = 600.0) -> None:
@@ -381,6 +577,7 @@ def _arm_hash(
     rng_source_seeds: RNGSourceSeeds | None = None,
     shuffle_augmentation_seeds: ShuffleAugmentationSeeds | None = None,
     dynamic_s3: dict[str, Any] | None = None,
+    online_state_s2: dict[str, Any] | None = None,
 ) -> str:
     return hashlib.sha256(
         json.dumps(
@@ -393,6 +590,7 @@ def _arm_hash(
                     None if shuffle_augmentation_seeds is None else shuffle_augmentation_seeds.as_dict()
                 ),
                 "dynamic_s3": dynamic_s3,
+                "online_state_s2": online_state_s2,
                 "source_git_sha": source_sha,
             },
             sort_keys=True,
@@ -424,11 +622,26 @@ def run_stage_a_arm(
     dynamic_s3_peer_epoch80_state: Path | None = None,
     dynamic_s3_shared_prefix_checkpoint: Path | None = None,
     dynamic_s3_experiment_parent_checkpoint: Path | None = None,
+    online_state_s2: dict[str, Any] | None = None,
     resume_epoch: int | None = None,
     mask_anchor_epoch: int | None = None,
     force_sample_keyed_attack: bool = False,
+    canary_max_train_batches: int | None = None,
+    canary_max_validation_batches: int | None = None,
+    canary_source_ids: tuple[int, ...] | None = None,
 ) -> dict[str, Any]:
     config = load_config(parent_config_path)
+    canary_enabled = canary_max_train_batches is not None or canary_max_validation_batches is not None
+    if canary_enabled:
+        if (
+            not isinstance(canary_max_train_batches, int)
+            or not isinstance(canary_max_validation_batches, int)
+            or canary_max_train_batches <= 0
+            or canary_max_validation_batches <= 0
+            or canary_max_train_batches > 8
+            or canary_max_validation_batches > 2
+        ):
+            raise StageARuntimeError("public online canary requires bounded 1–8 train and 1–2 validation batches")
     if force_sample_keyed_attack:
         # The historical parent config predates the sample-keyed random-start
         # contract.  Keep the checkpoint/config hash as the parent identity,
@@ -465,6 +678,70 @@ def run_stage_a_arm(
         and actual_parent_checkpoint_sha256 != expected_parent_checkpoint_sha256
     ):
         raise StageARuntimeError("parent checkpoint bytes do not match the registered SHA-256")
+    online_arm: str | None = None
+    online_prefix_epoch = 100
+    online_original_parent_checkpoint: Path | None = None
+    online_original_parent_payload: dict[str, Any] | None = None
+    online_original_parent_sha256: str | None = None
+    online_thresholds_path: Path | None = None
+    if online_state_s2 is not None:
+        if dynamic_s3_arm is not None:
+            raise StageARuntimeError("online S2 and dynamic S3 routing are mutually exclusive")
+        if mask_path is not None or treatment.mask_key is not None:
+            raise StageARuntimeError("online S2 routing cannot be combined with a fixed treatment mask")
+        if not isinstance(online_state_s2, dict):
+            raise StageARuntimeError("online S2 routing specification must be a JSON-compatible object")
+        online_arm = online_state_s2.get("arm")
+        if online_arm not in {"prefix", "control", "pmp", "dbdp"}:
+            raise StageARuntimeError("online S2 routing arm must be prefix, control, pmp, or dbdp")
+        _validate_online_state_s2_treatment(arm=online_arm, treatment=treatment)
+        if online_state_s2.get("prefix_epoch", 100) != 100:
+            raise StageARuntimeError("online S2 screen is frozen to a shared epoch-100 prefix")
+        raw_original_parent = online_state_s2.get("original_parent_checkpoint")
+        if not isinstance(raw_original_parent, str):
+            raise StageARuntimeError("online S2 routing requires the exact original e99 parent path")
+        online_original_parent_checkpoint = Path(raw_original_parent)
+        if not online_original_parent_checkpoint.is_file():
+            raise StageARuntimeError("online S2 original e99 parent is unavailable")
+        online_original_parent_payload = torch.load(
+            online_original_parent_checkpoint, map_location="cpu", weights_only=False
+        )
+        online_original_parent_sha256 = _sha256(online_original_parent_checkpoint)
+        if (
+            not isinstance(online_original_parent_payload, dict)
+            or online_original_parent_payload.get("epoch") != 99
+            or online_original_parent_payload.get("epoch_boundary") != "end"
+        ):
+            raise StageARuntimeError("online S2 original parent must be the exact e99 end-boundary checkpoint")
+        if online_state_s2.get("original_parent_checkpoint_sha256") != online_original_parent_sha256:
+            raise StageARuntimeError("online S2 original parent bytes differ from the frozen SHA-256")
+        if online_arm == "prefix":
+            if actual_parent_checkpoint_sha256 != online_original_parent_sha256:
+                raise StageARuntimeError("shared e100 prefix must resume the immutable original e99 parent")
+            if resume_epoch not in {None, 99}:
+                raise StageARuntimeError("shared e100 prefix must resume exactly from epoch 99")
+            if not treatment.online_state_s2:
+                raise StageARuntimeError("shared e100 prefix must be an online-observation-only baseline treatment")
+        else:
+            if (
+                not isinstance(payload, dict)
+                or payload.get("epoch") != 100
+                or payload.get("epoch_boundary") != "end"
+                or resume_epoch not in {None, 100}
+            ):
+                raise StageARuntimeError("online S2 child must resume the exact shared e100 end-boundary checkpoint")
+            _validate_online_state_prefix_lineage(
+                prefix_payload=payload,
+                experiment_parent_payload=online_original_parent_payload,
+                experiment_parent_sha256=online_original_parent_sha256,
+                prefix_epoch=online_prefix_epoch,
+            )
+            raw_thresholds = online_state_s2.get("thresholds_path")
+            if not isinstance(raw_thresholds, str):
+                raise StageARuntimeError("online S2 child requires the frozen e100 threshold artifact")
+            online_thresholds_path = Path(raw_thresholds)
+            if not online_thresholds_path.is_file():
+                raise StageARuntimeError("online S2 frozen threshold artifact is unavailable")
     shared_prefix = dynamic_s3_shared_prefix_checkpoint is not None
     if shared_prefix:
         if dynamic_s3_shared_prefix_checkpoint.resolve() != parent_checkpoint.resolve():
@@ -498,6 +775,16 @@ def run_stage_a_arm(
             raise StageARuntimeError("resume_epoch does not match the parent checkpoint payload")
         start_epoch = resume_epoch + 1
         experiment_parent_sha256 = _sha256(parent_checkpoint)
+    if online_arm is not None:
+        assert online_original_parent_sha256 is not None
+        experiment_parent_sha256 = online_original_parent_sha256
+        # The online router persists one state record per stable ID and its
+        # entry/re-entry counters are defined over a complete epoch sequence.
+        # This registered screen has no rank-synchronization protocol, so
+        # silently accepting a distributed launch would corrupt those
+        # per-ID trajectories.
+        if get_world_size() != 1:
+            raise StageARuntimeError("online S2 state persistence screen requires world_size == 1")
     parent_hash = payload.get("config_hash")
     if not isinstance(parent_hash, str) or len(parent_hash) != 64:
         raise StageARuntimeError("parent checkpoint lacks a valid config hash")
@@ -544,6 +831,24 @@ def run_stage_a_arm(
         if dynamic_s3_arm is None
         else {"arm": dynamic_s3_arm, "beta_advce": dynamic_s3_beta_advce, "timing": "same_step_pre_update"}
     )
+    online_state_s2_identity: dict[str, Any] | None = None
+    if online_arm is not None:
+        assert online_state_s2 is not None and online_original_parent_sha256 is not None
+        expected_training = online_state_s2.get("training_attack")
+        expected_endpoint = online_state_s2.get("endpoint_attack")
+        _require_attack_identity(config.method.attack.identity(), expected_training, label="training")
+        if config.method.selection_attack is None:
+            raise StageARuntimeError("online S2 routing requires the frozen CE-PGD20 endpoint attack")
+        _require_attack_identity(config.method.selection_attack.identity(), expected_endpoint, label="endpoint")
+        online_state_s2_identity = {
+            "arm": online_arm,
+            "timing": "same_step_pre_update",
+            "prefix_epoch": online_prefix_epoch,
+            "router_margin": "global_true_logit_minus_global_max_nontrue_logit",
+            "action_pair": "current_student_strongest_nontrue_reused_for_teacher",
+            "original_parent_checkpoint_sha256": online_original_parent_sha256,
+            "threshold_artifact_sha256": None if online_thresholds_path is None else _sha256(online_thresholds_path),
+        }
     if continuation_seed is not None and (isinstance(continuation_seed, bool) or continuation_seed < 0):
         raise StageARuntimeError("continuation seed must be a non-negative integer")
     if continuation_seed is not None and rng_source_seeds is not None:
@@ -569,7 +874,9 @@ def run_stage_a_arm(
         rng_source_seeds=None if continuation_seed is not None else rng_source_seeds,
         shuffle_augmentation_seeds=shuffle_augmentation_seeds,
         dynamic_s3=dynamic_s3_identity,
+        online_state_s2=online_state_s2_identity,
     )
+    canary_selected_source_ids: list[int] | None = None
     train_dataset, validation_dataset = build_train_validation_views(
         config.dataset,
         validation_fraction=config.training.validation_fraction,
@@ -584,24 +891,76 @@ def run_stage_a_arm(
             )
         ),
     )
+    if canary_enabled:
+        # Resolve a fixed real-data source-ID subset before constructing the
+        # runtime loader.  Prefix and child canaries share this exact ID set;
+        # no state outside the bounded canary universe is fabricated.
+        try:
+            full_train_ids = [int(value) for value in train_dataset.indices]
+        except (AttributeError, TypeError) as exc:
+            raise StageARuntimeError("public online canary cannot recover stable train IDs") from exc
+        source_to_position = {sample_id: position for position, sample_id in enumerate(full_train_ids)}
+        if len(source_to_position) != len(full_train_ids):
+            raise StageARuntimeError("public online canary found duplicate train source IDs")
+        if canary_source_ids is None:
+            selector = EpochShuffleSampler(
+                len(train_dataset), seed=config.seeds.data_order, rank=0, world_size=1, shuffle=True
+            )
+            selector.set_epoch(start_epoch)
+            positions = [
+                int(item.index)
+                for _, item in zip(range(canary_max_train_batches * config.training.per_rank_batch_size), selector)
+            ]
+            selected_source_ids = [full_train_ids[position] for position in positions]
+        else:
+            selected_source_ids = [int(value) for value in canary_source_ids]
+            if len(selected_source_ids) != len(set(selected_source_ids)) or not selected_source_ids:
+                raise StageARuntimeError("public online canary source-ID set is empty or duplicated")
+            if set(selected_source_ids) - set(source_to_position):
+                raise StageARuntimeError("public online canary source IDs are outside the train universe")
+            if len(selected_source_ids) > canary_max_train_batches * config.training.per_rank_batch_size:
+                raise StageARuntimeError("public online canary source-ID set exceeds its bounded train quota")
+        canary_selected_source_ids = list(selected_source_ids)
+        positions = [source_to_position[source_id] for source_id in selected_source_ids]
+        train_dataset = _CanaryEpochSubset(train_dataset, positions, selected_source_ids)
+        validation_positions = list(
+            range(min(len(validation_dataset), canary_max_validation_batches * config.training.per_rank_batch_size))
+        )
+        if not validation_positions:
+            raise StageARuntimeError("public online canary validation view is empty")
+        validation_dataset = _CanaryEpochSubset(
+            validation_dataset,
+            validation_positions,
+            [int(value) for value in validation_positions],
+        )
     dynamic_s3_router = None
+    online_state_s2_router = None
+    # CIFAR train views retain sparse original source IDs in the subset; both
+    # online routers bind every observed row to this exact immutable universe.
+    train_labels: dict[int, int] | None = None
+    if dynamic_s3_arm is not None or online_arm is not None:
+        train_labels = _stable_train_labels(train_dataset)
     if dynamic_s3_arm is not None:
         from ard.analysis.ert_dynamic_s3_recovery import DynamicS3Router
 
-        # CIFAR train views retain sparse original source IDs in the subset;
-        # read labels from the unaugmented underlying targets, never through a
-        # stochastic transformed item.
-        try:
-            source_ids = list(train_dataset.indices)
-            targets = train_dataset.dataset.dataset.targets
-            train_labels = {int(sample_id): int(targets[int(sample_id)]) for sample_id in source_ids}
-        except (AttributeError, TypeError, IndexError) as exc:
-            raise StageARuntimeError("dynamic S3 routing cannot prove the exact train ID/label universe") from exc
+        assert train_labels is not None
         dynamic_s3_router = DynamicS3Router(
             arm=dynamic_s3_arm,
             train_labels=train_labels,
             output_dir=output_dir,
             capture_epoch=80,
+        )
+    if online_arm is not None:
+        from ard.analysis.ert_i100_online_state_s2 import OnlineStateS2Router
+
+        assert train_labels is not None and online_original_parent_sha256 is not None
+        online_state_s2_router = OnlineStateS2Router(
+            arm=online_arm,
+            train_labels=train_labels,
+            output_dir=output_dir,
+            original_parent_checkpoint_sha256=online_original_parent_sha256,
+            prefix_epoch=online_prefix_epoch,
+            thresholds_path=online_thresholds_path,
         )
     sampler = EpochShuffleSampler(
         len(train_dataset), seed=config.seeds.data_order, rank=get_rank(), world_size=get_world_size(), shuffle=True
@@ -677,6 +1036,7 @@ def run_stage_a_arm(
     )
     _prepare_stage_output_dir(output_dir)
     shared_epoch80: dict[str, Any] | None = None
+    online_prefix_state: dict[str, Any] | None = None
     if shared_prefix:
         if dynamic_s3_router is None:
             raise StageARuntimeError("shared-prefix continuation requires a dynamic S3 router")
@@ -718,6 +1078,45 @@ def run_stage_a_arm(
             "shared_prefix": True,
         }
         _write_json_atomic(output_dir / "epoch80-routing-state.json", shared_epoch80)
+    if online_arm is not None and online_arm != "prefix":
+        if (
+            online_state_s2_router is None
+            or online_original_parent_payload is None
+            or online_original_parent_sha256 is None
+        ):
+            raise StageARuntimeError("online S2 child router/prefix lineage was not constructed")
+        prefix_lineage = _validate_online_state_prefix_lineage(
+            prefix_payload=payload,
+            experiment_parent_payload=online_original_parent_payload,
+            experiment_parent_sha256=online_original_parent_sha256,
+            prefix_epoch=online_prefix_epoch,
+            expected_source_git_sha=source_sha,
+            expected_training_attack_identity_sha256=config.method.attack.identity_sha256(),
+        )
+        prefix_router_state = prefix_lineage.get("online_state_s2_state")
+        if not isinstance(prefix_router_state, dict):
+            raise StageARuntimeError("shared e100 checkpoint lacks online router state")
+        raw_materialized_state_path = online_state_s2.get("prefix_state_materialized_path")
+        materialized_state_path = None
+        if raw_materialized_state_path is not None:
+            if not isinstance(raw_materialized_state_path, str):
+                raise StageARuntimeError("online shared-prefix state materialization path must be a string")
+            materialized_state_path = Path(raw_materialized_state_path)
+        online_state_s2_router.adopt_prefix_state(
+            prefix_router_state,
+            materialized_state_path=materialized_state_path,
+            prefix_checkpoint_sha256=actual_parent_checkpoint_sha256,
+            source_git_sha=source_sha,
+            training_attack_identity_sha256=config.method.attack.identity_sha256(),
+        )
+        online_prefix_state = {
+            "path": str(parent_checkpoint.resolve()),
+            "checkpoint_sha256": _sha256(parent_checkpoint),
+            "components": _checkpoint_component_equivalence(payload, epoch=online_prefix_epoch),
+            "threshold_artifact_sha256": None if online_thresholds_path is None else _sha256(online_thresholds_path),
+            "shared_prefix": True,
+        }
+        _write_json_atomic(output_dir / "epoch100-online-state.json", online_prefix_state)
     # Include the immutable source revision so a prior canary or interrupted
     # launch can never collide with a new production arm using the same label.
     run_id = _tracking_run_id(
@@ -739,6 +1138,8 @@ def run_stage_a_arm(
             "tracker_run_id": run_id,
         }
     )
+    if online_arm is not None and tracked_config.tracking.artifact_retention != "metrics_only":
+        raise StageARuntimeError("online S2 screen requires the registered W&B metrics-only artifact policy")
     trainer = Trainer(
         model=student,
         optimizer=optimizer,
@@ -778,6 +1179,7 @@ def run_stage_a_arm(
         boundary_coefficient=treatment.boundary_coefficient,
         boundary_epsilon=treatment.boundary_epsilon,
         dynamic_s3_router=dynamic_s3_router,
+        online_state_s2_router=online_state_s2_router,
         # The baseline diagnostic arm observes the exact same state but
         # deliberately ignores the decision, so it never receives AdvCE.
         adversarial_ce_coefficient=(
@@ -837,9 +1239,13 @@ def run_stage_a_arm(
         "parent_config_hash": parent_hash,
         "parent_epoch": int(payload["epoch"]),
         "experiment_parent_checkpoint_sha256": experiment_parent_sha256,
-        "experiment_parent_epoch": 79 if shared_prefix else int(payload["epoch"]),
+        "experiment_parent_epoch": (99 if online_arm is not None else 79 if shared_prefix else int(payload["epoch"])),
         "shared_prefix_checkpoint_sha256": _sha256(parent_checkpoint) if shared_prefix else None,
         "shared_prefix": shared_prefix,
+        "online_state_s2": online_state_s2_identity,
+        "online_shared_prefix_checkpoint_sha256": (
+            _sha256(parent_checkpoint) if online_arm is not None and online_arm != "prefix" else None
+        ),
         "child_config_hash": arm_hash,
         "calibration_sha256": calibration.get("artifact_sha256"),
         "training_attack_identity_sha256": config.method.attack.identity_sha256(),
@@ -881,6 +1287,8 @@ def run_stage_a_arm(
                     if dynamic_s3_arm is None
                     else {"arm": dynamic_s3_arm, "beta_advce": dynamic_s3_beta_advce, "timing": "same_step_pre_update"}
                 ),
+                "online_state_s2": online_state_s2_identity,
+                "online_shared_prefix": online_prefix_state,
             },
             sort_keys=True,
         ),
@@ -907,13 +1315,17 @@ def run_stage_a_arm(
     horizon_dir = output_dir / "checkpoints"
     horizon_paths: dict[str, Path] = {}
     dynamic_epoch80: dict[str, Any] | None = shared_epoch80
+    online_epoch100: dict[str, Any] | None = online_prefix_state
 
     def record(metrics: dict[str, float], improved: bool) -> None:
-        nonlocal dynamic_epoch80
+        nonlocal dynamic_epoch80, online_epoch100
         row = {"epoch": trainer.current_epoch, "global_step": trainer.global_step, **metrics, "improved": improved}
         if dynamic_s3_router is not None:
             state = dynamic_s3_router.epoch_statistics.get(trainer.current_epoch, {})
             row.update({f"routing_{key}": value for key, value in state.items()})
+        if online_state_s2_router is not None:
+            state = online_state_s2_router.epoch_statistics.get(trainer.current_epoch, {})
+            row.update({f"online_state_{key}": value for key, value in state.items()})
         with metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
         tracker.log_metrics(row, step=trainer.global_step)
@@ -938,6 +1350,25 @@ def run_stage_a_arm(
             _write_json_atomic(output_dir / "epoch80-routing-state.json", dynamic_epoch80)
             if dynamic_s3_peer_epoch80_state is not None:
                 _epoch80_gate(own=dynamic_epoch80, peer_path=dynamic_s3_peer_epoch80_state)
+        if (
+            online_state_s2_router is not None
+            and online_arm == "prefix"
+            and trainer.current_epoch == online_prefix_epoch
+        ):
+            horizon_dir.mkdir(exist_ok=True)
+            epoch100_path = horizon_dir / "epoch-100.pt"
+            if not epoch100_path.is_file():
+                raise StageARuntimeError("shared e100 prefix horizon checkpoint was not materialized")
+            epoch100_payload = torch.load(epoch100_path, map_location="cpu", weights_only=False)
+            if not isinstance(epoch100_payload, dict):
+                raise StageARuntimeError("shared e100 prefix checkpoint is malformed")
+            online_epoch100 = {
+                "path": str(epoch100_path.resolve()),
+                "checkpoint_sha256": _sha256(epoch100_path),
+                "components": _checkpoint_component_equivalence(epoch100_payload, epoch=online_prefix_epoch),
+                "shared_prefix": True,
+            }
+            _write_json_atomic(output_dir / "epoch100-online-state.json", online_epoch100)
 
     trainer.fork_lineage = {
         **trainer.fork_lineage,
@@ -954,6 +1385,7 @@ def run_stage_a_arm(
             on_epoch_end=record,
         )
         dynamic_s3_artifacts = None if dynamic_s3_router is None else dynamic_s3_router.finalize()
+        online_state_s2_artifacts = None if online_state_s2_router is None else online_state_s2_router.finalize()
         tracker.set_summary(
             {
                 "best_metric": trainer.best_metric,
@@ -963,6 +1395,13 @@ def run_stage_a_arm(
                 "stage": run_namespace,
                 "arm": treatment.arm,
                 "horizon_epochs": list(horizon_epochs),
+                "online_state_s2_active_count": (
+                    None
+                    if online_state_s2_router is None
+                    else online_state_s2_router.epoch_statistics.get(trainer.current_epoch, {}).get(
+                        "active_treatment_count"
+                    )
+                ),
             }
         )
         if should_upload_model_artifact(tracked_config.tracking.artifact_retention, is_final=True):
@@ -993,6 +1432,9 @@ def run_stage_a_arm(
                 artifact_type="routing-input",
                 aliases=("epoch-80-routing-state",),
             )
+        # Online-state rows and frozen threshold artifacts deliberately remain
+        # local hash-bound lineage.  The campaign's W&B policy is metrics-only
+        # and must not upload 45k-ID routing tables or checkpoints.
         horizon_manifest = {
             str(epoch): {
                 "path": str(path.resolve()),
@@ -1036,4 +1478,16 @@ def run_stage_a_arm(
         },
         "dynamic_s3": dynamic_s3_artifacts,
         "dynamic_s3_epoch80": dynamic_epoch80,
+        "online_state_s2": online_state_s2_artifacts,
+        "online_state_s2_epoch100": online_epoch100,
+        "canary": (
+            None
+            if not canary_enabled
+            else {
+                "enabled": True,
+                "max_train_batches": canary_max_train_batches,
+                "max_validation_batches": canary_max_validation_batches,
+                "source_ids": canary_selected_source_ids,
+            }
+        ),
     }
