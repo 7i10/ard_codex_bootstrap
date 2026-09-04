@@ -2,6 +2,7 @@
 
 - [Experiment dashboard](EXPERIMENT_DASHBOARD.md): 人間向けの目的、条件、確定結果、W&B run分類
 - [History-routing v2 results](HISTORY_ROUTING_V2_RESULTS.md): exact online historyを用いたBest-oriented介入の2-seed結果とDevelopment No-Go判定
+- [I100 online-state S2 preservation results](ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md): OS-PMP / OS-DBDP two-seed screen, e104/e109/e114 held-out CE-PGD20 endpoints, and the sub-noise-floor SUPPORTED verdict
 - [FF/current-wrong forecasting status](FFNR_FORECASTING_STATUS.md): plateau GTの実現可能性、L/T/S/D CPU ablation、GPU follow-up境界
 - [FFNR human image review](FFNR_HUMAN_REVIEW.md): role-blind CIFAR panelのHTMLレビューと分類基準
 - [FFNR human review results](FFNR_HUMAN_REVIEW_RESULTS.md): 200枚の人手判定結果と研究上の扱い

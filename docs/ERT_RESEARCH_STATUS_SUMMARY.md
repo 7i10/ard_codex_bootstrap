@@ -1,7 +1,7 @@
 # ERT / RSLAD research status summary
 
 Status: consolidated navigation readout of completed development experiments
-through 2026-09-04. This document is a navigation and interpretation aid; the linked
+through 2026-09-05. This document is a navigation and interpretation aid; the linked
 reports and hash-bound JSON records remain the sources of truth. Results are
 internal validation results unless explicitly stated otherwise. No official
 CIFAR-10 test or AutoAttack result is included.
@@ -14,9 +14,10 @@ policy `I100`: `CROPSHIFT` through epoch 99 followed by `IDBH_WEAK` from epoch
 then improves the independent epoch-199 CE-PGD20 endpoint over the matched
 `CROP_SUFFIX` in all three unseen confirmation bundles. More complex
 sample-level interventions can predict difficult examples or improve a treated
-training cohort, but they have not yet produced a stable held-out
-robust-accuracy improvement. `I100` is therefore the global incumbent; history
-and routing signals remain mechanism evidence rather than promoted methods.
+training cohort, but they have produced at most sub-noise-floor held-out gains
+(online-state S2 preservation, 2026-09-04). `I100` is therefore the global
+incumbent; history and routing signals remain mechanism evidence rather than
+promoted methods.
 
 ## Main evidence ledger
 
@@ -32,6 +33,7 @@ and routing signals remain mechanism evidence rather than promoted methods.
 | Is action utility heterogeneous by Teacher margin? | Yes descriptively in the fixed train cohort; action rankings are more aligned in high-margin bins, but this is not held-out router validation. | Keep as a hypothesis map; do not choose Q5/thresholds post hoc. See [`margin action map`](ERT_CW_MARGIN_ACTION_MAP.md). |
 | What causes run-to-run divergence? | Shuffle, augmentation, and their interaction can cause local 1--2 pp changes; source dominance differs by seed. | Preserve the frozen RNG contract; do not infer a universal dominant source. See [`RNG decomposition`](ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md) and [`shuffle/augmentation`](ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md). |
 | Does dynamic S2 boundary-distance treatment improve the I100 trajectory? | At e114, DPM vs Control is `+0.08/+0.12 pp`; D-BDD vs DPM is `-0.04/+0.08 pp`. Corrected S-BDD became non-finite in both development seeds. | No D-BDD promotion or e199 extension. S-BDD is `NUMERICALLY_UNSUPPORTED`; any stabilized secant redesign needs a new contract. See [`BDD recovery`](ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md) and [`secant forensic`](ERT_RSLAD_I100_SECANT_BOUNDARY_DISTANCE_FORENSIC.md). |
+| Does online pre-update S2×T1 preservation (OS-PMP / OS-DBDP) improve the I100 trajectory? | e114 held-out CE-PGD20 vs Control: PMP `+0.14/+0.20 pp`, DBDP `+0.14/+0.06 pp` (both seeds positive); DBDP−PMP `+0.00/-0.14 pp`. Effects are below the documented 1--2 pp RNG floor. | First SUPPORTED arm-vs-control label; no promotion, no e199/seed/official-test extension without a new contract. See [`online-state S2`](ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md). |
 
 ## Interpretation boundaries
 

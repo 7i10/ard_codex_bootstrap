@@ -4,8 +4,8 @@
 
 - Owner: Codex
 - Base SHA: `fcbebc6`
-- Current milestone: re-frozen public canary after telemetry-lineage repair
-- Last updated: 2026-09-04
+- Current milestone: complete; results recorded (push deferred to the user)
+- Last updated: 2026-09-05
 
 ## Goal
 
@@ -37,16 +37,25 @@ Online-S2×T1 branch during epochs 101–114.
 - [x] M1: implement only the minimal online S2×T1 router if existing runtime
   cannot express the exact same-step contract; add fail-closed assertions and
   focused tests.
-- [ ] M2: materialize two e100 common prefixes, derive and freeze q10
-  thresholds, and verify shared-prefix parity.
-- [ ] M3: freeze the source and an immutable DAG manifest; run static and
+- [x] M2: materialize two e100 common prefixes, derive and freeze q10
+  thresholds, and verify shared-prefix parity.  Both prefixes and both
+  seed-local threshold freezes completed in the `attempt11` run of campaign
+  `ert-i100-online-state-s2-v1`; the aggregator re-verified the e100 prefix
+  and threshold SHA-256 bindings for both seeds.
+- [x] M3: freeze the source and an immutable DAG manifest; run static and
   exact scientific smoke coverage for the three scientific branches and needed
-  host execution classes.
-- [ ] M4: execute the two prefixes, six e101–114 continuations, e104/e109/e114
+  host execution classes.  Frozen scientific source `bcb09a7`; frozen manifest
+  `5c9220f3ff246f156d7bd075eac2035e21663c358bd33297722a492d21c5130c`.
+- [x] M4: execute the two prefixes, six e101–114 continuations, e104/e109/e114
   endpoints, e114 train audit, collection, aggregation, and reporting via the
-  detached DAG.
-- [ ] M5: conduct one consolidated scientific review, write report/artifact,
-  verify, commit, push, and stop.
+  detached DAG.  Completed, but **not as one clean DAG**: the legs were
+  produced across `attempt11` (prefixes, thresholds, D-BDP arms),
+  `recovery14` (control and PMP arms), `recovery15` (endpoints),
+  `recovery16` (canonical e114 replays) and `recovery17`/`recovery18`
+  (aggregation).  See caveats (b) and (d) in the completion report.
+- [x] M5: write report/artifact, verify, and commit.  The **consolidated
+  scientific review was NOT produced** for these results (caveat (e)), and
+  **push is deferred to the user**.
 
 ## Required runtime invariants
 
@@ -130,8 +139,52 @@ Online-S2×T1 branch during epochs 101–114.
   materialization used for threshold freeze; do not alter scientific inputs,
   thresholds, or the branch contract.
 
+- 2026-09-05: re-aggregated the finished campaign with the committed aggregator
+  at `66a223d` into runtime campaign root
+  `runs/ert-i100-online-state-s2-v1-recovery18`, reproducing `recovery17`'s
+  numbers leaf-for-leaf (6869 identical leaves, 104 added provenance leaves,
+  only `campaign_root` changed).  Imported the report and hash-bound JSON
+  record and closed the plan; no replay or training bytes were changed.
+
 ## Completion report
 
-Pending.  Record the final source SHA, parent/prefix/threshold/calibration
-lineage, all endpoint and state telemetry, the two-seed decision, review
-verdict, and no-follow-on stop.
+Sources: frozen scientific source `bcb09a73814e7788026b287309d148b7791ccf75`
+(all bytes are bound to it); aggregation code
+`66a223daf73f65df4d7dae5dda39ac305f1ded82` (a later clean commit that only
+repairs the aggregator).  Frozen manifest
+`5c9220f3ff246f156d7bd075eac2035e21663c358bd33297722a492d21c5130c`.
+Parents: dev-1 `360910a8a886cf904b206c9381cdf6eaa3e71d6150c0998224c7ab4307630835`;
+dev-2 `bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7`.
+Calibration artifact `37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840`.
+Frozen q10 thresholds: dev-1 Student `0.140155` / Teacher `0.174019`
+(`0e45334c…b8c4c40a`); dev-2 `0.138205` / `0.177792` (`ccc83541…0f7ba26f`).
+
+Decision — e114 held-out CE-PGD20 robust Δ, dev-1 / dev-2:
+
+| comparison | dev-1 | dev-2 | label |
+| --- | ---: | ---: | --- |
+| PMP − Control | +0.14 pp | +0.20 pp | SUPPORTED |
+| DBDP − Control | +0.14 pp | +0.06 pp | SUPPORTED |
+| DBDP − PMP | +0.00 pp | −0.14 pp | NOT_SUPPORTED |
+
+Overall `ONLINE_S2_SUPPORTED_FOR_NEXT_STAGE`.  Stop clause: no automatic e199
+extension, arm/threshold/coefficient change, fresh seed, official test, or
+AutoAttack follows from this screen.
+
+CAVEATS.  (a) Effects are 0.06–0.20 pp on 5,000 held-out samples where one
+sample is 0.02 pp (3–10 samples), while RNG alone moves e114 held-out by
+1–2 pp (`docs/ERT_RESEARCH_STATUS_SUMMARY.md`); two development seeds,
+directional only, below the noise floor.  (b) Producing the bytes spanned five
+campaigns after `attempt11`'s arms were killed by the dirty-source guard:
+`attempt11` (prefixes, thresholds, D-BDP), `recovery14` (control, PMP),
+`recovery15` (endpoints), `recovery16` (canonical replays),
+`recovery17`/`18` (aggregation); `docs/ERT_I100_ONLINE_STATE_S2_LAUNCH_POSTMORTEM.md`
+is stale, still saying attempt-11 is running.  (c) `recovery17` aggregated
+through an undisclosed out-of-tree shim; the committed aggregator at `66a223d`
+reproduces its numbers leaf-for-leaf in `recovery18`.  (d) `recovery12`–`17`
+bypassed the production launch gate with hand-authored manifests.  (e) No
+consolidated scientific review was run on these results.  (f) PMP dominates
+D-BDP on cost: mean epoch time +1.2% vs +7.9% over Control.
+
+Record: `docs/experiments/ert_rslad_i100_online_state_s2_preservation_v1.json`
+(SHA-256 sidecar) + `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`.
