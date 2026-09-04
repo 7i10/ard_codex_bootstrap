@@ -8,6 +8,6 @@
   "event_root": "automation/experiment-events",
   "append_only": true,
   "publisher": "scripts/publish_experiment_terminal_event.py",
-  "pull_request_number": null,
+  "pull_request_number": 1,
   "notes": "Operational event bus only; canonical scientific result commits remain authoritative."
 }
