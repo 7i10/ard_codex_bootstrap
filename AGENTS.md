@@ -152,3 +152,17 @@ Flag test-time use of training-only signals, evaluation on the wrong checkpoint,
 Flag production paths that can silently run with W&B disabled, duplicate runs after resume, log on every DDP rank, or omit config and artifact lineage.
 
 Mechanical formatting issues belong in deterministic tooling, not review comments.
+
+## Operational orchestration
+
+- New production campaigns must use the schema-v2 experiment-state bridge and
+  an orchestrator-authoritative `orchestrator_campaign` mode; legacy v1 states
+  remain read-only compatible.
+- Treat host/runtime signatures and dependency topology as validated inputs.
+  Unknown or changed signatures fail closed until an exact bounded smoke is
+  recorded in the tracked runtime registry.
+- Scheduled reconciliation is bounded and marker-driven.  Do not poll stable
+  jobs, infer success from a PID/GPU, or launch duplicate endpoint/report work.
+- Technical recovery may retry only a registered command with unchanged
+  scientific identity and a finite lease/attempt bound; scientific decisions
+  remain human-owned.

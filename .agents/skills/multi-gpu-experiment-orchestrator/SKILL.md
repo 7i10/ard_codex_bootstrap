@@ -46,6 +46,13 @@ detached workers, completion markers, retries, and resume.
 running jobs are not relaunched. Collect remote artifacts through the
 existing `run-on-ferret` skill; do not duplicate its SSH/rsync logic here.
 
+For campaigns launched through the production gate, the runtime-bound
+schema-v2 `experiment-state.json` is the lightweight control-plane bridge.
+The reconciler uses orchestrator state and registered job IDs as authority
+for training/downstream status. It does not inspect a local PID or GPU
+utilization to infer a remote result, and never launches an endpoint already
+assigned to the orchestrator DAG.
+
 ## Rapid-launch discipline
 
 For a short campaign whose scientific implementation and inputs already
@@ -145,6 +152,10 @@ argv position zero. Manifest validation rejects a locally present non-executable
   this is a completed-state read, not active monitoring.
 - W&B settings are passed through the scientific command. The orchestrator
   does not enable model/run-bundle uploads or alter tracking policy.
+- Terminal reporting may use the generic result publisher on the dedicated
+  `experiment-results` branch. It writes one compact, revision-keyed event;
+  canonical scientific result commits remain authoritative and are never
+  merged by the publisher.
 
 ## Commands
 

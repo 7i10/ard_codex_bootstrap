@@ -37,6 +37,8 @@ FULL_INTEGRATION_INDICATORS = frozenset(
         "new_remote_execution_mechanism",
         "new_checkpoint_serialization",
         "new_artifact_schema",
+        "new_dependency_topology",
+        "new_dependency_output_binding",
     }
 )
 SMOKE_EQUIVALENCE_FIELDS = frozenset(
@@ -72,6 +74,62 @@ MAX_PARALLEL_GATE_CHECKS = 4
 _FILE_DIGEST_CACHE: dict[tuple[str, int, int, int, int, int], str] = {}
 
 
+def runtime_signature_required(spec: dict[str, Any]) -> bool:
+    """Production/workspace campaigns must prove a validated runtime class."""
+    return bool(
+        spec.get("runtime_signature_required") is True
+        or spec.get("require_validated_runtime_signature") is True
+        or spec.get("tier") == "production"
+        or (
+            isinstance(spec.get("workspace_contract"), dict)
+            and spec["workspace_contract"].get("enforce_future_writes") is True
+        )
+    )
+
+
+def runtime_signature_report(spec: dict[str, Any], base: Path) -> dict[str, Any]:
+    """Resolve one immutable signature against the tracked validation registry."""
+    requested = spec.get("runtime_signature")
+    required = runtime_signature_required(spec)
+    if requested is None:
+        return {"required": required, "status": "missing", "signature": None, "registry": None}
+    registry_path = resolve_path(
+        spec.get("runtime_signature_registry") or "configs/operational/validated_runtime_signatures_v1.json", base
+    )
+    if registry_path is None or not registry_path.is_file():
+        return {"required": required, "status": "registry_missing", "signature": None, "registry": str(registry_path)}
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"required": required, "status": "registry_invalid", "signature": None, "registry": str(registry_path)}
+    entries = registry.get("signatures") if isinstance(registry, dict) else None
+    if not isinstance(entries, list):
+        return {"required": required, "status": "registry_invalid", "signature": None, "registry": str(registry_path)}
+    requested_id = requested.get("id") if isinstance(requested, dict) else requested
+    if not isinstance(requested_id, str) or not requested_id:
+        return {"required": required, "status": "invalid_request", "signature": None, "registry": str(registry_path)}
+    match = next((entry for entry in entries if isinstance(entry, dict) and entry.get("id") == requested_id), None)
+    if match is None:
+        return {"required": required, "status": "unknown", "signature": None, "registry": str(registry_path)}
+    if isinstance(requested, dict):
+        comparable = {key: value for key, value in requested.items() if key != "id"}
+        observed = {key: match.get(key) for key in comparable}
+        if observed != comparable:
+            return {
+                "required": required,
+                "status": "mismatch",
+                "signature": match,
+                "registry": str(registry_path),
+            }
+    return {
+        "required": required,
+        "status": "validated",
+        "signature": match,
+        "registry": str(registry_path),
+        "registry_sha256": file_digest(registry_path),
+    }
+
+
 def now() -> str:
     return dt.datetime.now(dt.UTC).isoformat()
 
@@ -82,6 +140,14 @@ def canonical(value: Any) -> bytes:
 
 def digest(value: Any) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
+
+
+def argv_digest(value: list[str] | None) -> str | None:
+    if value is None:
+        return None
+    return hashlib.sha256(
+        json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
 
 def file_digest(path: Path) -> str:
@@ -166,6 +232,128 @@ def atomic_json(path: Path, value: Any) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_bytes(canonical(value))
     os.replace(temporary, path)
+
+
+def experiment_state_path(spec: dict[str, Any], manifest: dict[str, Any], base: Path) -> Path | None:
+    """Resolve the canonical control-plane state path without guessing.
+
+    New production specs should opt into the workspace registry.  Tests and
+    legacy callers may provide an explicit path; otherwise no bridge state is
+    emitted rather than writing beside an arbitrary scientific output.
+    """
+    explicit = spec.get("experiment_state_path")
+    if explicit is not None:
+        return resolve_path(explicit, base)
+    contract = spec.get("workspace_contract")
+    if not isinstance(contract, dict):
+        return None
+    registry = resolve_path(contract.get("registry"), base)
+    if registry is None or not registry.is_file():
+        return None
+    try:
+        values = json.loads(registry.read_text(encoding="utf-8"))
+        runtime_root = values.get("runtime_root")
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(runtime_root, str) or not runtime_root:
+        return None
+    return Path(runtime_root).expanduser().resolve() / "runs" / str(manifest["campaign_id"]) / "experiment-state.json"
+
+
+def build_experiment_state(
+    spec: dict[str, Any], manifest: dict[str, Any], frozen_manifest: Path, *, state_path: Path
+) -> dict[str, Any]:
+    """Build the v2 reconciler bridge from one frozen orchestrator manifest."""
+    training_jobs = [
+        job["job_id"]
+        for job in manifest.get("jobs", [])
+        if str(job.get("job_type", "training")).lower() in {"training", "train"}
+    ]
+    result_jobs = [job["job_id"] for job in manifest.get("jobs", []) if job["job_id"] not in training_jobs]
+    postprocess = spec.get("postprocess", {})
+    if not isinstance(postprocess, dict):
+        postprocess = {}
+    owner_kind = postprocess.get("owner_kind")
+    if owner_kind is None:
+        owner_kind = "orchestrator_dag" if result_jobs else "external_registered_command"
+    if owner_kind not in {"orchestrator_dag", "external_registered_command"}:
+        raise ValueError(
+            "postprocess.owner_kind must be orchestrator_dag or external_registered_command: "
+            f"{owner_kind}"
+        )
+    identity_hash = digest(
+        {
+            "source_sha": manifest["source"]["git_sha"],
+            "campaign_id": manifest["campaign_id"],
+            "jobs": manifest.get("launch_gate", {}).get("scientific_identity_hashes", {}),
+        }
+    )
+    configured_postprocess = dict(postprocess)
+    configured_postprocess["owner_kind"] = owner_kind
+    recovery = spec.get("recovery", {})
+    if not isinstance(recovery, dict):
+        recovery = {}
+    publish = spec.get("result_publish", {})
+    if not isinstance(publish, dict):
+        publish = {}
+    recovery_command = recovery.get("command") if isinstance(recovery.get("command"), list) else None
+    postprocess_command = (
+        configured_postprocess.get("command") if isinstance(configured_postprocess.get("command"), list) else None
+    )
+    return {
+        "schema_version": 2,
+        "experiment_id": manifest["campaign_id"],
+        "mode": "orchestrator_campaign",
+        "source_sha": manifest["source"]["git_sha"],
+        "scientific_identity_hash": identity_hash,
+        "campaign_id": manifest["campaign_id"],
+        "manifest_path": str(frozen_manifest),
+        "manifest_sha256": file_digest(frozen_manifest),
+        "orchestrator_state_path": manifest["state_path"],
+        "required_training_jobs": training_jobs,
+        "terminal_result_jobs": result_jobs,
+        "training_failure_markers": {
+            job["job_id"]: job.get("_technical_failure_marker")
+            for job in manifest.get("jobs", [])
+            if job["job_id"] in training_jobs and job.get("_technical_failure_marker")
+        },
+        "state": "TRAINING",
+        "postprocess": configured_postprocess,
+        "postprocess_command_sha256": argv_digest(postprocess_command),
+        "recovery": dict(recovery),
+        "recovery_command_sha256": argv_digest(recovery_command),
+        "result_publish": dict(publish),
+        "created_at": now(),
+        "last_reconciled_at": None,
+        "control_state_path": str(state_path),
+    }
+
+
+def write_experiment_state(spec: dict[str, Any], manifest: dict[str, Any], frozen_manifest: Path) -> Path | None:
+    """Materialize the campaign bridge only for an actual launch."""
+    # The gate's resolved in-memory manifest is intentionally free of the
+    # orchestrator's private loader fields.  The frozen manifest path is the
+    # authoritative base for resolving the explicit state/registry paths.
+    base = frozen_manifest.resolve().parent
+    path = experiment_state_path(spec, manifest, base)
+    if path is None:
+        return None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    expected_state = build_experiment_state(spec, manifest, frozen_manifest, state_path=path)
+    if path.exists():
+        existing = load_document(path)
+        if (
+            existing.get("schema_version") != 2
+            or existing.get("campaign_id") != manifest["campaign_id"]
+            or existing.get("manifest_sha256") != file_digest(frozen_manifest)
+            or existing.get("source_sha") != expected_state["source_sha"]
+            or existing.get("scientific_identity_hash") != expected_state["scientific_identity_hash"]
+            or existing.get("orchestrator_state_path") != expected_state["orchestrator_state_path"]
+        ):
+            raise ValueError(f"experiment-state already exists for a different campaign/manifest: {path}")
+        return path
+    atomic_json(path, expected_state)
+    return path
 
 
 def load_document(path: Path) -> dict[str, Any]:
@@ -1048,6 +1236,16 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
     errors: list[dict[str, Any]] = []
     warnings: list[str] = []
     operational_profile = classify_operational_profile(spec, errors)
+    signature = runtime_signature_report(spec, base)
+    if operational_profile == FAST_EXISTING_RUNTIME and signature["required"] and signature["status"] != "validated":
+        error(
+            errors,
+            None,
+            "runtime_signature",
+            "validated registry entry matching the requested runtime",
+            signature["status"],
+            "declare a registered runtime signature or use FULL_NEW_INTEGRATION",
+        )
     if spec.get("schema_version", SCHEMA_VERSION) != SCHEMA_VERSION:
         error(
             errors,
@@ -1565,9 +1763,18 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
         "workspace_contract": spec.get("workspace_contract"),
         "hosts": hosts,
         "jobs": resolved_jobs,
+        # Operational bridge declarations are carried through the immutable
+        # manifest; they never enter scientific identity hashes.
+        "postprocess": spec.get("postprocess", {}) if isinstance(spec.get("postprocess", {}), dict) else {},
+        "recovery": spec.get("recovery", {}) if isinstance(spec.get("recovery", {}), dict) else {},
+        "result_publish": spec.get("result_publish", {})
+        if isinstance(spec.get("result_publish", {}), dict)
+        else {},
+        "experiment_state_path": str(experiment_state_path(spec, {"campaign_id": campaign_id}, base) or ""),
         "launch_gate": {
             "schema_version": SCHEMA_VERSION,
             "operational_profile": operational_profile,
+            "runtime_signature": signature,
             "scientific_identity_hashes": {job["job_id"]: job["identity_hash"] for job in resolved_jobs},
             "source_repo": source.get("repo_path"),
             "dataset_identity": dataset_identity,
@@ -1865,6 +2072,14 @@ def orchestrator_source_sha256() -> str:
     return file_digest(path)
 
 
+def dependency_topology_sha256(manifest: dict[str, Any]) -> str:
+    topology = [
+        {"job_id": job.get("job_id"), "dependencies": sorted(job.get("dependencies", []))}
+        for job in manifest.get("jobs", [])
+    ]
+    return digest(topology)
+
+
 def exact_smoke_binding(manifest: dict[str, Any], job: dict[str, Any], command: list[str]) -> dict[str, Any]:
     parent = job.get("parent") if isinstance(job.get("parent"), dict) else {}
     config = job.get("scientific_config") if isinstance(job.get("scientific_config"), dict) else {}
@@ -1875,6 +2090,8 @@ def exact_smoke_binding(manifest: dict[str, Any], job: dict[str, Any], command: 
         "config_sha256": config.get("sha256"),
         "parent_checkpoint_sha256": parent.get("sha256") or parent.get("parent_checkpoint_sha256"),
         "orchestrator_source_sha256": orchestrator_source_sha256(),
+        "dependency_topology_sha256": dependency_topology_sha256(manifest),
+        "runtime_signature": manifest.get("launch_gate", {}).get("runtime_signature"),
         "manifest_schema_version": manifest["schema_version"],
         "execution_class": execution_class(manifest, job),
         "fanout_group": job.get("fanout_group") or "__all__",
@@ -2522,6 +2739,9 @@ def fast_launch_errors(manifest: dict[str, Any]) -> list[str]:
     profile = manifest.get("launch_gate", {}).get("operational_profile")
     if profile != FAST_EXISTING_RUNTIME:
         errors.append("fast launch requires FAST_EXISTING_RUNTIME; use the Full integration workflow")
+    signature = manifest.get("launch_gate", {}).get("runtime_signature", {})
+    if isinstance(signature, dict) and signature.get("required") and signature.get("status") != "validated":
+        errors.append("fast launch requires a matching validated runtime signature")
     canary = manifest.get("launch_gate", {}).get("canary", {})
     if not isinstance(canary, dict) or not manifest.get("launch_gate", {}).get("require_exact_smoke"):
         errors.append("fast launch requires canary.require_exact_smoke=true")
@@ -2720,6 +2940,24 @@ def gate_main(args: argparse.Namespace) -> int:
             return 2
         if invoke_orchestrator("preflight", frozen_path) != 0:
             return 2
+        try:
+            bridge_path = write_experiment_state(spec, manifest, frozen_path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            report["status"] = "fail"
+            report["errors"].append(
+                {
+                    "job": None,
+                    "field": "experiment_state",
+                    "expected": "new or matching schema-v2 campaign bridge",
+                    "observed": str(exc),
+                    "remediation": "repair the registered runtime state before launching",
+                }
+            )
+            atomic_json(gate_dir / "preflight.json", report)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 2
+        if bridge_path is not None:
+            report["experiment_state_path"] = str(bridge_path)
         ledger.append({"event_type": "controller_launch_attempt", "timestamp": now()})
         launched = invoke_orchestrator("run", frozen_path, detached=True)
         if launched == 0:

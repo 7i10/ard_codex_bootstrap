@@ -1009,6 +1009,10 @@ def reconcile_running(manifest: dict[str, Any], state: dict[str, Any]) -> None:
             )
             info = valid_failure_marker(manifest, job)
             retryable = bool(info and info.get("retryable") is True)
+            attempt["failure_class"] = info.get("failure_class") if info else "unknown"
+            attempt["retryable"] = retryable
+            if info is not None:
+                attempt["failure_reason"] = info.get("reason")
             if code == 0 and result.get("status") == "completed":
                 record["status"] = "failed"
                 attempt["status"] = "failed"

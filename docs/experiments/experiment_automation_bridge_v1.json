@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "milestone": "experiment_automation_bridge_hardening",
+  "base_source_sha": "0b553d531409f0215546ee0391d3215c58ca9949",
+  "implementation_commit": "recorded_at_integration",
+  "scope": "operational_control_plane_only",
+  "active_scientific_campaign_touched": false,
+  "state_bridge": {
+    "schema_version": 2,
+    "mode": "orchestrator_campaign",
+    "legacy_v1_readable_as": "single_process",
+    "authority": "registered_orchestrator_state"
+  },
+  "failure_policy": {
+    "technical_retry_only": true,
+    "scientific_identity_mutation_on_retry": false,
+    "lease_required": true,
+    "bounded_attempts": true
+  },
+  "postprocess_policy": {
+    "owner_kinds": ["orchestrator_dag", "external_registered_command"],
+    "duplicate_downstream_launch": false,
+    "expired_lease_retry_is_bounded": true
+  },
+  "fast_path": {
+    "runtime_signature_registry": "configs/operational/validated_runtime_signatures_v1.json",
+    "unknown_signature_requires_full_integration": true,
+    "dependency_topology_bound_to_smoke": true
+  },
+  "terminal_event_publisher": {
+    "branch": "experiment-results",
+    "event_root": "automation/experiment-events",
+    "idempotent_revision": true,
+    "scientific_branch_merge": false
+  },
+  "verification": {
+    "focused_unit_test": "tests/unit/test_experiment_automation_bridge.py",
+    "focused_suite_count": 86,
+    "focused_suite_command": "pytest -q tests/unit/test_experiment_automation_bridge.py tests/unit/test_reconcile_experiment.py tests/skills/test_production_launch_gate.py tests/skills/test_multi_gpu_orchestrator.py",
+    "focused_suite_status": "passed",
+    "ruff_check_status": "passed",
+    "changed_test_preview": "inspected_only",
+    "dummy_gpu_required": false,
+    "production_campaign_started": false
+  },
+  "known_root_causes": [
+    "serial_input_and_host_path_discovery",
+    "manual_parent_child_handoff",
+    "unbounded_completion_polling",
+    "runtime_topology_assumed_from_label",
+    "technical_retry_identity_not_explicit"
+  ]
+}

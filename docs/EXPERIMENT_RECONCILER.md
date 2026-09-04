@@ -10,8 +10,18 @@ The canonical navigation record is
 `<runtime>/runs/<experiment-id>/experiment-state.json`. It is derived from the
 existing orchestrator state and terminal evidence; checkpoints, metrics,
 completion markers, and scientific manifests remain authoritative evidence.
-The state must contain `schema_version: 1`, `experiment_id`, `source_sha`,
+New campaigns use `schema_version: 2`, `mode: orchestrator_campaign`, and a
+registered `orchestrator_state_path`.  The v2 bridge also records the manifest
+SHA, required training job IDs, terminal result job IDs, recovery policy, and
+postprocess owner.  Legacy states with `schema_version: 1` remain readable as
+`single_process` states.  The state must contain `experiment_id`, `source_sha`,
 `scientific_identity_hash`, and a `state` from the registered lifecycle.
+
+For `orchestrator_campaign`, the orchestrator state is authoritative for
+training status.  The reconciler does not inspect a local PID, GPU utilization,
+or an inferred output directory to decide whether a remote job is complete.
+When an orchestrator-owned downstream DAG is active, the reconciler records
+that ownership and exits; it never launches a duplicate evaluator.
 
 Training success is accepted only when the training process is terminal, the
 launcher exit evidence is successful, the completion marker matches the
@@ -48,15 +58,29 @@ coefficient, threshold, Teacher, or method. Exhausted or scientific failures
 become `NEEDS_RESEARCH_DECISION` with compact evidence instead of an automatic
 experiment change.
 
+## Technical failure bridge
+
+Only an orchestrator failure marker classified as a retryable technical
+failure may invoke the pre-registered `recovery.command`.  The bridge passes
+the experiment ID, state path, lease ID, and attempt number through `ERT_*`
+environment variables and preserves source, parent, seed, attack, Teacher,
+threshold, coefficient, and method identity.  Scientific, unknown, or
+unregistered failures become `NEEDS_RESEARCH_DECISION`; they are never silently
+repaired.
+
 ## Example state fragment
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "experiment_id": "example-v1",
+  "mode": "orchestrator_campaign",
   "scientific_identity_hash": "...",
   "source_sha": "...",
   "state": "TRAINING",
+  "orchestrator_state_path": "/runtime/orchestration/example/state.json",
+  "required_training_jobs": ["train"],
+  "terminal_result_jobs": ["endpoint", "aggregate"],
   "training": {
     "pid": 12345,
     "completion_marker": "training/completion.json",

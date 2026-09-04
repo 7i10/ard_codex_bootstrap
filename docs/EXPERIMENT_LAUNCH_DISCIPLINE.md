@@ -128,6 +128,22 @@ scientific evidence.
   Prefer already-passing focused tests when the preview shows an unrelated
   long integration fixture and it cannot change the operational decision.
 
+### Automation bridge safeguards
+
+The production gate now writes one runtime-bound schema-v2 bridge only when a
+controller is actually launched.  A scheduled reconciler reads the registered
+orchestrator state, not a local PID, and treats orchestrator-owned endpoint /
+aggregation jobs as the single postprocess owner.  Technical recovery is
+delegated only from a matching failure marker under a bounded lease; scientific
+identity is immutable and unregistered failures stop at
+`NEEDS_RESEARCH_DECISION`.  A terminal result can publish one compact,
+idempotent pointer on the dedicated `experiment-results` branch without
+changing scientific authority or merging a PR.
+
+The runtime-signature registry is intentionally empty until an exact bounded
+smoke proves a public runtime/topology.  This avoids the previous failure mode
+where a familiar runtime label silently concealed a changed executor or DAG.
+
 ### Estimate contract
 
 When I launch a long job, I will state one estimate that includes:

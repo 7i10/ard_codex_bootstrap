@@ -14,6 +14,7 @@ import argparse
 import datetime as dt
 import errno
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -27,7 +28,8 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REGISTRY = REPO_ROOT / "configs" / "workspace" / "ard_workspace_v1.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+COMPATIBLE_SCHEMA_VERSIONS = {1, 2}
 TERMINAL_STATES = {"PUSHED", "AWAITING_RESEARCH_REVIEW", "NEEDS_RESEARCH_DECISION"}
 POSTPROCESS_STATES = {"EVALUATING", "SUMMARIZING", "PUSHED", "AWAITING_RESEARCH_REVIEW"}
 KNOWN_STATES = {
@@ -44,6 +46,7 @@ KNOWN_STATES = {
     "NEEDS_RESEARCH_DECISION",
 }
 SAFE_ID = re.compile(r"^[A-Za-z0-9_.-]+$")
+ORCHESTRATOR_MODES = {"orchestrator_campaign", "single_process"}
 
 
 class ReconcileError(RuntimeError):
@@ -246,6 +249,303 @@ def completion_evidence(state: dict[str, Any], state_file: Path) -> tuple[bool, 
     return True, "valid_completion"
 
 
+def state_mode(state: dict[str, Any]) -> str:
+    """Return the explicit v2 mode, or preserve v1 as a local process."""
+    mode = state.get("mode", "single_process")
+    if mode not in ORCHESTRATOR_MODES:
+        raise ReconcileError(f"unsupported experiment-state mode: {mode}")
+    return str(mode)
+
+
+def orchestrator_state(state: dict[str, Any], state_file: Path) -> dict[str, Any]:
+    raw = state.get("orchestrator_state_path")
+    path = path_from_state(raw, state_file=state_file)
+    if path is None or not path.is_file():
+        raise ReconcileError("orchestrator campaign state is not registered")
+    value = read_json(path)
+    if value.get("campaign_id") != state.get("campaign_id"):
+        raise ReconcileError("orchestrator campaign identity mismatch")
+    if value.get("source_sha") and str(value["source_sha"]).lower() != str(state["source_sha"]).lower():
+        raise ReconcileError("orchestrator source identity mismatch")
+    expected_manifest = state.get("manifest_sha256")
+    if expected_manifest and value.get("manifest_sha256") != expected_manifest:
+        raise ReconcileError("orchestrator manifest identity mismatch")
+    if not isinstance(value.get("jobs"), dict):
+        raise ReconcileError("orchestrator state has no job records")
+    return value
+
+
+def required_job_ids(state: dict[str, Any], orch: dict[str, Any]) -> list[str]:
+    declared = state.get("required_training_jobs")
+    if isinstance(declared, list) and declared:
+        return [str(item) for item in declared]
+    return list(orch.get("jobs", {}).keys())
+
+
+def terminal_result_job_ids(state: dict[str, Any]) -> list[str]:
+    declared = state.get("terminal_result_jobs")
+    return [str(item) for item in declared] if isinstance(declared, list) else []
+
+
+def campaign_failure_class(state: dict[str, Any], orch: dict[str, Any]) -> tuple[str, str]:
+    """Classify only registered orchestrator evidence; never infer from a PID."""
+    for job_id in required_job_ids(state, orch):
+        record = orch.get("jobs", {}).get(job_id)
+        if not isinstance(record, dict) or record.get("status") not in {"failed", "orphaned", "blocked"}:
+            continue
+        attempts = record.get("attempts")
+        if isinstance(attempts, list):
+            for attempt in reversed(attempts):
+                if not isinstance(attempt, dict):
+                    continue
+                failure_class = attempt.get("failure_class")
+                if failure_class == "scientific":
+                    return "scientific", f"job:{job_id}"
+                if failure_class == "technical" and attempt.get("retryable") is True:
+                    return "technical_retryable", f"job:{job_id}"
+                if failure_class:
+                    return str(failure_class), f"job:{job_id}"
+        return "unknown", f"job:{job_id}"
+    return "unknown", "no-registered-failure-evidence"
+
+
+def campaign_training_status(state: dict[str, Any], state_file: Path) -> tuple[str, str, dict[str, Any]]:
+    orch = orchestrator_state(state, state_file)
+    required = required_job_ids(state, orch)
+    missing = [job_id for job_id in required if job_id not in orch["jobs"]]
+    if missing:
+        raise ReconcileError(f"orchestrator state missing required jobs: {missing}")
+    statuses = {job_id: orch["jobs"][job_id].get("status") for job_id in required}
+    active = {"pending", "running", "retrying"}
+    if any(status in active for status in statuses.values()):
+        return "running", "required_training_jobs_active", orch
+    failed = {"failed", "orphaned", "blocked"}
+    if any(status in failed for status in statuses.values()):
+        failure_class, reason = campaign_failure_class(state, orch)
+        return "failed", f"{failure_class}:{reason}", orch
+    if not all(status == "completed" for status in statuses.values()):
+        return "failed", "unknown:training_status_incomplete", orch
+    return "success", "required_training_jobs_completed", orch
+
+
+def orchestrator_result_status(state: dict[str, Any], orch: dict[str, Any]) -> tuple[str, str]:
+    result_jobs = terminal_result_job_ids(state)
+    if not result_jobs:
+        return "none", "no-terminal-result-jobs"
+    statuses = {job_id: orch.get("jobs", {}).get(job_id, {}).get("status") for job_id in result_jobs}
+    if any(status in {"pending", "running", "retrying"} for status in statuses.values()):
+        return "active", "downstream_jobs_active"
+    if any(status in {"failed", "orphaned", "blocked"} for status in statuses.values()):
+        return "failed", "downstream_job_failed"
+    if all(status == "completed" for status in statuses.values()):
+        return "complete", "downstream_jobs_completed"
+    return "failed", "downstream_status_incomplete"
+
+
+def recovery_command(state: dict[str, Any]) -> list[str] | None:
+    value = state.get("recovery_command")
+    if value is None:
+        recovery = state.get("recovery")
+        value = recovery.get("command") if isinstance(recovery, dict) else None
+    if value is None:
+        return None
+    if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
+        raise ReconcileError("recovery command must be a non-empty argv list")
+    return list(value)
+
+
+def recovery_limit(state: dict[str, Any], default: int) -> int:
+    recovery = state.get("recovery")
+    value = recovery.get("max_attempts", default) if isinstance(recovery, dict) else default
+    try:
+        limit = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ReconcileError("recovery.max_attempts must be an integer") from exc
+    if limit < 1:
+        raise ReconcileError("recovery.max_attempts must be >= 1")
+    return limit
+
+
+def recovery_lease_active(state: dict[str, Any]) -> bool:
+    expiry = parse_time(state.get("recovery_lease_expires_at"))
+    return expiry is not None and expiry > now()
+
+
+def clear_recovery_lease(state: dict[str, Any]) -> None:
+    for key in (
+        "recovery_owner",
+        "recovery_lease_id",
+        "recovery_lease_started_at",
+        "recovery_lease_expires_at",
+        "recovery_pid",
+    ):
+        state.pop(key, None)
+
+
+def argv_digest(command: list[str] | None) -> str | None:
+    if command is None:
+        return None
+    payload = json.dumps(command, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def delegate_recovery(
+    state: dict[str, Any], state_file: Path, *, reason: str, args: argparse.Namespace
+) -> dict[str, Any]:
+    """Delegate a pre-registered technical recovery command exactly once."""
+    if recovery_lease_active(state):
+        atomic_json(state_file, state)
+        return {"status": "NO_OP", "reason": "recovery_lease_active", "state": state.get("state")}
+    command = recovery_command(state)
+    failure_class = reason.split(":", 1)[0]
+    if failure_class != "technical_retryable":
+        state["state"] = "NEEDS_RESEARCH_DECISION"
+        state["needs_research_decision_reason"] = f"training failure is not auto-retryable: {reason}"
+        clear_recovery_lease(state)
+        atomic_json(state_file, state)
+        return {"status": "NEEDS_RESEARCH_DECISION", "state": state["state"], "reason": reason}
+    attempts = int(state.get("recovery_attempts", 0))
+    if attempts >= recovery_limit(state, args.max_recovery_attempts):
+        state["state"] = "NEEDS_RESEARCH_DECISION"
+        state["needs_research_decision_reason"] = "technical recovery attempt bound reached"
+        clear_recovery_lease(state)
+        atomic_json(state_file, state)
+        return {"status": "NEEDS_RESEARCH_DECISION", "state": state["state"], "reason": "recovery_attempt_bound"}
+    if command is None:
+        state["state"] = "NEEDS_RESEARCH_DECISION"
+        state["needs_research_decision_reason"] = "technical failure has no registered recovery command"
+        clear_recovery_lease(state)
+        atomic_json(state_file, state)
+        return {"status": "NEEDS_RESEARCH_DECISION", "state": state["state"], "reason": "recovery_not_registered"}
+    expected_command_digest = state.get("recovery_command_sha256")
+    if expected_command_digest is not None and expected_command_digest != argv_digest(command):
+        state["state"] = "NEEDS_RESEARCH_DECISION"
+        state["needs_research_decision_reason"] = "registered recovery command changed after launch"
+        clear_recovery_lease(state)
+        atomic_json(state_file, state)
+        return {"status": "NEEDS_RESEARCH_DECISION", "state": state["state"], "reason": "recovery_command_drift"}
+    lease_id = uuid.uuid4().hex
+    started = now()
+    state.update(
+        {
+            "recovery_owner": owner_string(),
+            "recovery_lease_id": lease_id,
+            "recovery_lease_started_at": iso(started),
+            "recovery_lease_expires_at": iso(started + dt.timedelta(seconds=args.lease_seconds)),
+            "recovery_attempts": attempts + 1,
+            "recovery_reason": reason,
+        }
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "ERT_EXPERIMENT_ID": str(state.get("experiment_id", "")),
+            "ERT_EXPERIMENT_STATE": str(state_file),
+            "ERT_RECOVERY_LEASE_ID": lease_id,
+            "ERT_RECOVERY_ATTEMPT": str(attempts + 1),
+        }
+    )
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=env,
+            start_new_session=True,
+            close_fds=True,
+        )
+    except OSError as exc:
+        state["recovery_failure_reason"] = str(exc)
+        state["recovery_failure_class"] = "technical"
+        atomic_json(state_file, state)
+        return {"status": "TECHNICAL_FAILURE", "state": state.get("state"), "reason": "recovery_launch_failed"}
+    state["recovery_pid"] = process.pid
+    state["state"] = "TRAINING"
+    atomic_json(state_file, state)
+    return {
+        "status": "RECOVERY_HANDOFF",
+        "state": state["state"],
+        "pid": process.pid,
+        "recovery_lease_id": lease_id,
+    }
+
+
+def reconcile_campaign_state(state: dict[str, Any], path: Path, args: argparse.Namespace) -> dict[str, Any]:
+    """Reconcile a multi-job campaign using orchestrator evidence only."""
+    training_status, reason, orch = campaign_training_status(state, path)
+    owner_kind = _nested(state, "postprocess", "owner_kind", "orchestrator_dag")
+    if owner_kind not in {"orchestrator_dag", "external_registered_command"}:
+        raise ReconcileError(f"unsupported postprocess owner_kind: {owner_kind}")
+    if training_status == "running":
+        state["state"] = "TRAINING"
+        atomic_json(path, state)
+        return {"status": "NO_OP", "reason": "training_campaign_active", "state": state["state"]}
+    if training_status == "failed":
+        state["state"] = "TRAINING_FAILED"
+        state["failure_reason"] = reason
+        result = delegate_recovery(state, path, reason=reason, args=args)
+        if result.get("status") == "RECOVERY_HANDOFF":
+            return result
+        if result.get("status") == "NO_OP":
+            return result
+        return result
+    state["state"] = "TRAINING_SUCCESS"
+    state.setdefault("training_completed_at", iso())
+    clear_recovery_lease(state)
+    if owner_kind == "orchestrator_dag":
+        downstream, downstream_reason = orchestrator_result_status(state, orch)
+        if downstream == "active":
+            state["state"] = "EVALUATING"
+            state["postprocess_state"] = "owned_by_orchestrator_dag"
+            atomic_json(path, state)
+            return {"status": "NO_OP", "reason": downstream_reason, "state": state["state"]}
+        if downstream == "failed":
+            state["state"] = "NEEDS_RESEARCH_DECISION"
+            state["postprocess_state"] = "failed"
+            state["needs_research_decision_reason"] = downstream_reason
+            clear_recovery_lease(state)
+            atomic_json(path, state)
+            return {"status": "NEEDS_RESEARCH_DECISION", "state": state["state"], "reason": downstream_reason}
+        complete_marker, failure_marker = postprocess_marker_paths(state, path)
+        if marker_ok(failure_marker, state, failure=True)[0]:
+            state["state"] = "NEEDS_RESEARCH_DECISION"
+            state["postprocess_state"] = "failed"
+            clear_lease(state)
+            atomic_json(path, state)
+            return {
+                "status": "NEEDS_RESEARCH_DECISION",
+                "state": state["state"],
+                "reason": "postprocess_failure_marker",
+            }
+        if marker_ok(complete_marker, state)[0]:
+            marker = read_json(complete_marker) if complete_marker else {}
+            state["state"] = completed_final_state(marker)
+            state["postprocess_state"] = "complete"
+            clear_lease(state)
+            atomic_json(path, state)
+            return {"status": "COMPLETE", "state": state["state"], "reason": "postprocess_marker_seen"}
+        if complete_marker is None or failure_marker is None:
+            state["state"] = "NEEDS_RESEARCH_DECISION"
+            state["postprocess_state"] = "not_registered"
+            state["needs_research_decision_reason"] = "orchestrator terminal markers are not registered"
+            atomic_json(path, state)
+            return {
+                "status": "NEEDS_RESEARCH_DECISION",
+                "state": state["state"],
+                "reason": "orchestrator_terminal_markers_not_registered",
+            }
+        state["state"] = "EVALUATING"
+        state["postprocess_state"] = "awaiting_orchestrator_terminal_marker"
+        atomic_json(path, state)
+        return {"status": "NO_OP", "reason": "orchestrator_dag_terminal_outputs_pending", "state": state["state"]}
+    # External registered postprocessing follows the existing lease/handoff
+    # path below.  The caller re-enters the existing single-owner handoff
+    # implementation without duplicating it here.
+    atomic_json(path, state)
+    return {"status": "DELEGATE_POSTPROCESS", "state": state["state"]}
+
+
 def active_lease(state: dict[str, Any]) -> bool:
     expiry = parse_time(state.get("lease_expires_at"))
     # The durable expiry is authoritative.  A crashed owner must not be
@@ -313,7 +613,7 @@ def reconcile(args: argparse.Namespace) -> dict[str, Any]:
         return {"status": "NO_OP", "reason": "concurrent_reconciler", "state": str(path)}
     try:
         state = read_json(path)
-        if state.get("schema_version") != SCHEMA_VERSION:
+        if state.get("schema_version") not in COMPATIBLE_SCHEMA_VERSIONS:
             raise ReconcileError("unsupported experiment-state schema")
         for field in ("experiment_id", "source_sha", "scientific_identity_hash"):
             if not isinstance(state.get(field), str) or not state[field]:
@@ -327,6 +627,15 @@ def reconcile(args: argparse.Namespace) -> dict[str, Any]:
         if current in TERMINAL_STATES:
             atomic_json(path, state)
             return {"status": "NO_OP", "reason": "terminal_state", "state": current}
+        if state_mode(state) == "orchestrator_campaign":
+            campaign_result = reconcile_campaign_state(state, path, args)
+            if campaign_result.get("status") != "DELEGATE_POSTPROCESS":
+                return campaign_result
+            # The campaign reconciler has proven all required training jobs
+            # complete and selected the external registered owner.  Continue
+            # through the existing lease/marker handoff below in this same
+            # locked invocation; no second command or PID is consulted.
+            current = "TRAINING_SUCCESS"
         if current == "TRAINING":
             pid = _nested(state, "training", "pid")
             if process_alive(pid):
@@ -395,6 +704,18 @@ def reconcile(args: argparse.Namespace) -> dict[str, Any]:
                     "status": "NEEDS_RESEARCH_DECISION",
                     "state": state["state"],
                     "reason": "postprocess_not_registered",
+                }
+            expected_command_digest = state.get("postprocess_command_sha256")
+            if expected_command_digest is not None and expected_command_digest != argv_digest(command):
+                state["state"] = "NEEDS_RESEARCH_DECISION"
+                state["postprocess_state"] = "command_drift"
+                state["needs_research_decision_reason"] = "registered postprocess command changed after launch"
+                clear_lease(state)
+                atomic_json(path, state)
+                return {
+                    "status": "NEEDS_RESEARCH_DECISION",
+                    "state": state["state"],
+                    "reason": "postprocess_command_drift",
                 }
             env = os.environ.copy()
             env.update(
@@ -490,13 +811,14 @@ def parser() -> argparse.ArgumentParser:
     parser.add_argument("--scheduled", action="store_true", help="bounded wake mode; never performs repository scans")
     parser.add_argument("--lease-seconds", type=float, default=900.0)
     parser.add_argument("--max-postprocess-attempts", type=int, default=2)
+    parser.add_argument("--max-recovery-attempts", type=int, default=2)
     return parser
 
 
 def main() -> int:
     args = parser().parse_args()
-    if args.lease_seconds <= 0 or args.max_postprocess_attempts < 1:
-        raise SystemExit("lease-seconds must be positive and max-postprocess-attempts >= 1")
+    if args.lease_seconds <= 0 or args.max_postprocess_attempts < 1 or args.max_recovery_attempts < 1:
+        raise SystemExit("lease-seconds and retry limits must be >= 1")
     try:
         result = reconcile(args)
     except ReconcileError as exc:

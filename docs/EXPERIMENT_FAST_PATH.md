@@ -20,6 +20,15 @@ second gate or controller.
 Existing runtime defaults to Fast.  A declared integration change forces Full;
 the gate rejects an attempt to launch it with `--fast-launch`.
 
+Fast is now also a validated runtime class, not a self-asserted label.  A
+production/workspace campaign must name a runtime signature present in
+`configs/operational/validated_runtime_signatures_v1.json`.  The registry entry
+binds the public CLI, trainer/checkpoint path, output/artifact semantics,
+executor class, and dependency-output topology.  Unknown or changed topology
+is treated as Full integration until an exact bounded smoke supplies a new
+tracked entry.  The signature and a dependency-topology digest are included in
+the immutable manifest and exact-smoke binding.
+
 ## Fast sequence
 
 One preparation pass resolves and records:
@@ -45,6 +54,10 @@ It performs `resolve → validate → static CLI → exact smoke → freeze →
 detached controller launch`.  It leaves long-running completion, endpoint,
 collection, aggregation, and report dependencies to the existing DAG.  Codex
 does not poll a stable controller to advance its children.
+
+On an actual launch, the gate also materializes a schema-v2
+`experiment-state.json` in the registered runtime root.  Dry runs and
+preflight-only calls do not create this bridge.
 
 ## Required Fast proof
 

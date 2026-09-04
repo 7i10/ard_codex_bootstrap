@@ -46,9 +46,16 @@ python3 .agents/skills/production-launch-gate/scripts/launch_gate.py \
 declared.  It still performs complete resolution, static CLI checks, exact
 public-CLI smoke, one immutable freeze, frozen revalidation, and detached
 orchestrator handoff.  `FULL_NEW_INTEGRATION` is required for a new
-objective/runtime, trainer, DDP, dataset loader, remote executor, checkpoint
-serialization, artifact schema, or genuine integration uncertainty; Fast
-refuses it rather than silently weakening validation.
+ objective/runtime, trainer, DDP, dataset loader, remote executor, checkpoint
+ serialization, artifact schema, or genuine integration uncertainty; Fast
+ refuses it rather than silently weakening validation.
+
+Fast production/workspace campaigns must also declare a runtime signature
+registered in `configs/operational/validated_runtime_signatures_v1.json`.
+Unknown signatures fail closed until an exact bounded smoke validates the
+public CLI, checkpoint path, output/artifact semantics, executor class, and
+dependency-output topology. The signature and topology digest are bound into
+the immutable manifest and smoke proof.
 
 ## Launch timing and host matrix
 
@@ -73,6 +80,12 @@ validates canonical local aggregation inputs. The orchestrator remains
 responsible for GPU reservations, host-aware scheduling, detached workers,
 completion-marker dependency transitions, endpoint chaining, and
 technical-only retries.
+
+On a real `--launch`, the gate creates a runtime-bound schema-v2
+`experiment-state.json` bridge. It is not emitted by dry-run or preflight-only;
+the scheduled reconciler reads orchestrator state as the authority for
+multi-job training and never treats a local PID or GPU sample as remote
+success.
 
 ## Exact-command smoke contract
 
