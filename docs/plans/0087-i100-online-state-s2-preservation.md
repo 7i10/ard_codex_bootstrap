@@ -111,6 +111,11 @@ Online-S2×T1 branch during epochs 101–114.
   router lineage and callback/W&B metrics, added a regression, and require a
   fresh immutable manifest plus canary.  No production prefix or child arm
   was launched from this rejected canary.
+- 2026-09-04: the next manifest's static public-CLI probe correctly exposed
+  that gate static commands execute outside the job environment and therefore
+  lacked `PYTHONPATH=src`.  The manifest now binds that import root explicitly
+  through `/usr/bin/env`; this is an execution-wrapper repair only, so a fresh
+  source freeze and canary are required before any GPU reservation.
 
 ## Completion report
 

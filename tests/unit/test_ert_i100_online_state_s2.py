@@ -132,6 +132,8 @@ def test_online_state_manifest_binds_phase_epochs_and_static_cli_to_a_real_job(t
     )
     static = manifest["canary"]["static_cli"]
     static_command = [
+        "/usr/bin/env",
+        f"PYTHONPATH={builder.ROOT / 'src'}",
         str(builder.PYTHON),
         str(builder.ROOT / "scripts/run_ert_i100_online_state_s2.py"),
         "--help",

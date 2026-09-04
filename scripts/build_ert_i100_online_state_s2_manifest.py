@@ -494,7 +494,11 @@ def build_manifest(*, source_sha: str, campaign_root: Path, requested_at: str) -
             "static_cli": [
                 {
                     "job_id": "prefix-dev-1",
-                    "commands": [_command(str(script), "--help")],
+                    # Static CLI checks run outside a job's environment by
+                    # design.  Bind the public script to the same import root
+                    # as its production argv instead of relying on Codex's
+                    # ambient shell environment.
+                    "commands": [["/usr/bin/env", f"PYTHONPATH={ROOT / 'src'}", *_command(str(script), "--help")]],
                     "timeout_seconds": 30,
                     "parallel_safe": False,
                 }
