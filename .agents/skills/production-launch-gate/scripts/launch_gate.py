@@ -1956,7 +1956,7 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
     )
     manifest = {
         "schema_version": SCHEMA_VERSION,
-        "production_schema_version": 2 if runtime_signature_required(spec) else 1,
+        "production_schema_version": 2 if (runtime_signature_required(spec) or spec.get("schema_version") == 2) else 1,
         "campaign_id": campaign_id,
         "source": {"git_sha": source.get("git_sha")},
         "state_path": str(resolve_path(spec.get("state_path") or f".orchestration/{campaign_id}.state.json", base)),
