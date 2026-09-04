@@ -33,6 +33,12 @@ SOURCE_PREFIX_CONTRACT = "ert_rslad_i100_online_state_s2_prefix_v1"
 THRESHOLD_CONTRACT = "ert_rslad_i100_online_state_s2_preservation_v1"
 ENDPOINT_CONTRACT = "ert_stage_a_common_ce_pgd20_endpoint_v1"
 ENDPOINT_ATTACK_SHA256 = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
+# The held-out endpoint sweep is batch-keyed CE-PGD20 (ENDPOINT_ATTACK_SHA256).
+# The e114 raw-train canonical state replay is a different, sample-keyed
+# CE-PGD20 observation, registered as CANONICAL_CE20_ATTACK_SHA256 in
+# scripts/aggregate_ert_i100_s2_forensic_audit.py.  The two identities are not
+# interchangeable and neither may stand in for the other in a lineage assertion.
+CANONICAL_CE20_ATTACK_SHA256 = "675a8d4e3cd16d345acd7fe9e5d1e721f834fcf63c7225e9035e1736ed0c07b6"
 TRAIN_ATTACK_SHA256 = "97a41870008f5946af3b10dd0d7f145324fe5265b12d3c523bf3f8d099623d4d"
 CALIBRATION_SHA256 = "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840"
 TEACHER_SHA256 = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
@@ -113,6 +119,70 @@ def _local_or_declared(*, declared: object, local: Path, expected_sha256: str, k
         if candidate.is_file() and sha256(candidate) == expected_sha256:
             return candidate.resolve()
     raise AggregationError(f"{kind} is unavailable locally or differs from its declared SHA-256: {local}")
+
+
+def _producer(root: Path) -> dict[str, Any] | None:
+    """Return the campaign job completion record that produced *root*, if present.
+
+    A collection root is a symlink farm assembled by whichever repair campaign
+    aggregates last, so the directory a path resolves into is not evidence of
+    which campaign produced the bytes.  The DAG writes ``completion.json``
+    beside the artifact directory a job filled; arm jobs own the whole arm
+    directory and write it beside the ``training`` subtree.  A missing record is
+    provenance silence, not a contract failure.
+    """
+
+    candidates = [root / "completion.json"]
+    if root.name == "training":
+        candidates.append(root.parent / "completion.json")
+    for candidate in candidates:
+        if candidate.is_file():
+            record = _read_json(candidate)
+            return {
+                "campaign_id": record.get("campaign_id"),
+                "job_id": record.get("job_id"),
+                "completed_at": record.get("completed_at"),
+                "source_sha": record.get("source_sha"),
+            }
+    return None
+
+
+def _collection_provenance(root: Path) -> dict[str, Any]:
+    """Record a collected artifact root as declared, as realized, and by producer."""
+
+    return {
+        "declared_path": str(root),
+        "realpath": str(root.resolve()),
+        "producer": _producer(root),
+    }
+
+
+def _provenance_summary(campaign: Path, classes: Mapping[str, list[Mapping[str, Any]]]) -> dict[str, Any]:
+    """Summarize which campaigns actually produced each collected artifact class."""
+
+    artifact_classes: dict[str, Any] = {}
+    for name, records in classes.items():
+        campaign_ids = {
+            str(record["producer"]["campaign_id"])
+            for record in records
+            if isinstance(record.get("producer"), dict) and record["producer"].get("campaign_id") is not None
+        }
+        artifact_classes[name] = {
+            "campaign_ids": sorted(campaign_ids),
+            "roots": len(records),
+            "roots_without_completion_record": sum(1 for record in records if record.get("producer") is None),
+            "realpath_roots": sorted({str(record["realpath"]) for record in records}),
+        }
+    return {
+        "schema_version": 1,
+        "campaign_root": str(campaign),
+        "note": (
+            "declared_path is the campaign collection tree; realpath is the campaign whose bytes it points at. "
+            "They differ whenever a repair campaign collects earlier campaigns by symlink, so neither alone "
+            "attributes an artifact to a producing campaign."
+        ),
+        "artifact_classes": artifact_classes,
+    }
 
 
 def _mean(values: Iterable[float]) -> float:
@@ -264,6 +334,9 @@ def _prefix_and_threshold(campaign: Path, *, seed: str, source_sha: str) -> dict
     ):
         raise AggregationError(f"frozen e100 threshold contract differs for {seed}")
     return {
+        # The registered e99 parent is part of the frozen lineage the report
+        # renders; it is asserted above and must also be emitted, not implied.
+        "parent_checkpoint_sha256": PARENT_SHA256[seed],
         "prefix_checkpoint": str(prefix_checkpoint.resolve()),
         "prefix_checkpoint_sha256": sha256(prefix_checkpoint),
         "threshold_path": str(threshold_path.resolve()),
@@ -365,6 +438,7 @@ def _training_payload(
     return {
         "arm_root": str(arm_root.resolve()),
         "training_root": str(training_root.resolve()),
+        "provenance": _collection_provenance(training_root),
         "summary": summary,
         "checkpoints": checkpoints,
         "online_state_manifest": state_manifest,
@@ -382,7 +456,7 @@ def _canonical_payload(campaign: Path, *, seed: str, arm: str, training: Mapping
         or metadata.get("checkpoint_sha256") != expected_checkpoint["sha256"]
         or metadata.get("checkpoint_epoch") != 114
         or metadata.get("teacher_checkpoint_sha256") != TEACHER_SHA256
-        or metadata.get("observation", {}).get("attack_identity_sha256") != ENDPOINT_ATTACK_SHA256
+        or metadata.get("observation", {}).get("attack_identity_sha256") != CANONICAL_CE20_ATTACK_SHA256
         or metadata.get("row_count") != 45_000
         or not isinstance(metadata.get("rows_sha256"), str)
     ):
@@ -394,7 +468,12 @@ def _canonical_payload(campaign: Path, *, seed: str, arm: str, training: Mapping
         kind="canonical raw-train rows",
     )
     rows = _read_rows(rows_path, expected_count=45_000)
-    return {"metadata": metadata, "rows": rows, "rows_path": str(rows_path)}
+    return {
+        "metadata": metadata,
+        "rows": rows,
+        "rows_path": str(rows_path),
+        "provenance": _collection_provenance(root),
+    }
 
 
 def _route_mechanics(
@@ -702,6 +781,35 @@ def _markdown(result: Mapping[str, Any]) -> str:
                 f"| {seed} | {arm.upper()} | {runtime['mean_train_seconds']:.1f} | "
                 f"{runtime['mean_train_images_per_second']:.1f} | {_fmt_pct(relative)} |"
             )
+    provenance = result.get("provenance")
+    provenance_section = ""
+    if isinstance(provenance, Mapping):
+        provenance_rows = "\n".join(
+            "| {name} | {ids} | {realpaths} | {missing} |".format(
+                name=name,
+                ids=", ".join(record["campaign_ids"]) or "—",
+                realpaths=len(record["realpath_roots"]),
+                missing=record["roots_without_completion_record"],
+            )
+            for name, record in provenance["artifact_classes"].items()
+        )
+        provenance_section = f"""
+## Provenance
+
+Every collected artifact root is recorded twice in the machine artifact: the
+declared path under the campaign collection root, and its realpath.  They
+differ because a repair campaign collects earlier campaigns by symlink, so the
+directory a path resolves into does not attribute the bytes to a producing
+campaign.  Producing campaign IDs come from each job's `completion.json`; a
+root without one is recorded as unknown rather than assumed.
+
+| artifact class | producing campaign IDs | distinct realpath roots | roots without a completion record |
+| --- | --- | ---: | ---: |
+{provenance_rows}
+
+Scientific source SHA bound to the artifacts: `{result.get("source_git_sha", "unknown")}`.
+Aggregation code SHA: `{result.get("aggregator_source_sha", result.get("source_git_sha", "unknown"))}`.
+"""
     primary = result["decision"]
     frozen = result["frozen_contract"]
     lineage_rows = "\n".join(
@@ -834,11 +942,24 @@ tables stayed local and hash-bound.
   AutoAttack was added from these results.
 - A later Stable Indirect BDD design, if considered, requires a separate
   scientific contract and calibration.  This screen stops here.
-"""
+{provenance_section}"""
 
 
-def aggregate(*, campaign: Path, expected_source_sha: str) -> dict[str, Any]:
-    _require_clean_source(expected_source_sha)
+def _aggregator_source(expected_source_sha: str, aggregator_source_sha: str | None) -> str:
+    """Return the SHA the aggregation code itself must run from.
+
+    The collected artifacts stay bound to ``expected_source_sha`` (the frozen
+    scientific source that produced them).  The aggregation code may legitimately
+    be newer, for example after a formatter or lineage fix, so it declares its own
+    clean SHA separately and records both in the result.
+    """
+
+    return aggregator_source_sha or expected_source_sha
+
+
+def aggregate(*, campaign: Path, expected_source_sha: str, aggregator_source_sha: str | None = None) -> dict[str, Any]:
+    aggregator_sha = _aggregator_source(expected_source_sha, aggregator_source_sha)
+    _require_clean_source(aggregator_sha)
     campaign = campaign.resolve()
     if not campaign.is_dir():
         raise AggregationError(f"campaign root is missing: {campaign}")
@@ -847,6 +968,7 @@ def aggregate(*, campaign: Path, expected_source_sha: str) -> dict[str, Any]:
         "schema_version": 1,
         "contract": "ert_rslad_i100_online_state_s2_preservation_v1",
         "source_git_sha": expected_source_sha,
+        "aggregator_source_sha": aggregator_sha,
         "campaign_root": str(campaign),
         "calibration_artifact_sha256": CALIBRATION_SHA256,
         "frozen_coefficients": {
@@ -861,6 +983,7 @@ def aggregate(*, campaign: Path, expected_source_sha: str) -> dict[str, Any]:
     pmp_deltas: dict[str, float] = {}
     dbdp_deltas: dict[str, float] = {}
     dbdp_pmp_deltas: dict[str, float] = {}
+    provenance_classes: dict[str, list[Mapping[str, Any]]] = {"training": [], "endpoints": [], "canonical": []}
     for seed in SEEDS:
         e99_reference = _historical_e99_s2_t1(seed)
         seed_data: dict[str, Any] = {
@@ -876,8 +999,16 @@ def aggregate(*, campaign: Path, expected_source_sha: str) -> dict[str, Any]:
             training = _training_payload(
                 campaign, seed=seed, arm=arm, source_sha=expected_source_sha, prefix=frozen[seed]
             )
-            endpoints = _endpoint_payload(campaign / "endpoints" / seed / arm, seed=seed, arm=arm)
+            endpoint_root = campaign / "endpoints" / seed / arm
+            endpoints = _endpoint_payload(endpoint_root, seed=seed, arm=arm)
             canonical = _canonical_payload(campaign, seed=seed, arm=arm, training=training)
+            arm_provenance = {
+                "training": training["provenance"],
+                "endpoints": _collection_provenance(endpoint_root),
+                "canonical": canonical["provenance"],
+            }
+            for artifact_class, record in arm_provenance.items():
+                provenance_classes[artifact_class].append(record)
             endpoint_rows[arm] = {epoch: value["rows"] for epoch, value in endpoints.items()}
             canonical_rows[arm] = canonical["rows"]
             endpoint_summary: dict[str, Any] = {}
@@ -890,6 +1021,7 @@ def aggregate(*, campaign: Path, expected_source_sha: str) -> dict[str, Any]:
                     "robust_accuracy": _mean(float(bool(row["robust_correct"])) for row in rows.values()),
                 }
             seed_data["arms"][arm] = {
+                "provenance": arm_provenance,
                 "training": {
                     "checkpoints": training["checkpoints"],
                     "online_state_manifest": training["online_state_manifest"],
@@ -981,6 +1113,7 @@ def aggregate(*, campaign: Path, expected_source_sha: str) -> dict[str, Any]:
         dbdp_deltas[seed] = float(e114["dbdp_vs_control"]["robust"]["accuracy_delta"])
         dbdp_pmp_deltas[seed] = float(e114["dbdp_vs_pmp"]["robust"]["accuracy_delta"])
         result["seeds"][seed] = seed_data
+    result["provenance"] = _provenance_summary(campaign, provenance_classes)
     pmp_decision = _decision(pmp_deltas)
     dbdp_decision = _decision(dbdp_deltas)
     dbdp_pmp_decision = _decision(dbdp_pmp_deltas)
@@ -1005,7 +1138,14 @@ def aggregate(*, campaign: Path, expected_source_sha: str) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--campaign", type=Path, required=True, help="canonical local campaign collection root")
-    parser.add_argument("--expected-source-sha", required=True)
+    parser.add_argument(
+        "--expected-source-sha", required=True, help="frozen scientific source SHA the artifacts are bound to"
+    )
+    parser.add_argument(
+        "--aggregator-source-sha",
+        default=None,
+        help="clean source SHA this aggregation code runs from (defaults to --expected-source-sha)",
+    )
     parser.add_argument("--result", type=Path, default=RESULT_PATH)
     parser.add_argument("--report", type=Path, default=REPORT_PATH)
     args = parser.parse_args()
@@ -1013,7 +1153,11 @@ def main() -> int:
     report_path = args.report.resolve()
     _non_overwriting(result_path)
     _non_overwriting(report_path)
-    result = aggregate(campaign=args.campaign, expected_source_sha=args.expected_source_sha)
+    result = aggregate(
+        campaign=args.campaign,
+        expected_source_sha=args.expected_source_sha,
+        aggregator_source_sha=args.aggregator_source_sha,
+    )
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     report_path.write_text(_markdown(result), encoding="utf-8")
