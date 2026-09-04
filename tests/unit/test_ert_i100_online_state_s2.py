@@ -158,6 +158,10 @@ def test_online_state_manifest_binds_phase_epochs_and_static_cli_to_a_real_job(t
         "scientific_start_epoch": 101,
         "scientific_final_epoch": 114,
     }
+    arm_command = jobs["arm-dev-1-control"]["command"]
+    assert arm_command[arm_command.index("--prefix-state") + 1] == str(
+        tmp_path / "campaign" / "prefix" / "dev-1" / "training/online-state/epoch-100.parquet"
+    )
     assert jobs["arm-dev-1-control"]["command"][-1] == "115"
 
 

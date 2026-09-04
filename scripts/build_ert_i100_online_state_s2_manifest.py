@@ -268,6 +268,8 @@ def build_manifest(*, source_sha: str, campaign_root: Path, requested_at: str) -
                         str(prefix_root / "training/checkpoints/epoch-100.pt"),
                         "--thresholds",
                         str(threshold_root / "frozen-thresholds.json"),
+                        "--prefix-state",
+                        str(prefix_root / "training/online-state/epoch-100.parquet"),
                         "--output",
                         "{attempt_output_dir}",
                         "--device",
