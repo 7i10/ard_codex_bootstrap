@@ -236,12 +236,25 @@ def test_runtime_fingerprint_excludes_scientific_values_but_binds_runtime_shape(
                 "job_type": "training",
                 "command": ["python", "train.py", "--seed", "1", "--parent", "abc", "--config", "cfg.json"],
                 "dependencies": [],
-                "runtime_identity": {"public_cli": "train.py", "runtime_contract_version": "v1", "config_schema": "cfg-v1"},
+                "runtime_identity": {
+                    "public_cli": "train.py",
+                    "runtime_contract_version": "v1",
+                    "config_schema": "cfg-v1",
+                },
             }
         ],
     }
     changed = json.loads(json.dumps(base))
-    changed["jobs"][0]["command"] = ["python", "train.py", "--seed", "99", "--parent", "different", "--config", "other.json"]
+    changed["jobs"][0]["command"] = [
+        "python",
+        "train.py",
+        "--seed",
+        "99",
+        "--parent",
+        "different",
+        "--config",
+        "other.json",
+    ]
     assert gate.derive_runtime_fingerprint(base) == gate.derive_runtime_fingerprint(changed)
     changed["jobs"][0].pop("runtime_identity")
     changed["jobs"][0]["command"][1] = "other_train.py"
@@ -268,7 +281,14 @@ def test_production_manifest_requires_explicit_job_roles(tmp_path: Path) -> None
         "campaign_id": "roles",
         "source": {"git_sha": "a" * 40},
         "hosts": {"local": {"gpus": []}},
-        "jobs": [{"job_id": "train", "command": [sys.executable, "-c", "pass"], "scientific_identity": {"x": 1}, "output_dir": str(tmp_path / "out")}],
+        "jobs": [
+            {
+                "job_id": "train",
+                "command": [sys.executable, "-c", "pass"],
+                "scientific_identity": {"x": 1},
+                "output_dir": str(tmp_path / "out"),
+            }
+        ],
     }
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -293,7 +313,9 @@ def test_campaign_failure_class_allows_retry_only_when_every_failure_is_retryabl
 def test_experiment_state_launch_transition_requires_explicit_confirmation(tmp_path: Path) -> None:
     gate = load_module(GATE, "bridge_gate_launch_state")
     state_path = tmp_path / "state.json"
-    state_path.write_text(json.dumps({"schema_version": 2, "state": "LAUNCHING", "launch": {"status": "pending", "attempts": []}}))
+    state_path.write_text(
+        json.dumps({"schema_version": 2, "state": "LAUNCHING", "launch": {"status": "pending", "attempts": []}})
+    )
     gate.update_experiment_state_launch(state_path, status="confirmed", attempt={"controller_pid": 123})
     state = json.loads(state_path.read_text())
     assert state["state"] == "TRAINING"
@@ -316,7 +338,7 @@ def test_terminal_publisher_verifies_canonical_master_on_push(tmp_path: Path) ->
     subprocess.run(["git", "init", "-q", "-b", "master"], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
-    (repo / "results.json").write_text("{\"ok\":true}\n", encoding="utf-8")
+    (repo / "results.json").write_text('{"ok":true}\n', encoding="utf-8")
     (repo / "report.md").write_text("report\n", encoding="utf-8")
     subprocess.run(["git", "add", "results.json", "report.md"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-qm", "canonical"], cwd=repo, check=True)

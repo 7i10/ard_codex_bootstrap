@@ -27,7 +27,10 @@ RUNTIME_FINGERPRINT_VERSION = 1
 FAST_EXISTING_RUNTIME = "FAST_EXISTING_RUNTIME"
 FULL_NEW_INTEGRATION = "FULL_NEW_INTEGRATION"
 OPERATIONAL_PROFILES = frozenset({FAST_EXISTING_RUNTIME, FULL_NEW_INTEGRATION})
-JOB_TYPES = frozenset({"training", "evaluation", "collection", "inventory", "aggregation", "report", "finalization", "publish"})
+JOB_TYPES = frozenset(
+    {"training", "evaluation", "collection", "inventory", "aggregation", "report", "finalization", "publish"}
+)
+SAFE_COMPONENT = re.compile(r"^[A-Za-z0-9_.-]+$")
 # A change in any of these integration layers is intentionally a Full-path
 # concern.  They are operational declarations, not scientific identity fields.
 FULL_INTEGRATION_INDICATORS = frozenset(
@@ -91,10 +94,29 @@ def runtime_signature_required(spec: dict[str, Any]) -> bool:
 
 _SCIENTIFIC_ARG_FLAGS = frozenset(
     {
-        "--seed", "--parent", "--checkpoint", "--teacher", "--teacher-checkpoint",
-        "--dataset", "--data", "--data-root", "--output", "--output-dir", "--run-id",
-        "--wandb-run-id", "--mask", "--calibration", "--config", "--epochs", "--start-epoch",
-        "--end-epoch", "--epsilon", "--step-size", "--steps", "--attack-seed", "--eval-seed",
+        "--seed",
+        "--parent",
+        "--checkpoint",
+        "--teacher",
+        "--teacher-checkpoint",
+        "--dataset",
+        "--data",
+        "--data-root",
+        "--output",
+        "--output-dir",
+        "--run-id",
+        "--wandb-run-id",
+        "--mask",
+        "--calibration",
+        "--config",
+        "--epochs",
+        "--start-epoch",
+        "--end-epoch",
+        "--epsilon",
+        "--step-size",
+        "--steps",
+        "--attack-seed",
+        "--eval-seed",
     }
 )
 
@@ -164,10 +186,15 @@ def derive_runtime_fingerprint(resolved_manifest: dict[str, Any]) -> dict[str, A
             {
                 "job_type": str(job.get("job_type", "training")).lower(),
                 "execution_class": "external" if executor.get("type") == "external_probe" else "local",
-                "public_cli": _runtime_value(job, resolved_manifest, "public_cli") or _runtime_command_shape(job.get("command")),
-                "runtime_contract_version": _runtime_value(job, resolved_manifest, "runtime_contract_version", "unversioned"),
+                "public_cli": _runtime_value(job, resolved_manifest, "public_cli")
+                or _runtime_command_shape(job.get("command")),
+                "runtime_contract_version": _runtime_value(
+                    job, resolved_manifest, "runtime_contract_version", "unversioned"
+                ),
                 "config_schema": _runtime_value(job, resolved_manifest, "config_schema", "unversioned"),
-                "checkpoint_load_contract": _runtime_value(job, resolved_manifest, "checkpoint_load_contract", "default"),
+                "checkpoint_load_contract": _runtime_value(
+                    job, resolved_manifest, "checkpoint_load_contract", "default"
+                ),
                 "output_semantics": _runtime_value(
                     job,
                     resolved_manifest,
@@ -178,16 +205,17 @@ def derive_runtime_fingerprint(resolved_manifest: dict[str, Any]) -> dict[str, A
                 "overwrite_semantics": _runtime_value(job, resolved_manifest, "overwrite_semantics", "reject"),
                 "dependencies": deps,
                 "dependency_output_bindings": sorted(bindings, key=lambda value: str(value.get("producer_job_id", ""))),
-                "completion_marker_contract": _runtime_value(job, resolved_manifest, "completion_marker_contract", "schema-v1"),
+                "completion_marker_contract": _runtime_value(
+                    job, resolved_manifest, "completion_marker_contract", "schema-v1"
+                ),
             }
         )
-    topology = [
-        {"job_type": row["job_type"], "dependencies": row["dependencies"]}
-        for row in jobs
-    ]
+    topology = [{"job_type": row["job_type"], "dependencies": row["dependencies"]} for row in jobs]
     fingerprint = {
         "version": RUNTIME_FINGERPRINT_VERSION,
-        "public_cli_identity": _runtime_value(resolved_manifest, resolved_manifest, "public_cli_identity", "resolved-argv"),
+        "public_cli_identity": _runtime_value(
+            resolved_manifest, resolved_manifest, "public_cli_identity", "resolved-argv"
+        ),
         "runtime_contract_version": resolved_manifest.get("runtime_contract_version", "unversioned"),
         "config_schema": resolved_manifest.get("config_schema", "unversioned"),
         "checkpoint_load_contract": resolved_manifest.get("checkpoint_load_contract", "default"),
@@ -285,9 +313,7 @@ def digest(value: Any) -> str:
 def argv_digest(value: list[str] | None) -> str | None:
     if value is None:
         return None
-    return hashlib.sha256(
-        json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 def file_digest(path: Path) -> str:
@@ -415,14 +441,17 @@ def _declared_terminal_jobs(spec: dict[str, Any], jobs: list[dict[str, Any]]) ->
         else [
             job["job_id"]
             for job in jobs
-            if str(job.get("job_type", "")).lower() in {"evaluation", "collection", "inventory", "aggregation", "report", "finalization", "publish"}
+            if str(job.get("job_type", "")).lower()
+            in {"evaluation", "collection", "inventory", "aggregation", "report", "finalization", "publish"}
             and job.get("required_for_terminal", True) is not False
         ]
     )
     missing = sorted((set(training) | set(results)) - set(by_id))
     if missing:
         raise ValueError(f"terminal job declarations reference unknown IDs: {missing}")
-    incompatible_training = [job_id for job_id in training if str(by_id[job_id].get("job_type", "")).lower() != "training"]
+    incompatible_training = [
+        job_id for job_id in training if str(by_id[job_id].get("job_type", "")).lower() != "training"
+    ]
     if incompatible_training:
         raise ValueError(f"required_training_jobs must be training jobs: {incompatible_training}")
     overlap = sorted(set(training) & set(results))
@@ -444,8 +473,7 @@ def build_experiment_state(
         owner_kind = "orchestrator_dag" if result_jobs else "external_registered_command"
     if owner_kind not in {"orchestrator_dag", "external_registered_command"}:
         raise ValueError(
-            "postprocess.owner_kind must be orchestrator_dag or external_registered_command: "
-            f"{owner_kind}"
+            f"postprocess.owner_kind must be orchestrator_dag or external_registered_command: {owner_kind}"
         )
     identity_hash = digest(
         {
@@ -507,7 +535,9 @@ def update_experiment_state_launch(state_path: Path, *, status: str, attempt: di
     attempts = launch.setdefault("attempts", [])
     attempts.append(dict(attempt, status=status))
     launch["status"] = status
-    state["state"] = "TRAINING" if status == "confirmed" else ("LAUNCH_FAILED" if status == "failed" else "NEEDS_TECHNICAL_RECOVERY")
+    state["state"] = (
+        "TRAINING" if status == "confirmed" else ("LAUNCH_FAILED" if status == "failed" else "NEEDS_TECHNICAL_RECOVERY")
+    )
     state["last_reconciled_at"] = now()
     atomic_json(state_path, state)
 
@@ -1607,10 +1637,7 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
                     "use the exclusive runtime bound derived from the job-local scientific final epoch",
                 )
             authored_expected_final_epoch = job.get("expected_final_epoch")
-            if (
-                authored_expected_final_epoch is not None
-                and authored_expected_final_epoch != job_final_epoch
-            ):
+            if authored_expected_final_epoch is not None and authored_expected_final_epoch != job_final_epoch:
                 error(
                     errors,
                     job_id,
@@ -1971,9 +1998,7 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
         # manifest; they never enter scientific identity hashes.
         "postprocess": spec.get("postprocess", {}) if isinstance(spec.get("postprocess", {}), dict) else {},
         "recovery": spec.get("recovery", {}) if isinstance(spec.get("recovery", {}), dict) else {},
-        "result_publish": spec.get("result_publish", {})
-        if isinstance(spec.get("result_publish", {}), dict)
-        else {},
+        "result_publish": spec.get("result_publish", {}) if isinstance(spec.get("result_publish", {}), dict) else {},
         "experiment_state_path": str(experiment_state_path(spec, {"campaign_id": campaign_id}, base) or ""),
         "launch_gate": {
             "schema_version": SCHEMA_VERSION,
@@ -2000,11 +2025,27 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
     manifest["launch_gate"]["runtime_fingerprint"] = runtime_fingerprint
     if operational_profile == FAST_EXISTING_RUNTIME and signature["required"]:
         if registry_path is None or not registry_path.is_file():
-            errors.append({"job": None, "field": "runtime_signature", "expected": "tracked registry", "observed": "missing", "remediation": "promote a smoke-proven runtime"})
+            errors.append(
+                {
+                    "job": None,
+                    "field": "runtime_signature",
+                    "expected": "tracked registry",
+                    "observed": "missing",
+                    "remediation": "promote a smoke-proven runtime",
+                }
+            )
         else:
             derived_report = runtime_signature_report_for_manifest(manifest, registry_path)
             if derived_report.get("status") != "validated":
-                errors.append({"job": None, "field": "runtime_signature.fingerprint", "expected": "exact resolved-manifest fingerprint match", "observed": derived_report.get("status"), "remediation": "use FULL_NEW_INTEGRATION or promote a matching exact smoke"})
+                errors.append(
+                    {
+                        "job": None,
+                        "field": "runtime_signature.fingerprint",
+                        "expected": "exact resolved-manifest fingerprint match",
+                        "observed": derived_report.get("status"),
+                        "remediation": "use FULL_NEW_INTEGRATION or promote a matching exact smoke",
+                    }
+                )
             else:
                 manifest["launch_gate"]["runtime_signature_validation"] = derived_report
     report = {
@@ -2067,16 +2108,13 @@ def promote_runtime_signature(
         if code != 0 or head.lower() != source_sha:
             raise ValueError(f"source is stale for signature promotion: expected {source_sha}, got {head or stderr}")
     exact = [
-        item for item in smoke.get("results", [])
+        item
+        for item in smoke.get("results", [])
         if isinstance(item, dict) and item.get("kind") == "exact_public_cli" and item.get("status") == "pass"
     ]
     if not exact:
         raise ValueError("promotion requires at least one passed exact_public_cli smoke")
-    expected_classes = {
-        execution_class(manifest, job)
-        for job in manifest.get("jobs", [])
-        if requires_exact_smoke(job)
-    }
+    expected_classes = {execution_class(manifest, job) for job in manifest.get("jobs", []) if requires_exact_smoke(job)}
     observed_classes = {item.get("binding", {}).get("execution_class") for item in exact}
     if not expected_classes <= observed_classes:
         raise ValueError("exact smoke does not cover every execution class in the resolved campaign")
@@ -2084,7 +2122,9 @@ def promote_runtime_signature(
     binding = exact[0].get("binding")
     if not isinstance(binding, dict) or binding.get("source_sha", "").lower() != source_sha:
         raise ValueError("exact smoke binding is not bound to the resolved source")
-    registry = registry_path or (Path(__file__).resolve().parents[4] / "configs/operational/validated_runtime_signatures_v1.json")
+    registry = registry_path or (
+        Path(__file__).resolve().parents[4] / "configs/operational/validated_runtime_signatures_v1.json"
+    )
     if not registry.is_absolute():
         registry = (resolved_manifest_path.resolve().parent / registry).resolve()
     if registry.exists():
@@ -2094,7 +2134,10 @@ def promote_runtime_signature(
     entries = data.setdefault("signatures", [])
     existing = next((row for row in entries if isinstance(row, dict) and row.get("id") == signature_id), None)
     if existing is not None:
-        if existing.get("fingerprint_digest") != fingerprint["digest"] or existing.get("fingerprint") != fingerprint["fingerprint"]:
+        if (
+            existing.get("fingerprint_digest") != fingerprint["digest"]
+            or existing.get("fingerprint") != fingerprint["fingerprint"]
+        ):
             raise ValueError("signature ID already exists with a different fingerprint")
         return {"status": "NO_OP", "signature_id": signature_id, "fingerprint_digest": fingerprint["digest"]}
     entries.append(
@@ -2112,7 +2155,12 @@ def promote_runtime_signature(
     )
     data["schema_version"] = 1
     atomic_json(registry, data)
-    return {"status": "PROMOTED", "signature_id": signature_id, "fingerprint_digest": fingerprint["digest"], "registry": str(registry)}
+    return {
+        "status": "PROMOTED",
+        "signature_id": signature_id,
+        "fingerprint_digest": fingerprint["digest"],
+        "registry": str(registry),
+    }
 
 
 def plan_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
@@ -3266,7 +3314,9 @@ def gate_main(args: argparse.Namespace) -> int:
             if isinstance(controller_pid, int) and controller_pid > 0:
                 launch_attempt["controller_pid"] = controller_pid
                 launch_attempt["controller_status"] = parsed.get("status")
-                ledger.append({"event_type": "controller_launched", "timestamp": now(), "controller_pid": controller_pid})
+                ledger.append(
+                    {"event_type": "controller_launched", "timestamp": now(), "controller_pid": controller_pid}
+                )
                 if bridge_path is not None:
                     update_experiment_state_launch(bridge_path, status="confirmed", attempt=launch_attempt)
             else:
@@ -3318,7 +3368,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     if args.promote_runtime_signature:
         if args.resolved_manifest is None or args.exact_smoke_report is None or not args.signature_id:
-            parser().error("--promote-runtime-signature requires --resolved-manifest, --exact-smoke-report, and --signature-id")
+            parser().error(
+                "--promote-runtime-signature requires --resolved-manifest, --exact-smoke-report, and --signature-id"
+            )
         try:
             result = promote_runtime_signature(
                 args.resolved_manifest,

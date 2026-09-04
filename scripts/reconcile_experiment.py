@@ -521,9 +521,15 @@ def reconcile_campaign_state(state: dict[str, Any], path: Path, args: argparse.N
             return {"status": "NO_OP", "reason": downstream_reason, "state": state["state"]}
         if downstream == "failed":
             failure_class = downstream_reason.split(":", 1)[0]
-            state["state"] = "NEEDS_TECHNICAL_RECOVERY" if failure_class == "technical_retryable" else "NEEDS_RESEARCH_DECISION"
+            state["state"] = (
+                "NEEDS_TECHNICAL_RECOVERY" if failure_class == "technical_retryable" else "NEEDS_RESEARCH_DECISION"
+            )
             state["postprocess_state"] = "failed"
-            key = "technical_recovery_reason" if failure_class == "technical_retryable" else "needs_research_decision_reason"
+            key = (
+                "technical_recovery_reason"
+                if failure_class == "technical_retryable"
+                else "needs_research_decision_reason"
+            )
             state[key] = downstream_reason
             clear_recovery_lease(state)
             atomic_json(path, state)

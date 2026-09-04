@@ -136,11 +136,14 @@ def validate_canonical_fields(result: dict[str, Any], *, required: bool) -> None
 
 
 def _remote_commit_reachable(worktree: Path, commit: str) -> bool:
-    return subprocess.run(
-        ["git", "merge-base", "--is-ancestor", commit, f"origin/{EVENT_BRANCH}"],
-        cwd=worktree,
-        capture_output=True,
-    ).returncode == 0
+    return (
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", commit, f"origin/{EVENT_BRANCH}"],
+            cwd=worktree,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
 
 
 def _verify_canonical_remote(result: dict[str, Any], worktree: Path, *, required: bool) -> None:
@@ -152,12 +155,20 @@ def _verify_canonical_remote(result: dict[str, Any], worktree: Path, *, required
     canonical_commit = result["canonical_commit_sha"]
     if not required:
         return
-    if subprocess.run(["git", "cat-file", "-e", f"{canonical_commit}^{{commit}}"], cwd=worktree, capture_output=True).returncode != 0:
+    if (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{canonical_commit}^{{commit}}"], cwd=worktree, capture_output=True
+        ).returncode
+        != 0
+    ):
         raise ValueError("canonical commit is not present locally")
     git(worktree, "fetch", "origin", "--prune")
-    if subprocess.run(
-        ["git", "merge-base", "--is-ancestor", canonical_commit, "origin/master"], cwd=worktree, capture_output=True
-    ).returncode != 0:
+    if (
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", canonical_commit, "origin/master"], cwd=worktree, capture_output=True
+        ).returncode
+        != 0
+    ):
         raise ValueError("canonical commit is not reachable from origin/master")
     for key in ("result_manifest_path", "report_path", "failure_report_path"):
         relative = result.get(key) or result.get(f"repository_relative_{key[:-5]}")
@@ -166,9 +177,14 @@ def _verify_canonical_remote(result: dict[str, Any], worktree: Path, *, required
         candidate = Path(str(relative))
         if candidate.is_absolute() or ".." in candidate.parts:
             raise ValueError(f"{key} must be repository-relative")
-        if subprocess.run(
-            ["git", "cat-file", "-e", f"{canonical_commit}:{candidate.as_posix()}"], cwd=worktree, capture_output=True
-        ).returncode != 0:
+        if (
+            subprocess.run(
+                ["git", "cat-file", "-e", f"{canonical_commit}:{candidate.as_posix()}"],
+                cwd=worktree,
+                capture_output=True,
+            ).returncode
+            != 0
+        ):
             raise ValueError(f"{key} is missing from canonical commit")
         blob = git(worktree, "show", f"{canonical_commit}:{candidate.as_posix()}", check=False)
         if blob == "":
@@ -245,10 +261,17 @@ def publish(result_path: Path, *, worktree: Path, push: bool, ensure_pr: bool) -
             if not commit:
                 raise ValueError("published event exists but no local commit contains it")
             _ensure_remote_branch(worktree, commit, push=push)
-            return {"status": "NO_OP" if _remote_commit_reachable(worktree, commit) or not push else "RESUMED", "reason": "event_already_published", "event_path": str(event_path), "commit": commit}
+            return {
+                "status": "NO_OP" if _remote_commit_reachable(worktree, commit) or not push else "RESUMED",
+                "reason": "event_already_published",
+                "event_path": str(event_path),
+                "commit": commit,
+            }
         atomic_json(event_path, payload)
         git(worktree, "add", str(event_path.relative_to(worktree)))
-        git(worktree, "commit", "-m", f"Publish terminal result event {result['result_id']}@{result['result_revision']}")
+        git(
+            worktree, "commit", "-m", f"Publish terminal result event {result['result_id']}@{result['result_revision']}"
+        )
         commit = git(worktree, "rev-parse", "HEAD")
         _ensure_remote_branch(worktree, commit, push=push)
         pr = None
