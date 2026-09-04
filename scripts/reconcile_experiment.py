@@ -30,13 +30,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REGISTRY = REPO_ROOT / "configs" / "workspace" / "ard_workspace_v1.json"
 SCHEMA_VERSION = 2
 COMPATIBLE_SCHEMA_VERSIONS = {1, 2}
-TERMINAL_STATES = {"PUSHED", "AWAITING_RESEARCH_REVIEW", "NEEDS_RESEARCH_DECISION"}
+TERMINAL_STATES = {"PUSHED", "AWAITING_RESEARCH_REVIEW", "NEEDS_RESEARCH_DECISION", "NEEDS_TECHNICAL_RECOVERY"}
 POSTPROCESS_STATES = {"EVALUATING", "SUMMARIZING", "PUSHED", "AWAITING_RESEARCH_REVIEW"}
 KNOWN_STATES = {
     "PLANNED",
     "IMPLEMENTING",
     "VALIDATING",
+    "LAUNCHING",
     "TRAINING",
+    "LAUNCH_FAILED",
+    "NEEDS_TECHNICAL_RECOVERY",
     "TRAINING_SUCCESS",
     "TRAINING_FAILED",
     "EVALUATING",
@@ -288,25 +291,39 @@ def terminal_result_job_ids(state: dict[str, Any]) -> list[str]:
 
 
 def campaign_failure_class(state: dict[str, Any], orch: dict[str, Any]) -> tuple[str, str]:
-    """Classify only registered orchestrator evidence; never infer from a PID."""
-    for job_id in required_job_ids(state, orch):
+    """Aggregate all failed required jobs before selecting the safest class.
+
+    Scientific evidence dominates unknown/non-retryable technical evidence,
+    which dominates retryable technical evidence. A campaign is retryable
+    only when every observed failure is explicitly technical and retryable.
+    """
+    failures: list[tuple[str, str, bool]] = []
+    job_ids = required_job_ids(state, orch) + terminal_result_job_ids(state)
+    for job_id in job_ids:
         record = orch.get("jobs", {}).get(job_id)
         if not isinstance(record, dict) or record.get("status") not in {"failed", "orphaned", "blocked"}:
             continue
+        observed = False
         attempts = record.get("attempts")
         if isinstance(attempts, list):
             for attempt in reversed(attempts):
                 if not isinstance(attempt, dict):
                     continue
                 failure_class = attempt.get("failure_class")
-                if failure_class == "scientific":
-                    return "scientific", f"job:{job_id}"
-                if failure_class == "technical" and attempt.get("retryable") is True:
-                    return "technical_retryable", f"job:{job_id}"
                 if failure_class:
-                    return str(failure_class), f"job:{job_id}"
-        return "unknown", f"job:{job_id}"
-    return "unknown", "no-registered-failure-evidence"
+                    observed = True
+                    failures.append((job_id, str(failure_class), attempt.get("retryable") is True))
+                    break
+        if not observed:
+            failures.append((job_id, "unknown", False))
+    if not failures:
+        return "unknown", "no-registered-failure-evidence"
+    ids = ",".join(job_id for job_id, _, _ in failures)
+    if any(kind == "scientific" for _, kind, _ in failures):
+        return "scientific", f"jobs:{ids}"
+    if all(kind == "technical" and retryable for _, kind, retryable in failures):
+        return "technical_retryable", f"jobs:{ids}"
+    return "unknown", f"jobs:{ids}"
 
 
 def campaign_training_status(state: dict[str, Any], state_file: Path) -> tuple[str, str, dict[str, Any]]:
@@ -336,7 +353,8 @@ def orchestrator_result_status(state: dict[str, Any], orch: dict[str, Any]) -> t
     if any(status in {"pending", "running", "retrying"} for status in statuses.values()):
         return "active", "downstream_jobs_active"
     if any(status in {"failed", "orphaned", "blocked"} for status in statuses.values()):
-        return "failed", "downstream_job_failed"
+        failure_class, reason = campaign_failure_class(state, orch)
+        return "failed", f"{failure_class}:{reason}"
     if all(status == "completed" for status in statuses.values()):
         return "complete", "downstream_jobs_completed"
     return "failed", "downstream_status_incomplete"
@@ -478,7 +496,8 @@ def reconcile_campaign_state(state: dict[str, Any], path: Path, args: argparse.N
     if owner_kind not in {"orchestrator_dag", "external_registered_command"}:
         raise ReconcileError(f"unsupported postprocess owner_kind: {owner_kind}")
     if training_status == "running":
-        state["state"] = "TRAINING"
+        if state.get("state") != "LAUNCHING":
+            state["state"] = "TRAINING"
         atomic_json(path, state)
         return {"status": "NO_OP", "reason": "training_campaign_active", "state": state["state"]}
     if training_status == "failed":
@@ -501,12 +520,14 @@ def reconcile_campaign_state(state: dict[str, Any], path: Path, args: argparse.N
             atomic_json(path, state)
             return {"status": "NO_OP", "reason": downstream_reason, "state": state["state"]}
         if downstream == "failed":
-            state["state"] = "NEEDS_RESEARCH_DECISION"
+            failure_class = downstream_reason.split(":", 1)[0]
+            state["state"] = "NEEDS_TECHNICAL_RECOVERY" if failure_class == "technical_retryable" else "NEEDS_RESEARCH_DECISION"
             state["postprocess_state"] = "failed"
-            state["needs_research_decision_reason"] = downstream_reason
+            key = "technical_recovery_reason" if failure_class == "technical_retryable" else "needs_research_decision_reason"
+            state[key] = downstream_reason
             clear_recovery_lease(state)
             atomic_json(path, state)
-            return {"status": "NEEDS_RESEARCH_DECISION", "state": state["state"], "reason": downstream_reason}
+            return {"status": state["state"], "state": state["state"], "reason": downstream_reason}
         complete_marker, failure_marker = postprocess_marker_paths(state, path)
         if marker_ok(failure_marker, state, failure=True)[0]:
             state["state"] = "NEEDS_RESEARCH_DECISION"

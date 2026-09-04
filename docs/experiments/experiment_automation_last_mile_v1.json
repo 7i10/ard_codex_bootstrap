@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "milestone": "experiment_automation_last_mile_hardening",
+  "scope": "operational_control_plane_only",
+  "base_source_sha": "2aa855454ef0f4e01e6f32072b47e2152b5e9937",
+  "implementation_commit": "recorded by the Git commit containing this artifact",
+  "scientific_campaign_mutated": false,
+  "runtime_fingerprint": {
+    "version": 1,
+    "registry": "configs/operational/validated_runtime_signatures_v1.json",
+    "authored_id_alone_grants_fast": false,
+    "validated_entry": "operational-fast-path-v1",
+    "fingerprint_digest": "bef8aa83690478ea1f7e5f860a3a50f082869675a85f39a846cba32e78c709e5"
+  },
+  "production_roles": {
+    "schema_version": 2,
+    "allowed_job_types": ["training", "evaluation", "collection", "inventory", "aggregation", "report", "finalization", "publish"],
+    "missing_role": "preflight_failure",
+    "terminal_jobs": "derived_from_explicit_roles_or_declared_ids"
+  },
+  "failure_policy": {
+    "aggregate_scope": "required_training_and_downstream_result_jobs",
+    "priority": ["scientific", "unknown_or_nonretryable_technical", "technical_retryable"],
+    "retry_requires_all_failures_technical_retryable": true
+  },
+  "launch_lifecycle": ["LAUNCHING", "TRAINING", "LAUNCH_FAILED", "NEEDS_TECHNICAL_RECOVERY"],
+  "publisher": {
+    "branch": "experiment-results",
+    "base_branch": "master",
+    "event_root": "automation/experiment-events",
+    "canonical_remote_and_blob_verification_on_push": true,
+    "full_payload_collision_detection": true,
+    "partial_push_resume": true,
+    "pull_request_title": "Automated Experiment Results"
+  },
+  "verification": {
+    "focused_tests": "92 passed (including publisher remote/collision regression)",
+    "dummy_dag": "existing orchestrator success/failure/retry fixtures passed",
+    "real_runtime_validation": "bounded operational public CLI evidence only; no training or endpoint",
+    "changed_test_preview": "scripts/verify.py --changed --non-scientific --dry-run",
+    "gpu_used": false,
+    "wandb_network_required": false
+  },
+  "remaining_manual": [
+    "Each scientific runtime must pass its own exact source-bound public-CLI smoke before Fast promotion.",
+    "A deployment may set pull_request_number in experiment_event_bus_v1.json after the permanent event-bus PR exists."
+  ]
+}

@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
+JOB_TYPES = frozenset({"training", "evaluation", "collection", "inventory", "aggregation", "report", "finalization", "publish"})
 TERMINAL = {"completed", "failed", "blocked", "orphaned"}
 ACTIVE = {"running", "retrying"}
 RESERVATION_HANDLES: dict[tuple[str, int], Any] = {}
@@ -142,6 +143,8 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], str, Path]:
         raise ValueError("jobs must be a non-empty list")
     ids: set[str] = set()
     for job in jobs:
+        if manifest.get("production_schema_version") == 2 and (not isinstance(job, dict) or not isinstance(job.get("job_type"), str)):
+            raise ValueError("production schema-v2 jobs require an explicit job_type")
         _validate_job(job, ids, hosts, path.parent)
         _bind_controller_paths(manifest, job)
     _enforce_workspace_runtime_writes(manifest, path.parent)
@@ -216,6 +219,10 @@ def _validate_job(job: Any, ids: set[str], hosts: dict[str, Any], base: Path) ->
     if not isinstance(job, dict) or not isinstance(job.get("job_id"), str) or not job["job_id"]:
         raise ValueError("each job requires a unique job_id")
     job_id = job["job_id"]
+    if "job_type" in job and str(job["job_type"]).lower() not in JOB_TYPES:
+        raise ValueError(f"{job_id}: job_type must be one of {sorted(JOB_TYPES)}")
+    if "job_type" in job:
+        job["job_type"] = str(job["job_type"]).lower()
     if job_id in ids:
         raise ValueError(f"duplicate job_id: {job_id}")
     ids.add(job_id)
@@ -466,6 +473,36 @@ def initial_state(manifest: dict[str, Any]) -> dict[str, Any]:
 
 def event(state: dict[str, Any], event_type: str, job_id: str | None = None, **detail: Any) -> None:
     state["events"].append({"timestamp": now(), "event_type": event_type, "job_id": job_id, **detail})
+
+
+def aggregate_failure_summary(manifest: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+    """Collect every terminal failure for reconciler/publisher consumers."""
+    failures: list[dict[str, Any]] = []
+    for job in manifest.get("jobs", []):
+        record = state.get("jobs", {}).get(job.get("job_id"), {})
+        if record.get("status") not in {"failed", "blocked", "orphaned"}:
+            continue
+        attempts = record.get("attempts", [])
+        latest = attempts[-1] if isinstance(attempts, list) and attempts else {}
+        failures.append(
+            {
+                "job_id": job.get("job_id"),
+                "job_type": job.get("job_type", "training"),
+                "status": record.get("status"),
+                "failure_class": latest.get("failure_class", "unknown"),
+                "retryable": latest.get("retryable") is True,
+                "reason": latest.get("failure_reason"),
+            }
+        )
+    if any(item["failure_class"] == "scientific" for item in failures):
+        classification = "scientific"
+    elif failures and all(item["failure_class"] == "technical" and item["retryable"] for item in failures):
+        classification = "technical_retryable"
+    elif failures:
+        classification = "unknown"
+    else:
+        classification = None
+    return {"classification": classification, "failures": failures}
 
 
 def read_state(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -1092,6 +1129,8 @@ def controller_tick(manifest: dict[str, Any], state: dict[str, Any]) -> bool:
     statuses = [record["status"] for record in state["jobs"].values()]
     if all(status in TERMINAL for status in statuses):
         state["status"] = "completed" if all(status == "completed" for status in statuses) else "failed"
+        if state["status"] == "failed":
+            state["failure_summary"] = aggregate_failure_summary(manifest, state)
         if not state.get("finished_at"):
             state["finished_at"] = now()
             event(state, "campaign_complete", status=state["status"])

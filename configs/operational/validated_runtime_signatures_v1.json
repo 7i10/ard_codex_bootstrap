@@ -1,6 +1,49 @@
 {
   "schema_version": 1,
-  "signatures": [],
+  "signatures": [
+    {
+      "id": "operational-fast-path-v1",
+      "fingerprint": {
+        "artifact_schema": "completion-marker-v1",
+        "checkpoint_load_contract": "none",
+        "config_schema": "operational_dummy_v1",
+        "dependency_topology_class": [
+          {
+            "dependencies": [],
+            "job_type": "collection"
+          }
+        ],
+        "execution_class_compatibility": ["local"],
+        "job_types": ["collection"],
+        "jobs": [
+          {
+            "artifact_schema": "completion-marker-v1",
+            "checkpoint_load_contract": "none",
+            "completion_marker_contract": "schema-v1",
+            "config_schema": "operational_dummy_v1",
+            "dependencies": [],
+            "dependency_output_bindings": [],
+            "execution_class": "local",
+            "job_type": "collection",
+            "output_semantics": "non-overwrite",
+            "overwrite_semantics": "reject",
+            "public_cli": "operational_non_overwrite_dummy.py",
+            "runtime_contract_version": "fast-path-v1"
+          }
+        ],
+        "public_cli_identity": "operational_non_overwrite_dummy.py",
+        "required_completion_marker_contract": "schema-v1",
+        "runtime_contract_version": "fast-path-v1",
+        "version": 1
+      },
+      "fingerprint_digest": "bef8aa83690478ea1f7e5f860a3a50f082869675a85f39a846cba32e78c709e5",
+      "validated_execution_classes": ["local"],
+      "validating_source_sha": "46329e0382b834f28bf19ec1162fd868ab663bd3",
+      "exact_smoke_report_sha256": "e5a149fd35543c07287a6db479ddefd011a7e6a0d7da72ad8e0d049dd796d7c7",
+      "validation_evidence": "docs/experiments/ard_experiment_execution_fast_path_v1.json",
+      "description": "Operational non-overwrite public CLI validated by the bounded Fast Path smoke; no scientific computation."
+    }
+  ],
   "policy": {
     "description": "Only runtime topologies proven by an exact bounded smoke may be added.",
     "unknown_is_full_integration": true,

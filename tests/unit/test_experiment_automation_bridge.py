@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RECONCILER = ROOT / "scripts" / "reconcile_experiment.py"
 GATE = ROOT / ".agents/skills/production-launch-gate/scripts/launch_gate.py"
 PUBLISHER = ROOT / "scripts/publish_experiment_terminal_event.py"
+ORCHESTRATOR = ROOT / ".agents/skills/multi-gpu-experiment-orchestrator/scripts/orchestrate.py"
 
 
 def load_module(path: Path, name: str):
@@ -222,12 +223,128 @@ def test_terminal_event_publisher_is_idempotent(tmp_path: Path) -> None:
     assert second["status"] == "NO_OP"
 
 
+def test_runtime_fingerprint_excludes_scientific_values_but_binds_runtime_shape() -> None:
+    gate = load_module(GATE, "bridge_gate_fingerprint")
+    base = {
+        "runtime_contract_version": "v1",
+        "config_schema": "cfg-v1",
+        "checkpoint_load_contract": "resume-v2",
+        "artifact_schema": "marker-v1",
+        "jobs": [
+            {
+                "job_id": "train",
+                "job_type": "training",
+                "command": ["python", "train.py", "--seed", "1", "--parent", "abc", "--config", "cfg.json"],
+                "dependencies": [],
+                "runtime_identity": {"public_cli": "train.py", "runtime_contract_version": "v1", "config_schema": "cfg-v1"},
+            }
+        ],
+    }
+    changed = json.loads(json.dumps(base))
+    changed["jobs"][0]["command"] = ["python", "train.py", "--seed", "99", "--parent", "different", "--config", "other.json"]
+    assert gate.derive_runtime_fingerprint(base) == gate.derive_runtime_fingerprint(changed)
+    changed["jobs"][0].pop("runtime_identity")
+    changed["jobs"][0]["command"][1] = "other_train.py"
+    assert gate.derive_runtime_fingerprint(base)["digest"] != gate.derive_runtime_fingerprint(changed)["digest"]
+
+
+def test_campaign_failure_class_aggregates_scientific_and_downstream_failures(tmp_path: Path) -> None:
+    reconciler = load_module(ROOT / "scripts/reconcile_experiment.py", "bridge_reconcile_aggregate")
+    state = {"required_training_jobs": ["train"], "terminal_result_jobs": ["endpoint"]}
+    orch = {
+        "jobs": {
+            "train": {"status": "failed", "attempts": [{"failure_class": "technical", "retryable": True}]},
+            "endpoint": {"status": "failed", "attempts": [{"failure_class": "scientific", "retryable": False}]},
+        }
+    }
+    assert reconciler.campaign_failure_class(state, orch) == ("scientific", "jobs:train,endpoint")
+
+
+def test_production_manifest_requires_explicit_job_roles(tmp_path: Path) -> None:
+    orchestrator = load_module(ORCHESTRATOR, "bridge_orchestrator_roles")
+    manifest = {
+        "schema_version": 1,
+        "production_schema_version": 2,
+        "campaign_id": "roles",
+        "source": {"git_sha": "a" * 40},
+        "hosts": {"local": {"gpus": []}},
+        "jobs": [{"job_id": "train", "command": [sys.executable, "-c", "pass"], "scientific_identity": {"x": 1}, "output_dir": str(tmp_path / "out")}],
+    }
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="explicit job_type"):
+        orchestrator.load_manifest(path)
+
+
+def test_campaign_failure_class_allows_retry_only_when_every_failure_is_retryable() -> None:
+    reconciler = load_module(ROOT / "scripts/reconcile_experiment.py", "bridge_reconcile_retry_aggregate")
+    state = {"required_training_jobs": ["a", "b"]}
+    orch = {
+        "jobs": {
+            "a": {"status": "failed", "attempts": [{"failure_class": "technical", "retryable": True}]},
+            "b": {"status": "blocked", "attempts": [{"failure_class": "technical", "retryable": True}]},
+        }
+    }
+    assert reconciler.campaign_failure_class(state, orch)[0] == "technical_retryable"
+    orch["jobs"]["b"]["attempts"][0]["retryable"] = False
+    assert reconciler.campaign_failure_class(state, orch)[0] == "unknown"
+
+
+def test_experiment_state_launch_transition_requires_explicit_confirmation(tmp_path: Path) -> None:
+    gate = load_module(GATE, "bridge_gate_launch_state")
+    state_path = tmp_path / "state.json"
+    state_path.write_text(json.dumps({"schema_version": 2, "state": "LAUNCHING", "launch": {"status": "pending", "attempts": []}}))
+    gate.update_experiment_state_launch(state_path, status="confirmed", attempt={"controller_pid": 123})
+    state = json.loads(state_path.read_text())
+    assert state["state"] == "TRAINING"
+    assert state["launch"]["attempts"][0]["controller_pid"] == 123
+
+
 def test_publisher_rejects_nonterminal_manifest(tmp_path: Path) -> None:
     publisher = load_module(PUBLISHER, "bridge_publisher_invalid")
     path = tmp_path / "bad.json"
     path.write_text(json.dumps({"terminal_state": "TRAINING", "result_id": "x"}), encoding="utf-8")
     with pytest.raises(ValueError, match="not publishable"):
         publisher.load_result(path)
+
+
+def test_terminal_publisher_verifies_canonical_master_on_push(tmp_path: Path) -> None:
+    publisher = load_module(PUBLISHER, "bridge_publisher_remote")
+    repo = tmp_path / "repo"
+    bare = tmp_path / "remote.git"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "master"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    (repo / "results.json").write_text("{\"ok\":true}\n", encoding="utf-8")
+    (repo / "report.md").write_text("report\n", encoding="utf-8")
+    subprocess.run(["git", "add", "results.json", "report.md"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "canonical"], cwd=repo, check=True)
+    canonical_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(bare)], cwd=repo, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "master"], cwd=repo, check=True)
+    subprocess.run(["git", "checkout", "-qb", "experiment-results"], cwd=repo, check=True)
+    result = tmp_path / "terminal.json"
+    payload = {
+        "terminal_state": "NEEDS_TECHNICAL_RECOVERY",
+        "result_id": "campaign",
+        "result_revision": "r1",
+        "canonical_commit_sha": canonical_commit,
+        "source_sha": "b" * 40,
+        "result_manifest": str(repo / "results.json"),
+        "report": str(repo / "report.md"),
+        "result_manifest_path": "results.json",
+        "report_path": "report.md",
+        "result_manifest_sha256": publisher.sha256_bytes((repo / "results.json").read_bytes()),
+        "report_sha256": publisher.sha256_bytes((repo / "report.md").read_bytes()),
+        "artifact_digest": "c" * 64,
+    }
+    result.write_text(json.dumps(payload), encoding="utf-8")
+    first = publisher.publish(result, worktree=repo, push=True, ensure_pr=False)
+    second = publisher.publish(result, worktree=repo, push=True, ensure_pr=False)
+    assert first["status"] == "PUBLISHED"
+    assert second["status"] == "NO_OP"
 
 
 def test_publisher_rejects_path_traversal_revision(tmp_path: Path) -> None:

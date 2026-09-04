@@ -27,6 +27,9 @@ Training success is accepted only when the training process is terminal, the
 launcher exit evidence is successful, the completion marker matches the
 experiment/source/identity, and every registered expected output exists. A
 dead PID alone is never success. GPU utilization is not a success criterion.
+A launch begins in `LAUNCHING` and is promoted to `TRAINING` only by a
+structured controller start proof; failed or malformed starts remain
+`LAUNCH_FAILED`/`NEEDS_TECHNICAL_RECOVERY`.
 
 ## Scheduled wake
 
@@ -66,7 +69,12 @@ the experiment ID, state path, lease ID, and attempt number through `ERT_*`
 environment variables and preserves source, parent, seed, attack, Teacher,
 threshold, coefficient, and method identity.  Scientific, unknown, or
 unregistered failures become `NEEDS_RESEARCH_DECISION`; they are never silently
-repaired.
+repaired. Failure classification aggregates all required training and
+downstream result jobs: scientific evidence wins over unknown/non-retryable
+technical evidence, and retry is eligible only when every observed failure is
+explicitly technical and retryable. Downstream evaluation/aggregation/report/
+publish jobs remain owned by the orchestrator DAG; the reconciler does not
+launch a duplicate.
 
 ## Example state fragment
 

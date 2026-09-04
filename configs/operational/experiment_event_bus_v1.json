@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "repository": "7i10/ard_codex_bootstrap",
+  "remote": "origin",
+  "branch": "experiment-results",
+  "base_branch": "master",
+  "pull_request_title": "Automated Experiment Results",
+  "event_root": "automation/experiment-events",
+  "append_only": true,
+  "publisher": "scripts/publish_experiment_terminal_event.py",
+  "pull_request_number": null,
+  "notes": "Operational event bus only; canonical scientific result commits remain authoritative."
+}

@@ -111,6 +111,21 @@ as `['bash', 'scripts/wrapper.sh', ...]`; do not put the wrapper itself at
 argv position zero. Manifest validation rejects a locally present non-executable
 `*.sh` command or completion probe before any GPU reservation.
 
+Production manifests resolved by the launch gate carry
+`production_schema_version: 2` and must declare an explicit `job_type` for
+every node. Allowed roles are `training`, `evaluation`, `collection`,
+`inventory`, `aggregation`, `report`, `finalization`, and `publish`. The gate
+derives required training and terminal result sets from these roles when they
+are not explicitly declared; unknown, missing, overlapping, or contradictory
+declarations fail before launch.
+
+The gate derives a runtime fingerprint from the resolved public CLI shape,
+runtime/config/checkpoint contracts, output and marker semantics, execution
+class, job roles, dependency topology, and dependency-output bindings. A Fast
+signature is valid only when this fingerprint exactly matches a tracked entry
+promoted by a passed exact bounded public-CLI smoke; an authored runtime ID
+alone never grants Fast eligibility.
+
 ## Scheduling and safety
 
 - Ready jobs are sorted longest-processing-time first. Candidate slots are
@@ -156,6 +171,20 @@ argv position zero. Manifest validation rejects a locally present non-executable
   `experiment-results` branch. It writes one compact, revision-keyed event;
   canonical scientific result commits remain authoritative and are never
   merged by the publisher.
+
+The launch bridge records `LAUNCHING` before invoking the detached controller
+and changes to `TRAINING` only after a structured controller PID/start proof is
+returned. A failed or malformed launch becomes `LAUNCH_FAILED` or
+`NEEDS_TECHNICAL_RECOVERY`; a PID guessed from GPU activity is not evidence.
+
+Campaign failure classification aggregates every failed, blocked, orphaned,
+and required downstream node. Scientific evidence dominates unknown or
+non-retryable technical evidence; retry is permitted only when all observed
+failures are explicitly technical and retryable. The terminal publisher
+verifies canonical result reachability and declared blob digests on push, is
+collision-safe by full payload, and resumes a locally committed event after an
+interrupted push or PR step. The normal DAG should contain its final `publish`
+node; the reconciler is only a fallback for an already-registered owner.
 
 ## Commands
 

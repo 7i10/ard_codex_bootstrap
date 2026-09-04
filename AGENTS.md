@@ -166,3 +166,14 @@ Mechanical formatting issues belong in deterministic tooling, not review comment
 - Technical recovery may retry only a registered command with unchanged
   scientific identity and a finite lease/attempt bound; scientific decisions
   remain human-owned.
+- Production job roles are explicit (`training`, `evaluation`, `collection`,
+  `inventory`, `aggregation`, `report`, `finalization`, `publish`); never infer
+  a missing role as training in a schema-v2 campaign.
+- The launch lifecycle is `LAUNCHING` until a structured controller start proof
+  is recorded; GPU utilization or a guessed PID is not launch evidence.
+- Aggregate all required and downstream failures before retrying; retry only
+  when every observed failure is technical and explicitly retryable.
+- Publish terminal events only after canonical remote commit/blob verification;
+  resume the same revision after a partial push rather than creating a new one.
+- Keep the final publish node in the campaign DAG; the reconciler is a bounded
+  fallback and must not become a second post-processing owner.

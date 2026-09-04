@@ -140,9 +140,12 @@ identity is immutable and unregistered failures stop at
 idempotent pointer on the dedicated `experiment-results` branch without
 changing scientific authority or merging a PR.
 
-The runtime-signature registry is intentionally empty until an exact bounded
-smoke proves a public runtime/topology.  This avoids the previous failure mode
-where a familiar runtime label silently concealed a changed executor or DAG.
+The runtime-signature registry contains only runtime classes proven by an exact
+bounded smoke.  The initial operational non-overwrite public-CLI entry is
+tracked as `operational-fast-path-v1`; scientific runtimes remain Full until
+their own source-bound smoke is promoted.  This avoids the previous failure
+mode where a familiar runtime label silently concealed a changed executor or
+DAG.
 
 ### Estimate contract
 

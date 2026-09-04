@@ -22,7 +22,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-ALLOWED_TERMINAL_STATES = {"SUCCESS", "AWAITING_RESEARCH_REVIEW", "NEEDS_RESEARCH_DECISION"}
+ALLOWED_TERMINAL_STATES = {"SUCCESS", "AWAITING_RESEARCH_REVIEW", "NEEDS_RESEARCH_DECISION", "NEEDS_TECHNICAL_RECOVERY"}
 SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA64 = re.compile(r"^[0-9a-fA-F]{64}$")
 SAFE_COMPONENT = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -110,6 +110,72 @@ def validate_references(result: dict[str, Any], base: Path) -> None:
             path = base / path
         if not path.is_file():
             raise ValueError(f"{key} does not exist: {path}")
+        expected = result.get(f"{key}_sha256")
+        if expected is not None:
+            if not SHA64.fullmatch(str(expected)) or sha256_bytes(path.read_bytes()) != str(expected).lower():
+                raise ValueError(f"{key}_sha256 does not match referenced bytes")
+
+
+def validate_canonical_fields(result: dict[str, Any], *, required: bool) -> None:
+    if not required:
+        return
+    required_fields = {
+        "result_manifest_path": "result_manifest_sha256",
+        "report_path": "report_sha256",
+    }
+    for path_key, digest_key in required_fields.items():
+        value = result.get(path_key) or result.get(f"repository_relative_{path_key[:-5]}")
+        digest_value = result.get(digest_key)
+        if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in Path(value).parts:
+            raise ValueError(f"{path_key} must be a repository-relative path for remote publication")
+        if not isinstance(digest_value, str) or not SHA64.fullmatch(digest_value):
+            raise ValueError(f"{digest_key} must be a SHA-256 for remote publication")
+    failure_path = result.get("failure_report_path") or result.get("repository_relative_failure_report")
+    if failure_path is not None and (Path(str(failure_path)).is_absolute() or ".." in Path(str(failure_path)).parts):
+        raise ValueError("failure_report_path must be repository-relative")
+
+
+def _remote_commit_reachable(worktree: Path, commit: str) -> bool:
+    return subprocess.run(
+        ["git", "merge-base", "--is-ancestor", commit, f"origin/{EVENT_BRANCH}"],
+        cwd=worktree,
+        capture_output=True,
+    ).returncode == 0
+
+
+def _verify_canonical_remote(result: dict[str, Any], worktree: Path, *, required: bool) -> None:
+    """Verify canonical result commit and declared repository-relative blobs.
+
+    Local unit fixtures may publish without a remote. Production pushes must
+    have an origin/master containing the canonical commit and matching blobs.
+    """
+    canonical_commit = result["canonical_commit_sha"]
+    if not required:
+        return
+    if subprocess.run(["git", "cat-file", "-e", f"{canonical_commit}^{{commit}}"], cwd=worktree, capture_output=True).returncode != 0:
+        raise ValueError("canonical commit is not present locally")
+    git(worktree, "fetch", "origin", "--prune")
+    if subprocess.run(
+        ["git", "merge-base", "--is-ancestor", canonical_commit, "origin/master"], cwd=worktree, capture_output=True
+    ).returncode != 0:
+        raise ValueError("canonical commit is not reachable from origin/master")
+    for key in ("result_manifest_path", "report_path", "failure_report_path"):
+        relative = result.get(key) or result.get(f"repository_relative_{key[:-5]}")
+        if relative is None:
+            continue
+        candidate = Path(str(relative))
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise ValueError(f"{key} must be repository-relative")
+        if subprocess.run(
+            ["git", "cat-file", "-e", f"{canonical_commit}:{candidate.as_posix()}"], cwd=worktree, capture_output=True
+        ).returncode != 0:
+            raise ValueError(f"{key} is missing from canonical commit")
+        blob = git(worktree, "show", f"{canonical_commit}:{candidate.as_posix()}", check=False)
+        if blob == "":
+            raise ValueError(f"{key} is missing from canonical commit")
+        expected = result.get(f"{key}_sha256")
+        if expected and sha256_bytes(blob.encode()) != str(expected).lower():
+            raise ValueError(f"{key} digest does not match canonical commit")
 
 
 def event_payload(result: dict[str, Any]) -> dict[str, Any]:
@@ -125,14 +191,36 @@ def event_payload(result: dict[str, Any]) -> dict[str, Any]:
         "report": result["report"],
         "failure_report": result.get("failure_report"),
         "artifact_digest": result["artifact_digest"],
+        "result_manifest_path": result.get("result_manifest_path") or result.get("repository_relative_result_manifest"),
+        "report_path": result.get("report_path") or result.get("repository_relative_report"),
+        "failure_report_path": result.get("failure_report_path") or result.get("repository_relative_failure_report"),
+        "result_manifest_sha256": result.get("result_manifest_sha256"),
+        "report_sha256": result.get("report_sha256"),
+        "failure_report_sha256": result.get("failure_report_sha256"),
         "published_at": result.get("published_at") or dt.datetime.now(dt.UTC).isoformat(),
     }
     return payload
 
 
+def _payload_identity(payload: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in payload.items() if key != "published_at"}
+
+
+def _ensure_remote_branch(worktree: Path, commit: str, *, push: bool) -> None:
+    if not push:
+        return
+    if _remote_commit_reachable(worktree, commit):
+        return
+    git(worktree, "push", "origin", f"{commit}:refs/heads/{EVENT_BRANCH}")
+    git(worktree, "fetch", "origin", "--prune")
+    if not _remote_commit_reachable(worktree, commit):
+        raise ValueError("event commit push did not make the remote branch reachable")
+
+
 def publish(result_path: Path, *, worktree: Path, push: bool, ensure_pr: bool) -> dict[str, Any]:
     result = load_result(result_path)
     validate_references(result, result_path.parent)
+    validate_canonical_fields(result, required=push)
     worktree = worktree.resolve()
     if not (worktree / ".git").exists() and git(worktree, "rev-parse", "--is-inside-work-tree", check=False) != "true":
         raise ValueError(f"publisher worktree is not a Git worktree: {worktree}")
@@ -148,25 +236,21 @@ def publish(result_path: Path, *, worktree: Path, push: bool, ensure_pr: bool) -
         relative_result = Path(result["result_id"]) / f"{result['result_revision']}.json"
         event_path = worktree / "automation" / "experiment-events" / relative_result
         payload = event_payload(result)
+        _verify_canonical_remote(result, worktree, required=push)
         if event_path.exists():
             existing = json.loads(event_path.read_text(encoding="utf-8"))
-            if (
-                existing.get("result_id") != payload["result_id"]
-                or existing.get("result_revision") != payload["result_revision"]
-            ):
-                raise ValueError(f"event path collision with a different result: {event_path}")
-            return {"status": "NO_OP", "reason": "event_already_published", "event_path": str(event_path)}
+            if _payload_identity(existing) != _payload_identity(payload):
+                raise ValueError(f"RESULT_REVISION_COLLISION: event path has different payload: {event_path}")
+            commit = git(worktree, "log", "-1", "--format=%H", "--", str(event_path.relative_to(worktree)), check=False)
+            if not commit:
+                raise ValueError("published event exists but no local commit contains it")
+            _ensure_remote_branch(worktree, commit, push=push)
+            return {"status": "NO_OP" if _remote_commit_reachable(worktree, commit) or not push else "RESUMED", "reason": "event_already_published", "event_path": str(event_path), "commit": commit}
         atomic_json(event_path, payload)
         git(worktree, "add", str(event_path.relative_to(worktree)))
-        git(
-            worktree,
-            "commit",
-            "-m",
-            f"Publish terminal result event {result['result_id']}@{result['result_revision']}",
-        )
+        git(worktree, "commit", "-m", f"Publish terminal result event {result['result_id']}@{result['result_revision']}")
         commit = git(worktree, "rev-parse", "HEAD")
-        if push:
-            git(worktree, "push", "origin", f"HEAD:{EVENT_BRANCH}")
+        _ensure_remote_branch(worktree, commit, push=push)
         pr = None
         if ensure_pr:
             existing = subprocess.run(
