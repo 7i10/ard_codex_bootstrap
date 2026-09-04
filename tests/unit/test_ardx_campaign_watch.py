@@ -54,9 +54,7 @@ def write_state(path: Path, payload: dict) -> Path:
 
 
 def run_watch(args: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [sys.executable, str(WATCH), *args], capture_output=True, text=True, check=False, timeout=120
-    )
+    return subprocess.run([sys.executable, str(WATCH), *args], capture_output=True, text=True, check=False, timeout=120)
 
 
 def events(result: subprocess.CompletedProcess) -> list[dict]:
@@ -225,14 +223,12 @@ def test_on_event_not_fired_for_non_terminal_or_job(tmp_path):
     record = tmp_path / "hook-record.json"
     hook = tmp_path / "recorder.py"
     hook.write_text(
-        "#!/usr/bin/env python3\nimport sys\n" f"open({str(record)!r}, 'a').write(' '.join(sys.argv[1:]) + chr(10))\n",
+        f"#!/usr/bin/env python3\nimport sys\nopen({str(record)!r}, 'a').write(' '.join(sys.argv[1:]) + chr(10))\n",
         encoding="utf-8",
     )
     hook.chmod(0o755)
     emitted = events(
-        run_watch(
-            ["--once", "--emit-existing", "--roots", str(root), "--state", str(cursor), "--on-event", str(hook)]
-        )
+        run_watch(["--once", "--emit-existing", "--roots", str(root), "--state", str(cursor), "--on-event", str(hook)])
     )
     assert any(evt["kind"] == "job" for evt in emitted)
     import time
@@ -259,7 +255,9 @@ def test_malformed_json_is_skipped(tmp_path):
 # --------------------------------------------------------------------------
 
 
-def make_bundle(base: Path, run_id: str, *, status: str, completion: bool, marker: str | None, progress: str | None) -> Path:
+def make_bundle(
+    base: Path, run_id: str, *, status: str, completion: bool, marker: str | None, progress: str | None
+) -> Path:
     bundle = base / run_id / "run-bundle"
     bundle.mkdir(parents=True, exist_ok=True)
     manifest = {"schema_version": 1, "run_id": run_id, "status": status}
@@ -296,7 +294,9 @@ def test_hand_run_without_full_triple_is_not_terminal(tmp_path, ardx_common, com
 
 
 def test_hand_run_failed_is_terminal(tmp_path, ardx_common):
-    path = make_bundle(tmp_path, "run-failed", status="failed", completion=False, marker="application failure recorded", progress=None)
+    path = make_bundle(
+        tmp_path, "run-failed", status="failed", completion=False, marker="application failure recorded", progress=None
+    )
     summary = ardx_common.classify_run(path, json.loads(path.read_text()), stale_seconds=3600)
     assert (summary["status"], summary["terminal"], summary["success"]) == ("failed", True, False)
 
@@ -304,8 +304,8 @@ def test_hand_run_failed_is_terminal(tmp_path, ardx_common):
 def test_hand_run_stale_is_not_terminal_and_not_failed(tmp_path, ardx_common):
     import datetime as dt
 
-    old = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=5)).isoformat()
-    fresh = dt.datetime.now(dt.timezone.utc).isoformat()
+    old = (dt.datetime.now(dt.UTC) - dt.timedelta(hours=5)).isoformat()
+    fresh = dt.datetime.now(dt.UTC).isoformat()
     stale_path = make_bundle(tmp_path, "run-stale", status="running", completion=False, marker=None, progress=old)
     live_path = make_bundle(tmp_path, "run-live", status="running", completion=False, marker=None, progress=fresh)
     stale = ardx_common.classify_run(stale_path, json.loads(stale_path.read_text()), stale_seconds=3600)
@@ -316,7 +316,9 @@ def test_hand_run_stale_is_not_terminal_and_not_failed(tmp_path, ardx_common):
 
 def test_include_hand_run_emits_run_events(tmp_path):
     root = tmp_path / "runs"
-    make_bundle(root, "hand-1", status="completed", completion=True, marker="no application error recorded", progress=None)
+    make_bundle(
+        root, "hand-1", status="completed", completion=True, marker="no application error recorded", progress=None
+    )
     cursor = tmp_path / "watch-state.json"
     emitted = events(
         run_watch(["--once", "--emit-existing", "--include-hand-run", "--roots", str(root), "--state", str(cursor)])
@@ -331,7 +333,14 @@ def test_include_hand_run_emits_run_events(tmp_path):
 def test_campaign_owned_bundles_are_not_hand_runs(tmp_path):
     root = tmp_path / "runs"
     write_state(root / "camp" / "orchestration" / "state.json", campaign("camp", {"a": job("completed")}))
-    make_bundle(root / "camp" / "arms", "job-a", status="completed", completion=True, marker="no application error recorded", progress=None)
+    make_bundle(
+        root / "camp" / "arms",
+        "job-a",
+        status="completed",
+        completion=True,
+        marker="no application error recorded",
+        progress=None,
+    )
     cursor = tmp_path / "watch-state.json"
     emitted = events(
         run_watch(["--once", "--emit-existing", "--include-hand-run", "--roots", str(root), "--state", str(cursor)])
@@ -352,10 +361,40 @@ def test_cursor_is_written_atomically_and_reused(tmp_path):
 
 def test_launch_gate_canary_bundles_are_not_hand_runs(tmp_path):
     root = tmp_path / "runs"
-    make_bundle(root / "attempt1" / "gate-canary" / "arms", "canary-1", status="failed", completion=False, marker=None, progress=None)
-    make_bundle(root / "attempt1" / "outputs", "science-1", status="completed", completion=True, marker="no application error recorded", progress=None)
+    make_bundle(
+        root / "attempt1" / "gate-canary" / "arms",
+        "canary-1",
+        status="failed",
+        completion=False,
+        marker=None,
+        progress=None,
+    )
+    make_bundle(
+        root / "attempt1" / "outputs",
+        "science-1",
+        status="completed",
+        completion=True,
+        marker="no application error recorded",
+        progress=None,
+    )
     cursor = tmp_path / "watch-state.json"
     emitted = events(
         run_watch(["--once", "--emit-existing", "--include-hand-run", "--roots", str(root), "--state", str(cursor)])
     )
     assert [evt["id"] for evt in emitted if evt["kind"] == "run"] == ["science-1"]
+
+
+def test_fire_hook_accepts_a_multi_word_command(tmp_path: Path, monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    class _Proc:
+        def __init__(self, argv, **kwargs):  # noqa: ANN001
+            calls.append(list(argv))
+
+    sys.path.insert(0, str(ARDX))
+    import campaign_watch  # noqa: PLC0415
+
+    monkeypatch.setattr(campaign_watch.subprocess, "Popen", _Proc)
+    evt = {"kind": "campaign", "id": "c1", "status": "completed", "terminal": True}
+    campaign_watch.fire_hook("env ARDX_DRY_RUN=1 bash hook.sh", evt)
+    assert calls == [["env", "ARDX_DRY_RUN=1", "bash", "hook.sh", "campaign", "c1", "completed"]]

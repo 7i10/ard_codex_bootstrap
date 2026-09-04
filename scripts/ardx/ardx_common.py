@@ -31,11 +31,11 @@ DEFAULT_REGISTRY = REPO_ROOT / "configs" / "workspace" / "ard_workspace_v1.json"
 
 
 def now_iso() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat()
+    return dt.datetime.now(dt.UTC).isoformat()
 
 
 def utc_stamp() -> str:
-    return dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 def add_registry_argument(parser: argparse.ArgumentParser) -> None:
@@ -68,7 +68,11 @@ def runtime_root(registry: dict[str, Any]) -> Path:
 def ardx_root(registry: dict[str, Any]) -> Path:
     """``<runtime>/orchestration/ardx`` -- watcher cursor, log and claude runs."""
     orchestration = registry.get("orchestration_root")
-    base = Path(orchestration) if isinstance(orchestration, str) and orchestration else runtime_root(registry) / "orchestration"
+    base = (
+        Path(orchestration)
+        if isinstance(orchestration, str) and orchestration
+        else runtime_root(registry) / "orchestration"
+    )
     return base / "ardx"
 
 
@@ -122,7 +126,7 @@ def parse_timestamp(value: Any) -> dt.datetime | None:
         return None
     if parsed.tzinfo is None:
         return None
-    return parsed.astimezone(dt.timezone.utc)
+    return parsed.astimezone(dt.UTC)
 
 
 # --------------------------------------------------------------------------
@@ -300,8 +304,7 @@ def find_run_manifests(roots: list[Path], *, exclude_campaign_bundles: bool = Tr
     return sorted(
         path
         for path in found
-        if not any(parent in owned for parent in path.parents)
-        and not GATE_ARTIFACT_DIRS.intersection(path.parts)
+        if not any(parent in owned for parent in path.parents) and not GATE_ARTIFACT_DIRS.intersection(path.parts)
     )
 
 
@@ -313,7 +316,7 @@ def classify_run(
     now: dt.datetime | None = None,
 ) -> dict[str, Any]:
     """The triple rule; ``stale`` is neither terminal nor failed."""
-    observed_now = dt.datetime.now(dt.timezone.utc) if now is None else now.astimezone(dt.timezone.utc)
+    observed_now = dt.datetime.now(dt.UTC) if now is None else now.astimezone(dt.UTC)
     bundle = manifest_path.parent
     declared = manifest.get("status")
     completion = (bundle / "completion.json").exists()

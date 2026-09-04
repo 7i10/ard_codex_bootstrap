@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -112,7 +113,9 @@ def job_detail(state: dict[str, Any], job_id: str) -> dict[str, Any]:
     }
 
 
-def scan_campaign(path: Path, previous: dict[str, Any] | None, emit_existing: bool) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+def scan_campaign(
+    path: Path, previous: dict[str, Any] | None, emit_existing: bool
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     try:
         state = read_json(path)
     except (OSError, json.JSONDecodeError) as exc:
@@ -187,7 +190,9 @@ def scan_campaign(path: Path, previous: dict[str, Any] | None, emit_existing: bo
     return events, snapshot
 
 
-def scan_run(path: Path, previous: dict[str, Any] | None, emit_existing: bool, stale_seconds: float) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+def scan_run(
+    path: Path, previous: dict[str, Any] | None, emit_existing: bool, stale_seconds: float
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     try:
         manifest = read_json(path)
     except (OSError, json.JSONDecodeError) as exc:
@@ -248,7 +253,7 @@ def fire_hook(command: str, evt: dict[str, Any]) -> None:
         return
     env = dict(os.environ)
     env["ARDX_EVENT_JSON"] = json.dumps(evt, sort_keys=True)
-    argv = [command, evt["kind"], evt["id"], evt["status"]]
+    argv = [*shlex.split(command), evt["kind"], evt["id"], evt["status"]]
     try:
         subprocess.Popen(  # noqa: S603 - operator-supplied hook command
             argv,
@@ -289,17 +294,33 @@ def scan_once(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Watch orchestrator campaigns and hand-run bundles for state transitions.")
+    parser = argparse.ArgumentParser(
+        description="Watch orchestrator campaigns and hand-run bundles for state transitions."
+    )
     add_registry_argument(parser)
-    parser.add_argument("--roots", type=Path, nargs="+", default=None, help="directories to scan (default: run_root and orchestration_root)")
+    parser.add_argument(
+        "--roots",
+        type=Path,
+        nargs="+",
+        default=None,
+        help="directories to scan (default: run_root and orchestration_root)",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--once", action="store_true", help="scan once and exit (default)")
     mode.add_argument("--follow", action="store_true", help="scan forever every --interval seconds")
     parser.add_argument("--interval", type=float, default=30.0, help="seconds between scans in --follow (default: 30)")
-    parser.add_argument("--state", type=Path, default=None, help="cursor file (default: <runtime>/orchestration/ardx/watch-state.json)")
-    parser.add_argument("--on-event", default=None, help="command run as CMD KIND ID STATUS for terminal campaign/run events")
-    parser.add_argument("--emit-existing", action="store_true", help="emit the first snapshot instead of only recording it")
-    parser.add_argument("--stale-seconds", type=float, default=3600.0, help="hand-run progress age before 'stale' (default: 3600)")
+    parser.add_argument(
+        "--state", type=Path, default=None, help="cursor file (default: <runtime>/orchestration/ardx/watch-state.json)"
+    )
+    parser.add_argument(
+        "--on-event", default=None, help="command run as CMD KIND ID STATUS for terminal campaign/run events"
+    )
+    parser.add_argument(
+        "--emit-existing", action="store_true", help="emit the first snapshot instead of only recording it"
+    )
+    parser.add_argument(
+        "--stale-seconds", type=float, default=3600.0, help="hand-run progress age before 'stale' (default: 3600)"
+    )
     parser.add_argument(
         "--include-hand-run",
         action="store_true",

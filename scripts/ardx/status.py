@@ -96,7 +96,7 @@ def watcher_row(registry: dict[str, Any], state_path: Path) -> dict[str, Any]:
     sources = 0
     if state_path.exists():
         try:
-            cursor_mtime = dt.datetime.fromtimestamp(state_path.stat().st_mtime, dt.timezone.utc).isoformat()
+            cursor_mtime = dt.datetime.fromtimestamp(state_path.stat().st_mtime, dt.UTC).isoformat()
         except OSError:
             cursor_mtime = None
         try:
@@ -243,7 +243,7 @@ def scan_root(path: Path) -> dict[str, Any]:
             continue
         if newest is None or mtime > newest:
             newest = mtime
-    newest_iso = None if newest is None else dt.datetime.fromtimestamp(newest, dt.timezone.utc).isoformat()
+    newest_iso = None if newest is None else dt.datetime.fromtimestamp(newest, dt.UTC).isoformat()
     return {"entries": len(entries), "newest_mtime": newest_iso, "note": None}
 
 
@@ -358,7 +358,8 @@ def render_markdown(data: dict[str, Any], *, brief: bool) -> str:
         "",
         "## Watcher",
         f"- ardx-watch.service: {watcher['service']}",
-        f"- cursor: {watcher['state_path']} ({watcher['tracked_sources']} sources, last scan {watcher['last_scan'] or 'never'})",
+        f"- cursor: {watcher['state_path']} "
+        f"({watcher['tracked_sources']} sources, last scan {watcher['last_scan'] or 'never'})",
         "",
         "## Campaigns",
     ]
@@ -379,7 +380,8 @@ def render_markdown(data: dict[str, Any], *, brief: bool) -> str:
         out.append("- none found")
     for row in data["bundles"]:
         out.append(
-            f"- **{row['run_id']}** {row['status']} (manifest={row['manifest_status']}, progress={row['progress_timestamp']})"
+            f"- **{row['run_id']}** {row['status']} "
+            f"(manifest={row['manifest_status']}, progress={row['progress_timestamp']})"
         )
     out += ["", "## Pending decisions"]
     if not data["decisions"]:
