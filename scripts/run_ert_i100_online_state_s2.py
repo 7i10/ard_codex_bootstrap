@@ -159,6 +159,8 @@ def _calibration() -> dict[str, Any]:
 
 
 def _run_prefix(args: argparse.Namespace) -> dict[str, Any]:
+    if args.epochs != 101:
+        raise SystemExit("the registered shared prefix is exactly e100; --epochs must be the exclusive bound 101")
     source_sha = _require_source(args.expected_source_sha)
     config_path, checkpoint, training, endpoint = _contracts(args.seed)
     result = run_stage_a_arm(
@@ -169,7 +171,7 @@ def _run_prefix(args: argparse.Namespace) -> dict[str, Any]:
         treatment=StageATreatment(arm="I100_ONLINE_PREFIX", mask_key=None, kind="baseline", online_state_s2=True),
         calibration=_calibration(),
         device=torch.device(args.device),
-        end_epoch=101,
+        end_epoch=args.epochs,
         horizon_epochs=(100,),
         run_namespace=args.run_namespace,
         expected_parent_checkpoint_sha256=str(PARENTS[args.seed]["sha256"]),
@@ -235,6 +237,12 @@ def _run_freeze(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _run_arm(args: argparse.Namespace) -> dict[str, Any]:
+    expected_epochs = 102 if args.canary_one_epoch else 115
+    if args.epochs != expected_epochs:
+        raise SystemExit(
+            "the registered online-state child horizon is fixed; "
+            f"--epochs must be the exclusive bound {expected_epochs}"
+        )
     source_sha = _require_source(args.expected_source_sha)
     config_path, _, training, endpoint = _contracts(args.seed)
     if not args.prefix_checkpoint.is_file() or not args.thresholds.is_file():
@@ -255,7 +263,7 @@ def _run_arm(args: argparse.Namespace) -> dict[str, Any]:
         )
     if args.canary_one_epoch and args.run_namespace != "ert-i100-online-state-s2-v1-canary":
         raise SystemExit("one-epoch online canary is reserved for the registered public canary namespace")
-    end_epoch = 102 if args.canary_one_epoch else 115
+    end_epoch = args.epochs
     horizons = (101,) if args.canary_one_epoch else (104, 109, 114)
     result = run_stage_a_arm(
         parent_config_path=config_path,
@@ -319,6 +327,7 @@ def _run_canary(args: argparse.Namespace) -> dict[str, Any]:
             run_namespace=namespace,
             canary_max_train_batches=4,
             canary_max_validation_batches=1,
+            epochs=101,
         )
     )
     prefix_root = output / "prefix"
@@ -354,6 +363,7 @@ def _run_canary(args: argparse.Namespace) -> dict[str, Any]:
                 canary_max_train_batches=4,
                 canary_max_validation_batches=1,
                 canary_source_ids=source_ids,
+                epochs=102,
             )
         )
         horizon = arm_output / "training/checkpoints/epoch-101.pt"
@@ -400,6 +410,12 @@ def build_parser() -> argparse.ArgumentParser:
     prefix.add_argument("--output", type=Path, required=True)
     prefix.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     prefix.add_argument("--run-namespace", default="ert-i100-online-state-s2-v1")
+    prefix.add_argument(
+        "--epochs",
+        type=int,
+        default=101,
+        help="registered exclusive runtime bound; only 101 is accepted for the e100 shared prefix",
+    )
     freeze = sub.add_parser("freeze", help="freeze e100 q10 thresholds from one prefix")
     freeze.add_argument("--seed", choices=tuple(PARENTS), required=True)
     freeze.add_argument("--prefix-output", type=Path, required=True)
@@ -418,6 +434,12 @@ def build_parser() -> argparse.ArgumentParser:
     arm.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     arm.add_argument("--run-namespace", default="ert-i100-online-state-s2-v1")
     arm.add_argument("--canary-one-epoch", action="store_true")
+    arm.add_argument(
+        "--epochs",
+        type=int,
+        default=115,
+        help="registered exclusive runtime bound; only 115 is accepted outside the bounded canary",
+    )
     canary = sub.add_parser("canary", help="run the registered full-public-runtime e100/e101 canary")
     canary.add_argument("--seed", choices=tuple(PARENTS), required=True)
     canary.add_argument("--output", type=Path, required=True)

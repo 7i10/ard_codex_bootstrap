@@ -123,6 +123,8 @@ def _base_job(
     parent: dict[str, Any] | None = None,
     calibration: list[dict[str, Any]] | None = None,
     gpu_count: int = 1,
+    pin_to_seed_gpu: bool = True,
+    epoch_binding: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     parent_record = PARENTS[seed]
     return {
@@ -131,7 +133,10 @@ def _base_job(
         "seed": seed,
         "arm": arm,
         "host": "hamster",
-        "gpu": parent_record["gpu"] if gpu_count else None,
+        # State-mutating prefix/arm jobs remain pinned to their seed's GPU.
+        # Immutable read-only endpoint/replay jobs can use either Hamster GPU
+        # after their dependency is complete, avoiding artificial idle time.
+        "gpu": parent_record["gpu"] if gpu_count and pin_to_seed_gpu else None,
         "gpu_count": gpu_count,
         "cwd": str(ROOT),
         "command": command,
@@ -143,7 +148,7 @@ def _base_job(
         "output_dir": str(output_dir),
         "dependencies": dependencies,
         "estimated_work": estimated_work,
-        "work_unit": "estimated_seconds_on_hamster_679_img_s",
+        "work_unit": "measured_training_image_equivalents_v1",
         "retry_policy": {"max_attempts": 1},
         "attempt_scoped_output": {"enabled": True},
         "job_type": job_type,
@@ -158,6 +163,7 @@ def _base_job(
         "inputs": inputs or [],
         "calibration": calibration or [],
         "expected_outputs": expected_outputs,
+        "epoch_binding": epoch_binding,
         "scientific_identity": _identity(seed=seed, arm=arm, parent_sha256=parent_record["sha256"], role=role),
     }
 
@@ -191,10 +197,13 @@ def build_manifest(*, source_sha: str, campaign_root: Path, requested_at: str) -
                     "{attempt_output_dir}",
                     "--device",
                     "cuda",
+                    "--epochs",
+                    "101",
                 ),
                 dependencies=[],
-                estimated_work=720.0,
+                estimated_work=45_000.0,
                 job_type="training",
+                epoch_binding={"scientific_start_epoch": 100, "scientific_final_epoch": 100},
                 expected_outputs=[
                     {"path": "prefix-summary.json"},
                     {"path": "training/checkpoints/epoch-100.pt"},
@@ -263,10 +272,13 @@ def build_manifest(*, source_sha: str, campaign_root: Path, requested_at: str) -
                         "{attempt_output_dir}",
                         "--device",
                         "cuda",
+                        "--epochs",
+                        "115",
                     ),
                     dependencies=[prefix_id, threshold_id],
-                    estimated_work={"control": 8_100.0, "pmp": 9_100.0, "dbdp": 14_400.0}[arm],
+                    estimated_work={"control": 630_000.0, "pmp": 630_000.0, "dbdp": 1_260_000.0}[arm],
                     job_type="training",
+                    epoch_binding={"scientific_start_epoch": 101, "scientific_final_epoch": 114},
                     inputs=[
                         {
                             "kind": "dependency_output",
@@ -318,8 +330,9 @@ def build_manifest(*, source_sha: str, campaign_root: Path, requested_at: str) -
                         "cuda",
                     ),
                     dependencies=[arm_id],
-                    estimated_work=4_800.0,
+                    estimated_work=30_000.0,
                     job_type="collection",
+                    pin_to_seed_gpu=False,
                     inputs=[
                         {
                             "kind": "dependency_output",
@@ -355,8 +368,9 @@ def build_manifest(*, source_sha: str, campaign_root: Path, requested_at: str) -
                         "cuda",
                     ),
                     dependencies=[arm_id],
-                    estimated_work=12_000.0,
+                    estimated_work=90_000.0,
                     job_type="collection",
+                    pin_to_seed_gpu=False,
                     inputs=[
                         {
                             "kind": "dependency_output",

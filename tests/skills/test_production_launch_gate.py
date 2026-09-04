@@ -477,6 +477,7 @@ def test_good_spec_freezes_and_binds_inclusive_final_to_exclusive_runtime(tmp_pa
     manifest = json.loads((gate_dir / "resolved-manifest.json").read_text())
     assert manifest["jobs"][0]["command"][-1] == "3"
     assert manifest["jobs"][0]["epoch_binding"] == {
+        "scientific_start_epoch": 0,
         "scientific_final_epoch": 2,
         "runtime_exclusive_epochs": 3,
     }
@@ -1107,6 +1108,50 @@ def test_explicit_inclusive_runtime_bound_is_rejected(tmp_path: Path) -> None:
     result = invoke(write_spec(tmp_path, spec), "--preflight-only")
     assert result.returncode == 2
     assert "runtime_epochs" in result.stdout
+
+
+def test_job_local_epoch_binding_allows_a_short_prefix_within_campaign_envelope(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    prefix = spec["jobs"][0]
+    prefix["job_id"] = "prefix"
+    prefix["command"] = ["${PYTHON}", "train.py", "--epochs", "999"]
+    prefix["epoch_binding"] = {"scientific_start_epoch": 0, "scientific_final_epoch": 0}
+    suffix = json.loads(json.dumps(prefix))
+    suffix["job_id"] = "suffix"
+    suffix["output_dir"] = str(tmp_path / "outputs" / "suffix")
+    suffix["epoch_binding"] = {"scientific_start_epoch": 1, "scientific_final_epoch": 2}
+    spec["jobs"] = [prefix, suffix]
+
+    result = invoke(write_spec(tmp_path, spec), "--dry-run", output=tmp_path / "gate")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    resolved = json.loads((tmp_path / "gate" / "resolved-manifest.json").read_text())
+    jobs = {job["job_id"]: job for job in resolved["jobs"]}
+    assert jobs["prefix"]["command"][-1] == "1"
+    assert jobs["prefix"]["epoch_binding"] == {
+        "scientific_start_epoch": 0,
+        "scientific_final_epoch": 0,
+        "runtime_exclusive_epochs": 1,
+    }
+    assert jobs["suffix"]["command"][-1] == "3"
+    assert jobs["suffix"]["epoch_binding"] == {
+        "scientific_start_epoch": 1,
+        "scientific_final_epoch": 2,
+        "runtime_exclusive_epochs": 3,
+    }
+    assert jobs["prefix"]["identity_hash"] != jobs["suffix"]["identity_hash"]
+
+
+def test_job_local_epoch_binding_rejects_a_conflicting_expected_checkpoint_epoch(tmp_path: Path) -> None:
+    spec, _, _, _ = base_spec(tmp_path)
+    job = spec["jobs"][0]
+    job["epoch_binding"] = {"scientific_start_epoch": 0, "scientific_final_epoch": 0}
+    job["expected_final_epoch"] = 2
+
+    result = invoke(write_spec(tmp_path, spec), "--preflight-only")
+
+    assert result.returncode == 2
+    assert "expected_final_epoch" in result.stdout
 
 
 def test_resource_plan_conflict_is_fail_closed_before_freeze(tmp_path: Path) -> None:

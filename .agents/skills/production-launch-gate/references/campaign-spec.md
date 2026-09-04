@@ -68,6 +68,18 @@ and cannot use `--fast-launch`.
 
 `scientific_final_epoch` is inclusive and the runtime `--epochs` value is
 exclusive. The gate resolves the latter from the former and records both.
+For a multi-phase campaign, a training job may narrow the campaign envelope
+without changing it:
+
+```json
+"epoch_binding": {"scientific_start_epoch": 100, "scientific_final_epoch": 100}
+```
+
+The gate requires that local range to lie within the top-level contract,
+binds it into the job scientific identity, and rewrites that job's runtime
+`--epochs` to its own exclusive bound. This is intended for materialized
+prefixes and child continuations; it is not a way to extend the campaign
+horizon.
 `dataset.host_paths` and a host profile's `dataset_paths` should agree; a job's
 optional `dataset_path` is checked against the selected host mapping. Use
 `kind: dependency_output` with `producer_job_id` for an input created by an

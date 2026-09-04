@@ -119,7 +119,9 @@ root are rejected; historical inputs remain readable.
   parent bytes, attacks, augmentation, RNG, masks, and calibration. Host, GPU,
   attempt, and W&B execution IDs are excluded.
 - Runtime training bounds are exclusive: `scientific_final_epoch=114` resolves
-  `--epochs 115` and records expected final epoch 114.
+  `--epochs 115` and records expected final epoch 114. A prefix or other
+  bounded training DAG node may declare a narrower job-local `epoch_binding`;
+  it must stay within the campaign envelope and is identity-bound separately.
 - Dependency-produced inputs are deferred until the producer completes;
   existing inputs must already exist and match their hashes.
 - Technical retries get an attempt-specific W&B ID but may not change any

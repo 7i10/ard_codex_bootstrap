@@ -524,6 +524,69 @@ def _replace_epoch_bound(command: list[str], final_epoch: int, errors: list[dict
     return result
 
 
+def _job_epoch_binding(
+    job: dict[str, Any],
+    *,
+    campaign_start_epoch: int | None,
+    campaign_final_epoch: int | None,
+    errors: list[dict[str, Any]],
+    job_id: str,
+) -> tuple[int | None, int | None]:
+    """Resolve an optional, narrower epoch contract for one training DAG node.
+
+    A campaign can legitimately contain a short materialization prefix followed
+    by longer child continuations.  The top-level contract remains the campaign
+    envelope, while a training job may narrow it through ``epoch_binding``.
+    The local range is identity-bound below and still has to be expressed as an
+    exclusive ``--epochs`` runtime argument.
+    """
+
+    raw = job.get("epoch_binding")
+    if raw is None:
+        return campaign_start_epoch, campaign_final_epoch
+    if not isinstance(raw, dict):
+        error(
+            errors,
+            job_id,
+            "epoch_binding",
+            "mapping with scientific_start_epoch/scientific_final_epoch",
+            raw,
+            "declare a job-local inclusive epoch range",
+        )
+        return campaign_start_epoch, campaign_final_epoch
+    start_epoch = raw.get("scientific_start_epoch", campaign_start_epoch)
+    final_epoch = raw.get("scientific_final_epoch", campaign_final_epoch)
+    if not isinstance(start_epoch, int) or not isinstance(final_epoch, int) or final_epoch < start_epoch:
+        error(
+            errors,
+            job_id,
+            "epoch_binding",
+            "integer inclusive start/final with final >= start",
+            raw,
+            "declare a valid job-local epoch range",
+        )
+        return campaign_start_epoch, campaign_final_epoch
+    if isinstance(campaign_start_epoch, int) and start_epoch < campaign_start_epoch:
+        error(
+            errors,
+            job_id,
+            "epoch_binding.scientific_start_epoch",
+            f">= campaign start {campaign_start_epoch}",
+            start_epoch,
+            "keep the job-local range inside the campaign envelope",
+        )
+    if isinstance(campaign_final_epoch, int) and final_epoch > campaign_final_epoch:
+        error(
+            errors,
+            job_id,
+            "epoch_binding.scientific_final_epoch",
+            f"<= campaign final {campaign_final_epoch}",
+            final_epoch,
+            "keep the job-local range inside the campaign envelope",
+        )
+    return start_epoch, final_epoch
+
+
 def _argv(value: Any) -> list[str] | None:
     if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
         return None
@@ -1125,17 +1188,37 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             command = list(command)
         if command and command[0] in {"python", "${PYTHON}"} and profile.get("python"):
             command[0] = str(profile["python"])
-        if isinstance(final_epoch, int) and job.get("job_type", "training") == "training":
-            command = _replace_epoch_bound(command, final_epoch, errors, job_id)
+        job_start_epoch, job_final_epoch = _job_epoch_binding(
+            job,
+            campaign_start_epoch=start_epoch,
+            campaign_final_epoch=final_epoch,
+            errors=errors,
+            job_id=job_id,
+        )
+        if isinstance(job_final_epoch, int) and job.get("job_type", "training") == "training":
+            command = _replace_epoch_bound(command, job_final_epoch, errors, job_id)
             authored_runtime_epochs = job.get("runtime_epochs")
-            if authored_runtime_epochs is not None and authored_runtime_epochs != final_epoch + 1:
+            if authored_runtime_epochs is not None and authored_runtime_epochs != job_final_epoch + 1:
                 error(
                     errors,
                     job_id,
                     "runtime_epochs",
-                    final_epoch + 1,
+                    job_final_epoch + 1,
                     authored_runtime_epochs,
-                    "use the exclusive runtime bound derived from scientific_final_epoch",
+                    "use the exclusive runtime bound derived from the job-local scientific final epoch",
+                )
+            authored_expected_final_epoch = job.get("expected_final_epoch")
+            if (
+                authored_expected_final_epoch is not None
+                and authored_expected_final_epoch != job_final_epoch
+            ):
+                error(
+                    errors,
+                    job_id,
+                    "expected_final_epoch",
+                    job_final_epoch,
+                    authored_expected_final_epoch,
+                    "bind the expected final checkpoint to the job-local scientific final epoch",
                 )
         cwd = resolve_path(job.get("cwd") or profile.get("repo_path") or base, base)
         output = resolve_path(job.get("output_dir"), base)
@@ -1321,6 +1404,10 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             "rng": spec.get("rng_contract", job.get("rng_contract")),
             "masks": [identity_artifact(item) for item in masks],
             "calibration": [identity_artifact(item) for item in calibrations],
+            "epoch_binding": {
+                "scientific_start_epoch": job_start_epoch,
+                "scientific_final_epoch": job_final_epoch,
+            },
         }
         identity_hash = digest({"source_sha": source.get("git_sha"), **identity})
         base_run = str(job.get("wandb_run_id") or f"{campaign_id}-{job_id}-{identity_hash[:12]}")
@@ -1373,10 +1460,11 @@ def resolve_campaign(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, A
             "smoke_group": job.get("smoke_group"),
             "smoke_equivalence": job.get("smoke_equivalence"),
             "expected_outputs": expected_outputs,
-            "expected_final_epoch": job.get("expected_final_epoch", final_epoch),
+            "expected_final_epoch": job.get("expected_final_epoch", job_final_epoch),
             "epoch_binding": {
-                "scientific_final_epoch": final_epoch,
-                "runtime_exclusive_epochs": final_epoch + 1 if isinstance(final_epoch, int) else None,
+                "scientific_start_epoch": job_start_epoch,
+                "scientific_final_epoch": job_final_epoch,
+                "runtime_exclusive_epochs": job_final_epoch + 1 if isinstance(job_final_epoch, int) else None,
             },
             "dataset": {
                 "identity": dataset_identity,

@@ -95,6 +95,11 @@ Online-S2×T1 branch during epochs 101–114.
 - 2026-09-04: consolidated scientific review found and resolved six P1
   issues (including public-canary `SampleRef` handling); final verdict was
   APPROVED pending frozen-source public canary.
+- 2026-09-04: first immutable-manifest preflight correctly rejected a generic
+  gate assumption that every training node must share the campaign's e114
+  bound.  Added identity-bound job-local epoch contracts so the shared e100
+  prefix remains exactly one epoch while children remain exactly e101–114;
+  no GPU job was launched from the rejected manifest.
 
 ## Completion report
 
