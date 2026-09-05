@@ -1,0 +1,53 @@
+# ARD execution environment — the complete specification.
+#
+# WHY THIS FILE EXISTS
+# `requirements/constraints.txt` pins packages but not the Python interpreter,
+# and nothing verified that a host matched it.  On 2026-09-06 that gap surfaced:
+# Hamster was running Python 3.11.15 and Ferret 3.12.13, with the same torch.
+# Two hosts had silently become two different measurement instruments.  Given
+# that a control differing only in its random seed already moves the held-out
+# endpoint by 1.14-1.25 pp before the learning-rate decay, an unquantified
+# interpreter difference is not something this project can carry.
+#
+# RULE
+# Every host that runs or analyses an experiment installs exactly this.  A
+# comparison never straddles two environments.  Changing any line here starts a
+# new environment generation and invalidates cross-generation pooling.
+#
+# GENERATION: v2 (2026-09-06)
+# Supersedes the unnamed generation that produced results up to 2026-09-05.
+# Those results remain valid on their own terms; they are not pooled with v2.
+
+[interpreter]
+python == 3.11.15
+# Chosen to match the host that produced every committed result, and the
+# `target-version = "py311"` already declared in pyproject.toml.
+
+[cuda]
+# Wheels must come from the matching PyTorch index, not PyPI.
+index_url = https://download.pytorch.org/whl/cu128
+torch == 2.11.0+cu128
+torchvision == 0.26.0+cu128
+
+[runtime]
+pydantic == 2.13.4
+PyYAML == 6.0.3
+setuptools == 78.1.0
+numpy == 2.4.4          # VERIFY against Hamster on recovery; Ferret observed 2.4.4
+
+[tracking]
+wandb == 0.28.0
+pyarrow == 25.0.0
+
+[evaluation]
+autoattack @ git+https://github.com/fra31/auto-attack.git@a39220048b3c9f2cca9a4d3a54604793c68eca7e
+
+[development]
+pytest == 9.1.1
+ruff == 0.15.22
+mypy == 2.3.0
+
+[environment_name]
+# One name on every host.  The legacy `adv` environment is retained read-only on
+# each host so that pre-v2 results stay reproducible; it is never updated.
+name = ard-v2
