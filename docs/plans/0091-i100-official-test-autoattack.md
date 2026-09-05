@@ -4,7 +4,7 @@
 
 - Owner: human (scientific decisions), Claude Code (execution)
 - Branch / base SHA: master, see progress log
-- Current milestone: M0
+- Current milestone: M2 (running)
 - Last updated: 2026-09-05
 
 ## Goal
@@ -106,14 +106,14 @@ absolute terms; only the difference between arms is being tested.
 
 ## Milestones
 
-- [ ] M0: mirror the three Ferret runs, verify every checkpoint by SHA-256
+- [x] M0: mirror the three Ferret runs, verify every checkpoint by SHA-256
   against its run-bundle manifest, and confirm each run has a sibling
   `resolved_config.yaml`.
-- [ ] M1: add `configs/evaluation/autoattack_saved_checkpoint.yaml`
+- [x] M1: add `configs/evaluation/autoattack_saved_checkpoint.yaml`
   (`autoattack: true`, `checkpoints: both`), pin a source worktree, and run one
   bounded smoke: CE-PGD20 only, one arm, to prove the lineage and attack-identity
   checks pass before spending GPU hours.
-- [ ] M2: run the six AutoAttack evaluations detached, one per GPU.
+- [~] M2: run the six AutoAttack evaluations detached, one per GPU.
 - [ ] M3: aggregate into one record and report, apply the decision rule, commit.
 - [ ] M4: write the decision packet for what the result implies.
 
@@ -142,6 +142,19 @@ absolute terms; only the difference between arms is being tested.
 
 - 2026-09-05: plan authored.  Checkpoint inventory verified: all six arms exist
   with best and last; three are Ferret-only.  All five GPUs idle.
+- 2026-09-05 M0: mirrored `unseen-confirm-{a-crop-suffix-r2,c-crop-suffix-r2,c-i100-suffix-r3}`
+  from Ferret into `<runtime>/runs/i100-official-test-v1/arms/`, 208.7 MB of
+  checkpoints each, best and last plus `resolved_config.yaml` for all three.
+- 2026-09-05 M1: added `configs/evaluation/autoattack_saved_checkpoint.yaml`
+  (commit `9ffc1ae`) and pinned worktree `source-9ffc1aedf3b1`.  Bounded smoke on
+  `confirm-b-i100` with the CE-PGD20-only config passed: `count = 10000`
+  (official test split), threat hash `70811016...dcc4f2` matched the registered
+  selection attack, clean 82.86% and CE-PGD20 57.07% for both checkpoints
+  (confirm-b's best epoch is 199, so best and last hold the same weights).
+- 2026-09-05 M2: six evaluations launched detached from the pinned worktree,
+  three per GPU on Hamster, `13:29 JST`.  Round 1 confirmed running at 91% GPU
+  utilisation on both devices.  Budget about 60-90 minutes per job from the
+  2026-08-07 seed-0 AutoAttack evaluations, so roughly three to four hours.
 
 ## Completion report
 
