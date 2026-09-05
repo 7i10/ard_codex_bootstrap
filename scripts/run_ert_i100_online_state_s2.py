@@ -292,6 +292,7 @@ def _run_arm(args: argparse.Namespace) -> dict[str, Any]:
         ),
         resume_epoch=100,
         force_sample_keyed_attack=True,
+        continuation_seed=args.continuation_seed,
         canary_max_train_batches=getattr(args, "canary_max_train_batches", None),
         canary_max_validation_batches=getattr(args, "canary_max_validation_batches", None),
         canary_source_ids=getattr(args, "canary_source_ids", None),
@@ -443,6 +444,16 @@ def build_parser() -> argparse.ArgumentParser:
     arm.add_argument("--output", type=Path, required=True)
     arm.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     arm.add_argument("--run-namespace", default="ert-i100-online-state-s2-v1")
+    arm.add_argument(
+        "--continuation-seed",
+        type=int,
+        default=None,
+        help=(
+            "post-resume attack RNG seed for a matched continuation replicate; leaves the data "
+            "order and augmentation streams on the parent's seeds and is recorded in the child "
+            "identity, so two arms differing only here are the same experiment run twice"
+        ),
+    )
     arm.add_argument("--canary-one-epoch", action="store_true")
     arm.add_argument(
         "--epochs",

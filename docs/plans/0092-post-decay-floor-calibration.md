@@ -4,7 +4,7 @@
 
 - Owner: human (approval to spend GPU), Claude Code (execution)
 - Branch / base SHA: master, see progress log
-- Current milestone: M0, not started
+- Current milestone: M1
 - Last updated: 2026-09-05
 
 ## Goal
@@ -65,20 +65,37 @@ Parents are the plan-0087 lineage: dev-1 `360910a8...7630835`, dev-2
 `bb0c7c1a...f7aaf7`, teacher `fc398a48...c383983`, training attack
 `97a41870...9623d4d`, endpoint `70811016...dcc4f2`.
 
-## The one open question M0 must settle
+## What a replicate varies — settled
 
-"Differing only in the post-fork random stream" needs a precise definition in
-this runtime before anything launches.  The attack stream is derived per step
-from the training-attack seed, and the data order and augmentation views have
-their own seeds, but all seven seeds are part of the recorded scientific
-identity.  M0 must decide which seed or seeds a replicate varies, justify the
-choice against `docs/SCIENTIFIC_INVARIANTS.md`, and record it in the frozen
-contract, because the answer defines what "the same experiment twice" means for
-every future screen.  Varying the wrong thing would measure a different and
-larger quantity, which is precisely the confusion this plan exists to end.
+"Differing only in the post-fork random stream" already has a definition in this
+runtime, and a precedent.  Plan 0054 used it to build the `L2-R1`/`L2-R2`/`L4-R1`/
+`L4-R2` blocks whose control-versus-control gaps are the pre-decay floor that
+`docs/MEASUREMENT_DESIGN.md` reports.
 
-If the runtime cannot express a same-identity replicate at all, that is itself
-the finding, and the plan stops at M0 and reports it.
+The mechanism is the `continuation_seed` argument of `run_stage_a_arm`
+(`src/ard/analysis/ert_stage_a_runtime.py:876-882`).  Setting it produces:
+
+| random source | replicate behaviour |
+| --- | --- |
+| data order | unchanged — keeps the parent's `seeds.data_order` |
+| augmentation view | unchanged — same seed, so the same view per epoch and sample |
+| attack random start | re-seeded |
+| Python / NumPy / global Torch | re-seeded |
+
+The full epoch-100 model, optimizer, scheduler, scaler, sampler and sample state
+are restored from the parent checkpoint first; only the post-resume streams above
+are re-seeded.  The value enters the child identity hash
+(`_arm_hash(..., continuation_seed=...)`), so each replicate is a distinct,
+recorded object rather than a silent re-run, and two arms differing only in this
+value are the same experiment run twice.
+
+This also settles a question the audit left open: because R1/R2 were built this
+way, the 0.16 to 1.88 pp pre-decay gaps really are same-parent, same-data-order
+control-versus-control differences, not a comparison between different parents.
+`docs/MEASUREMENT_DESIGN.md`'s classification of them as type (a) is correct.
+
+The online-state runner did not expose the flag; a pass-through was added to its
+`arm` subcommand.  Nothing in the underlying contract changed.
 
 ## Scientific contracts affected
 
@@ -99,7 +116,7 @@ uncertainty, from six comparisons, and not presented as precise.
 
 ## Milestones
 
-- [ ] M0: define and freeze what a replicate varies; confirm the runtime can
+- [x] M0: define and freeze what a replicate varies; confirm the runtime can
   express it; confirm the epoch-100 prefixes and frozen thresholds from plan
   0087 are reusable, or rebuild them.
 - [ ] M1: launch six continuations from a pinned worktree, epochs 101 to 114.
@@ -137,7 +154,11 @@ for interpreting option A rather than an alternative to it.
 
 - 2026-09-05: plan authored from the prescription in `docs/MEASUREMENT_DESIGN.md`
   section 3.5 and the ranking in `docs/EVIDENCE_RECLASSIFICATION.md` Part 3(c).
-  Not launched; awaiting approval to spend GPU.
+- 2026-09-05 M0: replicate definition settled from the plan-0054 precedent and the
+  `continuation_seed` implementation; see the section above.  Verified that three
+  values of the seed give three distinct arm identity hashes.  Added the
+  `--continuation-seed` pass-through to the online-state runner's `arm`
+  subcommand; 54 focused tests pass.  Approved to spend GPU.
 
 ## Completion report
 
