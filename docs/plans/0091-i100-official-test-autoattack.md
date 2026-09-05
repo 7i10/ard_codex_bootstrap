@@ -155,6 +155,24 @@ absolute terms; only the difference between arms is being tested.
   three per GPU on Hamster, `13:29 JST`.  Round 1 confirmed running at 91% GPU
   utilisation on both devices.  Budget about 60-90 minutes per job from the
   2026-08-07 seed-0 AutoAttack evaluations, so roughly three to four hours.
+- 2026-09-05 M2 round 1 done (`14:41 JST`): `confirm-a-i100` and `confirm-b-crop`
+  are terminal and successful.  Both write `evaluation-results.json` with two
+  checkpoint rows each, `count = 10000` on the official test split, threat hash
+  `70811016...dcc4f2`, and AutoAttack actually run under the pinned upstream
+  commit `a3922004...`.  Round 2 (`confirm-a-crop`, `confirm-c-i100`) started at
+  `14:41 JST`; round 3 (`confirm-b-i100`, `confirm-c-crop`) has not started.  No
+  record can be imported before all six exist: `scripts/aggregate_i100_official_test.py`
+  reads all three seeds and both arms and fails closed on a missing one.  Numbers
+  are deliberately not copied into this plan; the aggregator is the only place
+  they may appear.
+- 2026-09-05 defect (execution plane, not science): the headless postrun fired by
+  `ardx-watch.service` for `confirm-a-i100` did no work.  Its whole log is
+  `Ignoring 44 permissions.allow entries from .claude/settings.json: this workspace
+  has not been trusted`, for the repo-root spelling
+  `/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap`.  Every headless
+  postrun on this checkout will be a no-op until that spelling is trusted, so the
+  remaining four terminal events need a hand-run `/experiment-postrun`.  This does
+  not affect any running evaluation.
 
 ## Completion report
 
