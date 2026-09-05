@@ -1,0 +1,2341 @@
+{
+  "arm_count": 118,
+  "arms": [
+    {
+      "aliases": [
+        "C"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "Control @all /fixed(e79)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": "reference; L2 endpoint clean 78.653%/robust 49.707%, L4 78.582%/49.251% (e84)",
+      "horizon": "79->84",
+      "loss_family": "Control",
+      "name": "C79",
+      "notes": "Chen ERT epoch-79 parent continued with no treatment (5/6 advKD + 1/6 cleanKD baseline).",
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [
+        "ST1W-rerun"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(beta=0.0710) @S3T1 /fixed(e79)",
+      "cohort": "S3T1",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 +1.500pp CI[+0.680,+2.320]; L4 +0.040pp CI[-0.760,+0.860]",
+      "horizon": "79->84",
+      "loss_family": "AdvCE",
+      "name": "ST1W",
+      "notes": "Cohort predicate: student_clean_correct & student_adversarial_wrong (S3), intersected with Teacher T1 (adversarial-correct OUTSIDE the fixed lower positive-margin q10, i.e. excludes T2). n=9889(L2)/9368(L4).",
+      "params": {
+        "beta": 0.07095924764871597
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(beta=0.142) @S3T1 /fixed(e79)",
+      "cohort": "S3T1",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 -2.380pp CI[-3.200,-1.520]; L4 +0.440pp CI[-0.400,+1.300]",
+      "horizon": "79->84",
+      "loss_family": "AdvCE",
+      "name": "ST1M",
+      "notes": null,
+      "params": {
+        "beta": 0.14191849529743195
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TargetSoften(tau=2.0,alpha=1.252) @S3T1 /fixed(e79)",
+      "cohort": "S3T1",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 -0.240pp CI[-1.180,+0.680]; L4 +2.180pp CI[+1.240,+3.040]",
+      "horizon": "79->84",
+      "loss_family": "TargetSoften",
+      "name": "ST1S",
+      "notes": "Teacher-only softened AdvKD target; distinct implementation from HS/RS uniform_target_softening (rho).",
+      "params": {
+        "alpha_soft": 1.2522921562194824,
+        "tau": 2.0
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(beta=0.0710) @S3T2 /fixed(e79)",
+      "cohort": "S3T2",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 +1.420pp CI[+0.600,+2.280]; L4 +1.320pp CI[+0.440,+2.100]",
+      "horizon": "79->84",
+      "loss_family": "AdvCE",
+      "name": "ST2W",
+      "notes": "Cohort = S3 intersect Teacher T2 (the fixed lower positive-margin q10 of teacher-correct). n=2162(L2)/2138(L4).",
+      "params": {
+        "beta": 0.07095924764871597
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(beta=0.142) @S3T2 /fixed(e79)",
+      "cohort": "S3T2",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 -0.980pp CI[-1.760,-0.160]; L4 +1.420pp CI[+0.620,+2.300]",
+      "horizon": "79->84",
+      "loss_family": "AdvCE",
+      "name": "ST2M",
+      "notes": null,
+      "params": {
+        "beta": 0.14191849529743195
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [
+        "ST2S-rerun"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "TargetSoften(tau=2.0,alpha=1.252) @S3T2 /fixed(e79)",
+      "cohort": "S3T2",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 -0.040pp CI[-0.960,+0.840]; L4 +1.960pp CI[+1.080,+2.800]",
+      "horizon": "79->84",
+      "loss_family": "TargetSoften",
+      "name": "ST2S",
+      "notes": null,
+      "params": {
+        "alpha_soft": 1.2522921562194824,
+        "tau": 2.0
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "KDScale(advkd_mult=1.0) @S3T3 /fixed(e79)",
+      "cohort": "S3T3",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 +0.680pp CI[-0.180,+1.560]; L4 +1.820pp CI[+0.980,+2.660]",
+      "horizon": "79->84",
+      "loss_family": "KDScale",
+      "name": "ST3K1",
+      "notes": "'KD=1.0' means baseline weight retained (5/6), not an unweighted raw sum. Cohort = S3 intersect Teacher T3 (adversarial-wrong). n=1790(L2)/1771(L4).",
+      "params": {
+        "advkd_multiplier": 1.0
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "KDScale(advkd_mult=0.5) @S3T3 /fixed(e79)",
+      "cohort": "S3T3",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 +0.980pp CI[+0.120,+1.820]; L4 +1.280pp CI[+0.440,+2.120]",
+      "horizon": "79->84",
+      "loss_family": "KDScale",
+      "name": "ST3K05",
+      "notes": null,
+      "params": {
+        "advkd_multiplier": 0.5
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "KDScale(advkd_mult=0.0) @S3T3 /fixed(e79)",
+      "cohort": "S3T3",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 +0.300pp CI[-0.600,+1.140]; L4 +1.700pp CI[+0.860,+2.540]",
+      "horizon": "79->84",
+      "loss_family": "KDScale",
+      "name": "ST3K0",
+      "notes": null,
+      "params": {
+        "advkd_multiplier": 0.0
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.078) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 -1.300pp CI[-2.180,-0.460]; L4 +0.440pp CI[-0.500,+1.380]",
+      "horizon": "79->84",
+      "loss_family": "CleanCE",
+      "name": "CW1",
+      "notes": "CW = student_clean_wrong cohort (fixed e79 mask, n=8623 L2/8925 L4). Same mask reused by CW-margin, broad-screen, and reliability-gated families below.",
+      "params": {
+        "beta": 0.07825280725955963
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(?) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 -1.460pp CI[-2.300,-0.560]; L4 +0.100pp CI[-0.900,+1.080]",
+      "horizon": "79->84",
+      "loss_family": "CleanCE",
+      "name": "CW2",
+      "notes": "UNRESOLVED: exact coefficient/mechanism distinguishing CW2 from CW1/CW3 is not stated in the source docs.",
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(?) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C79",
+      "headline_heldout_result": "L2 -1.440pp CI[-2.360,-0.580]; L4 -0.580pp CI[-1.480,+0.320]",
+      "horizon": "79->84",
+      "loss_family": "CleanCE",
+      "name": "CW3",
+      "notes": "UNRESOLVED: exact coefficient/mechanism distinguishing CW3 from CW1/CW2 is not stated in the source docs.",
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_STAGE_A_TREATMENT_RESULTS.md",
+      "source_record": "docs/experiments/ert_stage_a_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "Control @all /fixed(e79)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "80->94",
+      "loss_family": "Control",
+      "name": "C79CONF",
+      "notes": "Confirmatory re-run of the C79 continuation control, same parent lineage, longer horizon (94 not 84).",
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CONFIRMATORY_T123_RESULTS.md",
+      "source_record": "docs/experiments/ert_confirmatory_t123_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(beta=0.075) @S3T1 /fixed(e79)",
+      "cohort": "S3T1",
+      "cohort_rule": "fixed",
+      "comparator": "C79CONF",
+      "headline_heldout_result": "e84/89/94 held-out \u0394: L2 -0.14/+0.90/-0.34pp; L4 -0.04/-0.64/-0.92pp",
+      "horizon": "80->94",
+      "loss_family": "AdvCE",
+      "name": "T1WCONF",
+      "notes": "Confirmatory re-run of ST1W: identical cohort (S3xT1, n=9889/9368) and beta, longer horizon.",
+      "params": {
+        "beta": 0.075,
+        "beta_note": "frozen ROUNDED beta, ERT_CONFIRMATORY_T123_RESULTS.md:127; +5.7% versus Stage A's calibrated 0.07095924764871597"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CONFIRMATORY_T123_RESULTS.md",
+      "source_record": "docs/experiments/ert_confirmatory_t123_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(beta=0.075) @S3T2 /fixed(e79)",
+      "cohort": "S3T2",
+      "cohort_rule": "fixed",
+      "comparator": "C79CONF",
+      "headline_heldout_result": "e84/89/94 held-out \u0394: L2 +0.32/-0.40/-0.54pp; L4 -0.18/-1.96/-0.32pp",
+      "horizon": "80->94",
+      "loss_family": "AdvCE",
+      "name": "T2WCONF",
+      "notes": "Confirmatory re-run of ST2W: identical cohort (S3xT2, n=2162/2138) and beta, longer horizon.",
+      "params": {
+        "beta": 0.075,
+        "beta_note": "frozen ROUNDED beta, ERT_CONFIRMATORY_T123_RESULTS.md:127; +5.7% versus Stage A's calibrated 0.07095924764871597"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CONFIRMATORY_T123_RESULTS.md",
+      "source_record": "docs/experiments/ert_confirmatory_t123_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "KDScale(advkd_mult=0.5) @S3T3 /fixed(e79)",
+      "cohort": "S3T3",
+      "cohort_rule": "fixed",
+      "comparator": "C79CONF",
+      "headline_heldout_result": "e84/89/94 held-out \u0394: L2 -0.22/-1.42/-1.80pp; L4 -0.10/-2.14/-0.96pp",
+      "horizon": "80->94",
+      "loss_family": "KDScale",
+      "name": "T3LP05CONF",
+      "notes": "Confirmatory re-run of ST3K05 ('LP05'=low-pressure 0.5): identical cohort (S3xT3, n=1790/1771) and coefficient.",
+      "params": {
+        "advkd_multiplier": 0.5
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CONFIRMATORY_T123_RESULTS.md",
+      "source_record": "docs/experiments/ert_confirmatory_t123_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "Control @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "reference (0/0)",
+      "horizon": "79->84",
+      "loss_family": "Control",
+      "name": "C0",
+      "notes": "baseline, full 8/255 attack budget",
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "Control(epsilon=4/255,step=1/255) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 +0.080pp CI[-0.74,+0.92]; L4 -0.800pp CI[-1.62,+0.04]",
+      "horizon": "79->84",
+      "loss_family": "Control",
+      "name": "C1",
+      "notes": "half attack budget only, no loss-term change (family=Control, not AdvCE)",
+      "params": {
+        "epsilon": "4/255",
+        "step": "1/255"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "KDScale(advkd_multiplier=0.5) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -1.580pp CI[-2.44,-0.74]; L4 -0.360pp CI[-1.16,+0.42]",
+      "horizon": "79->84",
+      "loss_family": "KDScale",
+      "name": "C2",
+      "notes": "",
+      "params": {
+        "advkd_multiplier": 0.5
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "KDScale(advkd_multiplier=0.5,epsilon=4/255,step=1/255) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -0.560pp CI[-1.38,+0.26]; L4 -0.860pp CI[-1.74,0.00]",
+      "horizon": "79->84",
+      "loss_family": "KDScale",
+      "name": "C3",
+      "notes": "KD downweight + half budget",
+      "params": {
+        "advkd_multiplier": 0.5,
+        "epsilon": "4/255",
+        "step": "1/255"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.075) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -0.320pp CI[-1.10,+0.48]; L4 -0.620pp CI[-1.42,+0.22]",
+      "horizon": "79->84",
+      "loss_family": "CleanCE",
+      "name": "C4",
+      "notes": "",
+      "params": {
+        "beta": 0.075
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.075,epsilon=4/255,step=1/255) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -0.520pp CI[-1.28,+0.24]; L4 -2.100pp CI[-2.96,-1.26]",
+      "horizon": "79->84",
+      "loss_family": "CleanCE",
+      "name": "C5",
+      "notes": "CleanCE + half budget",
+      "params": {
+        "beta": 0.075,
+        "epsilon": "4/255",
+        "step": "1/255"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE+KDScale(beta=0.075,advkd_multiplier=0.5) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -1.140pp CI[-2.02,-0.20]; L4 -1.080pp CI[-1.98,-0.22]",
+      "horizon": "79->84",
+      "loss_family": "CleanCE+KDScale",
+      "name": "C6",
+      "notes": "",
+      "params": {
+        "advkd_multiplier": 0.5,
+        "beta": 0.075
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE+KDScale(beta=0.075,advkd_multiplier=0.5,epsilon=4/255,step=1/255) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -2.020pp CI[-2.90,-1.14]; L4 -0.280pp CI[-1.14,+0.58]",
+      "horizon": "79->84",
+      "loss_family": "CleanCE+KDScale",
+      "name": "C7",
+      "notes": "",
+      "params": {
+        "advkd_multiplier": 0.5,
+        "beta": 0.075,
+        "epsilon": "4/255",
+        "step": "1/255"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "Control(epsilon=2/255,step=0.5/255) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -1.240pp CI[-2.10,-0.38]; L4 -0.660pp CI[-1.52,+0.18]",
+      "horizon": "79->84",
+      "loss_family": "Control",
+      "name": "C8",
+      "notes": "quarter attack budget only",
+      "params": {
+        "epsilon": "2/255",
+        "step": "0.5/255"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "KDScale(advkd_multiplier=0.25) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -1.780pp CI[-2.64,-0.94]; L4 -0.840pp CI[-1.76,+0.08]",
+      "horizon": "79->84",
+      "loss_family": "KDScale",
+      "name": "C9",
+      "notes": "stronger KD downweight",
+      "params": {
+        "advkd_multiplier": 0.25
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.15) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 +0.040pp CI[-0.78,+0.88]; L4 -0.560pp CI[-1.40,+0.18]",
+      "horizon": "79->84",
+      "loss_family": "CleanCE",
+      "name": "C10",
+      "notes": "full-dose CleanCE",
+      "params": {
+        "beta": 0.15
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "KDScale(advkd_multiplier=1.5) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -0.600pp CI[-1.46,+0.24]; L4 -0.560pp CI[-1.34,+0.28]",
+      "horizon": "79->84",
+      "loss_family": "KDScale",
+      "name": "C11",
+      "notes": "KD upweight",
+      "params": {
+        "advkd_multiplier": 1.5
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE-BCE(beta_bce=0.08891977369785309,bce=True) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -0.180pp CI[-1.04,+0.64]; L4 -0.840pp CI[-1.64,-0.10]",
+      "horizon": "79->84",
+      "loss_family": "AdvCE-BCE",
+      "name": "C12",
+      "notes": "MART-inspired boundary-CE variant, nearest to AdvCE but a distinct margin-CE formula; calibration source_git_sha is null (provenance gap flagged in source doc). New family label 'AdvCE-BCE' used since none of the specified families is an exact fit.",
+      "params": {
+        "bce": true,
+        "beta_bce": 0.08891977369785309
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE-structural(adaptive_pressure=True) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 +0.340pp CI[-0.44,+1.10]; L4 -0.500pp CI[-1.34,+0.32]",
+      "horizon": "79->84",
+      "loss_family": "AdvCE-structural",
+      "name": "C13",
+      "notes": "Adaptive-pressure modifier on the existing adversarial-KD term (not a new coefficient-weighted loss). None of the specified families fits; 'AdvCE-structural' used as a placeholder, flagged explicitly.",
+      "params": {
+        "adaptive_pressure": true
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE-structural(teacher_gate=True) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -2.700pp CI[-3.54,-1.84]; L4 0.000pp CI[-0.80,+0.80]",
+      "horizon": "79->84",
+      "loss_family": "AdvCE-structural",
+      "name": "C14",
+      "notes": "Teacher-clean-reliability gate on the existing loss (structural, not a new term). None of the specified families fits; 'AdvCE-structural' used as a placeholder, flagged explicitly.",
+      "params": {
+        "teacher_gate": true
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE-structural(iad_inspired=True) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "C0",
+      "headline_heldout_result": "L2 -1.500pp CI[-2.38,-0.62]; L4 -1.080pp CI[-1.88,-0.28]",
+      "horizon": "79->84",
+      "loss_family": "AdvCE-structural",
+      "name": "C15",
+      "notes": "IAD-inspired detached self-target (structural target change). None of the specified families fits; 'AdvCE-structural' used as a placeholder, flagged explicitly.",
+      "params": {
+        "iad_inspired": true
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md",
+      "source_record": "docs/experiments/ert_clean_wrong_broad_screen_results_v1.json"
+    },
+    {
+      "aliases": [
+        "G0"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "Control @all /fixed(e79)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "Control",
+      "name": "G0_BASE",
+      "notes": null,
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md",
+      "source_record": "docs/experiments/ert_cw_reliability_gated_ce015_v1.json"
+    },
+    {
+      "aliases": [
+        "G1"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.150) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "G0_BASE",
+      "headline_heldout_result": "e94 vs G0: L2 -1.64pp; L4 -0.64pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "CleanCE",
+      "name": "G1_CW_ALL_CE015",
+      "notes": "SAME treatment as A1 (CW-margin family) and C10 (broad screen) and F1 (ablation family): CleanCE beta=0.15 on the ENTIRE fixed Clean-Wrong mask, no reliability gate. See collisions section.",
+      "params": {
+        "beta": 0.15
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md",
+      "source_record": "docs/experiments/ert_cw_reliability_gated_ce015_v1.json"
+    },
+    {
+      "aliases": [
+        "G2"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.150) @CW.CE20reliable /fixed(e79)",
+      "cohort": "CW.CE20reliable",
+      "cohort_rule": "fixed",
+      "comparator": "G0_BASE",
+      "headline_heldout_result": "e94 vs G0: L2 +0.44pp; L4 -0.56pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "CleanCE",
+      "name": "G2_CW_R_CE20_CE015",
+      "notes": "Cohort = CW intersect {teacher_adv_margin>0 under CE-PGD20 replay} (n=2908 L2/3119 L4), fixed at e79.",
+      "params": {
+        "beta": 0.15
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md",
+      "source_record": "docs/experiments/ert_cw_reliability_gated_ce015_v1.json"
+    },
+    {
+      "aliases": [
+        "G3"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.150) @CW.KL10reliable /fixed(e79)",
+      "cohort": "CW.KL10reliable",
+      "cohort_rule": "fixed",
+      "comparator": "G0_BASE",
+      "headline_heldout_result": "e94 vs G0: L2 -1.06pp; L4 -1.14pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "CleanCE",
+      "name": "G3_CW_R_KL10_CE015",
+      "notes": "Cohort = CW intersect {teacher_adv_margin>0 under cheaper KL-PGD10 training-replay proxy} (n=3452 L2/3729 L4).",
+      "params": {
+        "beta": 0.15
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md",
+      "source_record": "docs/experiments/ert_cw_reliability_gated_ce015_v1.json"
+    },
+    {
+      "aliases": [
+        "BASE(CW-margin)"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "Control @all /fixed(e79)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "Control",
+      "name": "A0",
+      "notes": null,
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.150) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "A0",
+      "headline_heldout_result": "e94 vs A0: L2 -1.64pp; L4 -0.64pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "CleanCE",
+      "name": "A1",
+      "notes": "SAME treatment as C10, G1_CW_ALL_CE015, F1. See collisions section.",
+      "params": {
+        "beta": 0.15
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(beta=0.0773) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "A0",
+      "headline_heldout_result": "e94 vs A0: L2 +0.56pp; L4 +0.10pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "AdvCE",
+      "name": "A2",
+      "notes": null,
+      "params": {
+        "beta": 0.07726448029279709
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE+AdvCE(clean_ce=0.150,beta=0.0773) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "A0",
+      "headline_heldout_result": "e94 vs A0: L2 -0.20pp; L4 -0.98pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "CleanCE+AdvCE",
+      "name": "A3",
+      "notes": null,
+      "params": {
+        "beta": 0.07726448029279709,
+        "clean_ce": 0.15
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "MF(mode=fixed,lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "A0",
+      "headline_heldout_result": "e94 vs A0: L2 +0.28pp; L4 -0.26pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "MF",
+      "name": "A4",
+      "notes": "Margin hinge to a fixed pooled-constant target (Q50), NOT the student's own quantile (contrast with SBF below).",
+      "params": {
+        "lambda": 0.2388051152229309,
+        "mode": "fixed",
+        "target_Q50": 0.07321701943874359
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE+MF(clean_ce=0.150,lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "A0",
+      "headline_heldout_result": "e94 vs A0: L2 -1.52pp; L4 -1.10pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "CleanCE+MF",
+      "name": "A5",
+      "notes": null,
+      "params": {
+        "clean_ce": 0.15,
+        "lambda": 0.2388051152229309,
+        "mode": "fixed"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "MF(mode=teacher_zero,lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "A0",
+      "headline_heldout_result": "e94 vs A0: L2 +1.50pp; L4 -0.36pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "MF",
+      "name": "A6",
+      "notes": "Target = clip(teacher_margin, 0, cap); always active.",
+      "params": {
+        "cap": 0.13952550292015925,
+        "lambda": 0.2388051152229309,
+        "mode": "teacher_zero"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [
+        "CW-TPFM",
+        "A7 margin-only"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "A0",
+      "headline_heldout_result": "e94 vs A0: L2 +0.82pp; L4 +1.06pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "A7",
+      "notes": "CONFIRMED alias: A7 = CW-TPFM = 'A7 margin-only'. Target = clip(teacher_margin, floor, cap), active=ones (no gating), no other loss term (extra_clean_ce=null). Reused/recalibrated under the SAME acronym TPFM for a DIFFERENT cohort (S2T1, e99) in the I100 canonical-boundary screen -- see hazards section.",
+      "params": {
+        "cap": 0.13952550292015925,
+        "floor": 0.03221710026264191,
+        "lambda": 0.2388051152229309,
+        "mode": "teacher_floor"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM-abstain(lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "A0",
+      "headline_heldout_result": "e94 vs A0: L2 +0.10pp; L4 +0.12pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM-abstain",
+      "name": "A8",
+      "notes": "Same target clamp as A6 but active only where teacher_margin>0 -- the one A-family arm that gates WITHIN the fixed CW cohort rather than applying to every sample every step.",
+      "params": {
+        "cap": 0.13952550292015925,
+        "lambda": 0.2388051152229309,
+        "mode": "teacher_abstain"
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md",
+      "source_record": "docs/experiments/ert_cw_margin_generalization_screen_v1.json"
+    },
+    {
+      "aliases": [
+        "=A0 (reused)"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "Control @all /fixed(e79)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "Control",
+      "name": "F0",
+      "notes": null,
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_A7_CLEANCE_ABLATION.md",
+      "source_record": "docs/experiments/ert_cw_a7_cleance_ablation_v1.json"
+    },
+    {
+      "aliases": [
+        "=A1 (reused)"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE(beta=0.150) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "F0",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "CleanCE",
+      "name": "F1",
+      "notes": "Reuse of A1; part of the CleanCE(0.15)@CW collision cluster.",
+      "params": {
+        "beta": 0.15
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_A7_CLEANCE_ABLATION.md",
+      "source_record": "docs/experiments/ert_cw_a7_cleance_ablation_v1.json"
+    },
+    {
+      "aliases": [
+        "=A7 (reused)"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "F0",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "F2",
+      "notes": null,
+      "params": {
+        "cap": 0.13952550292015925,
+        "floor": 0.03221710026264191,
+        "lambda": 0.2388051152229309
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_A7_CLEANCE_ABLATION.md",
+      "source_record": "docs/experiments/ert_cw_a7_cleance_ablation_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "CleanCE+TPFM(beta=0.150,lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "F0",
+      "headline_heldout_result": "e94 vs F0: L2 clean +0.50/robust +0.28pp; L4 clean +1.36/robust -1.50pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "CleanCE+TPFM",
+      "name": "F3",
+      "notes": "Only freshly-trained arm in this factorial; combines F1(CleanCE)+F2(TPFM).",
+      "params": {
+        "beta": 0.15,
+        "lambda": 0.2388051152229309
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_A7_CLEANCE_ABLATION.md",
+      "source_record": "docs/experiments/ert_cw_a7_cleance_ablation_v1.json"
+    },
+    {
+      "aliases": [
+        "=A0 (reused)"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "Control @all /fixed(e79)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "Control",
+      "name": "L0_BASE",
+      "notes": null,
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_LAMBDA_SENSITIVITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_lambda_sensitivity_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.100) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "L0_BASE",
+      "headline_heldout_result": "e94 vs L0: L2 +0.34pp; L4 -0.02pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "L1_010",
+      "notes": null,
+      "params": {
+        "lambda": 0.1
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_LAMBDA_SENSITIVITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_lambda_sensitivity_v1.json"
+    },
+    {
+      "aliases": [
+        "=A7 (reused)"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "L0_BASE",
+      "headline_heldout_result": "e94 vs L0: L2 +0.82pp; L4 +1.06pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "L2_CAL",
+      "notes": null,
+      "params": {
+        "lambda": 0.238805
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_LAMBDA_SENSITIVITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_lambda_sensitivity_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.250) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "L0_BASE",
+      "headline_heldout_result": "e94 vs L0: L2 -0.50pp; L4 +0.28pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "L3_025",
+      "notes": null,
+      "params": {
+        "lambda": 0.25
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_LAMBDA_SENSITIVITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_lambda_sensitivity_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.500) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "L0_BASE",
+      "headline_heldout_result": "e94 vs L0: L2 +1.62pp; L4 +0.38pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "L4_050",
+      "notes": null,
+      "params": {
+        "lambda": 0.5
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_CW_MARGIN_LAMBDA_SENSITIVITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_lambda_sensitivity_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "Control @all /fixed(e79)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "Control",
+      "name": "B0_BASE",
+      "notes": null,
+      "params": {},
+      "seeds": "L2-R1,L2-R2,L4-R1,L4-R2",
+      "source_doc": "docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_local_lambda_stability_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.215) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "B0_BASE",
+      "headline_heldout_result": "e94 block-mean robust vs B0: -0.458pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "N90",
+      "notes": "90% of calibrated lambda.",
+      "params": {
+        "lambda": 0.214924604
+      },
+      "seeds": "L2-R1,L2-R2,L4-R1,L4-R2",
+      "source_doc": "docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_local_lambda_stability_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.227) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "B0_BASE",
+      "headline_heldout_result": "e94 block-mean robust vs B0: -0.479pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "N95",
+      "notes": "95% of calibrated lambda.",
+      "params": {
+        "lambda": 0.226864859
+      },
+      "seeds": "L2-R1,L2-R2,L4-R1,L4-R2",
+      "source_doc": "docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_local_lambda_stability_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.239) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "B0_BASE",
+      "headline_heldout_result": "e94 block-mean robust vs B0: -0.069pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "A100",
+      "notes": "100% of calibrated lambda = same lambda as A7/L2_CAL, but this is a FRESH replicate run on new hardware (Hamster), not a reuse of A7's own checkpoint bytes.",
+      "params": {
+        "lambda": 0.238805115
+      },
+      "seeds": "L2-R1,L2-R2,L4-R1,L4-R2",
+      "source_doc": "docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_local_lambda_stability_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.251) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "B0_BASE",
+      "headline_heldout_result": "e94 block-mean robust vs B0: -0.618pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "N105",
+      "notes": "105% of calibrated lambda.",
+      "params": {
+        "lambda": 0.250745371
+      },
+      "seeds": "L2-R1,L2-R2,L4-R1,L4-R2",
+      "source_doc": "docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_local_lambda_stability_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "TPFM(lambda=0.263) @CW /fixed(e79)",
+      "cohort": "CW",
+      "cohort_rule": "fixed",
+      "comparator": "B0_BASE",
+      "headline_heldout_result": "e94 block-mean robust vs B0: +0.043pp",
+      "horizon": "79->84/89/94",
+      "loss_family": "TPFM",
+      "name": "N110",
+      "notes": "110% of calibrated lambda.",
+      "params": {
+        "lambda": 0.262685627
+      },
+      "seeds": "L2-R1,L2-R2,L4-R1,L4-R2",
+      "source_doc": "docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md",
+      "source_record": "docs/experiments/ert_cw_margin_local_lambda_stability_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "Control @all /fixed(e99)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "99->?",
+      "loss_family": "Control",
+      "name": "C",
+      "notes": "ordinary_rslad, no intervention. No results doc in the sources swept; referenced only as an untouched prior campaign by docs/FFNR_CAUSAL_PILOT_STATUS.md.",
+      "params": {},
+      "seeds": "n/a",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "TargetSoften(rho=0.500) @HistSel99 /fixed(e99)",
+      "cohort": "HistSel99",
+      "cohort_rule": "fixed",
+      "comparator": "RS",
+      "headline_heldout_result": null,
+      "horizon": "99->?(not in scope docs)",
+      "loss_family": "TargetSoften",
+      "name": "HS",
+      "notes": "selector=student_history (frozen predictor seed0_bartoldson_frozen_predictor). No numeric result doc found.",
+      "params": {
+        "rho": 0.5
+      },
+      "seeds": "n/a",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "TargetSoften(rho=0.500) @RandSel99 /fixed(e99)",
+      "cohort": "RandSel99",
+      "cohort_rule": "fixed",
+      "comparator": "HS",
+      "headline_heldout_result": null,
+      "horizon": "99->?(not in scope docs)",
+      "loss_family": "TargetSoften",
+      "name": "RS",
+      "notes": "selector=class_matched_random control for HS. No numeric result doc found.",
+      "params": {
+        "rho": 0.5
+      },
+      "seeds": "n/a",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "KDScale(advkd_mult=0.500) @HistSel99 /fixed(e99)",
+      "cohort": "HistSel99",
+      "cohort_rule": "fixed",
+      "comparator": "RD",
+      "headline_heldout_result": null,
+      "horizon": "99->?(not in scope docs)",
+      "loss_family": "KDScale",
+      "name": "HD",
+      "notes": "selector=student_history. No numeric result doc found.",
+      "params": {
+        "advkd_multiplier": 0.5
+      },
+      "seeds": "n/a",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "KDScale(advkd_mult=0.500) @RandSel99 /fixed(e99)",
+      "cohort": "RandSel99",
+      "cohort_rule": "fixed",
+      "comparator": "HD",
+      "headline_heldout_result": null,
+      "horizon": "99->?(not in scope docs)",
+      "loss_family": "KDScale",
+      "name": "RD",
+      "notes": "selector=class_matched_random control for HD. No numeric result doc found.",
+      "params": {
+        "advkd_multiplier": 0.5
+      },
+      "seeds": "n/a",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 39,
+      "canonical": "TargetSoften(mix=0.5/0.5) @OnlineHistSel39.PF /fixed(e39)",
+      "cohort": "OnlineHistSel39.PF",
+      "cohort_rule": "fixed",
+      "comparator": "PF_R, C",
+      "headline_heldout_result": "Best-PGD delta vs C: -0.18pp; vs PF_R: -0.13pp",
+      "horizon": "40->199",
+      "loss_family": "TargetSoften",
+      "name": "PF_TA",
+      "notes": "PF=Peak-Failure route (robust-correct at anchor e39). TA=online-history selector (real, not random). mechanism kind=teacher_target_true_label_mix: target=0.5*p_teacher(clean)+0.5*one_hot(y). Development No-Go: does not beat C or PF_R.",
+      "params": {
+        "teacher_mix": 0.5,
+        "true_label_mix": 0.5
+      },
+      "seeds": "seed1,seed2",
+      "source_doc": "docs/HISTORY_ROUTING_V2_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 39,
+      "canonical": "TargetSoften(mix=0.5/0.5) @RandSel39.PF /fixed(e39)",
+      "cohort": "RandSel39.PF",
+      "cohort_rule": "fixed",
+      "comparator": "PF_TA",
+      "headline_heldout_result": null,
+      "horizon": "40->199",
+      "loss_family": "TargetSoften",
+      "name": "PF_R",
+      "notes": "selector=class_state_count_matched_random, matched control for PF_TA.",
+      "params": {
+        "teacher_mix": 0.5,
+        "true_label_mix": 0.5
+      },
+      "seeds": "seed1,seed2",
+      "source_doc": "docs/HISTORY_ROUTING_V2_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 39,
+      "canonical": "TargetSoften(mix=0.5/0.5) @OnlineHistSel39.NR /fixed(e39)",
+      "cohort": "OnlineHistSel39.NR",
+      "cohort_rule": "fixed",
+      "comparator": "NR_R, C",
+      "headline_heldout_result": "Best-PGD delta vs C: -0.17pp; vs NR_R: +0.15pp",
+      "horizon": "40->199",
+      "loss_family": "TargetSoften",
+      "name": "NR_TA",
+      "notes": "NR=Non-Recovery route (robust-wrong at anchor e39). Development No-Go.",
+      "params": {
+        "teacher_mix": 0.5,
+        "true_label_mix": 0.5
+      },
+      "seeds": "seed1,seed2",
+      "source_doc": "docs/HISTORY_ROUTING_V2_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 39,
+      "canonical": "TargetSoften(mix=0.5/0.5) @RandSel39.NR /fixed(e39)",
+      "cohort": "RandSel39.NR",
+      "cohort_rule": "fixed",
+      "comparator": "NR_TA",
+      "headline_heldout_result": null,
+      "horizon": "40->199",
+      "loss_family": "TargetSoften",
+      "name": "NR_R",
+      "notes": "selector=class_state_count_matched_random, matched control for NR_TA.",
+      "params": {
+        "teacher_mix": 0.5,
+        "true_label_mix": 0.5
+      },
+      "seeds": "seed1,seed2",
+      "source_doc": "docs/HISTORY_ROUTING_V2_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(ce=0.250,kd=0.500) @RouteA.Strong /fixed(e79)",
+      "cohort": "RouteA.Strong",
+      "cohort_rule": "fixed",
+      "comparator": "RAR, C79",
+      "headline_heldout_result": "Route A S-R net-rescue, e.g. L2 h89 -0.741pp CI[-1.147,-0.318]; L4 h89 -1.077pp CI[-1.581,-0.608]",
+      "horizon": "79->84/89/94",
+      "loss_family": "AdvCE",
+      "name": "RA",
+      "notes": "Route A cohort = Student strong-wrong \u2229 clean-wrong \u2229 Teacher adversarial-wrong (selection via strong CE-PGD20).",
+      "params": {
+        "ce_coefficient": 0.25,
+        "kd_multiplier": 0.5
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/FFNR_CAUSAL_PILOT_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(ce=0.250,kd=0.500) @RouteA.Rand /fixed(e79)",
+      "cohort": "RouteA.Rand",
+      "cohort_rule": "fixed",
+      "comparator": "RA",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "AdvCE",
+      "name": "RAR",
+      "notes": "matched-random control for RA (same coefficients, class-matched random mask).",
+      "params": {
+        "ce_coefficient": 0.25,
+        "kd_multiplier": 0.5
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/FFNR_CAUSAL_PILOT_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(ce=0.250,kd=1.000) @RouteB.Strong /fixed(e79)",
+      "cohort": "RouteB.Strong",
+      "cohort_rule": "fixed",
+      "comparator": "RBR, C79",
+      "headline_heldout_result": "Route B S-R net-rescue sign-unstable, e.g. L2 h89 +3.292pp CI[-0.267,+6.940]; L2 h94 -5.071pp CI[-8.185,-1.868]",
+      "horizon": "79->84/89/94",
+      "loss_family": "AdvCE",
+      "name": "RB",
+      "notes": "Route B cohort = Student strong-correct \u2229 Teacher adversarial-correct, top-q(5%) by strong margin risk.",
+      "params": {
+        "ce_coefficient": 0.25,
+        "kd_multiplier": 1.0
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/FFNR_CAUSAL_PILOT_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AdvCE(ce=0.250,kd=1.000) @RouteB.Rand /fixed(e79)",
+      "cohort": "RouteB.Rand",
+      "cohort_rule": "fixed",
+      "comparator": "RB",
+      "headline_heldout_result": null,
+      "horizon": "79->84/89/94",
+      "loss_family": "AdvCE",
+      "name": "RBR",
+      "notes": "matched-random control for RB.",
+      "params": {
+        "ce_coefficient": 0.25,
+        "kd_multiplier": 1.0
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/FFNR_CAUSAL_PILOT_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AnchorRetain(teacher=0.75,anchor=0.25) @PV3.PF.Hist /fixed(e79)",
+      "cohort": "PV3.PF.Hist",
+      "cohort_rule": "fixed",
+      "comparator": "PF_RET_R",
+      "headline_heldout_result": null,
+      "horizon": "80->129",
+      "loss_family": "AnchorRetain",
+      "name": "PF_RET_H",
+      "notes": "Target = 0.75*p_teacher + 0.25*p_anchor (anchor = frozen eval-mode e79 self-copy). Route=peak_failure, selector=prescriptive_v3_online_history. Successor design to history-routing-v2's PF-TA no-go. No numeric result doc found in the swept sources.",
+      "params": {
+        "anchor_mix": 0.25,
+        "teacher_mix": 0.75
+      },
+      "seeds": "seed1(L1),seed2(L3)",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "AnchorRetain(teacher=0.75,anchor=0.25) @PV3.PF.Rand /fixed(e79)",
+      "cohort": "PV3.PF.Rand",
+      "cohort_rule": "fixed",
+      "comparator": "PF_RET_H",
+      "headline_heldout_result": null,
+      "horizon": "80->129",
+      "loss_family": "AnchorRetain",
+      "name": "PF_RET_R",
+      "notes": "selector=prescriptive_v3_matched_random, matched control for PF_RET_H.",
+      "params": {
+        "anchor_mix": 0.25,
+        "teacher_mix": 0.75
+      },
+      "seeds": "seed1(L1),seed2(L3)",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "PGDPrefix(step=5/10) @PV3.NR.Hist /fixed(e79)",
+      "cohort": "PV3.NR.Hist",
+      "cohort_rule": "fixed",
+      "comparator": "NR_PFX_R",
+      "headline_heldout_result": null,
+      "horizon": "80->99",
+      "loss_family": "PGDPrefix",
+      "name": "NR_PFX_H",
+      "notes": "Replaces full 10-step PGD with its 5-step prefix for selected samples (input-side, no loss-coefficient change). Route=non_recovery, selector=prescriptive_v3_online_history. No numeric result doc found.",
+      "params": {
+        "full_steps": 10,
+        "prefix_step": 5
+      },
+      "seeds": "seed1(L1),seed2(L3)",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 79,
+      "canonical": "PGDPrefix(step=5/10) @PV3.NR.Rand /fixed(e79)",
+      "cohort": "PV3.NR.Rand",
+      "cohort_rule": "fixed",
+      "comparator": "NR_PFX_H",
+      "headline_heldout_result": null,
+      "horizon": "80->99",
+      "loss_family": "PGDPrefix",
+      "name": "NR_PFX_R",
+      "notes": "selector=prescriptive_v3_matched_random, matched control for NR_PFX_H.",
+      "params": {
+        "full_steps": 10,
+        "prefix_step": 5
+      },
+      "seeds": "seed1(L1),seed2(L3)",
+      "source_doc": "src/ard/config/schema.py",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": null,
+      "canonical": "Control @S3nonCW.Tcorrect /online",
+      "cohort": "S3nonCW.Tcorrect",
+      "cohort_rule": "online",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "80->94",
+      "loss_family": "Control",
+      "name": "DYNBASE",
+      "notes": "Logs the predicate (student_clean_correct & student_adversarial_wrong & teacher_adversarial_correct) every visit WITHOUT applying any extra loss -- an online-tracked, zero-coefficient comparator.",
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md",
+      "source_record": "docs/experiments/ert_dynamic_s3_recovery_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 80,
+      "canonical": "AdvCE(beta=0.075) @S3nonCW.Tcorrect /fixed(e80)",
+      "cohort": "S3nonCW.Tcorrect",
+      "cohort_rule": "fixed",
+      "comparator": "DYNBASE",
+      "headline_heldout_result": "L2 e94 +1.82pp; L4 e94 +0.62pp vs DYNBASE (not consistent at all horizons: L2 e84 -0.26pp)",
+      "horizon": "80->94",
+      "loss_family": "AdvCE",
+      "name": "S3FIX075",
+      "notes": "Predicate captured at e80 and frozen. See collisions section for comparison with ST1W.",
+      "params": {
+        "beta": 0.075
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md",
+      "source_record": "docs/experiments/ert_dynamic_s3_recovery_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": null,
+      "canonical": "AdvCE(beta=0.075) @S3nonCW.Tcorrect /online",
+      "cohort": "S3nonCW.Tcorrect",
+      "cohort_rule": "online",
+      "comparator": "DYNBASE",
+      "headline_heldout_result": "L2 e84 -2.48pp, e94 -0.34pp; L4 e94 ~tied vs DYNBASE",
+      "horizon": "80->94",
+      "loss_family": "AdvCE",
+      "name": "S3DYN075",
+      "notes": "Predicate recomputed every visit (online). Active fraction stable ~21-22% despite 149,923 (L2) action switches -- membership genuinely churns, it is not an alias for the fixed set.",
+      "params": {
+        "beta": 0.075
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md",
+      "source_record": "docs/experiments/ert_dynamic_s3_recovery_v1.json"
+    },
+    {
+      "aliases": [
+        "BASE(S3hist)"
+      ],
+      "anchor_epoch": 79,
+      "canonical": "Control @all /fixed(e79)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator)",
+      "headline_heldout_result": null,
+      "horizon": "79->94",
+      "loss_family": "Control",
+      "name": "BASE",
+      "notes": "NAME COLLISION WARNING: 'BASE' is reused as a control-arm name independently in the augmentation family (canonical CropShift-free policy) and the CW-margin family (A0). This BASE is the S3-history-smoothing screen's own control and is NOT the same run as augmentation BASE.",
+      "params": {},
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_S3_HISTORY_PRODUCTION_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 80,
+      "canonical": "AdvCE(beta=0.075) @S3nonCW.Tcorrect(instant) /online",
+      "cohort": "S3nonCW.Tcorrect",
+      "cohort_rule": "online",
+      "comparator": "BASE(S3hist)",
+      "headline_heldout_result": "e94 vs BASE: L2 -0.0018 (-0.18pp); L4 -0.0016 (-0.16pp)",
+      "horizon": "79->94",
+      "loss_family": "AdvCE",
+      "name": "INST075",
+      "notes": "'Instant' rule: action = current-visit online S3DYN075 predicate (acts starting e80). This is the same online predicate as S3DYN075, just relabeled for the smoothing comparison.",
+      "params": {
+        "beta": 0.075
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_S3_HISTORY_PRODUCTION_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": null,
+      "canonical": "AdvCE(beta=0.075) @S3nonCW.Tcorrect(majority3) /online",
+      "cohort": "S3nonCW.Tcorrect",
+      "cohort_rule": "online",
+      "comparator": "BASE(S3hist)",
+      "headline_heldout_result": "e94 vs BASE: L2 -0.0088 (-0.88pp); L4 -0.0046 (-0.46pp)",
+      "horizon": "79->94",
+      "loss_family": "AdvCE",
+      "name": "M3_075",
+      "notes": "Majority-3 rule: active only once 3 visits are available and >=2 of last 3 were student-adversarial-wrong.",
+      "params": {
+        "beta": 0.075
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_S3_HISTORY_PRODUCTION_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [
+        "M3E2"
+      ],
+      "anchor_epoch": null,
+      "canonical": "AdvCE(beta=0.075) @S3nonCW.Tcorrect(majority3+exit2) /online",
+      "cohort": "S3nonCW.Tcorrect",
+      "cohort_rule": "online",
+      "comparator": "BASE(S3hist)",
+      "headline_heldout_result": "e94 vs BASE: L2 -0.0122 (-1.22pp); L4 -0.0098 (-0.98pp)",
+      "horizon": "79->94",
+      "loss_family": "AdvCE",
+      "name": "M3E2_075",
+      "notes": "Majority-3 entry + requires 2 consecutive current-correct visits to exit (adds hysteresis).",
+      "params": {
+        "beta": 0.075
+      },
+      "seeds": "L2,L4",
+      "source_doc": "docs/ERT_S3_HISTORY_PRODUCTION_RESULTS.md",
+      "source_record": null
+    },
+    {
+      "aliases": [
+        "CONTROL"
+      ],
+      "anchor_epoch": 99,
+      "canonical": "Control @all /fixed(e99)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator for SBF, TPFM, DPM, D-BDD, S-BDD, OS_PMP, OS_DBDP)",
+      "headline_heldout_result": null,
+      "horizon": "100->114",
+      "loss_family": "Control",
+      "name": "I100_CONTROL",
+      "notes": "ONE underlying production run reused verbatim (byte-identical clean/robust numbers at e104/e109/e114, both seeds) as the comparator across three separately-written reports: the canonical-boundary screen (SBF/TPFM), the dynamic-BDD screen (DPM/D-BDD/S-BDD), and the online-state screen (OS_PMP/OS_DBDP, which forks its own treatment-free one-epoch e100 prefix but reproduces the identical trajectory). This is a case of one arm correctly reused, not a naming collision.",
+      "params": {},
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md; also docs/ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md; also docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md",
+      "source_record": "docs/experiments/ert_rslad_i100_s2_rbp_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "MF(coef=0.236) @S2T1 /fixed(e99)",
+      "cohort": "S2T1",
+      "cohort_rule": "fixed",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 full-val robust \u0394 vs Control: dev-1 +0.160pp, dev-2 +0.040pp",
+      "horizon": "100->114",
+      "loss_family": "MF",
+      "name": "SBF",
+      "notes": "Target = per-seed Student's OWN frozen e99 positive-margin q10 (mode='fixed', but the fixed value is the student's own quantile, unlike CW-family A4's fixed pooled-Q50 target -- same 'fixed' word, different meaning).",
+      "params": {
+        "coefficient": 0.23594490117507805,
+        "floor_dev1": 0.04177670180797577,
+        "floor_dev2": 0.03347739577293396,
+        "mode": "fixed(own-quantile)"
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md",
+      "source_record": "docs/experiments/ert_rslad_i100_s2_rbp_results_v1.json"
+    },
+    {
+      "aliases": [
+        "I100 canonical TPFM"
+      ],
+      "anchor_epoch": 99,
+      "canonical": "TPFM(coef=0.167) @S2T1 /fixed(e99)",
+      "cohort": "S2T1",
+      "cohort_rule": "fixed",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 full-val robust \u0394 vs Control: dev-1 +0.220pp, dev-2 +0.040pp",
+      "horizon": "100->114",
+      "loss_family": "TPFM",
+      "name": "TPFM",
+      "notes": "SAME mechanism name/family as A7/CW-TPFM but a DIFFERENT cohort (S2T1 not CW), different anchor (e99 not e79), and independently recalibrated coefficient/floor/cap. See hazards section.",
+      "params": {
+        "cap": 0.32364362478256226,
+        "coefficient": 0.16676844691071563,
+        "floor": 0.16590790450572968
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md",
+      "source_record": "docs/experiments/ert_rslad_i100_s2_rbp_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "PM(lambda=0.054) @S2T1 /fixed(e99)",
+      "cohort": "S2T1",
+      "cohort_rule": "fixed",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 robust \u0394 vs Control: dev-1 +0.08pp, dev-2 +0.12pp",
+      "horizon": "100->114",
+      "loss_family": "PM",
+      "name": "DPM",
+      "notes": "Formula 0.5*relu(mT_adv-mS_adv)^2 in logit-margin space. Fixed sibling of OS-PMP (same lambda, online cohort).",
+      "params": {
+        "lambda": 0.05380932585058825
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md",
+      "source_record": "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_recovery_results_v1.json"
+    },
+    {
+      "aliases": [
+        "DBDD"
+      ],
+      "anchor_epoch": 99,
+      "canonical": "BD(coef=31.65) @S2T1 /fixed(e99)",
+      "cohort": "S2T1",
+      "cohort_rule": "fixed",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 robust \u0394 vs Control: dev-1 +0.04pp, dev-2 +0.20pp; vs DPM: dev-1 -0.04pp, dev-2 +0.08pp (mixed)",
+      "horizon": "100->114",
+      "loss_family": "BD",
+      "name": "D-BDD",
+      "notes": "Input-gradient L1-normalized margin distance, Teacher detached. Fixed sibling of OS-DBDP.",
+      "params": {
+        "coefficient": 31.649566509850324
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md",
+      "source_record": "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_recovery_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "SBD(coef=1.522) @S2T1 /fixed(e99)",
+      "cohort": "S2T1",
+      "cohort_rule": "fixed",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "NUMERICALLY_UNSUPPORTED -- non-finite loss both dev seeds (dev-1 diverged e106 after finite e105 loss 8.58e10; dev-2 no valid checkpoint after e101)",
+      "horizon": "100->114",
+      "loss_family": "SBD",
+      "name": "S-BDD",
+      "notes": "Secant boundary-distance variant; corrected v2 (non-detached qS) is formally correct but reproducibly unstable. Excluded from the causal DPM/D-BDD comparison.",
+      "params": {
+        "coefficient_v1": 3.487387518680544,
+        "coefficient_v2": 1.5219638832872224
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md",
+      "source_record": "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_recovery_results_v1.json"
+    },
+    {
+      "aliases": [
+        "PMP",
+        "OS-PMP"
+      ],
+      "anchor_epoch": 100,
+      "canonical": "PM(lambda=0.054) @S2T1 /online",
+      "cohort": "S2T1",
+      "cohort_rule": "online",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 robust \u0394 vs Control: dev-1 +0.14pp, dev-2 +0.20pp -> SUPPORTED",
+      "horizon": "100->114",
+      "loss_family": "PM",
+      "name": "OS_PMP",
+      "notes": "SAME lambda as DPM; cohort is 'current pre-update Online-S2xT1', recomputed every step from per-seed positive-margin q10 thresholds frozen once from the e100 prefix (dev-1 Student 0.140155/Teacher 0.174019; dev-2 0.138205/0.177792). Branch priority CW>S3-non-CW>Online-S2>Online-S1.",
+      "params": {
+        "lambda": 0.05380932585058825
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md",
+      "source_record": "docs/experiments/ert_rslad_i100_online_state_s2_preservation_v1.json"
+    },
+    {
+      "aliases": [
+        "DBDP",
+        "OS-DBDP",
+        "D-BDP"
+      ],
+      "anchor_epoch": 100,
+      "canonical": "BD(coef=31.65) @S2T1 /online",
+      "cohort": "S2T1",
+      "cohort_rule": "online",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 robust \u0394 vs Control: dev-1 +0.14pp, dev-2 +0.06pp -> SUPPORTED; vs OS_PMP: dev-1 +0.00pp, dev-2 -0.14pp -> DBDP-specific superiority NOT_SUPPORTED",
+      "horizon": "100->114",
+      "loss_family": "BD",
+      "name": "OS_DBDP",
+      "notes": "SAME coefficient as D-BDD; online cohort twin of D-BDD. Costs +7.9% mean epoch time vs Control's +1.2% for PMP.",
+      "params": {
+        "coefficient": 31.649566509850324
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md",
+      "source_record": "docs/experiments/ert_rslad_i100_online_state_s2_preservation_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "AdvCE(beta=0.118) @S3T1(I100) /fixed(e99)",
+      "cohort": "S3T1(I100)",
+      "cohort_rule": "fixed",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 robust \u0394 vs Control: dev-1 +0.22pp, dev-2 +0.04pp",
+      "horizon": "100->114",
+      "loss_family": "AdvCE",
+      "name": "PILOT_S3_T1_WEAK_ADVCE",
+      "notes": "Transfers the Stage-A ST1W mechanism (AdvCE@S3T1) to the I100/e99 lineage with an independently recalibrated beta; different lineage from ST1W despite the same mechanism/cohort label.",
+      "params": {
+        "beta": 0.11834514302628477
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md",
+      "source_record": "docs/experiments/ert_rslad_i100_action_transfer_results_v1.json"
+    },
+    {
+      "aliases": [
+        "PLAIN_ADVCE"
+      ],
+      "anchor_epoch": 99,
+      "canonical": "AdvCE(?) @CW(I100) /fixed(e99)",
+      "cohort": "CW(I100)",
+      "cohort_rule": "fixed",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 robust \u0394 vs Control: dev-1 +0.44pp, dev-2 +0.10pp",
+      "horizon": "100->114",
+      "loss_family": "AdvCE",
+      "name": "CLEAN_WRONG_PLAIN_ADVCE",
+      "notes": "Cohort = fixed I100/e99 Clean-Wrong mask (n=9263 dev-1/8709 dev-2) -- a THIRD, separately-anchored Clean-Wrong lineage distinct from the Chen-ERT e79 CW mask used by A1-A8/C0-C15/G0-G3. Coefficient not resolved in the skimmed source.",
+      "params": {},
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md",
+      "source_record": "docs/experiments/ert_rslad_i100_action_transfer_results_v1.json"
+    },
+    {
+      "aliases": [
+        "TPFM(action-transfer)"
+      ],
+      "anchor_epoch": 99,
+      "canonical": "TPFM(coef=0.316) @CW(I100) /fixed(e99)",
+      "cohort": "CW(I100)",
+      "cohort_rule": "fixed",
+      "comparator": "I100_CONTROL",
+      "headline_heldout_result": "e114 robust \u0394 vs Control: dev-1 +0.44pp, dev-2 +0.08pp; long-horizon e199 (separate continuation): dev-1 +0.04pp, dev-2 +0.20pp",
+      "horizon": "100->114",
+      "loss_family": "TPFM",
+      "name": "CLEAN_WRONG_A7_MARGIN_ONLY",
+      "notes": "THIRD independent recalibration of the same teacher_floor/TPFM mechanism (compare A7's lambda=0.239 @CW/e79 and the canonical-S2 TPFM's coef=0.167 @S2T1/e99). Same family, three different numbers, three different (cohort,anchor) pairs. See hazards section.",
+      "params": {
+        "cap": 0.5595575273036957,
+        "coefficient": 0.316427398202933,
+        "floor": 0.17963354289531708
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md",
+      "source_record": "docs/experiments/ert_rslad_i100_action_transfer_results_v1.json"
+    },
+    {
+      "aliases": [
+        "CONTROL"
+      ],
+      "anchor_epoch": 99,
+      "canonical": "Control @all /fixed(e99)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "(is the comparator for PILOT_S3_T1_WEAK_ADVCE, CLEAN_WRONG_PLAIN_ADVCE, CLEAN_WRONG_A7_MARGIN_ONLY)",
+      "headline_heldout_result": null,
+      "horizon": "100->114",
+      "loss_family": "Control",
+      "name": "I100_CONTROL",
+      "notes": "Same name and lineage generation (I100/e99) as the RBP/BDD/online-state I100_CONTROL above, but its exact numeric identity with that run was not independently confirmed in this sweep -- listed separately rather than merged.",
+      "params": {},
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md",
+      "source_record": "docs/experiments/ert_rslad_i100_action_transfer_results_v1.json"
+    },
+    {
+      "aliases": [
+        "BASE(aug)"
+      ],
+      "anchor_epoch": null,
+      "canonical": "Aug(canonical) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "CROPSHIFT",
+      "headline_heldout_result": null,
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "BASE",
+      "notes": "NAME COLLISION WARNING: reused independently as a control-arm name in the S3-history-smoothing and CW-margin families; this BASE is the augmentation-family's own no-CropShift policy.",
+      "params": {
+        "policy": "canonical RandomCrop(32,pad=4)+flip"
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_STATIC_TRAJECTORY_STABILIZATION.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": null,
+      "canonical": "Aug(CropShift) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "BASE(aug)",
+      "headline_heldout_result": "e199 held-out robust vs BASE: seed1 +1.32pp, seed2 +1.16pp (mean +1.24pp)",
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "CROPSHIFT",
+      "notes": "Became the incumbent baseline for every later augmentation-schedule comparison.",
+      "params": {
+        "policy": "flip + CropShift(0,11)"
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_STATIC_TRAJECTORY_STABILIZATION.md",
+      "source_record": null
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": null,
+      "canonical": "Aug(CropRE) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "CROPSHIFT",
+      "headline_heldout_result": "e199 robust vs CROPSHIFT: seed1 +1.00pp, seed2 +0.60pp; AUC \u0394 negative both seeds -> not promoted",
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "CROP_RE",
+      "notes": null,
+      "params": {
+        "policy": "CropShift + torchvision RandomErasing"
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_STATIC_AUGMENTATION_FAMILY.md",
+      "source_record": "docs/experiments/ert_rslad_static_augmentation_family_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": null,
+      "canonical": "Aug(IDBH_WEAK) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "CROPSHIFT",
+      "headline_heldout_result": "e199 robust vs CROPSHIFT: seed1 +1.12pp, seed2 +0.46pp; AUC \u0394 negative both seeds -> not promoted",
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "IDBH_WEAK",
+      "notes": "Full-run (static) candidate; distinct usage from I<N> below where IDBH_WEAK is only the POST-SWITCH policy.",
+      "params": {
+        "policy": "CropShift + ColorShape('color') + RandomErasing"
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_STATIC_AUGMENTATION_FAMILY.md",
+      "source_record": "docs/experiments/ert_rslad_static_augmentation_family_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 100,
+      "canonical": "Aug(CropShift->CROP_RE@e100) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "CROPSHIFT",
+      "headline_heldout_result": "e199 robust vs CROPSHIFT: seed1/seed2 deltas positive; all 4 schedules PASS the preregistered 2-seed promotion gate but decision remains human_review_required",
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "R100",
+      "notes": null,
+      "params": {
+        "late_policy": "CROP_RE",
+        "switch_epoch": 100
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md",
+      "source_record": "docs/experiments/ert_rslad_stagewise_augmentation_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 150,
+      "canonical": "Aug(CropShift->CROP_RE@e150) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "CROPSHIFT",
+      "headline_heldout_result": "e199 robust vs CROPSHIFT: seed1/seed2 deltas positive; all 4 schedules PASS the preregistered 2-seed promotion gate but decision remains human_review_required",
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "R150",
+      "notes": null,
+      "params": {
+        "late_policy": "CROP_RE",
+        "switch_epoch": 150
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md",
+      "source_record": "docs/experiments/ert_rslad_stagewise_augmentation_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 100,
+      "canonical": "Aug(CropShift->IDBH_WEAK@e100) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "CROPSHIFT",
+      "headline_heldout_result": "e199 robust vs CROPSHIFT: seed1/seed2 deltas positive; all 4 schedules PASS the preregistered 2-seed promotion gate but decision remains human_review_required",
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "I100",
+      "notes": null,
+      "params": {
+        "late_policy": "IDBH_WEAK",
+        "switch_epoch": 100
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md",
+      "source_record": "docs/experiments/ert_rslad_stagewise_augmentation_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 150,
+      "canonical": "Aug(CropShift->IDBH_WEAK@e150) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "CROPSHIFT",
+      "headline_heldout_result": "e199 robust vs CROPSHIFT: seed1/seed2 deltas positive; all 4 schedules PASS the preregistered 2-seed promotion gate but decision remains human_review_required",
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "I150",
+      "notes": null,
+      "params": {
+        "late_policy": "IDBH_WEAK",
+        "switch_epoch": 150
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md",
+      "source_record": "docs/experiments/ert_rslad_stagewise_augmentation_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 50,
+      "canonical": "Aug(CropShift->IDBH_WEAK@e50) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "I100",
+      "headline_heldout_result": null,
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "I50",
+      "notes": "None of I50/I75/I125 satisfies the 2-seed replacement rule vs I100 -> I100 remains frozen incumbent.",
+      "params": {
+        "late_policy": "IDBH_WEAK",
+        "switch_epoch": 50
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md",
+      "source_record": "docs/experiments/ert_rslad_single_switch_timing_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 75,
+      "canonical": "Aug(CropShift->IDBH_WEAK@e75) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "I100",
+      "headline_heldout_result": null,
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "I75",
+      "notes": "None of I50/I75/I125 satisfies the 2-seed replacement rule vs I100 -> I100 remains frozen incumbent.",
+      "params": {
+        "late_policy": "IDBH_WEAK",
+        "switch_epoch": 75
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md",
+      "source_record": "docs/experiments/ert_rslad_single_switch_timing_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 125,
+      "canonical": "Aug(CropShift->IDBH_WEAK@e125) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "I100",
+      "headline_heldout_result": null,
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "I125",
+      "notes": "None of I50/I75/I125 satisfies the 2-seed replacement rule vs I100 -> I100 remains frozen incumbent.",
+      "params": {
+        "late_policy": "IDBH_WEAK",
+        "switch_epoch": 125
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md",
+      "source_record": "docs/experiments/ert_rslad_single_switch_timing_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 0,
+      "canonical": "Aug(IDBH_WEAK@e0) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "I100",
+      "headline_heldout_result": null,
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "I0",
+      "notes": "IDBH_WEAK from scratch, no CropShift prefix (switch at epoch 0 is the degenerate case).",
+      "params": {
+        "late_policy": "IDBH_WEAK",
+        "switch_epoch": 0
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md",
+      "source_record": "docs/experiments/ert_rslad_single_switch_timing_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "Aug(CropShift@e0-99,prefix-only) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "(diagnostic, not a final arm)",
+      "headline_heldout_result": null,
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "CROP_PREFIX",
+      "notes": "Common CropShift prefix e0-99 shared by the CROP_SUFFIX and I100_SUFFIX forks in the unseen-seed bundles; not compared as a final arm.",
+      "params": {},
+      "seeds": "confirm-a,confirm-b,confirm-c",
+      "source_doc": "docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md",
+      "source_record": "docs/experiments/ert_rslad_unseen_confirmation_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 100,
+      "canonical": "Aug(CropShift->CROP_RE@e100) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "BASE(unseen)",
+      "headline_heldout_result": null,
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "CROP_SUFFIX",
+      "notes": "Confirmation-seed re-run of the R100 mechanism, forked from CROP_PREFIX at the exact e99 end state.",
+      "params": {
+        "late_policy": "CROP_RE",
+        "switch_epoch": 100
+      },
+      "seeds": "confirm-a,confirm-b,confirm-c",
+      "source_doc": "docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md",
+      "source_record": "docs/experiments/ert_rslad_unseen_confirmation_results_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 100,
+      "canonical": "Aug(CropShift->IDBH_WEAK@e100) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "CROP_SUFFIX",
+      "headline_heldout_result": "e199 robust vs CROP_SUFFIX: +0.78/+0.68/+0.62pp (3/3 same direction, mean +0.69pp); clean -0.06/-0.22/-0.46pp",
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "I100_SUFFIX",
+      "notes": "Confirmation-seed re-run of I100's mechanism; effectively the same arm as I100 under a bundle-scoped alias.",
+      "params": {
+        "late_policy": "IDBH_WEAK",
+        "switch_epoch": 100
+      },
+      "seeds": "confirm-a,confirm-b,confirm-c",
+      "source_doc": "docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md",
+      "source_record": "docs/experiments/ert_rslad_unseen_confirmation_results_v1.json"
+    },
+    {
+      "aliases": [
+        "BASE(unseen)"
+      ],
+      "anchor_epoch": null,
+      "canonical": "Aug(canonical) @all /none",
+      "cohort": "all",
+      "cohort_rule": "none",
+      "comparator": "(is the reference)",
+      "headline_heldout_result": null,
+      "horizon": "0->199",
+      "loss_family": "Aug",
+      "name": "BASE",
+      "notes": "Independent full run, not forked from CROP_PREFIX; third independent usage of the name 'BASE' in this corpus.",
+      "params": {
+        "policy": "canonical RandomCrop+flip"
+      },
+      "seeds": "confirm-a,confirm-b,confirm-c",
+      "source_doc": "docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md",
+      "source_record": "docs/experiments/ert_rslad_unseen_confirmation_results_v1.json"
+    },
+    {
+      "aliases": [
+        "CONTROL"
+      ],
+      "anchor_epoch": 99,
+      "canonical": "Order(epoch_shuffle) @all /none(BLOCKED)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "HISTORY_BALANCED",
+      "headline_heldout_result": "BLOCKED before training -- RNG confound found (attack random-start keyed by batch position, so reordering changes each sample's random start)",
+      "horizon": "100->199 (never run)",
+      "loss_family": "Order",
+      "name": "CONTROL(order-v1,blocked)",
+      "notes": "Never launched. Superseded by NEW_CONTROL below after the RNG contract was corrected.",
+      "params": {},
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV.md",
+      "source_record": "docs/experiments/ert_rslad_history_ordering_manifest_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "Order(history_balanced,v1) @all /none(BLOCKED)",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "CONTROL(order-v1,blocked)",
+      "headline_heldout_result": null,
+      "horizon": "100->199 (never run)",
+      "loss_family": "Order",
+      "name": "HISTORY_BALANCED",
+      "notes": "Never launched; blocked by the same RNG confound as CONTROL(order-v1). Superseded by NEW_HISTORY.",
+      "params": {},
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV.md",
+      "source_record": "docs/experiments/ert_rslad_history_ordering_manifest_v1.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "Order(epoch_shuffle) @all /none",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "NEW_HISTORY",
+      "headline_heldout_result": "e149 robust 58.34%/57.66%, e199 robust 60.78%/60.48% (seed1/seed2)",
+      "horizon": "100->199",
+      "loss_family": "Order",
+      "name": "NEW_CONTROL",
+      "notes": "Re-run of CONTROL(order-v1) under the corrected sample-keyed attack-RNG contract that decouples random start from batch position.",
+      "params": {
+        "attack_rng_keying": "sample_keyed_v1"
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV_V2.md",
+      "source_record": "docs/experiments/ert_rslad_history_balanced_ordering_dev_v2_results.json"
+    },
+    {
+      "aliases": [],
+      "anchor_epoch": 99,
+      "canonical": "Order(history_balanced,v2) @all /none",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "NEW_CONTROL",
+      "headline_heldout_result": "e199 robust \u0394 vs NEW_CONTROL: seed1 +0.02pp, seed2 -0.36pp -- promotion gate failed",
+      "horizon": "100->199",
+      "loss_family": "Order",
+      "name": "NEW_HISTORY",
+      "notes": "Re-run of HISTORY_BALANCED under the corrected RNG contract; reorders (not selects) samples into HIGH/MID/LOW margin-EMA-risk strata each epoch, HIGH-MID-MID-LOW-MID interleave.",
+      "params": {
+        "predictor": "H2_margin_ema",
+        "strata": "HIGH20/MID60/LOW20"
+      },
+      "seeds": "1,2",
+      "source_doc": "docs/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV_V2.md",
+      "source_record": "docs/experiments/ert_rslad_history_balanced_ordering_dev_v2_results.json"
+    },
+    {
+      "aliases": [
+        "SHUFFLE_PLUS_0",
+        "SHUFFLE_PLUS_1",
+        "SHUFFLE_PLUS_2",
+        "SHUFFLE_PLUS_3",
+        "SHUFFLE_PLUS_4",
+        "SHUFFLE_PLUS_5",
+        "SHUFFLE_PLUS_6",
+        "SHUFFLE_PLUS_7"
+      ],
+      "anchor_epoch": 99,
+      "canonical": "Order(pure-order-probe,8 schedules) @all /none",
+      "cohort": "none",
+      "cohort_rule": "none",
+      "comparator": "cross-schedule (no single control)",
+      "headline_heldout_result": "probe-AUC range 50.90-50.99% across all 8 schedules/2 seeds; all 6 D1-D6 mechanism descriptors FAILED the preregistered gate",
+      "horizon": "100->114",
+      "loss_family": "Order",
+      "name": "SHUFFLE_PLUS_0..7",
+      "notes": "Diagnostic pure-order probe (not a production candidate); mechanism not identified, no second ordering intervention was started as a result.",
+      "params": {
+        "schedules": 8
+      },
+      "seeds": "dev-1,dev-2",
+      "source_doc": "docs/ERT_RSLAD_ORDERING_MECHANISM_DISCOVERY.md",
+      "source_record": "docs/experiments/ert_rslad_pure_order_probe_results_v5.json"
+    }
+  ],
+  "canonical_name_convention": "LOSS(param) @COHORT /RULE(anchor)",
+  "contract": "ard_arm_registry_v1",
+  "generated_note": "READ-ONLY extraction; built from direct document reads plus parallel research-agent extraction, cross-verified against docs/experiments/*.json and src/ard/config/schema.py.",
+  "schema_version": 1
+}
