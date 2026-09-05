@@ -3,8 +3,9 @@
 Status: consolidated navigation readout of completed development experiments
 through 2026-09-05. This document is a navigation and interpretation aid; the linked
 reports and hash-bound JSON records remain the sources of truth. Results are
-internal validation results unless explicitly stated otherwise. No official
-CIFAR-10 test or AutoAttack result is included.
+internal validation results unless explicitly stated otherwise. The only official
+CIFAR-10 test and AutoAttack result is the last ledger row (`I100` official test,
+2026-09-05); every other row is internal validation.
 
 ## Executive conclusion
 
@@ -34,6 +35,7 @@ promoted methods.
 | What causes run-to-run divergence? | Shuffle, augmentation, and their interaction can cause local 1--2 pp changes; source dominance differs by seed. | Preserve the frozen RNG contract; do not infer a universal dominant source. See [`RNG decomposition`](ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md) and [`shuffle/augmentation`](ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md). |
 | Does dynamic S2 boundary-distance treatment improve the I100 trajectory? | At e114, DPM vs Control is `+0.08/+0.12 pp`; D-BDD vs DPM is `-0.04/+0.08 pp`. Corrected S-BDD became non-finite in both development seeds. | No D-BDD promotion or e199 extension. S-BDD is `NUMERICALLY_UNSUPPORTED`; any stabilized secant redesign needs a new contract. See [`BDD recovery`](ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md) and [`secant forensic`](ERT_RSLAD_I100_SECANT_BOUNDARY_DISTANCE_FORENSIC.md). |
 | Does online pre-update S2×T1 preservation (OS-PMP / OS-DBDP) improve the I100 trajectory? | e114 held-out CE-PGD20 vs Control: PMP `+0.14/+0.20 pp`, DBDP `+0.14/+0.06 pp` (both seeds positive); DBDP−PMP `+0.00/-0.14 pp`. Effects are below the documented 1--2 pp RNG floor. | First SUPPORTED arm-vs-control label; no promotion, no e199/seed/official-test extension without a new contract. See [`online-state S2`](ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md). |
+| Does the I100 advantage survive on the official CIFAR-10 test set under AutoAttack? | Epoch-199 last-checkpoint AutoAttack on the official 10,000-example test set, I100 minus matched `CROP_SUFFIX`: `+0.41/+0.06/+0.46 pp` on three unseen confirmation seeds, mean `+0.31 pp`. All six seed x checkpoint measurements are positive. Clean cost `-0.11 pp` on average. | CONFIRMED under the preregistered rule, and the only official-test result in the project. The mean sits inside the unmeasured 0.25--0.50 pp post-decay floor bracket, so the direction is established but the magnitude is at the resolution limit; no promotion. See [`official test`](ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md). |
 
 ## Interpretation boundaries
 
