@@ -165,6 +165,24 @@ absolute terms; only the difference between arms is being tested.
   reads all three seeds and both arms and fails closed on a missing one.  Numbers
   are deliberately not copied into this plan; the aggregator is the only place
   they may appear.
+- 2026-09-05 M2 round 2, first half done (`15:52 JST`): `confirm-a-crop` is terminal
+  and successful.  Its `evaluation-results.json` holds two checkpoint rows,
+  `count = 10000` with `dataset_identity.split = test`, threat hash
+  `70811016...dcc4f2`, AutoAttack run under the pinned upstream commit
+  `a3922004...` with source digest `e74d6dab...`, and lineage to
+  `unseen-confirm-a-crop-suffix-r2-training`.  Numbers stay out of this plan; the
+  aggregator is the only place they may appear.  Three of six are now terminal
+  (`confirm-a-i100`, `confirm-b-crop`, `confirm-a-crop`); `confirm-b-i100` and
+  `confirm-c-i100` are running and `confirm-c-crop` is queued behind
+  `confirm-c-i100` on GPU 1.  Both `launch.sh` drivers are alive and each walks its
+  own three-arm queue, so no arm is stranded and no relaunch is needed.
+  `scripts/aggregate_i100_official_test.py` iterates all three seeds and both arms
+  and raises on a missing one, so M3 stays closed until the sixth run is terminal.
+- 2026-09-05 defect update: this postrun ran headless from `ardx-watch.service` and
+  did its work, unlike the `confirm-a-i100` no-op below.  The headless invocation
+  passes its tool allowlist explicitly on the command line, so it does not depend
+  on the workspace-trust state that broke the earlier one.  Treat the entry below
+  as describing that one event, not a standing blocker.
 - 2026-09-05 defect (execution plane, not science): the headless postrun fired by
   `ardx-watch.service` for `confirm-a-i100` did no work.  Its whole log is
   `Ignoring 44 permissions.allow entries from .claude/settings.json: this workspace
