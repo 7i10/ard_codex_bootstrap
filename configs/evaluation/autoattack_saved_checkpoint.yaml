@@ -1,0 +1,16 @@
+# Official-test evaluation with standard AutoAttack enabled.
+#
+# AutoAttack is doubly opt-in: this flag AND `--allow-autoattack` on the command
+# line.  It runs only from a saved checkpoint in a separate evaluation process,
+# never from training, and the adapter verifies the installed package against the
+# pinned upstream commit and source digest before attacking.
+#
+# `pgd_saved_checkpoint.yaml` remains the CE-PGD20-only config; this file does not
+# replace it.
+evaluation:
+  checkpoints: both
+  seed: 0
+  write_sample_stats: true
+  panel_size: 24
+  autoattack: true
+  autoattack_batch_size: 128
