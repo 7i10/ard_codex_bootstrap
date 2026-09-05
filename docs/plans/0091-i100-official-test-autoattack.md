@@ -178,6 +178,23 @@ absolute terms; only the difference between arms is being tested.
   own three-arm queue, so no arm is stranded and no relaunch is needed.
   `scripts/aggregate_i100_official_test.py` iterates all three seeds and both arms
   and raises on a missing one, so M3 stays closed until the sixth run is terminal.
+- 2026-09-05 M2 round 2 done, round 3 half done (`17:03 JST`): `confirm-c-i100` and
+  `confirm-b-i100` are terminal and successful.  Checked `confirm-b-i100` in full: two
+  checkpoint rows (`best.pt`, `last.pt`, distinct checkpoint SHA-256), `count = 10000`
+  with `dataset_identity.split = test`, threat hash `70811016...dcc4f2`, AutoAttack
+  actually run (`attack_version = standard`) under the pinned upstream commit
+  `a3922004...` with source digest `e74d6dab...`, and lineage to
+  `unseen-confirm-b-i100-suffix-training`.  Source SHA `9ffc1aedf3b1`, clean worktree,
+  empty diff.  All seven manifest artifacts exist and each is stored in
+  `run-bundle/artifacts/<name>/<sha256>/` under a directory named by its manifest hash,
+  so the bundle is internally consistent; an independent re-hash was not possible
+  because the runtime tree is outside this session's sandbox.  Numbers stay out of this
+  plan; the aggregator is the only place they may appear.
+  Five of six are now terminal (`confirm-a-i100`, `confirm-b-crop`, `confirm-a-crop`,
+  `confirm-c-i100`, `confirm-b-i100`); only `confirm-c-crop` is still running, on the
+  GPU-1 driver's queue.  M3 stays closed until it is terminal, because
+  `scripts/aggregate_i100_official_test.py` iterates all three seeds and both arms and
+  raises on a missing one.  No relaunch is needed and none was attempted.
 - 2026-09-05 defect update: this postrun ran headless from `ardx-watch.service` and
   did its work, unlike the `confirm-a-i100` no-op below.  The headless invocation
   passes its tool allowlist explicitly on the command line, so it does not depend
