@@ -14,6 +14,15 @@
 # comparison never straddles two environments.  Changing any line here starts a
 # new environment generation and invalidates cross-generation pooling.
 #
+# CORRECTION (2026-09-06, same day)
+# The first version of this file listed only what `pip list` made obvious and
+# omitted the teacher-loading dependency set.  A real training launch on Ferret
+# failed at `import timm`, raised through `.external/robustbench/data.py`.  The
+# lesson is recorded rather than quietly fixed: a lock file is unverified until
+# a full training run has started under an environment built from it alone.
+# Building ard-v2 on a host and then launching one real job is the acceptance
+# test for this file, and it has not yet passed on any host.
+
 # GENERATION: v2 (2026-09-06)
 # Supersedes the unnamed generation that produced results up to 2026-09-05.
 # Those results remain valid on their own terms; they are not pooled with v2.
@@ -34,6 +43,22 @@ pydantic == 2.13.4
 PyYAML == 6.0.3
 setuptools == 78.1.0
 numpy == 2.4.4          # VERIFY against Hamster on recovery; Ferret observed 2.4.4
+pillow == 12.2.0
+scipy == 1.17.1
+pandas == 3.0.3
+
+[teacher]
+# `.external/robustbench` is the pinned checkout that actually loads the
+# teacher: src/ard/models/teacher_registry.py inserts it at sys.path[0] before
+# importing, so the site-packages `robustbench` distribution is NOT installed
+# here.  Its dependencies still are, because the checkout imports them.
+timm == 1.0.9
+tqdm == 4.68.4
+requests == 2.34.2
+Jinja2 == 3.1.6
+gdown == 5.1.0
+geotorch == 0.4.0
+torchdiffeq == 0.2.5
 
 [tracking]
 wandb == 0.28.0
