@@ -4,7 +4,7 @@
 
 - Owner: human (scientific decisions), Claude Code (execution)
 - Branch / base SHA: master, see progress log
-- Current milestone: M2 (running)
+- Current milestone: complete through M3; M4 pending
 - Last updated: 2026-09-05
 
 ## Goal
@@ -113,8 +113,8 @@ absolute terms; only the difference between arms is being tested.
   (`autoattack: true`, `checkpoints: both`), pin a source worktree, and run one
   bounded smoke: CE-PGD20 only, one arm, to prove the lineage and attack-identity
   checks pass before spending GPU hours.
-- [~] M2: run the six AutoAttack evaluations detached, one per GPU.
-- [ ] M3: aggregate into one record and report, apply the decision rule, commit.
+- [x] M2: run the six AutoAttack evaluations detached, one per GPU.
+- [x] M3: aggregate into one record and report, apply the decision rule, commit.
 - [ ] M4: write the decision packet for what the result implies.
 
 ## Test plan
@@ -211,4 +211,56 @@ absolute terms; only the difference between arms is being tested.
 
 ## Completion report
 
-Pending.
+**Verdict: CONFIRMED under the preregistered rule.**  The epoch-199 last-checkpoint
+AutoAttack difference, I100 minus matched CROP_SUFFIX, on the official
+10,000-example CIFAR-10 test set, is positive in all three confirmation seeds:
+`+0.41 / +0.06 / +0.46 pp`.  All six measurements (three seeds x best and last)
+are positive.
+
+| quantity | confirm-a | confirm-b | confirm-c | mean |
+| --- | ---: | ---: | ---: | ---: |
+| AutoAttack, last | +0.41 | +0.06 | +0.46 | **+0.31** |
+| AutoAttack, best | +0.30 | +0.45 | +0.42 | **+0.39** |
+| CE-PGD20, last | +0.69 | +0.29 | +0.49 | +0.49 |
+| clean, last | -0.20 | -0.05 | -0.08 | -0.11 |
+
+Source: `docs/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md`, record
+`docs/experiments/ard_i100_official_test_autoattack_v1.json`
+(SHA-256 `700e8d07...eecf59`).  Aggregation source `7f37aa2`; the six evaluations
+ran from pinned worktree `source-9ffc1aedf3b1`.
+
+**What this establishes.**  The I100 augmentation schedule keeps a positive
+advantage over its matched control when the comparison moves from a
+5,000-sample internal split under CE-PGD20 to the official 10,000-example test
+set under standard AutoAttack.  The direction survives on three seeds that were
+never used to develop the policy.  This is the only result in the project that
+has been measured this way.
+
+**What it does not establish, stated plainly.**  The magnitude shrank.  Internal
+validation gave `+0.78 / +0.68 / +0.62 pp` on CE-PGD20; the official-test
+AutoAttack difference is `+0.31 pp` on average, under half.  At `+0.31 pp` the
+effect sits inside the post-decay floor bracket of 0.25 to 0.50 pp that
+`docs/MEASUREMENT_DESIGN.md` reports, and that floor has never been measured
+directly for this design (plan 0092 would measure it).  With three seeds a sign
+test alone gives p = 0.125, and the paired t on the primary endpoint is
+t(2) = 2.46.  The same standard this project applied on 2026-09-05 to every
+sample-level screen must be applied here: the direction is consistent and
+independently replicated, the magnitude is at the resolution limit of the
+design, and a stronger claim needs either more seeds or the floor from plan 0092.
+
+The best-checkpoint effect is tighter (`+0.39 pp`, SD 0.079, t(2) = 8.51) than
+the last-checkpoint one, but "best" is selected on validation accuracy, so it
+carries a selection effect and was deliberately not the preregistered primary.
+
+**Robust overfitting.**  Best minus last AutoAttack is 0.00 / 0.00 / -0.23 pp for
+I100 and +0.11 / -0.39 / -0.19 pp for CROP_SUFFIX.  Neither arm degrades
+materially between its best epoch and epoch 199 on this measure.
+
+**Clean cost.**  I100 is slightly worse on clean accuracy in all three seeds
+(mean -0.11 pp), consistent with the internal-validation observation.
+
+**Deviations from the plan.**  None.  Scope, arms, checkpoints, endpoint, decision
+rule and resolution arithmetic were fixed before the runs and not revised.
+
+**Not authorized by this result.**  No promotion, no new seed, no architecture or
+dataset extension, and no sample-level intervention.

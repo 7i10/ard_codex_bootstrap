@@ -1,0 +1,217 @@
+{
+  "autoattack_upstream_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+  "campaign_root": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/i100-official-test-v1",
+  "comparisons": {
+    "confirm-a": {
+      "best": {
+        "autoattack_accuracy": 0.3,
+        "clean_accuracy": -0.04,
+        "pgd_accuracy": 0.55
+      },
+      "last": {
+        "autoattack_accuracy": 0.41,
+        "clean_accuracy": -0.2,
+        "pgd_accuracy": 0.69
+      },
+      "robust_overfit_gap_pp": {
+        "crop": 0.11,
+        "i100": 0.0
+      }
+    },
+    "confirm-b": {
+      "best": {
+        "autoattack_accuracy": 0.45,
+        "clean_accuracy": -0.36,
+        "pgd_accuracy": 0.39
+      },
+      "last": {
+        "autoattack_accuracy": 0.06,
+        "clean_accuracy": -0.05,
+        "pgd_accuracy": 0.29
+      },
+      "robust_overfit_gap_pp": {
+        "crop": -0.39,
+        "i100": 0.0
+      }
+    },
+    "confirm-c": {
+      "best": {
+        "autoattack_accuracy": 0.42,
+        "clean_accuracy": -0.05,
+        "pgd_accuracy": 0.64
+      },
+      "last": {
+        "autoattack_accuracy": 0.46,
+        "clean_accuracy": -0.08,
+        "pgd_accuracy": 0.49
+      },
+      "robust_overfit_gap_pp": {
+        "crop": -0.19,
+        "i100": -0.23
+      }
+    }
+  },
+  "contract": "ard_i100_official_test_autoattack_v1",
+  "dataset_scope": {
+    "count": 10000,
+    "name": "cifar10",
+    "split": "test"
+  },
+  "decision": {
+    "internal_validation_reference_pp": {
+      "confirm-a": 0.78,
+      "confirm-b": 0.68,
+      "confirm-c": 0.62
+    },
+    "per_seed_pp": {
+      "confirm-a": 0.41,
+      "confirm-b": 0.06,
+      "confirm-c": 0.46
+    },
+    "primary_endpoint": "epoch199 last-checkpoint official-test AutoAttack accuracy, I100 minus matched CROP_SUFFIX",
+    "secondary_best_checkpoint_pp": {
+      "confirm-a": 0.3,
+      "confirm-b": 0.45,
+      "confirm-c": 0.42
+    },
+    "stop": "this screen measures the official test endpoint only; it authorizes no promotion, no new seed, no architecture or dataset extension, and no sample-level intervention",
+    "verdict": "CONFIRMED"
+  },
+  "endpoint_attack_identity_sha256": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+  "schema_version": 1,
+  "seeds": {
+    "confirm-a": {
+      "crop": {
+        "checkpoints": {
+          "best": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5277999639511108,
+            "checkpoint_sha256": "9e6ba4b4b4a910fb50ded4e0e8fca6fbd429015df7a47c896d19e78a9ce85633",
+            "clean_accuracy": 0.8282,
+            "pgd_accuracy": 0.5673
+          },
+          "last": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.526699960231781,
+            "checkpoint_sha256": "5b0b8aa2e7e0628d41d3dbdb8f48e39bdedc9cc0ee162c7ba08df423dcc903d3",
+            "clean_accuracy": 0.8296,
+            "pgd_accuracy": 0.5656
+          }
+        },
+        "result_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/i100-official-test-v1/eval/confirm-a-crop/evaluation-results.json",
+        "result_sha256": "e87812f042621fc4ecbd235e310708593450323df8c7eb38f94231c0fee0463c",
+        "train_run_id": "unseen-confirm-a-crop-suffix-r2-training"
+      },
+      "i100": {
+        "checkpoints": {
+          "best": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5307999849319458,
+            "checkpoint_sha256": "c6871f52e086844a0795c926720c56eaeae344e21c03b9c76162d48cfd017513",
+            "clean_accuracy": 0.8278,
+            "pgd_accuracy": 0.5728
+          },
+          "last": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5307999849319458,
+            "checkpoint_sha256": "2eb66fc52febe091aa49bee5b9c9cbf89e0de1e3667d489cc88f35ccf27dfd43",
+            "clean_accuracy": 0.8276,
+            "pgd_accuracy": 0.5725
+          }
+        },
+        "result_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/i100-official-test-v1/eval/confirm-a-i100/evaluation-results.json",
+        "result_sha256": "89ae741a114b1b51037566b5b445f37d86f47b83927dd96697fb30d810585af8",
+        "train_run_id": "unseen-confirm-a-i100-suffix-training"
+      }
+    },
+    "confirm-b": {
+      "crop": {
+        "checkpoints": {
+          "best": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5256999731063843,
+            "checkpoint_sha256": "0f3e1b0db981063e16600f0e203294ec13ed13ee49a7dd2f9687f3acedcda7e2",
+            "clean_accuracy": 0.8322,
+            "pgd_accuracy": 0.5668
+          },
+          "last": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5295999646186829,
+            "checkpoint_sha256": "e0d090e85aa49fe8a37eafb5562782ebf6a6188401a169d25b9aec0b36b558fb",
+            "clean_accuracy": 0.8291,
+            "pgd_accuracy": 0.5678
+          }
+        },
+        "result_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/i100-official-test-v1/eval/confirm-b-crop/evaluation-results.json",
+        "result_sha256": "eebef0403d924c9e41447ab199d1a234632f554f302451ab2cf40626a8afc77f",
+        "train_run_id": "unseen-confirm-b-crop-suffix-training"
+      },
+      "i100": {
+        "checkpoints": {
+          "best": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5302000045776367,
+            "checkpoint_sha256": "ffccb372952b18d337e8b84147fd0142438e3ff733e681fa50deef28e1eb71ba",
+            "clean_accuracy": 0.8286,
+            "pgd_accuracy": 0.5707
+          },
+          "last": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5302000045776367,
+            "checkpoint_sha256": "ed7a1969771a75cb98ad9eb61e97d1f630287819df6fba16a565347a630dc9c4",
+            "clean_accuracy": 0.8286,
+            "pgd_accuracy": 0.5707
+          }
+        },
+        "result_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/i100-official-test-v1/eval/confirm-b-i100/evaluation-results.json",
+        "result_sha256": "3bc27d6916b929262322f5008f31ac19505e88c6e0af913562032c6b268ba1c7",
+        "train_run_id": "unseen-confirm-b-i100-suffix-training"
+      }
+    },
+    "confirm-c": {
+      "crop": {
+        "checkpoints": {
+          "best": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5253999829292297,
+            "checkpoint_sha256": "d06c5913c7a1e4ff7fa3bdc7739c15953f78ed2e38fddb28e286db58132ce376",
+            "clean_accuracy": 0.8287,
+            "pgd_accuracy": 0.5639
+          },
+          "last": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5273000001907349,
+            "checkpoint_sha256": "0c448b8fb2773cfa4d13037e56998f406457dec8d13d6fb6585fb99fb336552e",
+            "clean_accuracy": 0.8274,
+            "pgd_accuracy": 0.5657
+          }
+        },
+        "result_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/i100-official-test-v1/eval/confirm-c-crop/evaluation-results.json",
+        "result_sha256": "e9e377e15411c5e4d806f8dc32ad36fc5ef56a50d99f5f1d4530a4f572d60349",
+        "train_run_id": "unseen-confirm-c-crop-suffix-r2-training"
+      },
+      "i100": {
+        "checkpoints": {
+          "best": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5295999646186829,
+            "checkpoint_sha256": "a3bfe98c64a8937894ee99e88021a9adc8f4dfce7de5ca908108e826f301f10e",
+            "clean_accuracy": 0.8282,
+            "pgd_accuracy": 0.5703
+          },
+          "last": {
+            "attack_version": "standard",
+            "autoattack_accuracy": 0.5318999886512756,
+            "checkpoint_sha256": "97f1023f2854a3e817012dbf3248b3327fea47ba578c245e761f8766b32075e3",
+            "clean_accuracy": 0.8266,
+            "pgd_accuracy": 0.5706
+          }
+        },
+        "result_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/i100-official-test-v1/eval/confirm-c-i100/evaluation-results.json",
+        "result_sha256": "ba7facee1e50dd31ec00a994a9006b331d8b7658e09c41b92f9cbec413eefda4",
+        "train_run_id": "unseen-confirm-c-i100-suffix-r3-training"
+      }
+    }
+  },
+  "source_git_sha": "7f37aa2a80774d867dab698f5c6f42192eb72434"
+}
