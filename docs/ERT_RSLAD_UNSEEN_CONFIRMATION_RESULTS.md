@@ -29,7 +29,7 @@ full AUC、post-100 AUC も3/3で同方向だった。
   `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`
 - endpoint split identity SHA256:
   `16ec66fbcdeae0b70261589b1ba5f1e7fd4128743ce0194eabc5bea53a0cc6c4`
-- official test / AutoAttack: 未実施
+- official test / AutoAttack: 2026-09-05に実施（[I100 official test](ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md)）
 
 registryは事前freeze commit (`9b96c1a`) に作成され、実行時の source
 (`f4f859`) はその子孫である。実行manifest、checkpoint、endpointはすべて

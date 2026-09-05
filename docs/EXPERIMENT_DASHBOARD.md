@@ -453,6 +453,45 @@ effectsの小さな改善がある一方、productはlog-lossを悪化させま�
 retroactive preregistrationでもindependent confirmationでもありません。現時点で
 live replayやH3 launchは開始済みと扱いません。
 
+### I100 official test / AutoAttack確認（2026-09-05、CONFIRMED）
+
+ERT/RSLAD系のaugmentation schedule `I100`（epoch 0--99は`CROPSHIFT`、epoch 100--199は`IDBH_WEAK`）を、
+同一prefixから分岐した対応`CROP_SUFFIX` controlと、未使用のconfirmation seed 3本（`confirm-a/b/c`）で
+比較しました。TeacherはChen2021LTD WRN34-10、lossはRSLAD、200 epochsです。上のseed-0 8セルとは別campaignの
+matched pair比較なので、同じ表へは混ぜません。数値はaccuracy (%)で、bestとlastを分けて記載します。
+
+| Seed | Arm | Best clean | Best PGD | Best AA | Last clean | Last PGD | Last AA |
+|---|---|---:|---:|---:|---:|---:|---:|
+| confirm-a | I100 | 82.78 | 57.28 | 53.08 | 82.76 | 57.25 | 53.08 |
+| confirm-a | CROP_SUFFIX | 82.82 | 56.73 | 52.78 | 82.96 | 56.56 | 52.67 |
+| confirm-b | I100 | 82.86 | 57.07 | 53.02 | 82.86 | 57.07 | 53.02 |
+| confirm-b | CROP_SUFFIX | 83.22 | 56.68 | 52.57 | 82.91 | 56.78 | 52.96 |
+| confirm-c | I100 | 82.82 | 57.03 | 52.96 | 82.66 | 57.06 | 53.19 |
+| confirm-c | CROP_SUFFIX | 82.87 | 56.39 | 52.54 | 82.74 | 56.57 | 52.73 |
+
+差分（I100 − CROP_SUFFIX、pp）:
+
+| Seed | Best clean | Best PGD | Best AA | Last clean | Last PGD | Last AA |
+|---|---:|---:|---:|---:|---:|---:|
+| confirm-a | -0.04 | +0.55 | +0.30 | -0.20 | +0.69 | +0.41 |
+| confirm-b | -0.36 | +0.39 | +0.45 | -0.05 | +0.29 | +0.06 |
+| confirm-c | -0.05 | +0.64 | +0.42 | -0.08 | +0.49 | +0.46 |
+| 3 seed平均 | -0.15 | +0.53 | +0.39 | -0.11 | +0.49 | +0.31 |
+
+事前登録した主要endpointはlast checkpointのAA差で、3 seedすべてで正のためverdictは`CONFIRMED`です
+（best/last合わせた6測定もすべて正）。参考として、この確認が対象とした内部validationのCE-PGD20差は
+`+0.78 / +0.68 / +0.62 pp`でした。
+
+評価はCIFAR-10 official test **10,000例**（`dataset_identity.split = test`）で、AAは固定upstream commit
+`a3922004...`のstandard AutoAttack、PGDは登録済みthreat identity `70811016...`のCE PGD-20です。ただし
+last AAの平均`+0.31 pp`はpost-decay noise floorの範囲`0.25--0.50 pp`の内側にあるため、方向は確立しても
+大きさはこのdesignの分解能限界にあり、3 seedの記述的確認以上の主張はしません。
+
+詳細は[`I100 official test / AutoAttack`](ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md)、記録は
+[`ard_i100_official_test_autoattack_v1.json`](experiments/ard_i100_official_test_autoattack_v1.json)、
+計画は[`plan 0091`](plans/0091-i100-official-test-autoattack.md)です。noise floorの根拠は
+[`measurement design`](MEASUREMENT_DESIGN.md)にあります。
+
 ## 5. 出力
 
 ### ローカル
