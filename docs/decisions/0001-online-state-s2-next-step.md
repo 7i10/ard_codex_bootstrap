@@ -1,7 +1,8 @@
 ---
 id: 0001
-status: pending
+status: superseded
 created: 2026-09-05
+superseded: 2026-09-07
 campaign: ert-i100-online-state-s2-v1
 question: Online-State S2×T1 preservation screen (plan 0087) が完了し PMP/DBDP とも両 seed で正だった。次の一手は何か。
 options:
@@ -10,7 +11,7 @@ options:
   C: A と B を並列（Hamster で A、Ferret で B）。約 1 日で両方の証拠が揃う。
   D: 8-cell seed-0 コホートの multi-seed 化（protocol が求める 3 seed）。1 seed あたり 8 cell × 200 epoch ≈ 8 × 5 時間 = 40 GPU 時間/seed。論文の主表を固める。
 recommendation: C
-chosen: null
+chosen: superseded — A と B の双方が別計画として実行された
 ---
 
 ## 何が分かったか（plan 0087、記録は `docs/experiments/ert_rslad_i100_online_state_s2_preservation_v1.json`）
@@ -37,3 +38,42 @@ chosen: null
 ## 人間の記入欄
 
 `chosen:` に A/B/C/D を書くか、チャットで指示してください。選択後、Claude が `/experiment-launch` 用の plan（新番号）を起こします。
+
+
+---
+
+## 結末（2026-09-07 記入）
+
+**このパケットは決定されないまま、選択肢の側が実行された。** 推奨していた C
+（A と B の並列）と実質的に同じ結果になっている。
+
+| 選択肢 | 何が起きたか |
+|---|---|
+| A: PMP の確認実験（3 seed、e101–114） | **plan 0093 に置き換わった。** より大きい設計（親 6 本、official test、AutoAttack、近傍 2 本）で事前登録済み。親は 2026-09-07 00:31 から生成中 |
+| B: I100 の official test + AutoAttack | **plan 0091 として実行済み、判定 CONFIRMED**（`+0.41 / +0.06 / +0.46 pp`、6 測定すべて正） |
+| C: A と B の並列 | 上の 2 つが順に起きたことで、実質的に達成された |
+| D: 8-cell の multi-seed 化 | 未着手。依然として有効な選択肢 |
+
+### 本文中の誤った前提を記録しておく
+
+上の「判断材料」に次の記述がある。
+
+> 効果量 0.06–0.20 pp は、shuffle/augmentation RNG だけで生じる局所変動
+> **1–2 pp** の 1/10
+
+**この 1–2 pp は減衰前の床である。** 判定地平の e114 は減衰後で、そこでの床は
+plan 0092 が **0.092 pp** と実測した。つまり 0.14 / 0.20 pp は床の 1/10 ではなく
+**床の 1.5〜2 倍**である。このパケットの費用対効果は、11〜22 倍大きい床を前提に
+書かれていた。
+
+**さらに、その 0.092 pp すらこの対比には正しくない可能性がある。** plan 0087 の
+control / pmp / dbdp はいずれも `continuation_seed: null` で走っており、
+**共通の乱数流**を使っている。0.092 pp は乱数流が**異なる**複製間の床なので、
+種類が違う。正しい床はプラセボ arm で直接測れる
+（`docs/METHOD_DIRECTIONS.md` の検証節）。
+
+### 未着手のまま残るもの
+
+選択肢 D（8-cell コホートの 3 seed 化、1 seed あたり約 40 GPU 時間）は誰も
+実行していない。論文の主表を 1 seed のまま載せる危険は残っている。新しい
+パケットを起こすかどうかは、plan 0093 の結果を見てからでよい。
