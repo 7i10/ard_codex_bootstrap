@@ -1,7 +1,8 @@
 ---
 id: 0002
-status: pending
+status: decided
 created: 2026-09-06
+decided: 2026-09-06
 campaign: post-decay-floor-v1 (plan 0092)
 question: 減衰後の床が想定の 1/4（e114 で 0.092 pp）だと分かった。過去の約 40 件のスクリーン判定を、この値で見直すべきか。
 options:
@@ -9,7 +10,7 @@ options:
   B: 減衰後と判定された 17 行を新しい床で再分類する（計算のみ、再実験なし）。GPU 0 時間、作業半日程度。判定規則は「同一キャンペーン内の処置対対照で、その地平の床を超えていれば、その 2 seed について検出された」。
   C: B に加えて、有望に戻った arm を 1 本だけ確定ランで追試する。3.5 GPU 時間 x 複製数。どの arm かは B の結果で決まるので、いま指名はできない。
 recommendation: B
-chosen: null
+chosen: B
 ---
 
 ## なぜこの問いが生じたか
@@ -112,3 +113,20 @@ C は B の結果なしには arm を指名できないので、いま選べな�
 - 計画: `docs/plans/0092-post-decay-floor-calibration.md`
 - 再分類: `docs/EVIDENCE_RECLASSIFICATION.md`
 - 係数監査: `docs/COEFFICIENT_AUDIT.md`
+
+
+## この文書についての事故記録（2026-09-07）
+
+この決定は 2026-09-06 深夜に **B** と記入されたが、**コミットされる前に失われた**。
+
+原因は Claude 側の不注意な `git stash --keep-index` と `git stash drop` である。
+別の作業のために staged していないものを一時退避したつもりが、この文書の
+frontmatter への編集も一緒に破棄された。**そのとき「何も失われていない」と
+報告したが、確認したのは自分が意識していたファイルだけだった。**
+
+失われていたことは翌朝の red team 監査が「両方の決定パケットが `chosen: null`
+のままで、あらゆる着手を塞いでいる」と指摘したことで判明した。**規則上、
+`chosen` が null の間は新しい科学的ジョブを起動できない。** 記入されたはずの
+決定が消えたまま一晩が過ぎていた。
+
+再発防止として、`git stash` は使わない。退避が必要なら対象を明示的に指定する。
