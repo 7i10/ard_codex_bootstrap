@@ -545,3 +545,51 @@ That last property is also its weakness, and the thesis has to face it: a
 direction that works without a teacher is not by itself an argument for
 distillation.  Direction 5 exists to attach a teacher to whichever answer comes
 out, and it is deliberately gated on direction 1 rather than run beside it.
+
+## Where the teacher actually carries information, measured
+
+The red-team report objects that the teacher condition "admits about 90 % of
+training images", which would make a student-teacher gate collapse into the
+student-only gate AROID already covers.  The number is checked here because the
+objection decides whether the teacher-relation direction exists at all.
+
+**As stated the objection is wrong, and the concern behind it is right for two of
+the three student states.**  The 90 % is the share of the teacher's
+adversarially-correct set that clears its 10th-percentile margin, and that set is
+only 63.3 % of the training data.  T1 admits **57.0 %** of training images, not
+90 %.
+
+The joint distribution at epoch 100 on dev-1, from
+`prefix/dev-1/training/online-state/epoch-100.parquet` and the frozen thresholds
+(VERIFIED, 45,000 rows):
+
+| | T1 | T2 | T3 | total |
+| --- | ---: | ---: | ---: | ---: |
+| S1 | 18,418 | 455 | 586 | 19,459 |
+| S2 | 1,642 | 215 | 306 | 2,163 |
+| S3 | 5,584 | 2,180 | 15,614 | 23,378 |
+| total | 25,644 | 2,850 | 16,506 | 45,000 |
+
+What the teacher adds, given the student's state:
+
+| given | share that is T1 |
+| --- | ---: |
+| S1 | **94.7 %** |
+| S2 | 75.9 % |
+| S3 | **23.9 %** |
+
+So the objection holds where it was aimed and fails as a general claim.
+**Conditioning on the teacher inside S1 is decoration**: nineteen images in
+twenty are T1 anyway.  Inside S3 it is not: only one image in four is T1, and
+`S3xT1` — the student is wrong under attack while the teacher is confidently
+right — is 5,584 images, 12.4 % of the training set.
+
+Two consequences for this document.
+
+**Direction 1 is right to be student-only.**  It asks which way to allocate
+hardness, and adding a teacher term to an S1-conditioned arm would buy nothing
+while making the design harder to defend.
+
+**Direction 5 is right to live on S3xT1** and nowhere else.  Any teacher-relation
+proposal that conditions on S1 or S2 should be dropped, because the teacher is
+nearly redundant there and a reviewer can compute that in a minute.
