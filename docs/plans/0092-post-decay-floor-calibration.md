@@ -121,8 +121,12 @@ uncertainty, from six comparisons, and not presented as precise.
   express it; confirm the epoch-100 prefixes and frozen thresholds from plan
   0087 are reusable, or rebuild them.
 - [~] M1: launch six continuations from a pinned worktree, epochs 101 to 114.
-- [ ] M2: evaluate eighteen endpoints at e104, e109, e114.
-- [ ] M3: compute the floor, write the record and report, commit.
+  Attempt 2 running since 2026-09-06 21:34; rep1 complete on both parents.
+- [ ] M2: evaluate eighteen endpoints at e104, e109, e114.  Launcher ready
+  (`runs/post-decay-floor-v1/endpoints.sh`); waits on M1.
+- [ ] M3: compute the floor, write the record and report, commit.  Aggregator
+  ready (`scripts/aggregate_post_decay_floor.py`), statistics verified against
+  hand-computed values; waits on M2.
 - [ ] M4: fold the number into `docs/MEASUREMENT_DESIGN.md` and restate the
   minimum detectable effects there.
 
@@ -166,6 +170,49 @@ for interpreting option A rather than an alternative to it.
   collision.  Diagnosis below.  The attempt tree was moved aside to
   `runs/post-decay-floor-v1/arms-attempt1-wandb-id-collision/` and M1 was
   relaunched at 21:34 JST with a per-replicate run namespace.
+- 2026-09-06 M1 attempt 2: all six relaunched together under
+  `post-decay-floor-v1-rep<N>` namespaces.  `run_namespace` was confirmed absent
+  from `_arm_hash`, so it is a tracking label only and changing it leaves the
+  scientific identity untouched.  The two replicates that had already succeeded
+  under the old namespace were discarded rather than reused: a floor measurement
+  compares replicates to each other, so all six must be produced identically.
+  Each replicate takes about 26 minutes on one 4090.
+- 2026-09-06: the frozen thresholds were re-verified after the relaunch, because
+  the launcher bug below could in principle have hidden a failed freeze step.  It
+  had not: `thresholds/dev-1` and `thresholds/dev-2` match their recorded
+  SHA-256, carry the q10 cut points (student 0.140155 / 0.138205, teacher
+  0.174019 / 0.177792) and name the registered parents.
+- 2026-09-06 M2/M3 prepared while the GPUs were busy: `endpoints.sh` for the
+  eighteen endpoint sweeps and `scripts/aggregate_post_decay_floor.py` for the
+  floor itself.  The aggregator's statistics were checked against hand-computed
+  values on synthetic input before any real data existed.
+
+### A second launcher defect, found alongside the first
+
+The fan-out script reported `rc=0` for every replicate, including the four that
+had crashed after fourteen seconds.  The line was
+
+    echo "$(date -Is) done $name rc=$?"
+
+and the command substitution runs *before* the expansion of `$?`, so `$?` reports
+the status of `date`, which always succeeds.  Every launcher in this campaign and
+in plan 0091 carried the same line.  It is why the failures were noticed only
+when the log stream showed a traceback, rather than at the moment they happened.
+
+The corrected launchers capture `rc=$?` on its own line immediately after the
+command, and stop the remaining replicates on the first failure instead of
+continuing into a partially populated campaign.
+
+### The aggregator reports two spread numbers, deliberately
+
+The plan preregistered "the six pairwise absolute differences and their standard
+deviation".  That is reported unchanged.  But three replicates give two degrees
+of freedom per parent, and the six pairwise differences drawn from them are not
+independent, so the standard deviation of those six numbers is not the sigma_d a
+future screen needs.  The aggregator therefore also pools the two within-parent
+variances into four degrees of freedom and reports sigma_d = sigma_within * sqrt(2)
+with a 95% interval.  Both appear in the record, so neither the preregistration
+nor the better-founded estimator is hidden.
 
 ### M1 attempt 1: the run-id collision
 
