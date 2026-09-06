@@ -262,16 +262,24 @@ def _pairwise(values: Mapping[int, float]) -> list[dict[str, Any]]:
     return pairs
 
 
-def _mde(sigma_d_pp: float, blocks: int) -> float:
+def _mde(sigma_d_pp: float, blocks: int, *, df: int) -> float:
     """Minimum detectable effect for a paired two-arm design with k blocks.
 
-    Two-sided alpha = 0.05, power = 0.80, Student's t on k-1 degrees of freedom.
-    At k = 2 the t multiplier is enormous (df = 1); that is not a defect of the
-    formula, it is what two blocks actually buy.
+    Two-sided alpha = 0.05, power = 0.80.
+
+    The degrees of freedom are the calibration's, not the screen's.  The whole
+    purpose of measuring the floor is that a future screen does not have to
+    estimate sigma from its own handful of blocks: it uses this number.  Sizing
+    a screen with t on k-1 degrees of freedom would be answering a different
+    question -- what a screen that ignored this calibration could detect -- and
+    at k = 2 that inflates the requirement fivefold.
+
+    But the calibration's own four degrees of freedom are not free either.
+    `docs/MEASUREMENT_DESIGN.md` sizes screens with sqrt(7.85 / k), which is the
+    normal approximation, i.e. sigma treated as exactly known.  The values here
+    are larger than that convention by the ratio 3.717 / 2.80 = 1.33, and that
+    factor is the price of having estimated the floor from six runs.
     """
-    df = blocks - 1
-    if df < 1:
-        return float("inf")
     t_alpha = float(stats.t.ppf(1.0 - ALPHA / 2.0, df))
     t_beta = float(stats.t.ppf(POWER, df))
     return (t_alpha + t_beta) * sigma_d_pp / math.sqrt(blocks)
@@ -333,7 +341,10 @@ def _horizon_statistics(replicates: Iterable[Mapping[str, Any]], *, epoch: int) 
             "degrees_of_freedom": df,
             "sigma_d_ci95_pp": [lower, upper],
         },
-        "minimum_detectable_effect_pp": {str(k): _mde(sigma_d, k) for k in (2, 5, 10)},
+        "minimum_detectable_effect_pp": {str(k): _mde(sigma_d, k, df=df) for k in (2, 5, 10)},
+        "minimum_detectable_effect_normal_approximation_pp": {
+            str(k): sigma_d * math.sqrt(7.85 / k) for k in (2, 5, 10)
+        },
     }
 
 
@@ -448,11 +459,34 @@ def _markdown(result: Mapping[str, Any]) -> str:
         )
         add("")
         mde = stats_at["minimum_detectable_effect_pp"]
-        add("| paired blocks | smallest effect an 80%-power screen can detect |")
-        add("| ---: | ---: |")
+        normal = stats_at["minimum_detectable_effect_normal_approximation_pp"]
+        add("| paired blocks | smallest detectable effect | under the existing sqrt(7.85/k) convention |")
+        add("| ---: | ---: | ---: |")
         for blocks in ("2", "5", "10"):
-            add(f"| {blocks} | {_fmt(mde[blocks])} pp |")
+            add(f"| {blocks} | {_fmt(mde[blocks])} pp | {_fmt(normal[blocks])} pp |")
         add("")
+    add("## What this floor does and does not cover")
+    add("")
+    add(
+        "These replicates share a parent, share an epoch-100 prefix, share a data order, and share a campaign. "
+        "They differ in the random stream after the fork and in nothing else. That is exactly the structure of a "
+        "screen that compares a treated arm against a control inside one campaign, so the number applies there "
+        "directly."
+    )
+    add("")
+    add(
+        "It does not license comparisons across campaigns. `docs/COEFFICIENT_AUDIT.md` records two nominally "
+        "identical controls in different campaigns differing by 0.94 and 1.78 pp, which is an order of magnitude "
+        "above this floor. Whatever produces that shift is not the post-fork random stream, and this measurement "
+        "says nothing about it. A treated arm in one campaign still may not be compared with a control in another."
+    )
+    add("")
+    add(
+        "It is also a floor for this design only: two parents, fourteen epochs past the decay, the registered "
+        "CE-PGD20 endpoint on the validation split. Nothing here transfers to a different horizon, a different "
+        "endpoint, or the official test split."
+    )
+    add("")
     add("## How to read the two spread numbers")
     add("")
     add(
