@@ -21,7 +21,25 @@
 # lesson is recorded rather than quietly fixed: a lock file is unverified until
 # a full training run has started under an environment built from it alone.
 # Building ard-v2 on a host and then launching one real job is the acceptance
-# test for this file, and it has not yet passed on any host.
+# test for this file.
+#
+# ACCEPTANCE (2026-09-06, Hamster): PASSED.
+# `ard-v2` was built from this file alone.  All 21 pinned packages and the
+# interpreter matched `pip freeze` exactly.  Note that `setuptools` is installed
+# by conda and does not appear in `pip freeze`, so it must be checked with
+# `pip list` or an import rather than reported as missing.  A real CIFAR-10 RSLAD
+# training job then started under the environment: the config validated,
+# `.external/robustbench` imported (the exact `import timm` path that failed on
+# Ferret), the Chen teacher loaded and its SHA-256 verified as
+# fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983, and the run
+# bundle reached `status: running`.  The job was stopped there by design;
+# starting is the criterion.  Evidence:
+# <runtime>/runs/ard-v2-acceptance-v1/run-bundle/manifest.json
+#
+# STILL UNVERIFIED: this file has not been built on Ferret, whose legacy `adv`
+# environment is Python 3.12.13 against Hamster's 3.11.15.  Until it is, the two
+# hosts remain two different measurement instruments and no comparison may
+# straddle them.
 
 # GENERATION: v2 (2026-09-06)
 # Supersedes the unnamed generation that produced results up to 2026-09-05.

@@ -127,9 +127,9 @@
 
 | 前提 | 状態 |
 |---|---|
-| Hamster 復旧と 12 コミットの push | 未 |
-| plan 0092 の床確定（σ_d） | 未 |
-| env v2 を Hamster で構築し `pip freeze` を `requirements/environment.lock` と照合 | 未 |
+| Hamster 復旧と未 push コミットの push | 済（2026-09-06。master 25 件に加え、上流を持たない `a7-mechanism-diagnostic` 16 件も push。どのリモートにも無いコミットは 0 件） |
+| plan 0092 の床確定（σ_d） | 実行中（2026-09-06 21:02 起動、未処置対照 6 本、e101–114） |
+| env v2 を Hamster で構築し `pip freeze` を `requirements/environment.lock` と照合 | 済（2026-09-06。21 項目一致、受け入れ試験通過。Ferret では未構築） |
 | ランタイム root v2 の作成 | 未 |
 | 親 6 本の生成 | 未 |
 
