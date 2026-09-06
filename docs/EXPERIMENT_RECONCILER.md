@@ -1,5 +1,11 @@
 # Experiment reconciler and single-owner postprocessing
 
+> **Superseded (2026-09-07).** `scripts/reconcile_experiment.py` is listed as frozen
+> ("凍結（呼ばない・依存しない）") in `docs/CLAUDE_CODE_WORKFLOW.md` and in `CLAUDE.md`'s
+> frozen-subsystem list. Current campaigns use `launch_gate.py` → `orchestrate.py`
+> (detached DAG) plus `scripts/ardx/`, described in `docs/CLAUDE_CODE_WORKFLOW.md`.
+> Kept for historical reference; do not call or extend the reconciler it describes.
+
 `scripts/reconcile_experiment.py` is a small control-plane helper for a
 detached experiment. It is not a second orchestrator and it does not replace
 the production launch gate or the multi-GPU orchestrator.

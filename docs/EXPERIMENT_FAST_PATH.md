@@ -1,5 +1,11 @@
 # Experiment Execution Fast Path
 
+> **Superseded (2026-09-07).** "fast path / runtime signature" is listed as frozen in
+> `CLAUDE.md` and `docs/CLAUDE_CODE_WORKFLOW.md` — not to be called or extended. Current
+> campaigns get their preflight/canary/launch speed from `launch_gate.py` directly and the
+> `.claude/skills/experiment-launch` skill, not from this validated-runtime-signature mode.
+> Kept for historical reference only.
+
 ## Purpose
 
 This is the operational path for a short scientific campaign whose public

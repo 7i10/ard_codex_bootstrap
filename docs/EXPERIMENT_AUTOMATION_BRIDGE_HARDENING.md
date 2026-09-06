@@ -1,5 +1,11 @@
 # Experiment Automation Bridge Hardening
 
+> **Superseded (2026-09-07).** This bridge is built on `scripts/reconcile_experiment.py`,
+> `scripts/publish_experiment_terminal_event.py` (the PR #1 event bus), and the fast-path
+> runtime-signature registry, all of which `CLAUDE.md` and `docs/CLAUDE_CODE_WORKFLOW.md`
+> list as frozen — not to be called or extended. Current campaigns use `launch_gate.py` →
+> `orchestrate.py` plus `scripts/ardx/`. Kept for historical reference only.
+
 This milestone hardens the control plane without changing any scientific
 training code or the active I100 campaign.
 

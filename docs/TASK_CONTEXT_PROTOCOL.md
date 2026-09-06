@@ -1,5 +1,10 @@
 # Task-context protocol
 
+> **Superseded (2026-09-07).** `scripts/task_context.py` is listed as frozen in `CLAUDE.md`
+> and `docs/CLAUDE_CODE_WORKFLOW.md` — not to be called or extended. Long-task recovery now
+> reads campaign state from `state.json` / `run-bundle` per `docs/CLAUDE_CODE_WORKFLOW.md`,
+> not from this runtime-only context file. Kept for historical reference only.
+
 Use a runtime-only task context for long operational or scientific tasks:
 
 ```bash

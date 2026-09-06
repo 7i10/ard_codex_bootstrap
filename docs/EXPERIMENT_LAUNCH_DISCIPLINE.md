@@ -1,5 +1,12 @@
 # Experiment Launch Discipline
 
+> **Superseded (2026-09-07).** This document's launch-ledger procedure is built on
+> `launch_ledger.py`, which `CLAUDE.md` and `docs/CLAUDE_CODE_WORKFLOW.md` list as frozen —
+> not to be called or extended — and it points to `EXPERIMENT_FAST_PATH.md`, itself
+> superseded. The current launch path (preflight → dry-run → canary → launch, then arm the
+> watcher) is in `docs/CLAUDE_CODE_WORKFLOW.md` and the `.claude/skills/experiment-launch`
+> skill. The SLO targets and root-cause analysis below are kept for historical reference.
+
 ## Why this exists
 
 The I100 Dynamic-BDD screen and its subsequent forensic audit exposed a
