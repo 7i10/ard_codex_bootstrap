@@ -1,0 +1,13 @@
+# Reporting-only dependencies.
+#
+# These are NOT part of the training runtime and MUST NOT be installed into
+# the ard-v2 environment: adding packages there changes the environment
+# generation, and requirements/environment.lock requires that a comparison
+# never straddles two environments.
+#
+# Install into a separate environment instead:
+#
+#   conda create -y -n ard-report python=3.11
+#   conda run -n ard-report pip install -r requirements/reporting.txt
+#
+python-pptx==1.0.2
