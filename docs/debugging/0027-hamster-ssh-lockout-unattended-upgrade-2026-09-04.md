@@ -208,6 +208,52 @@ meanwhile.**  Until the loop is fixed, `SystemMaxUse=1G` and a `RateLimitBurst`
 in `/etc/systemd/journald.conf` would stop the noise from evicting the history
 needed the next time something breaks.
 
+## What was confirmed on 2026-09-06 evening
+
+**The hook is installed on both hosts.** Not the version drafted above but a
+broader one: it asks whether anything is listening on port 22 at all, rather
+than whether `ssh.service` is enabled and inactive. The drafted condition would
+have missed a postinst that *disabled* `ssh.service` as well as stopping it.
+Source: `scripts/ardx/host-setup/ensure-sshd`.
+
+**Ferret survived the identical upgrade for one reason, now verified.** It has
+the state file Hamster lacks:
+
+| | `/var/lib/systemd/deb-systemd-helper-enabled/ssh.socket.dsh-also` | `/etc/systemd/system/ssh.socket` | who holds port 22 |
+| --- | --- | --- | --- |
+| Hamster | absent | symlink to `/dev/null` (masked, dated 2026-04-04) | `ssh.service`, backlog 128 |
+| Ferret | present, with `sockets.target.wants/ssh.socket` | not masked | `ssh.socket`, backlog 4096 |
+
+On Ferret `was_enabled` finds recorded links and checks them, so the answer is
+real. On Hamster it finds no state file, the loop never executes, and the
+function returns true without having verified anything. That vacuous truth is
+the whole bug.
+
+**The migration branch was not involved.** Lines 148-160 of the postinst read
+`if dpkg --compare-versions "$2" ge 1:9.3p1-1ubuntu3~ && ! systemctl --quiet
+is-enabled ssh.socket; then :`. The upgrade was from `1:9.6p1-3ubuntu13.18`, so
+the version test passes, and a masked socket is not enabled, so the negation
+passes too. Both true means the `then` branch, which does nothing. It
+deliberately leaves a masked socket alone. Only the restart branch at lines
+221-224 misfires.
+
+**Both BMCs are alive and on the network.** `ipmitool mc info` answers on both
+hosts (ASUSTek, firmware 1.15, `Device Available: yes`), and the management LAN
+is on **channel 8**, not channel 1:
+
+| host | BMC address | MAC |
+| --- | --- | --- |
+| Hamster | 192.168.100.5 | 58:11:22:b4:44:8d |
+| Ferret | 192.168.100.3 | 58:11:22:b4:44:39 |
+
+Ports 623, 443 and 80 are open on each **as seen from the other host**. Neither
+BMC answers from its own host, which is normal for a shared-NIC BMC and not a
+fault. A console fallback therefore already exists for each machine; what
+remains is credentials, which have to be set from the host with
+`ipmitool user list 8`.
+
+This closes item 3 of the bounded fix as "available", not "needs approval".
+
 ## Operational rule
 
 Before starting a long unattended campaign on a host that will be left alone,
