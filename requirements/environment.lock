@@ -36,10 +36,28 @@
 # starting is the criterion.  Evidence:
 # <runtime>/runs/ard-v2-acceptance-v1/run-bundle/manifest.json
 #
-# STILL UNVERIFIED: this file has not been built on Ferret, whose legacy `adv`
-# environment is Python 3.12.13 against Hamster's 3.11.15.  Until it is, the two
-# hosts remain two different measurement instruments and no comparison may
-# straddle them.
+# ACCEPTANCE (2026-09-06, Ferret): PASSED.
+# Ferret's `ard-v2` already existed but predated the correction above: seven of
+# the pinned packages were missing outright and `pillow` was one patch ahead.
+# It was reconciled and now matches Hamster exactly.  A real CIFAR-10 RSLAD
+# training job then ran under it from a pinned worktree at 7bcf211 and completed
+# whole epochs rather than merely starting: `train_teacher_adversarial_forward_-
+# calls` reached 352 per epoch, which is the direct proof that the Chen teacher
+# loaded through the `import timm` path that previously failed on this host.
+# Evidence: <runtime>/runs/ard-v2-acceptance-ferret-v1/
+#   epoch 0  val_clean 0.3418  val_pgd 0.2324  (336 img/s)
+#   epoch 1  val_clean 0.4326  val_pgd 0.2730  (361 img/s)
+# Both hosts now report python 3.11.15, torch 2.11.0+cu128, cuda 12.8.
+#
+# KNOWN GAP: this file alone does not determine an environment.
+# It pins the 21 packages the project imports directly, but not the transitive
+# set they pull in -- `timm` alone brings `huggingface_hub`, `safetensors`,
+# `hf-xet`, `httpx` and its stack.  Installing from this file on a new host lets
+# pip choose whatever versions are current that day, which is exactly the drift
+# this file exists to prevent.  The full verified closure of 81 packages is
+# recorded in `requirements/environment.v2.freeze.txt`; build from this file for
+# the interpreter and CUDA wheels, then reconcile against that one and require
+# an empty diff.
 
 # GENERATION: v2 (2026-09-06)
 # Supersedes the unnamed generation that produced results up to 2026-09-05.
