@@ -67,8 +67,12 @@ gradient on purpose" to "our TRADES scores four points below every published
 value".  A declaration of intent is not a justification, and a difference that is
 documented but whose cost is not measured is indistinguishable from a defect.
 
-If a reason existed, it is not in the repository, and the human should say so
-before the corrected baseline is used.
+**Resolved 2026-09-07.**  Asked directly, the author does not remember a reason
+and judges it most likely to have been a mistake.  The fix stands, and this note
+is the record of how a mistake came to be labelled intentional: it was written
+down as a difference, a test was written to hold it in place, and neither step
+asked what it cost.  The cost was four points, and it was visible in the
+dashboard the whole time.
 
 ## Confirmation
 
