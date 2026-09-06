@@ -6,6 +6,21 @@ set -uo pipefail
 
 log() { printf '%s postrun_hook: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 
+# Push notification.  notify-send only reaches someone sitting at this machine,
+# which is exactly the case that does not need telling; the interesting one is a
+# campaign ending while nobody is in the building.  Topic and secrecy note live
+# in ~/.config/ardx/liveness.env, shared with the cross-host liveness monitor.
+# Only campaign identifiers and status text are sent, never research content.
+ntfy() {  # ntfy <priority> <tags> <title> <body>
+  local conf="$HOME/.config/ardx/liveness.env" topic
+  [ -r "$conf" ] || return 0
+  topic="$(sed -n 's/^NTFY_TOPIC=//p' "$conf")"
+  [ -n "$topic" ] || return 0
+  curl -fsS --max-time 15 -H "Title: $3" -H "Priority: $1" -H "Tags: $2" \
+    -d "$4" "https://ntfy.sh/$topic" >/dev/null 2>&1 \
+    || log "ntfy send failed; wanted to say: $3"
+}
+
 if [ "$#" -lt 3 ]; then
   log "usage: postrun_hook.sh KIND ID STATUS"
   exit 0
@@ -176,6 +191,8 @@ OUT="$RUN_DIR/$STAMP-$SAFE_ID.json"
 ERR="$RUN_DIR/$STAMP-$SAFE_ID.log"
 cd "$REPO_ROOT" || { log "cannot cd $REPO_ROOT"; exit 0; }
 log "running postrun for $KIND $ID ($STATUS) -> $OUT"
+ntfy default hourglass "$ID finished ($STATUS)" \
+  "The $KIND reached a terminal state on $(hostname). Running the postrun now."
 CLAUDE_CODE_EFFORT_LEVEL=high "${CMD[@]}" >"$OUT" 2>"$ERR" || log "claude exited non-zero; see $ERR"
 
 SUMMARY="$(/usr/bin/python3 - "$OUT" <<'PY' 2>/dev/null
@@ -191,6 +208,11 @@ PY
 )"
 [ -n "$SUMMARY" ] || SUMMARY="no result recorded"
 log "postrun for $ID finished: $SUMMARY"
+if [ "$STATUS" = "completed" ]; then
+  ntfy default white_check_mark "$ID: postrun done" "$SUMMARY"
+else
+  ntfy high warning "$ID: postrun done ($STATUS)" "$SUMMARY"
+fi
 # notify-send blocks ~60-75 s on this host (no D-Bus notification owner, so each
 # call waits out activation) while the per-ID flock is still held: bound it.
 if command -v notify-send >/dev/null 2>&1; then
