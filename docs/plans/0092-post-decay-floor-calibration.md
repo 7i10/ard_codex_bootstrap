@@ -4,8 +4,8 @@
 
 - Owner: human (approval to spend GPU), Claude Code (execution)
 - Branch / base SHA: master, see progress log
-- Current milestone: M1, relaunched 2026-09-06 21:34 after the first fan-out lost
-  four of six replicates to a W&B run-id collision
+- Current milestone: M3 complete; M4 (folding the number into
+  `docs/MEASUREMENT_DESIGN.md`) is the remaining step
 - Last updated: 2026-09-06
 
 ## Goal
@@ -120,13 +120,9 @@ uncertainty, from six comparisons, and not presented as precise.
 - [x] M0: define and freeze what a replicate varies; confirm the runtime can
   express it; confirm the epoch-100 prefixes and frozen thresholds from plan
   0087 are reusable, or rebuild them.
-- [~] M1: launch six continuations from a pinned worktree, epochs 101 to 114.
-  Attempt 2 running since 2026-09-06 21:34; rep1 complete on both parents.
-- [ ] M2: evaluate eighteen endpoints at e104, e109, e114.  Launcher ready
-  (`runs/post-decay-floor-v1/endpoints.sh`); waits on M1.
-- [ ] M3: compute the floor, write the record and report, commit.  Aggregator
-  ready (`scripts/aggregate_post_decay_floor.py`), statistics verified against
-  hand-computed values; waits on M2.
+- [x] M1: launch six continuations from a pinned worktree, epochs 101 to 114.
+- [x] M2: evaluate eighteen endpoints at e104, e109, e114.
+- [x] M3: compute the floor, write the record and report, commit.
 - [ ] M4: fold the number into `docs/MEASUREMENT_DESIGN.md` and restate the
   minimum detectable effects there.
 
@@ -279,53 +275,85 @@ then the arms have to be collected by hand.
 
 ## Completion report
 
-Pending.  The campaign is **not** complete, contrary to the assumption recorded in
-`docs/HANDOFF_2026-09-06_FERRET_TO_HAMSTER.md` chapter 0 step (4).
+**The floor is measured.  It is far below the bracket that stood in for it.**
 
-What ran on 2026-09-05, from pinned worktree `source-ed3b77daa1de`:
+Record: `docs/experiments/ard_post_decay_floor_v1.json`
+(sha256 `a9ea3baf923d22ee...`).
+Report: `docs/POST_DECAY_FLOOR.md`.  Runs produced at `ed3b77daa1de`.
 
-| stage | seed | result |
-| --- | --- | --- |
-| e100 prefix | dev-1 | completed 18:03:59, rc 0 |
-| e100 prefix | dev-2 | completed 18:04:03, rc 0 |
-| threshold freeze | dev-1 | completed 18:04:04, rc 0 |
-| threshold freeze | dev-2 | completed 18:04:08, rc 0 |
-| six control replicates | — | **never launched** |
-| eighteen endpoints | — | **never launched** |
+| horizon | sigma_d | 95% interval | mean pairwise gap | largest pairwise gap |
+| --- | ---: | ---: | ---: | ---: |
+| e104 | 0.159 pp | 0.095 to 0.457 pp | 0.133 pp | 0.260 pp |
+| e109 | 0.124 pp | 0.074 to 0.356 pp | 0.113 pp | 0.200 pp |
+| e114 | 0.092 pp | 0.055 to 0.265 pp | 0.087 pp | 0.140 pp |
 
-The session ended between the freeze and the arm launch, and the host became
-unreachable shortly afterwards.  `runs/post-decay-floor-v1/arms/` did not exist.
-No GPU work was lost, because none had started: the four stages above total about
-four minutes.
+`docs/MEASUREMENT_DESIGN.md` section 3.5 bracketed this quantity at **0.25 to
+0.50 pp** and adopted 0.40 pp as a working value; this plan's own prerequisites
+table carried 0.35 pp.  The measured value at e114 is **0.092 pp** -- a quarter
+of the working value, and below the whole bracket.  Even the upper end of its
+95% interval, 0.265 pp, sits at the bracket's floor.
 
-M1 attempt 1 ran on 2026-09-06 from the same pinned worktree and produced no
-usable measurement: two of six replicates reached epoch 114, the other four never
-started, and one replicate per seed gives zero control-versus-control pairs —
-the entire quantity this plan exists to measure.  About 0.9 GPU-hours were spent
-and discarded.  See "M1 attempt 1: the run-id collision" in the progress log.
-The e100 prefixes and frozen thresholds were untouched by all of this and are
-still the plan-0087 lineage.
+That section had predicted exactly this.  It noted that the quantity being
+bracketed -- two untreated forks of a common epoch-99 parent over fourteen
+epochs -- is the shortest fork of the three it reasoned from, and "could
+plausibly sit below the whole bracket".  It does.
 
-**Therefore the post-decay floor is still unmeasured and `sigma_d` remains the
-provisional 0.35 pp.**  Everything that depends on it is still provisional:
-`docs/MEASUREMENT_STANDARD.md` section 5, plan 0093's detectable effect, and the
-interpretation of the plan-0091 official-test result (`+0.31 pp` mean, which sits
-inside the unmeasured 0.25 to 0.50 pp bracket).
+### The floor keeps shrinking after the decay
 
-### A verification the interrupted stage did deliver
+0.159, 0.124, 0.092 pp at e104, e109, e114.  The collapse the design document
+observed within four epochs of the decay does not stop there; it continues
+through e114.  Judging later is not merely safer, it is measurably cheaper in
+replication.  Whether it keeps falling past e114 is untested.
 
-Regenerating the e100 prefix at source `ed3b77d` reproduced the plan-0087 prefix
-computation exactly.  The online-state Parquet is bit-identical across the two
-source revisions:
+### What a screen can now resolve
 
-| artifact | plan 0087 (`bcb09a7`) | plan 0092 (`ed3b77d`) | identical |
-| --- | --- | --- | --- |
-| dev-1 e100 online-state | `0bb0701f...70441a` | `0bb0701f...70441a` | yes |
-| dev-1 e100 checkpoint file | `89a43b3c...687158` | `e3a3975f...23e17d` | no |
+| paired blocks | e104 | e109 | e114 |
+| ---: | ---: | ---: | ---: |
+| 2 | 0.418 pp | 0.325 pp | 0.243 pp |
+| 5 | 0.265 pp | 0.206 pp | 0.154 pp |
+| 10 | 0.187 pp | 0.146 pp | 0.109 pp |
 
-The computed state matches; the checkpoint *file* hash does not, because the
-checkpoint embeds the resolved config and source metadata.  This independently
-confirms, from a different angle, what the Ferret session found by re-running the
-same source twice: a checkpoint file hash is not a test of reproducibility.  It
-also confirms that exposing `--continuation-seed` did not perturb the
-computation.
+The standard two-seed screen was believed to resolve nothing below about
+0.69 pp.  At e114 it resolves **0.242 pp**.  The 0.3 to 0.6 pp band that
+`docs/EVIDENCE_RECLASSIFICATION.md` called invisible is inside reach of the
+design this project already runs.
+
+These use the calibration's four degrees of freedom rather than the screen's
+k-1, because the point of measuring the floor is that a screen need not
+rediscover it.  They are 1.33x the `sqrt(7.85/k)` convention in
+`docs/MEASUREMENT_DESIGN.md`, which treats sigma as exactly known; six runs do
+not make it so, and that factor is the honest price of the sample size.
+
+### What this does not license
+
+The replicates share a parent, an epoch-100 prefix, a data order and a campaign,
+differing only in the post-fork random stream.  That is precisely a
+within-campaign treatment-versus-control screen, so the number applies there.
+
+It says nothing about comparisons across campaigns.  `docs/COEFFICIENT_AUDIT.md`
+records two nominally identical controls in different campaigns differing by
+0.94 and 1.78 pp -- an order of magnitude above this floor.  Whatever drives
+that is not the post-fork random stream, and this measurement does not touch it.
+**A smaller within-campaign floor makes the cross-campaign shift more anomalous,
+not less.**  That gap is now the largest unexplained quantity in the project.
+
+It is also specific to this design: two parents, fourteen epochs past the decay,
+the registered CE-PGD20 endpoint on the validation split.  Nothing transfers to
+another horizon, another endpoint, or the official test split.
+
+### Cost
+
+Six replicates at about 26 minutes each on one 4090, run two at a time: 2.6
+GPU-hours.  Eighteen endpoint sweeps at about 31 seconds each: 0.2 GPU-hours.
+A further 0.9 GPU-hours were spent and discarded on attempt 1.
+
+### What ran, and when
+
+| stage | result |
+| --- | --- |
+| e100 prefix, both seeds | 2026-09-05 18:03-18:04, rc 0 |
+| threshold freeze, both seeds | 2026-09-05 18:04, rc 0 |
+| six control replicates, attempt 1 | 2026-09-06 21:02-21:31, four of six lost to a W&B run-id collision, discarded |
+| six control replicates, attempt 2 | 2026-09-06 21:34-22:53, all six rc 0 |
+| eighteen endpoints | 2026-09-06 22:54-22:56, all rc 0 |
+
