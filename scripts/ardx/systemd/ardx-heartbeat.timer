@@ -1,0 +1,10 @@
+[Unit]
+Description=Send the ARD proof-of-life notification once a day
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+AccuracySec=5min
+
+[Install]
+WantedBy=timers.target

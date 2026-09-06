@@ -1,0 +1,7 @@
+[Unit]
+Description=ARD cross-host liveness check
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/ardx-liveness check

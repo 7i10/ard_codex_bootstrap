@@ -1,0 +1,7 @@
+[Unit]
+Description=ARD daily proof-of-life notification
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/ardx-liveness heartbeat
