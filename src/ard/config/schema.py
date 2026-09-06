@@ -269,6 +269,12 @@ class DatasetConfig(StrictModel):
     augmentation_crop_shift_high: int = Field(default=11, ge=1)
     stagewise_switch_epoch: int | None = Field(default=None, ge=1, le=199)
     stagewise_late_policy: Literal["crop_re", "idbh_weak"] | None = None
+    # Identity only, never a path: the same mask lives at different paths on
+    # different hosts, and a path in a hashed config makes two identical runs
+    # look different.  The verified mask itself is supplied at run time and is
+    # checked against these three fields before any image is transformed.
+    stagewise_late_mask_selected_ids_sha256: str | None = None
+    stagewise_late_mask_selected_count: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def validate_dataset(self) -> DatasetConfig:
@@ -277,6 +283,12 @@ class DatasetConfig(StrictModel):
         expected = {"cifar10": 10, "cifar100": 100}.get(self.name)
         if expected is not None and self.num_classes != expected:
             raise ValueError(f"{self.name} requires num_classes={expected}")
+        mask_fields = (self.stagewise_late_mask_selected_ids_sha256, self.stagewise_late_mask_selected_count)
+        if any(field is not None for field in mask_fields):
+            if any(field is None for field in mask_fields):
+                raise ValueError("a stagewise late mask needs both its ID digest and its count, or neither")
+            if self.augmentation_policy != "stagewise":
+                raise ValueError("a stagewise late mask only applies to the stagewise augmentation policy")
         if self.name == "tiny_imagenet" and self.root is None:
             raise ValueError("tiny_imagenet requires an explicit root")
         if self.augmentation_policy != "canonical" and self.name not in {"cifar10", "cifar100"}:

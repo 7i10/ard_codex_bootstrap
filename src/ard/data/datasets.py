@@ -17,6 +17,7 @@ from torchvision import datasets, transforms
 from torchvision.transforms import functional as transform_functional
 
 from ard.config.schema import DatasetConfig
+from ard.policies.fixed_mask import selected_ids_sha256
 
 from .indexed import IndexedDataset, IndexedItem, IndexedTransform, SampleRef
 
@@ -268,6 +269,12 @@ class EpochStagewiseAugmentationTransform:
     Both component transforms derive their spatial prefix from the same
     source/epoch-keyed stream.  The wrapper therefore changes only the late
     policy at ``switch_epoch``; it never resets augmentation or global RNG.
+
+    ``late_mask`` restricts the switch to the listed sample ids.  Because both
+    branches read the same source-keyed stream, an image outside the mask gets a
+    view identical bit for bit to the one it would get under a run with no mask
+    at all, which is what makes an allocation comparison paired everywhere it is
+    not treated.  See docs/plans/0096-hardness-allocation-direction.md.
     """
 
     policy_id = "stagewise"
@@ -279,6 +286,7 @@ class EpochStagewiseAugmentationTransform:
         switch_epoch: int,
         late_policy: str,
         high: int = 11,
+        late_mask: frozenset[int] | None = None,
     ) -> None:
         if isinstance(switch_epoch, bool) or not isinstance(switch_epoch, int) or switch_epoch < 1:
             raise ValueError("stagewise switch epoch must be a positive integer")
@@ -292,6 +300,9 @@ class EpochStagewiseAugmentationTransform:
             if late_policy == "crop_re"
             else EpochIdbhWeakTransform(augmentation_seed=augmentation_seed, high=high)
         )
+        if late_mask is not None and not late_mask:
+            raise ValueError("stagewise late mask must be non-empty; omit it to switch every sample")
+        self.late_mask = late_mask
         self.epoch = 0
         self.source_id_keyed = True
 
@@ -307,7 +318,8 @@ class EpochStagewiseAugmentationTransform:
         self.late.set_seed(seed)
 
     def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
-        transform = self.prefix if self.epoch < self.switch_epoch else self.late
+        switched = self.epoch >= self.switch_epoch and (self.late_mask is None or source_id in self.late_mask)
+        transform = self.late if switched else self.prefix
         return transform(image, source_id=source_id)
 
 
@@ -498,6 +510,7 @@ def build_train_validation_views(
     validation_fraction: float,
     split_seed: int,
     augmentation_seed: int,
+    stagewise_late_mask: frozenset[int] | None = None,
 ) -> tuple[SourceIndexedSubset, SourceIndexedSubset]:
     """Create independently transformed train/validation views over one raw set."""
     if config.split != "train":
@@ -526,11 +539,28 @@ def build_train_validation_views(
         elif config.augmentation_policy == "stagewise":
             assert config.stagewise_switch_epoch is not None
             assert config.stagewise_late_policy is not None
+            # The config carries the mask's identity and the caller carries the
+            # mask, so the two are checked against each other here rather than
+            # trusted: a run whose config declares one allocation and whose
+            # loader supplies another would be indistinguishable in the record.
+            declared_digest = config.stagewise_late_mask_selected_ids_sha256
+            if (stagewise_late_mask is None) != (declared_digest is None):
+                raise ValueError(
+                    "the stagewise late mask and the identity declared in the config "
+                    "must both be present or both absent"
+                )
+            if stagewise_late_mask is not None:
+                assert config.stagewise_late_mask_selected_count is not None
+                if len(stagewise_late_mask) != config.stagewise_late_mask_selected_count:
+                    raise ValueError("stagewise late mask size differs from the count declared in the config")
+                if selected_ids_sha256(tuple(sorted(stagewise_late_mask))) != declared_digest:
+                    raise ValueError("stagewise late mask IDs differ from the digest declared in the config")
             train_transform = EpochStagewiseAugmentationTransform(
                 augmentation_seed=augmentation_seed,
                 switch_epoch=config.stagewise_switch_epoch,
                 late_policy=config.stagewise_late_policy,
                 high=config.augmentation_crop_shift_high,
+                late_mask=stagewise_late_mask,
             )
         else:  # pragma: no cover - DatasetConfig rejects unknown literals
             raise ValueError(f"unsupported CIFAR augmentation policy: {config.augmentation_policy}")
