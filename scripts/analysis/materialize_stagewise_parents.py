@@ -83,7 +83,16 @@ def historical_config_hash(path: Path) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seed", type=int, choices=(1, 2), required=True)
+    parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument(
+        "--source-root",
+        type=Path,
+        default=None,
+        help=(
+            "the CropShift run to continue from. Required for any seed outside the two "
+            "historical runs, which are the only ones this tool knew about."
+        ),
+    )
     parser.add_argument("--boundary", type=int, choices=tuple(SOURCE_LABELS), required=True)
     parser.add_argument("--device", default="cuda", choices=("cuda", "cpu"))
     parser.add_argument("--output-root", type=Path, required=True)
@@ -92,8 +101,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    run_root = RUNS[args.seed]
+    if args.source_root is not None:
+        run_root = args.source_root.resolve()
+    elif args.seed in RUNS:
+        run_root = RUNS[args.seed]
+    else:
+        raise SystemExit(
+            f"seed {args.seed} has no registered CropShift run; pass --source-root to name one"
+        )
+    if not run_root.is_dir():
+        raise SystemExit(f"CropShift run root does not exist: {run_root}")
     config_path = run_root / "run-bundle" / "resolved_config.yaml"
+    if not config_path.is_file():
+        # Runs launched directly rather than through the bundle keep the
+        # resolved config beside the checkpoints instead.
+        config_path = run_root / "resolved_config.yaml"
     source_label = SOURCE_LABELS[args.boundary]
     sparse = run_root / f"epoch-{source_label:03d}.pt"
     target_epoch = args.boundary - 1

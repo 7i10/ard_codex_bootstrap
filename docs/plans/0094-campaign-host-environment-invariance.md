@@ -152,3 +152,29 @@ the floor.  Nothing else needs explaining.
 Two runs of about 35 minutes each on one GPU per host, run concurrently: 1.2
 GPU-hours, 40 minutes of wall clock.  The forensic pass that preceded it cost
 none.
+
+## Extension, 2026-09-07: it holds for a hundred epochs from scratch too
+
+This plan tested a fifteen-epoch continuation.  The parent regeneration for plan
+0093 supplied the stronger test for free.
+
+Seed 1's CropShift parent was retrained **from initialisation for a hundred
+epochs** under environment generation v2, four months after the original was
+produced under generation v1, and materialised to the same epoch-99 fork point.
+Every checkpoint component is identical: `model`, `optimizer`, `rng`,
+`sample_state`, `sampler_state`, `scaler`, `scheduler`, at the same
+`epoch=99, global_step=35200`.  The one-epoch continuation inside the
+materialisation reproduced the historical run's metrics to the last digit,
+including `train_loss = 0.10944159670935737`.
+
+Only the checkpoint file hashes differ, for the third independent time.
+
+**This refutes a premise of plan 0093.**  Its section 4 says the six parents must
+be regenerated because "the existing dev-1 / dev-2 are of the old environment
+generation and are therefore not used".  The two generations produce the same
+parent, bit for bit, so that reason does not hold.
+
+The regeneration was not wasted: the same runs continue to epoch 199 and give a
+six-seed CropShift baseline, which is the comparator the numeric audit found the
+published I100 headline had muddled.  But a future plan should not spend GPU time
+on the environment-generation argument again.
