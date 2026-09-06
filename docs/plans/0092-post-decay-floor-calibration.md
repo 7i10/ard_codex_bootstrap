@@ -330,16 +330,48 @@ The replicates share a parent, an epoch-100 prefix, a data order and a campaign,
 differing only in the post-fork random stream.  That is precisely a
 within-campaign treatment-versus-control screen, so the number applies there.
 
-It says nothing about comparisons across campaigns.  `docs/COEFFICIENT_AUDIT.md`
-records two nominally identical controls in different campaigns differing by
-0.94 and 1.78 pp -- an order of magnitude above this floor.  Whatever drives
-that is not the post-fork random stream, and this measurement does not touch it.
-**A smaller within-campaign floor makes the cross-campaign shift more anomalous,
-not less.**  That gap is now the largest unexplained quantity in the project.
+It does not license comparisons across campaigns.  But the reason is not the one
+first written here.
+
+**Amendment, same day.**  The completion report as first committed (11c960c)
+claimed that this floor sits an order of magnitude below the 0.94 and 1.78 pp
+shift between two campaigns' controls, and called that gap "the largest
+unexplained quantity in the project".  That was a mistake of regime.  Those
+controls are measured at **epoch 84**, sixteen epochs *before* the learning-rate
+decay; this floor is measured at 104 to 114, *after* it.  The 0.94 and 1.78 pp
+figures sit inside the pre-decay floor of **1.14 to 1.25 pp** that five campaign
+families independently agree on (`docs/MEASUREMENT_DESIGN.md` section 2.4).
+**They are that floor.  There is no anomaly, and nothing here is unexplained.**
+
+`docs/EVIDENCE_RECLASSIFICATION.md` had it right all along: its C3 row records
+the horizon as `e84 / e94`, the regime as `pre`, and the floor it applied as
+`1.14 (e84)`.  The reclassification is horizon-aware.  This measurement does not
+overturn it.
+
+What *is* open, and had been obscured by the false claim: **whether a
+cross-campaign penalty exists after the decay is untested.**  No two campaigns
+have ever run untreated controls from the same parent past epoch 100.  Until one
+does, a post-decay comparison across campaigns has no measured floor at all, so
+the practical rule is unchanged even though the reasoning behind it was wrong.
 
 It is also specific to this design: two parents, fourteen epochs past the decay,
 the registered CE-PGD20 endpoint on the validation split.  Nothing transfers to
 another horizon, another endpoint, or the official test split.
+
+### How much past evidence this actually reopens
+
+Also corrected.  `docs/EVIDENCE_RECLASSIFICATION.md` has 38 rows, not "about
+forty screens" all of which this touches:
+
+| regime | rows | floor they were judged against | does this measurement change it? |
+| --- | ---: | --- | --- |
+| post-decay | 17 | 0.25-0.50 pp bracket, 0.40 pp working | **yes** -- the measured value is 0.092 to 0.159 pp, so 2.5 to 4x too large |
+| pre-decay | 21 | 1.14-1.25 pp, measured separately | no |
+
+Two of the seventeen (B2, B3) were judged against floors derived from their own
+campaign's placebo or random arms (0.601 and 0.426 pp).  Those are empirical and
+design-specific and should not be replaced by this number without checking that
+the designs match.
 
 ### Cost
 
