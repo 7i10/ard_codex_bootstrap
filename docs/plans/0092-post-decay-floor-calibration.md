@@ -4,7 +4,8 @@
 
 - Owner: human (approval to spend GPU), Claude Code (execution)
 - Branch / base SHA: master, see progress log
-- Current milestone: M1, interrupted by the host outage
+- Current milestone: M1, relaunched 2026-09-06 21:34 after the first fan-out lost
+  four of six replicates to a W&B run-id collision
 - Last updated: 2026-09-06
 
 ## Goal
@@ -161,6 +162,73 @@ for interpreting option A rather than an alternative to it.
   values of the seed give three distinct arm identity hashes.  Added the
   `--continuation-seed` pass-through to the online-state runner's `arm`
   subcommand; 54 focused tests pass.  Approved to spend GPU.
+- 2026-09-06 M1 attempt 1: launched, four of six replicates lost to a W&B run-id
+  collision.  Diagnosis below.  The attempt tree was moved aside to
+  `runs/post-decay-floor-v1/arms-attempt1-wandb-id-collision/` and M1 was
+  relaunched at 21:34 JST with a per-replicate run namespace.
+
+### M1 attempt 1: the run-id collision
+
+`_tracking_run_id` (`src/ard/analysis/ert_stage_a_runtime.py:165-187`) builds the
+W&B run id from `(run_namespace, model_init seed, arm, source_sha[:7])`.  It does
+**not** include `continuation_seed`.  Plan 0092's replicates differ *only* in
+`continuation_seed`, so all three replicates of a seed asked W&B for one id:
+
+    ert-post-decay-floor-v1-<seed>-I100_CONTROL-ed3b77d
+
+The docstring's collision guard is the `-orch-`/`-retry-` suffix, and both are
+driven by `ARD_ORCH_*` environment variables that only the orchestrator sets.
+This was a hand-run, so no suffix was added.  `r1` reserved the id; `r2` and `r3`
+called `wandb.init(id=<taken>, resume="never")`, W&B raised `UsageError`, the
+adapter turned it into `TrackingError`, and the run-bundle recorded `failed`
+about 1.5 s after start.  Deterministic, not flaky: a verbatim retry fails
+identically.
+
+Outcome per replicate, all from pinned worktree `source-ed3b77daa1de`:
+
+| seed | replicate | result |
+| --- | --- | --- |
+| dev-1 | r1 | reached epoch 114, all three horizon checkpoints written |
+| dev-1 | r2, r3 | failed at start, W&B id collision |
+| dev-2 | r1 | reached epoch 114, all three horizon checkpoints written |
+| dev-2 | r2, r3 | failed at start, W&B id collision |
+
+Two surviving replicates give `C(1,2) = 0` control-versus-control pairs per seed,
+so attempt 1 yields **no** floor estimate.  `sigma_d` remains the provisional
+0.35 pp and everything downstream of it stays provisional.
+
+Two driver defects surfaced with it, both already fixed in the relaunched
+`arms.sh`: `rc=$?` was read after a `$(date -Is)` substitution had reset it, so
+every run logged `rc=0` including the failures; and there was no abort, so the
+driver marched on to the next doomed replicate.
+
+Two things the relaunch leaves open, neither blocking it:
+
+1. The runtime defect is worked around, not fixed.  `--run-namespace
+   post-decay-floor-v1-rep<N>` makes the ids distinct without touching the arm
+   identity hash or the pinned source SHA, but any future stage-A hand-run that
+   forks replicates under one namespace hits the collision again.  A fix means
+   adding `continuation_seed` to `_tracking_run_id` plus a regression test.
+2. Because the workaround varies the namespace, `run_namespace` now differs per
+   replicate, and it *is* recorded (`ert_stage_a_runtime.py:1292` and `:1410`).
+   The M3 aggregator must group replicates by seed and `continuation_seed`, never
+   by namespace, or six replicates of one campaign will read as six campaigns.
+
+### The watcher cannot see a successful stage-A replicate
+
+Independent of the collision, and found while re-deriving attempt 1's status:
+stage-A runs never write `run-bundle/completion.json`.  Only
+`src/ard/cli/train.py:1173` writes it, and `run_stage_a_arm` does not go through
+that path.  The hand-run completion contract
+(`scripts/ardx/ardx_common.py:322-344`) requires the completion marker, so a
+successful stage-A replicate is reported `incomplete`, stays non-terminal, and
+**never fires the postrun hook**.
+
+Confirmed on this campaign: both epoch-114 replicates of attempt 1 read
+`incomplete`, and the only terminal events the watcher emitted were the four
+failures — the automation could see the campaign break but could not have seen it
+succeed.  M2 and M3 cannot be driven by the watcher until this is closed; until
+then the arms have to be collected by hand.
 
 ## Completion report
 
@@ -179,9 +247,17 @@ What ran on 2026-09-05, from pinned worktree `source-ed3b77daa1de`:
 | eighteen endpoints | — | **never launched** |
 
 The session ended between the freeze and the arm launch, and the host became
-unreachable shortly afterwards.  `runs/post-decay-floor-v1/arms/` does not exist.
+unreachable shortly afterwards.  `runs/post-decay-floor-v1/arms/` did not exist.
 No GPU work was lost, because none had started: the four stages above total about
 four minutes.
+
+M1 attempt 1 ran on 2026-09-06 from the same pinned worktree and produced no
+usable measurement: two of six replicates reached epoch 114, the other four never
+started, and one replicate per seed gives zero control-versus-control pairs —
+the entire quantity this plan exists to measure.  About 0.9 GPU-hours were spent
+and discarded.  See "M1 attempt 1: the run-id collision" in the progress log.
+The e100 prefixes and frozen thresholds were untouched by all of this and are
+still the plan-0087 lineage.
 
 **Therefore the post-decay floor is still unmeasured and `sigma_d` remains the
 provisional 0.35 pp.**  Everything that depends on it is still provisional:
