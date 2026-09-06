@@ -4,7 +4,7 @@
 
 - Owner: human (direction), Claude Code (execution)
 - Launched 2026-09-06 23:25 JST on both hosts from pinned worktree `ed3b77d`
-- Current milestone: M1 running
+- Complete 2026-09-07 00:05 JST
 
 ## Goal
 
@@ -56,7 +56,7 @@ Training is deterministic on fixed inputs, so the readout is **bit-identity of
 the checkpoint component hashes**, not a statistic.  No statistics are needed for
 a yes-or-no question, and a difference of any size would be the finding.
 
-## Result so far — the epoch-100 prefix
+## Result — the epoch-100 prefix
 
 All nine component hashes are identical across all three: `model`, `optimizer`,
 `rng`, `sample_state`, `sampler_epoch`, `sampler_state`, `scaler`, `scheduler`,
@@ -70,9 +70,9 @@ never be used as a reproducibility test.
 ## Milestones
 
 - [x] M0: forensic pass on `C79` / `C79CONF`; three mechanical explanations ruled out
-- [~] M1: one control replicate per host under `ard-v2`, epochs 101-114
-- [ ] M2: compare component hashes at e114 and the endpoint accuracies
-- [ ] M3: if invariance holds, propose the measurement-standard change to the human
+- [x] M1: one control replicate per host under `ard-v2`, epochs 101-114
+- [x] M2: compare component hashes at e114 and the endpoint accuracies
+- [x] M3: invariance holds; the proposal is decision packet 0003
 
 ## What a positive result would license
 
@@ -90,3 +90,65 @@ Nothing about pooling across **environment generations** for results already
 committed under generation v1: this tests one 15-epoch continuation, not the
 200-epoch runs those results came from.  Nor anything about a different horizon,
 endpoint or split.
+
+## Completion report
+
+**A campaign is not a source of variation.  Neither is the host, nor the
+environment generation.**
+
+### Training
+
+After fourteen epochs past the learning-rate decay, every checkpoint component
+is bit-identical across all three runs:
+
+| component | Hamster/adv vs Hamster/ard-v2 | Hamster vs Ferret |
+| --- | --- | --- |
+| `model` | identical | identical |
+| `optimizer` | identical | identical |
+| `rng`, `sample_state`, `sampler_state` | identical | identical |
+| `scaler`, `scheduler` | identical | identical |
+
+The checkpoint **file** hashes differ in all three.  That is serialization, and
+it is now confirmed twice independently that a file hash is not a
+reproducibility test.
+
+### Evaluation
+
+Held-out CE-PGD20 robust accuracy is identical to the third decimal at every
+horizon in all three runs: 56.060, 56.940, 57.320 per cent.
+
+The per-sample rows are very nearly identical and not exactly so:
+
+| comparison | samples differing | correctness flips | largest logit-margin difference |
+| --- | ---: | ---: | ---: |
+| e104, Hamster/adv vs Hamster/ard-v2 | 1 / 5000 | 0 | 1.08e-03 |
+| e104, Hamster/adv vs Ferret/ard-v2 | 0 / 5000 | 0 | 0 |
+| e109, Hamster/adv vs Hamster/ard-v2 | 0 / 5000 | 0 | 0 |
+| e109, Hamster/adv vs Ferret/ard-v2 | 2 / 5000 | 0 | 7.62e-04 |
+| e114, both comparisons | 0 / 5000 | 0 | 0 |
+
+Three samples out of thirty thousand measurements, no prediction changed, and
+**the pattern does not follow the host or the environment**: at e104 the two
+Hamster runs disagree while Hamster and Ferret agree, and at e109 the reverse.
+This is run-to-run non-determinism inside the PGD attack — a non-deterministic
+reduction on one example — and not a property of either machine.
+
+It is worth stating rather than rounding to "identical", because it sets a hard
+resolution limit: the adversarial evaluation is reproducible to about 1e-3 in
+logit margin per sample, so any future claim resting on margin differences
+smaller than that is resting on noise.  No accuracy claim is affected.
+
+### What this means for the C79 / C79CONF observation
+
+Training is deterministic given the same parent, config, source and seeds.  The
+two historical controls therefore cannot have been repetitions of one another;
+they must differ in their random stream, which makes them RNG replicates.  Their
+gap of 0.94 and 1.78 pp is a pre-decay measurement, and the pre-decay floor for
+RNG replicates is independently measured at 1.14 to 1.25 pp.  The observation is
+the floor.  Nothing else needs explaining.
+
+### Cost
+
+Two runs of about 35 minutes each on one GPU per host, run concurrently: 1.2
+GPU-hours, 40 minutes of wall clock.  The forensic pass that preceded it cost
+none.
