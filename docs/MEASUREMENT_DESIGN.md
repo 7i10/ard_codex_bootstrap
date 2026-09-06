@@ -346,6 +346,16 @@ prefix through epoch 99 and differ only in the intervention from epoch 100.
 | dev-1 | 60.60 | 59.40 | +1.20 |
 | dev-2 | 60.30 | 59.26 | +1.04 |
 
+> **Correction, 2026-09-07.** The `0.25 pp` type (c) value below is the standard deviation
+> of the five-seed `I100 - CROPSHIFT` set, and that set mixes two comparators: three of its
+> five members are measured against `CROP_SUFFIX`, not against `CROPSHIFT`. Within each group
+> the spread is `0.11 pp` (dev) and `0.08 pp` (confirm), so **the `0.25 pp` figure is inflated
+> by the difference between the two comparators rather than being a noise floor**. It was the
+> lower end of the bracket every post-decay verdict used until 2026-09-06, when the floor was
+> measured directly at `0.092 pp` (`docs/POST_DECAY_FLOOR.md`). Both readings now point the
+> same way: the post-decay floor is smaller than this section assumed.
+> See `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2.
+
 Per-seed values VERIFIED from the campaign CSV; differences DERIVED. Mean `+0.864 pp` (which
 reproduces the published `+0.864 pp`, VERIFIED,
 `docs/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md:13`), **standard deviation across seeds `0.247 pp`**,

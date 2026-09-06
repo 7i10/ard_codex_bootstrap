@@ -265,6 +265,8 @@ Boundary 58–59 ("descriptive two-development-seed evidence") needs a second cl
 **(b) How the thesis's negative result should now be phrased.** Not "we tested many sample-level interventions and none transferred" — that claims a test that did not happen. Not "our screens could not have detected what we sought" — true of most rows, but it discards four real results. The honest third phrasing:
 
 > Two global augmentation results are real and replicated (`+1.612 pp` for CropShift over five seeds; `+0.864 pp`, `SD 0.247`, `t(4) = 7.82` for the epoch-100 switch). Against them, every sample-level intervention produced a large, reproducible effect on the samples it treated — 13x to 33x the train-split noise — and no held-out effect our screens could resolve. That contrast is the finding. At learning rate 0.1 a forked control differs from its sibling as much as a fresh seed does, so a five-epoch screen cannot see below about 2.5 pp while the interventions aimed at 0.1–2 pp. We therefore report a **measured ceiling on what this apparatus can detect**, not a refutation of sample-level intervention. One hypothesis was genuinely refuted at its own preregistered target; the rest remain open and untested.
+>
+> **Correction, 2026-09-07.** The `+0.864 pp` half of this sentence pools two comparators; see `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2. The two real figures are `+1.12 pp` against no late change and `+0.69 pp` against a different late change, both positive in every seed.
 
 **(c) Hypotheses genuinely still open, ranked by how cheaply a powered test could run.**
 

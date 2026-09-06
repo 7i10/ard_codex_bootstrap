@@ -9,6 +9,17 @@ row は、3 arm × 4 endpoint (`49, 99, 149, 199`) の全60 cellで揃い、stab
 
 - epoch 199 の endpoint robust 平均は `BASE 58.232%`, `CROPSHIFT 59.844%`,
   `I100 60.708%`。I100 は CROPSHIFT より `+0.864 pp` だった。
+
+> **Correction, 2026-09-07.** The pooled five-seed figure `+0.864 pp` averages two
+> different comparisons and should not be used as one number. On dev-1 and dev-2 the
+> control is `CROPSHIFT`, CropShift for all 200 epochs, and the effect is `+1.20 / +1.04 pp`.
+> On confirm-a/b/c the control is `CROP_SUFFIX`, which switches to CropShift-plus-RandomErasing
+> at epoch 100, and the effect is `+0.78 / +0.68 / +0.62 pp`. The two groups do not overlap
+> and each agrees internally to about 0.08 pp, so the split is real and not sampling noise.
+> Both comparisons are positive in every seed; what does not survive is the single number and
+> its `t(4) = 7.82`, which describe a quantity that does not exist.
+> See `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2 and its verification section.
+
 - epoch 199 の global training metric の5-seed SD/rangeは、`BASE
   0.272 pp / 0.62 pp`, `CROPSHIFT 0.532 pp / 1.18 pp`, `I100 0.118 pp /
   0.32 pp`。I100は平均を上方シフトし、最終global spreadも小さかった。

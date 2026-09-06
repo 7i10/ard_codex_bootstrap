@@ -14,6 +14,16 @@ CIFAR-10 test and AutoAttack result is the last ledger row (`I100` official test
 Two global augmentation results are real and replicated: `+1.612 pp` for
 `CROPSHIFT` over five seeds, and `+0.864 pp` (`SD 0.247`, `t(4) = 7.82`) for the
 frozen epoch-100 switch `I100` (`CROPSHIFT` through epoch 99, then `IDBH_WEAK`),
+
+> **Correction, 2026-09-07.** The pooled five-seed figure `+0.864 pp` averages two
+> different comparisons and should not be used as one number. On dev-1 and dev-2 the
+> control is `CROPSHIFT`, CropShift for all 200 epochs, giving `+1.20 / +1.04 pp`. On
+> confirm-a/b/c the control is `CROP_SUFFIX`, which switches to CropShift-plus-RandomErasing
+> at epoch 100, giving `+0.78 / +0.68 / +0.62 pp`. The groups do not overlap and each agrees
+> internally to about 0.08 pp, so the split is real. Both comparisons are positive in every
+> seed; what does not survive is the single number and its `t(4) = 7.82`.
+> See `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2.
+
 whose direction also survives on the official 10,000-example CIFAR-10 test set
 under standard AutoAttack in all three unseen confirmation seeds. Against them,
 every sample-level intervention produced a large, reproducible effect on the
