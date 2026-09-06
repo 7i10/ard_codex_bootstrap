@@ -70,15 +70,40 @@ def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _require_clean_source() -> str:
+def _aggregator_source_sha() -> str:
+    """The SHA of the tree this script is being run from.
+
+    This is NOT the SHA the campaign ran at, and conflating the two makes a
+    record impossible to reproduce from a clean checkout the moment any later
+    commit lands.  The campaign's own SHA is read from the runs themselves.
+    """
     dirty = subprocess.run(
         ["git", "-C", str(ROOT), "status", "--porcelain"], capture_output=True, text=True, check=True
     ).stdout.strip()
     if dirty:
-        raise AggregationError("the working tree must be clean so the record's source SHA is meaningful")
+        raise AggregationError("the working tree must be clean so the record's aggregator SHA is meaningful")
     return subprocess.run(
         ["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
     ).stdout.strip()
+
+
+def _campaign_source_sha(campaign: Path, *, declared: str | None) -> str:
+    """The one source SHA every replicate ran at, read from the replicates."""
+    observed: dict[str, str] = {}
+    for seed in SEEDS:
+        for replicate in REPLICATES:
+            summary = _read_json(campaign / "arms" / seed / f"rep{replicate}" / "arm-summary.json")
+            sha = str(summary.get("source_git_sha") or "")
+            if len(sha) != 40:
+                raise AggregationError(f"{seed} rep{replicate} does not record a source SHA")
+            observed[f"{seed}/rep{replicate}"] = sha
+    distinct = set(observed.values())
+    if len(distinct) != 1:
+        raise AggregationError(f"replicates did not all run at one source SHA: {observed}")
+    sha = distinct.pop()
+    if declared is not None and declared != sha:
+        raise AggregationError(f"campaign ran at {sha[:12]}, not the declared {declared[:12]}")
+    return sha
 
 
 def _non_overwriting(path: Path) -> None:
@@ -101,7 +126,36 @@ def _robust_accuracy(rows_path: Path, expected_sha256: str) -> tuple[float, floa
     return robust, clean
 
 
-def _replicate(campaign: Path, *, seed: str, replicate: int, source_sha: str) -> dict[str, Any]:
+def _prefix(campaign: Path, *, seed: str, source_sha: str) -> dict[str, Any]:
+    """The shared epoch-100 no-action prefix, and its link to the registered parent.
+
+    The replicates do not fork the epoch-99 parent directly; they fork the
+    epoch-100 prefix that was grown from it.  Checking only one of those two
+    links would leave the other unverified, so both are checked here: the prefix
+    descends from the registered parent, and every replicate descends from this
+    prefix.
+    """
+    summary = _read_json(campaign / "prefix" / seed / "prefix-summary.json")
+    result = summary.get("result", {})
+    if result.get("parent_checkpoint_sha256") != PARENT_SHA256[seed]:
+        raise AggregationError(
+            f"{seed}: the prefix was grown from {str(result.get('parent_checkpoint_sha256'))[:12]}, "
+            f"not the registered parent {PARENT_SHA256[seed][:12]}"
+        )
+    if summary.get("source_git_sha") != source_sha:
+        raise AggregationError(f"{seed}: the prefix ran at a different source SHA than the replicates")
+    epoch100 = str(result.get("last_checkpoint_sha256") or "")
+    if len(epoch100) != 64:
+        raise AggregationError(f"{seed}: the prefix does not record its epoch-100 checkpoint")
+    return {
+        "seed": seed,
+        "registered_parent_sha256": PARENT_SHA256[seed],
+        "epoch100_checkpoint_sha256": epoch100,
+        "online_state_sha256": ((result.get("online_state_s2") or {}).get("state") or {}).get("sha256"),
+    }
+
+
+def _replicate(campaign: Path, *, seed: str, replicate: int, source_sha: str, epoch100_sha256: str) -> dict[str, Any]:
     arm_root = campaign / "arms" / seed / f"rep{replicate}"
     arm = _read_json(arm_root / "arm-summary.json")
     result = arm.get("result", {})
@@ -114,9 +168,12 @@ def _replicate(campaign: Path, *, seed: str, replicate: int, source_sha: str) ->
             f"{seed} rep{replicate} records continuation_seed {result.get('continuation_seed')!r}; "
             "replicates that do not differ in the post-fork random stream are not replicates"
         )
-    if result.get("parent_checkpoint_sha256") != PARENT_SHA256[seed]:
-        raise AggregationError(f"{seed} rep{replicate} did not fork the registered parent")
-    if result.get("source_git_sha") != source_sha:
+    if result.get("parent_checkpoint_sha256") != epoch100_sha256:
+        raise AggregationError(
+            f"{seed} rep{replicate} forked {str(result.get('parent_checkpoint_sha256'))[:12]}, "
+            f"not the shared epoch-100 prefix {epoch100_sha256[:12]}"
+        )
+    if arm.get("source_git_sha") != source_sha:
         raise AggregationError(f"{seed} rep{replicate} ran at a different source SHA than the rest")
     if result.get("dynamic_s3") is not None or result.get("dynamic_s3_epoch80") is not None:
         raise AggregationError(f"{seed} rep{replicate} carries a treatment payload")
@@ -178,7 +235,8 @@ def _replicate(campaign: Path, *, seed: str, replicate: int, source_sha: str) ->
         "replicate": replicate,
         "continuation_seed": replicate,
         "config_hash": result.get("config_hash"),
-        "parent_checkpoint_sha256": PARENT_SHA256[seed],
+        "parent_checkpoint_sha256": epoch100_sha256,
+        "registered_e99_parent_sha256": PARENT_SHA256[seed],
         "prefix_state_sha256": (result.get("online_state_s2") or {}).get("prefix_state", {}).get("sha256"),
         "threshold_artifact_sha256": (result.get("online_state_s2") or {})
         .get("prefix_state", {})
@@ -279,10 +337,18 @@ def _horizon_statistics(replicates: Iterable[Mapping[str, Any]], *, epoch: int) 
     }
 
 
-def aggregate(*, campaign: Path) -> dict[str, Any]:
-    source_sha = _require_clean_source()
+def aggregate(*, campaign: Path, expected_source_sha: str | None = None) -> dict[str, Any]:
+    aggregator_sha = _aggregator_source_sha()
+    source_sha = _campaign_source_sha(campaign, declared=expected_source_sha)
+    prefixes = {seed: _prefix(campaign, seed=seed, source_sha=source_sha) for seed in SEEDS}
     replicates = [
-        _replicate(campaign, seed=seed, replicate=replicate, source_sha=source_sha)
+        _replicate(
+            campaign,
+            seed=seed,
+            replicate=replicate,
+            source_sha=source_sha,
+            epoch100_sha256=prefixes[seed]["epoch100_checkpoint_sha256"],
+        )
         for seed in SEEDS
         for replicate in REPLICATES
     ]
@@ -303,7 +369,8 @@ def aggregate(*, campaign: Path) -> dict[str, Any]:
     return {
         "contract": CONTRACT,
         "schema_version": 1,
-        "source_git_sha": source_sha,
+        "campaign_source_git_sha": source_sha,
+        "aggregator_source_git_sha": aggregator_sha,
         "campaign_root": str(campaign.resolve()),
         "design": {
             "description": "three untreated control replicates per parent, shared epoch-100 no-action prefix, "
@@ -317,6 +384,7 @@ def aggregate(*, campaign: Path) -> dict[str, Any]:
             "teacher_sha256": TEACHER_SHA256,
             "parent_checkpoint_sha256": dict(PARENT_SHA256),
         },
+        "prefixes": prefixes,
         "replicates": replicates,
         "horizon_statistics": {str(epoch): value for epoch, value in horizons.items()},
     }
@@ -331,7 +399,11 @@ def _markdown(result: Mapping[str, Any]) -> str:
     add = lines.append
     add("# Post-decay noise floor")
     add("")
-    add(f"Record: `{RESULT_PATH.relative_to(ROOT)}` (contract `{result['contract']}`).")
+    add(
+        f"Record: `{RESULT_PATH.relative_to(ROOT)}` (contract `{result['contract']}`). "
+        f"The runs were produced at source `{result['campaign_source_git_sha'][:12]}`; "
+        f"this report was rendered at `{result['aggregator_source_git_sha'][:12]}`."
+    )
     add("")
     add("## What this measures")
     add("")
@@ -403,6 +475,11 @@ def _markdown(result: Mapping[str, Any]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--campaign", type=Path, required=True)
+    parser.add_argument(
+        "--expected-source-sha",
+        default=None,
+        help="optional: fail unless every replicate ran at this SHA (it is read from the runs regardless)",
+    )
     parser.add_argument("--result", type=Path, default=RESULT_PATH)
     parser.add_argument("--report", type=Path, default=REPORT_PATH)
     parser.add_argument(
@@ -410,7 +487,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    result = aggregate(campaign=args.campaign)
+    result = aggregate(campaign=args.campaign, expected_source_sha=args.expected_source_sha)
     report = _markdown(result)
 
     if args.print_only:
