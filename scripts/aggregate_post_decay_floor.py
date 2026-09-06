@@ -475,10 +475,17 @@ def _markdown(result: Mapping[str, Any]) -> str:
     )
     add("")
     add(
-        "It does not license comparisons across campaigns. `docs/COEFFICIENT_AUDIT.md` records two nominally "
-        "identical controls in different campaigns differing by 0.94 and 1.78 pp, which is an order of magnitude "
-        "above this floor. Whatever produces that shift is not the post-fork random stream, and this measurement "
-        "says nothing about it. A treated arm in one campaign still may not be compared with a control in another."
+        "It does not license comparisons across campaigns, but not for the reason usually given. The evidence "
+        "cited for a cross-campaign penalty -- two nominally identical controls differing by 0.94 and 1.78 pp -- "
+        "is measured at epoch 84, sixteen epochs BEFORE the learning-rate decay, and it sits inside the "
+        "independently measured pre-decay floor of 1.14 to 1.25 pp. It is the pre-decay floor, not an extra term "
+        "on top of it. Comparing it against the number on this page compares two different regimes."
+    )
+    add("")
+    add(
+        "Whether a cross-campaign penalty exists *after* the decay is simply untested: no two campaigns have ever "
+        "run untreated controls from the same parent past epoch 100. Until one does, a post-decay comparison "
+        "across campaigns has no measured floor at all, and the safe course is still not to make one."
     )
     add("")
     add(
