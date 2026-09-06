@@ -164,8 +164,13 @@ fingerprints include every locked repository.
 Documented upstream-vs-local differences are intentional and covered by the
 fixed-batch differential test:
 
-- The official outer clean KL target is non-detached; local TRADES detaches it.
-  The scalar is equal, but clean-input gradients and the resulting SGD delta differ.
+- ~~The official outer clean KL target is non-detached; local TRADES detaches it.~~
+  **Removed 2026-09-07.** Local TRADES now matches the official objective on the
+  loss and on both gradients, and the differential test asserts agreement rather
+  than difference. This entry declared the divergence intentional without ever
+  recording a reason for it, and its consequence went untracked: the local TRADES
+  scored 45.14 % AutoAttack against a literature range of 49.0 to 49.4 %. See
+  `docs/debugging/0028-trades-clean-target-detached.md`.
 - Official attack initialization is Gaussian noise with `0.001` scale; local
   initialization is uniform in `[-epsilon, epsilon]`, immediately projected and clamped.
 - Official CIFAR defaults are epsilon `.031`, step `.007`, 10 steps, `beta=6`;

@@ -53,7 +53,18 @@ def _local_trades_loss(
     ).total.mean()
 
 
-def test_fixed_batch_outer_loss_beta_reduction_and_clean_target_gradient_difference() -> None:
+def test_fixed_batch_outer_loss_and_both_gradients_match_the_official_objective() -> None:
+    """Local TRADES must agree with the official objective on loss AND both gradients.
+
+    Until 2026-09-07 this test asserted the opposite for the clean branch, and
+    `docs/UPSTREAM_BASELINES.md` listed the divergence as intentional.  The
+    divergence was real, was pinned here, and had a consequence nobody connected
+    to it: the local TRADES scored 45.14 % AutoAttack against a literature range
+    of 49.0 to 49.4 %.  A baseline that deliberately differs from the method it
+    is named after, in the direction that flatters this project's own line of
+    work, is not usable as a comparator.  See
+    docs/debugging/0028-trades-clean-target-detached.md.
+    """
     labels = torch.tensor([0, 2])
     clean_base = torch.tensor([[0.4, -0.2, 0.7], [-0.5, 0.6, 0.1]], dtype=torch.float64)
     adversarial_base = torch.tensor([[0.1, 0.5, -0.4], [0.8, -0.3, 0.2]], dtype=torch.float64)
@@ -77,15 +88,16 @@ def test_fixed_batch_outer_loss_beta_reduction_and_clean_target_gradient_differe
 
     assert torch.allclose(local_loss, official_loss, rtol=0, atol=1e-14)
     assert torch.allclose(local_adversarial_gradient, official_adversarial_gradient, rtol=0, atol=1e-14)
-    assert not torch.allclose(local_clean_gradient, official_clean_gradient, rtol=0, atol=1e-14)
-    # The local clean branch receives CE only; the official branch additionally
-    # receives the non-detached target-side KL gradient.
+    assert torch.allclose(local_clean_gradient, official_clean_gradient, rtol=0, atol=1e-14)
+    # The clean branch must get more than the cross-entropy term, or the KL is
+    # not pulling the two predictions together and this is not TRADES.
     clean_for_ce = clean_base.clone().requires_grad_()
-    expected_local_clean = torch.autograd.grad(F.cross_entropy(clean_for_ce, labels), clean_for_ce)[0]
-    assert torch.allclose(local_clean_gradient, expected_local_clean, rtol=0, atol=1e-14)
+    cross_entropy_only = torch.autograd.grad(F.cross_entropy(clean_for_ce, labels), clean_for_ce)[0]
+    assert not torch.allclose(local_clean_gradient, cross_entropy_only, rtol=0, atol=1e-14)
 
 
-def test_one_sgd_delta_records_the_documented_nondetached_clean_branch_difference() -> None:
+def test_one_sgd_delta_matches_the_official_objective() -> None:
+    """One optimiser step must land on the same weights as the official objective."""
     inputs = torch.tensor([[0.2, -0.1], [0.7, 0.3]], dtype=torch.float64)
     adversarial_inputs = torch.tensor([[0.4, -0.2], [0.5, 0.9]], dtype=torch.float64)
     labels = torch.tensor([0, 1])
@@ -114,7 +126,7 @@ def test_one_sgd_delta_records_the_documented_nondetached_clean_branch_differenc
     local_loss, local_weight = one_step(local=True)
     official_loss, official_weight = one_step(local=False)
     assert torch.allclose(local_loss, official_loss, rtol=0, atol=1e-14)
-    assert not torch.allclose(local_weight, official_weight, rtol=0, atol=1e-14)
+    assert torch.allclose(local_weight, official_weight, rtol=0, atol=1e-14)
 
 
 class _ModeRecordingModel(nn.Module):

@@ -276,8 +276,14 @@ def test_entropy_policy_uses_global_valid_min_with_padded_two_rank_shards() -> N
 @pytest.mark.parametrize(
     ("method", "temperature_squared", "expected_loss", "expected_gradient"),
     [
-        ("trades", False, 1.0978097948679981, 0.3798930973442602),
-        ("trades", True, 1.1315866808684356, 0.12806653131986745),
+        # The two TRADES gradients changed on 2026-09-07 and the losses did not.
+        # The frozen values had pinned a defect: the clean target was detached, so
+        # the KL term never reached the clean branch.  Both new values were derived
+        # from the TRADES definition independently of this implementation and then
+        # matched to 1e-14; see docs/debugging/0028-trades-clean-target-detached.md.
+        # Superseded: 0.3798930973442602 and 0.12806653131986745.
+        ("trades", False, 1.0978097948679981, 0.4245468946338384),
+        ("trades", True, 1.1315866808684356, 0.3066817204781803),
         ("rslad", False, 0.015829451434101395, -0.05364875992800346),
         ("rslad", True, 0.06331780573640558, -0.21459503971201385),
     ],

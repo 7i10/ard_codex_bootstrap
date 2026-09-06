@@ -50,8 +50,25 @@ clean branch is then trained by the cross-entropy term alone.
 
 The helper's docstring says the detach is deliberate, and names both uses in one
 breath: "so teacher logits and the TRADES clean target do not receive
-outer-objective gradients."  The intent was right for the first and was carried
-over to the second without the difference being noticed.
+outer-objective gradients."  The intent was right for the first and wrong for the
+second.
+
+**Correction to this document's first version.**  It said the difference had gone
+unnoticed.  It had not.  `docs/UPSTREAM_BASELINES.md` section 8 listed it among
+"documented upstream-vs-local differences" that "are intentional", and
+`tests/regression/test_trades_upstream_differential.py` contained two tests whose
+job was to assert that the local and official clean-branch gradients **differ**.
+The divergence was known, declared deliberate, and pinned by tests.
+
+That makes the failure a different one, and a more instructive one.  **No reason
+for the divergence is recorded anywhere — only the fact of it.**  And its
+consequence was never connected to it: nothing links "we changed the TRADES
+gradient on purpose" to "our TRADES scores four points below every published
+value".  A declaration of intent is not a justification, and a difference that is
+documented but whose cost is not measured is indistinguishable from a defect.
+
+If a reason existed, it is not in the repository, and the human should say so
+before the corrected baseline is used.
 
 ## Confirmation
 
@@ -99,7 +116,11 @@ This changes a baseline's identity, so:
   `docs/plans/0027-controlled-teacherless-baselines.md` gain a line saying the
   45.14 % figure came from a defective loss;
 - a regression test asserts that the TRADES outer objective produces a non-zero
-  gradient through the clean branch, so this cannot come back silently.
+  gradient through the clean branch, so this cannot come back silently;
+- `tests/regression/test_trades_upstream_differential.py` is inverted: it now
+  asserts that local and official TRADES agree on the loss and on **both**
+  gradients, and that one optimiser step lands on the same weights. It is a
+  parity test where it used to be a record of divergence.
 
 ## Why it matters beyond one number
 

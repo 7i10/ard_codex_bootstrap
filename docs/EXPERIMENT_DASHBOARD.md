@@ -164,7 +164,7 @@ fragmentation OOMを避けましたが、残り約834 MiBではresume不能な20
 |---|---|---|---|
 | Controlled PGD-AT seed 0 | train、official PGD、AA完了 | official best: clean 82.01 / PGD-20 51.12 / AA 47.63; last: clean 84.46 / PGD-20 41.89 / AA 40.36 | official PGD gap 9.23 pp、AA gap 7.27 pp。強いROを確認 |
 | Upstream Chen34-10 full SAAD seed 0 | code oracle完了 | final SWA: clean 83.85 / PGD-20 56.40 / C&W 52.98 / AA 51.90 | upstream実行経路の結果。paper-protocol/controlled比較ではない |
-| Controlled TRADES seed 0 | train、official PGD、AA完了 | official best: clean 81.35 / PGD-20 47.83 / AA 45.14; last: clean 82.20 / PGD-20 45.46 / AA 43.25 | official PGD gap 2.37 pp、AA gap 1.89 pp |
+| Controlled TRADES seed 0 | train、official PGD、AA完了 | official best: clean 81.35 / PGD-20 47.83 / AA 45.14; last: clean 82.20 / PGD-20 45.46 / AA 43.25 | official PGD gap 2.37 pp、AA gap 1.89 pp。 **注意 2026-09-07: この値は欠陥のある TRADES 由来。** clean 側の KL 目標を detach していたため勾配が 58% 異なっていた。文献値 49.0–49.4 に対し 4 pp 低い。`docs/debugging/0028-trades-clean-target-detached.md`。修正後に再実行予定。 |
 
 Chen upstream oracleは約8時間9分で正常終了しました。commandはupstream既定の
 weight decay `2e-4`で、論文Appendix Bの`5e-4`と異なります。またteacherはWRN34-10であり、

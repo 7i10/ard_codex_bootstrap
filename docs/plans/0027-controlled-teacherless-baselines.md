@@ -137,7 +137,7 @@ to observed accuracy.
   `2.37 pp`. The separate best/last AutoAttack service is active on Hamster
   GPU 0; GPU 1 is idle.
 - 2026-08-07: TRADES saved-checkpoint AutoAttack completed. Best was clean /
-  PGD-20 / AA `81.35 / 47.83 / 45.14%`; last was
+  PGD-20 / AA `81.35 / 47.83 / 45.14%` (**superseded 2026-09-07: defective TRADES, see docs/debugging/0028-trades-clean-target-detached.md**); last was
   `82.20 / 45.46 / 43.25%`. The official PGD and AA best-to-last gaps are
   `2.37 pp` and `1.89 pp`. AutoAttack is pinned to commit
   `a39220048b3c9f2cca9a4d3a54604793c68eca7e` and source SHA-256
