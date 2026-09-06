@@ -2,6 +2,27 @@
 
 Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis. No new training or route selection.
 
+> **Correction, 2026-09-07.** The C0/C10/C12/C13 table below disagrees with the one in
+> `docs/ERT_CLEAN_WRONG_RELIABILITY_STRATIFIED.md`, which analyses the same arms at the same
+> epoch. The sample counts match exactly (11, 738, 182 for C10) and so does "teacher clean
+> correct", but **"teacher adv correct" differs** — 0.813 here against 0.791 there for C10
+> `robust_only_rescue` — and so do all three probability columns. A difference in the teacher's
+> adversarial predictions means the adversarial examples themselves differ, which is what two
+> feature replays with different attack random starts produce.
+>
+> **The disagreement cannot be resolved from this document, because this document does not say
+> which replay it used.** The stratified report carries a provenance table with a replay source
+> SHA and a parent checkpoint SHA for each seed; this one has only the prose sentence about
+> "the same full-train CE-PGD20 ordering". Where the two disagree, prefer the stratified
+> report, and treat the numbers here as unlocatable rather than as wrong.
+>
+> Regenerating this table with a recorded replay identity would settle it. Until then, note
+> that this project's own measurement puts per-sample adversarial evaluation reproducibility at
+> about 1e-3 in logit margin (`docs/plans/0094-campaign-host-environment-invariance.md`), and a
+> four-sample flip out of 182 is well within what a different attack random start produces.
+> Flagged by `docs/NUMERIC_CONSISTENCY_AUDIT.md` and by the consolidation pass.
+
+
 ## L2
 
 Fixed Clean-Wrong cohort: 8623 samples.
