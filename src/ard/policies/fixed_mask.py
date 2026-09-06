@@ -113,6 +113,10 @@ def load_fixed_intervention_mask(
         "ffnr_route_a_matched_random",
         "ffnr_route_b_strong_ce_pgd20",
         "ffnr_route_b_matched_random",
+        # Plan 0096: which images receive the richer late augmentation.
+        "stagewise_allocation_s1_epoch100_v1",
+        "stagewise_allocation_fragile_epoch100_v1",
+        "stagewise_allocation_matched_random_epoch100_v1",
     }:
         raise FixedMaskError("intervention mask provenance source is forbidden or unknown")
     return FixedInterventionMask(
