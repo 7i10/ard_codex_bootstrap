@@ -4,10 +4,20 @@
 
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
 - Current milestone: M0
-- Blocked on: the six environment-v2 parents (`runs/parents-v2`, 1/6 finished).
-  M0 cannot start on its own even once they finish: the materialiser looks for
-  `<out>/checkpoints/epoch-99.pt` and the trainer writes `<out>/epoch-099.pt`, so
-  it will time out at 0/6. Diagnosis and the proposed fix are in plan 0093's
+- Blocked on: the six environment-v2 parents (`runs/parents-v2`, 2/6 finished).
+  The path defect that would have timed the wait out at 0/6 is fixed;
+  `materialize_chain.sh` now waits on `<out>/epoch-099.pt` and restarted at
+  2026-09-07 05:07 JST, so its twelve-hour deadline is 17:07 JST. Two things still
+  block M0. (a) `materialize_chain.sh:51` calls
+  `create_stagewise_augmentation_forks.py`, which only relabels a checkpoint and
+  rejects `epoch-099.pt` outright, because that file holds payload epoch 98 and a
+  switch at 100 needs payload epoch 99; the tool that bridges that one-epoch gap is
+  `scripts/analysis/materialize_stagewise_parents.py`, already extended to any seed
+  in `d7c05d7`. So all six materialisations fail the moment the wait succeeds.
+  (b) whether seeds 3/4/5 are running on Ferret at all is unconfirmed — without
+  them the wait cannot reach 6/6 anyway. Separately, `parent.sh:27` still carries
+  the old path in its completion-skip guard and would retrain the two finished
+  seeds over themselves. Diagnosis and the corrected invocation are in plan 0093's
   Progress log (2026-09-07).
 
 ## Goal
@@ -45,31 +55,52 @@ is not optional.
 
 ## Design
 
-All arms fork from the same epoch-99 parent and share the epoch-100 no-action
-prefix.  Before epoch 100 nothing differs.  From epoch 100 the late policy is
-IDBH_WEAK for the selected images and CropShift for the rest.
+All arms fork from the same epoch-99 parent.  Before epoch 100 nothing differs.
+From epoch 100 the late policy is IDBH_WEAK for the images in that arm's mask and
+CropShift for the rest.
+
+**Every mask has the same size and the same class composition.**  That is the
+whole design.  If the arms differed in how many images they treated, or in which
+classes, the comparison would be about dose or about class balance, and neither
+is the question.
 
 | arm | receives IDBH_WEAK from e100 | role |
 | --- | --- | --- |
-| `I100` | every image | the existing result, and the comparator |
-| **`ALLOC_S1`** | S1 only: adversarially correct with margin above the frozen 10th percentile | **primary** |
-| `ALLOC_FRAGILE` | S2 and S3: fragile or adversarially wrong | **declared secondary, same analysis rule** |
-| `ALLOC_RANDOM` | a size- and class-matched random draw | the control that makes the question answerable |
-
-`ALLOC_RANDOM` is matched in size and class composition to `ALLOC_S1`.  Its draw
-seeds are declared here before anything runs: **`2026090801`, `2026090802`,
-`2026090803`** if replicated, otherwise `2026090801`.
+| `ALLOC_SAFE` | S1: adversarially correct with margin above the frozen 10th percentile | primary treatment |
+| `ALLOC_FRAGILE` | per class, the **lowest-margin** images outside S1 | secondary treatment |
+| `ALLOC_RANDOM` | per class, a random draw of the same size | **the comparator for both** |
+| `I100` | every image | reference only; see below |
 
 Six parents, treated and control branches paired on a shared `continuation_seed`,
 two replicates per parent, to **epoch 199**.
 
-**Judged at e199, recorded at e149 and e114.**  Not at e114 alone: I100's own
-effect is absent there, gains +0.24 pp by e149 and +0.69 pp by e199
-(`docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md:51,55`), so a screen that stops
-at e114 cannot see an effect of this shape however precise it is.
+**Judged at e199, recorded at e149 and e114.**  I100's own effect is absent at
+e114, gains +0.24 pp by e149 and +0.69 pp by e199
+(`docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md:51,55`), so a screen that stops at
+e114 cannot see an effect of this shape however precise it is.
 
 Endpoint: held-out CE-PGD20 at all three horizons; official test with AutoAttack
-on the primary and `I100` only, seen once.
+on the primary and its comparator only, seen once.
+
+### `I100` is a reference, not a comparator — corrected 2026-09-07
+
+The first version of this plan judged every allocation arm against `I100`.  That
+was wrong, and the commit that introduced it said why in its own message: `I100`
+treats 45,000 images and each allocation arm treats 19,459, so "`ALLOC_SAFE` is
+0.3 pp below `I100`" is fully explained by treating 57 % fewer images and refutes
+nothing.  **The dose-controlled contrasts are the ones between allocation arms**,
+and those are what the rule below uses.  `I100` is still run and reported,
+because knowing what full-dose costs or buys is worth having, but no directional
+claim rests on it.
+
+### `ALLOC_FRAGILE` takes the lowest margins — corrected 2026-09-07
+
+The first version took the complement's **highest**-margin end.  On dev-1 that
+excluded the 6,082 most negative-margin images, median margin −1.506: the arm
+meant to stand for AROID's vulnerability direction systematically omitted the
+most vulnerable quarter of the wrong set, so a null result could not have closed
+that direction.  It now takes the lowest-margin images, per class, so that it is
+the genuine opposite end of `ALLOC_SAFE`.
 
 ## Why the arms are student-only, with the arithmetic
 
@@ -84,26 +115,41 @@ frozen thresholds; the table is in `docs/METHOD_DIRECTIONS_V2.md`.
 
 ## Preregistered rule
 
-Effects are parent-level paired differences against `I100`, at e199, on the
-held-out endpoint.  The floor for a paired fork at e199 is not yet measured; plan
-0093's twelve controls produce it (that plan's section 8), and this plan's
-threshold is set from that number **before** its own results are read.  If plan
-0093 has not produced it, the threshold is the e114 value inflated to the widest
-end of the pre-registered bracket, 0.25 pp, and that choice is recorded here now.
+Effects are parent-level paired differences at e199 on the held-out endpoint.
+**Every comparison is between arms that treat the same number of images in the
+same class proportions**, so a difference cannot be a dose or a class effect.
 
-- **`ALLOC_S1` at least 0.3 pp below `I100`** refutes the capacity account.
-- **`ALLOC_FRAGILE` above `ALLOC_S1`** refutes the memorisation account.
-- **All three within the floor of each other and of `I100`** closes per-sample
-  augmentation allocation in both directions at once.  That is a real result and
-  is reported as one, not as a failure.
+The floor for a paired fork at e199 is not yet measured; plan 0093's twelve
+controls produce it (that plan's section 8), and the threshold is set from that
+number **before** any result here is read.  If plan 0093 has not produced it, the
+threshold is 0.25 pp, the widest end of the pre-registered post-decay bracket,
+and that choice is recorded here now.
 
-The primary is `ALLOC_S1` because the evidence points there, not because it is
-preferred.  `ALLOC_FRAGILE` is analysed under the identical rule and is reported
-whatever it does; it is the direction this project has been reaching for and it
-does not get a lower bar or a higher one.
+- **Primary.** `ALLOC_SAFE − ALLOC_RANDOM`.  Positive beyond the threshold means
+  giving the richer augmentation to samples with margin to spare beats giving it
+  to an arbitrary group of the same size and shape, which is what the IDBH
+  capacity account predicts.
+- **Secondary, same threshold and same analysis.** `ALLOC_FRAGILE − ALLOC_RANDOM`.
+  Positive means the vulnerability direction wins instead, which is what AROID's
+  objective predicts.
+- **The direction itself.** `ALLOC_SAFE − ALLOC_FRAGILE`.  This is the largest
+  contrast of the three and the one the two accounts disagree about most
+  directly.
+- **All three within the threshold of one another** closes per-sample allocation
+  in both directions at once.  That is a result and is reported as one.
 
-**Clean accuracy is reported alongside** and a drop beyond 0.5 pp disqualifies an
-arm regardless of its robust accuracy, as elsewhere in this project.
+Neither treatment arm gets a lower bar or a higher one.  The safe-side arm is
+called primary because the published evidence points there, not because it is
+preferred.
+
+**Attenuation is stated in advance.**  The random draw overlaps `ALLOC_SAFE` by
+about 47 % on dev-1, because S1 is 43 % of the training set.  So
+`ALLOC_SAFE − ALLOC_RANDOM` carries roughly half the allocation contrast of
+`ALLOC_SAFE − ALLOC_FRAGILE`, and a null on the primary with a positive on the
+direction contrast is a coherent outcome rather than a contradiction.
+
+**Clean accuracy is reported alongside**, and a drop beyond 0.5 pp disqualifies
+an arm regardless of its robust accuracy.
 
 ## What has to be built
 

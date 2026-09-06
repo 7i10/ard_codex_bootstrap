@@ -176,7 +176,7 @@ e199・official test・AutoAttack の床ではない。** ただし外挿の向�
 | plan 0092 の床確定（σ_d） | 実行中（2026-09-06 21:02 起動、未処置対照 6 本、e101–114） |
 | env v2 を Hamster で構築し `pip freeze` を `requirements/environment.lock` と照合 | 済（2026-09-06。21 項目一致、受け入れ試験通過。Ferret では未構築） |
 | ランタイム root v2 の作成 | 未 |
-| 親 6 本の生成 | 進行中（1/6 完了。§Progress log 参照。**材料化スクリプトに阻害欠陥あり**） |
+| 親 6 本の生成 | 進行中（2/6 完了。§Progress log 参照。**待ち受けのパス欠陥は修正済みだが、`materialize_chain.sh:51` が呼ぶスクリプトを間違えており 6/6 到達後に全滅する。`parent.sh:27` も未修正。seed 3/4/5 は未確認**） |
 
 ## Progress log
 
@@ -234,6 +234,107 @@ kill 111500 \
 **完了済みの seed1 を先頭から訓練し直して上書きする。**
 
 **GPU ジョブはこのセッションからは一切起動していない。**
+
+### 2026-09-07 — 親 seed2 完了、待ち受けは直ったが材料化は呼ぶ先を間違えている
+
+**seed2 は正常終了した。** `parents-v2-cropshift-s2`、200/200 エポック、
+source SHA `6ab179d`（作業ツリーの差分なし）、env v2、world size 1、
+per-rank batch 128、global batch 128、teacher `chen2021_ltd_wrn34_10`
+（SHA `fc398a48…`、宣言値と実測値が一致）。
+`epoch-049/099/149/199.pt`、`best.pt`、`last.pt` がすべて存在する。
+run-bundle の 2 成果物（`epoch-metrics.parquet` = `a68556ba…`、
+`sample-stats-train.parquet` = `78c5e15e…`）も両方あり、
+バンドルは内容アドレス方式の控えを同じハッシュ名で持っている。
+所要時間は 4 時間 38 分（15:31:42Z → 20:10:24Z）。
+
+| | seed1 | seed2 |
+|---|---|---|
+| best PGD | 59.40 %（e198） | **59.50 %**（e178） |
+| last PGD | 59.30 % | **59.12 %** |
+| best clean | 86.12 % | **85.88 %** |
+| last clean | 86.26 % | **86.30 %** |
+| robust overfit gap | 0.10 pp | **0.38 pp** |
+
+**これは 5000 枚 validation の CE-PGD20（ε=8/255、step 2/255、20 step、
+random start、batch keying）の途中記録であり、official test ではない。**
+seed は 2 本しかないので、これは 2 本ぶんの方向の記録であって、
+分布の推定でも母集団の主張でもない。
+
+**材料化の待ち受けは直っている（新情報）。** `materialize_chain.sh:21-23` の
+`have()` は現在 `$CAMP/seed$1/epoch-099.pt` を見ており、前回記録した
+`checkpoints/epoch-99.pt` ではない。ログは
+`2026-09-07T05:07:45+09:00 waiting for six epoch-99 checkpoints` で再起動を示す。
+**12 時間の新しい期限は 2026-09-07 17:07:45 JST。**
+
+**`parent.sh:27` は未修正のまま。** いまも
+`[ -f "$OUT/checkpoints/epoch-199.pt" ]` を見ており、`checkpoints/` は空なので
+スキップ判定は一度も成立しない。**`parent.sh` を再実行すると、完了済みの
+seed1 と seed2 を先頭から訓練し直して上書きする。** 次に走らせる前に
+`$OUT/epoch-199.pt` へ直すこと。
+
+**しかし待ち受けの先に第 2 の閉塞欠陥がある。`materialize_chain.sh:51` は
+呼ぶスクリプトを間違えている。** 6/6 が揃った直後に、6 本すべてが例外で落ちる。
+
+`epoch-099.pt` という名前のファイルは、**payload epoch 98**（global_step
+34848 = 99×352）の状態を持つ。トレーナが `epoch-{epoch + 1:03d}.pt` で書く
+ためで（`src/ard/engine/trainer.py:1538`）、
+`scripts/analysis/materialize_stagewise_parents.py:130` の
+`expected_source_payload = source_label - 1` も同じ規約を独立に述べている。
+一方 switch=100 のフォークが必要とするのは **payload epoch 99**（global_step
+35200）である。
+
+chain が呼ぶ `scripts/create_stagewise_augmentation_forks.py` は、この 1 エポック
+の差を埋めない。埋めないどころか明示的に拒否する。
+
+```
+:116  expected_epoch = args.switch - 1                      # = 99
+:117  if parent.get("epoch") != expected_epoch or parent.get("epoch_boundary") != "end":
+:118      raise ValueError("parent payload epoch does not match the requested switch boundary")
+:122  if parent.get("world_size") != 1 or parent.get("global_step") != (args.switch * 352):
+:123      raise ValueError("parent world size/global step is inconsistent ...")
+```
+
+`epoch-099.pt` は epoch=98、global_step=34848 なので、:117 で必ず落ちる。
+**このツールはラベルを付け替えるだけで、継続訓練をしない。**
+
+隙間を埋めるのは `scripts/analysis/materialize_stagewise_parents.py` のほうで、
+これは最も近い疎チェックポイントから CropShift を境界の直前まで継続する
+（同ファイル :4-7、:49-51）。コミット `d7c05d7` がこのツールを
+**任意の seed・任意の source run へ拡張済み**であり、
+`--source-root` と、バンドル外に置かれた `resolved_config.yaml` への
+フォールバックが入っている。**閉塞の解除に必要な変更は、すでに master にある。**
+
+**必要な修正（未実行。実行は人間の判断）。** `materialize_chain.sh:51-54` を
+差し替える。出力先 `$CAMP/parents/seed$s/s100/epoch-100.pt` は変わらないので、
+:49 のスキップ判定と :62 の SHA 出力はそのまま使える。
+
+```bash
+PYTHONPATH="$WT/src" "$PY" scripts/analysis/materialize_stagewise_parents.py \
+  --seed "$s" --boundary 100 \
+  --source-root "$CAMP/seed$s" \
+  --output-root "$CAMP/parents" >"$CAMP/logs/materialize-seed$s.log" 2>&1
+```
+
+`--device` の既定は `cuda` で、材料化は 1 エポックぶんの継続訓練を行うため
+**GPU を使う**。いま空いている Hamster GPU1 で賄える規模である。
+seed2 の `resolved_config.yaml` は run 直下にもバンドル内にも存在するので、
+上記フォールバックはどちらでも解決する。
+
+**残る不確実性は 2 つ。**
+
+1. **seed 3/4/5（Ferret）は今回も未確認。** ssh は本セッションでも承認されず、
+   実行していない。セッション開始時のフックが Ferret の 3 GPU を
+   41〜52 %・2319〜2533 MiB と報告しており、seed2 の実測ピーク
+   （reserved 1.91 GB）と矛盾しない規模ではあるが、**走っているジョブの同定には
+   ならない。** 3 本が実在しなければ、期限までに 6/6 には到達しない。
+2. **seed6 は間に合う見込み。** 05:09 JST 時点で epoch 2 / global_step 1056。
+   seed2 の実測 83.6 秒/エポックで外挿すると epoch 99 到達は **07:25 JST 前後**で、
+   17:07 の期限には余裕がある。これは外挿であって観測ではない。
+
+**Hamster の GPU1 は空いた。** GPU1 の `parent.sh` は seed2 だけを渡されており、
+後続がない。GPU0 は seed6 を走らせている。
+
+**このセッションからは GPU ジョブを起動も再試行もしていない。**
 
 ## 付録 — 過去の null が「効かない」を意味しない理由
 
