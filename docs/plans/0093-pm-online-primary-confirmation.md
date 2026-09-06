@@ -176,7 +176,64 @@ e199・official test・AutoAttack の床ではない。** ただし外挿の向�
 | plan 0092 の床確定（σ_d） | 実行中（2026-09-06 21:02 起動、未処置対照 6 本、e101–114） |
 | env v2 を Hamster で構築し `pip freeze` を `requirements/environment.lock` と照合 | 済（2026-09-06。21 項目一致、受け入れ試験通過。Ferret では未構築） |
 | ランタイム root v2 の作成 | 未 |
-| 親 6 本の生成 | 未 |
+| 親 6 本の生成 | 進行中（1/6 完了。§Progress log 参照。**材料化スクリプトに阻害欠陥あり**） |
+
+## Progress log
+
+### 2026-09-07 — 親 seed1 完了、ただし材料化は現状のままでは必ず失敗する
+
+**seed1 は正常終了した。** `parents-v2-cropshift-s1`、200/200 エポック、
+source SHA `6ab179d`、env v2（`ard-v2`）、world size 1、global batch 128。
+`epoch-049/099/149/199.pt`、`best.pt`、`last.pt`、`epoch-metrics.parquet`、
+`sample-stats-train.parquet` がすべて存在する。
+best 5000-validation CE-PGD20 = 59.40 %（e198）、last = 59.30 %、
+clean は best 86.12 % / last 86.26 %、robust overfit gap 0.10 pp。
+**これは validation の途中記録であり official test ではない。**
+
+**阻害欠陥（実行系。科学的な欠陥ではない）。**
+材料化スクリプトが探すチェックポイントのパスが、実際に書かれるパスと一致しない。
+
+| 参照箇所 | 探しているパス | 実際に存在するパス |
+|---|---|---|
+| `materialize_chain.sh:21`（ローカル seed 1/2/6） | `<out>/checkpoints/epoch-99.pt` | `<out>/epoch-099.pt` |
+| `materialize_chain.sh:23`（Ferret seed 3/4/5） | `<out>/checkpoints/epoch-99.pt` | 同上 |
+| `parent.sh:27`（完了スキップ判定） | `<out>/checkpoints/epoch-199.pt` | `<out>/epoch-199.pt` |
+
+ずれは 2 か所ある。`checkpoints/` という中間ディレクトリは存在せず、
+ファイル名は 3 桁ゼロ詰めである。根拠は `src/ard/engine/trainer.py:1538`
+（`self.output_dir / f"epoch-{epoch + 1:03d}.pt"`）と、seed1 の実ファイル一覧
+（`checkpoints/` は空、`epoch-099.pt` は存在）。VERIFIED。
+
+**帰結。** `have()` は 6 本すべてについて空を返し続ける。したがって
+`materialize_chain.sh` は 12 時間の期限（2026-09-07 13:17 JST）まで 0/6 のまま
+待ち、`gave up after twelve hours (0/6)` を出して exit 1 する。
+epoch-99 のチェックポイントがディスク上に揃っていても、親は 1 本も材料化されない。
+**plan 0096 の M0 と本プランの着手は、訓練が全部終わっても自動では解けない。**
+
+**未確認。** seed 3/4/5 は Hamster では走っていない（GPU0 が seed 1→6、GPU1 が
+seed 2）。`materialize_chain.sh` はこの 3 本を Ferret に期待しているが、
+Ferret への ssh は本セッションで承認されず確認できていない。
+仮に Ferret で走っていなければ、パスを直しても 6/6 には到達しない。
+**着手前提の表に「Ferret では env v2 未構築」とあるため、ここは実際に確認が要る。**
+
+**提案する修正（未実行。実行は人間の判断）。**
+実行中の bash はスクリプトを再読するため `parent.sh` は走行中に編集しない。
+`materialize_chain.sh` は関数を読み込み済みなので、編集だけでは効かず再起動が要る。
+
+```bash
+CAMP=/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/parents-v2
+kill 111500 \
+  && sed -i 's#/checkpoints/epoch-99\.pt#/epoch-099.pt#g' "$CAMP/materialize_chain.sh" \
+  && nohup "$CAMP/materialize_chain.sh" "$CAMP" \
+       /home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/worktrees/parents-6ab179d4d76d \
+       /home/shunsukenaito/.conda/envs/ard-v2/bin/python >/dev/null 2>&1 &
+```
+
+`parent.sh:27` は別件として、次に走らせる前に `<out>/epoch-199.pt` へ直す。
+現状ではスキップ判定が一度も成立しないため、`parent.sh` を再実行すると
+**完了済みの seed1 を先頭から訓練し直して上書きする。**
+
+**GPU ジョブはこのセッションからは一切起動していない。**
 
 ## 付録 — 過去の null が「効かない」を意味しない理由
 

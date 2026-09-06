@@ -4,7 +4,11 @@
 
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
 - Current milestone: M0
-- Blocked on: the six environment-v2 parents (`runs/parents-v2`, in progress)
+- Blocked on: the six environment-v2 parents (`runs/parents-v2`, 1/6 finished).
+  M0 cannot start on its own even once they finish: the materialiser looks for
+  `<out>/checkpoints/epoch-99.pt` and the trainer writes `<out>/epoch-099.pt`, so
+  it will time out at 0/6. Diagnosis and the proposed fix are in plan 0093's
+  Progress log (2026-09-07).
 
 ## Goal
 
