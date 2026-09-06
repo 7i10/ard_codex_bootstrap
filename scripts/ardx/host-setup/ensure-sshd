@@ -1,0 +1,56 @@
+#!/bin/sh
+# Restore remote access if a package operation left nothing listening on port 22.
+#
+# On 2026-09-04 an unattended openssh-server upgrade made this machine
+# unreachable for sixty hours.  The preinst stopped ssh.service; the postinst
+# then took its ssh.socket branch, and because ssh.socket is masked on this host
+# deb-systemd-invoke refused to start it and never fell through to ssh.service.
+# The machine stayed perfectly healthy the entire time -- it answered ping -- so
+# nothing noticed.
+#
+# This is deliberately a check on the observable symptom rather than on that one
+# bug: if nothing is listening on 22 after a package operation, bring sshd back
+# by whichever mechanism this host uses.  It must never fail an apt run, so every
+# step tolerates failure.
+set -u
+
+listening() {
+    ss -H -ltn 'sport = :22' 2>/dev/null | grep -q . && return 0
+    return 1
+}
+
+listening && exit 0
+
+logger -t ensure-sshd "nothing is listening on port 22 after a package operation; restoring sshd"
+
+systemctl start ssh.service >/dev/null 2>&1
+listening || systemctl start ssh.socket >/dev/null 2>&1
+listening || {
+    # Only unmask as a last resort: masking is usually a deliberate choice about
+    # which activation mechanism this host uses, and undoing it silently would
+    # change how sshd runs.  Losing remote access outranks that preference.
+    systemctl unmask ssh.socket >/dev/null 2>&1
+    systemctl start ssh.socket >/dev/null 2>&1
+}
+
+if listening; then
+    logger -t ensure-sshd "sshd is listening again"
+    state=recovered
+else
+    logger -t ensure-sshd "FAILED to restore sshd; this machine may now be unreachable"
+    state=failed
+fi
+
+# Tell someone.  The whole point is that the last outage was silent.
+conf=/root/.config/ardx/liveness.env
+[ -r "$conf" ] || conf=$(getent passwd 1000 2>/dev/null | cut -d: -f6)/.config/ardx/liveness.env
+if [ -r "$conf" ]; then
+    topic=$(sed -n 's/^NTFY_TOPIC=//p' "$conf")
+    [ -n "${topic:-}" ] && curl -fsS --max-time 15 \
+        -H "Title: $(hostname): sshd was lost after a package operation" \
+        -H "Priority: urgent" -H "Tags: rotating_light" \
+        -d "Recovery $state. This is the 2026-09-04 failure recurring." \
+        "https://ntfy.sh/$topic" >/dev/null 2>&1
+fi
+
+exit 0

@@ -1,0 +1,4 @@
+// Check that sshd survived every package operation.
+// Installed at /etc/apt/apt.conf.d/99-ensure-sshd-running.
+// See scripts/ardx/host-setup/ensure-sshd for why this exists.
+DPkg::Post-Invoke { "[ -x /usr/local/sbin/ensure-sshd ] && /usr/local/sbin/ensure-sshd || true"; };
