@@ -270,11 +270,13 @@ class EpochStagewiseAugmentationTransform:
     source/epoch-keyed stream.  The wrapper therefore changes only the late
     policy at ``switch_epoch``; it never resets augmentation or global RNG.
 
-    ``late_mask`` restricts the switch to the listed sample ids.  Because both
-    branches read the same source-keyed stream, an image outside the mask gets a
-    view identical bit for bit to the one it would get under a run with no mask
-    at all, which is what makes an allocation comparison paired everywhere it is
-    not treated.  See docs/plans/0096-hardness-allocation-direction.md.
+    ``late_mask`` restricts the switch to the listed sample ids.  Because every
+    call builds its generator from ``(augmentation_seed, epoch, source_id)`` and
+    nothing is shared between samples, an image outside the mask gets exactly the
+    CropShift view -- bit for bit, and identical across any two arms in which
+    that image is untreated.  It does **not** match a run with no mask at all:
+    there, every image is switched, so an untreated image would get the late
+    policy.  See docs/plans/0096-hardness-allocation-direction.md.
     """
 
     policy_id = "stagewise"
@@ -495,6 +497,42 @@ def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
     raise ValueError(f"unknown dataset: {config.name}")
 
 
+def load_stagewise_late_mask(path: Path) -> frozenset[int]:
+    """Read an allocation mask and check it against itself.
+
+    Only self-consistency is checked here: the schema, that the IDs are sorted
+    and unique, and that the recorded digest matches the IDs.  Whether the mask
+    is the one the run declares is checked in ``build_train_validation_views``
+    against the config, and whether its IDs belong to the training partition is
+    checked there too, because only that function knows the partition.
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    required = {
+        "schema_version",
+        "namespace",
+        "num_classes",
+        "selected_ids",
+        "selected_ids_sha256",
+        "selected_count",
+        "selected_class_counts",
+        "provenance",
+    }
+    if not isinstance(payload, dict) or set(payload) != required:
+        raise ValueError(f"allocation mask has unexpected or missing fields: {path}")
+    if payload["schema_version"] != 1 or payload["namespace"] != "train":
+        raise ValueError(f"allocation mask is not a version-1 train-namespace mask: {path}")
+    ids = payload["selected_ids"]
+    if not isinstance(ids, list) or any(isinstance(v, bool) or not isinstance(v, int) for v in ids):
+        raise ValueError(f"allocation mask IDs must be integers: {path}")
+    if list(ids) != sorted(set(ids)):
+        raise ValueError(f"allocation mask IDs must be sorted and unique: {path}")
+    if payload["selected_count"] != len(ids):
+        raise ValueError(f"allocation mask count does not match its own IDs: {path}")
+    if selected_ids_sha256(tuple(ids)) != payload["selected_ids_sha256"]:
+        raise ValueError(f"allocation mask digest does not match its own IDs: {path}")
+    return frozenset(ids)
+
+
 def build_dataset(config: DatasetConfig, *, transform: Callable[[Any], torch.Tensor] | None = None) -> IndexedDataset:
     """Build one indexed view; callers needing train/validation use views below."""
     base = build_raw_dataset(config)
@@ -555,6 +593,15 @@ def build_train_validation_views(
                     raise ValueError("stagewise late mask size differs from the count declared in the config")
                 if selected_ids_sha256(tuple(sorted(stagewise_late_mask))) != declared_digest:
                     raise ValueError("stagewise late mask IDs differ from the digest declared in the config")
+                # Without this an ID outside the training partition is simply never
+                # looked up: the run treats fewer images than the record claims and
+                # nothing reports it.
+                outside = stagewise_late_mask.difference(split_train.indices)
+                if outside:
+                    raise ValueError(
+                        f"stagewise late mask contains {len(outside)} IDs outside the training partition; "
+                        f"the first is {min(outside)}"
+                    )
             train_transform = EpochStagewiseAugmentationTransform(
                 augmentation_seed=augmentation_seed,
                 switch_epoch=config.stagewise_switch_epoch,

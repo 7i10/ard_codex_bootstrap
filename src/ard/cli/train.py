@@ -30,6 +30,7 @@ from ard.data import (
     build_train_validation_views,
     collate_indexed,
     data_loader_generator,
+    load_stagewise_late_mask,
     seed_data_loader_worker,
 )
 from ard.engine import Trainer, config_digest, get_rank, get_world_size
@@ -90,6 +91,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("overrides", nargs="*", help="Dot-path YAML overrides such as training.epochs=2")
     parser.add_argument("--output", type=Path, help="Override output_dir")
     parser.add_argument("--resume", type=Path, help="Resume an epoch-boundary checkpoint")
+    parser.add_argument(
+        "--stagewise-late-mask",
+        type=Path,
+        default=None,
+        help=(
+            "Restrict the stage-wise late augmentation policy to the sample IDs in this mask. "
+            "The config must declare the mask's digest and count; both are checked against the "
+            "file before training starts, and the IDs must lie inside the training partition."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true", help="Resolve and save config without constructing training")
     parser.add_argument(
         "--ordering-policy",
@@ -686,11 +697,13 @@ def main(argv: list[str] | None = None) -> int:
         _seed_everything(config.seeds.model_init + get_rank())
         if config.training.deterministic:
             torch.use_deterministic_algorithms(True)
+        late_mask = load_stagewise_late_mask(args.stagewise_late_mask) if args.stagewise_late_mask else None
         train_dataset, validation_dataset = build_train_validation_views(
             config.dataset,
             validation_fraction=config.training.validation_fraction,
             split_seed=config.seeds.split,
             augmentation_seed=config.seeds.augmentation,
+            stagewise_late_mask=late_mask,
         )
         frozen_risk_lookup: FrozenRiskLookup | None = None
         intervention_mask: FixedInterventionMask | None = None

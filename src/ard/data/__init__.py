@@ -11,6 +11,7 @@ from .datasets import (
     build_dataset,
     build_raw_dataset,
     build_train_validation_views,
+    load_stagewise_late_mask,
     stratified_train_validation_split,
 )
 from .indexed import (
@@ -39,6 +40,7 @@ __all__ = [
     "build_dataset",
     "build_raw_dataset",
     "build_train_validation_views",
+    "load_stagewise_late_mask",
     "collate_indexed",
     "data_loader_generator",
     "seed_data_loader_worker",
