@@ -1,22 +1,24 @@
 """Freeze the three allocation masks plan 0096 compares.
 
-The plan asks which images should receive the richer augmentation from epoch
-100.  The answer has to be decided from each parent's own state at epoch 99 and
-then frozen, because an allocation that keeps changing is a different experiment
-from an allocation that is fixed, and only the fixed one isolates the direction.
+The plan asks which images should receive the richer augmentation from epoch 100.
+Three masks per parent, **identical in size and in class composition**, so that a
+difference between arms cannot be a dose effect or a class-balance effect:
 
-Three masks per parent, all the same size so the comparison is about *which*
-images and not *how many*:
+* ``safe``     -- adversarially correct with margin above the frozen tenth
+                  percentile: the samples the model already handles well.
+* ``fragile``  -- per class, the **lowest**-margin images outside that set: the
+                  genuine opposite end, which is what AROID's vulnerability
+                  direction means.  An earlier version took the highest-margin
+                  end of the complement and therefore excluded the most
+                  vulnerable images entirely; a null from that arm could not have
+                  closed the direction it was standing for.
+* ``random``   -- a draw of the same per-class counts, keyed on the parent as
+                  well as the declared seed.  Keying on the seed alone made the
+                  six parents' controls near-identical (Jaccard 0.99) while their
+                  treatments varied (Jaccard 0.45), so the control would have had
+                  one effective realisation across all six blocks.
 
-* ``s1``       -- adversarially correct with margin above the frozen tenth
-                  percentile: the samples the model already handles safely.
-* ``fragile``  -- the same number drawn from the rest, nearest the threshold
-                  first, so it is the complement's most-nearly-safe end rather
-                  than an arbitrary slice of it.
-* ``random``   -- a class-matched random draw of the same size, which is the
-                  control that turns "we chose well" into a testable claim.
-
-The random draw's seeds are declared in the plan before any of this runs.
+The draw seeds are declared in the plan before any of this runs.
 """
 
 from __future__ import annotations
@@ -35,7 +37,7 @@ from ard.policies.fixed_mask import selected_ids_sha256
 SCHEMA_VERSION = 1
 NUM_CLASSES = 10
 SOURCES = {
-    "s1": "stagewise_allocation_s1_epoch100_v1",
+    "safe": "stagewise_allocation_s1_epoch100_v1",
     "fragile": "stagewise_allocation_fragile_epoch100_v1",
     "random": "stagewise_allocation_matched_random_epoch100_v1",
 }
@@ -76,51 +78,69 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    thresholds = json.loads(args.thresholds.read_text(encoding="utf-8"))["thresholds"]
-    student_q10 = float(thresholds["student_global_logit_q10"])
+    thresholds_payload = json.loads(args.thresholds.read_text(encoding="utf-8"))
+    student_q10 = float(thresholds_payload["thresholds"]["student_global_logit_q10"])
+    state_sha = hashlib.sha256(args.state.read_bytes()).hexdigest()
     rows = pq.read_table(args.state).to_pylist()
     labels = {int(r["sample_id"]): int(r["class_id"]) for r in rows}
 
-    s1, rest = [], []
+    epochs = {int(row["epoch"]) for row in rows}
+    if epochs != {100}:
+        raise SystemExit(f"state file must be the epoch-100 boundary, found epochs {sorted(epochs)}")
+    if thresholds_payload.get("prefix_state_sha256") not in (None, state_sha):
+        raise SystemExit(
+            "the thresholds artifact was frozen against a different state file; "
+            "pairing one parent's state with another's thresholds silently changes every mask"
+        )
+
+    # Split the training set at the frozen threshold, then take a symmetric slice
+    # from each side.  The safe side is class-imbalanced -- easy classes have more
+    # safe images than hard ones -- so the largest arm that can be matched on both
+    # size and class composition is min(|safe|, |rest|) per class, taken from the
+    # extreme end of each side.  Matching matters more than size here: an
+    # unmatched pair would confound the direction of allocation with class
+    # balance, and the class ratio between the two sides reaches 2.5x.
+    safe_by_class: dict[int, list[tuple[float, int]]] = defaultdict(list)
+    rest_by_class: dict[int, list[tuple[float, int]]] = defaultdict(list)
     for row in rows:
         sample_id = int(row["sample_id"])
-        if bool(row["student_adv_correct"]) and float(row["student_global_margin"]) > student_q10:
-            s1.append(sample_id)
-        else:
-            rest.append((float(row["student_global_margin"]), sample_id))
-    if not s1 or len(rest) < len(s1):
-        raise SystemExit(f"cannot build equal-sized masks: |S1|={len(s1)}, |rest|={len(rest)}")
+        margin = float(row["student_global_margin"])
+        target = safe_by_class if (bool(row["student_adv_correct"]) and margin > student_q10) else rest_by_class
+        target[labels[sample_id]].append((margin, sample_id))
 
-    # The fragile arm takes the complement's highest-margin end, so the two arms
-    # differ in which side of the threshold they sit on rather than in how far
-    # from it they are.
-    fragile = [sample_id for _, sample_id in sorted(rest, reverse=True)[: len(s1)]]
-
-    # Class-matched random: same count per class as S1, drawn by a hash of the
-    # declared seed so the draw is reproducible from the plan alone.
-    by_class: dict[int, list[int]] = defaultdict(list)
-    for sample_id in labels:
-        by_class[labels[sample_id]].append(sample_id)
-    wanted = Counter(labels[sample_id] for sample_id in s1)
+    safe: list[int] = []
+    fragile: list[int] = []
     random_ids: list[int] = []
-    for class_id, count in sorted(wanted.items()):
+    by_class: dict[int, list[int]] = defaultdict(list)
+    for sample_id, class_id in labels.items():
+        by_class[class_id].append(sample_id)
+
+    for class_id in sorted(by_class):
+        safe_side = sorted(safe_by_class[class_id], reverse=True)   # highest margin first
+        rest_side = sorted(rest_by_class[class_id])                 # lowest margin first
+        count = min(len(safe_side), len(rest_side))
+        if count == 0:
+            raise SystemExit(f"class {class_id} has no images on one side of the threshold")
+        safe.extend(sample_id for _, sample_id in safe_side[:count])
+        fragile.extend(sample_id for _, sample_id in rest_side[:count])
         ranked = sorted(
             by_class[class_id],
-            key=lambda sid: hashlib.sha256(f"{args.random_seed}:{class_id}:{sid}".encode()).digest(),
+            key=lambda sid: hashlib.sha256(
+                f"{args.random_seed}:{args.seed_label}:{class_id}:{sid}".encode()
+            ).digest(),
         )
-        if len(ranked) < count:
-            raise SystemExit(f"class {class_id} has {len(ranked)} images, need {count}")
         random_ids.extend(ranked[:count])
 
     args.output.mkdir(parents=True, exist_ok=True)
-    base = {"seed_label": args.seed_label, "switch_epoch": 100, "state": str(args.state.resolve())}
+    # Identity, never a path: a path in a hashed provenance differs between hosts.
+    base = {"seed_label": args.seed_label, "switch_epoch": 100, "state_sha256": state_sha}
     manifest = {
         "contract": "ard_stagewise_allocation_masks_v1",
         "seed_label": args.seed_label,
         "student_global_logit_q10": student_q10,
         "masks": {
-            "s1": _write_mask(
-                args.output / "s1.json", selected=s1, labels=labels, provenance={"source": SOURCES["s1"], **base}
+            "safe": _write_mask(
+                args.output / "safe.json", selected=safe, labels=labels, provenance={"source": SOURCES["safe"], **base}
             ),
             "fragile": _write_mask(
                 args.output / "fragile.json",
@@ -139,9 +159,14 @@ def main() -> int:
     sizes = {name: spec["selected_count"] for name, spec in manifest["masks"].items()}
     if len(set(sizes.values())) != 1:
         raise SystemExit(f"masks must be the same size so the contrast is about which, not how many: {sizes}")
-    if manifest["masks"]["s1"]["selected_class_counts"] != manifest["masks"]["random"]["selected_class_counts"]:
-        raise SystemExit("the random draw is not class-matched to S1")
-    (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    counts = {name: spec["selected_class_counts"] for name, spec in manifest["masks"].items()}
+    if len({json.dumps(c, sort_keys=True) for c in counts.values()}) != 1:
+        raise SystemExit(f"all three masks must share one class composition, got {counts}")
+    manifest_path = args.output / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (args.output / "manifest.json.sha256").write_text(
+        hashlib.sha256(manifest_path.read_bytes()).hexdigest() + "\n", encoding="utf-8"
+    )
     print(json.dumps(manifest, indent=2, sort_keys=True))
     return 0
 
