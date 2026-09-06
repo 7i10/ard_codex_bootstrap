@@ -4,8 +4,8 @@
 
 - Owner: human (approval to spend GPU), Claude Code (execution)
 - Branch / base SHA: master, see progress log
-- Current milestone: M1
-- Last updated: 2026-09-05
+- Current milestone: M1, interrupted by the host outage
+- Last updated: 2026-09-06
 
 ## Goal
 
@@ -119,7 +119,7 @@ uncertainty, from six comparisons, and not presented as precise.
 - [x] M0: define and freeze what a replicate varies; confirm the runtime can
   express it; confirm the epoch-100 prefixes and frozen thresholds from plan
   0087 are reusable, or rebuild them.
-- [ ] M1: launch six continuations from a pinned worktree, epochs 101 to 114.
+- [~] M1: launch six continuations from a pinned worktree, epochs 101 to 114.
 - [ ] M2: evaluate eighteen endpoints at e104, e109, e114.
 - [ ] M3: compute the floor, write the record and report, commit.
 - [ ] M4: fold the number into `docs/MEASUREMENT_DESIGN.md` and restate the
@@ -154,6 +154,8 @@ for interpreting option A rather than an alternative to it.
 
 - 2026-09-05: plan authored from the prescription in `docs/MEASUREMENT_DESIGN.md`
   section 3.5 and the ranking in `docs/EVIDENCE_RECLASSIFICATION.md` Part 3(c).
+- 2026-09-06: recorded the interrupted state after the host outage; see the
+  completion report.  The prefixes and frozen thresholds survive and are reusable.
 - 2026-09-05 M0: replicate definition settled from the plan-0054 precedent and the
   `continuation_seed` implementation; see the section above.  Verified that three
   values of the seed give three distinct arm identity hashes.  Added the
@@ -162,4 +164,45 @@ for interpreting option A rather than an alternative to it.
 
 ## Completion report
 
-Pending.
+Pending.  The campaign is **not** complete, contrary to the assumption recorded in
+`docs/HANDOFF_2026-09-06_FERRET_TO_HAMSTER.md` chapter 0 step (4).
+
+What ran on 2026-09-05, from pinned worktree `source-ed3b77daa1de`:
+
+| stage | seed | result |
+| --- | --- | --- |
+| e100 prefix | dev-1 | completed 18:03:59, rc 0 |
+| e100 prefix | dev-2 | completed 18:04:03, rc 0 |
+| threshold freeze | dev-1 | completed 18:04:04, rc 0 |
+| threshold freeze | dev-2 | completed 18:04:08, rc 0 |
+| six control replicates | — | **never launched** |
+| eighteen endpoints | — | **never launched** |
+
+The session ended between the freeze and the arm launch, and the host became
+unreachable shortly afterwards.  `runs/post-decay-floor-v1/arms/` does not exist.
+No GPU work was lost, because none had started: the four stages above total about
+four minutes.
+
+**Therefore the post-decay floor is still unmeasured and `sigma_d` remains the
+provisional 0.35 pp.**  Everything that depends on it is still provisional:
+`docs/MEASUREMENT_STANDARD.md` section 5, plan 0093's detectable effect, and the
+interpretation of the plan-0091 official-test result (`+0.31 pp` mean, which sits
+inside the unmeasured 0.25 to 0.50 pp bracket).
+
+### A verification the interrupted stage did deliver
+
+Regenerating the e100 prefix at source `ed3b77d` reproduced the plan-0087 prefix
+computation exactly.  The online-state Parquet is bit-identical across the two
+source revisions:
+
+| artifact | plan 0087 (`bcb09a7`) | plan 0092 (`ed3b77d`) | identical |
+| --- | --- | --- | --- |
+| dev-1 e100 online-state | `0bb0701f...70441a` | `0bb0701f...70441a` | yes |
+| dev-1 e100 checkpoint file | `89a43b3c...687158` | `e3a3975f...23e17d` | no |
+
+The computed state matches; the checkpoint *file* hash does not, because the
+checkpoint embeds the resolved config and source metadata.  This independently
+confirms, from a different angle, what the Ferret session found by re-running the
+same source twice: a checkpoint file hash is not a test of reproducibility.  It
+also confirms that exposing `--continuation-seed` did not perturb the
+computation.
