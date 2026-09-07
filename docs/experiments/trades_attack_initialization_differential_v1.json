@@ -1,0 +1,129 @@
+{
+  "contract": "trades-attack-initialization-differential/v1",
+  "question": "Does the local uniform-in-[-eps,eps] attack initialization, against official TRADES' 0.001-scale Gaussian initialization, change the inner maximisation enough to explain the 1.2-1.5 pp shortfall of the corrected local TRADES against the published range?",
+  "config": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/resolved_config.yaml",
+  "batch_size": 256,
+  "batch": "first N images of the configured split, in index order",
+  "attack": {
+    "epsilon": 0.03137254901960784,
+    "step_size": 0.00784313725490196,
+    "steps": 10,
+    "loss": "kl",
+    "target": "student_clean"
+  },
+  "trades_beta": 6.0,
+  "gaussian_scale": 0.001,
+  "init_seed": 23,
+  "checkpoints": [
+    {
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/epoch-049.pt",
+      "epoch": 48,
+      "uniform": {
+        "inner_kl_trace": [
+          0.00011995036038570106,
+          0.004453881643712521,
+          0.013956625014543533,
+          0.02641451358795166,
+          0.03993882238864899,
+          0.05274496227502823,
+          0.06354031711816788,
+          0.07143432646989822,
+          0.07571802288293839,
+          0.0778399109840393,
+          0.07937788218259811
+        ],
+        "inner_kl_final": 0.07937788218259811,
+        "outer_trades_loss": 1.4330623149871826,
+        "outer_parameter_gradient_l2": 2.564079297187677,
+        "mean_abs_delta": 0.028951114043593407,
+        "fraction_at_epsilon": 0.8584912419319153
+      },
+      "gaussian": {
+        "inner_kl_trace": [
+          1.9657773009384982e-07,
+          0.003447500290349126,
+          0.014817618764936924,
+          0.03441960737109184,
+          0.06071874126791954,
+          0.06605525314807892,
+          0.070341095328331,
+          0.07238452136516571,
+          0.07442685961723328,
+          0.0756901353597641,
+          0.07701309770345688
+        ],
+        "inner_kl_final": 0.07701309770345688,
+        "outer_trades_loss": 1.41887366771698,
+        "outer_parameter_gradient_l2": 2.837451828200314,
+        "mean_abs_delta": 0.02902853488922119,
+        "fraction_at_epsilon": 0.8585039973258972
+      },
+      "comparison": {
+        "inner_kl_relative_difference": 0.030706263605276164,
+        "outer_loss_relative_difference": 0.009999936987365968,
+        "outer_gradient_relative_difference": -0.09634437783073355,
+        "per_sample_kl_uniform_stronger_fraction": 0.50390625,
+        "per_sample_kl_mean_difference": 0.002364780753850937,
+        "per_sample_kl_max_abs_difference": 0.20660452544689178,
+        "adversarial_linf_distance_mean": 0.0627451241016388,
+        "adversarial_linf_distance_max": 0.0627451241016388,
+        "adversarial_identical_fraction": 0.0
+      }
+    },
+    {
+      "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/best.pt",
+      "epoch": 150,
+      "uniform": {
+        "inner_kl_trace": [
+          0.00024507660418748856,
+          0.004621319007128477,
+          0.01343886461108923,
+          0.024801068007946014,
+          0.03698532283306122,
+          0.0487268790602684,
+          0.05893520265817642,
+          0.06667335331439972,
+          0.07109414041042328,
+          0.07349652051925659,
+          0.07533317804336548
+        ],
+        "inner_kl_final": 0.07533317804336548,
+        "outer_trades_loss": 0.9188446402549744,
+        "outer_parameter_gradient_l2": 3.253682826894254,
+        "mean_abs_delta": 0.028244977816939354,
+        "fraction_at_epsilon": 0.8156649470329285
+      },
+      "gaussian": {
+        "inner_kl_trace": [
+          2.8650902095250785e-07,
+          0.0032081687822937965,
+          0.01297588087618351,
+          0.02959323860704899,
+          0.052469950169324875,
+          0.058064013719558716,
+          0.06283395737409592,
+          0.06544411182403564,
+          0.06815094500780106,
+          0.06994083523750305,
+          0.0718679130077362
+        ],
+        "inner_kl_final": 0.0718679130077362,
+        "outer_trades_loss": 0.8980530500411987,
+        "outer_parameter_gradient_l2": 3.606618475652966,
+        "mean_abs_delta": 0.028409788385033607,
+        "fraction_at_epsilon": 0.819403350353241
+      },
+      "comparison": {
+        "inner_kl_relative_difference": 0.04821713739282028,
+        "outer_loss_relative_difference": 0.023151850787458277,
+        "outer_gradient_relative_difference": -0.09785777207687993,
+        "per_sample_kl_uniform_stronger_fraction": 0.46484375,
+        "per_sample_kl_mean_difference": 0.003465268760919571,
+        "per_sample_kl_max_abs_difference": 0.5069769024848938,
+        "adversarial_linf_distance_mean": 0.0627451241016388,
+        "adversarial_linf_distance_max": 0.0627451241016388,
+        "adversarial_identical_fraction": 0.0
+      }
+    }
+  ]
+}

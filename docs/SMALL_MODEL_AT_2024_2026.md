@@ -6,6 +6,40 @@ Setting throughout: CIFAR-10 test set, ResNet-18 (RN-18) or PreActResNet-18 (PRN
 
 ---
 
+## 0a. Addendum, 2026-09-08: RobustBench stopped, and the pin is the head
+
+`docs/THESIS_FRAME.md` section 7 asked for the live RobustBench leaderboard to be rendered once,
+because a seed-reported, no-generated-data ResNet-18 entry at or above 54 AA published since
+March 2025 would make this survey's premise false. The leaderboard page renders its tables in
+JavaScript and cannot be read by fetching it. The underlying data can be, and it answers the
+question more exactly than the page would.
+
+**The RobustBench repository's most recent commit of any kind is 2025-03-31.** VERIFIED from the
+GitHub commits API on 2026-09-08. That is the same commit this repository pins at
+`.external/robustbench` (`78fcc9e48a07a861268f295a777b975f25155964`, 2025-03-31), so **the pinned
+checkout is the head of the project, not a stale copy of it.** The last commit touching
+`model_info/cifar10/Linf` is older still, 2024-12-20; the last CIFAR-10 L-infinity models added
+were Xu2024MIMIR on 2025-02-02. VERIFIED, same source.
+
+Three consequences, and the third cuts against this survey.
+
+1. **The overturn condition cannot be met through RobustBench.** No entry has been added in
+   about seventeen months, so no post-March-2025 result can appear there whatever its number.
+   The premise of the comparison chapter survives this check.
+2. **The pinned `model_info` is complete, not partial.** Every statement in this document and in
+   `docs/ARD_VERSUS_AT_ASSESSMENT.md` that reads a number off the pin is reading the whole
+   leaderboard. The live-leaderboard caveat those documents carry can be struck.
+3. **"Not on RobustBench" no longer means "does not exist".** For 2022 to 2024 the leaderboard was
+   a near-complete index and absence from it was evidence. From 2025 it is evidence of nothing:
+   a 2025 or 2026 ResNet-18 result at 54 AA would simply not be there. Every claim in this
+   document about the 2025-2026 period therefore rests on the paper search in sections 1 to 4,
+   not on the leaderboard, and must be written that way. The user observed this independently
+   before the check was run.
+
+This does not change the recommendation in section 6. It changes what carries it.
+
+---
+
 ## 0. The number
 
 **The strongest no-extra-data RN-18 AutoAttack result I can find is 52.76 +/- 0.14, from DAT + AWP + SWA (Li, Li, Wu, Tian, Zhou, "DAT: Improving Adversarial Robustness via Generative Amplitude Mix-up in Frequency Domain", NeurIPS 2024, Table 3). It beats 52.48 by 0.28 pp.** VERIFIED from the arXiv PDF text (2410.12307), Table 3 rows, caption "average experimental results ... in 7 runs".

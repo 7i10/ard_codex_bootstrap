@@ -376,7 +376,7 @@ a robust teacher's.
   0.72 pp (CropShift) (DERIVED in `docs/MEASUREMENT_DESIGN.md` §2.5 from the five-seed cache); official-test
   AutoAttack SD for I100 over three seeds is 0.218 pp last, 0.079 pp best (VERIFIED, audit finding 3). With
   per-run SD s, the standard error of a difference of two five-seed means is 0.63 s, so 0.13-0.32 pp; a
-  0.5 pp effect is resolvable if s is at or below about 0.28 pp (DERIVED). Declare 0.5 pp as the minimum
+  0.5 pp effect is resolvable if s is at or below about 0.28 pp (DERIVED). **Corrected 2026-09-08: the measured per-run SD is 0.339 pp (`docs/MEASUREMENT_DESIGN.md` line 298, I100 at epoch 199, five seeds), above that 0.28 pp condition, so at five seeds the resolvable effect is 0.60 pp and not 0.5.** Declare 0.6 pp, not 0.5 pp, as the minimum
   and report the interval either way.
 
 **What it is worth if null.** A null on (i) is the thesis: a teacher adds less than half a point to a

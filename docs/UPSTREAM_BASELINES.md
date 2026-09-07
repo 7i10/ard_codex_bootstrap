@@ -173,6 +173,15 @@ fixed-batch differential test:
   `docs/debugging/0028-trades-clean-target-detached.md`.
 - Official attack initialization is Gaussian noise with `0.001` scale; local
   initialization is uniform in `[-epsilon, epsilon]`, immediately projected and clamped.
+  **Cost measured 2026-09-08** on a fixed 256-image batch through one shared step loop, so
+  the initialization is the only difference: the local initialization drives the inner KL
+  **3.1 % higher at epoch 48 and 4.8 % higher at epoch 150**, that is, it makes the attack
+  stronger, not weaker; the outer TRADES loss moves +1.0 % and +2.3 % and the parameter
+  gradient -9.6 % and -9.8 %. This cannot explain the local TRADES sitting 1.2 to 1.5 pp
+  *below* the published 49.0-49.4 % range, because the sign is wrong, and it is an order of
+  magnitude smaller than the detached-target defect measured the same way (58 % gradient
+  difference, 2.73 pp of AutoAttack). Record and report:
+  `docs/experiments/trades_attack_initialization_differential_v1.json` and `.md`.
 - Official CIFAR defaults are epsilon `.031`, step `.007`, 10 steps, `beta=6`;
   local defaults are `8/255`, `2/255`, 10 steps, `beta=6`.
 - Upstream data uses `ToTensor()` without `Normalize`; local attacks still receive
