@@ -4,6 +4,10 @@
 
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
 - Launched 2026-09-07 13:17 JST at source `815dabd`; M2 running
+- **First arm finished 2026-09-07 06:34 UTC**: `alloc-v1-p1-safe-fork` reached
+  epoch 199. `alloc-v1-p1-fragile-fork` is resuming from `last.pt`. The other
+  twenty-two arm runs (p1 `random` and `i100`, and every arm of p2-p6) have not
+  been created. See the Progress log.
 - Blocked on: materialising the six environment-v2 fork parents.
   **M0's input is now complete**: all six `epoch-099.pt` checkpoints are on
   Hamster (seeds 1/2/6 trained there, seeds 3/4/5 fetched from Ferret), and
@@ -173,8 +177,8 @@ duplicated, which is the intention.
   all three arms of a parent sharing one size and one class composition
 - [x] M1: mask-gated late policy implemented, reviewed, four defects and three
   design objections fixed, source frozen at `815dabd`
-- [~] M2: four arms on parents p1-p4 running since 13:17 on four GPUs; p5 and p6
-  queued behind them
+- [~] M2: one arm of twenty-four finished (`p1` / `ALLOC_SAFE`), one running
+  (`p1` / `ALLOC_FRAGILE`); the remaining twenty-two have not started
 - [ ] M3: endpoints at e114, e149, e199; aggregate; close
 
 ## What this cannot settle
@@ -186,6 +190,72 @@ matter for this pair at this point in this schedule.
 And it says nothing about distillation.  **A result here would be a result about
 adversarial training**, which is worth having and is not by itself an argument
 for a teacher.  That argument, if it exists, is the disagreement-set plan.
+
+## Progress log
+
+### 2026-09-07 — `alloc-v1-p1-safe-fork` finished at epoch 199
+
+Terminal status was re-derived from the bundle that fired the event
+(`runs/alloc-direction-v1/arms/p1/safe/run-bundle/manifest.json`), not from the
+watcher's hint. The hand-run completion triple holds: `run-bundle/completion.json`
+is present, the manifest declares `completed`, and `error-marker.txt` reads
+`no application error recorded`. Finished 2026-09-07T06:34:50Z at epoch 199,
+global step 70400.
+
+Lineage, all read from the manifest: source SHA `815dabd`, worktree
+`p0096-815dabd20c7b`, parent `parents-v2-cropshift-s1` payload epoch 99
+(checkpoint SHA `03feadbb…`, parent config SHA `d4715a2e…`), child config SHA
+`1c6d9696…`, fork kind `stagewise_augmentation_fork_v1`, switch epoch 100,
+prefix policy `cropshift`, late policy `idbh_weak`, mask `masks/p1/safe.json`.
+Fixed identity: CIFAR-10 / `saad_resnet18_cifar_v1` / RSLAD / teacher
+`chen2021_ltd_wrn34_10` (SHA `fc398a48…`) / training seed 1 / evaluation-attack
+seed 0 / linf eps 8-255 / world size 1 / effective global batch 128.
+
+**No result is recorded, because none exists yet.** The numbers below are the
+validation-split accuracies the run used to select its own checkpoint. They are
+internal validation, not the plan's endpoint: the endpoint is held-out CE-PGD20
+at e114, e149 and e199, and no endpoint evaluation has been run for any arm.
+
+| checkpoint | epoch | val clean | val PGD |
+| --- | --- | --- | --- |
+| best | 178 | 0.8618 | 0.6004 |
+| last | 199 | 0.8640 | 0.5968 |
+
+Robust overfit gap 0.36 pp. A single arm has no comparator, so this closes
+nothing: every preregistered contrast is a difference between arms on the same
+parent, and the comparator arm `ALLOC_RANDOM` does not exist yet.
+
+Two things to carry forward rather than treat as defects:
+
+1. The manifest summary says `epoch_metrics_complete: false`, with 100 recorded
+   epochs against 200 expected. That is correct for a fork that resumes at
+   epoch 100 and holds rows for epochs 100-199 only. The aggregator must not
+   read it as a truncated run.
+2. The six `I100_ONLINE_PREFIX` runs under `prefix/p1`-`p6` all sit at epoch 100
+   with `completion.json` absent, so the watcher counts them non-terminal. They
+   are the finished fork parents; their bundles were never closed out.
+
+### 2026-09-07 — what actually exists versus what the Status block claimed
+
+Scanning the whole campaign root found arm bundles for `p1/safe` and
+`p1/fragile` only. The earlier Status line ("four arms on parents p1-p4 running
+on four GPUs; p5 and p6 queued") did not match disk, and has been corrected.
+
+`alloc-v1-p1-fragile-fork` is alive, resuming from its own `last.pt`, and had
+written no progress row at the time of this check.
+
+### 2026-09-07 — relation to decision packet 0004
+
+Decision 0004 describes a run-ID collision on this same arm and asks whether to
+resume the first attempt or retake it under a new run ID; its `chosen` is still
+`null`. The successful run recorded above uses run ID `alloc-v1-p1-safe-fork`,
+not the colliding `alloc-p1-safe-fork`, and its manifest was created at
+04:17:58Z — about four minutes after the failed attempt and roughly two hours
+before the packet was written. The retake had therefore already happened when
+0004 was authored, so the packet's question is settled in fact but not on
+record, and the orphan W&B run holding only epochs 100-101 that 0004 listed as
+the cost of that route now exists. The preflight gate 0004 recommends is
+untouched and remains open. Resolving 0004 is the human's call.
 
 ## Execution notes
 
