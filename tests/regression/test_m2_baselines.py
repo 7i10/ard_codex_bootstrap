@@ -75,7 +75,14 @@ def test_fixed_batch_pgd_at_trades_rslad_formula_direction_temperature_and_t2() 
     )
     expected_trades_kl = 3.0 * _kl_target_to_student(student_adv, student_clean, temperature)
     assert torch.allclose(trades.hard, F.cross_entropy(student_clean, labels, reduction="none"), atol=1e-7, rtol=0)
-    assert torch.equal(trades.kd, expected_trades_kl)
+    # Not torch.equal since 2026-09-07. TRADES computes this KL in log space,
+    # because its target carries gradients and F.softmax underflows to exactly
+    # zero under mixed precision, which puts log(0) on the gradient path and
+    # killed a run in its first epoch. The two formulations are algebraically
+    # identical and differ here by 1.3e-06, about eleven float32 eps on values
+    # of order 0.7. Demanding bit-equality would demand the unsafe formulation.
+    # See docs/debugging/0028-trades-clean-target-detached.md.
+    assert torch.allclose(trades.kd, expected_trades_kl, atol=1e-5, rtol=0)
 
     rslad = RSLADObjective(temperature=temperature, temperature_squared=True)(
         student_logits=student_adv,

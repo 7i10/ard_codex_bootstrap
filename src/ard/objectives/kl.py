@@ -33,8 +33,18 @@ def target_to_student_kl(
     if student_logits.shape != target_logits.shape or student_logits.ndim != 2:
         raise ValueError("student and target logits must be matching [batch, class] tensors")
     log_student = F.log_softmax(student_logits / temperature, dim=1)
-    target = F.softmax((target_logits.detach() if detach_target else target_logits) / temperature, dim=1)
-    values = F.kl_div(log_student, target, reduction="none").sum(dim=1)
+    scaled_target = (target_logits.detach() if detach_target else target_logits) / temperature
+    if detach_target:
+        target = F.softmax(scaled_target, dim=1)
+        values = F.kl_div(log_student, target, reduction="none").sum(dim=1)
+    else:
+        # The same quantity in log space.  ``F.softmax`` can underflow to exactly
+        # zero under mixed precision, and the target-side gradient then needs
+        # ``log(0)``; ``log_softmax`` returns a large finite negative instead, so
+        # ``p * log p`` stays finite.  Only the non-detached branch needs this,
+        # because a detached target carries no gradient through ``log(target)``.
+        log_target = F.log_softmax(scaled_target, dim=1)
+        values = (log_target.exp() * (log_target - log_student)).sum(dim=1)
     return values * (temperature * temperature) if temperature_squared else values
 
 

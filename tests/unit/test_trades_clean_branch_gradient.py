@@ -14,7 +14,6 @@ docs/debugging/0028-trades-clean-target-detached.md.
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as F
 
 from ard.objectives.kl import target_to_student_kl
 from ard.objectives.trades import TRADESObjective
@@ -71,3 +70,26 @@ def test_a_frozen_teacher_target_is_unaffected_by_the_flag() -> None:
         target_to_student_kl(**kwargs, detach_target=True),
         target_to_student_kl(**kwargs, detach_target=False),
     )
+
+
+def test_the_clean_branch_gradient_survives_softmax_underflow() -> None:
+    """The reason the KL is computed in log space rather than through softmax.
+
+    Making the target non-detached puts ``log(target)`` on the gradient path.
+    ``softmax`` underflows to exactly zero under large logits, and far sooner
+    under mixed precision, so that path needs ``log(0)``. The first attempt at
+    this fix used ``F.softmax`` and killed a two-hundred-epoch TRADES run in its
+    first epoch with a non-finite loss. ``log_softmax`` returns a large finite
+    negative instead, so ``p * log p`` stays finite.
+    """
+    objective = TRADESObjective(beta=6.0)
+    for scale, dtype in ((50.0, torch.float32), (30.0, torch.float16)):
+        clean = (torch.randn(4, 10, dtype=dtype) * scale).requires_grad_()
+        adversarial = torch.randn(4, 10, dtype=dtype, requires_grad=True)
+        terms = objective(
+            student_logits=adversarial, labels=torch.randint(0, 10, (4,)), clean_student_logits=clean
+        )
+        loss = terms.total.mean()
+        (grad,) = torch.autograd.grad(loss, clean)
+        assert torch.isfinite(loss), f"loss is not finite at scale {scale} in {dtype}"
+        assert torch.isfinite(grad).all(), f"clean-branch gradient is not finite at scale {scale} in {dtype}"
