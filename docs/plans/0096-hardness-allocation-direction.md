@@ -3,7 +3,7 @@
 ## Status
 
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
-- Current milestone: M0
+- Launched 2026-09-07 13:17 JST at source `815dabd`; M2 running
 - Blocked on: materialising the six environment-v2 fork parents.
   **M0's input is now complete**: all six `epoch-099.pt` checkpoints are on
   Hamster (seeds 1/2/6 trained there, seeds 3/4/5 fetched from Ferret), and
@@ -169,10 +169,12 @@ duplicated, which is the intention.
 
 ## Milestones
 
-- [ ] M0: freeze the S1 and fragile masks from each parent's epoch-100 state;
-  record their sizes, class composition and hashes
-- [ ] M1: implement the mask-gated late policy; review; freeze a source SHA
-- [ ] M2: run the four arms on six parents to e199
+- [x] M0: eighteen masks frozen across six parents, 15,085 to 15,343 images each,
+  all three arms of a parent sharing one size and one class composition
+- [x] M1: mask-gated late policy implemented, reviewed, four defects and three
+  design objections fixed, source frozen at `815dabd`
+- [~] M2: four arms on parents p1-p4 running since 13:17 on four GPUs; p5 and p6
+  queued behind them
 - [ ] M3: endpoints at e114, e149, e199; aggregate; close
 
 ## What this cannot settle
@@ -184,3 +186,19 @@ matter for this pair at this point in this schedule.
 And it says nothing about distillation.  **A result here would be a result about
 adversarial training**, which is worth having and is not by itself an argument
 for a teacher.  That argument, if it exists, is the disagreement-set plan.
+
+## Execution notes
+
+The six parents are registered as `p1` through `p6` in the online-state runner
+alongside `dev-1` and `dev-2`, which other analyses cite by name.  Each arm is
+built in two steps: the fork builder rewrites the parent checkpoint's config hash
+to a stage-wise config carrying that arm's mask identity, so the four arms are
+four distinct recorded objects rather than relabelled copies of one; training
+then resumes from that fork with the mask file, which is checked against the
+declared digest, count and training partition before the first image is
+transformed.
+
+Mask sizes per parent: p1 15,317; p2 15,145; p3 15,253; p4 15,324; p5 15,085;
+p6 15,343.  They differ because each parent's own epoch-99 state decides its
+split, and within a parent all three arms are identical in size and class
+composition, which is what the comparison requires.
