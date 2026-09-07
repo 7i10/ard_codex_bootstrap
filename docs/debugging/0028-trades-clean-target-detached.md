@@ -135,3 +135,34 @@ points below the literature would have made the teacher look four points better
 than it is**, and the error would have run in the direction that flattered the
 project's own line of work.  It was found before the comparison was run, which is
 the only reason it is a footnote rather than a retraction.
+
+## Confirmed by experiment, 2026-09-07
+
+The corrected TRADES was retrained for two hundred epochs at seed 0, the same
+protocol as the superseded run, and evaluated on the official CIFAR-10 test set.
+
+| official test, best checkpoint | defective | corrected | difference |
+| --- | ---: | ---: | ---: |
+| clean | 81.35 | 82.35 | +1.00 |
+| PGD-20 | 47.83 | 50.66 | **+2.83** |
+| AutoAttack | 45.14 | **47.87** | **+2.73** |
+
+At the last checkpoint: clean 82.24, PGD-20 47.49, AutoAttack 44.99.
+
+**One line -- detaching the clean target of the KL term -- cost 2.73 points of
+AutoAttack accuracy.**
+
+The remaining distance to the literature is now 1.2 to 1.5 points rather than
+four, and the likely reason is visible in the protocol rather than in the loss:
+this project holds out 5,000 images for validation and trains on 45,000, while
+the papers it is tabled against train on all 50,000.  The other candidate the
+audit raised, weight decay, is 5e-4 here and matches the literature.
+
+That gap is a fairness axis for any comparison between adversarial training and
+distillation, and it applies to both sides equally, so it is a labelling problem
+rather than a defect.  It is recorded in `docs/ARD_VERSUS_AT_ASSESSMENT.md` as
+something the comparison must state.
+
+Had the comparison been run before this fix, **the teacher would have looked
+2.73 points better than it is** -- an error in exactly the direction that
+flatters this project's own line of work, and one that no test would have caught.
