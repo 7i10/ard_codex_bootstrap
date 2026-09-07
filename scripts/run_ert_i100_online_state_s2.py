@@ -31,6 +31,17 @@ RUN_ROOT = Path(
         "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1",
     )
 ).expanduser()
+# The six environment-v2 parents that plans 0093 and 0096 fork from.  They were
+# grown from initialisation under the pinned environment and materialised to the
+# epoch-99 boundary; seed 1 reproduced the historical dev-1 parent bit for bit
+# (docs/plans/0094-campaign-host-environment-invariance.md), so this registry
+# adds them rather than replacing dev-1 and dev-2, which other analyses cite.
+PARENTS_V2_ROOT = Path(
+    os.environ.get(
+        "ARD_PARENTS_V2_ROOT",
+        "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/parents-v2",
+    )
+).expanduser()
 CALIBRATION = ROOT / "docs/experiments/ert_rslad_i100_s2_dynamic_bdd_calibration_v1.json"
 CALIBRATION_SHA256 = "37bf0a0e1aa6ff12951f1c05f59f6df55700be0e28291c6925670d7b6cb56840"
 TEACHER_SHA256 = "fc398a4890e6856b5dd80856076000ec9e2debdd12d9f78a66171b9ffc383983"
@@ -47,6 +58,42 @@ PARENTS = {
         # Historical filename, but checkpoint payload is the exact e99 end state.
         "checkpoint": RUN_ROOT / "seed2/s100/epoch-100.pt",
         "sha256": "bb0c7c1ace81fd3df1b85660af265b91b1cefd6e91f3ce5d035b0d0c94f7aaf7",
+    },
+    "p1": {
+        "config": PARENTS_V2_ROOT / "seed1/resolved_config.yaml",
+        # Historical filename kept for the loader; payload is the exact e99 end state.
+        "checkpoint": PARENTS_V2_ROOT / "parents/seed1/s100/epoch-100.pt",
+        "sha256": "03feadbba05f7cec3b7a51885e7c83355ad68be71431e311c9f5d5953aa3ced3",
+    },
+    "p2": {
+        "config": PARENTS_V2_ROOT / "seed2/resolved_config.yaml",
+        # Historical filename kept for the loader; payload is the exact e99 end state.
+        "checkpoint": PARENTS_V2_ROOT / "parents/seed2/s100/epoch-100.pt",
+        "sha256": "41b8baeb905d0ce7ea76a43d1e68fcc6970c44a94dd7e5478e43dc0ed5713402",
+    },
+    "p3": {
+        "config": PARENTS_V2_ROOT / "seed3/resolved_config.yaml",
+        # Historical filename kept for the loader; payload is the exact e99 end state.
+        "checkpoint": PARENTS_V2_ROOT / "parents/seed3/s100/epoch-100.pt",
+        "sha256": "b9cf4c2c82643f2261a0235c600e4f0e2bfa2bf6b0a64bba512347b41cb88a83",
+    },
+    "p4": {
+        "config": PARENTS_V2_ROOT / "seed4/resolved_config.yaml",
+        # Historical filename kept for the loader; payload is the exact e99 end state.
+        "checkpoint": PARENTS_V2_ROOT / "parents/seed4/s100/epoch-100.pt",
+        "sha256": "bd00ae0c5cf9173a2ff9542c43d6d4ff73484afb6f42ae9305479d17d4c11aff",
+    },
+    "p5": {
+        "config": PARENTS_V2_ROOT / "seed5/resolved_config.yaml",
+        # Historical filename kept for the loader; payload is the exact e99 end state.
+        "checkpoint": PARENTS_V2_ROOT / "parents/seed5/s100/epoch-100.pt",
+        "sha256": "d8c0ce35b38696466ed40ebb61731dffc9693aafb6b3b5f5c8eaf3925b3dbb3f",
+    },
+    "p6": {
+        "config": PARENTS_V2_ROOT / "seed6/resolved_config.yaml",
+        # Historical filename kept for the loader; payload is the exact e99 end state.
+        "checkpoint": PARENTS_V2_ROOT / "parents/seed6/s100/epoch-100.pt",
+        "sha256": "bc90328d62173453ffe80ea15a65a088d2c414b1da409198a92b7752c1cc4209",
     },
 }
 ARMS = {
