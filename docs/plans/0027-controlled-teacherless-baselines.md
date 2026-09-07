@@ -6,8 +6,8 @@
 - Host: Hamster only; Ferret is forbidden
 - Base SHA: PGD-AT `c2220f11738e8963b922ae379a047a862ffa5915`;
   TRADES must launch from the then-current clean pushed SHA
-- Current milestone: B0--B3 complete
-- Last updated: 2026-08-07
+- Current milestone: B0--B4 complete; B5 waits on a human decision
+- Last updated: 2026-09-07
 
 ## Question and order
 
@@ -58,6 +58,12 @@ clean-to-adversarial KL implementation with beta 6.
   validate its successful 200-epoch terminal state.
 - [x] B2 -- after PGD-AT terminal validation, launch TRADES seed 0 on GPU 1.
 - [x] B3 -- close both best/last official clean/PGD-20 and AutoAttack.
+- [x] B4 -- re-run TRADES seed 0 after the clean-target detach fix
+  (`docs/debugging/0028-trades-clean-target-detached.md`) and validate its
+  200-epoch terminal state.
+- [ ] B5 -- official saved-checkpoint clean/PGD-20 and AutoAttack for the fixed
+  TRADES best and last. Not launched: an official test is a human decision.
+  See `docs/decisions/0005-trades-fix-official-evaluation.md`.
 
 ## Stop conditions
 
@@ -142,6 +148,89 @@ to observed accuracy.
   `2.37 pp` and `1.89 pp`. AutoAttack is pinned to commit
   `a39220048b3c9f2cca9a4d3a54604793c68eca7e` and source SHA-256
   `e74d6dab0e34faf840f1bdfe0f77e9ddcc5f753a7426cbaa54b11bf17f896487`.
+- 2026-09-07: the first re-run attempt after the detach fix (`trades-fix-v1-s0`,
+  SHA `6eec21f`) exited two seconds after start with no recorded traceback; see
+  `docs/decisions/0003-trades-fix-v1-failure-not-diagnosable.md`. The cause was
+  found afterwards and is not mysterious: undetaching the clean target puts
+  `log(target)` on the gradient path, `softmax` underflows to exactly zero under
+  mixed precision, and the loss became non-finite in the first epoch. Commit
+  `ee9ced0` computes the same quantity in log space, where `log_softmax` returns
+  a large finite negative instead. The separate platform defect that decision
+  0003 was written about -- a failed run bundle stores no traceback -- is still
+  open and is not closed by this plan.
+- 2026-09-07: B4 re-run `trades-fix-v1-s0-attempt2` reached 200/200 epochs from
+  clean SHA `ee9ced07d78214e7507f2bdb3a355690fbf7b56a` (empty working diff) on
+  Hamster, world size 1, global batch 128. Validation best was epoch 150: clean
+  `83.32%`, CE-PGD-20 `51.76%`; last was epoch 199: clean `83.28%`, CE-PGD-20
+  `48.66%`, a `3.10 pp` best-to-last robust gap. These are validation results,
+  not official-test results; no official evaluation has been run on this model.
+
+## B4 completion report (2026-09-07)
+
+**Source SHA.** `ee9ced07d78214e7507f2bdb3a355690fbf7b56a`, an ancestor of
+master, checked out clean (`dirty: false`, empty diff SHA-256). The corrected
+objective is in that tree: `src/ard/objectives/trades.py` passes
+`detach_target=False`, and `src/ard/objectives/kl.py` takes the log-space path
+for the non-detached branch.
+
+**Lineage.** Hand-run under the run-bundle contract, not an orchestrated
+campaign. Bundle
+`<runtime>/runs/trades-fix-v1/seed0/run-bundle/manifest.json`, run ID
+`trades-fix-v1-s0-attempt2`, W&B run
+`single-teacher-ard/trades-fix-v1-s0-attempt2`, config hash
+`cbed20a1330c49e9deb9efb84856550e7e47872e1157019c6e979d3111cc8299`, protocol
+`controlled_cifar10_r18_v1`, training and evaluation seed 0. Artifacts:
+`epoch-metrics.parquet` SHA-256 `ce2f9ddc...ed92b`, `sample-stats-train.parquet`
+SHA-256 `b57d3a2d...8bf8f`. Both `best.pt` and `last.pt` are on disk with the
+periodic epoch-049/099/149/199 checkpoints. Epoch rows are complete: 200
+expected, 200 recorded, from `local_canonical_epoch_rows`.
+
+**Result, and what it may be compared with.** All values below are internal
+validation CE-PGD-20 and validation clean accuracy for CIFAR-10,
+`saad_resnet18_cifar_v1`, TRADES beta 6, seed 0, world size 1, effective global
+batch 128, training PGD-10 at radius 8/255 and step 2/255. The defective column
+is this plan's own 2026-08-07 entry, which used the identical config and
+protocol and differs only in the objective.
+
+| validation quantity | defective (`f0c3ace`) | fixed (`ee9ced0`) | change |
+| --- | ---: | ---: | ---: |
+| best epoch | 154 | 150 | |
+| best clean | 82.00% | 83.32% | +1.32 pp |
+| best CE-PGD-20 | 48.62% | 51.76% | **+3.14 pp** |
+| last clean | 83.10% | 83.28% | +0.18 pp |
+| last CE-PGD-20 | 45.74% | 48.66% | **+2.92 pp** |
+| best-to-last robust gap | 2.88 pp | 3.10 pp | +0.22 pp |
+
+Late-trajectory validation CE-PGD-20 for the fixed run is `50.09%` over epochs
+100--199, `49.89%` over 120--199 and `49.92%` over 150--199, with a slope of
+`-0.00015` per epoch over 120--199; late validation clean is `83.53%` over
+150--199.
+
+**Decision.** B4 is closed. The fix moves validation robustness by about
+`+3 pp` at both best and last, in the direction and of the magnitude that
+`docs/debugging/0028` predicted from a 58% gradient difference. The internal
+consistency check also holds: the fixed TRADES now reaches the controlled
+PGD-AT best validation CE-PGD-20 (`51.76%` against `51.80%`) while keeping the
+small best-to-last gap that distinguishes TRADES from PGD-AT (`3.10 pp` against
+`8.54 pp`), which is the published qualitative signature and was not true of the
+defective run.
+
+**Caveats.** Three, and they bound the claim tightly.
+
+1. **This is not an official-test result and cannot supersede one.** The
+   superseded row in `docs/EXPERIMENT_DASHBOARD.md` is official-test
+   clean/PGD-20/AutoAttack (`81.35 / 47.83 / 45.14`). Only a saved-checkpoint
+   official evaluation plus AutoAttack on this run's `best.pt` and `last.pt`
+   can replace it. That has not been run and is not launched from postrun.
+2. **One seed, one run per arm.** This is a directional verdict for seed 0
+   under this protocol. It is not a distributional estimate and not a claim
+   about TRADES as a method.
+3. **No aggregated record exists for this run.** No contract string and no
+   aggregator were declared for it, so there is no `docs/experiments/*.json`
+   entry; the numbers above are transcribed from the machine-emitted bundle
+   manifest summary, which is this plan's existing convention for its
+   baselines. If the B5 official evaluation runs, that result should get a
+   proper contract and aggregator rather than another progress-log entry.
 
 ## Hamster-only execution block (complete)
 
