@@ -4,11 +4,15 @@
 
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
 - Launched 2026-09-07 13:17 JST at source `815dabd`; M2 running
-- **Two arms finished**: `alloc-v1-p1-safe-fork` at 2026-09-07 06:34 UTC and
-  `alloc-v1-p1-fragile-fork` at 08:51 UTC, both at epoch 199.
-  `alloc-v1-p1-random-fork` — the comparator both of them are judged against —
-  started after fragile finished and is running. The other twenty-one arm runs
-  (p1 `i100`, and every arm of p2-p6) have not been created. See the Progress log.
+- **Parent p1's dose-matched triple is complete**: `alloc-v1-p1-safe-fork` at
+  2026-09-07 06:34 UTC, `alloc-v1-p1-fragile-fork` at 08:51 UTC and
+  `alloc-v1-p1-random-fork` — the comparator both treatments are judged against —
+  at 11:07 UTC, all three at epoch 199. `alloc-v1-p1-all-fork`, the `I100`
+  reference, started afterwards and is running. Every arm of p2-p6 (twenty runs)
+  has not been created. See the Progress log.
+- **No contrast is evaluated yet.** The endpoint is held-out CE-PGD20 and it has
+  not been run for any arm; the preregistered rule is a parent-level paired
+  difference over six parents, and one parent exists.
 - **The frozen config saves no epoch-114 checkpoint**, so the e114 horizon this
   plan asks for cannot be evaluated on the arms that have already run. See the
   Progress log and decision packet 0006.
@@ -181,9 +185,10 @@ duplicated, which is the intention.
   all three arms of a parent sharing one size and one class composition
 - [x] M1: mask-gated late policy implemented, reviewed, four defects and three
   design objections fixed, source frozen at `815dabd`
-- [~] M2: two arms of twenty-four finished (`p1` / `ALLOC_SAFE` and
-  `p1` / `ALLOC_FRAGILE`), one running (`p1` / `ALLOC_RANDOM`); the remaining
-  twenty-one have not started
+- [~] M2: three arms of twenty-four finished — `p1` / `ALLOC_SAFE`,
+  `p1` / `ALLOC_FRAGILE` and `p1` / `ALLOC_RANDOM`, which is p1's whole
+  dose-matched triple — and one running (`p1` / `I100`, the reference);
+  the remaining twenty have not started
 - [ ] M3: endpoints at e114, e149, e199; aggregate; close.
   **e114 is not reachable for the finished arms** — the frozen config saves
   checkpoints at 99, 149 and 199 only.
@@ -199,6 +204,77 @@ adversarial training**, which is worth having and is not by itself an argument
 for a teacher.  That argument, if it exists, is the disagreement-set plan.
 
 ## Progress log
+
+### 2026-09-07 — `alloc-v1-p1-random-fork` finished; p1's triple is complete
+
+Terminal status was re-derived from the bundle that fired the event
+(`runs/alloc-direction-v1/arms/p1/random/run-bundle/manifest.json`), not from the
+watcher's hint. The hand-run completion triple holds: `run-bundle/completion.json`
+declares `completed`, the manifest declares `completed`, and the error marker reads
+`no application error recorded`. The fork was created 2026-09-07T08:51:32Z —
+fifteen seconds after `ALLOC_FRAGILE` released the GPU — and finished 11:07:46Z at
+epoch 199, global step 70400, with one hundred epoch rows covering 100 through 199,
+the whole post-fork range.
+
+Lineage, read from the manifest and `fork-lineage.json`: source SHA `815dabd`,
+worktree `p0096-815dabd20c7b`, parent `parents-v2-cropshift-s1` payload epoch 99
+(checkpoint SHA `03feadbb…`, parent config SHA `d4715a2e…`), child config SHA
+`01410c4a…`, fork kind `stagewise_augmentation_fork_v1`, switch epoch 100, prefix
+policy `cropshift`, late policy `idbh_weak`, mask `masks/p1/random.json`. Fixed
+identity: CIFAR-10 / `saad_resnet18_cifar_v1` / RSLAD / teacher
+`chen2021_ltd_wrn34_10` (SHA `fc398a48…`) / training seed 1 / evaluation-attack
+seed 0 / linf eps 8-255 step 2-255 / world size 1 / effective global batch 128.
+
+**All three arms share one configuration apart from the mask.** The `random` and
+`safe` `resolved_config.yaml` files were read in full and disagree on exactly three
+lines: the mask digest (`f5af3a8e…` against `31912f40…`), the `tracking.run_id` and
+the `output_dir`. The fragile-versus-safe comparison recorded below found the same
+three lines, so the property now holds across the whole triple. Every attack,
+schedule, optimizer, seed and normalization field is identical.
+
+**The dose-and-composition invariant is now verified for all three arms, not two.**
+`masks/p1/manifest.json` gives each of `safe`, `fragile` and `random` the same
+`selected_count` of 15,317 and the *same per-class counts* — 1687, 935, 1509, 1421,
+1637, 1770, 2152, 1582, 1188, 1436 — all three derived from one epoch-100 state
+(`77bb3dd8…`). This is the whole design: the arms cannot differ in how many images
+they treat or in which classes, so a difference between them cannot be a dose
+effect or a class-balance effect. The `random` mask's `selected_ids_sha256`
+`f5af3a8e…` is the digest the run's config declares, so the mask the run used is the
+mask the manifest describes.
+
+**No result is recorded, because none exists yet.** The numbers below are the
+validation-split accuracies the run used to select its own checkpoint. They are
+internal validation, not the plan's endpoint.
+
+| checkpoint | epoch | val clean | val PGD |
+| --- | --- | --- | --- |
+| best | 191 | 0.8596 | 0.6006 |
+| last | 199 | 0.8610 | 0.5970 |
+
+Robust overfit gap 0.36 pp. Each number was read back from the row for its epoch in
+`epoch-metrics.jsonl` (rows 92 and 100) and matches the manifest summary.
+`train_valid_examples` is 45,000 at epoch 199, so the run used the full training
+split and `resolved_config.yaml:18` `num_samples: 16` is again the inert display
+artifact recorded in decision 0003. As on the other two arms, the manifest's
+`epoch_metrics_complete: false` (100 recorded against 200 expected) is correct for a
+fork that resumes at epoch 100 and must not be read as truncation.
+
+Checkpoints on disk: `epoch-149.pt`, `epoch-199.pt`, `best.pt`, `last.pt`. There is
+**no `epoch-114.pt`**, exactly as on `safe` and `fragile`, so decision packet 0006
+now describes all three arms of p1 rather than two.
+
+**What this changes, and what it does not.** The comparator exists, so for the first
+time all three preregistered contrasts are computable in principle. None is computed
+here, for two independent reasons. First, the endpoint is held-out CE-PGD20 and *no
+endpoint evaluation has been run for any arm* — the table above is validation, and
+substituting it would change the measurement. Second, the rule is a parent-level
+paired difference over six parents, and one parent exists. The floor is also still
+unmeasured, so the fallback threshold of 0.25 pp stands. No contrast is reported and
+no direction is claimed.
+
+A fourth run has started on this parent: `alloc-v1-p1-all-fork`, the `I100`
+reference that treats all 45,000 images, at epoch 100 as of 11:09:31Z. It is a
+reference, not a comparator, and no directional claim will rest on it.
 
 ### 2026-09-07 — `alloc-v1-p1-fragile-fork` finished at epoch 199
 
