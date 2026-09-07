@@ -4,10 +4,14 @@
 
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
 - Launched 2026-09-07 13:17 JST at source `815dabd`; M2 running
-- **First arm finished 2026-09-07 06:34 UTC**: `alloc-v1-p1-safe-fork` reached
-  epoch 199. `alloc-v1-p1-fragile-fork` is resuming from `last.pt`. The other
-  twenty-two arm runs (p1 `random` and `i100`, and every arm of p2-p6) have not
-  been created. See the Progress log.
+- **Two arms finished**: `alloc-v1-p1-safe-fork` at 2026-09-07 06:34 UTC and
+  `alloc-v1-p1-fragile-fork` at 08:51 UTC, both at epoch 199.
+  `alloc-v1-p1-random-fork` — the comparator both of them are judged against —
+  started after fragile finished and is running. The other twenty-one arm runs
+  (p1 `i100`, and every arm of p2-p6) have not been created. See the Progress log.
+- **The frozen config saves no epoch-114 checkpoint**, so the e114 horizon this
+  plan asks for cannot be evaluated on the arms that have already run. See the
+  Progress log and decision packet 0006.
 - Blocked on: materialising the six environment-v2 fork parents.
   **M0's input is now complete**: all six `epoch-099.pt` checkpoints are on
   Hamster (seeds 1/2/6 trained there, seeds 3/4/5 fetched from Ferret), and
@@ -177,9 +181,12 @@ duplicated, which is the intention.
   all three arms of a parent sharing one size and one class composition
 - [x] M1: mask-gated late policy implemented, reviewed, four defects and three
   design objections fixed, source frozen at `815dabd`
-- [~] M2: one arm of twenty-four finished (`p1` / `ALLOC_SAFE`), one running
-  (`p1` / `ALLOC_FRAGILE`); the remaining twenty-two have not started
-- [ ] M3: endpoints at e114, e149, e199; aggregate; close
+- [~] M2: two arms of twenty-four finished (`p1` / `ALLOC_SAFE` and
+  `p1` / `ALLOC_FRAGILE`), one running (`p1` / `ALLOC_RANDOM`); the remaining
+  twenty-one have not started
+- [ ] M3: endpoints at e114, e149, e199; aggregate; close.
+  **e114 is not reachable for the finished arms** — the frozen config saves
+  checkpoints at 99, 149 and 199 only.
 
 ## What this cannot settle
 
@@ -192,6 +199,75 @@ adversarial training**, which is worth having and is not by itself an argument
 for a teacher.  That argument, if it exists, is the disagreement-set plan.
 
 ## Progress log
+
+### 2026-09-07 — `alloc-v1-p1-fragile-fork` finished at epoch 199
+
+Terminal status was re-derived from the bundle that fired the event
+(`runs/alloc-direction-v1/arms/p1/fragile/run-bundle/manifest.json`), not from
+the watcher's hint. The hand-run completion triple holds: `run-bundle/completion.json`
+declares `completed`, the manifest declares `completed`, and `error-marker.txt`
+reads `no application error recorded`. Started 2026-09-07T06:35:05Z — fifteen
+seconds after `ALLOC_SAFE` released the GPU — and finished 08:51:17Z at epoch 199,
+global step 70400. One hundred epoch rows, 100 through 199, which is the whole
+post-fork range.
+
+Lineage, all read from the manifest and `fork-lineage.json`: source SHA `815dabd`,
+worktree `p0096-815dabd20c7b`, parent `parents-v2-cropshift-s1` payload epoch 99
+(checkpoint SHA `03feadbb…`, parent config SHA `d4715a2e…`), child config SHA
+`cfc5147a…`, fork kind `stagewise_augmentation_fork_v1`, switch epoch 100,
+prefix policy `cropshift`, late policy `idbh_weak`. Fixed identity: CIFAR-10 /
+`saad_resnet18_cifar_v1` / RSLAD / teacher `chen2021_ltd_wrn34_10`
+(SHA `fc398a48…`) / training seed 1 / evaluation-attack seed 0 / linf eps 8-255
+step 2-255 / world size 1 / effective global batch 128.
+
+**The two finished arms differ in the mask and in nothing else.** Their
+`resolved_config.yaml` files were compared line by line and disagree on exactly
+three lines: the mask digest
+(`31912f40…` for `ALLOC_SAFE`, `8cc7f286…` for `ALLOC_FRAGILE`), the
+`tracking.run_id`, and the `output_dir`. `stagewise_late_mask_selected_count`
+is 15,317 on both, which is p1's mask size, so the dose is equal as the design
+requires. Every attack, schedule, optimizer, seed and normalization field is
+identical.
+
+**No result is recorded, because none exists yet.** The numbers below are the
+validation-split accuracies the run used to select its own checkpoint. They are
+internal validation, not the plan's endpoint: the endpoint is held-out CE-PGD20,
+and no endpoint evaluation has been run for any arm.
+
+| checkpoint | epoch | val clean | val PGD |
+| --- | --- | --- | --- |
+| best | 188 | 0.8592 | 0.6006 |
+| last | 199 | 0.8602 | 0.5980 |
+
+Robust overfit gap 0.26 pp. Each of these four numbers was read back from the row
+for its epoch in `epoch-metrics.jsonl` and matches the manifest summary.
+`train_valid_examples` is 45,000 at both epoch 100 and epoch 199, so the run used
+the full training split and the `num_samples: 16` line in `resolved_config.yaml:18`
+is the same inert display artifact recorded in decision 0003.
+
+**This still closes nothing.** Every preregistered contrast is a difference
+between arms on the same parent, and `ALLOC_RANDOM` — the comparator for both
+the primary and the secondary — is still running. Comparing the two finished
+arms to each other would be the `ALLOC_SAFE − ALLOC_FRAGILE` direction contrast,
+but on validation accuracy rather than the held-out endpoint, on one parent
+rather than six, with no measured floor, so it is not evaluated here and no
+such number is reported.
+
+#### The frozen config cannot produce the e114 endpoint
+
+`resolved_config.yaml:130-133` sets `checkpoint_epochs: [99, 149, 199]`. The
+design section of this plan asks for the held-out CE-PGD20 endpoint at e114,
+e149 and e199. Both finished arms hold `epoch-149.pt`, `epoch-199.pt`, `best.pt`
+and `last.pt` and **no `epoch-114.pt`**; the weights that existed at e114 are
+gone, and recovering them would mean retraining the arm.
+
+This does not touch the primary judgment, which is at e199, and e149 survives.
+What is lost is the earliest of the three horizons — the one the plan included
+to show the shape of the effect over time, by analogy with I100 being absent at
+e114 and present by e149. The choice is whether the twenty-two arms that have
+not started should be frozen with `114` added to `checkpoint_epochs`, which
+would leave p1's pair on a different checkpoint schedule from every other
+parent. That is a scientific decision and is written up as decision packet 0006.
 
 ### 2026-09-07 — `alloc-v1-p1-safe-fork` finished at epoch 199
 
