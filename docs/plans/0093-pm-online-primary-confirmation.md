@@ -176,7 +176,7 @@ e199・official test・AutoAttack の床ではない。** ただし外挿の向�
 | plan 0092 の床確定（σ_d） | 実行中（2026-09-06 21:02 起動、未処置対照 6 本、e101–114） |
 | env v2 を Hamster で構築し `pip freeze` を `requirements/environment.lock` と照合 | 済（2026-09-06。21 項目一致、受け入れ試験通過。Ferret では未構築） |
 | ランタイム root v2 の作成 | 未 |
-| 親 6 本の生成 | 進行中（2/6 完了。§Progress log 参照。**待ち受けのパス欠陥は修正済みだが、`materialize_chain.sh:51` が呼ぶスクリプトを間違えており 6/6 到達後に全滅する。`parent.sh:27` も未修正。seed 3/4/5 は未確認**） |
+| 親 6 本の生成 | 進行中（**e99 は 6/6 ローカルに到達。材料化は 1/6**。§Progress log 参照。訓練 e199 は Hamster の seed 1/2/6 が完了、Ferret の seed 3/4/5 は未確認。**chain はもう正しいスクリプトを呼ぶが、pinned worktree（`6ab179d`）にその旧版しか無く seed 2〜6 が rc=2 で全滅した。`parent.sh:27` も未修正**） |
 
 ## Progress log
 
@@ -333,6 +333,112 @@ seed2 の `resolved_config.yaml` は run 直下にもバンドル内にも存在
 
 **Hamster の GPU1 は空いた。** GPU1 の `parent.sh` は seed2 だけを渡されており、
 後続がない。GPU0 は seed6 を走らせている。
+
+**このセッションからは GPU ジョブを起動も再試行もしていない。**
+
+### 2026-09-07 — 親 seed6 完了、e99 は 6/6 揃った、材料化は 1/6 で止まった
+
+**seed6 は正常終了した。** `parents-v2-cropshift-s6`、200/200 エポック
+（`epoch_metrics_recorded_epochs` = 200、`epoch_metrics_complete` = true）、
+source SHA `6ab179d`（作業ツリーの差分なし、`diff_sha256` は空文字列のハッシュ）、
+env v2、world size 1、per-rank batch 128、global batch 128、
+teacher `chen2021_ltd_wrn34_10`（SHA `fc398a48…`、宣言値と実測値が一致）。
+所要時間は 4 時間 33 分（2026-09-06T20:05:07Z → 2026-09-07T00:38:26Z）。
+
+`epoch-049/099/149/199.pt`、`best.pt`、`last.pt` がすべて存在する。
+run-bundle は `completion.json`、`error-marker.txt`（`no application error
+recorded`）と 2 成果物（`epoch-metrics.parquet` = `011e3759…`、
+`sample-stats-train.parquet` = `dec61fb0…`）を持ち、内容アドレス方式の控えも
+同じハッシュ名のディレクトリ下に置かれている。
+**ただしハッシュの再計算は本セッションでは実施できていない**（サンドボックスが
+作業ディレクトリ外のハッシュ計算を拒否する）。確認できたのは、
+ファイルの実在と、バンドルが宣言ハッシュと同じ名前で控えを持っていることまでである。
+
+| | seed1 | seed2 | seed6 |
+|---|---|---|---|
+| best PGD | 59.40 %（e198） | 59.50 %（e178） | **59.54 %**（e173） |
+| last PGD | 59.30 % | 59.12 % | **59.20 %** |
+| best clean | 86.12 % | 85.88 % | **86.00 %** |
+| last clean | 86.26 % | 86.30 % | **86.10 %** |
+| robust overfit gap | 0.10 pp | 0.38 pp | **0.34 pp** |
+
+**これは 5000 枚 validation の CE-PGD20（ε=8/255、step 2/255、20 step、
+random start、batch keying）の途中記録であり、official test ではない。**
+3 本ぶんの方向の記録であって、分布の推定でも母集団の主張でもない。
+
+**seed 3/4/5 は実在した（前回の不確実性 1 の解消）。** `materialize_chain.sh` は
+2026-09-07T07:24:02+09:00 に `all six present` を出して待ち受けを抜けており、
+Ferret の 3 本ぶんの `epoch-099.pt` を scp で取得済みである
+（`$CAMP/seed3|4|5/epoch-099.pt` と `resolved_config.yaml` がローカルに存在）。
+**epoch-99 のチェックポイントは 6/6 ローカルに揃っている。M0 の入力は全部ある。**
+
+**Ferret の 3 GPU は現在アイドル**（0 %、15〜251 MiB）。seed 3/4/5 が e199 まで
+到達したかは本セッションでは未確認（`ssh Ferret ls` が承認されなかった）。
+e199 側は 6 seed CropShift ベースライン用であって、**M0 には要らない。**
+
+**新しい閉塞欠陥。chain はもう正しいスクリプトを呼んでいるが、
+ピン留めされた worktree にはそのスクリプトの古い版しか入っていない。**
+
+`materialize_chain.sh:62` は前回の指摘どおり
+`scripts/analysis/materialize_stagewise_parents.py` を `--source-root` 付きで
+呼ぶように直っている。しかし chain は `cd "$WT"`、すなわち
+`worktrees/parents-6ab179d4d76d`（SHA `6ab179d`）で実行する。
+**このツールを任意 seed へ拡張したのは `d7c05d7` で、`6ab179d` はその祖先である**
+（`git merge-base --is-ancestor` で確認）。したがって worktree に入っているのは
+`--seed {1,2}` しか受け付けず `--source-root` を知らない旧版である。
+
+| seed | rc | 実際のエラー |
+|---|---|---|
+| 1 | — | `skip seed 1`（親が既存） |
+| 2 | 2 | `unrecognized arguments: --source-root …` |
+| 3, 4, 5 | 2 | 同上 |
+| 6 | 2 | `invalid choice: 6 (choose from 1, 2)` |
+
+**結果、親は 1/6 しか存在しない。** 唯一存在する seed1 の親は
+`parents/seed1/s100/epoch-100.pt`（`03feadbb…`）で、
+`materialization.json` は `tracker_run_id` = `parents-v2-cropshift-s1`、
+`source_checkpoint` = parents-v2 の `seed1/epoch-099.pt`（`8cb59209…`）、
+`target_payload_epoch` = 99、`target_global_step` = 35200 を記録している。
+**これは env v1 の古い dev-1 親の使い回しではなく、正しい parents-v2 系統である。**
+
+**`materialize_chain.sh` はすでに終了している。** 07:24:20 に SHA 一覧を出して
+抜けており、待ち受けているプロセスはもう無い。放置しても状況は変わらない。
+
+**`parent.sh:27` は依然として未修正。** `[ -f "$OUT/checkpoints/epoch-199.pt" ]`
+のままなので、いま `parent.sh` を再実行すると
+**完了済みの seed1・seed2・seed6 を先頭から訓練し直して上書きする。**
+次に走らせる前に `$OUT/epoch-199.pt` へ直すこと。
+
+**提案する修正（未実行。材料化は 1 エポックの継続訓練で GPU を使うため、
+実行は人間の判断）。** ハード規則 1 により、材料化も pinned worktree から走らせる。
+拡張版ツールを含む最古の SHA は `d7c05d7` なので、そこに新しい worktree を切る。
+
+```bash
+CAMP=/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/parents-v2
+python3 scripts/ardx/pin_source.py d7c05d7 \
+  && nohup "$CAMP/materialize_chain.sh" "$CAMP" \
+       /home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/worktrees/source-d7c05d7XXXX \
+       /home/shunsukenaito/.conda/envs/ard-v2/bin/python >/dev/null 2>&1 &
+```
+
+（`pin_source.py` が出力する実際の worktree パスを第 2 引数に入れること。
+待ち受けは 6/6 がすでに揃っているので即座に抜ける。`skip seed 1` も従来どおり効く。）
+
+**`6ab179d` → `d7c05d7` で科学的中核が変わっていないことは確認済み（VERIFIED、
+コード読解による。ビット同一性の証明ではない）。** この区間で
+`src/ard` に入った変更は 4 ファイルで、いずれも既定値が旧挙動を保つ純追加である。
+
+| ファイル | 変更 | CropShift/RSLAD 親への影響 |
+|---|---|---|
+| `objectives/kl.py` | 引数 `detach_target` を追加、既定 `True` | 無し。旧挙動が既定。`False` を渡すのは TRADES だけ |
+| `objectives/trades.py` | `detach_target=False` を渡す | 無し。親の目的関数は RSLAD |
+| `config/schema.py` | 任意フィールド 2 個を追加、既定 `None` | 無し。検証は値が入ったときだけ発火 |
+| `data/datasets.py` | 引数 `late_mask` を追加、既定 `None` | 無し。`None` のとき分岐条件は旧式と同値 |
+| `policies/fixed_mask.py` | 許可 provenance を 3 個追加 | 無し |
+
+**`HEAD`（`eb71e19`）を選ばない理由**は、そこまで進めると `cli/train.py` と
+`data/datasets.py` にさらに差分が乗り、判断すべき差分が無用に増えるためである。
+`d7c05d7` は「拡張ツールを持つ最古の SHA」であり、確認すべき差分が最小になる。
 
 **このセッションからは GPU ジョブを起動も再試行もしていない。**
 

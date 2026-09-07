@@ -4,21 +4,22 @@
 
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
 - Current milestone: M0
-- Blocked on: the six environment-v2 parents (`runs/parents-v2`, 2/6 finished).
-  The path defect that would have timed the wait out at 0/6 is fixed;
-  `materialize_chain.sh` now waits on `<out>/epoch-099.pt` and restarted at
-  2026-09-07 05:07 JST, so its twelve-hour deadline is 17:07 JST. Two things still
-  block M0. (a) `materialize_chain.sh:51` calls
-  `create_stagewise_augmentation_forks.py`, which only relabels a checkpoint and
-  rejects `epoch-099.pt` outright, because that file holds payload epoch 98 and a
-  switch at 100 needs payload epoch 99; the tool that bridges that one-epoch gap is
-  `scripts/analysis/materialize_stagewise_parents.py`, already extended to any seed
-  in `d7c05d7`. So all six materialisations fail the moment the wait succeeds.
-  (b) whether seeds 3/4/5 are running on Ferret at all is unconfirmed — without
-  them the wait cannot reach 6/6 anyway. Separately, `parent.sh:27` still carries
-  the old path in its completion-skip guard and would retrain the two finished
-  seeds over themselves. Diagnosis and the corrected invocation are in plan 0093's
-  Progress log (2026-09-07).
+- Blocked on: materialising the six environment-v2 fork parents.
+  **M0's input is now complete**: all six `epoch-099.pt` checkpoints are on
+  Hamster (seeds 1/2/6 trained there, seeds 3/4/5 fetched from Ferret), and
+  `materialize_chain.sh` passed its wait at 2026-09-07 07:24 JST. It then called
+  the right tool from the wrong tree. The chain runs in the worktree pinned at
+  `6ab179d`, but the commit that extended
+  `scripts/analysis/materialize_stagewise_parents.py` beyond seeds 1–2 is
+  `d7c05d7`, a descendant of it, so the worktree holds a version that rejects
+  `--source-root` and `--seed 6`. Seeds 2–6 all exited rc=2 and **only 1 of 6
+  parents exists**. The chain has since exited; nothing is waiting. Fix: pin a
+  worktree at `d7c05d7` and re-run the chain — `6ab179d..d7c05d7` changes the
+  scientific core only by additions whose defaults preserve the old behaviour,
+  which is verified file by file in plan 0093's Progress log (2026-09-07, seed6
+  entry) together with the exact command. Separately, `parent.sh:27` still
+  carries the old path in its completion-skip guard and would now retrain three
+  finished seeds over themselves.
 
 ## Goal
 
