@@ -3,13 +3,14 @@
 ## Status
 
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
-- Launched 2026-09-07 13:17 JST at source `815dabd`; M2 running
-- **Parent p1's dose-matched triple is complete**: `alloc-v1-p1-safe-fork` at
-  2026-09-07 06:34 UTC, `alloc-v1-p1-fragile-fork` at 08:51 UTC and
+- Launched 2026-09-07 13:17 JST at source `815dabd`; M2 stalled after p1
+- **Parent p1 is complete, all four arms**: `alloc-v1-p1-safe-fork` at
+  2026-09-07 06:34 UTC, `alloc-v1-p1-fragile-fork` at 08:51 UTC,
   `alloc-v1-p1-random-fork` — the comparator both treatments are judged against —
-  at 11:07 UTC, all three at epoch 199. `alloc-v1-p1-all-fork`, the `I100`
-  reference, started afterwards and is running. Every arm of p2-p6 (twenty runs)
-  has not been created. See the Progress log.
+  at 11:07 UTC, and `alloc-v1-p1-all-fork`, the `I100` reference, at 13:24 UTC,
+  all four at epoch 199. **Nothing of this plan is running now**: the campaign root
+  holds arm bundles for p1 only, and every arm of p2-p6 (twenty runs) has not been
+  created. See the Progress log.
 - **No contrast is evaluated yet.** The endpoint is held-out CE-PGD20 and it has
   not been run for any arm; the preregistered rule is a parent-level paired
   difference over six parents, and one parent exists.
@@ -185,10 +186,9 @@ duplicated, which is the intention.
   all three arms of a parent sharing one size and one class composition
 - [x] M1: mask-gated late policy implemented, reviewed, four defects and three
   design objections fixed, source frozen at `815dabd`
-- [~] M2: three arms of twenty-four finished — `p1` / `ALLOC_SAFE`,
-  `p1` / `ALLOC_FRAGILE` and `p1` / `ALLOC_RANDOM`, which is p1's whole
-  dose-matched triple — and one running (`p1` / `I100`, the reference);
-  the remaining twenty have not started
+- [~] M2: four arms of twenty-four finished — `p1` / `ALLOC_SAFE`,
+  `p1` / `ALLOC_FRAGILE`, `p1` / `ALLOC_RANDOM` and `p1` / `I100`, which is the
+  whole of parent p1; the remaining twenty have not started and nothing is running
 - [ ] M3: endpoints at e114, e149, e199; aggregate; close.
   **e114 is not reachable for the finished arms** — the frozen config saves
   checkpoints at 99, 149 and 199 only.
@@ -204,6 +204,76 @@ adversarial training**, which is worth having and is not by itself an argument
 for a teacher.  That argument, if it exists, is the disagreement-set plan.
 
 ## Progress log
+
+### 2026-09-07 — `alloc-v1-p1-all-fork` finished; parent p1 is complete and nothing is running
+
+Terminal status was re-derived from the bundle that fired the event
+(`runs/alloc-direction-v1/arms/p1/all/run-bundle/manifest.json`), not from the
+watcher's hint. The hand-run completion triple holds: `run-bundle/completion.json`
+declares `completed`, the manifest declares `completed`, and the error marker reads
+`no application error recorded`. The fork was created 2026-09-07T11:08:01Z —
+fifteen seconds after `ALLOC_RANDOM` released the GPU — and finished 13:24:22Z at
+epoch 199, global step 70400, in 2 h 16 min, with one hundred epoch rows covering
+100 through 199, the whole post-fork range.
+
+Lineage, read from the manifest and `fork-lineage.json`: source SHA `815dabd`,
+worktree `p0096-815dabd20c7b`, parent `parents-v2-cropshift-s1` payload epoch 99
+(checkpoint SHA `03feadbb…`, parent config SHA `d4715a2e…`), child config SHA
+`b6d87b18…`, fork kind `stagewise_augmentation_fork_v1`, switch epoch 100, prefix
+policy `cropshift`, late policy `idbh_weak`, **no mask**. Fixed identity: CIFAR-10 /
+`saad_resnet18_cifar_v1` / RSLAD / teacher `chen2021_ltd_wrn34_10` (SHA
+`fc398a48…`) / training seed 1 / evaluation-attack seed 0 / linf eps 8-255 step
+2-255 / world size 1 / effective global batch 128.
+W&B: `single-teacher-ard/runs/alloc-v1-p1-all-fork`.
+
+**This arm is `I100` by construction, and the config proves it.** Its
+`resolved_config.yaml` was compared line by line against `ALLOC_SAFE`'s and they
+disagree on exactly four lines: `stagewise_late_mask_selected_ids_sha256`
+(`null` here, `31912f40…` there), `stagewise_late_mask_selected_count` (`null`
+against `15317`), the `tracking.run_id` and the `output_dir`. A null mask means the
+late policy applies to every training image, so this run gives all 45,000 images
+`IDBH_WEAK` from epoch 100 — the full dose — while everything else, every attack,
+schedule, optimizer, seed and normalization field, is identical to the three
+allocation arms.
+
+**No result is recorded, because none exists yet.** The numbers below are the
+validation-split accuracies the run used to select its own checkpoint. They are
+internal validation, not the plan's endpoint.
+
+| checkpoint | epoch | val clean | val PGD |
+| --- | --- | --- | --- |
+| best | 197 | 0.8616 | 0.6120 |
+| last | 199 | 0.8574 | 0.6092 |
+
+Robust overfit gap 0.28 pp. Each number was read back from the row for its epoch in
+`epoch-metrics.jsonl` (rows 98 and 100) and matches the manifest summary.
+`train_valid_examples` is 45,000 at epochs 100 and 199, so the run used the full
+training split and `resolved_config.yaml:18` `num_samples: 16` is again the inert
+display artifact recorded in decision 0003. As on the other three arms, the
+manifest's `epoch_metrics_complete: false` (100 recorded against 200 expected) is
+correct for a fork that resumes at epoch 100 and must not be read as truncation.
+`best_epoch` 197 is inside the post-fork range, as `post_fork_best_scope: true`
+requires.
+
+Checkpoints on disk: `epoch-149.pt`, `epoch-199.pt`, `best.pt`, `last.pt`. There is
+**no `epoch-114.pt`**, exactly as on the other three, so decision packet 0006 now
+describes all four arms of p1 rather than three.
+
+**This arm's validation numbers are higher than the three allocation arms', and
+that is not a result.** `I100` is a reference and not a comparator — it treats
+45,000 images against their 15,317, so any gap is fully explained by dose, which is
+the correction already written into this plan. Beyond that, these are
+checkpoint-selection accuracies rather than the held-out CE-PGD20 endpoint, which
+has not been run for any arm; the unit of the preregistered rule is a parent-level
+paired difference over six parents and one parent exists; and the floor is still
+unmeasured, so the fallback threshold of 0.25 pp stands. No contrast is computed and
+no direction is claimed.
+
+**Nothing of this plan is running.** Scanning the campaign root finds arm bundles
+for `p1/safe`, `p1/fragile`, `p1/random` and `p1/all` and no others, and the chain
+did not start a fifth run. The process holding Hamster GPU 1 belongs to
+`trades-fix-v1/seed0/eval-aa`, an unrelated AutoAttack evaluation. Materialising
+the p2-p6 parents remains the blocker described in the Status block.
 
 ### 2026-09-07 — `alloc-v1-p1-random-fork` finished; p1's triple is complete
 
