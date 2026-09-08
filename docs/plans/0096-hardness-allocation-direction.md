@@ -201,6 +201,69 @@ for a teacher.  That argument, if it exists, is the disagreement-set plan.
 
 ## Progress log
 
+### 2026-09-08 — all 24 arms reached epoch 199; training is complete and the endpoint evaluation has still never run
+
+`alloc-v1-p5-all-fork` and `alloc-v1-p6-all-fork` finished on Hamster; p2, p3 and
+p4 finished all four arms on Ferret. **Every cell of the 6 x 4 design is at epoch
+199.** Nothing is running. About 28 to 31 GPU-hours of training are on disk.
+
+**The judgment cannot be made from what this table shows.** The preregistered
+metric is the held-out endpoint, and the endpoint evaluation has not been run for
+a single arm. What follows is the *selection* split — the same split each run used
+to pick its own best checkpoint — read off the last line of each
+`epoch-metrics.jsonl`. It is recorded here because it is what the campaign
+produced, and it is labelled so that it is never mistaken for the verdict.
+
+| parent | `ALLOC_SAFE` | `ALLOC_FRAGILE` | `ALLOC_RANDOM` | `I100` (`all`) |
+| --- | ---: | ---: | ---: | ---: |
+| p1 | 59.68 / 86.40 | 59.80 / 86.02 | 59.70 / 86.10 | 60.92 / 85.74 |
+| p2 | 59.82 / 86.58 | 59.54 / 85.92 | 60.16 / 86.00 | 60.68 / 86.40 |
+| p3 | 60.16 / 86.14 | 59.86 / 85.76 | 59.78 / 86.18 | 60.82 / 86.10 |
+| p4 | 59.44 / 86.68 | 59.60 / 85.94 | 59.48 / 86.52 | 60.22 / 86.68 |
+| p5 | 59.62 / 86.12 | 59.56 / 85.56 | 59.66 / 86.14 | 60.50 / 85.80 |
+| p6 | 60.46 / 86.64 | 59.82 / 86.04 | 60.10 / 86.16 | 60.84 / 86.16 |
+
+Cells are selection-split PGD / clean, per cent, at epoch 199.
+
+Parent-level paired differences, the same arithmetic the preregistered rule
+specifies but on the wrong split:
+
+| contrast | p1 | p2 | p3 | p4 | p5 | p6 | mean | SD | SE |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `SAFE - RANDOM` (primary) | -0.02 | -0.34 | +0.38 | -0.04 | -0.04 | +0.36 | **+0.050** | 0.275 | 0.112 |
+| `FRAGILE - RANDOM` (secondary) | +0.10 | -0.62 | +0.08 | +0.12 | -0.10 | -0.28 | **-0.117** | 0.290 | 0.119 |
+| `SAFE - FRAGILE` (direction) | -0.12 | +0.28 | +0.30 | -0.16 | +0.06 | +0.64 | **+0.167** | 0.302 | 0.123 |
+
+Three things are worth writing down before the endpoint runs, and none of them is
+the verdict.
+
+**All three contrasts sit inside the 0.25 pp fallback threshold, and inside their
+own standard errors.** With k = 6 paired blocks and SE about 0.115 pp, this design
+resolves about 0.32 pp at 80 % power. The largest of the three effects is 0.167
+pp, about half of that. If the endpoint agrees with the selection split, the
+outcome is the plan's fourth preregistered branch — all three within the threshold
+of one another, which closes per-sample allocation in both directions at once and
+is reported as one result rather than as three nulls.
+
+**The dose effect is large and is not in question.** `I100`, which treats all
+45,000 training images, beats every allocation arm on every parent, by 0.38 to
+1.22 pp with a mean near 0.9 pp. The plan's own section 95 says `I100` is a
+reference and not a comparator, and that stands; but the contrast between a real
+dose effect of about 0.9 pp and an allocation effect of at most 0.17 pp is the
+shape of the answer this plan was built to find. Where the hardness goes appears
+to matter far less than how much of it there is.
+
+**The six parents give an empirical spread for free.** The three contrasts return
+SDs of 0.275, 0.290 and 0.302 pp — agreeing to within 0.03 pp across contrasts
+that share no arm pairing. That is a bound on this design's paired noise, not a
+measurement of it: it mixes true parent-to-parent heterogeneity with run noise,
+and only decision packet 0008's option B separates them. It does say that the
+0.25 pp fallback threshold was not obviously the wrong order of magnitude.
+
+Decision packet 0008 is rewritten against this state. Its option A no longer
+includes any training.
+
+
 ### 2026-09-08 — `alloc-v1-p6-all-fork` finished; parent p6 is complete, nothing is running, and p6's three dose-matched arms are six times further apart than p1's or p5's
 
 Terminal status was re-derived from the bundle that fired the event
