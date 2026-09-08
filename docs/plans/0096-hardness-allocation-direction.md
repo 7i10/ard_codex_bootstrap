@@ -201,6 +201,74 @@ for a teacher.  That argument, if it exists, is the disagreement-set plan.
 
 ## Progress log
 
+### 2026-09-08 — the paired noise floor is running: six `ALLOC_RANDOMB` arms, one per parent
+
+Decision packet 0008 was answered **B**: measure the floor and fix the threshold
+before the judgment endpoint is read. The packet also disambiguated what "random
+against random" means, because the two readings give different floors and the
+wrong one biases this plan's fourth branch.
+
+The floor arm is a **second matched-random draw**: the same 15,085 to 15,343
+images per parent in the same per-class proportions, drawn independently, with
+`continuation_seed` unchanged. It is not a re-run of the same mask under a new
+RNG seed. The four judged arms all share one stream and differ only in which
+images they treat, so the quantity that has to be bounded is the effect of the
+*arbitrary identity of the selected set*, not the effect of reseeding.
+
+Using the reseeded floor instead would inflate the threshold, and this plan's
+fourth branch -- all three contrasts within the threshold closes per-sample
+allocation -- is a no-effect claim, which an inflated threshold makes too easy to
+declare. The error would run against the conclusion, not toward it.
+
+**Preconditions, checked before launch and all met.**
+
+| parent | images | class counts match | ids differ | overlap | Jaccard | `safe`/`fragile` reproduce |
+| --- | ---: | :--: | :--: | ---: | ---: | :--: |
+| p1 | 15,317 | yes | yes | 5,480 | 0.2179 | identical |
+| p2 | 15,145 | yes | yes | 5,332 | 0.2136 | identical |
+| p3 | 15,253 | yes | yes | 5,425 | 0.2163 | identical |
+| p4 | 15,324 | yes | yes | 5,483 | 0.2179 | identical |
+| p5 | 15,085 | yes | yes | 5,272 | 0.2117 | identical |
+| p6 | 15,343 | yes | yes | 5,461 | 0.2165 | identical |
+
+The Jaccard values sit at the 0.205 two independent 34 % draws predict. The
+`safe` and `fragile` masks rebuilt from the same worktree are byte-identical to
+the frozen ones, which confirms the builder is deterministic and that only the
+random draw moved -- the one thing `--random-seed 2026090802` was supposed to
+change.
+
+**Three things are held fixed so they cannot enter the floor.** The source is the
+same pin the judged arms used (`815dabd20c7b`, both worktrees verified clean at
+that SHA). The interpreter is the same environment generation (`ard-v2`). And
+each parent's `randomb` runs **on the same host as its own `random`** -- p1, p5,
+p6 on Hamster and p2, p3, p4 on Ferret -- so host cannot appear in the contrast
+that exists to measure noise.
+
+Placement: Hamster gpu0 p1 then p6, gpu1 p5; Ferret gpu0 p2, gpu1 p3, gpu2 p4.
+About 5.2 hours of wall clock.
+
+#### Two false starts, both caught before any epoch mattered
+
+The first launch used the `adv` interpreter while every judged arm ran under
+`ard-v2`. The two report an identical recorded identity -- Python 3.11.15, torch
+2.11.0+cu128, CUDA 12.8, matching the run bundle exactly -- and plan 0094 showed
+environment generation is inert. It was stopped anyway after about one minute,
+because a noise floor is the one measurement that must not carry an untested
+difference, and the cost of removing the doubt was two minutes.
+
+The relaunch then had to avoid the W&B run-ID collision that has already cost
+this project GPU time three times, since `alloc-v1-p1-random2` and
+`alloc-v1-p3-random2` had been claimed by the aborted attempt. The arm was
+renamed `randomb` for all six parents rather than reusing the burnt identifiers.
+Two orphaned one-minute W&B runs remain under the `random2` names and belong to
+nothing; they are recorded here rather than left unexplained.
+
+The judgment endpoint for the 24 completed arms is **not** being run yet. Packet
+0008 states the ordering constraint: the threshold is fixed from this floor, or
+it stays at the preregistered 0.25 pp, and reading the endpoint first would
+discard the preregistration either way.
+
+
 ### 2026-09-08 — all 24 arms reached epoch 199; training is complete and the endpoint evaluation has still never run
 
 `alloc-v1-p5-all-fork` and `alloc-v1-p6-all-fork` finished on Hamster; p2, p3 and
