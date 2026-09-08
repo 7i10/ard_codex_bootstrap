@@ -11,9 +11,42 @@ CIFAR-10 test and AutoAttack result is the last ledger row (`I100` official test
 
 ## Executive conclusion
 
-Two global augmentation results are real and replicated: `+1.612 pp` for
-`CROPSHIFT` over five seeds, and `+0.864 pp` (`SD 0.247`, `t(4) = 7.82`) for the
+Two global augmentation results are real and replicated: ~~`+1.612 pp` for
+`CROPSHIFT` over five seeds~~, and ~~`+0.864 pp` (`SD 0.247`, `t(4) = 7.82`)~~ for the
 frozen epoch-100 switch `I100` (`CROPSHIFT` through epoch 99, then `IDBH_WEAK`),
+
+> **Correction, 2026-09-08.** The pooled five-seed figure `+1.612 pp` has the same
+> defect as the `+0.864 pp` below it, and the correction below repairs only that
+> second figure. Both are struck now.
+>
+> `+1.612 pp` averages **two different treatments** under one name. Seeds 1 and 2 ran
+> `CROPSHIFT` = `Aug(CropShift) @all`, CropShift for all 200 epochs, giving
+> `+1.32 / +1.16 pp`, mean **`+1.240`**. Seeds confirm-a/b/c ran `CROP_SUFFIX` =
+> `Aug(CropShift->CROP_RE@e100)`, which switches to CropShift-plus-RandomErasing at
+> epoch 100, giving `+2.18 / +1.30 / +2.10 pp`, mean **`+1.860`**. The run configs say
+> so: the dev runs read `augmentation_policy: cropshift`, the confirmation runs read
+> `augmentation_policy: stagewise, stagewise_late_policy: crop_re`. The pooled number,
+> the "five seeds" count and the `SD 0.487` describe no measured quantity.
+>
+> The record itself already showed this and nobody read it. In
+> `ert_rslad_five_seed_global_stochasticity_v1.json`, `coverage` gives `BASE` 1,000
+> source rows (five seeds x 200 epochs) but `CROPSHIFT` only **700**, and the
+> `stagewise` breakdown splits those 700 into 200 rows for epochs 0-99 (two seeds) and
+> 250 + 250 for epochs 100-199 (five seeds). Three of the five seeds have no
+> `CROPSHIFT` data before epoch 100 at all.
+>
+> **Unlike the `+0.864` case, do not write "the split is real" here.** The two groups
+> overlap: confirm-b's `+1.30` sits between the two dev values, and the confirmation
+> group's own SD is `0.487`, the same as the pooled SD. The split is established by run
+> provenance, not by a separation in the numbers.
+>
+> The mislabel is also **inside the hash-bound records**, not only in this prose:
+> `ert_rslad_five_seed_global_stochasticity_v1.json` labels all five differences
+> `CROPSHIFT-BASE`, and `ert_rslad_five_seed_artifact_inventory_v1.json` lists arm
+> `CROPSHIFT` over `confirm-*/crop-suffix/` paths. A prose correction alone leaves the
+> trap in place; see the amendment record named in `docs/EVIDENCE_LEDGER_V2.md` §5.
+>
+> See `docs/EVIDENCE_LEDGER_V2.md` §3 rank 1 and §1.1 rows E1 and E2.
 
 > **Correction, 2026-09-07.** The pooled five-seed figure `+0.864 pp` averages two
 > different comparisons and should not be used as one number. On dev-1 and dev-2 the
@@ -23,11 +56,19 @@ frozen epoch-100 switch `I100` (`CROPSHIFT` through epoch 99, then `IDBH_WEAK`),
 > internally to about 0.08 pp, so the split is real. Both comparisons are positive in every
 > seed; what does not survive is the single number and its `t(4) = 7.82`.
 > See `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2.
+>
+> **Amended 2026-09-08.** This correction stands, but it was read for four weeks as an
+> assurance that the figure three lines above it had been checked and had survived. It had
+> not been looked at. Placing a correction next to an uncorrected sibling is what made the
+> larger defect invisible.
 
 whose direction also survives on the official 10,000-example CIFAR-10 test set
 under standard AutoAttack in all three unseen confirmation seeds. Against them,
 every sample-level intervention produced a large, reproducible effect on the
-samples it treated -- 13x to 33x the train-split noise -- and no held-out effect
+samples it treated -- ~~13x to 33x~~ **about 5x to 15x** the train-split noise
+(corrected 2026-09-08: the printed multiple divided a sub-cohort effect by a
+whole-train 45,000-row noise figure; a cohort-scaled denominator roughly halves it,
+`docs/EVIDENCE_LEDGER_V2.md` §3 rank 7) -- and no held-out effect
 our screens could resolve. That contrast is the finding. At learning rate 0.1 a
 forked control differs from its sibling as much as a fresh seed does, so a
 five-epoch screen cannot see below about 2.5 pp while the interventions aimed at

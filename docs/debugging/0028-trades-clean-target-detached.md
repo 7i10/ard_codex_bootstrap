@@ -153,10 +153,41 @@ At the last checkpoint: clean 82.24, PGD-20 47.49, AutoAttack 44.99.
 AutoAttack accuracy.**
 
 The remaining distance to the literature is now 1.2 to 1.5 points rather than
-four, and the likely reason is visible in the protocol rather than in the loss:
+four.  ~~The likely reason is visible in the protocol rather than in the loss:
 this project holds out 5,000 images for validation and trains on 45,000, while
-the papers it is tabled against train on all 50,000.  The other candidate the
-audit raised, weight decay, is 5e-4 here and matches the literature.
+the papers it is tabled against train on all 50,000.~~
+
+**Corrected 2026-09-08.  That sentence contradicts this document's own opening
+argument and must not be repeated.**  The section above rules the 45,000-image
+split out, and the reason is still sound: a split effect would move PGD-AT too,
+and PGD-AT is exact at 47.63 % against a literature range of 47.7 to 48.8 %.
+**Only TRADES is low.**  Naming the split as the leading candidate for the
+remaining gap silently discards the asymmetry that identified the defect in the
+first place.  It is a candidate, not the likely reason, and it is the *least*
+likely of the ones on the list.
+
+Two candidates have since been ruled out by measurement, neither of them the
+split.
+
+- **The evaluation stack.**  DAJAT's published ResNet-18 through this pipeline on
+  the official test set gives clean 85.71 % and AutoAttack 52.45 % against a
+  published 85.71 and 52.48, a difference of -0.03 pp
+  (`docs/experiments/dajat_rn18_foreign_checkpoint_official_test_v1.md`,
+  2026-09-07).  The evaluation half is not the explanation.
+- **The attack initialization.**  This project starts the inner maximisation from
+  a uniform draw on the epsilon-ball where official TRADES starts from
+  0.001-scale Gaussian noise.  Measured on a fixed batch through one shared step
+  loop, the local initialization makes the attack *stronger* -- inner KL +3.07 %
+  at epoch 48 and +4.82 % at epoch 150
+  (`docs/experiments/trades_attack_initialization_differential_v1.md`,
+  2026-09-08).  The sign is wrong for it to explain a number that is too low.
+
+What remains unmeasured, in the order the asymmetry argument ranks them: the
+learning-rate path, the normalization path, and the epsilon and step-size
+defaults (`.031`/`.007` upstream against `8/255`/`2/255` here).  Each of these
+can act on TRADES differently from PGD-AT, which is what the asymmetry requires;
+the split cannot.  The other candidate the audit raised, weight decay, is 5e-4
+here and matches the literature.
 
 That gap is a fairness axis for any comparison between adversarial training and
 distillation, and it applies to both sides equally, so it is a labelling problem

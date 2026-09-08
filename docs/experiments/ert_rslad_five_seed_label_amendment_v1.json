@@ -1,0 +1,71 @@
+{
+  "contract": "ard_record_amendment_v1",
+  "created": "2026-09-08",
+  "supersedes": [
+    {
+      "record": "docs/experiments/ert_rslad_five_seed_global_stochasticity_v1.json",
+      "field": "treatment_effects[*].comparison == 'CROPSHIFT-BASE'",
+      "defect": "One label covers two treatments. Seeds dev-1 and dev-2 ran Aug(CropShift) @all for 200 epochs. Seeds confirm-a, confirm-b and confirm-c ran Aug(CropShift->CROP_RE@e100), which switches to CropShift plus RandomErasing at epoch 100. Their endpoint deltas must not be pooled.",
+      "correct_labels": {
+        "dev-1": "CROPSHIFT-BASE",
+        "dev-2": "CROPSHIFT-BASE",
+        "confirm-a": "CROP_SUFFIX-BASE",
+        "confirm-b": "CROP_SUFFIX-BASE",
+        "confirm-c": "CROP_SUFFIX-BASE"
+      }
+    },
+    {
+      "record": "docs/experiments/ert_rslad_five_seed_artifact_inventory_v1.json",
+      "field": "arm == 'CROPSHIFT' on confirm-*/crop-suffix/ paths",
+      "defect": "Same mislabel in the inventory: the confirmation paths carry arm CROP_SUFFIX, not CROPSHIFT."
+    }
+  ],
+  "corrected_quantities": {
+    "pooled_claim_withdrawn": {
+      "value_pp": 1.612,
+      "described_as": "CROPSHIFT over five seeds, SD 0.487",
+      "status": "withdrawn; describes no measured quantity"
+    },
+    "replacements": [
+      {
+        "arm": "CROPSHIFT",
+        "comparator": "BASE",
+        "seeds": [
+          "dev-1",
+          "dev-2"
+        ],
+        "per_seed_pp": [
+          1.32,
+          1.16
+        ],
+        "mean_pp": 1.24,
+        "k": 2
+      },
+      {
+        "arm": "CROP_SUFFIX",
+        "comparator": "BASE",
+        "seeds": [
+          "confirm-a",
+          "confirm-b",
+          "confirm-c"
+        ],
+        "per_seed_pp": [
+          2.18,
+          1.3,
+          2.1
+        ],
+        "mean_pp": 1.86,
+        "k": 3
+      }
+    ]
+  },
+  "corroboration_internal_to_the_record": "coverage.BASE.rows = 1000 (five seeds x 200 epochs) but coverage.CROPSHIFT.rows = 700, and the stagewise breakdown splits those 700 into 200 rows for stage_0_99 (two seeds) and 250 + 250 for stage_100_149 and stage_150_199 (five seeds). Three of the five seeds carry no CROPSHIFT rows before epoch 100. The record contradicted its own label.",
+  "caution": "Unlike the +0.864 pp correction of 2026-09-07, the two groups here overlap: confirm-b's +1.30 lies between the two dev values and the confirmation group's own SD is 0.487, equal to the pooled SD. The split is established by run provenance, not by a separation in the numbers. Do not write 'the split is real'.",
+  "provenance": {
+    "found_by": "evidence-ledger audit, 2026-09-08, rank 1 of 13",
+    "ledger": "docs/EVIDENCE_LEDGER_V2.md",
+    "verified_independently": true,
+    "source_git_sha": "430787c2692ef2aee4e4a0e89c429307733e947f"
+  },
+  "note": "This file amends; it does not rewrite. The superseded records are left byte-identical so that anything hashed against them still verifies. Readers of either record must read this one."
+}
