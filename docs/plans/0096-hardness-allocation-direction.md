@@ -14,9 +14,9 @@
   on Hamster, p2, p3 and p4 on Ferret. Training for the judged design is done.
 - **The paired noise floor is running: six `ALLOC_RANDOMB` arms, one per parent.**
   Launched 2026-09-08 after decision packet 0008 was answered B. `p1` finished
-  2026-09-08 06:03 UTC and is written up below; `p5` reached epoch 199 at 06:06
-  UTC and awaits its own postrun; `p6` started on the freed Hamster GPU at 06:03
-  UTC; `p2`, `p3` and `p4` are still running on Ferret.
+  2026-09-08 06:03 UTC and `p5` at 06:06 UTC; both are written up below. `p6`
+  started on the freed Hamster GPU at 06:03 UTC; `p2`, `p3` and `p4` are still
+  running on Ferret. Two of six draws are in.
 - **No contrast is evaluated yet.** The endpoint is held-out CE-PGD20 and it has
   not been run for a single arm, judged or floor. The preregistered rule is a
   parent-level paired difference at e199, and nothing on that split exists.
@@ -28,11 +28,15 @@
   0.12 pp on p1 and 0.10 pp on p5. Whatever this spread is, it is a property of
   the fork and not of the allocation, and it is the same size as the effect this
   plan is trying to read. Decision packet 0008 carries the number.
-- **The first floor pair, on p1, differs by 0.28 pp at the last checkpoint** —
-  two independent random draws of the same 15,317 images, which the design says
-  are interchangeable. That is wider than p1's whole three-arm allocation spread
-  and wider than the 0.25 pp fallback threshold. It is the selection split, not
-  the endpoint, so it fixes nothing; see the Progress log.
+- **The first two floor pairs differ by 0.28 pp (p1) and 0.36 pp (p5) at the last
+  checkpoint** — two independent random draws of the same images per parent, which
+  the design says are interchangeable. Both are wider than their parent's whole
+  three-arm allocation spread and wider than the 0.25 pp fallback threshold. It is
+  the selection split, not the endpoint, and two parents are not six, so it fixes
+  nothing; see the Progress log.
+- **The same jitter is visible inside single runs**: consecutive late epochs of one
+  run move validation PGD by 0.32 to 0.52 pp. That evidence needs no floor arm and
+  was already present in the twenty-four judged arms.
 - **The headless postrun did not run for six of these arms.** Every automatic
   postrun between 16:52 and 21:35 UTC on 2026-09-07 exited on the first turn with
   HTTP 429 "You've hit your session limit", so p5 `safe`/`fragile`/`random` and
@@ -213,6 +217,148 @@ adversarial training**, which is worth having and is not by itself an argument
 for a teacher.  That argument, if it exists, is the disagreement-set plan.
 
 ## Progress log
+
+### 2026-09-08 — the second floor pair agrees with the first: p5 moves 0.36 pp, and the same jitter is visible inside a single run
+
+`alloc-v1-p5-randomb-fork` is the second of the six floor arms to finish. Terminal
+status was re-derived from the bundle that fired the event
+(`runs/alloc-direction-v1/arms/p5/randomb/run-bundle/manifest.json`), not from the
+watcher's hint. The completion triple holds: `run-bundle/completion.json` declares
+`completed`, the manifest declares `completed`, and the error marker reads
+`no application error recorded`. Created 2026-09-08T03:46:25Z, finished 06:06:16Z —
+2 h 20 min — at epoch 199, global step 70400, with one hundred epoch rows covering
+100 through 199, the whole post-fork range.
+
+#### The number
+
+| arm | checkpoint | epoch | val clean | val PGD |
+| --- | --- | --- | --- | --- |
+| `ALLOC_RANDOM` | best | 197 | 0.8610 | 0.6018 |
+| `ALLOC_RANDOM` | last | 199 | 0.8614 | 0.5966 |
+| `ALLOC_RANDOMB` | best | 195 | 0.8656 | 0.6010 |
+| `ALLOC_RANDOMB` | last | 199 | 0.8600 | 0.6002 |
+
+**At the last checkpoint the two p5 draws differ by 0.36 pp.** At the best checkpoint
+they differ by −0.08 pp. Robust overfit gaps are 0.52 pp on `random` and 0.08 pp on
+`randomb`. Clean accuracy moves −0.14 pp between the two at e199, well inside the
+0.5 pp disqualification bar, so nothing here is a clean-accuracy artefact.
+
+**Two of six floor draws are now in, and they agree.**
+
+| parent | `RANDOMB − RANDOM`, last (e199) | same, best checkpoint |
+| --- | ---: | ---: |
+| p1 | +0.28 pp | +0.02 pp |
+| p5 | +0.36 pp | −0.08 pp |
+
+Both last-checkpoint figures exceed the 0.25 pp fallback threshold, and both exceed
+in absolute value every one of the plan's three preregistered contrasts averaged over
+six parents (+0.050, −0.117, +0.167 pp). Two arms that differ in nothing a reviewer
+could name — same dose, same class composition, same stream, same host, same source
+pin, same interpreter, only a different arbitrary set of 15,085 images — move further
+apart than any allocation direction does.
+
+**Both draws came out positive, and that carries no information yet.** With two
+paired blocks, matching signs happen half the time under a pure null. Only the six
+fix a threshold, and packet 0008's ordering constraint stands until they do.
+
+**The best-checkpoint column is still not a second, smaller estimate**, and p5 shows
+why more sharply than p1 did: the sign flips (+0.02 on p1, −0.08 on p5) while the
+last-checkpoint column stays consistent. Best-checkpoint selection maximises
+validation PGD and the column then reports validation PGD, so it is selection on the
+quantity being read and compresses differences toward zero by construction.
+
+#### A second, independent line of evidence: the jitter is inside each run
+
+This does not depend on the floor arms at all. Read consecutive epochs near the end
+of a *single* run and validation PGD moves as much as the contrast does:
+
+| run | epochs | val PGD | range |
+| --- | --- | --- | ---: |
+| `alloc-v1-p5-random-fork` | 196-199 | 0.6002, 0.6018, 0.5992, 0.5966 | 0.52 pp |
+| `alloc-v1-p5-randomb-fork` | 195-199 | 0.6010, 0.5978, 0.6004, 0.5996, 0.6002 | 0.32 pp |
+| `alloc-v1-p1-randomb-fork` | 196-199 | 0.5958, 0.5994, 0.6006, 0.5998 | 0.48 pp |
+| `alloc-v1-p1-random-fork` | 190-196 | 0.5992, 0.6006, 0.5988, 0.5966, 0.6006, 0.5984, 0.5990 | 0.40 pp |
+
+A single-epoch e199 reading therefore carries jitter of the same size as everything
+this plan is trying to measure, whichever images the mask selected. The floor arms
+and this observation are two different arguments for the same conclusion, and the
+second one was already available in the twenty-four judged arms before any floor arm
+was launched. It also suggests a cheap mitigation the endpoint could use — averaging
+the endpoint over a few late checkpoints rather than reading e199 alone — but that
+changes a preregistered measurement and is the human's call, not this postrun's.
+
+#### Verification
+
+Lineage, read from the manifest: source SHA `815dabd20c7b12ebfd7915dc803bad0a16756225`
+— the same pin the judged arms used, `dirty: false` with an empty diff — worktree
+`p0096-815dabd20c7b`, parent `parents-v2-cropshift-s5` payload epoch 99, parent
+checkpoint SHA `d8c0ce35…`, parent config SHA `26cef228…`, child config SHA
+`8d18af12…`, fork kind `stagewise_augmentation_fork_v1`, switch epoch 100, prefix
+policy `cropshift`, late policy `idbh_weak`, `post_fork_best_scope: true`. Fixed
+identity: CIFAR-10 / `saad_resnet18_cifar_v1` / RSLAD / teacher
+`chen2021_ltd_wrn34_10` (SHA `fc398a48…`) / training seed 5 / evaluation-attack seed
+0 / split seed 20260722 / linf eps 8-255 step 2-255 / world size 1 / effective global
+batch 128 / local per-rank BN.
+W&B: `single-teacher-ard/runs/alloc-v1-p5-randomb-fork`.
+
+**The config differs from `ALLOC_RANDOM`'s on exactly four lines**, compared line by
+line over all 199: `stagewise_late_mask_selected_ids_sha256` (`d1a1b612…` here,
+`d06033ec…` there), `tracking.run_id`, `output_dir`, and the teacher checkpoint *path
+spelling* — `/home/islab/workspace-local/shunsuke.naito/…` against
+`/home/shunsukenaito/workspace-local/…`, two spellings of the same file through the
+symlink, with an identical `checkpoint_sha256`. This is the same four-line result the
+p1 pair gave, including the symlink line, so it is a property of how the two batches
+were launched and not of either parent. `stagewise_late_mask_selected_count` is
+15,085 on both, and every seed, attack, schedule, optimizer, normalization,
+temperature and batch-size field is identical.
+
+**The mask is a genuine second draw of the same shape.** `masks/p5/randomb.json`
+carries `random_seed: 2026090802` against `random.json`'s `2026090801`, the same
+`state_sha256` `734c0810…` (one epoch-100 state), the same `switch_epoch` 100 and the
+same source string `stagewise_allocation_matched_random_epoch100_v1`. Its per-class
+counts are identical to all three frozen p5 masks — 1668, 943, 1468, 1394, 1553,
+1780, 2140, 1531, 1167, 1441, summing to 15,085 — and its `selected_ids_sha256`
+`d1a1b612…` is the digest the run's `resolved_config.yaml` declares.
+
+Both declared artifacts exist (`epoch-metrics.parquet`, `sample-stats-train.parquet`).
+All four validation numbers above were read back from the rows for epoch 195 and
+epoch 199 in `epoch-metrics.jsonl` and match the manifest summary.
+`train_valid_examples` is 45,000 at epochs 100, 195 and 199.
+`epoch_metrics_complete: false` (100 recorded against 200 expected) is again correct
+for a fork that resumes at epoch 100. Checkpoints on disk: `epoch-149.pt`,
+`epoch-199.pt`, `best.pt`, `last.pt` — and no `epoch-114.pt`, as everywhere else.
+
+**The dose signature holds on the floor pair.** Training-set accuracy at epoch 199 is
+0.8173 on `randomb` against 0.8159 on `random`, 0.14 pp apart, as two equal-dose
+masks should be, and far above the 0.683 the full-dose `all` arm reaches. The floor
+arm is treating the number of images it claims to treat.
+
+The two exported parquet digests (`a756ccd8…` and `b5f0ae56…`) were read and **not**
+recomputed: this session's sandbox refuses to hash, diff or list files outside the
+repository checkout, as on every postrun in this campaign. That is a harness
+restriction, not a finding about the run.
+
+#### The automatic postrun wrote nothing again, and this time the cause is the trust dialog alone
+
+Both `randomb` postruns that have fired — `20260908T060344Z-alloc-v1-p1-randomb-fork`
+and `20260908T060646Z-alloc-v1-p5-randomb-fork` — produced a 320-byte log holding only
+`Ignoring 44 permissions.allow entries from .claude/settings.json: this workspace has
+not been trusted` and a **zero-byte** result JSON. `~/.claude.json` line 938 confirms
+it: the entry for `/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap` has
+`hasTrustDialogAccepted: false`, and that is the only spelling registered. Both arms
+were written up from later sessions instead. This is the condition `CLAUDE.md` already
+documents, now observed directly, and it is *not* the HTTP 429 quota failure of
+2026-09-07 — the p6 `all` postrun at 23:56Z that night wrote 11 KB, so the trust state
+changed between then and now. One interactive session in this checkout fixes it.
+
+#### What is running
+
+`alloc-v1-p6-randomb-fork` is at epoch 102 on Hamster gpu0, started fourteen seconds
+after p1 released it; Hamster gpu1 is now idle. All three Ferret GPUs remain occupied
+by `p2`, `p3` and `p4`, whose bundles are not on this filesystem and were not
+inspected. No record, report or evidence-ledger row is written, because no endpoint
+contrast exists to write, and no decision packet is opened: packet 0008 already fixes
+what happens next, and there is nothing to decide until all six floor arms land.
 
 ### 2026-09-08 — the first floor pair is in: two interchangeable random draws on p1 differ by 0.28 pp at the judged checkpoint
 
