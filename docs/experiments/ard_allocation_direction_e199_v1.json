@@ -1,0 +1,366 @@
+{
+  "aggregator_source_git_sha": "52319c3d6267ac91fe16b2b2bd019c662b1252a4",
+  "attack": "registered CE-PGD20 selection attack, linf 8/255, step 2/255, 20 steps, random start",
+  "campaign_source_git_sha": "815dabd20c7b12ebfd7915dc803bad0a16756225",
+  "clean_accuracy_gate": {
+    "arms": {
+      "all": {
+        "clean_delta_pp": [
+          -0.36,
+          0.4,
+          -0.08,
+          0.16,
+          -0.34,
+          0.0
+        ],
+        "disqualified_on": [],
+        "mean_pp": -0.0367
+      },
+      "fragile": {
+        "clean_delta_pp": [
+          -0.08,
+          -0.08,
+          -0.42,
+          -0.58,
+          -0.58,
+          -0.12
+        ],
+        "disqualified_on": [
+          "p4",
+          "p5"
+        ],
+        "mean_pp": -0.31
+      },
+      "randomb": {
+        "clean_delta_pp": [
+          -0.1,
+          0.12,
+          -0.12,
+          0.02,
+          -0.14,
+          0.18
+        ],
+        "disqualified_on": [],
+        "mean_pp": -0.0067
+      },
+      "safe": {
+        "clean_delta_pp": [
+          0.3,
+          0.58,
+          -0.04,
+          0.16,
+          -0.02,
+          0.48
+        ],
+        "disqualified_on": [],
+        "mean_pp": 0.2433
+      }
+    },
+    "rule": "a drop beyond 0.5 pp against ALLOC_RANDOM disqualifies an arm"
+  },
+  "contract": "ard_allocation_direction_e199_v1",
+  "contrasts": {
+    "direction_safe_minus_fragile": {
+      "arms": [
+        "safe",
+        "fragile"
+      ],
+      "inside_threshold": true,
+      "mean_pp": 0.1267,
+      "per_parent_pp": [
+        -0.04,
+        0.32,
+        0.3,
+        -0.32,
+        0.04,
+        0.46
+      ],
+      "sd_pp": 0.2875,
+      "se_pp": 0.1174,
+      "signs_positive": 4
+    },
+    "primary_safe_minus_random": {
+      "arms": [
+        "safe",
+        "random"
+      ],
+      "inside_threshold": true,
+      "mean_pp": 0.05,
+      "per_parent_pp": [
+        0.0,
+        -0.26,
+        0.48,
+        0.02,
+        -0.04,
+        0.1
+      ],
+      "sd_pp": 0.2429,
+      "se_pp": 0.0992,
+      "signs_positive": 3
+    },
+    "reference_dose_all_minus_random": {
+      "arms": [
+        "all",
+        "random"
+      ],
+      "inside_threshold": false,
+      "mean_pp": 0.8633,
+      "per_parent_pp": [
+        1.26,
+        0.44,
+        1.08,
+        0.76,
+        0.8,
+        0.84
+      ],
+      "sd_pp": 0.2824,
+      "se_pp": 0.1153,
+      "signs_positive": 6
+    },
+    "secondary_fragile_minus_random": {
+      "arms": [
+        "fragile",
+        "random"
+      ],
+      "inside_threshold": true,
+      "mean_pp": -0.0767,
+      "per_parent_pp": [
+        0.04,
+        -0.58,
+        0.18,
+        0.34,
+        -0.08,
+        -0.36
+      ],
+      "sd_pp": 0.3426,
+      "se_pp": 0.1398,
+      "signs_positive": 3
+    }
+  },
+  "decision": "docs/decisions/0008-alloc-v1-endpoint-and-floor-order.md",
+  "endpoint_source_git_sha": "52319c3d6267ac91fe16b2b2bd019c662b1252a4",
+  "endpoints": {
+    "p1": {
+      "all": {
+        "clean_pp": 85.74000000000001,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 60.980000000000004
+      },
+      "fragile": {
+        "clean_pp": 86.02,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 59.760000000000005
+      },
+      "random": {
+        "clean_pp": 86.1,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 59.72
+      },
+      "randomb": {
+        "clean_pp": 86.0,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 60.0
+      },
+      "safe": {
+        "clean_pp": 86.4,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 59.72
+      }
+    },
+    "p2": {
+      "all": {
+        "clean_pp": 86.4,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 60.58
+      },
+      "fragile": {
+        "clean_pp": 85.92,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.56
+      },
+      "random": {
+        "clean_pp": 86.0,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 60.14000000000001
+      },
+      "randomb": {
+        "clean_pp": 86.11999999999999,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.8
+      },
+      "safe": {
+        "clean_pp": 86.58,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.88
+      }
+    },
+    "p3": {
+      "all": {
+        "clean_pp": 86.1,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 60.74
+      },
+      "fragile": {
+        "clean_pp": 85.76,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.84
+      },
+      "random": {
+        "clean_pp": 86.18,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.660000000000004
+      },
+      "randomb": {
+        "clean_pp": 86.06,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 60.019999999999996
+      },
+      "safe": {
+        "clean_pp": 86.14,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 60.14000000000001
+      }
+    },
+    "p4": {
+      "all": {
+        "clean_pp": 86.68,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 60.199999999999996
+      },
+      "fragile": {
+        "clean_pp": 85.94000000000001,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.78
+      },
+      "random": {
+        "clean_pp": 86.52,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.440000000000005
+      },
+      "randomb": {
+        "clean_pp": 86.53999999999999,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.699999999999996
+      },
+      "safe": {
+        "clean_pp": 86.68,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "ferret",
+        "robust_pp": 59.46
+      }
+    },
+    "p5": {
+      "all": {
+        "clean_pp": 85.8,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 60.5
+      },
+      "fragile": {
+        "clean_pp": 85.56,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 59.62
+      },
+      "random": {
+        "clean_pp": 86.14,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 59.699999999999996
+      },
+      "randomb": {
+        "clean_pp": 86.0,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 60.06
+      },
+      "safe": {
+        "clean_pp": 86.11999999999999,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 59.660000000000004
+      }
+    },
+    "p6": {
+      "all": {
+        "clean_pp": 86.16,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 60.940000000000005
+      },
+      "fragile": {
+        "clean_pp": 86.04,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 59.74
+      },
+      "random": {
+        "clean_pp": 86.16,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 60.099999999999994
+      },
+      "randomb": {
+        "clean_pp": 86.33999999999999,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 60.260000000000005
+      },
+      "safe": {
+        "clean_pp": 86.64,
+        "contract": "ert_stage_a_common_ce_pgd20_endpoint_v1",
+        "host": "hamster",
+        "robust_pp": 60.199999999999996
+      }
+    }
+  },
+  "floor": {
+    "definition": "max over parents of |ALLOC_RANDOM - ALLOC_RANDOMB| at e199",
+    "max_pp": 0.36,
+    "mean_pp": 0.2933,
+    "per_parent_pp": [
+      0.28,
+      0.34,
+      0.36,
+      0.26,
+      0.36,
+      0.16
+    ],
+    "sd_pp": 0.0776
+  },
+  "horizon": {
+    "checkpoint": "last.pt",
+    "epoch": 199,
+    "note": "epoch-199.pt carries payload epoch 198 and is a different checkpoint"
+  },
+  "plan": "docs/plans/0096-hardness-allocation-direction.md",
+  "schema_version": 1,
+  "split": "validation, 5000 images",
+  "threshold_pp": 0.36,
+  "threshold_rule": "max(floor, 0.25 pp), fixed before any endpoint was read",
+  "verdict": {
+    "allocation_closed": true,
+    "branch": "fourth preregistered branch",
+    "dose_effect_resolved": true,
+    "statement": "All three allocation contrasts lie inside the measured threshold, and the floor itself is larger than any of them. Per-sample allocation direction is closed in both directions at once. The dose effect, measured on the same parents with the same instrument, is resolved and positive on every parent."
+  }
+}

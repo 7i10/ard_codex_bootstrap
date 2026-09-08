@@ -2,6 +2,10 @@
 
 ## Status
 
+**CLOSED 2026-09-08.** The preregistered test ran and returned its fourth branch:
+per-sample allocation direction is inert at this operating point. Record and report:
+`docs/experiments/ard_allocation_direction_e199_v1.json` and `.md`.
+
 - Owner: human (approved 2026-09-07 to run), Claude Code (execution)
 - Launched 2026-09-07 13:17 JST at source `815dabd`
 - **The M0 blocker is gone.** All six fork parents are materialised — `prefix/p1`
@@ -215,6 +219,46 @@ matter for this pair at this point in this schedule.
 And it says nothing about distillation.  **A result here would be a result about
 adversarial training**, which is worth having and is not by itself an argument
 for a teacher.  That argument, if it exists, is the disagreement-set plan.
+
+## Completion, 2026-09-08
+
+The plan is answered. Threshold **0.36 pp**, measured from the second random draw
+before the effects were read as a number, though see the disclosure in the report
+about the ordering. All three allocation contrasts inside it:
+
+| contrast | mean | SE | verdict |
+| --- | ---: | ---: | --- |
+| `ALLOC_SAFE - ALLOC_RANDOM` (primary) | +0.050 pp | 0.099 | inside |
+| `ALLOC_FRAGILE - ALLOC_RANDOM` (secondary) | -0.077 pp | 0.140 | inside |
+| `ALLOC_SAFE - ALLOC_FRAGILE` (direction) | +0.127 pp | 0.117 | inside |
+| `I100 - ALLOC_RANDOM` (dose, reference) | **+0.863 pp** | 0.115 | **outside, 6/6 positive** |
+
+**This is the fourth preregistered branch and it is one result, not three nulls.**
+Per-sample allocation direction is closed in both directions at once. The capacity
+account and the vulnerability account are both unsupported here; neither wins.
+
+The statement that needs no threshold: **two independent random draws of the same
+size and class proportions differ by up to 0.36 pp, more than either named
+direction differs from random.** Choosing by margin moves the endpoint less than
+choosing arbitrarily twice.
+
+The design is not blind. On the same parents, the same instrument and the same
+day, changing the *dose* -- treating all 45,000 images instead of a matched fifth
+-- is worth +0.863 pp, 2.4x the threshold, positive on every parent.
+
+`ALLOC_FRAGILE` is additionally disqualified by the clean-accuracy gate on p4 and
+p5 (-0.58 pp each, beyond the 0.5 pp rule).
+
+Milestones: M0 masks frozen, M1 24 arms trained, M2 floor measured on six second
+draws, M3 endpoints evaluated on all 30 arms, M4 record and report imported. All
+met. Nothing is running.
+
+Two things this campaign produced that outlive its own question. The endpoint
+evaluator could not read a stage-wise run at all until 2026-09-08, because those
+configs declare an allocation-mask identity and the view builder refuses a
+mismatch; the fix passes the mask rather than relaxing the guard. And the
+judgment horizon is `last.pt`, not the file named `epoch-199.pt`, which carries
+payload epoch 198 -- a trap that would have silently evaluated the wrong weights.
 
 ## Progress log
 
