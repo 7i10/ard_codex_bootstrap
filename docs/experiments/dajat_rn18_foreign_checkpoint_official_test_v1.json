@@ -1,0 +1,70 @@
+{
+  "architecture": "saad_resnet18_cifar_v1",
+  "autoattack": {
+    "attack_version": "standard",
+    "autoattack_accuracy": 0.5245000123977661,
+    "batch_size": 128,
+    "epsilon": 0.03137254901960784,
+    "norm": "Linf",
+    "provenance": {
+      "direct_url": {
+        "url": "https://github.com/fra31/auto-attack.git",
+        "vcs_info": {
+          "commit_id": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+          "requested_revision": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+          "vcs": "git"
+        }
+      },
+      "distribution": {
+        "name": "autoattack",
+        "version": "0.1"
+      },
+      "expected_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+      "licenses": [
+        {
+          "path": "autoattack-0.1.dist-info/licenses/LICENSE",
+          "sha256": "ff88cd04d9c3d141115d733ef17ed1b368d0ca10e0b58e15891c2385d1877b5d"
+        }
+      ],
+      "mode": "installed",
+      "source_paths": [
+        "__init__.py",
+        "autoattack.py",
+        "autopgd_base.py",
+        "checks.py",
+        "fab_base.py",
+        "fab_projections.py",
+        "fab_pt.py",
+        "fab_tf.py",
+        "other_utils.py",
+        "square.py",
+        "state.py",
+        "utils_tf.py",
+        "utils_tf2.py"
+      ],
+      "source_sha256": "e74d6dab0e34faf840f1bdfe0f77e9ddcc5f753a7426cbaa54b11bf17f896487",
+      "vcs_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e"
+    },
+    "seed": 0,
+    "version": "0.1"
+  },
+  "checkpoint_sha256": "a8fd58136e2e1ed78fd87f9fb105d4786b40db4bf5611aaec6db47729bc93f13",
+  "clean_accuracy": 0.8570999503135681,
+  "contract": "ard_external_checkpoint_evaluation_v1",
+  "dataset": "cifar10 official test, 10000 examples",
+  "decision": "docs/decisions/0007-dajat-foreign-checkpoint-official-evaluation.md",
+  "difference_pp": -0.029998760223393095,
+  "import_note": "difference_pp was NaN in the run's own result.json because the script read a key named robust_accuracy from a dict whose key is autoattack_accuracy. Recomputed here from the unchanged autoattack_accuracy the same file records; the script now refuses instead of defaulting to NaN. No measured value was altered.",
+  "imported_from": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/dajat-eval-v1/result/result.json",
+  "imported_on": "2026-09-08",
+  "lineage": "FOREIGN: these weights were not produced by this repository and have no run lineage here",
+  "normalization": "none; raw pixels in [0,1]",
+  "published_robust_accuracy": 0.5248,
+  "seed": 0,
+  "source": "RobustBench model zoo, Addepalli2022Efficient_RN18, gdrive_id 1m5vhdzIUUKhDbsZdOG9z76Eyp6f4xe_f; DAJAT, Addepalli et al., NeurIPS 2022",
+  "threat": {
+    "attack": "AutoAttack standard",
+    "epsilon": 0.03137254901960784,
+    "norm": "linf"
+  }
+}

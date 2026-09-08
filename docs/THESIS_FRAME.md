@@ -308,7 +308,20 @@ it will read as a retreat.
 
 Six items. Four cost nothing. Two cost under three GPU-hours between them.
 
-1. **Delete the DAJAT anchor, or make it true.** Framing 1, framing 2, framing 4 and framing 5 all
+1. ~~**Delete the DAJAT anchor, or make it true.**~~ **WITHDRAWN 2026-09-08. The anchor is
+   true and the run exists.** `runs/dajat-eval-v1/result/result.json`, 2026-09-07 05:47:
+   clean **85.71 %** and AutoAttack **52.45 %** against a published 85.71 and 52.48, a
+   difference of **-0.03 pp**, an order of magnitude inside the 0.3 pp calibration band.
+   This section searched the repository and concluded from an empty search that the run did
+   not exist. Results live in the runtime tree until rule 5's import step moves them, and
+   that step had been skipped; the run's own log also read `nan%` because of a wrong key
+   name. Both are fixed and the record is now at
+   `docs/experiments/dajat_rn18_foreign_checkpoint_official_test_v1.json`. The framings that
+   asserted the anchor were right. **The lesson stands but inverts: an absent record in
+   `docs/` is not evidence of an absent measurement, and a read-only analysis that greps
+   only the repository will mistake an un-imported result for a fabricated one.** The
+   original item, kept for the record:
+    Framing 1, framing 2, framing 4 and framing 5 all
    state as established that DAJAT's released ResNet-18 checkpoint scores clean 85.71 and AutoAttack
    52.45 through this pipeline against a published 85.71 and 52.48. That run does not exist. A
    search of the entire repository for "52.45" returns nothing, and there is no `runs/` tree. The

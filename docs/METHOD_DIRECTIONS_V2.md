@@ -105,7 +105,11 @@ repository's TRADES was four points low because the clean-side KL target was det
 in commit `7666d77`, the 45.14 result is marked superseded, and **no corrected TRADES run exists yet**
 (VERIFIED, `docs/debugging/0028-trades-clean-target-detached.md`; `docs/EXPERIMENT_DASHBOARD.md` note).
 A script to evaluate a foreign checkpoint through this pipeline exists; DAJAT's ResNet-18 scored 87.3 %
-clean on 512 images and has not yet been run through AutoAttack (VERIFIED, commit `914b10a`). AWP and SWA
+clean on 512 images and has not yet been run through AutoAttack (VERIFIED, commit `914b10a`).
+**Superseded 2026-09-08: it has. The full official test ran on 2026-09-07 and gives clean 85.71 %
+and AutoAttack 52.45 % against a published 85.71 and 52.48, a difference of -0.03 pp. The result was
+not imported into `docs/` until 2026-09-08, which is why this line stood.** Record:
+`docs/experiments/dajat_rn18_foreign_checkpoint_official_test_v1.json`. AWP and SWA
 are not implemented (VERIFIED absence, `docs/ARD_VERSUS_AT_ASSESSMENT.md` section 2.1).
 
 ### 1.4 The measured floor is the wrong kind for the historical contrasts
@@ -362,11 +366,16 @@ a robust teacher's.
 
 **Smallest experiment.**
 
-- *Step 0, this week, no decision needed, 5 GPU-h.* One corrected TRADES run, seed 0, config-only, expected
-  49.0-49.4 AutoAttack at the best checkpoint (VERIFIED literature range, debugging note 0028); if it lands
-  elsewhere, stop and debug before anything uses TRADES. DAJAT's checkpoint through AutoAttack on the full
-  test set, about one hour, expected 52.48 ± evaluation noise (VERIFIED published value); if it does not
-  reproduce, the evaluation stack is wrong and every comparison waits.
+- *Step 0, ~~this week, no decision needed, 5 GPU-h~~ **done, 2026-09-07**.* One corrected TRADES run, seed 0,
+  config-only, expected 49.0-49.4 AutoAttack at the best checkpoint (VERIFIED literature range, debugging note
+  0028); if it lands elsewhere, stop and debug before anything uses TRADES. **It landed at 47.87, so the
+  stop-and-debug condition tripped.** The initialization hypothesis was measured on 2026-09-08 and refuted
+  (`docs/experiments/trades_attack_initialization_differential_v1.md`); the gap is open.
+  DAJAT's checkpoint through AutoAttack on the full test set, about one hour, expected 52.48 ± evaluation
+  noise (VERIFIED published value); if it does not reproduce, the evaluation stack is wrong and every
+  comparison waits. **It reproduced: clean 85.71 and AutoAttack 52.45, a difference of -0.03 pp
+  (`docs/experiments/dajat_rn18_foreign_checkpoint_official_test_v1.md`). The evaluation stack is
+  calibrated, which also rules it out as the explanation for the TRADES gap.**
 - *Step 1, about one week of attention.* AWP and SWA in the training step, through the scientific reviewer.
   AWP changes the optimiser step; SWA is small. Neither touches the attack.
 - *Step 2, 80 GPU-h training plus about 40 GPU-h of AutoAttack.* Four new arms × five seeds × 4 GPU-h, with

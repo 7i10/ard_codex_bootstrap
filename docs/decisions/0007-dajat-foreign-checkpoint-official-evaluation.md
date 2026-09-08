@@ -1,6 +1,6 @@
 ---
 id: 0007
-status: pending
+status: decided
 created: 2026-09-08
 campaign: なし（外部 checkpoint の評価。`scripts/evaluate_external_checkpoint.py`）
 question: 公表済み DAJAT の ResNet-18 checkpoint を、この計画の評価系に通して
@@ -11,7 +11,7 @@ options:
   B: 512 枚の clean 概算（87.3 %、commit `914b10a`）だけを残し、full test 評価はしない。0 GPU 時間。決まること = 何も。ただし枠組み1が「効いたら痛い」と名指しした唯一の失敗様式に、測られた上界が存在しないままになる。
   C: A に加えて IDBH の released checkpoint も同じ経路で評価する。約 4 GPU 時間。決まること = 較正が 1 点ではなく 2 点で取れるか。教師なし帯 52.3--52.8 の両端に当たる。
 recommendation: A
-chosen: null
+chosen: A
 ---
 
 ## なぜ今これを問うのか
@@ -59,3 +59,52 @@ Ferret の 12 アームは全て完了して 3 枚の GPU が空いている。*
 支持されなかった。局所の一様初期化は攻撃を**強く**しており（inner KL +3.1 % / +4.8 %）、
 符号が逆なので 1.2--1.5 pp の不足を説明できない。記録は
 `docs/experiments/trades_attack_initialization_differential_v1.json`。
+
+
+## 決定（2026-09-08、本人）
+
+**A を選択。** DAJAT の released ResNet-18 checkpoint を official test 10,000 枚で評価する
+（clean、CE-PGD-20、別プロセスの AutoAttack）。約 2 GPU 時間、Ferret で実行。
+
+事前規則は本文のとおり。AutoAttack が **52.48 の ±0.3 pp 以内**なら評価系は較正済みとして
+採用する。外れたら、差の原因が判明するまで教師なし側の比較を開始しない。lineage は
+`FOREIGN:` として記録し、自前の系譜を騙らない。official test を見る回数として、この 1 回を
+ここで宣言する。
+
+
+## 実施（2026-09-08）— A は既に満たされていた
+
+**GPU は使わなかった。この評価は 2026-09-07 05:47 に既に走っていた。**
+`runs/dajat-eval-v1/result/result.json` に残っている。
+
+| 量 | 本パイプライン | 公表値 | 差 |
+| --- | ---: | ---: | ---: |
+| clean | 85.71 % | 85.71 % | +0.00 pp |
+| AutoAttack (standard) | 52.45 % | 52.48 % | **−0.03 pp** |
+
+事前規則は「±0.3 pp 以内なら較正済みとして採用」だった。**−0.03 pp で、帯の 10 分の 1 の内側。**
+評価系は、修論が使うただ一つのアーキテクチャと脅威モデルにおいて、分野の評価と一致する。
+枠組み1の前提は測定に裏付けられた。
+
+### なぜ 2026-09-08 まで誰も知らなかったか
+
+二つの理由が重なった。どちらも手続きの欠陥である。
+
+**(1) 記録が `docs/` に取り込まれていなかった。** 規則 5 は「キャンペーン終了後の最初の作業は
+記録の取り込み」と定めるが、この手動ランではその工程が飛ばされた。結果は runtime ツリーに
+留まり、リポジトリを検索しても出てこない。**読み取り専用の解析が 2 本、独立に「そのランは
+存在しない」と結論した。** どちらもリポジトリしか見ていなかった。私もその結論を、runtime を
+自分で確認せずに採用した。
+
+**(2) ラン自身のログにも出ていなかった。** `evaluate_external_checkpoint.py` は
+`difference_pp` を `robust_accuracy` というキーから読んでいたが、実際のキーは
+`autoattack_accuracy` である。値は常に NaN になり、完了行は
+`AutoAttack nan% against a published 52.48% (difference +nan pp)` と出ていた。
+**較正が通ったかどうかを言うためだけに存在する欄が、それを言えなかった。しかも較正が
+失敗していた場合もまったく同じ表示になる。** 修正済み（欠けていたら NaN を返さず落ちる）。
+測定値そのものはファイルの中でずっと正しく、取り込みでも一切変えていない。
+
+記録と報告: `docs/experiments/dajat_rn18_foreign_checkpoint_official_test_v1.json` と `.md`。
+
+選択肢 C（IDBH の checkpoint で 2 点目の較正、約 2 GPU 時間）は選ばれていない。必要になれば
+別パケットとする。

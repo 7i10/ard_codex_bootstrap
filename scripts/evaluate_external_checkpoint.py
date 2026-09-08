@@ -113,7 +113,13 @@ def main() -> int:
         "autoattack": result,
     }
     if args.published_robust_accuracy is not None:
-        measured = float(result.get("robust_accuracy", float("nan")))
+        # The key is "autoattack_accuracy" (src/ard/evaluation/autoattack.py).  Reading a
+        # name that is not there used to default to NaN, so difference_pp was NaN on every
+        # run and a failed calibration was indistinguishable from a passing one.  The whole
+        # point of this field is to fail loudly, so an absent key is now an error.
+        if "autoattack_accuracy" not in result:
+            raise SystemExit("AutoAttack result carries no autoattack_accuracy; refusing to report a difference")
+        measured = float(result["autoattack_accuracy"])
         record["published_robust_accuracy"] = args.published_robust_accuracy
         record["difference_pp"] = (measured - args.published_robust_accuracy) * 100.0
     (args.output / "result.json").write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
