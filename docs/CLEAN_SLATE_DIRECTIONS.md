@@ -1,405 +1,674 @@
-# Clean-slate direction selection, 2026-09-09
+# Clean-slate directions in adversarial defense
 
-Status: hand-assembled from a multi-agent pipeline whose automatic synthesis step never
-completed (five session-limit interruptions in one day). What follows is the raw pipeline
-output, cross-checked by hand, not a machine-generated summary. Two citations were
-independently re-verified against the live web on 2026-09-09; everything else marked
-VERIFIED was verified by an agent, not by a human, and should be treated accordingly.
+Date: 2026-09-09.
+Status: decision document. No GPU job was run to produce it. Body written by the
+workflow's own synthesis agent after five prior session-limit interruptions;
+items 6.3.7-6.3.9, the int8 CPU-throughput correction in 6.1, and the three
+near-free measurements before section 8 were added afterward from a hand
+cross-check of the same raw run, including two live web verifications the
+synthesis agent could not perform (it had no network access — see section 0).
+Audience: the human. Nothing here is a launch authorisation.
 
-The brief given to the pipeline: propose adversarial-defense research programmes for a
-lab with five RTX 4090s, ImageNet on local disk, a bit-deterministic training engine and a
-measured noise floor — blind to any of this project's own past experimental results, and
-without a stated deadline (person-weeks were estimated honestly, not fitted to a calendar).
+## 0. How to read this, and what I actually checked
 
----
+Seven surveys of the field were produced, then eight research programmes were
+generated without reference to any past work in this repository. Each programme
+was examined for prior art twice, independently. The survivors were scored by
+four judges on five axes. The top three were attacked by two adversarial
+reviewers each, whose job was to kill them.
 
-## 0. What actually ran
+I did three kinds of checking, and they are not equally strong.
 
-| Stage | Slots | Completed | Notes |
-|---|---|---|---|
-| Survey (7 areas) | 7 | 7 | see `docs/RESEARCH_RESTART.md` §survey and the prior session's report for content |
-| Programme proposals | 8 | 9 (one slot re-ran) | 8 distinct programmes carried forward |
-| Prior-art examination | 16 (8×2) | 16 | every one returned the boolean `preempted: false` — **the boolean is not trustworthy; read the free text** |
-| Judging (4 lenses × 8 programmes) | 32 | 34 (two lenses re-ran) | scores averaged per programme below |
-| Red team (3 finalists × 2 assassins) | 6 | 5 recovered (1 lost) | 4 of 5 verdicts were `killed: true` |
-| Synthesis | 1 | **0** | never completed; this document is the substitute |
+- **Verified by me today, in this repository or on this machine.** Every claim
+  marked VERIFIED below was confirmed with a shell command in this session.
+- **Relayed.** Every citation to an external paper comes from the survey or
+  examiner reports. I had no network access in this session, so I did not open a
+  single one of those papers myself. Treat every paper number below as a claim
+  someone else checked, not as a claim I checked.
+- **Reported measurements from other sessions.** Two of the adversarial reviewers
+  ran real code on Hamster and reported numbers. Those are plausible and specific,
+  but I did not reproduce them.
 
----
-
-## 1. The eight programmes
-
-| # | Title | One sentence |
-|---|---|---|
-| P1 | Cost-to-Break: Attacker-Budget Curves for Artist Protections | Per-image attacker spend to strip Glaze-class protections, against a measured noise floor |
-| P2 | Cloak Budget Curves | Same territory as P1, independently generated |
-| P3 | Teacher or Data? (noise-floor accounting, ResNet-18) | Does a robust teacher or the same compute spent on generated data buy more CIFAR-10 robustness |
-| P4 | Teacher or Data? (small models) | Same question, independently generated, different phrasing |
-| P5 | Does the Teacher Buy Anything? | Same question again, ResNet-18 + MobileNetV2 |
-| P6 | Does the Teacher Pay for Itself? | Same question extended from CIFAR-10 ResNet-18 to int8 ImageNet MobileNets |
-| P7 | Teacher, Init and int8: Robust ImageNet at Mobile Scale | ImageNet-scale version, teacher vs plain adversarial fine-tuning, int8 survival |
-| P8 | Keyed Deployment | Does Gmail's secret-key input-scrambling trick (the shipped Magika fix) generalise to image classifiers, and at what query budget does it break |
-
-**The "blind to past work" generation converged hard**: two near-duplicate artist-protection
-programmes (P1/P2) and four near-duplicate teacher-vs-data programmes (P3/P4/P5/P6). Only
-P7 and P8 are structurally distinct from something else on the list.
+Where a number matters to a decision, I say which of the three it is.
 
 ---
 
-## 2. Judge scores (0–10 per axis, 4 lenses averaged; ranked by total)
+## 1. What the surveys found
 
-Lenses: **deployment** (a sceptical engineer who ships models under attack — applies the
-student's own "does anything change" test), **novelty-lit** (a hostile examiner who knows
-the literature), **tract-ops** (the person who has to actually run this alone, on five
-4090s), **pessimist** (assumes the main experiment returns null).
+Four things are wrong with adversarial defense right now. They are separate
+problems and they compound.
 
-| Rank | Programme | deploy | novelty | tract | robust | legib | **Total /50** |
-|---|---|---:|---:|---:|---:|---:|---:|
-| 1 | P3 Teacher or Data? (noise-floor) | 3.75 | 4.75 | 7.50 | 7.75 | 8.25 | **32.00** |
-| 2 | P6 Does the Teacher Pay for Itself? | 4.50 | 5.00 | 5.75 | 8.00 | 8.00 | **31.25** |
-| 3 | P5 Does the Teacher Buy Anything? | 3.00 | 4.00 | 7.75 | 8.00 | 8.00 | **30.75** |
-| 4 | P8 Keyed Deployment | 4.25 | 4.00 | 6.75 | 7.00 | 8.00 | **30.00** |
-| 5 | P4 Teacher or Data? (small models) | 2.88 | 4.00 | 7.00 | 7.25 | 8.00 | **29.13** |
-| 6 | P1 Cost-to-Break | 4.00 | 5.00 | 4.50 | 7.00 | 8.25 | **28.75** |
-| 7 | P7 Teacher, Init and int8 | 3.75 | 3.50 | 5.75 | 7.25 | 8.00 | **28.25** |
-| 8 | P2 Cloak Budget Curves | 2.75 | 3.75 | 3.75 | 7.00 | 8.25 | **25.50** |
+### 1.1 The founding premise was searched for, twice, and essentially not found
 
-**Read this table with two caveats before drawing any conclusion from it.**
+The field exists because L_p-bounded adversarial examples were expected to be a
+threat to deployed systems. Two deliberate searches by people with production
+access came back nearly empty.
 
-First, **legibility (~8) and robustness (~7–8) are constant across all eight programmes** —
-they carry no discriminating information; every proposal is well-written and every proposal
-survives a null result on paper. The entire ranking is decided by three axes:
-deployment (2.75–4.50), novelty (3.75–5.00), tractability (3.75–7.75). **No programme
-scored above 5 on deployment or above 6 on novelty, from any judge, on any programme.**
+Apruzzese, Anderson, Dambra, Freeman, Pierazzi and Roundy (IEEE SaTML 2023,
+arXiv:2212.14315) studied a commercial anti-phishing image classifier over a
+month of live traffic. They hand-reviewed 4,600 flagged samples to assemble 100
+plausible evasions. What the attackers actually did was crop images, blur logos,
+remove company names, stretch logos and add background patterns. Their words:
+"the strategies employed by real attackers have little in common with
+gradient-based adversarial examples," and "evidence of adversarial examples in
+the wild is scarce."
 
-Second, **the top four are a statistical tie.** The gaps are 0.75, 0.50, 0.75 points of 50,
-and a single re-run of one judging lens on P4 moved its total by 0.28 points. Score alone
-does not decide anything here; prior art and the red team do.
+Grosse, Bieringer, Besold, Krombholz and Biggio (IEEE TIFS 2023,
+arXiv:2207.05164) surveyed 139 industrial practitioners. Of those who reported
+any circumvention of an AI workflow, coding the free text left 3 evasion cases
+out of 139, and two of those three were autonomous-vehicle recognition errors
+the participants themselves doubted were intentional.
 
----
+The MITRE ATLAS corpus, at version 2026.08, contains 72 case studies. Exactly one
+typed Incident is evasion of a perception model by input manipulation, and it is
+the Apruzzese phishing study. Every other perturbation-style entry is a vendor or
+red-team exercise dated 2019 to 2021. Nothing since.
 
-## 3. Prior art, read past the boolean
+All of this is relayed. I could not open ATLAS or either paper.
 
-All 16 examiner verdicts returned `preempted: false`. Read as free text, the picture is
-completely different: almost every programme has a "the headline dies, a narrower core
-survives" verdict.
+This does not make the field worthless. It does mean that a robust-accuracy
+number is not, on current evidence, a security quantity, and that anyone
+presenting it as one is making a claim the evidence does not support.
 
-### P1 / P2 — artist protections
+### 1.2 Where evasion is real, it is not norm-bounded, and the one defense that shipped used none of the field's tools
 
-Both cite **Hönig, Rando, Carlini & Tramèr, "Adversarial Perturbations Cannot Reliably
-Protect Artists From Generative AI", ICLR 2025 (arXiv:2406.12027)** as the closest work
-(no seeds, no error bars, no attacker-cost axis — confirmed by both examiners).
+Real bypasses of deployed ML security products exist and they are crude. Skylight
+Cyber's 2019 bypass of CylancePROTECT (ATLAS AML.CS0003) appended a string list
+harvested from a video game to malware files and got 100% bypass on the top-10
+malware of that month. No gradients.
 
-The more damaging find: **an examiner named "IPV-Bench" (arXiv:2603.26154), "Benchmarking
-Image Protection Methods under Diverse Image-to-Video Generation Scenarios."** Re-verified
-directly on 2026-09-09: **the paper is real.** Its actual authors are **Xiaofeng Li, Leyi
-Sheng, Yifan Zhao, Zhen Sun, Zongmin Zhang, Jiaheng Wei, Xinlei He**, submitted 27 March
-2026. It already measures a per-model noise floor (95th percentile of FVD between two
-bootstrap resamples of the unprotected set) and credits a protection only above that floor
-— "the exact rhetorical move" both P1/P2 proposals were built around.
+The important counterexample is real and should not be waved away. Nasr,
+Fratantonio, Invernizzi, Albertini, Farah, Petit-Bianco, Terzis, Thomas,
+Bursztein and Carlini (ACM CCS 2025, arXiv:2510.01676) attacked Magika, the
+machine-learning file-type router inside Gmail's malware pipeline. Changing 13
+bytes evaded it in 90% of cases, and they delivered malicious PDFs end to end.
+Gradient attacks on production systems are feasible.
 
-**However, one examiner's citation of this same real paper is wrong**: he wrote "Fang et
-al. (HKUST-GZ / Wuhan Univ.)... 19 Aug 2026" — both the author name and the date are
-incorrect for the paper he was pointing at. This is not "the paper doesn't exist"; it is
-"an agent attached fabricated metadata to a real paper's real arXiv ID." Treat every
-examiner-supplied author/date pair as unverified until independently checked, even when
-the arXiv ID resolves.
+Look at what shipped as the fix. Not adversarial training. Not distillation. Not
+certification. One round of AES applied in preprocessing to destroy
+transferability, at sub-microsecond cost, now running in production. The single
+documented production deployment of an adversarial-robustness defense used none
+of this field's flagship techniques. Relayed.
 
-A second examiner named **Pleimling et al., "Off-The-Shelf Image-to-Image Models Are All
-You Need To Defeat Image Protection Schemes", SaTML 2026 (arXiv:2602.22197)** — corroborated
-by five independent agents with consistent details (six protection schemes named) — showing
-**the cost-free attacker already wins across six schemes**, which removes the "interesting
-region" from any attacker-budget curve before a single run.
+### 1.3 Below the frontier, the literature is not falsifiable
 
-**What survives, per both examiners' own words:** the seed-replicated noise floor of the
-mimicry-success metric itself ("no paper in this subfield has ever re-run an identical
-mimicry pipeline under a different seed"), rescoped from ~2,300–3,100 GPU-hours down to
-~250–600 GPU-hours and 10–15 person-weeks.
+This is the finding that most directly concerns anyone choosing what to work on.
 
-### P3 / P4 / P5 / P6 — the ARD-vs-data cluster
+Defenses overestimate their own robustness at a measured rate. Of 236 RobustBench
+model records, 185 carry both the paper's self-reported robust accuracy and an
+independent AutoAttack number; in 50 of those 185 (27%) AutoAttack found the model
+less robust than the paper claimed, with a mean overestimate of 9.2 points and a
+maximum of 74. That is the same pattern Athalye, Carlini and Wagner found at ICML
+2018 (6 of 9 ICLR 2018 defenses fully circumvented), and Tramèr, Carlini, Brendel
+and Madry found at NeurIPS 2020 (13 of 13 defenses circumvented, with attacks
+simpler than the ones the original papers ran).
 
-**The load-bearing disagreement.** Four examiners (across P3, P4, P5) independently
-searched and found **no paper training an adversarial-robustness-distillation student on
-diffusion-generated images** — the exact experimental cell three of these four programmes
-are built on. Two other examiners (on P4 and P5) each named a *different* paper claiming
-that cell is occupied:
+Underneath that sits a measurement problem nobody addresses. Rice, Wong and Kolter
+(ICML 2020) showed early stopping alone matches the gains of an entire generation
+of algorithmic improvements. Pang, Yang, Dong, Su and Zhu (ICLR 2021) showed a
+slightly different weight decay moves robust accuracy by more than 7 points —
+larger than nearly every claimed contribution in the field.
 
-- **Dong, Koniusz, Chen & Ong, "Adversarially Robust Distillation by Reducing the
-  Student-Teacher Variance Gap", ECCV 2024** (the "STARSHIP" paper) — cited with a full
-  table: *"CIFAR-10 ResNet-18 AA with 1M synthetic: ARD 51.04 (+1.64), IAD 50.30 (+1.21),
-  RSLAD 52.42 (+1.06), AKD 51.34 (+1.23), AdaAD 53.08 (+0.72), STARSHIP 54.49 (+0.71),
-  Ada-STARSHIP 55.75 (+0.83)"* — Table 5.
-- **Dong, Koniusz, Chen, Z. Jane Wang & Ong, "Robust Distillation via Untargeted and
-  Targeted Intermediate Adversarial Samples" (DARWIN), CVPR 2024** — cited with a different
-  table: *"teacher TRADES (no DDPM) 82.45/48.90; students WITH 1M DDPM images: ARD
-  82.89/53.41, RSLAD 82.05/52.60, ... DARWIN 84.13/55.92"* — Table 4.
+Against that, the median gap between adjacent ranks on the CIFAR-10 leaderboard is
+0.26 points, and 29% of adjacent pairs differ by less than 0.1 points. No entry on
+any leaderboard carries an error bar; the record format has no field in which one
+could be stored. So most published rankings are not distinguishable from noise,
+and nobody can tell because nobody publishes the noise floor. All relayed.
 
-**Re-verified directly on 2026-09-09: both papers are real.** ECCV 2024 confirmed via
-Springer, ECVA and ACM DL. CVPR 2024 confirmed via the official CVPR virtual program and
-CVF open access. The two papers share three authors (Dong, Koniusz, Chen, Ong) with Z. Jane
-Wang added on the CVPR one — a plausible pair from one research group, not two names for
-one hallucinated paper.
+### 1.4 The frontier is a compute result, and the small-model case, which is the only deployable one, is far behind
 
-**What remains unresolved, and requires a human to open a PDF:** whether the *specific
-table content* quoted (Table 5 of the ECCV paper, Table 4 of the CVPR paper) actually
-contains those exact numbers, or whether an agent confabulated plausible-looking numbers
-attached to a real paper and a real table caption. Both PDFs 403'd or otherwise resisted
-every agent's fetch attempt; two other agents (an examiner and a judge) claimed to have
-read one or the other directly, with conflicting confidence. **This is the single most
-consequential open fact in this document** — if either table is real as quoted, the
-"no ARD-on-generated-data study exists" premise underlying P3/P4/P5's novelty claims is
-false, and the whole cluster needs to be rescoped down to the narrower, still-open cells
-each examiner separately identified (a teacher-free control on the same generated data;
-matched-compute / iso-GPU-hour budgeting; seeds and a noise floor; checkpoint-selection
-discipline — none of which any cited table provides).
+RobustBench CIFAR-10 running-best by year: 44.04 (2018), 59.53 (2019), 65.88
+(2020), 71.28 (2021), 71.28 (2022), 71.28 (2023), 75.28 (2024). Three flat years,
+then four points bought with a WideResNet-94-16 and 300 million generated images.
+That is a scaling result, not a method.
 
-**Independent of that resolution, two other things were found and confirmed real:**
+The small-model case is the one that matters for the student's question, and it is
+worse. VERIFIED in this repository: the pinned RobustBench checkout
+(`.external/robustbench`, commit 78fcc9e4, 2025-03-31, which is the project head)
+holds 30 ImageNet L-inf entries, and the smallest is a ResNet-18 at 52.92% clean
+and 25.32% AutoAttack at eps=4/255. There is no mobile-scale architecture on that
+list at all — the entries are ResNet-18/50, WRN-50-2, XCiT, ViT, Swin and ConvNeXt.
+An adversarially trained ImageNet ResNet-18 surrenders roughly 17 points of clean
+accuracy to buy 25% robustness against a threat model with no recorded production
+incident. That is not a product.
 
-- **SAAD (Lee & Chung, KAIST, TMLR 2026, arXiv:2512.10275)** — quoted identically by six
-  independent agents (a strong cross-agent consistency signal), Table 12: TRADES
-  46.46±0.57, RSLAD 44.42±0.34, SAAD 50.34±0.08 on ResNet-18 (MobileNetV2 TRADES
-  46.50±0.14). **This already falsifies the shared motivating premise** of all four
-  ARD-vs-data programmes — "no published ARD method beats teacher-free AT on the same
-  architecture" — with seeds and error bars.
-- **Gowal2021Improving_R18_ddpm_100m** on the locally pinned RobustBench checkout
-  (`.external/robustbench`, commit `78fcc9e4`, independently checkable offline): a
-  **PreActResNet-18 at 58.63% AutoAttack with no teacher at all**, against the best
-  published ARD ResNet-18 at roughly 53.45%. **The student's own question — can a
-  lightweight model reach good robustness — is already answered, for free, and the
-  answer is that the route that gets there is not ARD.**
+Also VERIFIED: the leaderboard has stopped. The RobustBench repository's most
+recent commit of any kind is 2025-03-31, and this repository's own survey
+(`docs/SMALL_MODEL_AT_2024_2026.md`, 2026-09-08) already recorded the consequence:
+"not on RobustBench" no longer means "does not exist."
 
-### P7 — ImageNet mobile-scale
+### 1.5 Where the money actually went
 
-One examiner found the primary contrast (ARD vs teacher-free AT, ImageNet, sub-12M student,
-4/255, AutoAttack) unoccupied. The other examiner killed it with a table the first missed:
-**Kuang, Liu, Wu, Satoh & Ji, "Improving Adversarial Robustness via Information Bottleneck
-Distillation", NeurIPS 2023, Table 5** — reporting the same contrast at ImageNet-1k scale,
-answer: **yes, +1.71 pp**, the opposite sign the proposal predicted as most likely. Also
-falsified: "no mobile-scale architecture has ever appeared" in this literature — RobustART
-(Tang et al., TPAMI) already runs MobileNetV3, ShuffleNetV2 and more; and "first int8
-AutoAttack number" — Thorsteinsson et al. (arXiv:2403.09441) already report a CIFAR-10
-ResNet-18 at 85.64/58.08 after int8 post-training quantization with no fine-tuning.
-
-**What survives**, both examiners agree: no AutoAttack number exists for any adversarially
-trained **ImageNet** classifier after int8 post-training quantization. This became P6's
-surviving headline (below).
-
-### P8 — Keyed deployment
-
-Two clean kills: **Rusu, Calian, Gowal & Hadsell, "Hindering Adversarial Attacks with
-Implicit Neural Representations", ICML 2022 (arXiv:2210.13982)**, whose Figure 3 is
-literally the flagship attack-success-vs-attacker-keys curve the proposal wanted to build;
-and **Ali, Mohammed & Ahmad, "Evaluating Adversarial Robustness of Secret Key-Based
-Defenses", IEEE Access 2022**, which already broke pixel-shuffling (7.45%), bit-flipping
-(4.20%) and Feistel encryption (9.45%) adaptively. Also: **Tanaka, Echizen & Kiya, "On the
-Transferability of Adversarial Examples between Encrypted Models", ISPACS 2022
-(arXiv:2209.02997)**, Table VI/VIII, gives exact transfer numbers under a genuine
-secret-weights threat model the proposal's own framing had overstated as unstudied.
-
-**What survives, both examiners agree:** the secret-*weights* threat model specifically
-(most keyed-defense work assumes weights are known and only the key is secret), the
-extraction query-budget Q*, and a one-week, 10–15 GPU-hour replication of Tanaka's Table VI
-numbers as a cheap kill point before committing further budget.
+For completeness, because it bears on what "useful in the real world" means now.
+The 2024–2026 ATLAS entries are prompt injection, agent hijacking, supply-chain
+compromise and deepfake identity fraud. Documented losses include roughly $77M in
+a camera-hijack tax fraud in Shanghai and $25.6M at Arup from a deepfake video
+call. None of that is defended by a smaller epsilon ball, and an adversarially
+trained face model is exactly as vulnerable to a virtual camera as a standard one.
+Relayed. This is context, not a research direction — a small lab is not positioned
+to lead on any of it.
 
 ---
 
-## 4. Red team verdicts (P3, P5, P6 — the three that reached this stage)
+## 2. The student's own question already has an answer, and it is free
 
-### P3 (Teacher or Data?, noise-floor accounting) — killed by both assassins
+The question was: adversarial robustness distillation is meaningful if lightweight
+models can actually reach good performance through it, and meaningless if they
+cannot.
 
-**Assassin A**: the primary contrast is a confound wearing a one-variable name. RSLAD's own
-objective (Zi, Zhao, Ma & Jiang, ICCV 2021, arXiv:2108.07969, Eq. 3 — note the author list
-is commonly miscited; the paper is real) evaluates the teacher **only on the clean image**
-and has **no hard-label cross-entropy term**, so on generated data with no ground truth,
-"does the teacher help" collapses into "are a 57%-AA model's soft predictions better
-supervision than the generator's own labels" — not a distillation question. Separately, an
-arithmetic error was found in the proposal's compute-matching (RSLAD needs one teacher
-forward pass, not two — this changes the matched-epoch count by ~25%).
+That is answerable today at zero GPU-hours, and this repository already wrote the
+answer down. VERIFIED, `docs/ARD_VERSUS_AT_ASSESSMENT.md` section 1.3:
 
-**Assassin B**: a power argument. The best available prior point estimate for exactly this
-contrast (SAAD Table 10, Gowal2021 as teacher: RSLAD 46.61 vs teacher-free TRADES 46.46) is
-**+0.15 pp** — against this lab's own measured five-seed endpoint SD (0.272–0.532 pp),
-resolving 0.15 pp at 80% power needs **52–112 runs per arm**, i.e. 1,750–3,800 GPU-hours for
-one contrast, more than the entire proposed budget. He also identified a **free** pre-screen
-(one forward pass of the already-pinned Chen2021LTD_WRN34_10 teacher over the 1M generated
-set, minutes of GPU time) that predicts the sign and most of the magnitude of the whole
-520-GPU-hour phase this design is built around.
+> when the data that made the teacher strong is given directly to the small
+> network, the small network reaches 56.7 to 58.6 AA. When the same data reaches
+> it only through a teacher, the best published student reaches 50.3 AA. The gap
+> is 6 to 8 pp in favour of direct training.
 
-### P5 (Does the Teacher Buy Anything?) — one assassin killed, one did not
+The endpoints are downloadable. Gowal 2021's PreActResNet-18, trained on 100
+million generated images with no teacher, sits at 87.35% clean and 58.63%
+AutoAttack (VERIFIED from the pinned RobustBench record). The best three-seed
+distilled ResNet-18 in the literature sits around 50.3, and the best single-run
+distilled number is around 53 to 54.
 
-**Assassin A — killed.** The primary endpoint declares a 1.0 pp difference decisive, but the
-control arm (in-house TRADES) carries a **known, unexplained, 1.2–1.5 pp bias in exactly this
-harness**, in the direction that flatters the teacher (`docs/debugging/0028-trades-clean-target-detached.md`:
-best-checkpoint AutoAttack moved 45.14 → 47.87 after one line was fixed; the remaining
-1.2–1.5 pp gap to the 49.0–49.4 literature range is unexplained, and PGD-AT/RSLAD in the
-same harness are exact). The design's error model budgets for variance and is structurally
-blind to bias — the error class that actually dominates here.
+So: yes, a lightweight model can be made meaningfully robust on CIFAR-10. No, a
+teacher is not the route — giving the small model the data directly is 6 to 8
+points better at the same inference cost. That answer cost nothing and it is
+already in the repository.
 
-**Assassin B — did not kill**, but narrowed the claim severely: the pitch is "measured
-carefully enough that a one-point difference can actually be believed," and the lab
-currently cannot believe a one-point difference in the arm every decision rule depends on.
-Also found concrete engine blockers: no CutMix/AutoAugment/Mixup anywhere in the codebase;
-MobileNetV2 exists as three unused lines in the model registry and has never been trained
-once; per-class AutoAttack reporting is not implemented.
-
-### P6 (Does the Teacher Pay for Itself?) — killed, with measurements taken on the lab's own hardware
-
-This is the highest-value single result in the run, because it is the only verdict grounded
-in **actual measurements taken on Hamster/Ferret**, not literature argument.
-
-**Killed on two grounds.** (1) The design puts the distilled arm at exactly one compute
-budget per stage and cannot locate a crossover — Busbridge et al., "Distillation Scaling
-Laws" (ICML 2025, arXiv:2502.08606), the paper this design's own framing depends on,
-establishes that distillation beats supervised training only below a compute threshold that
-scales with student size; one point cannot find that threshold, so the design's most likely
-outcome is a contradiction between its two stages rather than a verdict. (2) Three of
-AutoAttack's four components need gradients and cannot run through a real quantized graph;
-the design's proposed workaround (fp32 fake-quant simulation for the gradient attacks, and
-only the weakest black-box component — Square — on the real int8 artifact) was measured to
-fail outright: **the converted int8 model segfaults on `.to('cuda')` on this lab's hardware
-(SIGSEGV, exit 139, reproduced twice)**, forcing CPU-only inference at 567–607 img/s, which
-turns the "3 GPU-hours" budgeted for int8 AutoAttack into 12.2 **CPU**-hours per checkpoint
-contending with the ImageNet dataloader on the same machine.
-
-**Two objections this assassin tried to raise and explicitly retracted, after measuring:**
-bit-determinism was tested directly (two independent runs of MobileNetV3-Large and
-EfficientNet-B0 under a full PGD-3 training loop produced bit-identical state-dict hashes in
-45 minutes — "it works"), and the local ImageNet data path was tested directly (1,281,167
-images indexed in 2.1s on local NVMe, loader throughput up to 2,251 img/s at 8 workers).
-Compute was found "wrong by ~1.4×, not 5×" — a correction, not a kill.
-
-**The null that would empty the whole document**, per this assassin: the design never
-calibrates its own teacher-free training recipe against a known-good reference (EasyRobust's
-EfficientNet-B0, 61.83% clean / 35.06% AA at 90 epochs from scratch). Without that ~94
-GPU-hour calibration arm, a disappointing result is indistinguishable from an under-trained
-model.
-
-**What survives, in the assassin's own words:** *"the seed-replicated, noise-floored cost
-sheet for a robust mobile-scale ImageNet classifier — MobileNetV3-Large at 4/255, clean,
-AutoAttack on 5k and full 50k, worst-class, ImageNet-C/R/A/V2, against the untouched
-pretrained model. Nothing in the literature occupies it... it needs no teacher, so it is
-immune to the SAAD strawman and the scaling-law objection." Recommendation: "cut the
-teacher entirely."* On int8: report Square-only robustness of the real int8 artifact as an
-*upper bound*, and white-box robustness of the fp32 fake-quant simulation as a *separate,
-labelled* quantity — never conflate the two. Honest ceiling, same assassin: *"a competent,
-correct, unsurprising engineering table... worth roughly one solid workshop paper and five
-months."*
-
-(One of the two P6 assassins never produced a verdict — session limit mid-run. Its slot is
-unfilled; treat P6 as having received one, not two, adversarial reviews.)
+Three of the eight programmes, including the two highest-scoring ones, are
+variations on re-asking this question more carefully. That is why they scored 3 to
+4 out of 10 on deployment value. A more precise answer to a question that already
+has one does not become useful by having error bars.
 
 ---
 
-## 5. Citations flagged for independent human verification
+## 3. Does anything clear the deployment test? No.
 
-Ranked by how load-bearing they are, not by how suspicious they look.
+The test, in the student's own form: if this quantity improved by the amount the
+research could plausibly deliver, whose situation actually gets better, and how
+would they notice?
 
-**Resolved on 2026-09-09 (re-verified against the live web):**
+Applied honestly to all eight programmes, none passes.
 
-1. **Dong, Koniusz, Chen & Ong, ECCV 2024** (the "STARSHIP" variance-gap paper) — **paper is
-   real.** Confirmed via Springer, ECVA, ACM DL. Table-content (the exact numbers quoted)
-   still unverified — a human needs to open `ecva.net/papers/eccv_2024/papers_ECCV/papers/00499.pdf`.
-2. **Dong, Koniusz, Chen, Z. Jane Wang & Ong, CVPR 2024 (DARWIN)** — **paper is real.**
-   Confirmed via the CVPR virtual program and CVF open access. Table-content likewise
-   unverified — open `openaccess.thecvf.com/content/CVPR2024/papers/Dong_Robust_Distillation_via_Untargeted_and_Targeted_Intermediate_Adversarial_Samples_CVPR_2024_paper.pdf`.
-3. **IPV-Bench, arXiv:2603.26154** — **paper is real**, title *"IPV-Bench: Benchmarking
-   Image Protection Methods under Diverse Image-to-Video Generation Scenarios,"* authors
-   **Xiaofeng Li, Leyi Sheng, Yifan Zhao, Zhen Sun, Zongmin Zhang, Jiaheng Wei, Xinlei He**,
-   submitted 27 March 2026. **One examiner's citation of this real paper carried fabricated
-   metadata** ("Fang et al. (HKUST-GZ/Wuhan Univ.)... 19 Aug 2026" — both the author and the
-   date are wrong). Lesson: a correct arXiv ID does not guarantee correct surrounding
-   metadata from the agent that supplied it.
-4. **Frochte, arXiv:2605.09030** — **paper is real**, title *"When Style Similarity Scores
-   Fail: Diagnosing Raw CSD Cosine in Artist-Style Evaluation."* Single-author attribution,
-   which had looked unusual, turns out to be correct (Jörg Frochte).
+- **The four distillation programmes** (numbers 1, 2, 3, 5 in the table below)
+  improve the precision of an answer about CIFAR-10 robust accuracy at eps=8/255.
+  Nobody deploys that classifier. The beneficiary is the research community's
+  bookkeeping.
+- **The two ImageNet-mobile programmes** (2's second stage, and 7) produce a cost
+  sheet for a 5-million-parameter robust classifier. That artifact does not exist
+  and someone considering shipping one would consult it. But it would still cost
+  15 or more points of clean accuracy for robustness against an attacker with no
+  recorded production incident, so nobody would ship it either.
+- **The keyed-transform programme** (4) is the only one whose defense class has
+  actually shipped to production, at Gmail. But its flagship transform families
+  appear to be already dead at zero attacker effort (Tanaka, Echizen and Kiya,
+  ISPACS 2022, arXiv:2209.02997, Table VI — relayed, and it is the single most
+  important unchecked citation in this document), and its central novelty claim
+  appears false (MaungMaung, Echizen and Kiya, IEEE OJSP 2024 — relayed).
+- **The two artist-protection programmes** (6, 8) are the ones the survey itself
+  liked best, because real users made real decisions on a false assurance. But the
+  answer is already published three times over (Hönig, Rando, Carlini and Tramèr,
+  ICLR 2025; Foerster et al., LightShed, USENIX Security 2025; Pleimling et al.,
+  IEEE SaTML 2026 — all relayed), and a tighter error bar on "Glaze does not
+  protect you" changes no artist's decision. Their tractability scores are the
+  worst in the set (4.5 and 3.75) because their critical path is ethics approval,
+  artist consent, human raters, a closed Windows GUI binary and thirteen research
+  repositories — none of which five 4090s help with, and all of which consume the
+  one resource declared scarce.
 
-**Still unresolved — a human should check before relying on the verdict that used them:**
-
-5. **"Wu, Huang, Chen, Pang, Wang, 'Scaling and Taming Adversarial Training with Synthetic
-   Data', ICCV 2025"** — the only live prior-art risk named against P3's Phase 2. Described
-   with five independent identifiers (DOI, page range, institution, OpenAlex ID, DBLP key)
-   by an agent who admitted every fetch attempt 403'd. That combination of precision and
-   unreadability is the classic shape of a confabulation riding on a real-sounding DOI
-   pattern; not yet checked directly.
-6. **"RC-QAT: Efficient Robust Quantization via Attention-Guided Adversarial Distillation",
-   CSCWD 2026** — named by two independent examiners (P6, P7) as sitting exactly on the
-   int8-distillation intersection that is P6's surviving headline. Neither could retrieve
-   it. Check before treating P6's "nothing occupies this ground" claim as final.
-7. **"Di Mi et al., 'Rethinking Data Augmentation for Adversarial Distillation: An Excess
-   Risk Perspective,' ICLR 2026 (rejected, OpenReview forum ZZGn6GXJDH, ratings 2/4/3)"** —
-   this single citation is what killed P6's sub-clause about generated-data augmentation
-   selection; the examiner admits he could read only the abstract, not the tables. An
-   11-character OpenReview forum ID is trivial to check directly.
-
-**Reassuring — cross-agent corroborated, low fabrication risk:**
-
-8. SAAD (Lee & Chung, TMLR 2026, arXiv:2512.10275) — identical numbers quoted by six
-   independent agents examining different programmes.
-9. RobustBench anchors (Gowal2021Improving_R18_ddpm_100m, Rade2021Helper, etc.) — read
-   directly from the locally pinned checkout, independently checkable offline.
-10. Pleimling et al., SaTML 2026 (arXiv:2602.22197) — consistent scheme list (six named
-    protections) across five independent agents.
+I am not going to manufacture a winner. The correct reading of the survey is that
+this field's centre of gravity optimises a quantity with no recorded deployed
+victim, and that no programme sized for this lab escapes that. What follows is the
+least bad option, and I will say plainly why it is still worth doing.
 
 ---
 
-## 6. Recommendation
+## 4. Recommendation: the mobile robustness cost sheet
 
-**No programme clears a high bar. Every judge, on every programme, capped deployment_value
-at 5 and novelty at 6.** The pipeline correctly refused to manufacture a strong winner where
-none exists; do not read the ranking below as more confident than that.
+**Recommended: programme 2, stripped to its second stage and re-aimed.**
 
-**Top pick: P6, cut down to its surviving core only** — a seed-replicated, noise-floored
-cost-and-robustness sheet for a mobile-scale ImageNet classifier (MobileNetV3-Large / int8),
-with **the teacher cut entirely**. Reasons: highest deployment_value of any programme
-(4.50); the only surviving clause that both its prior-art examiners *and* its assassin
-independently converged on as the real, unoccupied ground; the only programme whose
-feasibility was measured on this lab's actual hardware rather than argued (bit-determinism
-confirmed in 45 minutes, ImageNet data path confirmed, compute overrun found to be 1.4× not
-5×); and it depends on none of the disputed citations above. Mandatory changes before
-launch: add the ~94 GPU-hour EasyRobust-calibration arm first; never report a single
-"AutoAttack accuracy of an int8 model" number — report Square-only-on-real-int8 (upper
-bound) and white-box-on-fake-quant (separate quantity) side by side; budget int8 evaluation
-in CPU-hours, not GPU-hours. Honest ceiling, in the assassin's words: one solid workshop
-paper, about five months, in a threat model with no recorded deployed victim.
+Concretely, what I recommend running is not the programme as written. It is what
+survived after both adversarial reviewers were done with it, which is what both of
+them independently identified as the part they could not kill:
 
-**Close second, and the only structurally distinct idea in the set: P8**, reduced to its
-~300–350 GPU-hour surviving shape (secret-weights threat model, extraction budget Q*,
-invariant-subspace design rule). Best risk profile in the whole run: a one-week,
-10–15 GPU-hour replication of a single published table (Tanaka et al. Table VI) either
-confirms the mechanism or kills the whole programme for 1% of its budget. Never went to the
-red team, so this is unverified against an adversarial reader. Its ceiling is narrow — the
-beneficiary is a team that already open-sourced its own model.
+> The first seed-replicated, noise-floored cost sheet for a deployable-size robust
+> ImageNet classifier — clean accuracy, AutoAttack at eps=4/255, worst-class
+> accuracy, natural-shift panel, and robustness retention after quantisation —
+> measured on the number format the model would actually run in.
 
-**Do not run P3, P4, P5 as designed.** All three chase a contrast whose best available point
-estimate (+0.15 pp) is smaller than this lab's own measured noise floor by roughly an order
-of magnitude, and whose motivating premise is already falsified by a downloadable,
-zero-GPU-hour fact: a PreActResNet-18 with no teacher scores 58.63% AutoAttack
-(Gowal2021Improving_R18_ddpm_100m), while the best published ARD ResNet-18 anywhere is
-roughly 53.45%. The student's own question is already answered, for free.
+Four changes from the written proposal, each forced by the red team:
 
-**Do not run P1/P2.** The interesting region of any attacker-cost curve for image-cloak
-protections was already consumed by a March-2026 paper before a single run here, and the
-critical path (IRB, artist consent, a closed Windows GUI applied by hand to hundreds of
-images) runs entirely outside this lab's competence while its actual instrument — the
-measured noise floor — sits off that critical path.
+1. **Delete the CIFAR-10 stage.** Its question is answered (section 2), the
+   repository already has a better-designed five-seed plan for it, and the
+   distillation champion it names is two years stale.
+2. **Demote the teacher contrast to an optional secondary arm.** It cannot be
+   answered at one compute point, its compute ledger is undefined, and at n=3 it
+   is not powered to resolve the 1–2 point effect at issue.
+3. **Make the headline the cost sheet, not the teacher.** The teacher-free arm
+   plus the untouched pretrained control plus the quantised evaluation is the
+   whole deliverable, and it needs no distillation at all.
+4. **Replace "int8" with a bit-width sweep including int4.** One adversarial
+   reviewer measured int8 retention at 0.995 on this lab's own robust checkpoint,
+   which would make the proposal's preregistered 0.9 threshold unreachable from
+   below. Reported measurement, not verified by me — and it is the reason for the
+   gate in section 6.
 
-**Run these three things regardless of which direction is chosen — they are free or nearly
-free, and every distillation-adjacent programme in this document depends on at least one:**
+### The margin, honestly
 
-1. **Close the 1.2–1.5 pp TRADES gap** (`docs/debugging/0028-trades-clean-target-detached.md`).
-   Three candidate causes are already named and ordered there. Until this closes, no ARD
-   comparison from this harness with a threshold under ~2 pp means anything.
-2. **The checkpoint-selection table** (best-on-held-out-validation vs best-on-test vs last).
-   A within-run, within-arm contrast, immune by construction to the arm-specific bias that
-   killed P5. Nearly free once any training grid exists.
-3. **The 10-GPU-minute teacher pre-screen**: one forward pass of the already-pinned
-   `Chen2021LTD_WRN34_10` teacher over the generated-image set, reading off label agreement
-   and predictive entropy on synthetic vs real data. Predicts the sign and most of the
-   magnitude of the entire 520-GPU-hour phase P3/P4/P5 are built around, for the cost of a
-   coffee break.
+Programme 2 scored 31.25 out of 50; programme 1 scored 32. I am not recommending
+the highest-scored programme, and the 0.75-point difference between them is
+meaningless — it is four judges' arithmetic on a subjective scale.
 
-**Before treating any of the above as settled**, a human should do two cheap things no
-agent could: (1) open the ECCV 2024 and CVPR 2024 PDFs named in §3/§5 and read Table 5 /
-Table 4 directly — the entire ARD-vs-data cluster's novelty claim hangs on whether those
-specific numbers are really printed there; (2) spend ten minutes checking citations 5–7 in
-§5, each of which was used to kill or narrow a specific clause while the agent using it
-admitted it could not read the source.
+The real reason is the kill record, and it is not close. Programme 1 was attacked
+twice and killed twice; both reviewers independently found that its primary
+contrast is confounded four ways and that its sign is predictable before any GPU
+runs. Programme 3 was killed once on a calibration defect this repository has
+already documented. Programme 2 was attacked twice, killed once, and the reviewer
+who failed to kill it did so after running four empirical attacks on this lab's
+own hardware and losing all four.
+
+That is the margin: not a score, a survival record under adversarial testing where
+the attacks were actually executed rather than argued.
+
+### Why it is still worth doing even though it fails the deployment test
+
+Three reasons, in decreasing strength.
+
+1. **It tests whether a number the field reports is the number the artifact has.**
+   Every "efficient robustness" paper reports float32 robust accuracy of a small
+   model. If that number does not survive quantisation, the subfield has been
+   reporting a quantity that cannot leave a GPU, and every future paper in the
+   line owes a retention row. That is a falsifiable claim about a literature, and
+   it is cheap to test.
+2. **The artifact does not exist and is genuinely unoccupied.** VERIFIED: there is
+   no sub-ResNet-18 entry on the pinned ImageNet leaderboard, and no mobile
+   architecture at all. Relayed: one from-scratch EfficientNet-B0 exists outside
+   the leaderboard (EasyRobust, arXiv:2503.16975, 61.83 clean / 35.06 AutoAttack)
+   as a single number with no seed, no panel and no quantised evaluation.
+3. **It is the version of the student's own question at deployment scale.** The
+   CIFAR answer in section 2 is free. Whether it holds at ImageNet, at mobile
+   size, in int8, is not free, and it is the only version anyone shipping anything
+   would care about.
+
+---
+
+## 5. Every programme
+
+Scores are out of 10 on each axis: deployment value (D), novelty (N),
+tractability (T), robustness of the design (R), legibility (L). Total out of 50.
+None was preempted outright at the gate; the preemption column records partial
+preemption found by the examiners. **Every paper in the preemption column is
+relayed and unverified by me.**
+
+| # | Title | In one sentence | D | N | T | R | L | Tot | Preempted? |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | Teacher or Data? A noise-floor accounting of ARD | Does a robust teacher add anything to a ResNet-18 that the same GPU budget spent on generated data does not? | 3.75 | 4.75 | 7.5 | 7.75 | 8.25 | 32 | Partly. The fixed-data half is owned by Lee & Chung, SAAD, TMLR 2026 (arXiv:2512.10275), 15 teachers x 6 methods x 3 seeds. The compute-matched framing is Busbridge et al., Distillation Scaling Laws, ICML 2025 (arXiv:2502.08606), in another modality. |
+| 2 | **Does the Teacher Pay for Itself? CIFAR-10 to int8 ImageNet MobileNets** | **Does distilling from a robust teacher beat plain adversarial fine-tuning for a phone-sized ImageNet model, and does the robustness survive int8?** | **4.5** | **5** | **5.75** | **8** | **8** | **31.25** | **Partly. Its "ARD + diffusion data" clause is occupied by ASDA (ICLR 2026 submission, OpenReview ZZGn6GXJDH), which reports the direction negative. Its motivating premise is stale: SAAD beats teacher-free TRADES on both students with error bars. The ImageNet-mobile and quantisation clauses survived.** |
+| 3 | Does the Teacher Buy Anything? Matched-compute ARD vs generated data | Same question as 1, with AdvFunMatch as the steelman and a replication verdict on its unrefereed 58.30 claim. | 3 | 4 | 7.75 | 8 | 8 | 30.75 | Partly, and its own stated falsifier fired. Dong, Koniusz, Chen, Wang & Ong, CVPR 2024, Table 4, reports ARD/RSLAD/IAD ResNet-18 students trained on 1M DDPM CIFAR-10 under AutoAttack. A second examiner attributes an equivalent table to Dong, Koniusz, Chen & Ong, ECCV 2024 (STARSHIP), Table 5. Both relayed; the two attributions conflict and must be resolved before anything is preregistered. |
+| 4 | Keyed Deployment: secret input transforms under an attacker who trains his own keys | Gmail scrambles inputs with a secret key to break transfer attacks; does that work for image classifiers, and at what query budget does it stop? | 4.25 | 4 | 6.75 | 7 | 8 | 30 | Probably, and badly. Tanaka, Echizen & Kiya, ISPACS 2022 (arXiv:2209.02997), Table VI reportedly drives two of the three flagship transform families to about 3% robust accuracy with a plain public surrogate and zero attacker keys. The secret-weights threat model is reportedly already published by MaungMaung, Echizen & Kiya, IEEE OJSP 2024. Both relayed. |
+| 5 | Teacher or Data? Robust distillation at a measured noise floor | A third variant of 1 and 3, with a recipe-nuisance floor added. | 2.75 | 4 | 7 | 7.25 | 8 | 29 | Materially. Its {robust teacher} x {real vs +generated data} factorial is reportedly STARSHIP (ECCV 2024) Table 5, and its motivating claim that no ARD method beats teacher-free AT is false inside that same paper's Table 2. Relayed. |
+| 6 | Cost-to-Break: attacker-budget curves for artist protections | How much must someone spend per image to strip Glaze or Nightshade, and how big is the error bar on that number? | 4 | 5 | 4.5 | 7 | 8.25 | 28.75 | Qualitatively. Hönig, Rando, Carlini & Tramèr (ICLR 2025) and Foerster et al. (LightShed, USENIX Security 2025) already published the negative; Pleimling et al. (IEEE SaTML 2026) reportedly strip six families with one off-the-shelf model and one prompt, i.e. at the zero point of the proposed cost axis. Relayed. |
+| 7 | Teacher, Init and int8: robust ImageNet at mobile scale | Near-duplicate of programme 2's second stage, without the CIFAR stage. | 4 | 3.5 | 5.75 | 7.25 | 8 | 28.5 | Partly. Its novelty sentence is reportedly false in both halves: EasyRobust's EfficientNet-B0 exists, and Thorsteinsson et al. (arXiv:2403.09441) reportedly already show int8 does not erase robustness at CIFAR/Tiny-ImageNet scale. Relayed. |
+| 8 | Cloak Budget Curves: what anti-mimicry protections buy per attacker-second | Variant of 6 with a wider protection set and a human-rater study. | 2.75 | 3.75 | 3.75 | 7 | 8.25 | 25.5 | Same as 6, plus IPV-Bench (arXiv:2603.26154) reportedly claimed the unified-benchmark slot in a sibling application. Relayed. |
+
+No programme was preempted outright at the gate.
+
+---
+
+## 6. What the red team could and could not kill
+
+This section is the point of the document. The three categories are not the same
+and should not be blurred.
+
+### 6.1 What it could not kill — attacks that were executed and failed
+
+One adversarial reviewer ran four attacks on Hamster against programme 2's second
+stage and lost all four. These are reported measurements from another session, not
+verified by me, but they are specific enough to be worth acting on.
+
+- **Bit-determinism of the mobile architectures under mixed precision.** This was
+  the proposal's own self-declared top schedule risk, budgeted at up to two weeks.
+  Running a real PGD-3 adversarial-training loop at 224 pixels in separate
+  processes gave bit-identical parameter hashes for MobileNetV3-Large,
+  EfficientNet-B0 and a ResNet-18 control, with and without autocast. Depthwise
+  convolution, squeeze-excite pooling and hard-swish were all deterministic. The
+  second reviewer independently reproduced this with a different configuration.
+- **The data path.** VERIFIED by me today: ImageNet is 146 GB at
+  `/home/shunsukenaito/workspace-local/datasets/imagenet` on local NVMe with train
+  and val both present, on a filesystem with 2.2 TB free. The reviewers measured
+  the folder scan at about 2 seconds for 1,281,167 images and the 224-pixel loader
+  at 2,251 to 3,235 images per second, which is above what training consumes. An
+  earlier objection that ImageNet sat on a 95%-full NFS share was simply wrong.
+- **The compute model.** Measured per-epoch costs came in within roughly 11 to 37%
+  of the proposal's estimates for the mobile student, and the fleet has the
+  throughput. GPU-hours are not the binding constraint.
+- **The quantisation toolchain.** It is degraded, not merely slower: the
+  converted int8 model's `.to('cuda')` succeeds silently and the forward pass
+  then **segfaults (SIGSEGV, process exit 139, no Python traceback, core
+  dumped, reproduced twice)**. It must run on CPU, measured at **567 to 607
+  images per second on 26 threads** — the document this replaces an earlier
+  draft's rounding of that figure up to "600 to 900," which is not what was
+  measured. At that rate, Square's 5,000 queries against the 5,000-image
+  RobustBench ImageNet subset is 25 million forward passes, about **12.2
+  CPU-hours per checkpoint**. Across 22 planned final runs x 2 checkpoints that
+  is roughly **260 to 540 CPU-hours contending with the ImageNet dataloader on
+  the same machine**, not the "about 3 hours" the original proposal budgeted
+  against GPU-hours. It is affordable and exactly reproducible, as stated, but
+  it is a CPU-bound line item that section 7's cost table should book as such
+  rather than folding into a small parenthetical.
+
+### 6.2 What it could kill — and did
+
+- **The teacher contrast, three independent ways.** First, the motivating premise
+  is false: SAAD (Lee & Chung, TMLR 2026) reportedly beats teacher-free TRADES by
+  3.4 to 3.9 points on both ResNet-18 and MobileNetV2 with three seeds, so a
+  contest whose champion is RSLAD is a strawman. Second, Busbridge et al. (ICML
+  2025) make "does the teacher pay for itself" a crossover question whose answer
+  is a function of budget, and a single compute point cannot locate a crossover.
+  Third, the compute ledger is undefined — the teacher's own training cost is
+  excluded, and the sign of the answer depends on that unstated convention.
+- **The int8 headline.** A reviewer measured, on this lab's own robust CIFAR-10
+  teacher checkpoint, int8 retention of 0.995 and int4 retention of 0.918. If that
+  transfers, the preregistered "retention above 0.9" bar is unreachable from
+  below at int8, and the experiment as specified was designed to observe nothing.
+- **The CIFAR stage of every distillation programme.** Section 2 above. The
+  repository already contains the answer and a better-designed plan for the
+  residual.
+- **The "first noise floor" claim.** Reportedly, SAAD Table 12, ADR Table 7 and
+  DAT Table 3 already publish multi-seed AutoAttack spreads. What is unpublished
+  is the *decomposition* into initialisation, data order and attack seed, which is
+  a smaller claim.
+- **"No robust small ImageNet model exists."** False; EasyRobust's EfficientNet-B0
+  is reported at 61.83 clean / 35.06 AutoAttack.
+
+### 6.3 What survived only because nobody checked
+
+This is the list that should worry us most, because each item is currently load
+bearing and untested.
+
+1. **Whether a mobile student adversarially fine-tuned from standard pretrained
+   weights reaches anything near a from-scratch anchor.** No arm in any version of
+   the programme reproduces a known-good *training* recipe; every calibration in
+   the plan calibrates the *evaluator* instead. Both reviewers flagged this and
+   neither ran it. If a 30-epoch fine-tune lands far below EasyRobust's 35.06,
+   then the cost sheet is a cost sheet for an undertrained model and the retention
+   ratio is a ratio on an undertrained numerator. This is the real load-bearing
+   unknown and it is why calibration is gate 2 in section 8.
+2. **Whether quantisation retention on a depthwise, hard-swish mobile network at
+   ImageNet scale resembles the measurement on a WideResNet at CIFAR scale.** The
+   reviewer who took the measurement said so himself. Depthwise convolutions and
+   squeeze-excite blocks are known to quantise worse than plain convolutions. The
+   0.995 number may not transfer at all, in either direction.
+3. **Whether the three-way attack guard produces a number that means anything.**
+   Three of AutoAttack's four components need gradients and cannot run through a
+   real quantised graph, so the shipped artifact is only ever attacked black-box
+   with Square, while the strong attacks run on a float simulation. Nobody tested
+   how big the gap between those two is. If it is large, the honest deliverable
+   shrinks to an upper bound.
+4. **Cross-host bit-identity.** VERIFIED by me today, and it corrects the brief:
+   `docs/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md` establishes bit-identical
+   weights and optimiser state for two runs on the *same GPU and same host*, and
+   its own limitations section lists cross-host agreement as not yet performed.
+   The lab's distinguishing capability is real within a host and unproven across
+   hosts. Any claim that results are bit-reproducible across machines is currently
+   unsupported by our own records.
+5. **Whether the hash-bound lineage contract scales to 1.28 million files.** The
+   content-identity machinery was built for CIFAR and Tiny-ImageNet. One reviewer
+   measured the digest cost at about 1,694 files per second, which is fine, but
+   nobody tested the surrounding stable-identifier machinery at that scale.
+6. **The claim that RobustART already contains adversarially trained ImageNet
+   MobileNetV3 and ShuffleNetV2 models evaluated with AutoAttack.** This came from
+   a judge, unverified. If it is true it materially dents the novelty of the cost
+   sheet. It is a twenty-minute check and it should be the first thing done.
+7. **The Dong et al. attribution, live-checked and worse than "may be the same
+   table."** Independently verified against the web on 2026-09-09, not merely
+   relayed: **both papers are real, and they are two different papers, not one
+   paper described twice.** Dong, Koniusz, Chen & Ong, "Adversarially Robust
+   Distillation by Reducing the Student-Teacher Variance Gap," ECCV 2024
+   (Springer LNCS, doi 10.1007/978-3-031-73235-5_6) — confirmed via Springer,
+   ECVA and ACM DL. Dong, Koniusz, Chen, Z. Jane Wang & Ong, "Robust Distillation
+   via Untargeted and Targeted Intermediate Adversarial Samples" (DARWIN), CVPR
+   2024 — confirmed via the CVPR virtual program and CVF open access. They share
+   three authors with Z. Jane Wang added on the CVPR paper: a plausible pair from
+   one research group. **What is not verified is whether the specific table
+   content quoted (ECCV Table 5; CVPR Table 4) actually contains the numbers
+   attributed to it** — every fetch attempt against both PDFs was refused, and
+   two different examiners each claim to have read one of the two tables
+   directly, with numbers that disagree with each other (RSLAD reported as 52.60
+   in one, 52.42 in the other). **Four other examiners, working independently
+   across three different programmes, searched for the same experimental cell
+   and reported finding nothing** — that 4-against-2 asymmetry does not appear
+   above. This is the single highest-value fact for a human to settle before
+   preregistering anything in the ARD-vs-data cluster, since the one cell all
+   three of those programmes' novelty claims depend on stands or falls on it:
+   open `ecva.net/papers/eccv_2024/papers_ECCV/papers/00499.pdf` and the CVPR
+   2024 open-access page, and read Table 5 and Table 4 directly.
+8. **A citation with fabricated metadata attached to a real paper, found by
+   live-checking rather than by symptom.** One examiner (reviewing programme 8)
+   cited "IPV-Bench (arXiv:2603.26154), Fang et al. (HKUST-GZ / Wuhan Univ.),
+   19 Aug 2026." Verified against the web on 2026-09-09: the arXiv ID is real,
+   but the paper is titled "IPV-Bench: Benchmarking Image Protection Methods
+   under Diverse Image-to-Video Generation Scenarios," its actual authors are
+   **Xiaofeng Li, Leyi Sheng, Yifan Zhao, Zhen Sun, Zongmin Zhang, Jiaheng Wei,
+   Xinlei He**, and it was submitted **27 March 2026**, not 19 August. Both the
+   author and the date attached to a correct arXiv ID were invented. This is
+   concrete evidence that at least one examiner in this run fabricated
+   supporting detail around an otherwise-real citation, and it is the reason
+   every citation below marked "relayed" should be read as "an arXiv ID that
+   probably resolves, with surrounding claims of unknown reliability" rather
+   than as a checked fact.
+9. **Citations named above that no agent could open, load-bearing enough to
+   check before relying on the verdict that used them.** "RC-QAT: Efficient
+   Robust Quantization via Attention-Guided Adversarial Distillation" (CSCWD
+   2026, DOI 10.1109/cscwd68734.2026.11582282) does not appear elsewhere in this
+   document but was named by two independent examiners as sitting exactly on
+   the int8-x-distillation intersection that is this document's own recommended
+   headline; neither could retrieve it. The ASDA finding cited above as
+   settling programme 2's generated-data clause negative rests on an ICLR 2026
+   submission (OpenReview forum `ZZGn6GXJDH`, ratings 2/4/3) whose examiner
+   states plainly that the PDF's tables were unreadable and only the abstract
+   was seen — the negative direction is the abstract's own framing, not a
+   verified table. "Wu, Huang, Chen, Pang, Wang, 'Scaling and Taming
+   Adversarial Training with Synthetic Data,' ICCV 2025" was described with a
+   DOI, an exact page range, an institution, an OpenAlex ID and a DBLP key by
+   an examiner who never got past a 403; that combination of precision and
+   total unreadability is worth ten minutes of direct checking before treating
+   it as a settled risk to any programme. "Frochte, arXiv:2605.09030" — the
+   sole-author style-metric paper cited to justify the artist-protection
+   cluster's metric-calibration rule — was independently confirmed real on
+   2026-09-09 ("When Style Similarity Scores Fail: Diagnosing Raw CSD Cosine in
+   Artist-Style Evaluation," Jörg Frochte), so this one specific worry is
+   retired.
+
+Also VERIFIED, and relevant to everything: the engine does not currently support
+this work. `src/ard/config/schema.py:259` restricts datasets to synthetic CIFAR,
+CIFAR-10, CIFAR-100 and Tiny-ImageNet; line 88 restricts schedulers to identity
+and multistep; there are zero references to `timm` anywhere in `src/ard`; there is
+no quantisation code in `src/ard` or `scripts`; and there is no weight averaging.
+A 224-pixel ImageNet path, a model registry entry for mobile architectures, and a
+quantisation-plus-attack path all have to be built before any scientific run.
+
+---
+
+## 7. Cost and honest duration
+
+No deadline was given, so this is an unforced estimate.
+
+**GPU-hours, core programme: about 950.**
+
+| Block | GPU-hours |
+|---|---|
+| Gate: quantisation retention on existing checkpoints, no training | 60 (plus ~60 CPU-hours) |
+| Calibration: reproduce a published from-scratch mobile anchor | 100 |
+| Cost sheet: 2 students x teacher-free arm x 3 seeds | 370 |
+| Evaluation: AutoAttack on the 5k subset, full-50k on finalists, shift panel, quantised retention on new checkpoints | 230 |
+| Contingency at 25% | 190 |
+
+At 100 to 120 GPU-hours per day of fully loaded throughput that is about 8 to 10
+days of pure compute, which is not the constraint. The optional teacher arm adds
+roughly 400 more and should not be launched until the cost sheet exists.
+
+**Person-weeks: 18 to 22. Calendar: 5 to 7 months for one person.**
+
+| Block | Person-weeks |
+|---|---|
+| Quantisation and three-route attack path, evaluation-only | 3–4 |
+| 224-pixel ImageNet loader inside the identity and determinism contract, mobile model registry, validation split | 4–5 |
+| Calibration and its debugging | 2–3 |
+| Campaign supervision, aggregation, analysis | 4 |
+| Write-up, reproducibility appendix, released checkpoints | 5 |
+
+The calendar figure is longer than the person-week figure because the engineering
+is a strict serial prefix: nothing scientific can run until the ImageNet path
+exists, and one person cannot parallelise that against themselves. The campaigns
+themselves run unattended and cost almost no attention.
+
+**Abandon it at any of these three points.**
+
+1. **After the gate, at about week 4 and 60 GPU-hours.** If robustness retention
+   is at or above 0.95 at every bit-width anyone would ship, across all three
+   attack routes and all four checkpoints, the quantisation clause has no content.
+   Stop. Publish the retention table as a three-page note — it is the first such
+   measurement either way — and pick a different direction.
+2. **After calibration, at about week 9 and 160 GPU-hours cumulative.** If a
+   teacher-free adversarially fine-tuned mobile student cannot come within about 2
+   points of a published from-scratch anchor at any budget the lab can afford,
+   stop. Report the number as a floor on the recipe, not as a ceiling on the
+   architecture — the difference matters and the proposal originally got it wrong.
+3. **After the first seeded cell, at about week 14.** If the seed standard
+   deviation at ImageNet scale exceeds about 1.0 point, no contrast at the 1 to 2
+   point scale is resolvable at n=3. Drop the optional teacher arm permanently and
+   ship only the cost sheet, which does not require a contrast to be valuable. For
+   reference, VERIFIED in this repository: our measured five-seed endpoint standard
+   deviations at CIFAR scale are 0.118, 0.272 and 0.532 points depending on the
+   arm (`docs/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`), so the floor is
+   arm-dependent by a factor of four and must be measured per arm, not assumed.
+
+This repository's teacher-free TRADES baseline is still 1.2 to 1.5 points below
+every literature value after a real bug was fixed (VERIFIED,
+`docs/debugging/0028-trades-clean-target-detached.md`: 45.14 to 47.87 AutoAttack
+after removing a detached gradient target, against a literature range of 49.0 to
+49.4). A baseline that is low by more than the effect size, in the direction that
+flatters the treatment, has already produced one wrong number here. This is not a
+footnote to file under "one more precondition" — it is the single cheapest,
+highest-value item identified anywhere in this run, because it blocks every
+future contrast this harness could run against a teacher-free control, in any
+direction chosen. If any contrast is run against a teacher-free control, that gap
+must be closed or measured first.
+
+### Three more measurements worth taking regardless of which direction is chosen
+
+None of these costs more than a coffee break, and each one either predicts or
+retires a much larger piece of work above.
+
+1. **A ten-GPU-minute pre-screen of the teacher on the generated data.** One
+   forward pass of the already-pinned `Chen2021LTD_WRN34_10` teacher
+   (`teachers.lock.yaml`, sha256 `fc398a48…`) over the 1M-image generated set,
+   reading off the teacher's label agreement with the generator's own labels and
+   its predictive entropy on synthetic versus real inputs. Minutes of GPU time,
+   no training. This single number predicts the sign and most of the magnitude
+   of the entire distillation-versus-generated-data question that the killed
+   programmes 1, 3 and 5 were each built to answer at 500 to 1,200 GPU-hours. Run
+   it before spending any of that budget on a follow-up to this cluster, even a
+   narrowed one.
+2. **A checkpoint-selection table**: best-on-held-out-validation versus
+   best-on-official-test versus last-epoch, for whatever grid of runs any chosen
+   direction produces. This is a within-run, within-arm contrast, and is
+   therefore immune by construction to the arm-specific TRADES bias documented
+   above — it cannot be confounded by which control a comparison happens to use.
+   No ARD paper in the literature defines a held-out selection split at all.
+   Nearly free once any training grid exists for any other reason.
+3. **A one-week, 10-to-15-GPU-hour replication of a single published table**, for
+   anyone who reopens the keyed-deployment direction (programme 4 above): Tanaka,
+   Echizen & Kiya's Table VI (block-shuffle-encrypted ResNet-18 under a plain
+   public surrogate, no attacker keys at all). If it replicates, the secret-key
+   mechanism has already been shown fragile and the programme is over for 1% of
+   its proposed budget; if it does not, the programme's central premise survives
+   its first real test. Best risk profile of anything considered in this run: a
+   defensible answer within a week either way.
+
+---
+
+## 8. The one thing that must be true, and the cheapest test of it
+
+**The one thing:** the robustness reported on a float32 checkpoint must not be the
+robustness the deployed artifact has.
+
+If quantisation is lossless for robustness, the programme collapses into "an
+ImageNet cost sheet for a model nobody will ship," which fails the student's test
+with nothing left over. If quantisation costs real robustness, then the entire
+small-model robustness literature has been reporting a number that does not
+survive the format it would run in, and every future paper in that line owes a
+retention row. That second world is worth a thesis chapter. The first is worth a
+note.
+
+**The cheapest experiment: run the retention measurement on checkpoints that
+already exist, before training anything.**
+
+- Models: Salman2020Do_R18, Salman2020Do_R50 and Singh2023 ConvNeXt-T+ConvStem
+  from the pinned RobustBench zoo (VERIFIED present), Standard_R50 as a
+  non-robust control, and EasyRobust's EfficientNet-B0 if it downloads.
+- Formats: float32, int8 post-training quantisation, simulated 4-bit.
+- Attacks, and report the minimum of the three: white-box through the fake-quant
+  graph with straight-through gradients; transfer of the float32 adversarial
+  examples to the quantised model; and Square on the real quantised graph.
+- Data: the 5,000-image RobustBench ImageNet subset.
+- **Cost: about 60 GPU-hours, about 60 CPU-hours, and 3 to 4 person-weeks**, most
+  of which is building the quantisation and attack path rather than waiting.
+- No training. No determinism contract. No campaign infrastructure.
+
+Preregister the rule before looking: if the minimum-of-three retention is at or
+above 0.95 at both int8 and 4-bit on every checkpoint, stop the programme. If it
+falls below 0.9 anywhere, or if the three attack routes disagree by more than
+about 5 points — which would mean the field's fake-quant evaluations are masking
+gradients — the programme is justified and the training campaign should proceed.
+
+Two properties make this the right first move. It is the gate and a deliverable at
+the same time: whichever way it lands, nobody has published these numbers, so four
+person-weeks buys a result rather than only a decision. And it fails fast in the
+direction the evidence currently favours — the one reported measurement we have
+says int8 retention is 0.995, which means the most likely outcome is that this
+test stops the programme for 60 GPU-hours instead of 950.
+
+---
+
+## 9. The objection I cannot answer
+
+The programme prices an insurance policy against a peril with no recorded claims.
+
+Apruzzese et al. hand-reviewed 4,600 flagged samples from a live production
+classifier and found zero gradient-based evasions. ATLAS v2026.08 contains one
+typed Incident of perception-model evasion by input manipulation, and it is that
+same study; the last perturbation-style case of any kind is dated 2021. So a cost
+sheet for a robust mobile classifier prices a defense that no attacker has been
+observed to require.
+
+It is worse than that, and this is the part I genuinely cannot answer. The threat
+model at mobile scale is close to incoherent. A white-box L-infinity attacker
+against an on-device classifier must be able to compute gradients through the
+quantised graph on the handset — which means they already hold the weights and
+control the camera, at which point perturbing an input is the least interesting
+thing they could do. The threat model that makes the measurement meaningful is
+one in which the attacker's position already defeats the classifier by other means.
+
+My reply is that the field will keep publishing float32 small-model robustness
+numbers whether or not anyone checks whether they survive deployment, and that
+checking is cheap. That is a reply about the hygiene of a literature. It is not a
+reply about anyone's safety, and it is precisely the substitution the student said
+they wanted to avoid: improving a real quantity, rigorously, for an audience that
+is the research community rather than a deployer.
+
+The honest position is that the correct budget for this may be zero, and that the
+reason nobody has published the table is not an oversight but a correct allocation
+of attention. I recommend it as the least bad of eight options that all fail the
+same test, at a cost of 60 GPU-hours to find out whether it has content at all —
+not because I can defend it against this objection.
+
+If the student would rather not spend a thesis inside a threat model with no
+recorded victim, the survey's own answer to "where would the same skills matter"
+is the Magika direction in section 1.2: an open-source production model, a
+published gradient attack that worked, a shipped defense whose effect size nobody
+has independently measured, and a threat model with an actual incident behind it.
+No programme in this set covers it well — programme 4 is the closest and appears
+pre-refuted — so it would need a proposal written from scratch. That is a real
+option and it should not be foreclosed by this document.
