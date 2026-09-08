@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from ard.analysis import write_sample_parquet
 from ard.attacks import AttackRequest, LinfPGD
 from ard.config import load_config
-from ard.data import EpochShuffleSampler, build_train_validation_views, collate_indexed
+from ard.data import EpochShuffleSampler, build_train_validation_views, collate_indexed, load_stagewise_late_mask
 from ard.evaluation.saved_checkpoint import load_saved_student_checkpoint
 from ard.models import build_student
 from ard.tracking.adapter import collect_git_state
@@ -79,6 +79,7 @@ def evaluate_endpoint(
     device: torch.device,
     expected_epoch: int = 84,
     split: EndpointSplit = "train",
+    stagewise_late_mask_path: Path | None = None,
 ) -> dict[str, Any]:
     config = load_config(config_path)
     attack_config = config.method.selection_attack
@@ -93,11 +94,27 @@ def evaluate_endpoint(
     source = collect_git_state(Path.cwd())
     if source.get("dirty") is not False or not isinstance(source.get("sha"), str):
         raise StageAEndpointError("endpoint evaluation requires a clean source tree")
+    # A stage-wise run's config declares the identity of the allocation mask it
+    # trained under, and `build_train_validation_views` refuses to build a view
+    # when the declaration and the mask disagree -- including when one is absent.
+    # The mask never touches the validation view (it is checked to lie inside the
+    # training partition), so the endpoint does not depend on it; but satisfying
+    # the guard by passing the mask is right, and relaxing the guard for this
+    # call site would remove the check that a run's loader matched its record.
+    stagewise_late_mask = None
+    if config.dataset.stagewise_late_mask_selected_ids_sha256 is not None:
+        if stagewise_late_mask_path is None:
+            raise StageAEndpointError(
+                "this run's config declares a stage-wise allocation mask; "
+                "the endpoint needs --stagewise-late-mask to verify it"
+            )
+        stagewise_late_mask = load_stagewise_late_mask(stagewise_late_mask_path)
     train_dataset, validation_dataset = build_train_validation_views(
         config.dataset,
         validation_fraction=config.training.validation_fraction,
         split_seed=config.seeds.split,
         augmentation_seed=config.seeds.augmentation,
+        stagewise_late_mask=stagewise_late_mask,
     )
     selected_dataset = train_dataset if split == "train" else validation_dataset
     identity = split_identity(selected_dataset, split=split)
