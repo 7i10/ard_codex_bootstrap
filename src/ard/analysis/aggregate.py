@@ -8,6 +8,15 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+# best-ema.pt (an ADR/adr_trades run's EMA-selected checkpoint, see
+# ard.engine.trainer) is a peer of best.pt, not a third checkpoint kind: a
+# given evaluation-results.json set is always uniformly "model" or "ema"
+# weights (ard.cli.evaluate's own --weights flag and checkpoint-dir
+# remapping never mix best.pt and best-ema.pt for one train_run_id), so
+# normalizing it into the "best" bucket cannot silently combine a
+# student-selected and an EMA-selected checkpoint under one label.
+_CHECKPOINT_ALIAS_GROUP = {"best": "best", "last": "last", "best-ema": "best"}
+
 _TRAINING_SEED_FIELDS = frozenset(
     {
         "split",
@@ -69,9 +78,10 @@ def summarize_checkpoint_groups(rows: Iterable[Mapping[str, Any]], *, metric: st
         missing = required.difference(row)
         if missing:
             raise ValueError("canonical evaluation result is missing: " + ", ".join(sorted(missing)))
-        checkpoint = str(row["checkpoint_alias"])
-        if checkpoint not in {"best", "last"}:
-            raise ValueError("checkpoint group must be best or last")
+        raw_alias = str(row["checkpoint_alias"])
+        checkpoint = _CHECKPOINT_ALIAS_GROUP.get(raw_alias)
+        if checkpoint is None:
+            raise ValueError("checkpoint group must be best, last, or best-ema")
         training_protocol = row["training_protocol_identity"]
         if not isinstance(training_protocol, Mapping):
             raise ValueError("training_protocol_identity must be a mapping")

@@ -88,3 +88,15 @@ P1(TRADES+ADRの内側PGD攻撃が公式実装〈`.external/adr`にpin、commit 
 独立にEMAシャドウモデルの検証PGD精度も計測し、`best-ema.pt`へ別途保存する。
 `--weights=ema`で`best.pt`を指定することは明示的エラーになり、
 `--checkpoint-dir`経由では自動的に`best-ema.pt`へ読み替えられる。
+
+3回目のレビューで、`best.pt`/`best-ema.pt`は公式実装の"ADR"/"ADR + WA"行と
+厳密には同じ量ではない(公式はepochごとに1モデルだけ検証し、同一epochの
+student/EMA重みを同じファイルに保存するため両行は同一epoch。このプロジェクトの
+2つの選択は独立なので一般には別epoch)という指摘、および`best-ema.pt`から
+訓練を誤ってresumeすると`self.best_metric`/`selection_metadata`がEMAの値で
+上書きされ`best.pt`の選択状態が壊れるという指摘を受け、両方を修正した
+(resumeをfail closedで拒否、`selection_metadata_ema`に攻撃identity/RNGプロトコル
+を追加、resume時のfresh-restart windowを記録、W&Bアーティファクト公開と
+集計器のcheckpoint_alias許可リストにbest-emaを追加)。公式実装と厳密に一致する
+同一epoch比較をしたい場合は`best-ema.pt`を`--weights=model`と`--weights=ema`の
+両方で評価する。詳細は`docs/SCIENTIFIC_INVARIANTS.md`のADRの契約セクション。

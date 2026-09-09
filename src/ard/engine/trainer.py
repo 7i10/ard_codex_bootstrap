@@ -413,7 +413,9 @@ class Trainer:
         self.selection_metadata_ema: dict[str, Any] = {
             "metric": "val_pgd_accuracy",
             "selection_source": "ema",
+            "attack": self._attack_metadata(self.selection_attack),
             "tie_break": "earliest_epoch",
+            "seed_protocol": "seed+1000003*global_step+10007*rank+590017; one advancing generator per pass",
             "selected_epoch": None,
         }
         if prescriptive_v3_route is not None:
@@ -1739,10 +1741,14 @@ class Trainer:
             # Absent on a checkpoint written before this feature existed --
             # not a resume failure, EMA-best tracking simply restarts fresh
             # from this epoch rather than replaying the pre-resume history.
+            # Recorded explicitly so best-ema.pt is never read as "best over
+            # the whole run" when it is really only "best since resume".
             if state.best_metric_ema is not None:
                 self.best_metric_ema = state.best_metric_ema
             if state.selection_metadata_ema is not None:
                 self.selection_metadata_ema = state.selection_metadata_ema
+            else:
+                self.selection_metadata_ema["selection_window_start"] = state.next_epoch
         if self.tracker_run_id is not None and state.tracker_run_id != self.tracker_run_id:
             raise ValueError("checkpoint tracker run ID does not match the active tracker")
         self.tracker_run_id, self.sample_state = state.tracker_run_id, state.sample_state

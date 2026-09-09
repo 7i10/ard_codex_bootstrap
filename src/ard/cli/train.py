@@ -1064,6 +1064,14 @@ def main(argv: list[str] | None = None) -> int:
                         artifact_type="model",
                         aliases=("best",),
                     )
+                    best_ema_path = output_dir / "best-ema.pt"
+                    if trainer.ema_model is not None and best_ema_path.exists():
+                        active_tracker.log_artifact(
+                            best_ema_path,
+                            name=f"model-{active_tracker.run_id}-best-ema",
+                            artifact_type="model",
+                            aliases=("best-ema",),
+                        )
                 sparse = (
                     trainer.current_epoch == 0
                     or improved

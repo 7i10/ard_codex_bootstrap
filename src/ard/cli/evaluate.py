@@ -259,6 +259,23 @@ def main(argv: list[str] | None = None) -> int:
     checkpoint_payloads = [
         validate_checkpoint_lineage(checkpoint, expected_config_hash=expected_config_hash) for checkpoint in checkpoints
     ]
+    if args.weights == "ema":
+        # The filename-based check in _checkpoint_paths only catches a
+        # literal "best.pt"; a student-selected checkpoint hand-copied or
+        # renamed to anything else would slip past it. last.pt carries no
+        # selection at all (every epoch's "last" is unambiguous), so only
+        # non-last.pt files need their own selection_metadata to actually
+        # say "ema".
+        for checkpoint, payload in zip(checkpoints, checkpoint_payloads, strict=True):
+            if checkpoint.name == "last.pt":
+                continue
+            selection_metadata = payload.get("selection_metadata")
+            source = selection_metadata.get("selection_source") if isinstance(selection_metadata, Mapping) else None
+            if source != "ema":
+                raise ValueError(
+                    f"--weights=ema requires a checkpoint selected on the EMA's own accuracy, but "
+                    f"{checkpoint.name} was not (selection_source={source!r}) -- point at best-ema.pt instead"
+                )
     train_run_id = checkpoint_payloads[0].get("tracker_run_id")
     if not isinstance(train_run_id, str):
         raise ValueError("saved checkpoint lacks a stable tracking run ID")

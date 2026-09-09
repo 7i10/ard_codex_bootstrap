@@ -211,6 +211,23 @@ def validate_resume_checkpoint(path: Path, *, expected_config_hash: str) -> None
         raise ValueError(f"checkpoint world size {world_size} does not match {get_world_size()}")
     if payload["config_hash"] != expected_config_hash:
         raise ValueError("checkpoint config hash does not match resolved config")
+    _reject_ema_selected_resume(payload)
+
+
+def _reject_ema_selected_resume(payload: Mapping[str, Any]) -> None:
+    """best-ema.pt's top-level best_metric/selection_metadata describe the
+    EMA's own selection story, not the student's. Resuming from it would
+    silently overwrite self.best_metric/selection_metadata with the EMA's
+    values, freezing best.pt's own selection and dropping its attack
+    identity -- training must always resume from last.pt (or an
+    epoch-NNN.pt), never a selection artifact."""
+    selection_metadata = payload.get("selection_metadata")
+    if isinstance(selection_metadata, Mapping) and selection_metadata.get("selection_source") == "ema":
+        raise ValueError(
+            "cannot resume training from an EMA-selected checkpoint (best-ema.pt): its top-level "
+            "best_metric/selection_metadata describe the EMA's own selection, not the student's -- "
+            "resume from last.pt instead"
+        )
 
 
 def load_checkpoint(

@@ -183,6 +183,84 @@ def test_best_ema_checkpoint_is_written_independently_of_best_pt(tmp_path: Path)
     assert payload["best_metric"] == trainer.best_metric_ema
     for key, value in trainer.ema_model.state_dict().items():
         assert torch.equal(payload["ema"][key], value), key
+    # The selection record must name the attack and RNG protocol that
+    # produced it, exactly like the student's -- otherwise the sole
+    # artifact behind the "ADR + WA" number can't be audited on its own.
+    assert payload["selection_metadata"]["attack"] == trainer.selection_metadata["attack"]
+    assert payload["selection_metadata"]["seed_protocol"] == trainer.selection_metadata["seed_protocol"]
+
+
+def test_best_ema_selection_is_independent_of_student_selection(tmp_path: Path) -> None:
+    """best.pt and best-ema.pt must be free to disagree on which epoch is
+    best -- a fixture where the student peaks at epoch 0 and the EMA peaks
+    at epoch 2 would pass even if best-ema.pt were gated on the student's
+    own `improved` flag, unless the two selections are checked separately."""
+    output = tmp_path / "adr-independent-selection"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=3)
+    loader, validation_loader, _ = _loaders()
+    student_trajectory = iter(
+        [
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.9},
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.1},
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.2},
+        ]
+    )
+    ema_trajectory = iter(
+        [
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.1},
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.2},
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.9},
+        ]
+    )
+
+    def fake_validate_epoch(loader, *, model=None):
+        return next(ema_trajectory) if model is trainer.ema_model else next(student_trajectory)
+
+    trainer.validate_epoch = fake_validate_epoch
+    trainer.fit(loader, validation_loader=validation_loader, epochs=3)
+    best = torch.load(output / "best.pt", map_location="cpu", weights_only=False)
+    best_ema = torch.load(output / "best-ema.pt", map_location="cpu", weights_only=False)
+    assert best["selection_metadata"]["selected_epoch"] == 0
+    assert best_ema["selection_metadata"]["selected_epoch"] == 2
+    assert best["best_metric"] == pytest.approx(0.9)
+    assert best_ema["best_metric"] == pytest.approx(0.9)
+
+
+def test_resuming_from_best_ema_checkpoint_is_rejected(tmp_path: Path) -> None:
+    """best-ema.pt's top-level best_metric/selection_metadata describe the
+    EMA's own selection, not the student's -- resuming TRAINING from it
+    would silently overwrite self.best_metric/selection_metadata with the
+    EMA's values. Only last.pt (or epoch-NNN.pt) may be resumed from."""
+    output = tmp_path / "adr-reject-ema-resume"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=1)
+    loader, validation_loader, _ = _loaders()
+    trainer.fit(loader, validation_loader=validation_loader, epochs=1)
+
+    resumed = _adr_trainer(output, objective=ADRObjective(), epochs=1)
+    _, _, sampler = _loaders()
+    with pytest.raises(ValueError, match="cannot resume training from an EMA-selected checkpoint"):
+        resumed.resume(output / "best-ema.pt", sampler=sampler)
+
+
+def test_ema_selection_window_start_recorded_when_resuming_a_pre_feature_checkpoint(tmp_path: Path) -> None:
+    """A checkpoint written before best_metric_ema/selection_metadata_ema
+    existed has neither key; resuming it must not silently claim best-ema.pt
+    describes the whole run -- the fresh restart records where its search
+    window actually begins."""
+    output = tmp_path / "adr-ema-window-start"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=2)
+    loader, validation_loader, _ = _loaders()
+    trainer.fit(loader, validation_loader=validation_loader, epochs=1)
+
+    payload = torch.load(output / "last.pt", map_location="cpu", weights_only=False)
+    del payload["best_metric_ema"]
+    del payload["selection_metadata_ema"]
+    torch.save(payload, output / "last.pt")
+
+    resumed = _adr_trainer(output, objective=ADRObjective(), epochs=2)
+    _, _, sampler = _loaders()
+    state = resumed.resume(output / "last.pt", sampler=sampler)
+    assert resumed.selection_metadata_ema["selection_window_start"] == state.next_epoch
 
 
 def test_best_metric_ema_round_trips_through_resume(tmp_path: Path) -> None:
@@ -230,7 +308,9 @@ def test_checkpoint_without_adr_still_resumes_a_non_adr_trainer(tmp_path: Path) 
     trainer.fit(loader, validation_loader=validation_loader, epochs=1)
     payload = torch.load(output / "last.pt", map_location="cpu", weights_only=False)
     assert "ema" not in payload
+    assert "best_metric_ema" not in payload
     assert REQUIRED_KEYS.issubset(payload)
+    assert not (output / "best-ema.pt").exists()
 
     resumed_model = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
     resumed = Trainer(

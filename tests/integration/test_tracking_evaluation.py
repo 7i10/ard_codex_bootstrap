@@ -651,6 +651,36 @@ def test_evaluation_with_ema_weights_writes_namespaced_outputs_through_the_cli(
     assert ema_manifest["run_id"] != model_manifest["run_id"]
 
 
+def test_evaluation_checkpoint_dir_remaps_best_to_best_ema_through_the_cli(
+    adr_offline_run: dict[str, Any], tmp_path: Path
+) -> None:
+    """--checkpoint-dir + --weights=ema must resolve "best" to the real
+    best-ema.pt the trainer wrote (an independent, EMA-selected epoch), not
+    best.pt -- and the result row must say so via selection_weights."""
+    training_output: Path = adr_offline_run["output"]
+    assert (training_output / "best-ema.pt").exists()
+    evaluation_config = tmp_path / "evaluation.yaml"
+    evaluation_config.write_text(yaml.safe_dump(_adr_training_config(tmp_path / "unused")), encoding="utf-8")
+    output = tmp_path / "evaluation-ema-dir"
+    evaluate_cli.main(
+        [
+            "--config",
+            str(evaluation_config),
+            "--checkpoint-dir",
+            str(training_output),
+            "--output",
+            str(output),
+            "--weights",
+            "ema",
+        ]
+    )
+    results = {item["checkpoint_alias"]: item for item in json.loads((output / "evaluation-results.json").read_text())}
+    assert set(results) == {"best-ema", "last"}
+    assert results["best-ema"]["checkpoint_filename"] == "best-ema.pt"
+    assert results["best-ema"]["selection_weights"] == "ema"
+    assert results["last"]["selection_weights"] == "model"
+
+
 def test_evaluation_rejects_temperature_squared_drift_before_output_creation(
     offline_run: dict[str, Any], tmp_path: Path
 ) -> None:

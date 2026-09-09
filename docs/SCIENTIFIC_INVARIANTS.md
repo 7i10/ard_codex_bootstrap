@@ -194,15 +194,22 @@ Training" (ICLR 2024, arXiv:2305.12118)。公式実装は `.external/adr`
   ——world_size/config_hashの既存drift検知がこの値の一貫性を保証する前提であり、
   それらのチェックを弱めた場合はこの前提も崩れる。
 - **評価対象の重み(student vs EMA)はデフォルトstudent**。`ard.cli.evaluate --weights
-  {model,ema}`で切替可能(公式実装の`--ema`フラグに対応、"ADR"行=student、
-  "ADR + WA"行=EMA)。**チェックポイント選択はstudentとEMAで完全に独立**——
-  `ard.engine.trainer`はstudentのvalidation PGD精度で`best.pt`を選ぶのと**別に**、
-  EMAシャドウモデル自身のvalidation PGD精度で`best-ema.pt`を選ぶ(公式実装の
-  "ADR + WA"と同じ規約: EMA自身の精度で再選択したbest epochのEMA重み)。
-  `--weights=ema`で`best.pt`(studentが選んだepoch)を評価することは明示的に
-  禁止されており(`ard.cli.evaluate._checkpoint_paths`がValueErrorで拒否)、
-  `--checkpoint-dir`経由の`--weights=ema`評価は自動的に`best-ema.pt`へ
-  読み替えられる。`last.pt`はepoch定義上selectionと無関係なので両重みで
-  そのまま評価できる。`evaluation-results.json`の`selection_weights`
-  フィールドが、実際に読んだチェックポイントの選択根拠(`"model"`/`"ema"`)を
-  記録する。
+  {model,ema}`で切替可能(公式実装の`--ema`フラグに対応)。**チェックポイント選択は
+  studentとEMAで完全に独立**——`ard.engine.trainer`はstudentのvalidation PGD精度で
+  `best.pt`を選ぶのと**別に**、EMAシャドウモデル自身のvalidation PGD精度で
+  `best-ema.pt`を選ぶ。`--weights=ema`で`best.pt`(studentが選んだepoch)を評価する
+  ことは明示的に禁止されており(`ard.cli.evaluate`がファイル名とチェックポイント
+  自身の`selection_metadata`の両方をValueErrorで拒否)、`--checkpoint-dir`経由の
+  `--weights=ema`評価は自動的に`best-ema.pt`へ読み替えられる。`last.pt`はepoch
+  定義上selectionと無関係なので両重みでそのまま評価できる。
+  `evaluation-results.json`の`selection_weights`フィールドが、実際に読んだ
+  チェックポイントの選択根拠(`"model"`/`"ema"`)を記録する。
+  - **公式実装の"ADR"/"ADR + WA"行と厳密には同じ量ではない点に注意**:
+    公式コード(`.external/adr/src/advTrainer.py`)はepochごとに**1つのモデル**
+    だけをvalidationし(`--ema`はどちらを検証するかを選ぶopt-inフラグ)、選ばれた
+    そのepochの`model`と`model_ema`を**同じ**`best_adv_score.pt`に保存する——
+    つまり公式の"ADR"行と"ADR + WA"行は**同一epoch**の2つの読み出し方に過ぎない。
+    このプロジェクトの`best.pt`(student選択)と`best-ema.pt`(EMA選択)は独立な
+    選択なので、一般には**epochが異なる**。公式実装と厳密に対応する同一epoch比較
+    をしたい場合は、`best-ema.pt`を`--weights=model`と`--weights=ema`の**両方**で
+    評価する(同じファイル、同じepoch、重みだけ切り替え)。
