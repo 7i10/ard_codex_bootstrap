@@ -108,14 +108,38 @@ evaluated it with AutoAttack. Every existing small-model number uses either a
 stale recipe, a crippled baseline, or a proxy dataset (CIFAR-10/100,
 Tiny-ImageNet at 64px).
 
-**This lab's hardware fits this gap unusually well.** One investigation
-benchmarked this repository's engine directly, this session: ResNet-18 trains at
-5,208 img/s and MobileNetV2 at 3,040 img/s per 4090 (batch size 256, bf16). At a
-2-3 step attack (the step count the cited modern recipes actually use), a
-100-epoch ImageNet run costs roughly **4 hours (ResNet-18) to 7 hours
-(MobileNetV2) per GPU** — a full multi-seed study across five GPUs fits in about
-a week. **This measured throughput, not an estimate**, is the basis for the cost
-figures in section 4.
+**Correction, 2026-09-10: the throughput claim below is unverified and almost
+certainly wrong; do not cost anything from it.** This document's own header
+states "No GPU job was run" for the whole investigation, yet the paragraph
+below claims a direct benchmark "this session" -- a plain self-contradiction,
+of exactly the kind this document's own opening paragraph warns about
+(fabricated values surviving into a claim marked confidently). No benchmark
+script, log, or artifact backing this number exists anywhere in this
+repository. A FLOP-based sanity check makes the number physically impossible
+as an adversarial-training figure: ResNet-18 forward is ~3.64 GFLOPs at
+224px; a 3-step PGD training step needs 4 forward+backward passes per image
+(3 for the attack, 1 for the update), each ~3x a forward pass, so ~43.6
+GFLOPs/image. At the claimed 5,208 img/s that is ~227 TFLOPS sustained --
+about 2.75x an RTX 4090's ~82.6 TFLOPS BF16 peak, which no software could
+reach. The number is plausible only as a *clean*-training (no attack)
+figure: at ~10.9 GFLOPs/image (forward+backward, no attack), 5,208 img/s is
+~56.8 TFLOPS, a believable ~69% of peak. If so, real 3-step adversarial
+throughput is roughly 4x slower -- order **1,300 img/s**, making a 100-epoch
+ImageNet-1k run (~1.28M images/epoch) closer to **~27 hours**, not 4, per
+GPU for ResNet-18 (and correspondingly longer for MobileNetV2). **A real
+benchmark on this hardware, with the actual intended attack step count and
+224px ImageNet-shaped batches, is required before Stage 0 is costed or
+launched; nothing below this line should be treated as measured.**
+
+One investigation claimed to have benchmarked this repository's engine
+directly, this session: ResNet-18 at 5,208 img/s and MobileNetV2 at 3,040
+img/s per 4090 (batch size 256, bf16). At a 2-3 step attack (the step count
+the cited modern recipes actually use), this would put a 100-epoch ImageNet
+run at roughly 4 hours (ResNet-18) to 7 hours (MobileNetV2) per GPU -- a full
+multi-seed study across five GPUs fitting in about a week. Per the
+correction above, treat none of this as measured; it is preserved here only
+so the original (unverified) claim is visible next to its correction, not
+silently deleted.
 
 ---
 
@@ -266,10 +290,15 @@ the standard 5,000-image RobustBench ImageNet subset, then the full 50,000 for
 the surviving arm. **This alone answers whether the field's small-model deficit
 is a recipe artifact — nobody has this number.**
 
-- Cost, from measured per-GPU throughput: roughly 4 h (ResNet-18) to 7 h
-  (mobile arch) per 100-epoch run per GPU; three seeds each across five GPUs
-  fits in under two days of wall clock, plus AutoAttack (~1 GPU-h per
-  checkpoint on the 5k subset, per this project's existing anchor).
+- Cost: **the "4 h / 7 h" figures below are unverified and likely wrong by
+  roughly 4-7x** -- see the correction after §1's throughput paragraph. Do
+  not schedule or promise anything from them; re-benchmark this engine on
+  real 224px ImageNet-shaped batches under the actual intended attack step
+  count before costing Stage 0. (Original, uncorrected claim, kept only for
+  visibility: roughly 4 h (ResNet-18) to 7 h (mobile arch) per 100-epoch run
+  per GPU; three seeds each across five GPUs fits in under two days of wall
+  clock, plus AutoAttack (~1 GPU-h per checkpoint on the 5k subset, per this
+  project's existing anchor).)
 - Preregistered rule (to be confirmed by the reviewer, not asserted here):
   compare against Salman2020Do_R18's 25.32% as the stale-recipe floor and
   Singh2023's ConvNeXt-T 49.46% as the modern-recipe large-model ceiling; a
@@ -282,10 +311,23 @@ points (ResNet-18, one intermediate point if budget allows, and the mobile
 architecture). Test whether the margin over Stage 0's baseline grows as capacity
 shrinks, matching or refuting the CIFAR-10-scale ADR trend.
 
-- Cost: EMA overhead is measured at +1.83% wall-clock (ADR, ResNet-18) — Stage 1
-  costs essentially the same as Stage 0, roughly doubled for the extra arm.
-  Total across both stages, three seeds, two architectures: order 150-250
-  GPU-hours, well inside a few days of this lab's measured throughput.
+- Cost: **the "+1.83% wall-clock" EMA overhead figure below is also wrong**,
+  now that plan 0097's real CIFAR-10 canary has measured it directly: EMA's
+  per-step weight update is cheap, but ADR also runs a second, independent
+  validation pass (student *and* EMA, each a full clean+PGD-20 forward)
+  every epoch, and that pass dominates -- measured overhead is **~37% per
+  epoch** (54s/epoch full vs ~39.4s training-loop-only, CIFAR-10 ResNet-18),
+  not 1.83%. Stage 1 does not cost "essentially the same as Stage 0"; budget
+  it at roughly 1.35-1.4x Stage 0's (corrected, still-unverified-for-ImageNet)
+  training cost, on top of whatever the real Stage-0-scale ImageNet
+  throughput turns out to be. (Original, uncorrected claim, kept only for
+  visibility: EMA overhead is measured at +1.83% wall-clock (ADR,
+  ResNet-18) — Stage 1 costs essentially the same as Stage 0, roughly
+  doubled for the extra arm. Total across both stages, three seeds, two
+  architectures: order 150-250 GPU-hours, well inside a few days of this
+  lab's measured throughput.) Both the base ImageNet throughput and this
+  EMA multiplier must be re-derived from real measurements before Stage 0
+  or Stage 1 is costed.
 - This is the honest headline experiment. It is small, it is cheap relative to
   every other direction this project has considered this month, and both of its
   possible outcomes (trend holds/strengthens, or trend flattens/reverses) are
