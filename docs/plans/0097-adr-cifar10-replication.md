@@ -5,8 +5,8 @@
 - Owner: human (scientific decisions), Claude Code (execution)
 - Base SHA: `cd0b571e4685fbe02d7655a22b06397c7b8d9a28` (pinned worktree
   `source-cd0b571e4685`, created 2026-09-09)
-- Current milestone: M0 and M1a complete; M1c execution under way (8 of the
-  20 training runs have run dirs, 6 of them terminal and successful) and its
+- Current milestone: M0 and M1a complete; M1c execution under way (9 of the
+  20 training runs have run dirs, 7 of them terminal and successful) and its
   checkbox stays unticked until the full 20-job launch is verified; M1b and
   M2/M3 open
 - Last updated: 2026-09-10
@@ -524,3 +524,75 @@ is a multi-day unattended campaign, not a same-session one.
   running at epoch 0. All three `adr-s1` early checks are now terminal, so that
   diagnostic set is closed. Arms 6-8 (trades_49k_validation, mobilenetv2 pair)
   and seed 2 of arms 2/3 have not started. M1b and M1c stay unticked.
+- 2026-09-10: postrun of the `adr-campaign-v1-cifar10_r18_trades-s1` **training**
+  terminal event (`.../cifar10_r18_trades-s1/train/run-bundle/manifest.json`) —
+  the first arm-4 (TRADES) job of this campaign to finish. **Nothing imported —
+  no milestone closed.** The campaign is still mid-flight, this run has no
+  `evaluation/` output yet, and no arm has a complete official-test result, so
+  there is no campaign-level result to aggregate.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py --once
+  --emit-existing --include-hand-run` scan of the campaign root returns
+  `terminal: true`, `success: true`, `failure_class: null` on the line whose
+  `path` is that manifest. `docs/experiments/` is still empty apart from
+  `.gitkeep`, so the idempotency check had nothing to collide with.
+  Verified for this bundle: `completion.json` `{"status": "completed"}`,
+  `manifest.status=sync_pending`, `error-marker.txt` reads "no application error
+  recorded", 200/200 epoch rows in both `epoch-metrics.jsonl` and
+  `run-bundle/metrics.jsonl` (`epoch_metrics_complete: true`, epoch 199,
+  `global_step` 70400), both declared artifacts present —
+  `epoch-metrics.parquet` (`5c19a2d9…`) and `sample-stats-train.parquet`
+  (`7cafdf05…`) — each with a content-addressed copy under its own SHA-256 path,
+  `best.pt` and `last.pt` on disk (and no `best-ema.pt`, correct for a non-ADR
+  arm), source SHA `cd0b571e4685…` clean (`dirty: false`, empty-diff
+  `e3b0c442…`) from worktree `source-cd0b571e4685`. Artifact hashes were not
+  recomputed — this session cannot hash outside the repo root — so integrity
+  rests on the content-addressed paths matching the manifest; the aggregator
+  owns the real check at M3.
+  Contract fields match arm 4 of the frozen plan exactly: protocol
+  `controlled_cifar10_r18_v1`, method `trades` (`trades_beta 6.0`, `adr: null`),
+  SGD with **`nesterov: false`** as arm 4 requires, `epochs=200`,
+  `milestones=[100,150] gamma=0.1`, `validation_fraction=0.1`, train attack
+  KL/`student_clean` 10 steps at `8/255` step `2/255` random start, selection and
+  evaluation attack CE 20 steps at the same budget, seeds all 1 except the fixed
+  `split=20260722` and `evaluation_attack=0`, `world_size=1`, effective global
+  batch 128, identity normalization. `git diff cd0b571e4685 HEAD` on
+  `configs/scientific/cifar10_r18_trades.yaml` and `configs/protocols/` is empty,
+  so the contract has not drifted since the pin.
+  Held-out **validation** diagnostics only (not the official test set, not
+  reportable, and not comparable to the official-test tables logged above for
+  `adr-s1`): best epoch 157 clean 0.8322 / PGD 0.5164; last (epoch 199) clean
+  0.8338 / PGD 0.4844; robust-overfit gap 0.0320. Both figures re-read from
+  `metrics.jsonl` and they match the manifest summary.
+  **Budget finding — the plan's non-ADR cost line does not fit TRADES.** The
+  budget table charges arms 1/2/4/6/7 ≈47 s per full epoch (≈2.6 GPU-h per run),
+  a figure extrapolated from the ADR canary's single-validation cost and since
+  confirmed for PGD-AT (`pgd_at_nesterov-s1`: 1167 img/s, 38.6 s/epoch training
+  loop). TRADES is intrinsically more expensive — it adds a clean forward pass
+  to the objective — and ran at **998 img/s, ≈45.1 s/epoch training loop** while
+  uncontended (epochs 0-123). The training loop alone therefore nearly consumes
+  the whole 47 s full-epoch allowance, so the ≈2.6 GPU-h line is too low for the
+  three remaining TRADES runs (arm 4 seed 2 and arm 6); ≈3.0 GPU-h, the ADR
+  line, is the better estimate. This run's own wall clock was 3 h 27 min
+  (19:43:26Z → 23:10:41Z, 62.2 s/epoch averaged), but that figure is inflated by
+  GPU contention and is not the uncontended cost: throughput fell to 510-610
+  img/s at epochs 124-134, recovered to ≈645 for 135-163 and ≈730 for 164-199 as
+  co-scheduled jobs came and went. The per-epoch rows carry no timestamps or
+  validation-pass timing, so the uncontended *full*-epoch cost cannot be
+  separated out from this run. Contention changes only wall clock, not results:
+  `deterministic: true`, fixed seeds and fixed batch size make the numbers
+  independent of throughput.
+  **First contract evaluations have started.** Two `<arm>-s<seed>/train/
+  evaluation/` bundles now exist and are running — `cifar10_r18_adr-s0` and
+  `cifar10_r18_pgd_at_nesterov-s1`. These are the real thing, not the
+  `early-check-*` diagnostics: their paths are exactly what
+  `scripts/aggregate_adr_cifar10_replication.py` reads
+  (`run_root/<arm>-s<seed>/train/evaluation/evaluation-results.json`, line 271),
+  so the M3 aggregation will find them. `adr-s0` additionally needs an
+  `evaluation-ema/` sibling (`has_ema`), which has not appeared yet.
+  Campaign state at the 23:11Z scan (`--include-hand-run`), **9 of 20 run
+  dirs**: training terminal and successful for `pgd_at-s1`, `-s2`,
+  `pgd_at_nesterov-s0`, `-s1`, `adr-s0`, `adr-s1` and now `trades-s1`;
+  `trades_adr-s0` running at epoch 145 and `cifar10_mobilenetv2_adr-s1` — the
+  first arm-8 job, and the campaign's first MobileNetV2 run — just started. Arms
+  6 and 7 (trades_49k_validation, mobilenetv2 pgd_at) and seed 2 of arms 2/3/4
+  have not started. M1b and M1c stay unticked.
