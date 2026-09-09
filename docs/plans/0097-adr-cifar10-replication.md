@@ -5,8 +5,8 @@
 - Owner: human (scientific decisions), Claude Code (execution)
 - Base SHA: `cd0b571e4685fbe02d7655a22b06397c7b8d9a28` (pinned worktree
   `source-cd0b571e4685`, created 2026-09-09)
-- Current milestone: M0 and M1a complete; M1c execution under way (6 of the
-  20 training runs have run dirs, 5 of them terminal and successful) and its
+- Current milestone: M0 and M1a complete; M1c execution under way (8 of the
+  20 training runs have run dirs, 6 of them terminal and successful) and its
   checkbox stays unticked until the full 20-job launch is verified; M1b and
   M2/M3 open
 - Last updated: 2026-09-10
@@ -269,6 +269,70 @@ is a multi-day unattended campaign, not a same-session one.
   No aggregator (`scripts/aggregate_*` for this contract) exists yet; it is
   an M3 deliverable. Next terminal events should keep accumulating until all
   training + evaluation jobs are done (M2).
+- 2026-09-10: postrun of the `early-check-eval-ema` terminal event
+  (`eval-d16d4b5680196136ccd9`, bundle
+  `runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s1/train/early-check-eval-ema/`).
+  **Nothing imported — no milestone closed.** This is the EMA half of an
+  *early check* of one arm, not the contract evaluation: it lives in
+  `early-check-eval-ema/`, not the `<run>/evaluation-ema/` path the aggregator
+  reads, and it ran with `evaluation.autoattack: false`. The campaign is also
+  still mid-flight, so there is no campaign-level result to aggregate either
+  way.
+  Watcher scan of the campaign root at 19:41Z (`--include-hand-run`), 6 run
+  dirs of the planned 20: terminal+successful training for
+  `cifar10_r18_pgd_at-s1`, `-s2`, `cifar10_r18_pgd_at_nesterov-s0`, `-s1` and
+  now `cifar10_r18_adr-s1` (epoch 199, finished 19:38:26Z);
+  `cifar10_r18_adr-s0` still running at epoch 196; the third early-check
+  evaluation `early-check-eval-aa-best-model` (`eval-2e106980f84b326999a1`,
+  AutoAttack) still running. Arms 4-8 (trades, trades_adr,
+  trades_49k_validation, mobilenetv2 pair) have not started.
+  Verified for this bundle: `completion.json` present,
+  `manifest.status=sync_pending`, error marker "no application error
+  recorded", source SHA `cd0b571e4685…` clean (empty diff) from worktree
+  `source-cd0b571e4685`, seeds all 1 except the fixed `split=20260722` and the
+  fixed `evaluation_attack=0`, `world_size=1`, effective global batch 128,
+  protocol `controlled_cifar10_r18_adr_v1` (Nesterov on) — matching the frozen
+  contract. Declared-artifact hash re-verification was not possible from this
+  session (the sandbox denies hashing outside the repo root); it is the
+  aggregator's own check at M3 and no number was imported on the strength of
+  it here.
+
+  **These are official CIFAR-10 test-set numbers (`split: test`, `count:
+  10000`), CE-PGD-20, `epsilon=8/255 step=2/255 steps=20 random_start=true`,
+  `autoattack.enabled=false`.** ADR seed 1 only, one seed, no baseline
+  evaluated on the official test set yet, so nothing here is comparable to
+  anything and none of it touches the preregistered decision rule.
+
+  | checkpoint | weights | clean | CE-PGD-20 |
+  |---|---|---|---|
+  | `best.pt` | model (student) | 0.8282 | 0.5334 |
+  | `last.pt` | model (student) | 0.8507 | 0.4823 |
+  | `best-ema.pt` | ema ("ADR + WA") | 0.8385 | 0.5394 |
+  | `last.pt` | ema ("ADR + WA") | 0.8514 | 0.4848 |
+
+  (The first two rows come from the sibling bundle `early-check-eval-model`,
+  `eval-1895f30af963e58c697d`, also terminal and successful; recorded together
+  because they are the same run's student-vs-EMA comparison.) EMA is ahead of
+  the student on both checkpoints and both metrics (+0.60 pp PGD at best,
+  +0.25 pp at last), and the robust-overfitting gap (best minus last PGD) is
+  0.0511 student / 0.0546 EMA. Single seed, no AutoAttack yet — directional
+  for this run only.
+
+  Two things for the human before M2/M3:
+  1. **Test-set peeking.** These evaluations are named "early check" and were
+     run on the official test set for one ADR seed while 14 of the 20 training
+     runs have not started. The preregistered decision rule was written before
+     any of it (this plan, 2026-09-09) and is unchanged, so the rule itself is
+     not contaminated — but any further mid-campaign official-test evaluation
+     should be a deliberate, logged choice rather than a habit.
+  2. **Nested bundles.** These three evaluation bundles live *inside* the
+     training run's own output dir (`.../cifar10_r18_adr-s1/train/
+     early-check-eval-*/run-bundle/`), so the watcher surfaces them nested
+     under a training run. They cannot leak into the record:
+     `scripts/aggregate_adr_cifar10_replication.py` reads `<run>/evaluation/`
+     and `<run>/evaluation-ema/` and refuses any row without an AutoAttack
+     block, and `early-check-*` is neither. Keep it that way — the early
+     checks are diagnostics and must not be wired into the aggregator.
 - 2026-09-10: postrun of the `eval-1895f30af963e58c697d` terminal event
   (`cifar10_r18_adr-s1/train/early-check-eval-model`). **Nothing imported — no
   milestone closed.** This is an *early check* of one arm, not the contract
@@ -308,3 +372,155 @@ is a multi-day unattended campaign, not a same-session one.
   `<run>/evaluation/` and `<run>/evaluation-ema/`, so the `early-check-*` dirs
   must not be wired into it — they are diagnostics, and it correctly refuses
   any row whose AutoAttack block is absent.
+- 2026-09-10: postrun of the `adr-campaign-v1-cifar10_r18_adr-s1` **training**
+  terminal event (`.../cifar10_r18_adr-s1/train/run-bundle/manifest.json`) —
+  the parent of the two early-check evaluation entries above, logged after
+  them because its headless postrun did not finish. **Nothing imported — no
+  milestone closed.** Status re-derived, not taken from the event: a fresh
+  `campaign_watch.py --once --emit-existing --include-hand-run` scan of the
+  campaign root returns `terminal: true`, `success: true`,
+  `failure_class: null` on the line whose `path` is that manifest.
+  Verified for the training bundle: `completion.json`
+  `{"status":"completed"}`, `manifest.status=sync_pending`, error marker "no
+  application error recorded", 200 of 200 epoch rows
+  (`epoch_metrics_complete: true`), both declared artifacts present —
+  `epoch-metrics.parquet` (`fab2fe25…`) and `sample-stats-train.parquet`
+  (`664090fa…`) — each with a content-addressed copy under its own SHA-256
+  path. Source SHA `cd0b571e4685…` clean (`dirty: false`, empty diff) from
+  worktree `source-cd0b571e4685`, `.external/adr` pinned at `515da0e0…`,
+  protocol `controlled_cifar10_r18_adr_v1` with Nesterov on, `world_size=1`,
+  effective global batch 128, seeds all 1 except the fixed `split=20260722`
+  and `evaluation_attack=0`. Hashes were not recomputed here — this session's
+  sandbox refuses to read outside the repo root — so artifact integrity rests
+  on the content-addressed paths matching the manifest, and the aggregator
+  still owns the real check at M3.
+  **ADR stop-rule checks pass.** `best.pt`, `best-ema.pt` and `last.pt` are
+  all on disk; EMA validation ran every epoch and never crashed (all 200 rows
+  of `run-bundle/metrics.jsonl` carry `val_clean_accuracy_ema` and
+  `val_pgd_accuracy_ema`); and `best-ema.pt` was selected independently of the
+  student — EMA's best validation epoch is 110, the student's is 103 — which
+  is what `docs/SCIENTIFIC_INVARIANTS.md`'s ADR section requires.
+  Held-out **validation** diagnostics only (not the official test set, not
+  reportable): student best epoch 103 clean 0.8392 / PGD 0.5396, last clean
+  0.8612 / PGD 0.4988, robust-overfit gap 0.0408; EMA best epoch 110 clean
+  0.8524 / PGD 0.5498, EMA last clean 0.8628 / PGD 0.4996. EMA ahead of the
+  student at the best checkpoint on validation, the same direction as the
+  official-test table above — a consistency check on the selection logic, not
+  independent evidence.
+  Cost: 1141 img/s, `train_seconds` 39.4 s/epoch — matching the plan's ADR
+  canary measurement (1136–1144 img/s, ≈39.4 s/epoch training-loop), so the
+  ≈3.0 GPU-h per ADR run budget line stands as written.
+  Operational note: the headless postruns for all three `adr-s1` events
+  (`orchestration/ardx/claude-runs/20260909T1938*`, `…T1939*`, `…T1940*`) left
+  empty `.json` outputs, and the log of the training one contains only
+  "Ignoring 44 permissions.allow entries from .claude/settings.json: this
+  workspace has not been trusted". Their plan edits were left staged and
+  uncommitted; this session commits them together with this entry. The trust
+  dialog for the `/home/islab/...` repo-root spelling still needs to be
+  accepted once interactively, per CLAUDE.md.
+- 2026-09-10: postrun of the `adr-campaign-v1-cifar10_r18_adr-s0` terminal
+  event (bundle `runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s0/train/
+  run-bundle/`). **Nothing imported — no milestone closed.** The campaign is
+  still mid-flight, this run has produced no `evaluation/` or
+  `evaluation-ema/` output at all, and
+  `scripts/aggregate_adr_cifar10_replication.py` is still uncommitted, so
+  there is no campaign-level result to aggregate and no official-test number
+  for this run to import.
+  Verified for this bundle: `completion.json` `{"status": "completed"}`,
+  `manifest.status=sync_pending`, error marker "no application error
+  recorded", 200/200 epoch rows (`epoch_metrics_complete: true`, epoch 199,
+  `global_step` 70400), both declared artifacts (`epoch-metrics.parquet`,
+  `sample-stats-train.parquet`) present with their content-addressed copies
+  under the manifest's own SHA-256 paths, `best.pt`, `best-ema.pt` and
+  `last.pt` on disk, source SHA `cd0b571e4685…` clean (`dirty: false`, empty
+  diff) from worktree `source-cd0b571e4685`, upstream `adr` pinned at
+  `515da0e0…`. Contract fields match the frozen plan: protocol
+  `controlled_cifar10_r18_adr_v1`, Nesterov on, `epochs=200`,
+  `milestones=[100,150] gamma=0.1`, `validation_fraction=0.1`, ADR
+  `ema_decay=0.995` `T 2.5→2.0` `lambda 0.7→0.95`, train attack KL/rectified
+  10 steps at `8/255` step `2/255` random start, selection and evaluation
+  attack CE 20 steps, seeds all 0 except the fixed `split=20260722`,
+  `world_size=1`, effective global batch 128. Artifact hashes were not
+  recomputed — this session's sandbox refuses to hash outside the repo root —
+  so integrity rests on the content-addressed paths matching the manifest,
+  and the aggregator still owns the real check at M3.
+  **ADR stop-rule checks pass.** EMA validation ran every epoch and never
+  crashed (all 200 rows of `run-bundle/metrics.jsonl` carry
+  `val_clean_accuracy_ema` and `val_pgd_accuracy_ema`), and `best-ema.pt` was
+  selected independently of the student — EMA's best validation epoch is 104,
+  the student's is 103 — which is what `docs/SCIENTIFIC_INVARIANTS.md`'s ADR
+  section requires.
+  Held-out **validation** diagnostics only (not the official test set, not
+  reportable, and not comparable to the official-test table logged above for
+  `adr-s1`):
+
+  | weights | checkpoint | epoch | clean | PGD |
+  |---|---|---|---|---|
+  | student | best | 103 | 0.8402 | 0.5394 |
+  | student | last | 199 | 0.8634 | 0.4938 |
+  | EMA | best-ema | 104 | 0.8458 | 0.5506 |
+  | EMA | last | 199 | 0.8658 | 0.4994 |
+
+  Student robust-overfit gap (best minus last PGD) 0.0456. EMA is ahead of
+  the student at the best checkpoint (+1.12 pp validation PGD), the same
+  direction as `adr-s1`'s validation and official-test figures — a
+  consistency check on the selection logic, not independent evidence.
+  Arm 3 (ADR) now has two terminal seeds, and arm 2 (its Nesterov-matched
+  baseline) also has two, so a **validation-only** within-arm spread can be
+  read for the first time. Student best-checkpoint validation PGD: ADR 0.5394
+  (s0) / 0.5396 (s1); Nesterov PGD-AT 0.5184 (s0) / 0.5188 (s1). Student
+  robust-overfit gap: ADR 0.0456 / 0.0408; Nesterov PGD-AT 0.0888 / 0.0864.
+  Both arms are strikingly tight across their two seeds (≤0.04 pp on best
+  PGD), and ADR sits about 2.1 pp above its matched baseline with roughly half
+  the robust-overfitting gap. **This is not the preregistered comparison**,
+  which is AutoAttack on the official 10,000-example test set at the best
+  checkpoint, over three seeds; validation PGD is the model-selection metric
+  these runs optimized against, so it is expected to flatter the arm whose
+  selection it drove. Two seeds are directional for those seeds only.
+  Cost: 1106 img/s, `train_seconds` 40.7 s/epoch — consistent with the plan's
+  ADR canary (1136–1144 img/s, ≈39.4 s/epoch training-loop) and with the
+  ≈3.0 GPU-h per ADR run budget line.
+  Campaign state at the 19:43Z scan (`--include-hand-run`), 7 of the 20 run
+  dirs: training terminal and successful for `pgd_at-s1`, `-s2`,
+  `pgd_at_nesterov-s0`, `-s1`, `adr-s0`, `adr-s1`; `cifar10_r18_trades-s1` now
+  running (the first arm-4 job started); `adr-s1`'s third early check
+  `early-check-eval-aa-best-model` (AutoAttack) still running. Arms 5-8
+  (trades_adr, trades_49k_validation, mobilenetv2 pair) and seed 2 of arms 2/3
+  have not started. M1b and M1c stay unticked.
+- 2026-09-10: postrun of the `early-check-eval-aa-best-model` terminal event
+  (`eval-2e106980f84b326999a1`, bundle `runs/adr-cifar10-campaign-v1/
+  cifar10_r18_adr-s1/train/early-check-eval-aa-best-model/`) — the third and
+  last of the `adr-s1` early checks, and the campaign's first AutoAttack job.
+  **Nothing imported — no milestone closed.** Same reason as its two siblings:
+  it is an *early check*, living in `early-check-eval-aa-best-model/` rather
+  than the `<run>/evaluation/` path
+  `scripts/aggregate_adr_cifar10_replication.py` reads, so it is a diagnostic
+  and must not be wired into the aggregator. The campaign is also still
+  mid-flight, so there is no campaign-level result to aggregate.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan returns `terminal: true`,
+  `success: true`, `failure_class: null` on the line whose `path` is that
+  manifest, with `completion.json` present, `manifest.status=sync_pending` and
+  error marker "no application error recorded". `docs/experiments/` is still
+  empty apart from `.gitkeep`, so there was nothing to collide with on the
+  idempotency check.
+  **Read limitation — no numbers logged for this bundle.** Unlike the earlier
+  postruns in this log, this session's sandbox refuses every read outside the
+  repo root (`ls`, `cat`, `find` and ad-hoc `python3 -c` were all blocked on
+  `.../ard-runtime/...`), so `evaluation-results.json`, the manifest body and
+  the declared-artifact list could not be opened at all. Everything above comes
+  from the sanctioned scanner (`scripts/ardx/campaign_watch.py`) and
+  `ard.cli.status`, which are on the permission allow-list. The AutoAttack
+  accuracy for `adr-s1` `best.pt` (student weights) is therefore **not**
+  recorded here. It is a diagnostic that no import depends on; to log it, add
+  the runtime tree to the session (`/add-dir /home/islab/workspace-local/
+  shunsuke.naito/ard-runtime`) and re-run this postrun. No number was inferred,
+  and no contract or artifact check was reported as passed on evidence this
+  session could not see.
+  Campaign state at the 20:15Z scan (`--include-hand-run`), 8 of the 20 run
+  dirs: training terminal and successful for `pgd_at-s1`, `-s2`,
+  `pgd_at_nesterov-s0`, `-s1`, `adr-s0`, `adr-s1`; `cifar10_r18_trades-s1`
+  running at epoch 34 and `cifar10_r18_trades_adr-s0` (the first arm-5 job)
+  running at epoch 0. All three `adr-s1` early checks are now terminal, so that
+  diagnostic set is closed. Arms 6-8 (trades_49k_validation, mobilenetv2 pair)
+  and seed 2 of arms 2/3 have not started. M1b and M1c stay unticked.
