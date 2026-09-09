@@ -240,3 +240,30 @@ is a multi-day unattended campaign, not a same-session one.
   PGD-AT and TRADES seed-0 official-test+AutoAttack results are field-
   identical to the current controlled_cifar10_r18_v1 contract and reusable;
   seeds fixed at 0/1/2. 20 new training runs remain before M1c launch.
+- 2026-09-10: postrun of the `adr-campaign-v1-cifar10_r18_pgd_at_nesterov-s1`
+  terminal event. **Nothing imported — no milestone closed.** M1c execution
+  is under way but incomplete (6 of the 20 run dirs exist under
+  `runs/adr-cifar10-campaign-v1/`), so there is no campaign-level result to
+  aggregate, and no evaluation (official test / AutoAttack) job has run yet.
+  Watcher scan of the campaign root at 16:40Z: terminal+successful training
+  for `cifar10_r18_pgd_at-s1`, `cifar10_r18_pgd_at-s2`,
+  `cifar10_r18_pgd_at_nesterov-s0`, `cifar10_r18_pgd_at_nesterov-s1`;
+  `cifar10_r18_adr-s0` and `-s1` still running (epoch 0). The M1c checkbox is
+  left unticked because the launch of all 20 jobs is not verified from this
+  session, and the plan's M1c/M1b state was never updated when execution
+  began — close that gap when the launch is next touched.
+  Verified for the `pgd_at_nesterov-s1` bundle: `completion.json` present,
+  `manifest.status=sync_pending`, error marker "no application error
+  recorded", 200/200 epoch rows, both declared artifacts
+  (`epoch-metrics.parquet`, `sample-stats-train.parquet`) present with
+  content-addressed copies, `best.pt` and `last.pt` on disk, source SHA
+  `cd0b571e4685…` clean (empty diff) from worktree `source-cd0b571e4685`,
+  seeds all 1 except the fixed `split=20260722`. Held-out **validation**
+  diagnostics only (not the official test set, not reportable): best epoch
+  101 clean 0.8360 / PGD 0.5188; last clean 0.8524 / PGD 0.4324;
+  robust-overfit gap 0.0864. Training throughput 1167 img/s, 38.6 s/epoch
+  training-loop time — consistent with the plan's non-ADR ≈47 s/epoch full
+  wall-clock budget line, which this first non-ADR run was meant to confirm.
+  No aggregator (`scripts/aggregate_*` for this contract) exists yet; it is
+  an M3 deliverable. Next terminal events should keep accumulating until all
+  training + evaluation jobs are done (M2).
