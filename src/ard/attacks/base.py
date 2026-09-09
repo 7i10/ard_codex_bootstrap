@@ -16,6 +16,12 @@ class AttackRequest:
     student: nn.Module
     teacher: nn.Module | None = None
     target_logits: torch.Tensor | None = None
+    # Already-resolved target *probabilities* (not logits): the caller has
+    # blended a soft target itself (e.g. an EMA-of-student rectified label,
+    # ard.objectives.adr) and no further temperature/softmax resolution
+    # should happen inside the attack.  Mutually exclusive with
+    # ``target_logits`` and valid only under ``kl_target="rectified"``.
+    target_probabilities: torch.Tensor | None = None
     generator: torch.Generator | None = None
     # Required only by the versioned sample-keyed random-start contract.
     source_ids: torch.Tensor | None = None

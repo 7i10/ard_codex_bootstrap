@@ -29,7 +29,9 @@ class RSLADObjective(DistillationObjective):
         teacher_logits: torch.Tensor | None = None,
         clean_student_logits: torch.Tensor | None = None,
         adversarial_target_probabilities: torch.Tensor | None = None,
+        rectified_target_probabilities: torch.Tensor | None = None,
     ) -> ObjectiveTerms:
+        del rectified_target_probabilities
         if teacher_logits is None or clean_student_logits is None:
             raise ValueError("RSLAD requires clean teacher and clean student logits")
         if adversarial_target_probabilities is None:

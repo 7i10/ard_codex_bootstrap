@@ -50,6 +50,8 @@ class ProtocolConfig(StrictModel):
         "controlled_cifar10_r18_pilot_v1",
         "controlled_cifar10_r18_pilot_1ep_v1",
         "controlled_cifar10_r18_pilot_3ep_v1",
+        "controlled_cifar10_r18_adr_v1",
+        "controlled_cifar10_r18_trades_49k_validation_v1",
         "synthetic_smoke_v2",
     ]
 
@@ -109,6 +111,37 @@ class TargetPolicyConfig(StrictModel):
     mixing: Literal["uniform"]
     apply_to: Literal["adversarial_student_kd"]
     rho_max: float = Field(default=0.5, ge=0, le=1)
+
+
+class AdrConfig(StrictModel):
+    """EMA-teacher and rectification hyperparameters for ``adr``/``adr_trades``.
+
+    ADR: Wu, Wang & Chen, "Annealing Self-Distillation Rectification Improves
+    Adversarial Training", ICLR 2024, arXiv:2305.12118.  Defaults match the
+    paper's CIFAR-10 configuration exactly (its §5.1 and the official code's
+    per-dataset gin configs, github.com/yuyuwu5/ADR); this is a fixed decay
+    updated once per training iteration (not per epoch), and temperature/
+    lambda anneal by the same per-iteration cosine schedule
+    (``ard.schedules.cosine_value.cosine_anneal``), covering the full
+    training run.  The EMA-decay is a genuinely separate piece of state from
+    ``MethodConfig.student_ema_decay`` (a per-sample robust-margin EMA used
+    by an unrelated risk-weighting mechanism) and must not be confused with
+    it.
+    """
+
+    ema_decay: float = Field(default=0.995, ge=0, lt=1)
+    temperature_high: float = Field(default=2.5, gt=0)
+    temperature_low: float = Field(default=2.0, gt=0)
+    lambda_low: float = Field(default=0.7, ge=0, le=1)
+    lambda_high: float = Field(default=0.95, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> AdrConfig:
+        if self.temperature_low > self.temperature_high:
+            raise ValueError("temperature_low must not exceed temperature_high (temperature anneals downward)")
+        if self.lambda_low > self.lambda_high:
+            raise ValueError("lambda_low must not exceed lambda_high (lambda anneals upward)")
+        return self
 
 
 class NormalizationConfig(StrictModel):
@@ -190,7 +223,11 @@ class AttackConfig(StrictModel):
     # DataLoader order decide which fixed source ID receives a random start.
     random_start_keying: Literal["batch", "sample_keyed_v1"] = "batch"
     loss: Literal["ce", "kl"] = "ce"
-    kl_target: Literal["student_clean", "teacher_clean"] | None = None
+    # "rectified" means the caller resolves the target itself and supplies it
+    # as AttackRequest.target_probabilities (already a probability
+    # distribution, not logits) -- used by ard.objectives.adr's EMA-blended
+    # label, which must be identical across the attack and the training loss.
+    kl_target: Literal["student_clean", "teacher_clean", "rectified"] | None = None
     temperature: float = Field(default=1.0, gt=0)
     temperature_squared: bool = True
     student_mode: Literal["train", "eval"] = "eval"
@@ -335,11 +372,14 @@ class TeacherConfig(StrictModel):
     preprocessing_owner: Literal["teacher_adapter", "model_embedded"] = "teacher_adapter"
     checkpoint: Path | None = None
     checkpoint_sha256: str | None = None
-    registry_id: Literal[
-        "chen2021_ltd_wrn34_10",
-        "chen2021_ltd_wrn34_20",
-        "bartoldson2024_adversarial_wrn94_16",
-    ] | None = None
+    registry_id: (
+        Literal[
+            "chen2021_ltd_wrn34_10",
+            "chen2021_ltd_wrn34_20",
+            "bartoldson2024_adversarial_wrn94_16",
+        ]
+        | None
+    ) = None
     threat_norm: Literal["linf"] = "linf"
     threat_epsilon: str = "8/255"
     fixture_seed: int = 1729
@@ -381,6 +421,8 @@ class MethodConfig(StrictModel):
         "rslad_joint_downweight",
         "rslad_hard_fallback",
         "rslad_frozen_oracle_softening",
+        "adr",
+        "adr_trades",
     ]
     version: Literal[1]
     attack: AttackConfig = Field(default_factory=AttackConfig)
@@ -395,6 +437,7 @@ class MethodConfig(StrictModel):
     oracle_mask: bool = False
     frozen_oracle_manifest: Path | None = None
     frozen_oracle_manifest_sha256: str | None = None
+    adr: AdrConfig | None = None
 
     @property
     def name(self) -> str:
@@ -413,6 +456,11 @@ class MethodConfig(StrictModel):
             "rslad_joint_downweight": "teacher_clean",
             "rslad_hard_fallback": "teacher_clean",
             "rslad_frozen_oracle_softening": "teacher_clean",
+            # The attack ascends the EMA-blended rectified label the caller
+            # supplies via AttackRequest.target_probabilities, not a fixed
+            # teacher/student forward the attack resolves itself.
+            "adr": "rectified",
+            "adr_trades": "rectified",
         }.get(self.id)
         if self.attack.loss != expected_loss:
             raise ValueError(f"{self.id} requires attack.loss={expected_loss}")
@@ -475,6 +523,18 @@ class MethodConfig(StrictModel):
                 raise ValueError(f"{self.id} requires an explicit target_policy")
         elif self.target_policy is not None:
             raise ValueError(f"target_policy is only defined for {sorted(target_methods)}")
+        adr_methods = {"adr", "adr_trades"}
+        if self.id in adr_methods:
+            if self.adr is None:
+                raise ValueError(f"{self.id} requires an explicit adr configuration")
+            if self.attack.temperature != 1.0:
+                raise ValueError(
+                    f"{self.id} attack must use temperature=1.0; the EMA-teacher temperature is annealed via "
+                    "the adr configuration block, not attack.temperature, and the rectified target is already "
+                    "a resolved distribution the attack must not re-scale"
+                )
+        elif self.adr is not None:
+            raise ValueError(f"adr configuration is only defined for {sorted(adr_methods)}")
         if self.oracle_mask and self.id != "rslad_hard_fallback":
             raise ValueError("oracle_mask is only defined for rslad_hard_fallback")
         frozen_fields = (self.frozen_oracle_manifest, self.frozen_oracle_manifest_sha256)
@@ -846,8 +906,15 @@ class InterventionConfig(StrictModel):
 
     arm: Literal["C", "HS", "RS", "HD", "RD", "PF_TA", "PF_R", "NR_TA", "NR_R", "C79", "RA", "RAR", "RB", "RBR"]
     selector: Literal[
-        "none", "student_history", "class_matched_random", "online_history", "class_state_count_matched_random",
-        "route_a_strong", "route_a_matched_random", "route_b_strong", "route_b_matched_random"
+        "none",
+        "student_history",
+        "class_matched_random",
+        "online_history",
+        "class_state_count_matched_random",
+        "route_a_strong",
+        "route_a_matched_random",
+        "route_b_strong",
+        "route_b_matched_random",
     ]
     kind: Literal[
         "ordinary_rslad",

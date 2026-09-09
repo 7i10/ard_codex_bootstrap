@@ -133,6 +133,12 @@ class ObjectiveTerms:
 class DistillationObjective(ABC):
     requires_clean_student_logits = False
     requires_teacher_clean_logits = False
+    # Set by ard.objectives.adr's methods: the trainer computes an
+    # EMA-of-student-blended rectified target once per batch (before the
+    # attack runs, so the attack ascends the same target) and passes it here
+    # as ``rectified_target_probabilities``, already a resolved probability
+    # distribution.
+    requires_rectified_target_probabilities = False
 
     @abstractmethod
     def __call__(
@@ -143,5 +149,6 @@ class DistillationObjective(ABC):
         teacher_logits: torch.Tensor | None = None,
         clean_student_logits: torch.Tensor | None = None,
         adversarial_target_probabilities: torch.Tensor | None = None,
+        rectified_target_probabilities: torch.Tensor | None = None,
     ) -> ObjectiveTerms:
         raise NotImplementedError

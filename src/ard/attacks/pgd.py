@@ -130,31 +130,59 @@ class LinfPGD(AttackGenerator):
     def requires_teacher_clean_target(self) -> bool:
         return self.config.loss == "kl" and self.config.kl_target == "teacher_clean"
 
-    def _target_logits(self, request: AttackRequest, clean: torch.Tensor) -> torch.Tensor | None:
+    def _resolve_target(
+        self, request: AttackRequest, clean: torch.Tensor
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
+        """Return ``(target_logits, target_probabilities)``; at most one is non-None.
+
+        Resolved once per call, before the step loop, so the target stays
+        fixed across every PGD step regardless of which source produced it.
+        """
         if self.config.loss == "ce":
-            return None
+            return None, None
+        if self.config.kl_target == "rectified":
+            if request.target_logits is not None:
+                raise ValueError("kl_target='rectified' takes target_probabilities, not target_logits")
+            if request.target_probabilities is None:
+                raise ValueError("rectified KL PGD requires target_probabilities on the request")
+            return None, request.target_probabilities.detach().float()
+        if request.target_probabilities is not None:
+            raise ValueError("target_probabilities is only accepted when kl_target='rectified'")
         if request.target_logits is not None:
-            return request.target_logits.detach().float()
+            return request.target_logits.detach().float(), None
         if self.config.kl_target == "student_clean":
             with torch.no_grad(), torch.autocast(device_type=clean.device.type, enabled=False):
-                return request.student(clean).detach().float()
+                return request.student(clean).detach().float(), None
         if self.config.kl_target == "teacher_clean":
             if request.teacher is None:
                 raise ValueError("teacher_clean KL PGD requires a teacher")
             with torch.no_grad(), torch.autocast(device_type=clean.device.type, enabled=False):
-                return request.teacher(clean).detach().float()
+                return request.teacher(clean).detach().float(), None
         raise RuntimeError("validated KL attack has no target source")
 
-    def _loss(self, logits: torch.Tensor, labels: torch.Tensor, target_logits: torch.Tensor | None) -> torch.Tensor:
+    def _loss(
+        self,
+        logits: torch.Tensor,
+        labels: torch.Tensor,
+        target_logits: torch.Tensor | None,
+        target_probabilities: torch.Tensor | None,
+    ) -> torch.Tensor:
         if self.config.loss == "ce":
             return F.cross_entropy(logits, labels)
-        assert target_logits is not None
         temperature = self.config.temperature
-        loss = F.kl_div(
-            F.log_softmax(logits / temperature, dim=1),
-            F.softmax(target_logits / temperature, dim=1),
-            reduction="batchmean",
-        )
+        if target_probabilities is not None:
+            # Already a resolved distribution (e.g. an EMA-blended rectified
+            # label): no further temperature/softmax resolution on the
+            # target side.  The student side is still divided by
+            # temperature for consistency with the other KL targets; callers
+            # that want a plain, untempered cross-entropy (as ADR does) set
+            # attack.temperature=1.0 explicitly rather than special-casing it
+            # here.
+            target = target_probabilities
+        else:
+            assert target_logits is not None
+            target = F.softmax(target_logits / temperature, dim=1)
+        loss = F.kl_div(F.log_softmax(logits / temperature, dim=1), target, reduction="batchmean")
         return loss * (temperature * temperature) if self.config.temperature_squared else loss
 
     def generate(self, request: AttackRequest) -> AttackResult:
@@ -208,12 +236,12 @@ class LinfPGD(AttackGenerator):
             student_train=self.config.student_mode == "train",
             teacher_train=self.config.teacher_mode == "train",
         ):
-            target_logits = self._target_logits(request, clean)
+            target_logits, target_probabilities = self._resolve_target(request, clean)
             for step in range(1, self.config.steps + 1):
                 adversarial.requires_grad_(True)
                 with torch.autocast(device_type=adversarial.device.type, enabled=False):
                     logits = request.student(adversarial.float())
-                    loss = self._loss(logits.float(), request.labels, target_logits)
+                    loss = self._loss(logits.float(), request.labels, target_logits, target_probabilities)
                 gradient = torch.autograd.grad(loss, adversarial, only_inputs=True)[0]
                 if losses is not None:
                     losses.append(float(loss.detach().cpu()))

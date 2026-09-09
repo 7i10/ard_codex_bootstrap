@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import math
 import time
 from collections.abc import Callable, Iterator, Mapping
@@ -16,8 +17,10 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
 from ard.attacks import AttackGenerator, AttackRequest
+from ard.config.schema import AdrConfig
 from ard.data import IndexedBatch
 from ard.objectives import DistillationObjective, ObjectiveTerms
+from ard.objectives.adr import rectify_label
 from ard.policies import (
     FixedInterventionMask,
     PolicyContext,
@@ -26,6 +29,7 @@ from ard.policies import (
     student_risk_from_margin,
     teacher_risk_from_entropy,
 )
+from ard.schedules.cosine_value import cosine_anneal
 from ard.signals import (
     RobustMarginSignal,
     TeacherConfidenceBatch,
@@ -45,6 +49,7 @@ from .distributed import (
     reduce_min,
     reduce_sums,
     suspend_ddp_buffer_broadcasts,
+    unwrap_model,
 )
 
 if TYPE_CHECKING:
@@ -147,6 +152,8 @@ class Trainer:
         target_policy: TeacherTargetPolicy | None = None,
         intervention_mask: FixedInterventionMask | None = None,
         anchor_model: nn.Module | None = None,
+        adr_config: AdrConfig | None = None,
+        total_iterations: int | None = None,
         prescriptive_v3_route: str | None = None,
         adversarial_kd_multiplier: float | None = None,
         adversarial_ce_coefficient: float | None = None,
@@ -332,6 +339,26 @@ class Trainer:
             # the forward, while this persistent mode prevents accidental BN
             # state updates should a future call site bypass that helper.
             self.anchor_model.eval()
+        self.adr_config = adr_config
+        if (adr_config is not None) != (total_iterations is not None):
+            raise ValueError("adr_config and total_iterations must be supplied together")
+        self.total_iterations = total_iterations
+        if self.adr_config is None:
+            self.ema_model = None
+        else:
+            # A genuinely separate copy, not the frozen static ``anchor_model``
+            # pattern: this one is updated every iteration from the live
+            # student's weights (see ``_update_ema``), covering parameters and
+            # buffers alike, matching ADR's official code (timm's
+            # ``ModelEmaV2`` semantics -- the whole state_dict, not just
+            # trainable parameters).  ``unwrap_model`` gives the plain,
+            # non-DDP-wrapped module so the deep copy and every later
+            # state_dict read/write use ordinary (unprefixed) keys.
+            self.ema_model = copy.deepcopy(unwrap_model(self.model)).to(device)
+            for parameter in self.ema_model.parameters():
+                parameter.requires_grad_(False)
+                parameter.grad = None
+            self.ema_model.eval()
         self.adversarial_kd_multiplier = adversarial_kd_multiplier
         self.adversarial_ce_coefficient = adversarial_ce_coefficient
         self.clean_ce_coefficient = clean_ce_coefficient
@@ -633,6 +660,67 @@ class Trainer:
             raise FloatingPointError("frozen anchor logits are non-finite")
         return logits
 
+    def _ema_clean_logits(self, images: torch.Tensor) -> torch.Tensor:
+        """ADR's EMA-of-student forward, on the clean image.  Never DDP-wrapped
+        (like ``self.teacher``), so no buffer-broadcast guard is needed here."""
+        if self.ema_model is None:
+            raise RuntimeError("rectified target requested without an EMA-of-student model")
+        with (
+            _evaluation_mode(self.ema_model),
+            torch.no_grad(),
+            torch.autocast(device_type=self.device.type, enabled=False),
+        ):
+            logits = self.ema_model(images.float()).detach().float()
+        if not bool(torch.isfinite(logits).all()):
+            raise FloatingPointError("EMA-of-student logits are non-finite")
+        return logits
+
+    def _update_ema(self) -> None:
+        """``theta_t <- decay*theta_t + (1-decay)*theta_s``, once per training
+        iteration, over the *entire* state_dict -- parameters and buffers
+        (BatchNorm running stats, ``num_batches_tracked``) alike, matching the
+        paper's official code (timm's ``ModelEmaV2``).  Buffers are typically
+        integer/statistics tensors; the same linear-interpolation arithmetic
+        is applied to every entry without special-casing dtype, exactly as
+        the reference implementation does.
+        """
+        if self.ema_model is None:
+            return
+        assert self.adr_config is not None
+        decay = self.adr_config.ema_decay
+        live_state = unwrap_model(self.model).state_dict()
+        with torch.no_grad():
+            for name, ema_value in self.ema_model.state_dict().items():
+                live_value = live_state[name].to(device=ema_value.device, dtype=ema_value.dtype)
+                if ema_value.dtype.is_floating_point:
+                    ema_value.mul_(decay).add_(live_value, alpha=1.0 - decay)
+                else:
+                    # Integer buffers (num_batches_tracked): the reference
+                    # implementation applies the same interpolation, which for
+                    # an integer tensor means truncating rounding -- match it
+                    # rather than special-case a "cleaner" integer update the
+                    # paper's numbers were not produced with.
+                    ema_value.copy_((decay * ema_value + (1.0 - decay) * live_value).to(ema_value.dtype))
+
+    def _rectified_target(self, images: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        assert self.adr_config is not None and self.total_iterations is not None
+        temperature = cosine_anneal(
+            start=self.adr_config.temperature_high,
+            end=self.adr_config.temperature_low,
+            iteration=self.global_step,
+            total_iterations=self.total_iterations,
+        )
+        lambda_floor = cosine_anneal(
+            start=self.adr_config.lambda_low,
+            end=self.adr_config.lambda_high,
+            iteration=self.global_step,
+            total_iterations=self.total_iterations,
+        )
+        ema_logits = self._ema_clean_logits(images)
+        return rectify_label(
+            ema_clean_logits=ema_logits, labels=labels, temperature=temperature, lambda_floor=lambda_floor
+        )
+
     def _flush_sample_store(self) -> None:
         """Replicate valid sparse observations before a checkpoint is written."""
         if self.sample_store is None:
@@ -875,6 +963,7 @@ class Trainer:
                 getattr(self.objective, "requires_teacher_clean_logits", False) or requires_online_state
             )
             attack_requires_teacher_clean = bool(getattr(self.attack, "requires_teacher_clean_target", False))
+            requires_rectified_target = bool(getattr(self.objective, "requires_rectified_target_probabilities", False))
             teacher_clean_logits = None
             teacher_clean_forward_calls = 0.0
             if requires_teacher_clean or attack_requires_teacher_clean or self._records_teacher_response:
@@ -926,9 +1015,12 @@ class Trainer:
                     ),
                     torch.as_tensor(baseline_step, device=batch.images.device, dtype=batch.images.dtype),
                 )
+            rectified_target = self._rectified_target(batch.images, batch.labels) if requires_rectified_target else None
             skip_selected = (
                 self.clean_wrong_attack_skip and treatment_risk is not None and bool((treatment_risk > 0).any())
             )
+            if requires_rectified_target and skip_selected:
+                raise ValueError("adr/adr_trades cannot be combined with clean-wrong attack skipping")
             if skip_selected:
                 if treatment_risk is None:
                     raise RuntimeError("clean-wrong attack skip lost its intervention mask")
@@ -970,6 +1062,7 @@ class Trainer:
                         student=self.model,
                         teacher=self.teacher,
                         target_logits=teacher_clean_logits,
+                        target_probabilities=rectified_target,
                         generator=self._attack_generator(),
                         source_ids=batch.sample_ids,
                         epoch=self.current_epoch,
@@ -1052,6 +1145,9 @@ class Trainer:
             if requires_clean_student:
                 assert clean_student_logits is not None
                 objective_inputs["clean_student_logits"] = clean_student_logits
+            if requires_rectified_target:
+                assert rectified_target is not None
+                objective_inputs["rectified_target_probabilities"] = rectified_target
             weights = self._policy_weights(
                 batch=batch,
                 adversarial=adversarial,
@@ -1374,6 +1470,7 @@ class Trainer:
             else:
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
+            self._update_ema()
             with _evaluation_mode(self.model), torch.no_grad():
                 clean_logits = self.model(batch.images)
             totals += torch.tensor(
@@ -1532,6 +1629,7 @@ class Trainer:
                 tracker_run_id=self.tracker_run_id,
                 config_hash=self.config_hash,
                 fork_lineage=self.fork_lineage,
+                ema_model=self.ema_model,
             )
             save_checkpoint(self.output_dir / "last.pt", **common)
             if epoch + 1 in self.checkpoint_epochs:
@@ -1559,11 +1657,7 @@ class Trainer:
             # observability only: the full-batch objective and checkpoint
             # state above are already final at this point.
             epoch_metrics.update(
-                {
-                    f"train_{key}": value
-                    for key, value in train_metrics.items()
-                    if key.startswith("boundary_")
-                }
+                {f"train_{key}": value for key, value in train_metrics.items() if key.startswith("boundary_")}
             )
             history.append(epoch_metrics)
             # The callback is deliberately after both atomic checkpoints; it
@@ -1582,6 +1676,7 @@ class Trainer:
             sampler=sampler,
             expected_config_hash=self.config_hash,
             device=self.device,
+            ema_model=self.ema_model,
         )
         self.global_step, self.best_metric = state.global_step, state.best_metric
         if self.tracker_run_id is not None and state.tracker_run_id != self.tracker_run_id:

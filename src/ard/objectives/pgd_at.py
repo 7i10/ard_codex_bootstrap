@@ -17,8 +17,9 @@ class PGDATObjective(DistillationObjective):
         teacher_logits: torch.Tensor | None = None,
         clean_student_logits: torch.Tensor | None = None,
         adversarial_target_probabilities: torch.Tensor | None = None,
+        rectified_target_probabilities: torch.Tensor | None = None,
     ) -> ObjectiveTerms:
-        del teacher_logits, clean_student_logits, adversarial_target_probabilities
+        del teacher_logits, clean_student_logits, adversarial_target_probabilities, rectified_target_probabilities
         hard = F.cross_entropy(student_logits, labels, reduction="none")
         zeros = torch.zeros_like(hard)
         return ObjectiveTerms(hard=hard, kd=zeros, regularization=zeros)

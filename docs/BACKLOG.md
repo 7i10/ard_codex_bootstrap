@@ -52,3 +52,27 @@ A 段が尽きたときは、B 段を始めるのではなく**決定パケッ�
 | 親 6 本（CROPSHIFT 200 エポック、env v2、seed 1–6） | 2026-09-07 00:31 開始、5 枚並列、約 8 時間 |
 | plan 0093 | 親の完了待ち。事前登録は副産物を含めて確定済み |
 | plan 0095（コホート・プラセボ） | 実装中（選択器 seed の引数化、マスク配線、arm 登録） |
+
+## B-tier item added 2026-09-09: rename the `ard` package/paths
+
+The research direction pivoted away from Adversarial Robustness Distillation
+to mobile-scale ImageNet robustness via teacher-free self-distillation. The
+package name `src/ard/` (and every `from ard.x import y` across the codebase,
+roughly 460+ files) is a naming relic of the abandoned direction and will
+read as noise to anyone reading the eventual published research artifact.
+
+This needs a decision packet before it starts (a rename this size touches
+every Python file's imports, every config, every script, every doc still
+live at the top level, and every CI/test invocation) -- not a drive-by change
+folded into an unrelated implementation commit. Do it as its own dedicated
+pass: pick a new name, one mechanical find-and-replace commit, full test
+suite green before and after, nothing else in the same commit.
+
+Cheap and separate: `CLAUDE.md`'s own self-description ("Single-teacher
+Adversarial Robustness Distillation (RSLAD family...)") is now stale
+regardless of the rename question and should be corrected to describe the
+current direction.
+
+Not in scope for this item: `docs/archive/ard-distillation-2026/` is named
+that deliberately, to label it as the ARD-era historical record -- it should
+keep the name it has.

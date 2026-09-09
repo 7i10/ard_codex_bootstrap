@@ -249,6 +249,49 @@ def _pilot_metadata(epochs: int) -> Mapping[str, object]:
     )
 
 
+# ADR (Wu, Wang & Chen, "Annealing Self-Distillation Rectification Improves
+# Adversarial Training", ICLR 2024, arXiv:2305.12118) uses Nesterov momentum,
+# unlike this project's other controlled CIFAR-10 protocols -- confirmed from
+# the paper's own text ("SGD optimizer with Nesterov momentum of 0.9") and its
+# official code (github.com/yuyuwu5/ADR).  Everything else (200 epochs, batch
+# 128, wd 5e-4, lr 0.1 decayed at 100/150, eps 8/255 step 2/255 steps 10)
+# already matches this project's canonical controlled protocol exactly.  A
+# distinct protocol identity is used rather than reusing
+# controlled_cifar10_r18_v1 because of this optimizer difference and because
+# the attack loss (a rectified soft target, not a fixed teacher/student
+# target) has no entry in that protocol's train_attacks contract.
+_ADR_METADATA = MappingProxyType(
+    {
+        **_CONTROLLED_METADATA,
+        "optimizer": MappingProxyType(
+            {"id": "sgd", "learning_rate": 0.1, "momentum": 0.9, "weight_decay": 5e-4, "nesterov": True}
+        ),
+    }
+)
+
+# The TRADES-vs-literature gap investigation (docs/debugging/0028) named the
+# 45k/50k training-set-size difference from published TRADES numbers as an
+# unmeasured candidate.  This protocol tests it cheaply: a smaller held-out
+# validation slice (1,000 images, ~2%) rather than the canonical 10% (5,000),
+# with everything else identical.  This is *not* the paper's own
+# zero-held-out convention (kept: this project's held-out-validation
+# discipline; see docs/decisions/0009), only a narrower held-out fraction to
+# see whether the gap moves.
+_TRADES_49K_VALIDATION_METADATA = MappingProxyType(
+    {
+        **_CONTROLLED_METADATA,
+        "training": MappingProxyType(
+            {
+                "epochs": 200,
+                "global_batch_size": 128,
+                "validation_fraction": 0.02,
+                "deterministic": True,
+                "batchnorm_mode": "local_per_rank",
+            }
+        ),
+    }
+)
+
 _PAPER_METADATA = MappingProxyType(
     {
         "dataset": "cifar10",
@@ -346,6 +389,18 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_pilot_metadata(3),
+        ),
+        "controlled_cifar10_r18_adr_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_adr_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_ADR_METADATA,
+        ),
+        "controlled_cifar10_r18_trades_49k_validation_v1": ProtocolSpec(
+            id="controlled_cifar10_r18_trades_49k_validation_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_TRADES_49K_VALIDATION_METADATA,
         ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",

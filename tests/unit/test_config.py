@@ -548,4 +548,6 @@ def test_top_level_configs_resolve_under_controlled_environment(
                 "trades",
                 "rslad",
                 "rslad_frozen_oracle_softening",
+                "adr",
+                "adr_trades",
             }

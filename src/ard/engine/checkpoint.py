@@ -125,6 +125,7 @@ def save_checkpoint(
     tracker_run_id: str | None,
     config_hash: str,
     fork_lineage: Mapping[str, Any] | None = None,
+    ema_model: nn.Module | None = None,
 ) -> None:
     local_sampler_state = sampler.state_dict() if sampler is not None and hasattr(sampler, "state_dict") else {}
     rng_by_rank = gather_objects(capture_rng_state())
@@ -153,6 +154,10 @@ def save_checkpoint(
         }
         if fork_lineage is not None:
             payload["fork_lineage"] = dict(fork_lineage)
+        # Optional, like fork_lineage: not in REQUIRED_KEYS, so checkpoints
+        # written before adr/adr_trades existed keep loading unmodified.
+        if ema_model is not None:
+            payload["ema"] = unwrap_model(ema_model).state_dict()
         path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
         os.close(descriptor)
@@ -206,6 +211,7 @@ def load_checkpoint(
     sampler: Any,
     expected_config_hash: str,
     device: torch.device,
+    ema_model: nn.Module | None = None,
 ) -> TrainingState:
     validate_resume_checkpoint(path, expected_config_hash=expected_config_hash)
     payload = torch.load(path, map_location="cpu", weights_only=False)
@@ -213,6 +219,21 @@ def load_checkpoint(
     if missing:
         raise ValueError("checkpoint is incomplete; missing: " + ", ".join(sorted(missing)))
     unwrap_model(model).load_state_dict(payload["model"], strict=True)
+    if ema_model is not None:
+        raw_ema = payload.get("ema")
+        if raw_ema is None:
+            raise ValueError(
+                "this run requires an EMA-of-student model (adr/adr_trades), but the checkpoint being "
+                "resumed carries no 'ema' state -- it was written by a run that did not use one"
+            )
+        try:
+            unwrap_model(ema_model).load_state_dict(raw_ema, strict=True)
+        except RuntimeError as exc:
+            # Fail closed and specific rather than surface a bare shape-mismatch
+            # trace or silently skip the restore (docs/debugging/0026): a
+            # mismatched EMA state means the wrong architecture or a
+            # corrupted checkpoint, not something to paper over.
+            raise ValueError(f"checkpoint EMA state does not match the current EMA model: {exc}") from exc
     optimizer.load_state_dict(payload["optimizer"])
     _optimizer_to(optimizer, device)
     if scheduler is not None:
