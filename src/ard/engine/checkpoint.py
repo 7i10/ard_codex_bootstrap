@@ -49,6 +49,13 @@ class TrainingState:
     tracker_run_id: str | None
     sample_state: dict[str, Any]
     fork_lineage: dict[str, Any] | None = None
+    # Only present when the checkpoint carries an EMA-of-student model
+    # (adr/adr_trades) that has its own, independent best-checkpoint
+    # selection. None on a checkpoint written before this existed -- the
+    # caller restarts EMA-best tracking fresh rather than treating it as
+    # missing required state (unlike "ema" itself, which fails closed).
+    best_metric_ema: float | None = None
+    selection_metadata_ema: dict[str, Any] | None = None
 
 
 def config_digest(config: Mapping[str, Any]) -> str:
@@ -126,6 +133,8 @@ def save_checkpoint(
     config_hash: str,
     fork_lineage: Mapping[str, Any] | None = None,
     ema_model: nn.Module | None = None,
+    best_metric_ema: float | None = None,
+    selection_metadata_ema: Mapping[str, Any] | None = None,
 ) -> None:
     local_sampler_state = sampler.state_dict() if sampler is not None and hasattr(sampler, "state_dict") else {}
     rng_by_rank = gather_objects(capture_rng_state())
@@ -158,6 +167,9 @@ def save_checkpoint(
         # written before adr/adr_trades existed keep loading unmodified.
         if ema_model is not None:
             payload["ema"] = unwrap_model(ema_model).state_dict()
+        if best_metric_ema is not None:
+            payload["best_metric_ema"] = best_metric_ema
+            payload["selection_metadata_ema"] = dict(selection_metadata_ema or {})
         path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
         os.close(descriptor)
@@ -256,6 +268,8 @@ def load_checkpoint(
     raw_fork_lineage = payload.get("fork_lineage")
     if raw_fork_lineage is not None and not isinstance(raw_fork_lineage, Mapping):
         raise ValueError("checkpoint fork_lineage must be a mapping when present")
+    raw_best_metric_ema = payload.get("best_metric_ema")
+    raw_selection_metadata_ema = payload.get("selection_metadata_ema")
     return TrainingState(
         next_epoch=int(payload["epoch"]) + 1,
         global_step=int(payload["global_step"]),
@@ -264,4 +278,6 @@ def load_checkpoint(
         tracker_run_id=payload["tracker_run_id"],
         sample_state=dict(payload["sample_state"]),
         fork_lineage=None if raw_fork_lineage is None else dict(raw_fork_lineage),
+        best_metric_ema=None if raw_best_metric_ema is None else float(raw_best_metric_ema),
+        selection_metadata_ema=None if raw_selection_metadata_ema is None else dict(raw_selection_metadata_ema),
     )

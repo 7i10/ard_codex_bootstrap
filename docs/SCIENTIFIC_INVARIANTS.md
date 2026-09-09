@@ -195,10 +195,14 @@ Training" (ICLR 2024, arXiv:2305.12118)。公式実装は `.external/adr`
   それらのチェックを弱めた場合はこの前提も崩れる。
 - **評価対象の重み(student vs EMA)はデフォルトstudent**。`ard.cli.evaluate --weights
   {model,ema}`で切替可能(公式実装の`--ema`フラグに対応、"ADR"行=student、
-  "ADR + WA"行=EMA)。**重要な既知の制約**: チェックポイント選択(`best.pt`)は
-  常にstudentのvalidation PGD精度で行われ、EMAの精度では選択されない
-  (`ard.engine.trainer`はEMAをvalidationしない)。したがって`best.pt`を
-  `--weights=ema`で評価した結果は、公式実装の"ADR + WA"(EMA自身の精度で
-  再選択されたbest epoch)とは異なる量であり、単純に並べて報告してはならない。
-  `evaluation-results.json`の`selection_weights`フィールド(常に`"model"`)が
-  この事実を明示する。
+  "ADR + WA"行=EMA)。**チェックポイント選択はstudentとEMAで完全に独立**——
+  `ard.engine.trainer`はstudentのvalidation PGD精度で`best.pt`を選ぶのと**別に**、
+  EMAシャドウモデル自身のvalidation PGD精度で`best-ema.pt`を選ぶ(公式実装の
+  "ADR + WA"と同じ規約: EMA自身の精度で再選択したbest epochのEMA重み)。
+  `--weights=ema`で`best.pt`(studentが選んだepoch)を評価することは明示的に
+  禁止されており(`ard.cli.evaluate._checkpoint_paths`がValueErrorで拒否)、
+  `--checkpoint-dir`経由の`--weights=ema`評価は自動的に`best-ema.pt`へ
+  読み替えられる。`last.pt`はepoch定義上selectionと無関係なので両重みで
+  そのまま評価できる。`evaluation-results.json`の`selection_weights`
+  フィールドが、実際に読んだチェックポイントの選択根拠(`"model"`/`"ema"`)を
+  記録する。

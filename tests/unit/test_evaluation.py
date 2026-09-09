@@ -7,6 +7,7 @@ import pytest
 
 from ard.analysis import ParquetDependencyError, fixed_panel_ids, summarize_checkpoint_groups, write_sample_parquet
 from ard.cli.evaluate import (
+    _checkpoint_paths,
     _evaluation_preflight_config,
     _evaluation_run_id_weights_suffix,
     _evaluation_tracker_config,
@@ -466,6 +467,40 @@ def test_evaluation_run_id_weights_suffix_is_empty_only_for_the_default() -> Non
     and reported numbers were untouched."""
     assert _evaluation_run_id_weights_suffix("model") == ""
     assert _evaluation_run_id_weights_suffix("ema") == ":ema"
+
+
+def test_checkpoint_paths_rejects_explicit_best_pt_with_ema_weights(tmp_path: Path) -> None:
+    """best.pt is selected on the student's own validation accuracy, never
+    the EMA's -- --weights=ema must be steered to best-ema.pt (the EMA's own
+    independently-selected best epoch) instead of silently evaluating a
+    mismatched pair."""
+    best = tmp_path / "best.pt"
+    best.write_bytes(b"not a real checkpoint, never read")
+    with pytest.raises(ValueError, match="Point --checkpoint at best-ema.pt instead"):
+        _checkpoint_paths(checkpoint=best, checkpoint_dir=None, selection="best", weights="ema")
+    # The exact same file is fine for the default (student) weights.
+    assert _checkpoint_paths(checkpoint=best, checkpoint_dir=None, selection="best", weights="model") == (
+        best.resolve(),
+    )
+
+
+def test_checkpoint_paths_remaps_best_to_best_ema_under_checkpoint_dir(tmp_path: Path) -> None:
+    """--checkpoint-dir + --weights=ema must resolve "best" to best-ema.pt,
+    not best.pt, without the caller having to know the filename convention."""
+    (tmp_path / "best.pt").write_bytes(b"student-selected, never read")
+    (tmp_path / "best-ema.pt").write_bytes(b"ema-selected, never read")
+    (tmp_path / "last.pt").write_bytes(b"last epoch, never read")
+    assert _checkpoint_paths(checkpoint=None, checkpoint_dir=tmp_path, selection="best", weights="ema") == (
+        (tmp_path / "best-ema.pt").resolve(),
+    )
+    assert _checkpoint_paths(checkpoint=None, checkpoint_dir=tmp_path, selection="both", weights="ema") == (
+        (tmp_path / "best-ema.pt").resolve(),
+        (tmp_path / "last.pt").resolve(),
+    )
+    # The default (student) weights are untouched by this remapping.
+    assert _checkpoint_paths(checkpoint=None, checkpoint_dir=tmp_path, selection="best") == (
+        (tmp_path / "best.pt").resolve(),
+    )
 
 
 def test_load_saved_student_checkpoint_rejects_a_missing_weight_set(tmp_path: Path) -> None:

@@ -80,3 +80,11 @@ P1(TRADES+ADRの内側PGD攻撃が公式実装〈`.external/adr`にpin、commit 
   `ard.cli.evaluate`に`--weights {model,ema}`を追加**(`ard.evaluation.saved_checkpoint`
   の`weights_key`引数)。デフォルトはstudent(`model`)で、既存の全手法・既存の
   出力ファイル名との後方互換を保つ。
+
+再レビューで、`best.pt --weights=ema`(studentが選んだepochのEMA重み)が公式実装の
+"ADR + WA"(EMA自身の精度で再選択したbest epoch)と異なる量になるという追加指摘を
+受け、**EMA自身のvalidationを実装する**ことを選択した(簡易な記録のみ、または
+ブロックのみの案は不採用)。`ard.engine.trainer`は毎epoch、studentの検証とは
+独立にEMAシャドウモデルの検証PGD精度も計測し、`best-ema.pt`へ別途保存する。
+`--weights=ema`で`best.pt`を指定することは明示的エラーになり、
+`--checkpoint-dir`経由では自動的に`best-ema.pt`へ読み替えられる。

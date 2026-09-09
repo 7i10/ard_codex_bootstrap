@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -66,12 +67,29 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _checkpoint_paths(*, checkpoint: Path | None, checkpoint_dir: Path | None, selection: str) -> tuple[Path, ...]:
+def _checkpoint_paths(
+    *, checkpoint: Path | None, checkpoint_dir: Path | None, selection: str, weights: str = "model"
+) -> tuple[Path, ...]:
     if checkpoint is not None:
-        return (checkpoint.resolve(),)
+        resolved = checkpoint.resolve()
+        # "best.pt" is selected on the raw student's validation accuracy,
+        # never the EMA's -- evaluating it with weights="ema" would silently
+        # report EMA weights at a student-selected epoch, which is not the
+        # official ADR code's "ADR + WA" quantity (EMA weights at an
+        # EMA-reselected best epoch, see best-ema.pt). Only an explicit
+        # single-file --checkpoint can hit this, since --checkpoint-dir is
+        # remapped to best-ema.pt below.
+        if weights == "ema" and resolved.name == "best.pt":
+            raise ValueError(
+                "--weights=ema cannot evaluate best.pt: its epoch was selected on the student's own validation "
+                "accuracy, not the EMA's. Point --checkpoint at best-ema.pt instead (the EMA's own "
+                "independently-selected best epoch), or evaluate last.pt."
+            )
+        return (resolved,)
     assert checkpoint_dir is not None
     directory = checkpoint_dir.resolve()
-    names = {"best": ("best.pt",), "last": ("last.pt",), "both": ("best.pt", "last.pt")}[selection]
+    best_name = "best-ema.pt" if weights == "ema" else "best.pt"
+    names = {"best": (best_name,), "last": ("last.pt",), "both": (best_name, "last.pt")}[selection]
     paths = tuple(directory / name for name in names)
     missing = [str(path) for path in paths if not path.is_file()]
     if missing:
@@ -205,8 +223,16 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("evaluation requires evaluation.dataset with an official val or test split")
     if config.evaluation.autoattack and not args.allow_autoattack:
         raise ValueError("AutoAttack is opt-in: rerun this separate evaluation process with --allow-autoattack")
+    if args.weights == "ema" and training_config.method.adr is None:
+        raise ValueError(
+            "--weights=ema requires an adr/adr_trades training run; "
+            f"this checkpoint's method is {training_config.method.id!r}, which carries no EMA state"
+        )
     checkpoints = _checkpoint_paths(
-        checkpoint=args.checkpoint, checkpoint_dir=args.checkpoint_dir, selection=config.evaluation.checkpoints
+        checkpoint=args.checkpoint,
+        checkpoint_dir=args.checkpoint_dir,
+        selection=config.evaluation.checkpoints,
+        weights=args.weights,
     )
     _validate_evaluation_tracking_identity(config, training_config)
     # The training config remains the canonical lineage/config-hash source.
@@ -250,11 +276,6 @@ def main(argv: list[str] | None = None) -> int:
         training=training_config.training,
         world_size=checkpoint_world_size,
     )
-    if args.weights == "ema" and training_config.method.adr is None:
-        raise ValueError(
-            "--weights=ema requires an adr/adr_trades training run; "
-            f"this checkpoint's method is {training_config.method.id!r}, which carries no EMA state"
-        )
     default_evaluation_dirname = "evaluation" if args.weights == "model" else f"evaluation-{args.weights}"
     output_dir = (args.output or ((args.checkpoint_dir or args.checkpoint.parent) / default_evaluation_dirname)).resolve()
     if output_dir.exists() and any(output_dir.iterdir()):
@@ -387,16 +408,16 @@ def main(argv: list[str] | None = None) -> int:
                     "checkpoint_filename": checkpoint.name,
                     "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
                     "weights": args.weights,
-                    # Checkpoint selection (which epoch "best.pt" is) always
-                    # runs against the raw student's validation metric --
-                    # ard.engine.trainer never validates the EMA shadow
-                    # model. A "best.pt" row evaluated with weights="ema" is
-                    # therefore EMA weights at a student-selected epoch, NOT
-                    # the official ADR code's "ADR + WA" semantics (which
-                    # reselects "best" using the EMA's own validation
-                    # metric). This field makes that explicit for anyone
-                    # reading evaluation-results.json directly.
-                    "selection_weights": "model",
+                    # Which weights this checkpoint's OWN selection (if any)
+                    # was made on -- "ema" only for best-ema.pt, "model" for
+                    # every other file (best.pt/last.pt/epoch-*.pt are always
+                    # selected, or simply not selected at all, on the
+                    # student). Read from the checkpoint's own
+                    # selection_metadata rather than assumed, so this stays
+                    # correct if a checkpoint is renamed or hand-copied.
+                    "selection_weights": cast(Mapping[str, object], checkpoint_payload.get("selection_metadata", {})).get(
+                        "selection_source", "model"
+                    ),
                     "threat_model": threat_model,
                     "threat_hash": threat_hash,
                     "train_run_id": train_run_id,

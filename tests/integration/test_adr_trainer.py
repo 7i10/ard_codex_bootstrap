@@ -167,6 +167,39 @@ def test_ema_state_round_trips_exactly_through_save_and_resume(tmp_path: Path) -
         assert torch.equal(resumed.ema_model.state_dict()[key], expected_value), key
 
 
+def test_best_ema_checkpoint_is_written_independently_of_best_pt(tmp_path: Path) -> None:
+    """The EMA shadow model gets its own independent checkpoint selection,
+    matching the official ADR code's "ADR + WA" convention (EMA weights at
+    an EMA-reselected best epoch) rather than reusing the student's
+    best.pt epoch. best-ema.pt must exist, carry an "ema" key that matches
+    the live EMA state, and self-document its selection source."""
+    output = tmp_path / "adr-best-ema"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=1)
+    loader, validation_loader, _ = _loaders()
+    trainer.fit(loader, validation_loader=validation_loader, epochs=1)
+    assert (output / "best-ema.pt").exists()
+    payload = torch.load(output / "best-ema.pt", map_location="cpu", weights_only=False)
+    assert payload["selection_metadata"]["selection_source"] == "ema"
+    assert payload["best_metric"] == trainer.best_metric_ema
+    for key, value in trainer.ema_model.state_dict().items():
+        assert torch.equal(payload["ema"][key], value), key
+
+
+def test_best_metric_ema_round_trips_through_resume(tmp_path: Path) -> None:
+    output = tmp_path / "resume-ema-metric"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=2)
+    loader, validation_loader, _ = _loaders()
+    trainer.fit(loader, validation_loader=validation_loader, epochs=1)
+    expected_best_metric_ema = trainer.best_metric_ema
+    expected_selection_metadata_ema = dict(trainer.selection_metadata_ema)
+
+    resumed = _adr_trainer(output, objective=ADRObjective(), epochs=2)
+    _, _, sampler = _loaders()
+    resumed.resume(output / "last.pt", sampler=sampler)
+    assert resumed.best_metric_ema == expected_best_metric_ema
+    assert resumed.selection_metadata_ema == expected_selection_metadata_ema
+
+
 def test_checkpoint_without_adr_still_resumes_a_non_adr_trainer(tmp_path: Path) -> None:
     """Backward compatibility: a checkpoint from a non-ADR run has no 'ema'
     key at all, and a non-ADR trainer resuming it must not even look for one."""

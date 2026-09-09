@@ -402,6 +402,20 @@ class Trainer:
             "seed_protocol": "seed+1000003*global_step+10007*rank+590017; one advancing generator per pass",
             "selected_epoch": None,
         }
+        # ADR's EMA shadow model is selected on its OWN validation accuracy,
+        # independent of the student's, and saved to a separate best-ema.pt.
+        # The official ADR code's "ADR + WA" table rows are EMA weights at
+        # an EMA-reselected best epoch, not EMA weights at the student's
+        # best epoch (see docs/SCIENTIFIC_INVARIANTS.md's ADR section).
+        # Harmless for every non-ADR method: stays at its initial value and
+        # is never written to a checkpoint when there is no ema_model.
+        self.best_metric_ema = float("-inf")
+        self.selection_metadata_ema: dict[str, Any] = {
+            "metric": "val_pgd_accuracy",
+            "selection_source": "ema",
+            "tie_break": "earliest_epoch",
+            "selected_epoch": None,
+        }
         if prescriptive_v3_route is not None:
             self.selection_metadata["prescriptive_v3"] = {
                 "route": prescriptive_v3_route,
@@ -1509,29 +1523,37 @@ class Trainer:
             **self._boundary_epoch_stats,
         }
 
-    def validate_epoch(self, loader: DataLoader[IndexedBatch]) -> dict[str, float]:
-        """Evaluate post-update clean and PGD accuracy without mutating model state."""
+    def validate_epoch(self, loader: DataLoader[IndexedBatch], *, model: nn.Module | None = None) -> dict[str, float]:
+        """Evaluate post-update clean and PGD accuracy without mutating model state.
+
+        ``model`` defaults to the live student. ADR passes ``self.ema_model``
+        for a second, independent validation pass so the EMA shadow model's
+        own best epoch can be selected on its own accuracy rather than
+        reusing the student's selected epoch (see
+        docs/SCIENTIFIC_INVARIANTS.md's ADR section).
+        """
+        target_model = self.model if model is None else model
         totals = torch.zeros(3, dtype=torch.float64, device=self.device)
         generator = self._selection_generator()
-        with _evaluation_mode(self.model):
+        with _evaluation_mode(target_model):
             for batch in loader:
                 if not isinstance(batch, IndexedBatch):
                     raise TypeError("trainer requires IndexedBatch batches")
                 batch = batch.to(self.device)
                 mask = self._mask(batch)
                 with torch.no_grad():
-                    clean_logits = self.model(batch.images)
+                    clean_logits = target_model(batch.images)
                 attack_result = self.selection_attack.generate(
                     AttackRequest(
                         inputs=batch.images,
                         labels=batch.labels,
-                        student=self.model,
+                        student=target_model,
                         teacher=self.teacher,
                         generator=generator,
                     )
                 )
                 with torch.no_grad():
-                    adversarial_logits = self.model(attack_result.adversarial)
+                    adversarial_logits = target_model(attack_result.adversarial)
                 totals += torch.tensor(
                     [
                         float(((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
@@ -1616,6 +1638,19 @@ class Trainer:
                 self.selection_metadata["selected_epoch"] = epoch
                 self.selection_metadata["selected_clean_accuracy"] = validation_metrics["clean_accuracy"]
                 self.selection_metadata["selected_pgd_accuracy"] = validation_metrics["pgd_accuracy"]
+            ema_validation_metrics: dict[str, float] | None = None
+            improved_ema = False
+            if self.ema_model is not None:
+                ema_validation_metrics = self.validate_epoch(validation_loader, model=self.ema_model)
+                self.selection_metadata_ema["last_epoch"] = epoch
+                self.selection_metadata_ema["last_clean_accuracy"] = ema_validation_metrics["clean_accuracy"]
+                self.selection_metadata_ema["last_pgd_accuracy"] = ema_validation_metrics["pgd_accuracy"]
+                improved_ema = ema_validation_metrics["pgd_accuracy"] > self.best_metric_ema
+                if improved_ema:
+                    self.best_metric_ema = ema_validation_metrics["pgd_accuracy"]
+                    self.selection_metadata_ema["selected_epoch"] = epoch
+                    self.selection_metadata_ema["selected_clean_accuracy"] = ema_validation_metrics["clean_accuracy"]
+                    self.selection_metadata_ema["selected_pgd_accuracy"] = ema_validation_metrics["pgd_accuracy"]
             common = dict(
                 epoch=epoch,
                 model=self.model,
@@ -1625,6 +1660,8 @@ class Trainer:
                 sampler=sampler,
                 sample_state=self.sample_state,
                 global_step=self.global_step,
+                best_metric_ema=(self.best_metric_ema if self.ema_model is not None else None),
+                selection_metadata_ema=(self.selection_metadata_ema if self.ema_model is not None else None),
                 best_metric=self.best_metric,
                 selection_metadata=self.selection_metadata,
                 tracker_run_id=self.tracker_run_id,
@@ -1637,6 +1674,21 @@ class Trainer:
                 save_checkpoint(self.output_dir / f"epoch-{epoch + 1:03d}.pt", **common)
             if improved:
                 save_checkpoint(self.output_dir / "best.pt", **common)
+            if improved_ema:
+                # A separate file, not an overload of best.pt: "best" there
+                # means "best by the student's own validation accuracy" and
+                # must keep meaning exactly that. best-ema.pt's own
+                # best_metric/selection_metadata describe the EMA's
+                # independent selection story, matching what
+                # --weights=ema evaluation of this file actually measures.
+                save_checkpoint(
+                    self.output_dir / "best-ema.pt",
+                    **{
+                        **common,
+                        "best_metric": self.best_metric_ema,
+                        "selection_metadata": self.selection_metadata_ema,
+                    },
+                )
             epoch_metrics = {
                 "train_loss": train_metrics["loss"],
                 "train_clean_accuracy": train_metrics["clean_accuracy"],
@@ -1653,6 +1705,9 @@ class Trainer:
                 "learning_rate": epoch_learning_rate,
                 "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
             }
+            if ema_validation_metrics is not None:
+                epoch_metrics["val_clean_accuracy_ema"] = ema_validation_metrics["clean_accuracy"]
+                epoch_metrics["val_pgd_accuracy_ema"] = ema_validation_metrics["pgd_accuracy"]
             # Boundary diagnostics are computed in the common training loop
             # and must survive into the metrics callback/W&B path.  This is
             # observability only: the full-batch objective and checkpoint
@@ -1680,6 +1735,14 @@ class Trainer:
             ema_model=self.ema_model,
         )
         self.global_step, self.best_metric = state.global_step, state.best_metric
+        if self.ema_model is not None:
+            # Absent on a checkpoint written before this feature existed --
+            # not a resume failure, EMA-best tracking simply restarts fresh
+            # from this epoch rather than replaying the pre-resume history.
+            if state.best_metric_ema is not None:
+                self.best_metric_ema = state.best_metric_ema
+            if state.selection_metadata_ema is not None:
+                self.selection_metadata_ema = state.selection_metadata_ema
         if self.tracker_run_id is not None and state.tracker_run_id != self.tracker_run_id:
             raise ValueError("checkpoint tracker run ID does not match the active tracker")
         self.tracker_run_id, self.sample_state = state.tracker_run_id, state.sample_state
