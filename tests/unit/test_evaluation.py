@@ -15,7 +15,7 @@ from ard.config.loader import load_resolved_config_for_evaluation
 from ard.config.schema import ExperimentConfig, TrainingConfig, training_execution_identity, validate_global_batch_size
 from ard.engine.checkpoint import REQUIRED_KEYS, config_digest
 from ard.evaluation.autoattack import AutoAttackProvenanceError, autoattack_provenance, run_autoattack
-from ard.evaluation.saved_checkpoint import validate_checkpoint_lineage
+from ard.evaluation.saved_checkpoint import load_saved_student_checkpoint, validate_checkpoint_lineage
 
 pytestmark = pytest.mark.t1
 
@@ -431,6 +431,43 @@ def test_checkpoint_lineage_requires_complete_epoch_boundary_payload(tmp_path: P
     torch.save(_lineage_payload(boundary="mid"), boundary_path)
     with pytest.raises(ValueError, match="epoch-boundary"):
         validate_checkpoint_lineage(boundary_path, expected_config_hash="config-hash")
+
+
+def test_load_saved_student_checkpoint_selects_the_requested_weight_set(tmp_path: Path) -> None:
+    """--weights=ema must restore the EMA shadow model, not the raw student
+    -- confirmed against the official ADR code's own --ema flag, which
+    switches between "model" and "model_ema" state dict keys."""
+    import torch
+    from torch import nn
+
+    model_state = {"weight": torch.tensor([[1.0, 0.0], [0.0, 1.0]]), "bias": torch.tensor([0.0, 0.0])}
+    ema_state = {"weight": torch.tensor([[2.0, 0.0], [0.0, 2.0]]), "bias": torch.tensor([1.0, 1.0])}
+    checkpoint_path = tmp_path / "last.pt"
+    torch.save({"model": model_state, "ema": ema_state}, checkpoint_path)
+
+    student = nn.Linear(2, 2, bias=True)
+    load_saved_student_checkpoint(checkpoint_path, student, weights_key="model")
+    assert torch.equal(student.weight, model_state["weight"])
+    assert torch.equal(student.bias, model_state["bias"])
+
+    student = nn.Linear(2, 2, bias=True)
+    load_saved_student_checkpoint(checkpoint_path, student, weights_key="ema")
+    assert torch.equal(student.weight, ema_state["weight"])
+    assert torch.equal(student.bias, ema_state["bias"])
+
+
+def test_load_saved_student_checkpoint_rejects_a_missing_weight_set(tmp_path: Path) -> None:
+    """A non-ADR checkpoint carries no "ema" key; requesting it must fail
+    closed with a specific message, not a bare KeyError/AttributeError deep
+    inside load_state_dict."""
+    import torch
+    from torch import nn
+
+    checkpoint_path = tmp_path / "last.pt"
+    torch.save({"model": {"weight": torch.eye(2), "bias": torch.zeros(2)}}, checkpoint_path)
+    student = nn.Linear(2, 2, bias=True)
+    with pytest.raises(ValueError, match="carries no such state"):
+        load_saved_student_checkpoint(checkpoint_path, student, weights_key="ema")
 
 
 def test_evaluation_migrates_legacy_resolved_config_without_changing_checkpoint_hash(tmp_path: Path) -> None:

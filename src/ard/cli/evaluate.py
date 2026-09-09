@@ -50,6 +50,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Acknowledge an explicitly configured full AutoAttack run (never used by tests).",
     )
+    parser.add_argument(
+        "--weights",
+        choices=("model", "ema"),
+        default="model",
+        help=(
+            "Which checkpointed weight set to evaluate: 'model' (default) is the raw trained student, "
+            "matching every non-ADR method and the official ADR code's plain 'ADR' table rows. 'ema' "
+            "evaluates the EMA/weight-averaged shadow model an ADR run also checkpoints, matching the "
+            "official ADR code's '--ema'-flagged 'ADR + WA' rows; only checkpoints from an adr/adr_trades "
+            "run carry it."
+        ),
+    )
     parser.add_argument("overrides", nargs="*", help="Dot-path YAML overrides")
     return parser
 
@@ -226,7 +238,13 @@ def main(argv: list[str] | None = None) -> int:
         training=training_config.training,
         world_size=checkpoint_world_size,
     )
-    output_dir = (args.output or ((args.checkpoint_dir or args.checkpoint.parent) / "evaluation")).resolve()
+    if args.weights == "ema" and training_config.method.adr is None:
+        raise ValueError(
+            "--weights=ema requires an adr/adr_trades training run; "
+            f"this checkpoint's method is {training_config.method.id!r}, which carries no EMA state"
+        )
+    default_evaluation_dirname = "evaluation" if args.weights == "model" else f"evaluation-{args.weights}"
+    output_dir = (args.output or ((args.checkpoint_dir or args.checkpoint.parent) / default_evaluation_dirname)).resolve()
     if output_dir.exists() and any(output_dir.iterdir()):
         raise FileExistsError(f"refusing to overwrite existing evaluation output: {output_dir}")
     tracker_config = _evaluation_tracker_config(config, training_config, output_dir=output_dir)
@@ -250,7 +268,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     checkpoint_set = ",".join(path.name for path in checkpoints)
     evaluation_run_id = (
-        "eval-" + hashlib.sha256(f"{train_run_id}:{evaluation_hash}:{checkpoint_set}".encode()).hexdigest()[:20]
+        "eval-"
+        + hashlib.sha256(f"{train_run_id}:{evaluation_hash}:{checkpoint_set}:{args.weights}".encode()).hexdigest()[
+            :20
+        ]
     )
     evaluation_tracker = create_tracker(
         config=tracker_config,
@@ -319,13 +340,17 @@ def main(argv: list[str] | None = None) -> int:
                 output_dir=output_dir,
                 panel_size=config.evaluation.panel_size,
                 write_sample_stats=config.evaluation.write_sample_stats,
+                weights_key=args.weights,
             )
             alias = checkpoint.stem
             autoattack_result = None
             if config.evaluation.autoattack:
                 # Explicitly separate from PGD and reached only from this saved-
                 # checkpoint CLI process; tests inject the adapter and never call it.
-                load_saved_student_checkpoint(checkpoint, student)
+                # Must restore the same weight set the PGD/clean pass above just
+                # evaluated -- otherwise --weights=ema would report AA numbers
+                # for the raw student instead.
+                load_saved_student_checkpoint(checkpoint, student, weights_key=args.weights)
                 student.to(device).eval()
                 batches = [batch.to(device) for batch in loader]
                 images = torch.cat([batch.images for batch in batches])
@@ -348,6 +373,7 @@ def main(argv: list[str] | None = None) -> int:
                     "checkpoint_alias": alias,
                     "checkpoint_filename": checkpoint.name,
                     "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+                    "weights": args.weights,
                     "threat_model": threat_model,
                     "threat_hash": threat_hash,
                     "train_run_id": train_run_id,

@@ -1,6 +1,6 @@
 ---
 id: 0009
-status: pending
+status: decided
 created: 2026-09-09
 campaign: なし(新方向の着手可否。まだ何も走っていない)
 question: モバイル規模 ImageNet 頑健性を新方向として採るか。採る場合、
@@ -13,7 +13,7 @@ options:
   C: ImageNet側の床(段階0)だけ先に測る。自己蒸留の目的関数は実装せず、ImageNet対応・モバイルアーキテクチャ登録だけ行い、現代的レシピの素の敵対訓練をResNet-18と1つのモバイルアーキテクチャで3 seed回す。実測スループット(ResNet-18 5,208枚/秒、MobileNetV2 3,040枚/秒、4090 1枚、bf16)から、100エポック訓練が約4時間(R18)/7時間(モバイル)×3 seed=約33 GPU時間+AutoAttack(5,000枚部分集合、1 checkpointあたり約1 GPU時間×3 seed×2アーキテクチャ×2 checkpoint=約12 GPU時間)≒約45 GPU時間。決まること = 「小規模は頑健になれない」という前提が2020年レシピの産物に過ぎないかどうか、それ単独で。事前規則 = Salman2020Do_R18の25.32%(2020年レシピ)を下限、Singh2023のConvNeXt-Tの49.46%(2023年レシピ、より大きいアーキテクチャ)を参照点とし、モバイル規模で25.32%を大きく超えれば(目安+10pp以上)それだけで報告価値ありとする。
   D: この方向を採らない、または保留する。GPU 0時間。決まること = 何も。次の方向探索に戻る。
 recommendation: B
-chosen: null
+chosen: B
 ---
 
 ## 背景
@@ -59,3 +59,24 @@ CはImageNet対応そのものは避けて通れない(A・Cどちらのみで�
 エンジン変更(EMA自己蒸留の目的関数)は科学的核心に触れるため、ソースSHAを凍結する前に
 scientific-reviewer を通す必要がある(標準規則どおり)。この packet は「どの実験を
 どの順で走らせるか」を決めるものであり、実装のレビューを代替しない。
+
+## 実装・レビュー後の追記(2026-09-09)
+
+ADR(AT+ADR、TRADES+ADR、MobileNetV2拡張枠)を実装し、scientific-reviewer による
+レビューを実施。1回目のレビューでP0(CLIから一切起動できない配線漏れ3箇所)と
+P1(TRADES+ADRの内側PGD攻撃が公式実装〈`.external/adr`にpin、commit `515da0e`〉と
+異なっていた、新規2プロトコルの契約チェックが未登録で実質無効だった)を検出し、
+すべて修正済み(commit `e52c5d9` → `3917352`)。GPUカナリア前の最後のゲートとして、
+レビューで浮上した2つの実験設計判断をユーザーに確認し、以下の通り決定した:
+
+- **ResNet-18のoptimizer不一致**: ADRアーム(`controlled_cifar10_r18_adr_v1`、
+  論文どおりNesterov momentum使用)と既存のplain-AT baseline
+  (`controlled_cifar10_r18_v1`、Nesterovなし)を素朴に比較すると、ADRの効果と
+  optimizerの違いが混ざる。→ **Nesterov有りのbaselineを追加**
+  (`cifar10_r18_pgd_at_nesterov.yaml`、`controlled_cifar10_r18_adr_v1`配下)。
+  既存のplain-SGD baselineはそのまま残す(他アームの基準として必要)。
+- **評価対象の重み(student vs EMA)**: ADR公式実装はどちらも報告する
+  (`--ema`フラグ、"ADR"行=student、"ADR + WA"行=EMA)。→ **両方評価できるように
+  `ard.cli.evaluate`に`--weights {model,ema}`を追加**(`ard.evaluation.saved_checkpoint`
+  の`weights_key`引数)。デフォルトはstudent(`model`)で、既存の全手法・既存の
+  出力ファイル名との後方互換を保つ。

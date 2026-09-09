@@ -39,19 +39,34 @@ def _eval_mode(model: nn.Module) -> Iterator[None]:
         model.train(was_training)
 
 
-def load_saved_student_checkpoint(path: Path, model: nn.Module) -> Mapping[str, object]:
-    """Load only model weights from an already-written training checkpoint.
+def load_saved_student_checkpoint(path: Path, model: nn.Module, *, weights_key: str = "model") -> Mapping[str, object]:
+    """Load one named weight set from an already-written training checkpoint.
 
     Evaluation intentionally does not restore an optimizer, teacher, sample
     state, or any training-time policy.  It can therefore never use them as a
     test-time defence.
+
+    ``weights_key`` selects which state dict to restore: ``"model"`` (the
+    default) is the raw trained student, exactly what every non-ADR method
+    has always evaluated.  ``"ema"`` restores the EMA/weight-averaged shadow
+    model an ADR run also checkpoints (see ``ard.engine.trainer``) -- the
+    official ADR code reports both, distinguished by an explicit ``--ema``
+    flag ("ADR" rows use the raw student, "ADR + WA" rows use the EMA
+    weights); this mirrors that choice rather than picking one silently.
     """
     if not path.is_file():
         raise FileNotFoundError(f"saved checkpoint does not exist: {path}")
     payload = torch.load(path, map_location="cpu", weights_only=False)
     if not isinstance(payload, dict) or not isinstance(payload.get("model"), dict):
         raise ValueError("evaluation requires a complete saved training checkpoint with model weights")
-    unwrap_model(model).load_state_dict(payload["model"], strict=True)
+    weights = payload.get(weights_key)
+    if not isinstance(weights, dict):
+        available = [key for key in ("model", "ema") if isinstance(payload.get(key), dict)]
+        raise ValueError(
+            f"evaluation requested weights_key={weights_key!r} but the checkpoint carries no such state "
+            f"(available weight sets: {available})"
+        )
+    unwrap_model(model).load_state_dict(weights, strict=True)
     return payload
 
 
@@ -85,9 +100,16 @@ def evaluate_saved_checkpoint(
     output_dir: Path,
     panel_size: int,
     write_sample_stats: bool = False,
+    weights_key: str = "model",
 ) -> EvaluationResult:
-    """Report clean and explicitly configured PGD accuracy from a saved model."""
-    load_saved_student_checkpoint(checkpoint, model)
+    """Report clean and explicitly configured PGD accuracy from a saved model.
+
+    ``weights_key`` picks which checkpointed state dict to evaluate -- see
+    ``load_saved_student_checkpoint``. Output filenames are namespaced by it
+    so evaluating both "model" and "ema" from the same checkpoint into the
+    same output directory never collides.
+    """
+    load_saved_student_checkpoint(checkpoint, model, weights_key=weights_key)
     model.to(device)
     totals = torch.zeros(3, dtype=torch.float64, device=device)
     rows: list[dict[str, object]] = []
@@ -156,13 +178,17 @@ def evaluate_saved_checkpoint(
             raise TypeError("evaluation sample ID must be an integer")
         sample_ids.append(sample_id)
     selected = set(fixed_panel_ids(sample_ids, seed=seed, size=panel_size))
-    panel = output_dir / f"panel-{checkpoint.stem}.jsonl"
+    # "model" keeps the pre-existing filename exactly (no evaluation ever
+    # requested anything else before EMA support existed); any other weight
+    # set gets an explicit suffix so it never collides with the student's.
+    name_suffix = "" if weights_key == "model" else f"-{weights_key}"
+    panel = output_dir / f"panel-{checkpoint.stem}{name_suffix}.jsonl"
     panel.write_text(
         "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows if row["sample_id"] in selected),
         encoding="utf-8",
     )
     sample_stats = (
-        write_sample_parquet(rows, output_dir / f"sample-stats-{checkpoint.stem}.parquet")
+        write_sample_parquet(rows, output_dir / f"sample-stats-{checkpoint.stem}{name_suffix}.parquet")
         if write_sample_stats
         else None
     )
