@@ -158,6 +158,43 @@ def test_rectified_kl_pgd_uses_supplied_probabilities_directly_and_matches_hand_
     assert torch.allclose(result.adversarial, expected, atol=1e-6)
 
 
+def test_rectified_kl_pgd_holds_the_target_fixed_across_multiple_steps() -> None:
+    """A single-step attack can't distinguish 'target resolved once' from
+    'target re-resolved every step', since both coincide for steps=1. Run
+    3 steps and hand-roll the same loop against a target fixed up front --
+    if the attack re-resolved anything per step, the two would only match
+    for a target that never changes to begin with, so this also guards
+    against a future refactor that accidentally recomputes it."""
+    torch.manual_seed(5)
+    student = linear_model()
+    inputs = torch.rand(2, 3, 4, 4)
+    labels = torch.tensor([0, 1])
+    rectified = torch.tensor([[0.65, 0.25, 0.10], [0.15, 0.25, 0.60]])
+    config = AttackConfig(
+        loss="kl",
+        kl_target="rectified",
+        temperature=1.0,
+        epsilon="4/255",
+        step_size="1/255",
+        steps=3,
+        random_start=False,
+    )
+    result = LinfPGD(config).generate(
+        AttackRequest(inputs=inputs, labels=labels, student=student, target_probabilities=rectified)
+    )
+    adversarial = inputs.clone()
+    epsilon, step_size = 4.0 / 255.0, 1.0 / 255.0
+    for _ in range(3):
+        probe = adversarial.clone().requires_grad_(True)
+        logits = student(probe)
+        loss = -(rectified * torch.log_softmax(logits, dim=1)).sum(dim=1).mean()
+        gradient = torch.autograd.grad(loss, probe)[0]
+        stepped = adversarial + step_size * gradient.sign()
+        projected = torch.clamp(stepped, inputs - epsilon, inputs + epsilon)
+        adversarial = projected.clamp(0, 1)
+    assert torch.allclose(result.adversarial, adversarial, atol=1e-6)
+
+
 def test_rectified_kl_pgd_rejects_target_logits_and_plain_kl_rejects_target_probabilities() -> None:
     student = linear_model()
     inputs = torch.rand(2, 3, 4, 4)

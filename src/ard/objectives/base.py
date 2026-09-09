@@ -135,10 +135,19 @@ class DistillationObjective(ABC):
     requires_teacher_clean_logits = False
     # Set by ard.objectives.adr's methods: the trainer computes an
     # EMA-of-student-blended rectified target once per batch (before the
-    # attack runs, so the attack ascends the same target) and passes it here
-    # as ``rectified_target_probabilities``, already a resolved probability
-    # distribution.
+    # attack runs) and passes it here as ``rectified_target_probabilities``,
+    # already a resolved probability distribution, for use in the loss.
     requires_rectified_target_probabilities = False
+    # Whether the PGD attack itself must also ascend this rectified target
+    # (via ``AttackRequest.target_probabilities``), rather than resolving its
+    # own target the normal way. True only for plain ``ADRObjective``: the
+    # official ADR code's TRADES+ADR inner attack ignores the rectified label
+    # and keeps TRADES' original inner-max (KL between the student's own
+    # clean and perturbed outputs) -- confirmed against
+    # .external/adr/src/util/trades_attack.py, where the rectified label
+    # argument passed into ``TRADES.attack`` is never read. Only the outer
+    # natural-CE term is rectified for adr_trades.
+    rectifies_attack_target = False
 
     @abstractmethod
     def __call__(

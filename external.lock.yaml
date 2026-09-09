@@ -31,3 +31,11 @@ repositories:
     license_status: verified
     license_evidence:
       sha256: e824bdf7f389c53ce7a64a38033778496fa9a25ac98e043a47df21149fbb1937
+  adr:
+    url: https://github.com/yuyuwu5/ADR.git
+    commit: 515da0e0373f9d3de2325ad970f1f9d7e5cdcd3e
+    fetched_at: '2026-09-09T07:45:59.710627+00:00'
+    license_file: LICENSE
+    license_status: unclear
+    license_evidence:
+      sha256: 488d32514d983bb48e0e75dab8f02bdc148fc0c34a52bea2bdbfdee2c43e8206

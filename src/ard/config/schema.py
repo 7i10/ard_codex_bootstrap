@@ -51,6 +51,7 @@ class ProtocolConfig(StrictModel):
         "controlled_cifar10_r18_pilot_1ep_v1",
         "controlled_cifar10_r18_pilot_3ep_v1",
         "controlled_cifar10_r18_adr_v1",
+        "controlled_cifar10_mobilenetv2_adr_v1",
         "controlled_cifar10_r18_trades_49k_validation_v1",
         "synthetic_smoke_v2",
     ]
@@ -456,11 +457,15 @@ class MethodConfig(StrictModel):
             "rslad_joint_downweight": "teacher_clean",
             "rslad_hard_fallback": "teacher_clean",
             "rslad_frozen_oracle_softening": "teacher_clean",
-            # The attack ascends the EMA-blended rectified label the caller
-            # supplies via AttackRequest.target_probabilities, not a fixed
-            # teacher/student forward the attack resolves itself.
+            # Plain ADR's attack ascends the EMA-blended rectified label the
+            # caller supplies via AttackRequest.target_probabilities. The
+            # TRADES+ADR variant does NOT: the official ADR code's inner PGD
+            # attack ignores the rectified label and keeps TRADES' original
+            # inner-max (student clean vs perturbed) -- confirmed against
+            # .external/adr/src/util/trades_attack.py. Only the outer
+            # natural-CE term is rectified for adr_trades.
             "adr": "rectified",
-            "adr_trades": "rectified",
+            "adr_trades": "student_clean",
         }.get(self.id)
         if self.attack.loss != expected_loss:
             raise ValueError(f"{self.id} requires attack.loss={expected_loss}")
@@ -1262,6 +1267,9 @@ class ExperimentConfig(StrictModel):
             "controlled_cifar10_r18_cropshift_prefix_v1",
             "controlled_cifar10_r18_delayed_multistep_v1",
             "controlled_cifar10_r18_prescriptive_v3_v1",
+            "controlled_cifar10_r18_adr_v1",
+            "controlled_cifar10_mobilenetv2_adr_v1",
+            "controlled_cifar10_r18_trades_49k_validation_v1",
             *pilot_protocols,
         }:
             return
@@ -1315,9 +1323,13 @@ class ExperimentConfig(StrictModel):
         for field, expected in schedule.items():
             if getattr(self.scheduler, field) != expected:
                 errors.append(f"scheduler.{field} must be {expected!r}")
-        attack_family = self.method.id if self.method.id in {"pgd_at", "trades"} else "rslad"
+        attack_family = self.method.id if self.method.id in {"pgd_at", "trades", "adr", "adr_trades"} else "rslad"
         train_attacks = metadata["train_attacks"]
         assert isinstance(train_attacks, Mapping)
+        if attack_family not in train_attacks:
+            raise ValueError(
+                f"{self.protocol.id} contract has no train_attacks entry for method family {attack_family!r}"
+            )
         attack = train_attacks[attack_family]
         selection = metadata["selection_attack"]
         assert isinstance(attack, Mapping) and isinstance(selection, Mapping)

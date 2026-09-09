@@ -45,7 +45,7 @@ from ard.engine.distributed import (
     wrap_ddp,
 )
 from ard.models import build_student, build_teacher
-from ard.objectives import DistillationObjective, PGDATObjective, RSLADObjective, TRADESObjective
+from ard.objectives import ADRObjective, ADRTRADESObjective, DistillationObjective, PGDATObjective, RSLADObjective, TRADESObjective
 from ard.policies import (
     EntropyOnlyPolicy,
     FixedInterventionMask,
@@ -476,6 +476,19 @@ def _build_method(
             SampleStateStore(ema_decay=method.student_ema_decay),
             None,
         )
+    if method.id == "adr":
+        return ADRObjective(), None, None, None
+    if method.id == "adr_trades":
+        return (
+            ADRTRADESObjective(
+                beta=method.trades_beta,
+                temperature=method.temperature,
+                temperature_squared=method.temperature_squared,
+            ),
+            None,
+            None,
+            None,
+        )
     raise RuntimeError(f"unsupported validated method: {method.id}")
 
 
@@ -871,6 +884,12 @@ def main(argv: list[str] | None = None) -> int:
                 worker_init_fn=seed_data_loader_worker,
             ),
         )
+        # ADR's per-iteration temperature/lambda cosine schedule needs the
+        # total step count up front. Derived from the config alone (not a
+        # live `len(loader)` snapshot after resume) so it is identical every
+        # time this run is launched -- resume's existing config-hash/
+        # world-size drift checks keep it consistent across restarts.
+        total_iterations = len(loader) * config.training.epochs if config.method.adr is not None else None
         validation_loader = cast(
             DataLoader[IndexedBatch],
             DataLoader(
@@ -913,6 +932,8 @@ def main(argv: list[str] | None = None) -> int:
             target_policy=target_policy,
             intervention_mask=intervention_mask,
             anchor_model=anchor_model,
+            adr_config=config.method.adr,
+            total_iterations=total_iterations,
             prescriptive_v3_route=(
                 "pf_retention"
                 if config.prescriptive_v3 is not None and config.prescriptive_v3.arm.startswith("PF_")

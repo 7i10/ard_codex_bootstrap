@@ -4,11 +4,15 @@ tier: production
 seeds: {split: 20260722, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
 dataset: {name: cifar10, root: "${ARD_CIFAR10_ROOT}", split: train, download: false, num_classes: 10}
 student: {architecture: saad_resnet18_cifar_v1, num_classes: 10, preprocessing_owner: student_adapter, normalization: {profile: cifar10_raw_identity}}
-# The attack config is identical to plain "adr": ADR's attack ascends the
-# rectified soft label regardless of which base method (PGD-AT or TRADES)
-# receives it. Only the outer loss differs (ADRTRADESObjective adds the same
-# beta*KL(adv||clean) robustness term TRADESObjective uses, untouched).
-method: {id: adr_trades, version: 1, trades_beta: 6.0, adr: {ema_decay: 0.995, temperature_high: 2.5, temperature_low: 2.0, lambda_low: 0.7, lambda_high: 0.95}, attack: {loss: kl, kl_target: rectified, temperature: 1.0, temperature_squared: false, epsilon: 8/255, step_size: 2/255, steps: 10, random_start: true, trace_step_losses: false}, selection_attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 20, random_start: true, student_mode: eval, teacher_mode: eval, trace_step_losses: false}}
+# The attack config is identical to plain "trades" (kl_target: student_clean),
+# NOT to plain "adr": the official ADR code's TRADES+ADR inner PGD attack
+# ignores the rectified label and keeps TRADES' original inner-max (KL
+# between the student's own clean and perturbed outputs) -- confirmed against
+# .external/adr/src/util/trades_attack.py, where the rectified label argument
+# passed into TRADES.attack is never read. Only the outer natural-CE term is
+# rectified (ADRTRADESObjective adds the same beta*KL(adv||clean) robustness
+# term TRADESObjective uses, untouched).
+method: {id: adr_trades, version: 1, trades_beta: 6.0, adr: {ema_decay: 0.995, temperature_high: 2.5, temperature_low: 2.0, lambda_low: 0.7, lambda_high: 0.95}, attack: {loss: kl, kl_target: student_clean, temperature: 1.0, temperature_squared: true, epsilon: 8/255, step_size: 2/255, steps: 10, random_start: true, trace_step_losses: false}, selection_attack: {loss: ce, epsilon: 8/255, step_size: 2/255, steps: 20, random_start: true, student_mode: eval, teacher_mode: eval, trace_step_losses: false}}
 optimizer: {id: sgd, learning_rate: 0.1, momentum: 0.9, weight_decay: 0.0005, nesterov: true}
 scheduler: {id: multistep, milestones: [100, 150], gamma: 0.1, step_at: epoch_end}
 training: {epochs: 200, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.1, batchnorm_mode: local_per_rank}

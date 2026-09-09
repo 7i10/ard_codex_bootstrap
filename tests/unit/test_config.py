@@ -6,10 +6,12 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from ard.cli.train import _build_method
 from ard.config import load_config, save_resolved_config
 from ard.config.schema import AttackConfig, ExperimentConfig, MethodConfig, NormalizationConfig
 from ard.config.teacher_audit import load_teacher_audit_config
 from ard.engine.checkpoint import config_digest
+from ard.tracking.adapter import canonical_run_group
 
 pytestmark = pytest.mark.t0
 
@@ -551,3 +553,53 @@ def test_top_level_configs_resolve_under_controlled_environment(
                 "adr",
                 "adr_trades",
             }
+            # Every scientific config must actually be constructible on the
+            # real CLI execution path, not just pass schema validation --
+            # ard.cli.train._build_method and ard.tracking.adapter's group
+            # naming are separate registries from MethodConfig.id's Literal,
+            # and a config can validate cleanly while still being unrunnable
+            # (see the ADR CLI-wiring gap found in scientific review).
+            objective, _, _, _ = _build_method(config)
+            assert objective is not None
+            exec_id: dict[str, object] = {
+                "world_size": 1,
+                "per_rank_batch_size": config.training.per_rank_batch_size,
+                "global_batch_size": config.training.global_batch_size,
+                "effective_global_batch_size": config.training.global_batch_size,
+                "batchnorm_mode": config.training.batchnorm_mode,
+            }
+            canonical_run_group(config, training_execution=exec_id)
+
+
+@pytest.mark.parametrize(
+    ("config_name", "overrides", "message"),
+    (
+        ("cifar10_r18_adr.yaml", ["optimizer.nesterov=false"], "nesterov must be True"),
+        (
+            "cifar10_r18_adr.yaml",
+            ["method.attack.epsilon=4/255", "method.selection_attack.epsilon=4/255"],
+            "epsilon must be",
+        ),
+        ("cifar10_r18_trades_adr.yaml", ["training.epochs=100"], "epochs must be"),
+        ("cifar10_mobilenetv2_adr.yaml", ["training.deterministic=false"], "deterministic must be"),
+        ("cifar10_r18_trades_49k_validation.yaml", ["training.validation_fraction=0.1"], "validation_fraction must be"),
+    ),
+)
+def test_new_adr_protocols_actually_enforce_their_pinned_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_name: str, overrides: list[str], message: str
+) -> None:
+    """Registering a protocol id is not enough: _validate_protocol_contract
+    only checks the fixed allowlist it names explicitly. Scientific review
+    found the three new ADR/49k-validation protocol ids were registered but
+    never added to that allowlist, so every field they claim to pin (optimizer,
+    attack, epochs, training determinism, validation split) went unchecked."""
+    monkeypatch.setenv("ARD_SEED", "7")
+    monkeypatch.setenv("ARD_CIFAR10_ROOT", str(tmp_path / "cifar10"))
+    monkeypatch.setenv("ARD_NUM_WORKERS", "0")
+    monkeypatch.setenv("ARD_JOB_OUTPUT_DIR", str(tmp_path / "job-output"))
+    monkeypatch.setenv("ARD_RUN_ID", "config-test-run")
+    monkeypatch.setenv("WANDB_ENTITY", "entity")
+    monkeypatch.setenv("WANDB_PROJECT", "project")
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    with pytest.raises(ValueError, match=message):
+        load_config(config_dir / config_name, overrides)

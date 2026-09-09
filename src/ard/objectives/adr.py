@@ -8,11 +8,21 @@ ADR is not a KD loss term added on top of hard-label CE, unlike every other
 objective in this package.  It is a label replacement: an EMA copy of the
 student's own weights produces a temperature-softened clean prediction, which
 is blended with the one-hot label into a single rectified soft target
-``P(x)``.  ``P(x)`` is computed once per batch, before the attack runs, and
-substitutes for the true label in *both* the PGD attack (see
-``ard.attacks.pgd``'s ``kl_target="rectified"`` path, which consumes the same
-tensor via ``AttackRequest.target_probabilities`` so the attack and the loss
-below never disagree about the target) and the training loss.
+``P(x)``.  ``P(x)`` is computed once per batch, before the attack runs.
+
+For plain ``ADRObjective`` (PGD-AT base), ``P(x)`` substitutes for the true
+label in *both* the PGD attack (see ``ard.attacks.pgd``'s
+``kl_target="rectified"`` path, which consumes the same tensor via
+``AttackRequest.target_probabilities``) and the training loss.
+
+For ``ADRTRADESObjective``, ``P(x)`` substitutes for the label only in the
+outer natural-CE term; the inner PGD attack keeps TRADES' original inner-max
+(KL between the student's own clean and perturbed outputs, unrectified) and
+the KL robustness term is untouched. This matches the official ADR code, not
+this repo's first-pass assumption: in
+``.external/adr/src/util/trades_attack.py``'s ``TRADES.attack``, the label
+argument is never read -- only ``advTrainer.py``'s outer natural-CE term uses
+the rectified label.
 
 Both this module and the attack reuse the existing KL machinery
 (``probabilities_to_student_kl``, ``target_to_student_kl``) rather than a
@@ -81,6 +91,7 @@ class ADRObjective(DistillationObjective):
     ADR does not add a term, it replaces the label the existing term uses."""
 
     requires_rectified_target_probabilities = True
+    rectifies_attack_target = True
 
     def __call__(
         self,

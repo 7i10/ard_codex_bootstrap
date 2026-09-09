@@ -48,6 +48,7 @@ def _loaders(seed: int = 7) -> tuple[DataLoader, DataLoader, EpochShuffleSampler
 
 
 def _rectified_attack() -> LinfPGD:
+    """Plain ADR's attack: ascends the rectified label directly."""
     return LinfPGD(
         AttackConfig(
             loss="kl",
@@ -61,7 +62,27 @@ def _rectified_attack() -> LinfPGD:
     )
 
 
-def _adr_trainer(output: Path, *, objective: object, epochs: int, seed: int = 7) -> Trainer:
+def _trades_shaped_attack() -> LinfPGD:
+    """ADR-TRADES' attack: unrectified, identical to plain TRADES' inner-max
+    (confirmed against .external/adr/src/util/trades_attack.py -- the
+    official code's TRADES+ADR inner PGD step never reads the rectified
+    label)."""
+    return LinfPGD(
+        AttackConfig(
+            loss="kl",
+            kl_target="student_clean",
+            temperature=1.0,
+            epsilon="1/255",
+            step_size="1/255",
+            steps=1,
+            random_start=True,
+        )
+    )
+
+
+def _adr_trainer(
+    output: Path, *, objective: object, epochs: int, seed: int = 7, attack: LinfPGD | None = None
+) -> Trainer:
     torch.manual_seed(123)
     model = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
     optimizer = SGD(model.parameters(), lr=0.03, momentum=0.9)
@@ -73,7 +94,7 @@ def _adr_trainer(output: Path, *, objective: object, epochs: int, seed: int = 7)
         optimizer=optimizer,
         scheduler=scheduler,
         scaler=None,
-        attack=_rectified_attack(),
+        attack=attack if attack is not None else _rectified_attack(),
         selection_attack=LinfPGD(
             AttackConfig(
                 epsilon="1/255", step_size="1/255", steps=1, random_start=True, student_mode="eval", teacher_mode="eval"
@@ -99,7 +120,9 @@ def test_one_epoch_of_adr_runs_end_to_end(tmp_path: Path) -> None:
 
 
 def test_one_epoch_of_adr_trades_runs_end_to_end(tmp_path: Path) -> None:
-    trainer = _adr_trainer(tmp_path / "adr_trades", objective=ADRTRADESObjective(beta=6.0), epochs=1)
+    trainer = _adr_trainer(
+        tmp_path / "adr_trades", objective=ADRTRADESObjective(beta=6.0), epochs=1, attack=_trades_shaped_attack()
+    )
     loader, validation_loader, _ = _loaders()
     trainer.fit(loader, validation_loader=validation_loader, epochs=1)
     assert trainer.ema_model is not None

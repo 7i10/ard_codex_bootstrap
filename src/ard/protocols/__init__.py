@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import cast
 
 
 @dataclass(frozen=True)
@@ -259,12 +260,73 @@ def _pilot_metadata(epochs: int) -> Mapping[str, object]:
 # distinct protocol identity is used rather than reusing
 # controlled_cifar10_r18_v1 because of this optimizer difference and because
 # the attack loss (a rectified soft target, not a fixed teacher/student
-# target) has no entry in that protocol's train_attacks contract.
+# target) needs its own train_attacks contract entries (added below).
 _ADR_METADATA = MappingProxyType(
     {
         **_CONTROLLED_METADATA,
         "optimizer": MappingProxyType(
             {"id": "sgd", "learning_rate": 0.1, "momentum": 0.9, "weight_decay": 5e-4, "nesterov": True}
+        ),
+        "train_attacks": MappingProxyType(
+            {
+                **cast(Mapping[str, object], _CONTROLLED_METADATA["train_attacks"]),
+                "adr": MappingProxyType(
+                    {
+                        "loss": "kl",
+                        "kl_target": "rectified",
+                        "temperature": 1.0,
+                        "temperature_squared": False,
+                        "steps": 10,
+                        "epsilon": "8/255",
+                        "step_size": "2/255",
+                        "random_start": True,
+                        "norm": "linf",
+                        "input_domain": "pixel_0_1",
+                        "student_mode": "eval",
+                        "teacher_mode": "eval",
+                    }
+                ),
+                # Unlike plain "adr", the TRADES+ADR variant's inner PGD
+                # attack is NOT rectified: the official ADR code keeps
+                # TRADES' original inner-max (confirmed against
+                # .external/adr/src/util/trades_attack.py), so this entry is
+                # identical to the inherited "trades" attack shape above.
+                "adr_trades": MappingProxyType(
+                    {
+                        "loss": "kl",
+                        "kl_target": "student_clean",
+                        "temperature": 1.0,
+                        "temperature_squared": True,
+                        "steps": 10,
+                        "epsilon": "8/255",
+                        "step_size": "2/255",
+                        "random_start": True,
+                        "norm": "linf",
+                        "input_domain": "pixel_0_1",
+                        "student_mode": "eval",
+                        "teacher_mode": "eval",
+                    }
+                ),
+            }
+        ),
+    }
+)
+
+# MobileNetV2 is this project's own capacity-extension arm, not part of the
+# ADR paper's replication cells (ResNet-18 / PreAct-ResNet-18 / WRN-34-10
+# only). It needs its own protocol identity -- reusing
+# controlled_cifar10_r18_adr_v1 would silently assert a saad_resnet18_cifar_v1
+# student identity for a mobilenet_v2_cifar run.
+_ADR_MOBILENETV2_METADATA = MappingProxyType(
+    {
+        **_ADR_METADATA,
+        "student": MappingProxyType(
+            {
+                "architecture": "mobilenet_v2_cifar",
+                "num_classes": 10,
+                "normalization_profile": "cifar10_standard",
+                "preprocessing_owner": "student_adapter",
+            }
         ),
     }
 )
@@ -395,6 +457,12 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             runnable_locally=True,
             local_train_reason=None,
             metadata=_ADR_METADATA,
+        ),
+        "controlled_cifar10_mobilenetv2_adr_v1": ProtocolSpec(
+            id="controlled_cifar10_mobilenetv2_adr_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            metadata=_ADR_MOBILENETV2_METADATA,
         ),
         "controlled_cifar10_r18_trades_49k_validation_v1": ProtocolSpec(
             id="controlled_cifar10_r18_trades_49k_validation_v1",

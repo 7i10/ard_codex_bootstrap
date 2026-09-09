@@ -343,7 +343,7 @@ def _bounded_wandb_group(canonical_identity: str) -> str:
 def canonical_run_group(config: ExperimentConfig, *, training_execution: Mapping[str, object]) -> str | None:
     """Append teacher, protocol, and execution identity to the comparison base."""
     teacher_registry_id = None if config.teacher is None else config.teacher.registry_id
-    teacherless_baseline = config.teacher is None and config.method.id in {"pgd_at", "trades"}
+    teacherless_baseline = config.teacher is None and config.method.id in {"pgd_at", "trades", "adr", "adr_trades"}
     if config.tier in {"pilot", "production"} and teacher_registry_id is None and not teacherless_baseline:
         raise TrackingError("pilot/production canonical groups require teacher.registry_id")
     base = config.tracking.group

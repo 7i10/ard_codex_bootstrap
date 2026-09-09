@@ -964,6 +964,7 @@ class Trainer:
             )
             attack_requires_teacher_clean = bool(getattr(self.attack, "requires_teacher_clean_target", False))
             requires_rectified_target = bool(getattr(self.objective, "requires_rectified_target_probabilities", False))
+            attack_rectifies_target = bool(getattr(self.objective, "rectifies_attack_target", False))
             teacher_clean_logits = None
             teacher_clean_forward_calls = 0.0
             if requires_teacher_clean or attack_requires_teacher_clean or self._records_teacher_response:
@@ -1062,7 +1063,7 @@ class Trainer:
                         student=self.model,
                         teacher=self.teacher,
                         target_logits=teacher_clean_logits,
-                        target_probabilities=rectified_target,
+                        target_probabilities=(rectified_target if attack_rectifies_target else None),
                         generator=self._attack_generator(),
                         source_ids=batch.sample_ids,
                         epoch=self.current_epoch,
