@@ -79,6 +79,18 @@ def _checkpoint_paths(*, checkpoint: Path | None, checkpoint_dir: Path | None, s
     return paths
 
 
+def _evaluation_run_id_weights_suffix(weights: str) -> str:
+    """Hash-input suffix for the requested weight set.
+
+    Empty for "model" so every evaluation run ID minted before --weights
+    existed remains re-derivable byte-for-byte (~20 archived IDs depend on
+    this, see docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md and
+    scripts/aggregate_controlled_trades_fix_official_test.py's pinned
+    "pgd_only_run_id"). Only a non-default weight set changes the identity.
+    """
+    return "" if weights == "model" else f":{weights}"
+
+
 def _attack_identity(attack: Any) -> dict[str, object]:
     return attack.identity()
 
@@ -267,9 +279,10 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
     checkpoint_set = ",".join(path.name for path in checkpoints)
+    weights_suffix = _evaluation_run_id_weights_suffix(args.weights)
     evaluation_run_id = (
         "eval-"
-        + hashlib.sha256(f"{train_run_id}:{evaluation_hash}:{checkpoint_set}:{args.weights}".encode()).hexdigest()[
+        + hashlib.sha256(f"{train_run_id}:{evaluation_hash}:{checkpoint_set}{weights_suffix}".encode()).hexdigest()[
             :20
         ]
     )
@@ -374,6 +387,16 @@ def main(argv: list[str] | None = None) -> int:
                     "checkpoint_filename": checkpoint.name,
                     "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
                     "weights": args.weights,
+                    # Checkpoint selection (which epoch "best.pt" is) always
+                    # runs against the raw student's validation metric --
+                    # ard.engine.trainer never validates the EMA shadow
+                    # model. A "best.pt" row evaluated with weights="ema" is
+                    # therefore EMA weights at a student-selected epoch, NOT
+                    # the official ADR code's "ADR + WA" semantics (which
+                    # reselects "best" using the EMA's own validation
+                    # metric). This field makes that explicit for anyone
+                    # reading evaluation-results.json directly.
+                    "selection_weights": "model",
                     "threat_model": threat_model,
                     "threat_hash": threat_hash,
                     "train_run_id": train_run_id,

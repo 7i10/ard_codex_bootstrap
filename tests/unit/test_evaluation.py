@@ -8,6 +8,7 @@ import pytest
 from ard.analysis import ParquetDependencyError, fixed_panel_ids, summarize_checkpoint_groups, write_sample_parquet
 from ard.cli.evaluate import (
     _evaluation_preflight_config,
+    _evaluation_run_id_weights_suffix,
     _evaluation_tracker_config,
     _validate_evaluation_tracking_identity,
 )
@@ -454,6 +455,17 @@ def test_load_saved_student_checkpoint_selects_the_requested_weight_set(tmp_path
     load_saved_student_checkpoint(checkpoint_path, student, weights_key="ema")
     assert torch.equal(student.weight, ema_state["weight"])
     assert torch.equal(student.bias, ema_state["bias"])
+
+
+def test_evaluation_run_id_weights_suffix_is_empty_only_for_the_default() -> None:
+    """The evaluation run ID hash must be byte-for-byte unchanged for the
+    default --weights=model, so every evaluation run ID minted before this
+    flag existed stays re-derivable. Regression guard for a bug where the
+    suffix was appended unconditionally (":model" for the default case),
+    silently changing every archived run's identity even though filenames
+    and reported numbers were untouched."""
+    assert _evaluation_run_id_weights_suffix("model") == ""
+    assert _evaluation_run_id_weights_suffix("ema") == ":ema"
 
 
 def test_load_saved_student_checkpoint_rejects_a_missing_weight_set(tmp_path: Path) -> None:

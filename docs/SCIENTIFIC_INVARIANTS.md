@@ -169,3 +169,36 @@ Schema v2 は `teacher_target_uniform_mix@1` を student/joint の adversarial s
 ## Best-oriented history-routing v2
 
 `teacher_target_true_label_mix@1` はepoch 39完了時に固定したbinary train-ID maskへだけ適用する。selected sampleのadversarial RSLAD targetは`0.5 * softmax(z_teacher_clean/T) + 0.5 * one_hot(y)`、unselected sampleは通常RSLAD targetと完全に同一である。clean KD branch、attack、temperature、`T^2` scaling、branch coefficient、reductionは変更しない。selectorは全45,000 train sample上でinclusive online correctness-frequency riskとnegative margin EMAをそれぞれmidrankし、等重み合成後にanchor-correct/anchor-wrongへ分けて各上位10%を固定する。future outcome、official test、teacher correctnessはselectionへ使用しない。
+
+## ADR (EMA自己蒸留) の契約
+
+Wu, Wang & Chen, "Annealing Self-Distillation Rectification Improves Adversarial
+Training" (ICLR 2024, arXiv:2305.12118)。公式実装は `.external/adr`
+(commit `515da0e0373f9d3de2325ad970f1f9d7e5cdcd3e`) にpin済み。
+
+- **`adr`(PGD-AT base)は内側PGD攻撃を補正ラベル`P(x)`(EMA-of-student softmaxと
+  one-hotの per-sample ブレンド、paper Eq.3-5)に対して行う。`adr_trades`はしない**
+  ——公式コードの`TRADES.attack`は渡されたラベル引数を一切読まず、素のTRADES内側max
+  (学生自身のclean出力とperturbed出力間のKL)のまま。補正ラベルは`adr_trades`でも
+  outer natural-CE項にだけ使う。この非対称は`DistillationObjective.rectifies_attack_target`
+  (adrのみTrue)で実装されている。攻撃層・目的関数どちらか一方だけをこの規則から
+  逸脱させて変更すると、両者の想定するtargetが食い違う。
+- **EMA更新は`state_dict()`全体(パラメータ+バッファ、BNのrunning statsと
+  `num_batches_tracked`含む)に対し、optimizer.step()の直後、1 iterationに1回**行う
+  (timm `ModelEmaV2`と同じ規約)。整数バッファは補間後に丸めて型を戻す。
+  epoch単位や一部パラメータのみの更新に変更しない。
+- **温度τ(2.5→2.0)とλ(0.7→0.95)の per-iteration cosine anneal はwarmupなし**
+  (公式コードの`cosine_scheduler`はwarmup対応だが、ADRのCIFAR-10設定は
+  `warmup_epochs=0`で呼んでいる)。`total_iterations`は`len(loader) * training.epochs`
+  から起動のたびに解決済みconfigだけで再計算し、チェックポイントには保存しない
+  ——world_size/config_hashの既存drift検知がこの値の一貫性を保証する前提であり、
+  それらのチェックを弱めた場合はこの前提も崩れる。
+- **評価対象の重み(student vs EMA)はデフォルトstudent**。`ard.cli.evaluate --weights
+  {model,ema}`で切替可能(公式実装の`--ema`フラグに対応、"ADR"行=student、
+  "ADR + WA"行=EMA)。**重要な既知の制約**: チェックポイント選択(`best.pt`)は
+  常にstudentのvalidation PGD精度で行われ、EMAの精度では選択されない
+  (`ard.engine.trainer`はEMAをvalidationしない)。したがって`best.pt`を
+  `--weights=ema`で評価した結果は、公式実装の"ADR + WA"(EMA自身の精度で
+  再選択されたbest epoch)とは異なる量であり、単純に並べて報告してはならない。
+  `evaluation-results.json`の`selection_weights`フィールド(常に`"model"`)が
+  この事実を明示する。

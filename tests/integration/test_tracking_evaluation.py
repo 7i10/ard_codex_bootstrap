@@ -99,6 +99,50 @@ def _training_config(output: Path) -> dict[str, Any]:
     }
 
 
+def _adr_training_config(output: Path) -> dict[str, Any]:
+    config = _training_config(output)
+    config["method"] = {
+        "id": "adr",
+        "version": 1,
+        "adr": {
+            "ema_decay": 0.9,
+            "temperature_high": 2.0,
+            "temperature_low": 1.0,
+            "lambda_low": 0.5,
+            "lambda_high": 0.9,
+        },
+        "attack": {
+            "loss": "kl",
+            "kl_target": "rectified",
+            "temperature": 1.0,
+            "epsilon": "1/255",
+            "step_size": "1/255",
+            "steps": 1,
+            "random_start": False,
+        },
+    }
+    config["tracking"]["run_id"] = "offline-smoke-adr"
+    config["tracking"]["group"] = "fixture-comparison-adr"
+    return config
+
+
+@pytest.fixture(scope="module")
+def adr_offline_run(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    """A trained (but not yet evaluated) ADR checkpoint directory -- separate
+    from `offline_run` so --weights=ema tests exercise a checkpoint that
+    actually carries an "ema" state, rather than every non-ADR rejection
+    test needing its own training run."""
+    root = Path(__file__).resolve().parents[2]
+    temporary = tmp_path_factory.mktemp("tracking-evaluation-adr")
+    output = temporary / "train"
+    raw_config = _adr_training_config(output)
+    train_config = temporary / "train.yaml"
+    train_config.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+    trained = _run(root, "ard.cli.train", "--config", str(train_config))
+    assert trained.returncode == 0, trained.stderr
+    return {"output": output, "config": ExperimentConfig.model_validate(raw_config), "temporary": temporary}
+
+
 @pytest.fixture(scope="module")
 def offline_run(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     root = Path(__file__).resolve().parents[2]
@@ -522,6 +566,89 @@ def test_evaluation_rejects_weakened_selection_attack(offline_run: dict[str, Any
                 str(tmp_path / "weakened-evaluation"),
             ]
         )
+
+
+def test_evaluation_rejects_ema_weights_for_a_non_adr_checkpoint_before_output_creation(
+    offline_run: dict[str, Any], tmp_path: Path
+) -> None:
+    """--weights=ema only makes sense for an adr/adr_trades checkpoint (it
+    carries no "ema" state otherwise); this must fail before any output
+    directory exists, the same discipline every other pre-flight identity
+    check in this file follows."""
+    training_output: Path = offline_run["output"]
+    raw = _training_config(tmp_path / "unused")
+    config_path = tmp_path / "ema-on-non-adr.yaml"
+    config_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    rejected_output = tmp_path / "ema-rejected"
+    with pytest.raises(ValueError, match="requires an adr/adr_trades training run"):
+        evaluate_cli.main(
+            [
+                "--config",
+                str(config_path),
+                "--checkpoint-dir",
+                str(training_output),
+                "--output",
+                str(rejected_output),
+                "--weights",
+                "ema",
+            ]
+        )
+    assert not rejected_output.exists()
+
+
+def test_evaluation_with_ema_weights_writes_namespaced_outputs_through_the_cli(
+    adr_offline_run: dict[str, Any], tmp_path: Path
+) -> None:
+    """End-to-end through ard.cli.evaluate.main -- not just the unit-level
+    load_saved_student_checkpoint call -- since the original ADR CLI-wiring
+    gap (P0 on the ADR implementation) came specifically from tests that all
+    bypassed the CLI path. --weights=ema must actually restore the EMA
+    state (not silently fall back to the student), and its output must be
+    namespaced so it never collides with a --weights=model run into the
+    same checkpoint's default output directory."""
+    training_output: Path = adr_offline_run["output"]
+    evaluation_config = tmp_path / "evaluation.yaml"
+    evaluation_config.write_text(yaml.safe_dump(_adr_training_config(tmp_path / "unused")), encoding="utf-8")
+    ema_output = tmp_path / "evaluation-ema"
+    evaluate_cli.main(
+        [
+            "--config",
+            str(evaluation_config),
+            "--checkpoint",
+            str(training_output / "last.pt"),
+            "--output",
+            str(ema_output),
+            "--weights",
+            "ema",
+        ]
+    )
+    results = json.loads((ema_output / "evaluation-results.json").read_text(encoding="utf-8"))
+    assert len(results) == 1
+    assert results[0]["weights"] == "ema"
+    assert results[0]["selection_weights"] == "model"
+    assert (ema_output / "panel-last-ema.jsonl").exists()
+    assert not (ema_output / "panel-last.jsonl").exists()
+
+    # A --weights=model evaluation of the SAME checkpoint into its own
+    # directory must produce the pre-existing (unsuffixed) filenames and a
+    # different run identity than the ema evaluation above.
+    model_output = tmp_path / "evaluation-model"
+    evaluate_cli.main(
+        [
+            "--config",
+            str(evaluation_config),
+            "--checkpoint",
+            str(training_output / "last.pt"),
+            "--output",
+            str(model_output),
+        ]
+    )
+    model_results = json.loads((model_output / "evaluation-results.json").read_text(encoding="utf-8"))
+    assert model_results[0]["weights"] == "model"
+    assert (model_output / "panel-last.jsonl").exists()
+    ema_manifest = json.loads((ema_output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    model_manifest = json.loads((model_output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert ema_manifest["run_id"] != model_manifest["run_id"]
 
 
 def test_evaluation_rejects_temperature_squared_drift_before_output_creation(
