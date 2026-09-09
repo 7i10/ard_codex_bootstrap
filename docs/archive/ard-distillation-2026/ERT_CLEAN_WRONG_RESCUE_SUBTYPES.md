@@ -3,7 +3,7 @@
 Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis. No new training or route selection.
 
 > **Correction, 2026-09-07.** The C0/C10/C12/C13 table below disagrees with the one in
-> `docs/ERT_CLEAN_WRONG_RELIABILITY_STRATIFIED.md`, which analyses the same arms at the same
+> `docs/archive/ard-distillation-2026/ERT_CLEAN_WRONG_RELIABILITY_STRATIFIED.md`, which analyses the same arms at the same
 > epoch. The sample counts match exactly (11, 738, 182 for C10) and so does "teacher clean
 > correct", but **"teacher adv correct" differs** — 0.813 here against 0.791 there for C10
 > `robust_only_rescue` — and so do all three probability columns. A difference in the teacher's
@@ -20,7 +20,7 @@ Read-only C0/C10/C12/C13 epoch-84 endpoint transition analysis. No new training 
 > that this project's own measurement puts per-sample adversarial evaluation reproducibility at
 > about 1e-3 in logit margin (`docs/plans/0094-campaign-host-environment-invariance.md`), and a
 > four-sample flip out of 182 is well within what a different attack random start produces.
-> Flagged by `docs/NUMERIC_CONSISTENCY_AUDIT.md` and by the consolidation pass.
+> Flagged by `docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` and by the consolidation pass.
 
 
 ## L2

@@ -52,6 +52,6 @@ The same five arms from the same epoch-79 parents were continued to
 or treatment. All ten arms reached metric epoch 93 (the zero-based horizon-94
 endpoint) and wrote final sample-state Parquets. Validation trajectory and
 training-state diagnostic results are documented in
-`docs/FFNR_CAUSAL_HORIZON_EXTENSION_RESULTS.md`. The sample-state contrasts
+`docs/archive/ard-distillation-2026/FFNR_CAUSAL_HORIZON_EXTENSION_RESULTS.md`. The sample-state contrasts
 are explicitly not treated as the preregistered CE-PGD20 causal endpoint;
 that endpoint still requires a common eval-mode replay.

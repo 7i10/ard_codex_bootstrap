@@ -1,6 +1,6 @@
 # Re-judging the e114 evidence against the measured floor
 
-`docs/EVIDENCE_RECLASSIFICATION.md` judged its post-decay rows against a bracket of 0.25 to 0.50 pp with **0.40 pp** as the working value, because the floor had never been measured. Plan 0092 measured it: **sigma_d = 0.092 pp** at epoch 114 (`docs/experiments/ard_post_decay_floor_v1.json`). This re-judges everything that measurement legitimately covers.
+`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` judged its post-decay rows against a bracket of 0.25 to 0.50 pp with **0.40 pp** as the working value, because the floor had never been measured. Plan 0092 measured it: **sigma_d = 0.092 pp** at epoch 114 (`docs/experiments/ard_post_decay_floor_v1.json`). This re-judges everything that measurement legitimately covers.
 
 ## Scope: five rows, not forty
 

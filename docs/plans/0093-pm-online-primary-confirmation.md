@@ -26,7 +26,7 @@
 > **訂正 2026-09-07。** この行には `+0.41 / +0.06 / +0.46 pp` と書かれていた。
 > それは plan 0091 の I100 official test AutoAttack の値（3 seed）で、PM のもの
 > ではない。plan 0087 は 2 seed 設計なので、数値が 3 つある時点で成立しない。
-> 実測値は `docs/EVIDENCE_RECLASSIFICATION.md` E1 行の `+0.14 / +0.20 pp`。
+> 実測値は `docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` E1 行の `+0.14 / +0.20 pp`。
 > 引き継ぎ文書は 02f0bb3 で訂正済みだったが、事前登録である本文書が残っていた。
 
 したがって **PM は効果量で選ばれたのではない。** 効果量で選べば

@@ -27,7 +27,7 @@ Status: completed read-only analysis.
 
 ## Outputs
 
-- `docs/ERT_CW_MARGIN_ACTION_MAP.md`
+- `docs/archive/ard-distillation-2026/ERT_CW_MARGIN_ACTION_MAP.md`
 - `docs/experiments/ert_cw_margin_action_map_v1.json`
 - `scripts/analysis/ert_cw_margin_action_map.py`
 

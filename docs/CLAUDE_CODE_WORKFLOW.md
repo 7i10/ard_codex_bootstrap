@@ -10,7 +10,7 @@ Status: design + runbook. 2026-09-05 に Codex 運用から移行するにあた
 1. **3 プレーン分離**。科学コード（`src/ard`, `configs`）／実行プレーン（GPU job の起動・完了検知。
    LLM 不要、耐久）／エージェントプレーン（設計・実装・集計・報告。Claude Code）。
    前回の最大の損失は実行プレーンの修理が科学の critical path に乗ったこと
-   （request→launch 7h01m に対し gate 本体は 69.7 s。`docs/ERT_I100_ONLINE_STATE_S2_REQUEST_TO_LAUNCH_RETRO.md`）。
+   （request→launch 7h01m に対し gate 本体は 69.7 s。`docs/archive/ard-distillation-2026/ERT_I100_ONLINE_STATE_S2_REQUEST_TO_LAUNCH_RETRO.md`）。
 2. **完了検知→次タスクは常駐 watcher + ヘッドレス Claude**。Claude セッションを開きっぱなしにしない。
    Hamster は `loginctl` Linger=yes なので `systemd --user` サービスが logout 後も生きる。
    `claude -p` はサブスクのログインで systemd ユニット内からも動作することを 2026-09-05 に実測済み。

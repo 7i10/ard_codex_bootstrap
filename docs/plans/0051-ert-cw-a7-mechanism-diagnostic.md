@@ -51,7 +51,7 @@ checkpoint-bound no-update replay, and existing CE-PGD20 endpoint rows.
 
 ## Outputs
 
-- `docs/ERT_CW_A7_MECHANISM_DIAGNOSTIC.md`
+- `docs/archive/ard-distillation-2026/ERT_CW_A7_MECHANISM_DIAGNOSTIC.md`
 - `docs/experiments/ert_cw_a7_mechanism_diagnostic_v1.json`
 
 The report must distinguish training-time R0--R3 regimes from pre-treatment

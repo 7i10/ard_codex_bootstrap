@@ -5,7 +5,7 @@
 - Owner: human (approval to spend GPU), Claude Code (execution)
 - Branch / base SHA: master, see progress log
 - Current milestone: M3 complete; M4 (folding the number into
-  `docs/MEASUREMENT_DESIGN.md`) is the remaining step
+  `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md`) is the remaining step
 - Last updated: 2026-09-06
 
 ## Goal
@@ -19,7 +19,7 @@ epoch-99 parent, run for fourteen epochs past the learning-rate decay, evaluated
 at the registered CE-PGD20 endpoint.
 
 That number decides what every future screen can conclude, and it has never been
-measured.  `docs/MEASUREMENT_DESIGN.md` brackets it at 0.25 to 0.50 pp from three
+measured.  `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` brackets it at 0.25 to 0.50 pp from three
 indirect estimates that disagree by a factor of two, and notes that the exact
 quantity — two untreated forks from a common epoch-99 parent over fourteen epochs
 — is the shortest fork of the three, so it could plausibly sit below the whole
@@ -36,7 +36,7 @@ needed to resolve a 0.17 pp effect from seventeen to sixty-eight.
 
 ## Existing state
 
-`docs/MEASUREMENT_DESIGN.md` establishes the surrounding picture and is the
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` establishes the surrounding picture and is the
 reason this plan exists:
 
 - Before the learning-rate decay the floor is 1.14 to 1.25 pp and flat in
@@ -45,9 +45,9 @@ reason this plan exists:
 - A shared 79-epoch prefix removes only about six per cent of the variance
   before the decay, so pairing is much weaker protection than it looks.
 - Two nominally identical controls in different campaigns differ by 0.94 and
-  1.78 pp (`docs/COEFFICIENT_AUDIT.md`).  That is the failure this plan prevents.
+  1.78 pp (`docs/archive/ard-distillation-2026/COEFFICIENT_AUDIT.md`).  That is the failure this plan prevents.
 
-`docs/EVIDENCE_RECLASSIFICATION.md` ranks this measurement first among all open
+`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` ranks this measurement first among all open
 work, as the prerequisite for the other four.
 
 ## Design
@@ -71,7 +71,7 @@ Parents are the plan-0087 lineage: dev-1 `360910a8...7630835`, dev-2
 "Differing only in the post-fork random stream" already has a definition in this
 runtime, and a precedent.  Plan 0054 used it to build the `L2-R1`/`L2-R2`/`L4-R1`/
 `L4-R2` blocks whose control-versus-control gaps are the pre-decay floor that
-`docs/MEASUREMENT_DESIGN.md` reports.
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` reports.
 
 The mechanism is the `continuation_seed` argument of `run_stage_a_arm`
 (`src/ard/analysis/ert_stage_a_runtime.py:876-882`).  Setting it produces:
@@ -93,7 +93,7 @@ value are the same experiment run twice.
 This also settles a question the audit left open: because R1/R2 were built this
 way, the 0.16 to 1.88 pp pre-decay gaps really are same-parent, same-data-order
 control-versus-control differences, not a comparison between different parents.
-`docs/MEASUREMENT_DESIGN.md`'s classification of them as type (a) is correct.
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md`'s classification of them as type (a) is correct.
 
 The online-state runner did not expose the flag; a pass-through was added to its
 `arm` subcommand.  Nothing in the underlying contract changed.
@@ -123,7 +123,7 @@ uncertainty, from six comparisons, and not presented as precise.
 - [x] M1: launch six continuations from a pinned worktree, epochs 101 to 114.
 - [x] M2: evaluate eighteen endpoints at e104, e109, e114.
 - [x] M3: compute the floor, write the record and report, commit.
-- [ ] M4: fold the number into `docs/MEASUREMENT_DESIGN.md` and restate the
+- [ ] M4: fold the number into `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` and restate the
   minimum detectable effects there.
 
 ## Test plan
@@ -153,8 +153,8 @@ for interpreting option A rather than an alternative to it.
 
 ## Progress log
 
-- 2026-09-05: plan authored from the prescription in `docs/MEASUREMENT_DESIGN.md`
-  section 3.5 and the ranking in `docs/EVIDENCE_RECLASSIFICATION.md` Part 3(c).
+- 2026-09-05: plan authored from the prescription in `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md`
+  section 3.5 and the ranking in `docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` Part 3(c).
 - 2026-09-06: recorded the interrupted state after the host outage; see the
   completion report.  The prefixes and frozen thresholds survive and are reusable.
 - 2026-09-05 M0: replicate definition settled from the plan-0054 precedent and the
@@ -287,7 +287,7 @@ Report: `docs/POST_DECAY_FLOOR.md`.  Runs produced at `ed3b77daa1de`.
 | e109 | 0.124 pp | 0.074 to 0.356 pp | 0.113 pp | 0.200 pp |
 | e114 | 0.092 pp | 0.055 to 0.265 pp | 0.087 pp | 0.140 pp |
 
-`docs/MEASUREMENT_DESIGN.md` section 3.5 bracketed this quantity at **0.25 to
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` section 3.5 bracketed this quantity at **0.25 to
 0.50 pp** and adopted 0.40 pp as a working value; this plan's own prerequisites
 table carried 0.35 pp.  The measured value at e114 is **0.092 pp** -- a quarter
 of the working value, and below the whole bracket.  Even the upper end of its
@@ -315,13 +315,13 @@ replication.  Whether it keeps falling past e114 is untested.
 
 The standard two-seed screen was believed to resolve nothing below about
 0.69 pp.  At e114 it resolves **0.242 pp**.  The 0.3 to 0.6 pp band that
-`docs/EVIDENCE_RECLASSIFICATION.md` called invisible is inside reach of the
+`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` called invisible is inside reach of the
 design this project already runs.
 
 These use the calibration's four degrees of freedom rather than the screen's
 k-1, because the point of measuring the floor is that a screen need not
 rediscover it.  They are 1.33x the `sqrt(7.85/k)` convention in
-`docs/MEASUREMENT_DESIGN.md`, which treats sigma as exactly known; six runs do
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md`, which treats sigma as exactly known; six runs do
 not make it so, and that factor is the honest price of the sample size.
 
 ### What this does not license
@@ -340,10 +340,10 @@ unexplained quantity in the project".  That was a mistake of regime.  Those
 controls are measured at **epoch 84**, sixteen epochs *before* the learning-rate
 decay; this floor is measured at 104 to 114, *after* it.  The 0.94 and 1.78 pp
 figures sit inside the pre-decay floor of **1.14 to 1.25 pp** that five campaign
-families independently agree on (`docs/MEASUREMENT_DESIGN.md` section 2.4).
+families independently agree on (`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` section 2.4).
 **They are that floor.  There is no anomaly, and nothing here is unexplained.**
 
-`docs/EVIDENCE_RECLASSIFICATION.md` had it right all along: its C3 row records
+`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` had it right all along: its C3 row records
 the horizon as `e84 / e94`, the regime as `pre`, and the floor it applied as
 `1.14 (e84)`.  The reclassification is horizon-aware.  This measurement does not
 overturn it.
@@ -360,7 +360,7 @@ another horizon, another endpoint, or the official test split.
 
 ### How much past evidence this actually reopens
 
-Also corrected.  `docs/EVIDENCE_RECLASSIFICATION.md` has 38 rows, not "about
+Also corrected.  `docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` has 38 rows, not "about
 forty screens" all of which this touches:
 
 | regime | rows | floor they were judged against | does this measurement change it? |

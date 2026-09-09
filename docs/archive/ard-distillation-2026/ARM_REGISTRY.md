@@ -232,7 +232,7 @@ gets right when clean and the Teacher still gets right — run under two names i
 **Its near-twin: ST1W and T1WCONF.** The Confirmatory-T123 campaign re-ran the same
 treatment on the same cohort (S3×T1, n=9,889/9,368) from the same epoch-79 parent, with
 byte-identical selected-ID masks, extended to epoch 94 and relabeled.
-`docs/ERT_RSLAD_HISTORICAL_TREATMENT_RESPONSE_ANALYSIS.md` calls T1WCONF a re-run of ST1W.
+`docs/archive/ard-distillation-2026/ERT_RSLAD_HISTORICAL_TREATMENT_RESPONSE_ANALYSIS.md` calls T1WCONF a re-run of ST1W.
 
 The coefficient is *not* identical, and the difference matters. Stage A used the calibrated
 `beta_advce_weak = 0.07095924764871597`
@@ -242,7 +242,7 @@ pair is the project's only executed test of what happens when a calibrated coeff
 rounded for reporting. The held-out robust effect on L2 went from `+1.500 pp`
 (sample-bootstrap CI `[+0.680,+2.320]`) to `-0.14 pp`; L4 was near zero under both. The sign
 changed — but the change is inside the measured floor for that regime (about 1.14 pp, see
-`docs/MEASUREMENT_DESIGN.md`), so it cannot be attributed to the rounding rather than to
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md`), so it cannot be attributed to the rounding rather than to
 run-to-run variation. The correct reading is that this pair establishes neither that the
 treatment works nor that rounding is safe.
 
@@ -251,7 +251,7 @@ The same relabeling repeats twice more in the same campaign: **ST2W / T2WCONF** 
 *is* an exact coefficient match). Each pair should be scored as one line of evidence, not two.
 
 **S3DYN075 ≈ INST075.** `S3DYN075`'s online cohort rule ("recompute the predicate every
-visit") is described in `docs/ERT_S3_HISTORY_PRODUCTION_RESULTS.md` as the "Instant" rule
+visit") is described in `docs/archive/ard-distillation-2026/ERT_S3_HISTORY_PRODUCTION_RESULTS.md` as the "Instant" rule
 — the same online recomputation, same predicate, same beta=0.075 — just given a new name
 (`INST075`) in the follow-on smoothing screen that also introduced `M3_075` and `M3E2_075`
 (majority-of-3-visits smoothing, with and without exit hysteresis). All five arms in this
@@ -391,7 +391,7 @@ These are genuinely different partitions, not a relabeling of the same thing —
 that is "S3" under the legacy pilot scheme (clean-correct, adversarially wrong) is exactly
 this project's "Clean-Wrong-adjacent" S3 cohort used throughout Stage A, while "S2" or "S3"
 under the canonical contract is defined from a margin quantile, not from a raw correct/
-wrong split. `docs/reviews/0001-ert-routing-contract-review.md` records this as an
+wrong split. `docs/archive/ard-distillation-2026/reviews/0001-ert-routing-contract-review.md` records this as an
 *intentional*, documented divergence: legacy v1 masks and hashes are preserved as-is and
 are never silently migrated to canonical labels; a new canonical overlay would need to be
 a new, separately versioned artifact. **Practical rule for this registry:** every arm in
@@ -443,23 +443,23 @@ invented. The following gaps are known and explicit rather than silently papered
   only, no headline result.
 - **`SHUFFLE_PLUS_0` through `SHUFFLE_PLUS_7`** (pure-order mechanism probe) and the
   **shuffle-vs-augmentation RNG decomposition arms** (`REF1/REF2/SHUF1/SHUF2/AUG1/AUG2/
-  BOTH1/BOTH2` in `docs/ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md`) are grouped/summarized
+  BOTH1/BOTH2` in `docs/archive/ard-distillation-2026/ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md`) are grouped/summarized
   rather than given one row each — they are RNG-mechanism diagnostics, not named
   treatments competing for promotion, and itemizing all sixteen individually would not
   change the collision analysis.
 - **Not read at all in this pass** (named in the task's source list or discovered
-  adjacent to it, but out of scope for time): `docs/ERT_RSLAD_I100_CW_GAP_COMPLETION_AND_S2_BRIDGE.md`,
-  `docs/ERT_RSLAD_I100_CW_HELDOUT_GENERALIZATION_GAP.md`, `docs/ERT_RSLAD_I100_CLEAN_WRONG_LONG_HORIZON.md`
+  adjacent to it, but out of scope for time): `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CW_GAP_COMPLETION_AND_S2_BRIDGE.md`,
+  `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CW_HELDOUT_GENERALIZATION_GAP.md`, `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CLEAN_WRONG_LONG_HORIZON.md`
   (a light skim by one research pass surfaced that these discuss `PLAIN_ADVCE` and `TPFM`
   continuing to epoch 199, already captured above by name, but their held-out e199 numbers
-  are not independently re-verified here), `docs/ERT_CLEAN_WRONG_RELIABILITY_PROXY_SAFETY.md`,
-  `docs/ERT_CLEAN_WRONG_RELIABILITY_STRATIFIED.md`, `docs/ERT_CLEAN_WRONG_RESCUE_SUBTYPES.md`
+  are not independently re-verified here), `docs/archive/ard-distillation-2026/ERT_CLEAN_WRONG_RELIABILITY_PROXY_SAFETY.md`,
+  `docs/archive/ard-distillation-2026/ERT_CLEAN_WRONG_RELIABILITY_STRATIFIED.md`, `docs/archive/ard-distillation-2026/ERT_CLEAN_WRONG_RESCUE_SUBTYPES.md`
   (these three are confirmed to be read-only re-analyses of already-listed arms — C0/C10/
   C12/C13 and the CW-R/CW-U reliability split — not new arms, but their internal quintile/
   subtype tables were not transcribed), and the runtime/RNG-audit-only documents under
   `docs/ERT_RSLAD_RUNTIME_*`, `docs/ERT_RSLAD_*_RNG_*`, and `docs/ERT_RSLAD_ORDER_RNG_AUDIT.md`
   (confirmed by name to contain no new named arms).
-- **`docs/SIGNAL_AUDIT.md`**: skimmed; confirmed to report model/teacher configuration
+- **`docs/archive/ard-distillation-2026/essays/SIGNAL_AUDIT.md`**: skimmed; confirmed to report model/teacher configuration
   comparisons (`stored_risk_kind: student` vs. `joint`), not training arms, so nothing was
   added to this registry from it.
 - Every arm's held-out result above is quoted as printed in its source document. Where a

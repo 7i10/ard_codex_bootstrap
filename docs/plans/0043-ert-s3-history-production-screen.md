@@ -45,7 +45,7 @@ No new selector, coefficient, seed, official test, or AutoAttack is allowed.
       Teacher-only versus Student-state switches. Class-stratified bootstrap
       CIs were not run; the fixed validation point estimates were sufficient
       for this screen and are not seed-uncertainty estimates.
-- [x] Write `docs/ERT_S3_HISTORY_PRODUCTION_RESULTS.md` and the machine report
+- [x] Write `docs/archive/ard-distillation-2026/ERT_S3_HISTORY_PRODUCTION_RESULTS.md` and the machine report
       with source/config/parent/mask/attack/output hashes.
 - [x] Stop after the report; do not auto-promote Stage B or add Teacher
       smoothing.

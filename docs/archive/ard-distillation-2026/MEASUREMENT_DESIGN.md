@@ -103,7 +103,7 @@ current documents. Section 2.5 says which one to use.
 
 ### 2.2 Confirming the primary published measurement
 
-`docs/ERT_CW_MARGIN_RNG_STABILITY_DIAGNOSTIC.md` continued four blocks (L2-R1, L2-R2, L4-R1,
+`docs/archive/ard-distillation-2026/ERT_CW_MARGIN_RNG_STABILITY_DIAGNOSTIC.md` continued four blocks (L2-R1, L2-R2, L4-R1,
 L4-R2) from epoch-79 parents to epochs 84/89/94, with arms N95/A100/N105 plus an untreated
 `B0_BASE` (VERIFIED, `docs/ERT_CW_MARGIN_RNG_STABILITY_DIAGNOSTIC.md:18`). Its "BASE gap" column
 is exactly a type (a) control-versus-control difference.
@@ -272,7 +272,7 @@ committed report.
 
 ### 2.5 Type (b): between training seeds
 
-`docs/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md` compares five independently seeded runs
+`docs/archive/ard-distillation-2026/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md` compares five independently seeded runs
 (`dev-1`, `dev-2`, `confirm-a/b/c`) of BASE, CROPSHIFT and I100 at epochs 49/99/149/199. Its
 headline table gives *training-log* standard deviations at epoch 199: BASE `0.272 pp`,
 CROPSHIFT `0.532 pp`, I100 `0.118 pp` (VERIFIED,
@@ -354,7 +354,7 @@ prefix through epoch 99 and differ only in the intervention from epoch 100.
 > lower end of the bracket every post-decay verdict used until 2026-09-06, when the floor was
 > measured directly at `0.092 pp` (`docs/POST_DECAY_FLOOR.md`). Both readings now point the
 > same way: the post-decay floor is smaller than this section assumed.
-> See `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2.
+> See `docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` finding 2.
 
 Per-seed values VERIFIED from the campaign CSV; differences DERIVED. Mean `+0.864 pp` (which
 reproduces the published `+0.864 pp`, VERIFIED,
@@ -905,29 +905,29 @@ proposes ("a new preregistered, longer-horizon ST1W experiment", VERIFIED,
 
 Reports read and cited:
 
-- `docs/ERT_CW_MARGIN_RNG_STABILITY_DIAGNOSTIC.md`
+- `docs/archive/ard-distillation-2026/ERT_CW_MARGIN_RNG_STABILITY_DIAGNOSTIC.md`
 - `docs/experiments/ert_cw_margin_rng_stability_diagnostic_v1.json`
-- `docs/ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md`
-- `docs/ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md`
-- `docs/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`
 - `docs/experiments/ert_rslad_five_seed_global_stochasticity_v1.json`
 - `.cache/analysis/ert-rslad-five-seed-stochasticity-v1/outputs/rescue_summary.csv`
-- `docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md`
-- `docs/ERT_CONFIRMATORY_T123_RESULTS.md`
-- `docs/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md`
-- `docs/ERT_STAGE_A_EFFECT_DECOMPOSITION.md`
+- `docs/archive/ard-distillation-2026/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md`
+- `docs/archive/ard-distillation-2026/ERT_CONFIRMATORY_T123_RESULTS.md`
+- `docs/archive/ard-distillation-2026/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md`
+- `docs/archive/ard-distillation-2026/ERT_STAGE_A_EFFECT_DECOMPOSITION.md`
 - `docs/experiments/ert_stage_a_effect_decomposition_v1.json`
-- `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`
-- `docs/ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md`
-- `docs/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md`
-- `docs/ERT_RSLAD_I100_CW_HELDOUT_GENERALIZATION_GAP.md`
-- `docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md`
-- `docs/FFNR_CAUSAL_HORIZON_CE20_RESULTS.md`
-- `docs/FFNR_CAUSAL_PILOT_RESULTS.md`
-- `docs/HISTORY_ROUTING_V2_RESULTS.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CW_HELDOUT_GENERALIZATION_GAP.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md`
+- `docs/archive/ard-distillation-2026/FFNR_CAUSAL_HORIZON_CE20_RESULTS.md`
+- `docs/archive/ard-distillation-2026/FFNR_CAUSAL_PILOT_RESULTS.md`
+- `docs/archive/ard-distillation-2026/essays/HISTORY_ROUTING_V2_RESULTS.md`
 - `docs/plans/0087-i100-online-state-s2-preservation.md`
 - `docs/decisions/0001-online-state-s2-next-step.md`
-- `docs/ERT_RESEARCH_STATUS_SUMMARY.md`
+- `docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md`
 
 All endpoints referenced here use the single registered CE-PGD20 attack identity
 `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2` (VERIFIED in every one of the

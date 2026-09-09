@@ -69,6 +69,6 @@ the false claim that historical A7 was the full F3 arm.
 ## Machine records
 
 - Reuse audit: `docs/experiments/ert_cw_a7_cleance_reuse_audit_v1.json`
-- Human audit: `docs/ERT_CW_A7_CLEANCE_REUSE_AUDIT.md`
-- Final report: `docs/ERT_CW_A7_CLEANCE_ABLATION.md`
+- Human audit: `docs/archive/ard-distillation-2026/ERT_CW_A7_CLEANCE_REUSE_AUDIT.md`
+- Final report: `docs/archive/ard-distillation-2026/ERT_CW_A7_CLEANCE_ABLATION.md`
 - Final machine record: `docs/experiments/ert_cw_a7_cleance_ablation_v1.json`

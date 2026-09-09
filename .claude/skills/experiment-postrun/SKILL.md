@@ -48,7 +48,10 @@ overwritten.
 4. Add a `Provenance` line to the report footer linking the record path and the
    source SHA.
 5. Append exactly one row to the evidence ledger table in
-   `docs/ERT_RESEARCH_STATUS_SUMMARY.md`: `question | result | decision`.
+   `docs/RESEARCH_STATUS_SUMMARY.md`: `question | result | decision`. (The
+   ARD/RSLAD-era ledger is frozen at
+   `docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md` and is
+   not extended.)
 6. Tick only the plan milestones the evidence actually closes, and write the
    plan's Completion report: source SHA, lineage, decision, caveats.
 7. Run `/verify`. Fix nothing scientific to make it pass; if it is red, stop.

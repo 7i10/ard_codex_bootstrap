@@ -74,7 +74,7 @@ plan 0027 で PGD-AT の best/last AutoAttack が訓練と並行して同日中�
 **事前規則**:
 
 - best checkpoint の AA が `48.0%` 以上 → 修正は確認。欠陥が主因。TRADES 行を差し替え、
-  `docs/ARD_VERSUS_AT_ASSESSMENT.md` の比較を進めてよい。
+  `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md` の比較を進めてよい。
 - AA が欠陥版 `45.14%` に対し `+2.0 pp` 以上だが `48.0%` 未満 → detach は実在の欠陥だが
   4 pp の全額ではない。残差の別原因を新しい調査として開く。行は差し替えるが
   「文献帯に未達」と明記する。
@@ -112,7 +112,7 @@ A が答えない唯一の問いがこれである。
 
 **決まること**: 何も。
 
-**リスク**: `docs/ARD_VERSUS_AT_ASSESSMENT.md` が論文の問いに据えようとしている
+**リスク**: `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md` が論文の問いに据えようとしている
 「adversarial training 対 adversarial distillation」の公平な比較は、teacher-free
 baseline が正しいことに依存している。ダッシュボードには現在、公式値としては
 欠陥由来の `45.14%` しか無く、それは**教師を 4 pp よく見せる向き**に効く。
@@ -162,7 +162,7 @@ traceback を保存しないため、例外が端末以外のどこにも残ら�
 ここに記録する。
 
 **残る論点は 47.87 が文献帯 49.0–49.4% より 1.2–1.5 pp 低いことである。** これは本パケットの
-問いではなく、`docs/THESIS_FRAME.md` §3 の同点崩し条件に直結する別の問いなので、そちらで追う。
-`docs/THESIS_FRAME.md` §7 項目 2 は、9 本の run を投じる前に攻撃初期化の差
+問いではなく、`docs/archive/ard-distillation-2026/THESIS_FRAME.md` §3 の同点崩し条件に直結する別の問いなので、そちらで追う。
+`docs/archive/ard-distillation-2026/THESIS_FRAME.md` §7 項目 2 は、9 本の run を投じる前に攻撃初期化の差
 （ローカルは一様 [-eps, eps]、公式は Gaussian scale 0.001）を固定バッチ上で GPU 0 時間で
 測れと指摘しており、それを先に行う。

@@ -100,5 +100,5 @@ long-running shards are required.
 
 ## Completion report
 
-Completed in `docs/ERT_RSLAD_I100_CANONICAL_S2_BOUNDARY_GEOMETRY_AUDIT.md` and
+Completed in `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CANONICAL_S2_BOUNDARY_GEOMETRY_AUDIT.md` and
 the versioned `docs/experiments/ert_rslad_i100_s2_geometry_*.json` artifacts.

@@ -44,9 +44,9 @@ frozen epoch-100 switch `I100` (`CROPSHIFT` through epoch 99, then `IDBH_WEAK`),
 > `ert_rslad_five_seed_global_stochasticity_v1.json` labels all five differences
 > `CROPSHIFT-BASE`, and `ert_rslad_five_seed_artifact_inventory_v1.json` lists arm
 > `CROPSHIFT` over `confirm-*/crop-suffix/` paths. A prose correction alone leaves the
-> trap in place; see the amendment record named in `docs/EVIDENCE_LEDGER_V2.md` §5.
+> trap in place; see the amendment record named in `docs/archive/ard-distillation-2026/EVIDENCE_LEDGER_V2.md` §5.
 >
-> See `docs/EVIDENCE_LEDGER_V2.md` §3 rank 1 and §1.1 rows E1 and E2.
+> See `docs/archive/ard-distillation-2026/EVIDENCE_LEDGER_V2.md` §3 rank 1 and §1.1 rows E1 and E2.
 
 > **Correction, 2026-09-07.** The pooled five-seed figure `+0.864 pp` averages two
 > different comparisons and should not be used as one number. On dev-1 and dev-2 the
@@ -55,7 +55,7 @@ frozen epoch-100 switch `I100` (`CROPSHIFT` through epoch 99, then `IDBH_WEAK`),
 > at epoch 100, giving `+0.78 / +0.68 / +0.62 pp`. The groups do not overlap and each agrees
 > internally to about 0.08 pp, so the split is real. Both comparisons are positive in every
 > seed; what does not survive is the single number and its `t(4) = 7.82`.
-> See `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2.
+> See `docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` finding 2.
 >
 > **Amended 2026-09-08.** This correction stands, but it was read for four weeks as an
 > assurance that the figure three lines above it had been checked and had survived. It had
@@ -68,7 +68,7 @@ every sample-level intervention produced a large, reproducible effect on the
 samples it treated -- ~~13x to 33x~~ **about 5x to 15x** the train-split noise
 (corrected 2026-09-08: the printed multiple divided a sub-cohort effect by a
 whole-train 45,000-row noise figure; a cohort-scaled denominator roughly halves it,
-`docs/EVIDENCE_LEDGER_V2.md` §3 rank 7) -- and no held-out effect
+`docs/archive/ard-distillation-2026/EVIDENCE_LEDGER_V2.md` §3 rank 7) -- and no held-out effect
 our screens could resolve. That contrast is the finding. At learning rate 0.1 a
 forked control differs from its sibling as much as a fresh seed does, so a
 five-epoch screen cannot see below about 2.5 pp while the interventions aimed at

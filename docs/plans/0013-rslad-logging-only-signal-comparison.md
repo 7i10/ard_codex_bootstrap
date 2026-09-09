@@ -35,7 +35,7 @@ exact logging-only RSLAD path whose observations do not affect training loss.
 - Existing Student/Joint formal audits are intervention-confounded and are not
   used for the strict Entropy-versus-Student comparison.
 - The worktree also contains an unrelated untracked user document,
-  `docs/ARD_RESEARCH_ISSEUES_AND_PROPOSALS.md`; it is outside this plan.
+  `docs/archive/ard-distillation-2026/essays/ARD_RESEARCH_ISSEUES_AND_PROPOSALS.md`; it is outside this plan.
 
 ## Scientific contracts affected
 
@@ -83,7 +83,7 @@ exact logging-only RSLAD path whose observations do not affect training loss.
     lineage report; no source artifact mutation.
 - [ ] M2: paired predictive audit.
   - Files: analysis/report module, CLI integration, focused deterministic unit
-    tests, `docs/SIGNAL_AUDIT.md`.
+    tests, `docs/archive/ard-distillation-2026/essays/SIGNAL_AUDIT.md`.
   - Acceptance: teacher-specific complete Entropy/Student metric table and
     paired intervals from the same held-out samples. Implementation and
     deterministic unit coverage are complete; the teacher-specific table is

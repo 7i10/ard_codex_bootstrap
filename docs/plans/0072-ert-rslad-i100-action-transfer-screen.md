@@ -66,4 +66,4 @@ fix). All 8 training and 8 endpoint jobs completed with valid markers. The
 aggregated endpoint artifact is
 `docs/experiments/ert_rslad_i100_action_transfer_results_v1.json`, and the
 human-facing results are in
-`docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md`.
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md`.

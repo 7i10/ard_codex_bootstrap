@@ -173,12 +173,12 @@ AutoAttack follows from this screen.
 
 CAVEATS.  (a) Effects are 0.06–0.20 pp on 5,000 held-out samples where one
 sample is 0.02 pp (3–10 samples), while RNG alone moves e114 held-out by
-1–2 pp (`docs/ERT_RESEARCH_STATUS_SUMMARY.md`); two development seeds,
+1–2 pp (`docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md`); two development seeds,
 directional only, below the noise floor.  (b) Producing the bytes spanned five
 campaigns after `attempt11`'s arms were killed by the dirty-source guard:
 `attempt11` (prefixes, thresholds, D-BDP), `recovery14` (control, PMP),
 `recovery15` (endpoints), `recovery16` (canonical replays),
-`recovery17`/`18` (aggregation); `docs/ERT_I100_ONLINE_STATE_S2_LAUNCH_POSTMORTEM.md`
+`recovery17`/`18` (aggregation); `docs/archive/ard-distillation-2026/ERT_I100_ONLINE_STATE_S2_LAUNCH_POSTMORTEM.md`
 is stale, still saying attempt-11 is running.  (c) `recovery17` aggregated
 through an undisclosed out-of-tree shim; the committed aggregator at `66a223d`
 reproduces its numbers leaf-for-leaf in `recovery18`.  (d) `recovery12`–`17`
@@ -187,4 +187,4 @@ consolidated scientific review was run on these results.  (f) PMP dominates
 D-BDP on cost: mean epoch time +1.2% vs +7.9% over Control.
 
 Record: `docs/experiments/ert_rslad_i100_online_state_s2_preservation_v1.json`
-(SHA-256 sidecar) + `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`.
+(SHA-256 sidecar) + `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`.

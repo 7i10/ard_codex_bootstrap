@@ -25,7 +25,7 @@ description: Close finished confirmations into the records, refresh the status s
 
 ## 2. status summary を更新する
 
-`docs/ERT_RESEARCH_STATUS_SUMMARY.md` の該当行を、1 で作った記録に合わせて書き換える。
+`docs/RESEARCH_STATUS_SUMMARY.md`（現行の研究方向のライブな evidence ledger）の該当行を、1 で作った記録に合わせて書き換える。ARD/RSLAD期のものは `docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md` に凍結済みで、これ以上追記しない。
 
 - 記録に無い数値を書かない
 - 効果量には必ず床（`docs/MEASUREMENT_STANDARD.md` §5）との対比を添える。

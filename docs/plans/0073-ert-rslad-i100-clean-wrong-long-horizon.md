@@ -24,7 +24,7 @@ update.
 ## Existing state
 
 The short transfer screen is complete and recorded in
-`docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md` and its machine artifact. The
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md` and its machine artifact. The
 six exact e114 checkpoints are stored under the completed Ferret run root
 `ert-i100-action-transfer-v6`; their parent e99, fixed-mask, calibration,
 Teacher, and CE-PGD20 identities are inherited unchanged.
@@ -121,5 +121,5 @@ To be filled after the six continuations and all preregistered endpoints are
 complete. The report must distinguish long-horizon point estimates from
 training-seed uncertainty and must not start an automatic follow-up.
 
-Completion report: see `docs/ERT_RSLAD_I100_CLEAN_WRONG_LONG_HORIZON.md` and
+Completion report: see `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CLEAN_WRONG_LONG_HORIZON.md` and
 the four `docs/experiments/ert_rslad_i100_cw_long_horizon_*_v1.json` artifacts.

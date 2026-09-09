@@ -1,8 +1,8 @@
 # Evidence Ledger v2
 
 Status: corrected evidence ledger, 2026-09-08. Supersedes the verdict columns of
-`docs/EVIDENCE_RECLASSIFICATION.md` and the executive conclusion of
-`docs/ERT_RESEARCH_STATUS_SUMMARY.md` wherever the two disagree with this file.
+`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` and the executive conclusion of
+`docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md` wherever the two disagree with this file.
 Built from a defect audit that traced 117 candidate defects; 28 survived two
 independent checks.
 
@@ -163,7 +163,7 @@ Only N2 above. One preregistered target, one matching floor, one honest failure.
 These claims have numbers and have been judged. The judgement is void, in both directions.
 Neither "fails" nor "passes" was earned.
 
-**The nine epoch-114 treated-versus-control contrasts.** `docs/POST_DECAY_FLOOR_RECLASSIFICATION.md`
+**The nine epoch-114 treated-versus-control contrasts.** `docs/archive/ard-distillation-2026/POST_DECAY_FLOOR_RECLASSIFICATION.md`
 judges rows E1, E2, E4, E5 and E6 of the reclassification against thresholds of 0.243 pp
 and 0.181 pp, both derived from the 0.092 pp figure. That figure varies the attack and
 global RNG streams. Every judged arm and its control ran with `continuation_seed: null` and
@@ -295,7 +295,7 @@ unmeasured rather than zero, and why its size relative to 0.092 pp is unknown.
 ### Rank 4 — the reclassification's row A2 never received its own correction
 
 The comparator correction of 2026-09-07 was written into the prose of the same file, into
-`docs/MEASUREMENT_DESIGN.md` §2.6 and into the status summary, but not into the table row
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` §2.6 and into the status summary, but not into the table row
 the prose points at. Row A2 at `docs/EVIDENCE_RECLASSIFICATION.md:153` still reads
 `mean +0.864, SD 0.247, t(4) = 7.82` against a floor cell reading
 `0.25 (type c, this exact contrast)` — the exact combination the audit ruled out, and a

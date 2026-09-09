@@ -127,7 +127,7 @@ recovery/relapse rates.
 ## Completion record
 
 Completion details are recorded in
-`docs/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md` and the machine-readable summary
+`docs/archive/ard-distillation-2026/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md` and the machine-readable summary
 `docs/experiments/ert_dynamic_s3_recovery_v1.json`. The source SHA was
 `95e72cd1a2a32caa21686ad76d318eab33e1807a`; config SHA was
 `39691b9559d6df20baf09c9c33b7f63b8c37dd3e2937309e2aa1899cd26b8660`; the

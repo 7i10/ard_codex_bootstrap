@@ -114,7 +114,7 @@ remain local.
 M3--M6 completed. The six fresh runs are `idbh-s50-s1-prod`,
 `idbh-s50-s2-prod`, `idbh-s75-s1-prod`, `idbh-s75-s2-prod`,
 `idbh-s125-s1-prod`, and `idbh-s125-s2-prod`. The result report and hash-bound
-machine artifact are [ERT_RSLAD_SINGLE_SWITCH_TIMING.md](../ERT_RSLAD_SINGLE_SWITCH_TIMING.md)
+machine artifact are [ERT_RSLAD_SINGLE_SWITCH_TIMING.md](../archive/ard-distillation-2026/ERT_RSLAD_SINGLE_SWITCH_TIMING.md)
 and [ert_rslad_single_switch_timing_results_v1.json](../experiments/ert_rslad_single_switch_timing_results_v1.json).
 All six parent/child lineages and endpoint attack identities passed aggregation.
 I50 did not pass full/post-switch AUC gates; I75 and I125 passed their

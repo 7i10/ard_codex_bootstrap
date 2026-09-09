@@ -33,7 +33,7 @@ Prepare method-independent infrastructure while the Ferret analyses run:
   so real-data PGD-AT/TRADES configs cannot satisfy both method and protocol
   validation.
 - The unrelated untracked
-  `docs/ARD_RESEARCH_ISSEUES_AND_PROPOSALS.md` remains outside this work.
+  `docs/archive/ard-distillation-2026/essays/ARD_RESEARCH_ISSEUES_AND_PROPOSALS.md` remains outside this work.
 
 ## Scientific contracts affected
 

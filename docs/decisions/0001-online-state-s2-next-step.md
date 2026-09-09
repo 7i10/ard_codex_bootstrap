@@ -23,10 +23,10 @@ chosen: superseded — A と B の双方が別計画として実行された
 | OS-DBDP − OS-PMP | +0.00 pp | −0.14 pp | NOT_SUPPORTED |
 
 - これはプログラム初の「arm vs control で SUPPORTED」判定。ただし plan 0079 の DPM − Control も +0.08/+0.12 pp で両 seed 正だった（当時の主比較が D-BDD vs DPM だったため未ラベル）。同方向の両 seed 正が 2 回。
-- 効果量 0.06–0.20 pp は、shuffle/augmentation RNG だけで生じる局所変動 1–2 pp（`docs/ERT_RESEARCH_STATUS_SUMMARY.md`）の 1/10。2 seed の方向一致だけでは母集団主張にならない。
+- 効果量 0.06–0.20 pp は、shuffle/augmentation RNG だけで生じる局所変動 1–2 pp（`docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md`）の 1/10。2 seed の方向一致だけでは母集団主張にならない。
 - コスト: PMP は epoch 時間 +1.2%、DBDP は +7.9%。DBDP に PMP を上回る根拠なし → 追うなら PMP のみ。
 - ルーター品質は低い（online vs canonical S2×T1 の Jaccard 4.5–5.1%）が、それでも効果は出ている。
-- 出自: arms/endpoints/canonical は attempt11 → recovery14/15/16 の 4 campaign で生成、集計は recovery17。全 20 個の checkpoint SHA-256 を照合済み。集計スクリプトの 2 バグ（attack identity 定数、parent SHA 欠落）は修正してコミット済み（66a223d）。記録は `docs/experiments/ert_rslad_i100_online_state_s2_preservation_v1.json`、報告は `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`、plan 0087 の Completion report に注意点 (a)–(f) を記載。
+- 出自: arms/endpoints/canonical は attempt11 → recovery14/15/16 の 4 campaign で生成、集計は recovery17。全 20 個の checkpoint SHA-256 を照合済み。集計スクリプトの 2 バグ（attack identity 定数、parent SHA 欠落）は修正してコミット済み（66a223d）。記録は `docs/experiments/ert_rslad_i100_online_state_s2_preservation_v1.json`、報告は `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`、plan 0087 の Completion report に注意点 (a)–(f) を記載。
 - 契約上の stop: この screen 自体は e199 延長・seed 追加・official test を自動的には許可しない。次は新しい契約（= 本パケット）。
 
 ## 判断材料
@@ -70,7 +70,7 @@ plan 0092 が **0.092 pp** と実測した。つまり 0.14 / 0.20 pp は床の 
 control / pmp / dbdp はいずれも `continuation_seed: null` で走っており、
 **共通の乱数流**を使っている。0.092 pp は乱数流が**異なる**複製間の床なので、
 種類が違う。正しい床はプラセボ arm で直接測れる
-（`docs/METHOD_DIRECTIONS.md` の検証節）。
+（`docs/archive/ard-distillation-2026/METHOD_DIRECTIONS.md` の検証節）。
 
 ### 未着手のまま残るもの
 

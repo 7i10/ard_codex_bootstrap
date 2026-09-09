@@ -114,7 +114,7 @@ source Git SHA/dirty state, parent checkpoint SHA, parent config and manifest
 hashes, state/mask SHA, treatment config hash, seed, world size/per-rank batch,
 GPU/runtime, endpoint attack identity/hash, and output SHA. Machine reports are
 written under `.cache/analysis/` and the human report is
-`docs/ERT_STATE_CONDITIONED_MECHANISM_RESULTS.md`.
+`docs/archive/ard-distillation-2026/ERT_STATE_CONDITIONED_MECHANISM_RESULTS.md`.
 
 ## Tests and acceptance criteria
 
@@ -158,7 +158,7 @@ evaluation are separately approved.
   implemented and tested.
 - [x] Real-data overlay output regenerated from final tracked-clean commit
   `5bc0a1b` after endpoint parent-binding fixes; final hashes are recorded in
-  `docs/ERT_STATE_CONDITIONED_MECHANISM_RESULTS.md`.
+  `docs/archive/ard-distillation-2026/ERT_STATE_CONDITIONED_MECHANISM_RESULTS.md`.
 - [ ] Freeze and implement the numeric moderate KD temperature and exact clean
   CE/Clean-KD equations before any Stage-A GPU launch.
 - [ ] Canary and 12 unique treatment arms per seed.

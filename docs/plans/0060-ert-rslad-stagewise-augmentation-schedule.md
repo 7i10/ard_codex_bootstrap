@@ -133,7 +133,7 @@ review cycles for unchanged evidence.
 - Source SHA for all eight production continuations: `bb68afc0ff505248f84c0263179ec24f0b346bcd`.
 - Result artifact: `docs/experiments/ert_rslad_stagewise_augmentation_results_v1.json`,
   SHA-256 `d7ae5afce02792faf95c58e753d509c40a0ca19f8732d1bf829fe64ca0631faf`.
-- Human report: `docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`.
+- Human report: `docs/archive/ard-distillation-2026/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`.
 - Independent endpoint attack identity:
   `7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2`.
 - All schedules have positive final CE-PGD20 robustness deltas in both seeds:

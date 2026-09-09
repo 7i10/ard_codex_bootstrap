@@ -6,9 +6,9 @@ file; nothing else in the repository is touched.
 This document is built on three audits committed at `a027a93` and does not re-derive what they
 already establish:
 
-- `docs/MEASUREMENT_DESIGN.md` — how big a difference these screens can resolve.
-- `docs/COEFFICIENT_AUDIT.md` — how each coefficient was set, and whether any neighbour was tested.
-- `docs/ARM_REGISTRY.md` + `docs/experiments/ard_arm_registry_v1.json` — 118 arms under canonical
+- `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` — how big a difference these screens can resolve.
+- `docs/archive/ard-distillation-2026/COEFFICIENT_AUDIT.md` — how each coefficient was set, and whether any neighbour was tested.
+- `docs/archive/ard-distillation-2026/ARM_REGISTRY.md` + `docs/experiments/ard_arm_registry_v1.json` — 118 arms under canonical
   names, and which arms are the same treatment under different names.
 
 Every number is marked **VERIFIED** (read from a file, with `file:line`) or **DERIVED** (computed
@@ -21,7 +21,7 @@ here, with the arithmetic shown).
 ### 0.1 The problem in one paragraph
 
 Over roughly forty preregistered screens this project returned "No-Go", "not supported", "no
-promotion" or "MIXED" almost every time, and `docs/ERT_RESEARCH_STATUS_SUMMARY.md` now treats those
+promotion" or "MIXED" almost every time, and `docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md` now treats those
 verdicts as settled. The measurement audit shows the gap between two runs that differ **only in
 their random number stream** is 1.14–1.25 pp before the learning-rate decay and 0.25–0.50 pp after
 it, while the effects being judged were typically 0.02–2 pp. A verdict reached below its own floor
@@ -252,7 +252,7 @@ REFUTED and is also flagged COEFFICIENT-UNTESTED.
 
 ## Part 3 — What this changes
 
-**(a) Sentences in `docs/ERT_RESEARCH_STATUS_SUMMARY.md` no longer supported as written.**
+**(a) Sentences in `docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md` no longer supported as written.**
 
 | line | quoted sentence | why it fails | replacement wording |
 | ---: | --- | --- | --- |
@@ -266,7 +266,7 @@ Boundary 58–59 ("descriptive two-development-seed evidence") needs a second cl
 
 > Two global augmentation results are real and replicated (`+1.612 pp` for CropShift over five seeds; `+0.864 pp`, `SD 0.247`, `t(4) = 7.82` for the epoch-100 switch). Against them, every sample-level intervention produced a large, reproducible effect on the samples it treated — 13x to 33x the train-split noise — and no held-out effect our screens could resolve. That contrast is the finding. At learning rate 0.1 a forked control differs from its sibling as much as a fresh seed does, so a five-epoch screen cannot see below about 2.5 pp while the interventions aimed at 0.1–2 pp. We therefore report a **measured ceiling on what this apparatus can detect**, not a refutation of sample-level intervention. One hypothesis was genuinely refuted at its own preregistered target; the rest remain open and untested.
 >
-> **Correction, 2026-09-07.** The `+0.864 pp` half of this sentence pools two comparators; see `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2. The two real figures are `+1.12 pp` against no late change and `+0.69 pp` against a different late change, both positive in every seed.
+> **Correction, 2026-09-07.** The `+0.864 pp` half of this sentence pools two comparators; see `docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` finding 2. The two real figures are `+1.12 pp` against no late change and `+0.69 pp` against a different late change, both positive in every seed.
 
 **(c) Hypotheses genuinely still open, ranked by how cheaply a powered test could run.**
 
@@ -304,27 +304,27 @@ Boundary 58–59 ("descriptive two-development-seed evidence") needs a second cl
 
 ## 5. Sources
 
-Audits used as the evidence base: `docs/MEASUREMENT_DESIGN.md`, `docs/COEFFICIENT_AUDIT.md`,
-`docs/ARM_REGISTRY.md`, `docs/experiments/ard_arm_registry_v1.json`.
+Audits used as the evidence base: `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md`, `docs/archive/ard-distillation-2026/COEFFICIENT_AUDIT.md`,
+`docs/archive/ard-distillation-2026/ARM_REGISTRY.md`, `docs/experiments/ard_arm_registry_v1.json`.
 
 Reports and plans read directly for this document:
-`docs/ERT_RESEARCH_STATUS_SUMMARY.md`, `docs/ERT_RSLAD_STATIC_TRAJECTORY_STABILIZATION.md`,
-`docs/ERT_RSLAD_STATIC_AUGMENTATION_FAMILY.md`, `docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`,
-`docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`, `docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md`,
-`docs/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`, `docs/ERT_RSLAD_STUDENT_HISTORY_PREDICTIVE_VALIDITY.md`,
-`docs/EXPERIMENT_DASHBOARD.md`, `docs/HISTORY_ROUTING_V2_RESULTS.md`,
-`docs/ERT_S3_HISTORY_PRODUCTION_RESULTS.md`, `docs/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md`,
-`docs/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV_V2.md`, `docs/ERT_RSLAD_ORDERING_MECHANISM_DISCOVERY.md`,
-`docs/ERT_STAGE_A_EFFECT_DECOMPOSITION.md`, `docs/ERT_CONFIRMATORY_T123_RESULTS.md`,
-`docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md`, `docs/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md`,
-`docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md`, `docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md`,
-`docs/ERT_CW_A7_CLEANCE_ABLATION.md`, `docs/ERT_CLEAN_WRONG_RELIABILITY_PROXY_SAFETY.md`,
-`docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`,
-`docs/ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md`,
-`docs/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md`,
-`docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md`,
-`docs/ERT_RSLAD_I100_CW_HELDOUT_GENERALIZATION_GAP.md`,
-`docs/FFNR_CAUSAL_HORIZON_CE20_RESULTS.md`,
+`docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md`, `docs/archive/ard-distillation-2026/ERT_RSLAD_STATIC_TRAJECTORY_STABILIZATION.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_STATIC_AUGMENTATION_FAMILY.md`, `docs/archive/ard-distillation-2026/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`, `docs/archive/ard-distillation-2026/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`, `docs/archive/ard-distillation-2026/ERT_RSLAD_STUDENT_HISTORY_PREDICTIVE_VALIDITY.md`,
+`docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md`, `docs/archive/ard-distillation-2026/essays/HISTORY_ROUTING_V2_RESULTS.md`,
+`docs/archive/ard-distillation-2026/ERT_S3_HISTORY_PRODUCTION_RESULTS.md`, `docs/archive/ard-distillation-2026/ERT_DYNAMIC_S3_RECOVERY_RESULTS.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV_V2.md`, `docs/archive/ard-distillation-2026/ERT_RSLAD_ORDERING_MECHANISM_DISCOVERY.md`,
+`docs/archive/ard-distillation-2026/ERT_STAGE_A_EFFECT_DECOMPOSITION.md`, `docs/archive/ard-distillation-2026/ERT_CONFIRMATORY_T123_RESULTS.md`,
+`docs/archive/ard-distillation-2026/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md`, `docs/archive/ard-distillation-2026/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md`,
+`docs/archive/ard-distillation-2026/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md`, `docs/archive/ard-distillation-2026/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md`,
+`docs/archive/ard-distillation-2026/ERT_CW_A7_CLEANCE_ABLATION.md`, `docs/archive/ard-distillation-2026/ERT_CLEAN_WRONG_RELIABILITY_PROXY_SAFETY.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_S2_DYNAMIC_BDD_RECOVERY_RESULTS.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md`,
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CW_HELDOUT_GENERALIZATION_GAP.md`,
+`docs/archive/ard-distillation-2026/FFNR_CAUSAL_HORIZON_CE20_RESULTS.md`,
 `docs/plans/0015-history-replication-gate-and-handoff.md`,
 `docs/plans/0020-best-oriented-history-routing-v2.md`,
 `docs/plans/0038-ert-stage-a-effect-decomposition.md`,

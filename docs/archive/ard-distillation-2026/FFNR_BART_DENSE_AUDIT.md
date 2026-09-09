@@ -39,4 +39,4 @@ The current evidence therefore supports:
 The CE/KL factorial currently executed in this phase is Chen L2/L4 only, as
 specified. Bartoldson remains a follow-up audit rather than an unplanned new
 training campaign. The replay comparison is documented in
-`docs/FFNR_BART_CE_PGD20_REPLAY.md`.
+`docs/archive/ard-distillation-2026/FFNR_BART_CE_PGD20_REPLAY.md`.

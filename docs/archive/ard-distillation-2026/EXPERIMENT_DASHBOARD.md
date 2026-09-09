@@ -114,7 +114,7 @@ seed-0 core campaignとfollow-up解析の全phaseはterminalであり、完了�
 このterminal reconciliation時点で対象GPUはidleでした。再配置した5 jobは、immutable result/checkpoint/sequence digestを含むportable
 evidenceからowning hostへatomic batch import済みです。再importは両hostでstrict no-opとなり、canonical
 campaign stateは両方とも`awaiting_scientific_review`へ到達しました。証跡は
-[`docs/experiments/reconciliation/`](experiments/reconciliation/)にあります。
+[`docs/experiments/reconciliation/`](experiments-full/reconciliation/)にあります。
 
 ### 次段階の未着手研究
 
@@ -153,8 +153,8 @@ campaign stateは両方とも`awaiting_scientific_review`へ到達しました�
 これはfull SAADの科学的効果を否定する結果ではなく、固定したupstream batch 128と
 Bartoldson WRN-94-16を24GB single GPUへ載せられないという実行条件の結果です。
 自動的なbatch縮小・2-GPU化は論文設定/実行identityを変えるため行っていません。詳細は
-[`Plan 0024`](plans/0024-isolated-full-saad-baseline.md)と
-[`Plan 0025`](plans/0025-full-saad-allocator-retry.md)を参照してください。allocator-only retryは
+[`Plan 0024`](../../plans/0024-isolated-full-saad-baseline.md)と
+[`Plan 0025`](../../plans/0025-full-saad-allocator-retry.md)を参照してください。allocator-only retryは
 fragmentation OOMを避けましたが、残り約834 MiBではresume不能な200 epoch runの安全余裕が不足するため、
 結果を見た後に基準を緩めず停止しました。
 
@@ -177,7 +177,7 @@ TRADES best/last AutoAttackは完了しました。次は
 `Chen2021LTD_WRN34_20`の同一teacher/seedで、(U) pinned upstreamを一切変更しない
 code oracle（実効weight decay `2e-4`）と、(P) 論文Appendix Bに合わせてweight decayだけを
 `5e-4`へ直すpaper-hyperparameter-aligned variantを完了させます。Pは厳密な論文再現とは
-呼びません。詳細と再実行gateは[`Plan 0028`](plans/0028-chen-wrn34-20-paper-code-oracles.md)に固定します。
+呼びません。詳細と再実行gateは[`Plan 0028`](../../plans/0028-chen-wrn34-20-paper-code-oracles.md)に固定します。
 WRN34-20 checkpointの取得・strict registrationとU/P実装は完了しました。checkpointは
 `738,377,702` bytes、SHA-256 `dbfc7cfe...fa28`、`184,531,674` parametersで、二runtime間の
 固定入力logitはexact一致しました。U/Pそれぞれのbatch-16/batch-128 GPU smokeは合格し、
@@ -218,7 +218,7 @@ epoch-79から分岐したdelayed-schedule controlも2 seedとも完了しまし
 
 ### Best-oriented history routing v2（完了、Development No-Go）
 
-[事前登録plan](plans/0020-best-oriented-history-routing-v2.md)どおり、epoch-39 online historyのPF/NR上位10%と
+[事前登録plan](../../plans/0020-best-oriented-history-routing-v2.md)どおり、epoch-39 online historyのPF/NR上位10%と
 class/state/count-matched randomへ同じtrue-label anchorを適用し、Bartoldson 2 seedで比較しました。
 
 | 比較（2 seed平均） | Best PGD | Last PGD | RO gap | 判定 |
@@ -231,7 +231,7 @@ class/state/count-matched randomへ同じtrue-label anchorを適用し、Bartold
 NRでhistory選択がrandomを両seedともBestで上回った一方、通常のdelayed RSLAD controlを超えませんでした。
 したがってstudent historyの予測力は維持しつつ、今回のtrue-label target mixをBest改善手法として停止します。
 official test、AutoAttack、未使用seed、Chen no-harmは開発判断に使っていません。完全なrun表、trajectory AUC、
-lineageと次の判断は[History-routing v2 results](HISTORY_ROUTING_V2_RESULTS.md)に固定しました。
+lineageと次の判断は[History-routing v2 results](essays/HISTORY_ROUTING_V2_RESULTS.md)に固定しました。
 
 Ferret GPU 2で同一1-epoch workloadを比較した結果、teacher-response観測時は4 workersが
 387.4 images/s、8 workersが338.4 images/sで、4 workersが14.48%高速でした。loss・accuracyは一致しており、
@@ -244,7 +244,7 @@ transferは未変更で、worker調整後にも残るhost差をprofileする場�
 v2の失敗分析から、Student historyを予後予測として残し、介入をPFの時間的一貫性とNRの入力側learnabilityへ
 分離しました。PFはepoch-79 Student anchorをteacher targetへ25%混合し、NRは同じPGD-10 trajectoryのstep-5
 prefixをepoch 80--99だけ選択サンプルへ使います。true-label hardening、KD weight変更、attack budget変更は
-行いません。詳細な数式、mask、停止基準は[Plan 0022](plans/0022-prescriptive-v3-intervention-screen.md)です。
+行いません。詳細な数式、mask、停止基準は[Plan 0022](../../plans/0022-prescriptive-v3-intervention-screen.md)です。
 
 | 状態 | Host | Cell | W&B run ID | Validation Best PGD / Last PGD |
 |---|---|---|---|---|
@@ -270,7 +270,7 @@ NR-Hは`-0.15 pp`で、事前の`+0.50 pp`基準を満たしませんでした�
 （matched random `-17/+37`）、NR-HがL1 `+14`、L3 `-4`（matched random `-9/+13`）です。
 したがってStudent historyは予後信号として残りますが、PF/NRの介入selectorとしてはNo-Goです。
 PFのselected benefitと負のspilloverが両seedで再現しなかったため、高価なgradient-utility replayも
-事前gateに従って実行しません。詳細は[Plan 0023](plans/0023-prescriptive-v3-closure-and-utility-pivot.md)です。
+事前gateに従って実行しません。詳細は[Plan 0023](../../plans/0023-prescriptive-v3-closure-and-utility-pivot.md)です。
 
 epoch-79のteacher responseが実際のrescue対harmをStudent history以上に説明するかも、hash-bound
 held-out auditで確認しました。PF-Hでは`S -> S+T` AUROCがL1 `0.6742 -> 0.5985`、L3
@@ -386,7 +386,7 @@ Go/No-Go判定には使いません。
 全4セルでheld-out log-lossも改善しました。これはstudent signal、特にBartoldsonでの追加情報を支持しますが、
 現行target-softeningの有効性を示すものではありません。CIはclass-stratifiedなsample-level bootstrapで、
 seed-0訓練runに条件付けられており、訓練seed間の不確実性ではありません。詳細とreport hashは
-[Seed-0 signal audit](SIGNAL_AUDIT.md)に固定しています。
+[Seed-0 signal audit](essays/SIGNAL_AUDIT.md)に固定しています。
 
 ### ★ Frozen outcome-informed mask介入（完了、inconclusive）
 
@@ -491,7 +491,7 @@ last AAの平均`+0.31 pp`はpost-decay noise floorの範囲`0.25--0.50 pp`の�
 
 詳細は[`I100 official test / AutoAttack`](ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md)、記録は
 [`ard_i100_official_test_autoattack_v1.json`](experiments/ard_i100_official_test_autoattack_v1.json)、
-計画は[`plan 0091`](plans/0091-i100-official-test-autoattack.md)です。noise floorの根拠は
+計画は[`plan 0091`](../../plans/0091-i100-official-test-autoattack.md)です。noise floorの根拠は
 [`measurement design`](MEASUREMENT_DESIGN.md)にあります。
 
 ## 5. 出力

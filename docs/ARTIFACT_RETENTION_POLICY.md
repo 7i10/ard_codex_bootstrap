@@ -38,7 +38,7 @@ I100 系の実測は **2.08 分/エポック**である。したがって
    復旧後の棚卸しで特定する。
 3. **再生成低コストの checkpoint は保存対象としない。**
    バックアップ基盤を作らない。必要になったら作り直す。
-   `docs/ARTIFACT_LOCATION_MAP.md` に所在だけ記録する。
+   `docs/archive/ard-distillation-2026/ops/ARTIFACT_LOCATION_MAP.md` に所在だけ記録する。
 4. **NFS への複製は行わない。** 速度の代償に見合わない（決定済み）。
 
 ## この方針が成立する前提

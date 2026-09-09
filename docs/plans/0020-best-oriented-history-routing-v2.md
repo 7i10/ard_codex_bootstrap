@@ -184,4 +184,4 @@ student-history result; it means the prescriptive intervention failed.
   Development No-Go.  No official test, AutoAttack, confirmation seed, or
   Chen no-harm run was launched.  Frozen tables, run IDs, trajectory AUC, and
   interpretation are in
-  [`HISTORY_ROUTING_V2_RESULTS.md`](../HISTORY_ROUTING_V2_RESULTS.md).
+  [`HISTORY_ROUTING_V2_RESULTS.md`](../archive/ard-distillation-2026/essays/HISTORY_ROUTING_V2_RESULTS.md).

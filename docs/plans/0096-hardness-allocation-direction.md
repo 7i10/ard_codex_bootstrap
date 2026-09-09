@@ -138,7 +138,7 @@ minute.  The teacher earns its place only on the disagreement set — 23.9 % of 
 is T1 — and that is a separate plan, deliberately gated on this one.
 
 VERIFIED from `prefix/dev-1/training/online-state/epoch-100.parquet` and the
-frozen thresholds; the table is in `docs/METHOD_DIRECTIONS_V2.md`.
+frozen thresholds; the table is in `docs/archive/ard-distillation-2026/METHOD_DIRECTIONS_V2.md`.
 
 ## Preregistered rule
 

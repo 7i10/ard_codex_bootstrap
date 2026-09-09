@@ -111,7 +111,7 @@ The no-update sanity artifact is
 `docs/experiments/ert_confirmatory_t123_calibration_sanity_v1.json` with
 SHA-256 `3bcf69110216ce992b6d3e3e25a3894cc8d6a2f66fe266311c1f166c17f57a5c`.
 The endpoint interpretation and limitations are in
-`docs/ERT_CONFIRMATORY_T123_RESULTS.md`.
+`docs/archive/ard-distillation-2026/ERT_CONFIRMATORY_T123_RESULTS.md`.
 
 Executed verification and run commands:
 

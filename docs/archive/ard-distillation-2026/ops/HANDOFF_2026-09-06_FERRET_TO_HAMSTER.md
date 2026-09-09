@@ -8,9 +8,9 @@ Hamster 停止中に Ferret 側で行った作業の引き継ぎ。
 ### (1) Hamster の未 push コミットを push する ← 最優先
 
 2026-09-05 の約 12 コミットが Hamster のローカルディスクにしか存在しない。
-`CLAUDE.md`、`.claude/`、`docs/plans/0091`、`docs/plans/0092`、`docs/ARM_REGISTRY.md`、
-`docs/MEASUREMENT_DESIGN.md`、`docs/COEFFICIENT_AUDIT.md`、
-`docs/EVIDENCE_RECLASSIFICATION.md` などが該当する。
+`CLAUDE.md`、`.claude/`、`docs/plans/0091`、`docs/plans/0092`、`docs/archive/ard-distillation-2026/ARM_REGISTRY.md`、
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md`、`docs/archive/ard-distillation-2026/COEFFICIENT_AUDIT.md`、
+`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` などが該当する。
 
 **これらは checkpoint と違い再生成できない。** ディスク 1 本に依存している状態を
 まず解消する。認証は次で通る。
@@ -73,7 +73,7 @@ origin/master (ba767a7)
 ### (6) 成果物の棚卸し
 
 両ホストで `scripts/ardx/status.py --inventory` を取り、差分を
-`docs/ARTIFACT_LOCATION_MAP.md` に記録する。分類は
+`docs/archive/ard-distillation-2026/ops/ARTIFACT_LOCATION_MAP.md` に記録する。分類は
 `docs/ARTIFACT_RETENTION_POLICY.md` に従う（再生成不能 / 高コスト / 低コスト）。
 
 W&B へ退避するのは**再生成不能なものだけ**、すなわち
@@ -156,7 +156,7 @@ Markdown → pptx。内容は git、見た目は本人所有のテンプレー�
 > **訂正 2026-09-06。** この行には当初 `+0.41 / +0.06 / +0.46 pp` と書かれていた。
 > それは plan 0091 の **I100 official test AutoAttack** の値（3 seed）であって、
 > PM のものではない。数が 3 つある時点で 2 seed 設計と合っていない。
-> PM `/online` の実測値は `docs/EVIDENCE_RECLASSIFICATION.md` E1 行の
+> PM `/online` の実測値は `docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` E1 行の
 > `+0.14 / +0.20 pp`。主要 arm の選定理由は効果量ではないと本文が明記して
 > いるので結論は変わらないが、検出力を再計算する人を誤らせる。
 
@@ -189,7 +189,7 @@ Markdown → pptx。内容は git、見た目は本人所有のテンプレー�
 
 > **lock ファイルは、それ単独で構築した環境で実訓練が起動するまで未検証である。**
 
-### 実データ訓練は決定論的（`docs/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md`）
+### 実データ訓練は決定論的（`docs/archive/ard-distillation-2026/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md`）
 
 `I100_CONTROL` を dev-1 親から e100→e114 まで同一 GPU で 2 回。
 **model と optimizer の状態が 3 地平すべてでビット単位一致**。
@@ -238,7 +238,7 @@ Markdown → pptx。内容は git、見た目は本人所有のテンプレー�
 | 成果物の所在表 | 未作成 |
 | 親 6 本 | 未生成 |
 | スクリーンの妥当性 | 対 0 組。最初の 2 arm は全訓練で判断する |
-| `docs/ERT_RESEARCH_STATUS_SUMMARY.md` | 新基準を反映していない |
+| `docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md` | 新基準を反映していない |
 
 ## 4. 実験は開始しない
 

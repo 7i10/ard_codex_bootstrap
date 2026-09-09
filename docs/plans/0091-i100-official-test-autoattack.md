@@ -224,7 +224,7 @@ are positive.
 | CE-PGD20, last | +0.69 | +0.29 | +0.49 | +0.49 |
 | clean, last | -0.20 | -0.05 | -0.08 | -0.11 |
 
-Source: `docs/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md`, record
+Source: `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md`, record
 `docs/experiments/ard_i100_official_test_autoattack_v1.json`
 (SHA-256 `700e8d07...eecf59`).  Aggregation source `7f37aa2`; the six evaluations
 ran from pinned worktree `source-9ffc1aedf3b1`.
@@ -240,7 +240,7 @@ has been measured this way.
 validation gave `+0.78 / +0.68 / +0.62 pp` on CE-PGD20; the official-test
 AutoAttack difference is `+0.31 pp` on average, under half.  At `+0.31 pp` the
 effect sits inside the post-decay floor bracket of 0.25 to 0.50 pp that
-`docs/MEASUREMENT_DESIGN.md` reports, and that floor has never been measured
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` reports, and that floor has never been measured
 directly for this design (plan 0092 would measure it).  With three seeds a sign
 test alone gives p = 0.125, and the paired t on the primary endpoint is
 t(2) = 2.46.  The same standard this project applied on 2026-09-05 to every

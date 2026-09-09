@@ -55,7 +55,7 @@ The field writes papers about the last of these. Nobody has measured the others 
 noise floor on one engine.
 
 **This repository already contains evidence that the ranking is upside down.**
-Verified in `docs/EXPERIMENT_DASHBOARD.md`, all CIFAR-10 official test, 10,000 images,
+Verified in `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md`, all CIFAR-10 official test, 10,000 images,
 standard AutoAttack, seed 0, identical student and schedule, only the teacher changed:
 
 | Teacher / method | Best AA | Last AA | Best−Last |
@@ -73,7 +73,7 @@ Two things jump out, and the second is not in any of the eight programmes.
 
 1. The teacher moves the result by 4.79 pp at the best checkpoint and 8.66 pp at the last
    one. Method choice, across those same four methods, moves it by 0.5–0.8 pp. The
-   repository's own assessment already states this (`docs/ARD_VERSUS_AT_ASSESSMENT.md`
+   repository's own assessment already states this (`docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md`
    line 205, marked VERIFIED) and notes the published SAAD numbers show the same thing
    (44.42 versus 40.57 across two teachers).
 2. **The teacher effect is mostly an induced-robust-overfitting effect.** All four Chen arms
@@ -107,7 +107,7 @@ here with no new scientific surface.
    trajectories separate — from intermediate checkpoints.
 2. **Protocol.** Why the same method with the same teacher family is published at 48.66,
    49.86, 51.03 and 52.13, and measured here at 51.90 (all repo-VERIFIED rows in
-   `docs/ARD_VERSUS_AT_ASSESSMENT.md`). Fix teacher, architecture, data and evaluation;
+   `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md`). Fix teacher, architecture, data and evaluation;
    vary one protocol axis at a time. Roughly ten to twelve runs, no new code.
 3. **Selection.** Plan 0095, already written and unrun: the dose-matched, class-matched
    random-cohort placebo that closes the project's four-month negative result. 2.9 GPU-hours.
@@ -277,7 +277,7 @@ This section separates "survived an attack" from "survived because nobody looked
   published comparator trains on 50,000. This is a permanent asterisk on cross-paper
   comparisons and it must be labelled, not hidden — the red team flagged the repo for putting
   45k rows beside 50k rows once already.
-- **Generated data.** `docs/METHOD_DIRECTIONS_V2.md` currently parks it as outside the data
+- **Generated data.** `docs/archive/ard-distillation-2026/METHOD_DIRECTIONS_V2.md` currently parks it as outside the data
   contract and a human decision. Block B is the one genuinely unoccupied cell in the eight
   programmes, but reopening that contract, building a mixed loader that survives the
   determinism guarantee, and running 400-epoch arms is a second programme. Keep it as the
@@ -308,12 +308,12 @@ This section separates "survived an attack" from "survived because nobody looked
   deviation near 0.09 pp. **Use that last number, not the 0.092 pp paired figure and not the
   validation CE-PGD20 figure, when sizing anything against official-test AutoAttack.** Two
   assassins caught the previous designs importing the wrong floor.
-- **The eight teacher arms** in `docs/EXPERIMENT_DASHBOARD.md` section 4 — the table in
+- **The eight teacher arms** in `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md` section 4 — the table in
   section 2 above. These are chapter 1's pilot data and they already exist.
 - **The pinned RobustBench checkout** (`.external/robustbench`, commit 78fcc9e, 2025-03-31)
   and `teachers.lock.yaml` with seven pinned teachers, per-checkpoint SHAs and a factory
   allowlist.
-- **`docs/ARD_VERSUS_AT_ASSESSMENT.md`** — the eight-paper table with VERIFIED / REPORTED /
+- **`docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md`** — the eight-paper table with VERIFIED / REPORTED /
   INFERRED marks on every row. This is chapter 2's literature side and it is already done. It
   even contains a design sketch for the matched comparison at line 237.
 - **Plan 0095**, written, costed at 2.9 GPU-hours, and runnable on the existing state router

@@ -33,7 +33,7 @@ Every historical treated-versus-control contrast is a different animal.  Plan
 truly inert treatment would be bit-identical, so 0.092 pp is not their floor and
 their floor has never been measured.
 
-`docs/POST_DECAY_FLOOR_RECLASSIFICATION.md` judged nine contrasts against
+`docs/archive/ard-distillation-2026/POST_DECAY_FLOOR_RECLASSIFICATION.md` judged nine contrasts against
 0.092 pp.  It therefore used a threshold of the wrong kind.  It errs toward
 leaving verdicts underpowered rather than toward inventing findings, so nothing
 it concluded is unsafe — but it is not the right test, and this plan supplies the
@@ -48,13 +48,13 @@ The cohort must change, not the coefficient.
 ## Target
 
 `CLEAN_WRONG_PLAIN_ADVCE` (alias `PLAIN_ADVCE`), row E6 of
-`docs/EVIDENCE_RECLASSIFICATION.md`.  Observed `+0.44 / +0.10 pp` against the
+`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md`.  Observed `+0.44 / +0.10 pp` against the
 I100 control at e114.
 
 It is the target for three reasons.  It has the largest observed effect among the
 e114 arms that the measured floor made eligible.  It is one of the two arms that
 passed the exploratory paired test in
-`docs/POST_DECAY_FLOOR_RECLASSIFICATION.md` (`+0.270 pp`, t = 4.13) — a result
+`docs/archive/ard-distillation-2026/POST_DECAY_FLOOR_RECLASSIFICATION.md` (`+0.270 pp`, t = 4.13) — a result
 that document is explicit about not being a finding, because its threshold was
 chosen after the numbers were visible.  And its cohort rule is `/fixed@e99`, so
 the mask can be swapped without touching the online router, which has no

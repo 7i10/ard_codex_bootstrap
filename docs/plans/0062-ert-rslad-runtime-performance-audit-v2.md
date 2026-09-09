@@ -71,7 +71,7 @@ Any adopted change requires explicit host-local parity evidence.
 
 ### M1 files and acceptance
 
-- Files: this plan; `docs/ERT_RSLAD_RUNTIME_PERFORMANCE_AUDIT.md`; host-audit
+- Files: this plan; `docs/archive/ard-distillation-2026/ERT_RSLAD_RUNTIME_PERFORMANCE_AUDIT.md`; host-audit
   artifact.
 - Tests: static source audit and JSON/schema validation.
 - Acceptance: active production is untouched; host topology, software stack,

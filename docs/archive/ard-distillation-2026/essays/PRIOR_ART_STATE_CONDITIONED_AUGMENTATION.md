@@ -167,7 +167,7 @@ apply* (IAD, DGAD, SAAD), but never *which augmentation to apply* under an adver
 real. It is also narrow: a reviewer will read Variant 2 as "DGAD's partition applied to IDBH's
 augmentation", and the thesis must show that the augmentation lever behaves differently from the
 loss lever on the same partition. This project already has the loss-lever data for that comparison
-(`docs/ERT_RESEARCH_STATUS_SUMMARY.md`, Stage A and Clean-Wrong rows).
+(`docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md`, Stage A and Clean-Wrong rows).
 
 ## 3. How the field measures per-sample ARD effects
 
@@ -200,7 +200,7 @@ a re-implementation difference from a method difference.
 
 **This project's floor.** Two identical runs differ by a standard deviation of 0.092 pp at epoch 114
 after the learning-rate decay (pooled, 4 degrees of freedom, 95 % interval 0.055–0.265 pp) and by
-1.14–1.25 pp before it (`docs/POST_DECAY_FLOOR.md`; `docs/ERT_RESEARCH_STATUS_SUMMARY.md`,
+1.14–1.25 pp before it (`docs/POST_DECAY_FLOOR.md`; `docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md`,
 "Measurement limits"). Against the pre-decay floor, single-run claims of +0.20 (IAD), +0.53 (DGAD),
 +0.77 (MAP alone), +0.97 (IGDM) and +0.32–0.72 (AROID) are indistinguishable from nothing. Against
 the post-decay floor they would be resolvable, but only if the two arms share a parent, a data order
@@ -283,7 +283,7 @@ Put the verified claims together with two facts from outside the paper: robust o
 right after the first learning-rate decay (Rice, Wong and Kolter, ICML 2020 — REPORTED), and this
 project's own trajectories show that IDBH from epoch 0 (I0) ends below I100 and loses full-trajectory
 AUC, while switching at epoch 50 produces a −5.34 pp shock that takes until epoch 52–62 to recover
-(`docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`, VERIFIED). The hypothesis consistent with all of it:
+(`docs/archive/ard-distillation-2026/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`, VERIFIED). The hypothesis consistent with all of it:
 
 1. By IDBH's account, extra hardness pays an accuracy and fitting cost at all times and delivers a
    robustness benefit only through reduced robust overfitting.
@@ -331,9 +331,9 @@ uses an ascending epsilon schedule but a fixed augmentation pair.
 
 Local, VERIFIED: `.external/DA-Alone-Improves-AT/src/data/idbh.py`, `src/config/train.py`, `README.md`
 (commit 38b740a); `src/ard/data/datasets.py`; `src/ard/protocols/__init__.py`;
-`docs/POST_DECAY_FLOOR.md`; `docs/ERT_RESEARCH_STATUS_SUMMARY.md`;
-`docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`; `docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`;
-`docs/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md`.
+`docs/POST_DECAY_FLOOR.md`; `docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md`;
+`docs/archive/ard-distillation-2026/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`; `docs/archive/ard-distillation-2026/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`;
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md`.
 
 Papers read in full text (PDF extracted): Li and Spratling, ICLR 2023, arXiv 2301.09879; Li, Qiu and
 Spratling, IJCV 2024, arXiv 2306.07197; Park et al., ECCV 2024 (ecva.net paper 09110); Shao et al.,

@@ -48,5 +48,5 @@ The four validation replays were run on exact epoch-79 parents:
 
 Each artifact contains 5,000 fixed validation IDs and is hash-bound to its
 parent, attack identity, source SHA, schema, and Parquet rows. The resulting
-report is `docs/ERT_CW_GENERALIZATION_DIAGNOSTIC.md` with machine output at
+report is `docs/archive/ard-distillation-2026/ERT_CW_GENERALIZATION_DIAGNOSTIC.md` with machine output at
 `docs/experiments/ert_cw_generalization_diagnostic_v1.json`.

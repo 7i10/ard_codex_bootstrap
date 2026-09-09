@@ -1498,7 +1498,7 @@ global robust generalization
 - [x] 2026-08-09: Completed the Chen ERT two-seed epoch-79 -> 84 causal pilot
   (`C79/RA/RAR/RB/RBR` for L2 and L4) using Hamster and Ferret.  Endpoint
   validation and selected-sample rescue/harm are in
-  `docs/FFNR_CAUSAL_PILOT_RESULTS.md`.
+  `docs/archive/ard-distillation-2026/FFNR_CAUSAL_PILOT_RESULTS.md`.
 - [ ] The short pilot does not yet pass a global-Best confirmation gate;
   official test, AutoAttack, and long-horizon intervention remain unlaunched.
 

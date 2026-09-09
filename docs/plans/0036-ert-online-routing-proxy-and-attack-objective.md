@@ -49,7 +49,7 @@ route, coefficient, or intervention.
 - Public CPU CLI, fail-closed stable-ID/class/lineage joins, deterministic
   metrics, and no overwrite.
 - Machine report: `docs/experiments/ert_online_routing_proxy_v1.json`.
-- Human report: `docs/ERT_ONLINE_ROUTING_PROXY_RESULTS.md`.
+- Human report: `docs/archive/ard-distillation-2026/ERT_ONLINE_ROUTING_PROXY_RESULTS.md`.
 - Focused unit tests and `scripts/verify.py --changed` once after the delta.
 - Any missing online teacher-forward or one-epoch data is reported as
   unavailable, never reconstructed from a different attack or snapshot.

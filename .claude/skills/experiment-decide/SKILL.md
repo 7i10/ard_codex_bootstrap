@@ -11,8 +11,12 @@ description: Turn a just-imported campaign result into docs/decisions/NNNN-<slug
 
 Read, in this order: `docs/experiments/<contract>.json` (numbers), the matching
 `docs/<REPORT>.md` (interpretation), the plan's Completion report, and the
-`Current next-step discipline` section of `docs/ERT_RESEARCH_STATUS_SUMMARY.md`.
-Options must not contradict that discipline; if one does, say why explicitly.
+evidence ledger in `docs/RESEARCH_STATUS_SUMMARY.md` (the live status summary
+for the current research direction; the ARD/RSLAD-era one is frozen at
+`docs/archive/ard-distillation-2026/ERT_RESEARCH_STATUS_SUMMARY.md` and is
+background reading only, not a live constraint).
+Options must not contradict standing decisions already recorded there; if one
+does, say why explicitly.
 
 ## 2. Cost each option
 

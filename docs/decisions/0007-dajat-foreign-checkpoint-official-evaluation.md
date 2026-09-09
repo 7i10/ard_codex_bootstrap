@@ -16,10 +16,10 @@ chosen: A
 
 ## なぜ今これを問うのか
 
-`docs/THESIS_FRAME.md` §7 の第 1 項目である。修論の枠組みとして推奨された「条件を揃えた
+`docs/archive/ard-distillation-2026/THESIS_FRAME.md` §7 の第 1 項目である。修論の枠組みとして推奨された「条件を揃えた
 ARD 対 AT 比較」は、教師なし側の比較相手を自前で測れることに全面的に依存している。
 その依存を支える唯一の記録が、**512 枚の clean 概算 87.3 %** だけである
-（commit `914b10a`、`docs/METHOD_DIRECTIONS_V2.md` 107--108 行、AutoAttack 未実行）。
+（commit `914b10a`、`docs/archive/ard-distillation-2026/METHOD_DIRECTIONS_V2.md` 107--108 行、AutoAttack 未実行）。
 
 **そして 2026-09-08 に、私はこの点で誤りを犯した。** 会話の中で「DAJAT を clean 85.71
 （完全一致）／AA 52.45 対 52.48 で再現した」と述べたが、そのランは存在しない。リポジトリ全体を

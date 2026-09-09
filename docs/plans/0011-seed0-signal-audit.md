@@ -71,7 +71,7 @@ signal for intervention research but does not validate current target
 softening.
 
 The complete four-model table was subsequently extracted from those unchanged
-formal JSON reports into `docs/SIGNAL_AUDIT.md`. Student-only contains almost
+formal JSON reports into `docs/archive/ard-distillation-2026/essays/SIGNAL_AUDIT.md`. Student-only contains almost
 all held-out ranking information; adding teacher entropy after student history
 changes AUROC by `-0.0021` to `+0.0010`. Adding the multiplicative interaction
 changes AUROC by `+0.0009` to `+0.0035` and improves log-loss in all four

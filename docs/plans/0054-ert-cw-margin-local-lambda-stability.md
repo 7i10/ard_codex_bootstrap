@@ -93,7 +93,7 @@ from the same parents with `--epochs 95`, with no change to the treatment,
 seed, mask, attack, or endpoint contract.  The partial first launch is
 excluded from all results.  The valid v2 campaign completed all 24 trajectories
 and 96 endpoint evaluations on Hamster.  Results are recorded in
-`docs/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md` and
+`docs/archive/ard-distillation-2026/ERT_CW_MARGIN_LOCAL_LAMBDA_STABILITY.md` and
 `docs/experiments/ert_cw_margin_local_lambda_stability_v1.json`.
 
 ## Exclusions

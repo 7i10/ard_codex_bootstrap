@@ -24,7 +24,7 @@ The completed Dynamic-BDD screen was requested at approximately 2026-09-03
 14:00 JST.  Its first controller launched at 16:53:13 JST: **about 2 h 53 m
 before any production data-plane work began**.  The results commit followed at
 23:54:56 JST: **about 9 h 55 m** after the user-reported request.  The
-evidence-backed detail is in [the execution postmortem](ERT_RSLAD_I100_DYNAMIC_BDD_EXECUTION_POSTMORTEM.md).
+evidence-backed detail is in [the execution postmortem](../ERT_RSLAD_I100_DYNAMIC_BDD_EXECUTION_POSTMORTEM.md).
 
 For the follow-on forensic audit, the first implementation commit was
 01:59:06 JST on 2026-09-04.  The first valid canonical replay fan-out started

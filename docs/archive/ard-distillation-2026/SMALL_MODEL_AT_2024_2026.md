@@ -1,6 +1,6 @@
 # Small-model adversarial training, 2024 to 2026: does the 52.5 record still stand?
 
-Date: 2026-09-07. Read-only survey that closes the RobustBench gap left open in `docs/ARD_VERSUS_AT_ASSESSMENT.md`. This is the only file written. No GPU job was run.
+Date: 2026-09-07. Read-only survey that closes the RobustBench gap left open in `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md`. This is the only file written. No GPU job was run.
 
 Setting throughout: CIFAR-10 test set, ResNet-18 (RN-18) or PreActResNet-18 (PRN-18), L-infinity, epsilon 8/255, AutoAttack (AA), no extra real data and no generated data unless a row says otherwise. Marks: **VERIFIED** = I read the paper text or the repository record and can point to the table; **REPORTED** = I relay a statement I could not check against the table myself; **INFERRED** = my reasoning from the other two.
 
@@ -8,7 +8,7 @@ Setting throughout: CIFAR-10 test set, ResNet-18 (RN-18) or PreActResNet-18 (PRN
 
 ## 0a. Addendum, 2026-09-08: RobustBench stopped, and the pin is the head
 
-`docs/THESIS_FRAME.md` section 7 asked for the live RobustBench leaderboard to be rendered once,
+`docs/archive/ard-distillation-2026/THESIS_FRAME.md` section 7 asked for the live RobustBench leaderboard to be rendered once,
 because a seed-reported, no-generated-data ResNet-18 entry at or above 54 AA published since
 March 2025 would make this survey's premise false. The leaderboard page renders its tables in
 JavaScript and cannot be read by fetching it. The underlying data can be, and it answers the
@@ -27,7 +27,7 @@ Three consequences, and the third cuts against this survey.
    about seventeen months, so no post-March-2025 result can appear there whatever its number.
    The premise of the comparison chapter survives this check.
 2. **The pinned `model_info` is complete, not partial.** Every statement in this document and in
-   `docs/ARD_VERSUS_AT_ASSESSMENT.md` that reads a number off the pin is reading the whole
+   `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md` that reads a number off the pin is reading the whole
    leaderboard. The live-leaderboard caveat those documents carry can be struck.
 3. **"Not on RobustBench" no longer means "does not exist".** For 2022 to 2024 the leaderboard was
    a near-complete index and absence from it was evidence. From 2025 it is evidence of nothing:
@@ -62,7 +62,7 @@ What the number is and is not.
 - DAT uses no extra or generated images. The recombined images mix the amplitude spectrum of a training image with that of another training image (a "distractor drawn i.i.d. from the training set") and an amplitude generator trained jointly on the same data. VERIFIED (Section 3, "x0 is the distractor i.i.d. drawn from Dt"). Its generated-data results are WRN-28-10 only (Table 6, see section 3 below).
 - Protocol: SGD, weight decay 5e-4, 5-step PGD with step 2/255 for training, random crop and flip only. Base runs are 150 epochs with decay at 100 and 110; the AWP and AWP + SWA runs use decay epochs 100 and 150, so they run at least 150 epochs and the total is not stated for them. Whether best or last checkpoint is reported is not stated in the text I searched. VERIFIED absence (Appendix E.2; grep for "best checkpoint" and "last checkpoint" finds nothing).
 - Code: `github.com/Feng-peng-Li/DAT`, MIT licence, contains `train_cifar.py`, `Generator.py`, `utils_awp.py`. VERIFIED via the GitHub API. Not pinned in this repository.
-- Cross-check against this repository: DAT Table 1 reports PGD-AT on RN-18 at 82.78 / 47.63 +/- 0.08 AA. This repository's PGD-AT best checkpoint is 47.63 AA (`docs/EXPERIMENT_DASHBOARD.md`). The two protocols agree to the second decimal, which supports treating DAT's table as a same-protocol reference. VERIFIED both numbers; INFERRED conclusion.
+- Cross-check against this repository: DAT Table 1 reports PGD-AT on RN-18 at 82.78 / 47.63 +/- 0.08 AA. This repository's PGD-AT best checkpoint is 47.63 AA (`docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md`). The two protocols agree to the second decimal, which supports treating DAT's table as a same-protocol reference. VERIFIED both numbers; INFERRED conclusion.
 
 **Three claims above this band that do not meet the evaluation standard and must not be adopted as a baseline.**
 
@@ -213,7 +213,7 @@ Papers (text read unless marked REPORTED above).
 - *MMARD: Improving the Min-Max Optimization Process in Adversarial Robustness Distillation.* arXiv 2503.06559, March 2025. Tables 2, 3, 5.
 - *ProARD.* arXiv 2506.07666, IJCNN 2025 (REPORTED). *Towards Class-wise Fair Adversarial Training via Anti-Bias Soft Label Distillation.* arXiv 2506.08611 (REPORTED). *AdaGAT.* arXiv 2508.17265 (REPORTED). *DARD.* arXiv 2509.11525, Table 1 (REPORTED). *CIARD.* arXiv 2509.12633 (REPORTED). *FERD.* arXiv 2509.20793 (REPORTED). *MMT-ARD.* arXiv 2511.17448 (REPORTED). *Improving Certified Robustness via Adversarial Distillation.* arXiv 2606.31653 (REPORTED). *Information Bottleneck Distillation Through Dual Teachers.* arXiv 2607.27737 (REPORTED).
 - *InfoARD.* IEEE TIP, Dec 2025. *Allies Teach Better Than Enemies: Inverse Adversaries for Robust Knowledge Distillation.* IEEE TPAMI, Feb 2026. *Efficient Robustness for Small Models via Dual Adversarial Distillation With Hybrid Supervision.* IEEE TMM, 2026. *Mix2Aug.* IEEE TDSC, March 2026. Abstracts only, via the Semantic Scholar API (REPORTED).
-- Earlier-verified numbers reused from `docs/ARD_VERSUS_AT_ASSESSMENT.md`: DAJAT, IDBH, RSLAD, AdaAD, IGDM, PeerAiD, SAAD, "Why Robust Teachers Fail", Bartoldson 2024, Gowal 2021, Rade 2021, Rebuffi 2021, Sehwag 2022.
+- Earlier-verified numbers reused from `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md`: DAJAT, IDBH, RSLAD, AdaAD, IGDM, PeerAiD, SAAD, "Why Robust Teachers Fail", Bartoldson 2024, Gowal 2021, Rade 2021, Rebuffi 2021, Sehwag 2022.
 
 Repositories and APIs.
 

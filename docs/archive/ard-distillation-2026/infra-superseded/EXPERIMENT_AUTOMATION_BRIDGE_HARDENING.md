@@ -16,7 +16,7 @@ late host-path validation, manual parent-to-child handoff, endpoint launch
 gaps, and repeated status checks after a process was already stable.  A Ferret
 wrapper permission error and host-specific Python/data/Teacher paths were
 technical orchestration failures, not scientific outcomes.  These facts are
-recorded in `docs/EXPERIMENT_LAUNCH_DISCIPLINE.md` and the existing postmortem;
+recorded in `docs/archive/ard-distillation-2026/infra-superseded/EXPERIMENT_LAUNCH_DISCIPLINE.md` and the existing postmortem;
 this change does not infer new timestamps.
 
 ## Capacity and instruction diagnosis

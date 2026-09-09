@@ -50,7 +50,7 @@ evaluation attack, sample count, world size, BatchNorm profile, seed, Git SHA, a
   - Rollback: no external mutation.
   - Commit: included with D2.
 - [x] D1 — Write the human experiment dashboard.
-  - Files: `docs/EXPERIMENT_DASHBOARD.md`.
+  - Files: `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md`.
   - Tests: manual link/table consistency and docs-only impact selection.
   - Acceptance: overview, purpose, conditions, outputs, status, results, and limitations are explicit.
   - Rollback: additive documentation file.
@@ -62,7 +62,7 @@ evaluation attack, sample count, world size, BatchNorm profile, seed, Git SHA, a
   - Rollback: revert the documentation commit.
   - Commit: `Document experiment status and W&B run roles`.
 - [x] D3 — Add paper-reference targets and classify reproduction fidelity.
-  - Files: `docs/EXPERIMENT_DASHBOARD.md`, this plan.
+  - Files: `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md`, this plan.
   - Tests: primary-paper table/source cross-check and docs-only changed-path gate.
   - Acceptance: original RSLAD, SAAD RSLAD analysis, full SAAD, and entropy-only references are not conflated;
     Student/Joint are explicitly identified as new ablations without published target values.
@@ -109,7 +109,7 @@ review on a read-only reporting delta.
 
 ## Completion report
 
-Added `docs/EXPERIMENT_DASHBOARD.md` and linked it from the documentation index. The dashboard separates live status,
+Added `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md` and linked it from the documentation index. The dashboard separates live status,
 official results, execution profiles, output locations, W&B roles, and current scientific limitations. A reporting
 audit also corrected stale student/joint fallback wording in two contract documents to match the already-implemented
 schema-v2 target-softening semantics. No training, evaluation, W&B metadata, artifact, or run was changed or deleted.

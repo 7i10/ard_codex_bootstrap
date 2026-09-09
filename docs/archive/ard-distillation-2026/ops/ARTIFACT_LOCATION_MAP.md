@@ -175,7 +175,7 @@ plan 0092 の run はいずれも **online モード**で `wandb.ai/shunsuke-n-w
   つまり生成キャンペーンは Hamster にしか無い。
 - 同サイズの `.pt` を全ルートから 10 本見つけたが、ハッシュを取った結果 **重複は無かった**
   （`ert-rslad-static-trajstab-v1` と `unseen-confirm-*-prefix-r2` の e099 は別物）。
-- 来歴: 生成 SHA・親系譜・seed が `docs/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV.md` と
+- 来歴: 生成 SHA・親系譜・seed が `docs/archive/ard-distillation-2026/ERT_RSLAD_HISTORY_BALANCED_ORDERING_DEV.md` と
   `docs/experiments/ert_rslad_stagewise_augmentation_parent_audit_v1.json` に記録済み。
   **来歴は完全に特定できる。**
 - 再構築コスト: **1 本 3.5 GPU 時間**（100 エポック × 2.08 分、VERIFIED な実測レート）。
@@ -217,7 +217,7 @@ Bartoldson 系は 4.37 分/エポック。run 数は `resolved_config.yaml` の�
 | # | パス | 容量 | 中身 | 生成元 | 来歴 | 再構築コスト | 処分 |
 |---|---|---|---|---|---|---|---|
 | F1 | `ard-runs/ard_codex_bootstrap` | **117 G** | 160 個の固定ソース worktree 付き run。`c10-r18-ws1-b128-core` 25 G、`history-routing-v2-L3-v7` 16 G、Bartoldson 系 4.4 G ×4、chen-rslad 系、`ert-i100-action-transfer-v{3,5,6}`、`ert-i100-cw-long-horizon-v1` | 全期間の Ferret 実行分 | **各 run に `repo/` としてソースツリーそのものが同梱**。来歴は最も強い | ≈ 600–900 GPU 時間 | `KEEP-CHEAP-TO-REBUILD`。ただし §3 の親と F2 は保持 |
-| F2 | `ard-runs/.../determinism-realdata-v1` | 996 M | **実データ訓練決定論性の検証出力。** runA/runB、各 e104/e109/e114 + best/last、`epoch-metrics.jsonl`、run-bundle | plan 外の検証（2026-09-06） | `run-bundle/manifest.json`、source `b928dc7`（runA）/ `ee6364f`（runB）、親 sha256 記録済み | 約 1.2 GPU 時間（35 分 ×2） | **`KEEP-CHEAP-TO-REBUILD`**。結論は `docs/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md` として git に入っており、**保存方針全体がこの 1 件に依存している**。バイナリ自体は不要だが、再実行が安いので消して構わない |
+| F2 | `ard-runs/.../determinism-realdata-v1` | 996 M | **実データ訓練決定論性の検証出力。** runA/runB、各 e104/e109/e114 + best/last、`epoch-metrics.jsonl`、run-bundle | plan 外の検証（2026-09-06） | `run-bundle/manifest.json`、source `b928dc7`（runA）/ `ee6364f`（runB）、親 sha256 記録済み | 約 1.2 GPU 時間（35 分 ×2） | **`KEEP-CHEAP-TO-REBUILD`**。結論は `docs/archive/ard-distillation-2026/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md` として git に入っており、**保存方針全体がこの 1 件に依存している**。バイナリ自体は不要だが、再実行が安いので消して構わない |
 | F3 | `ard-runs/.../ert-i100-action-transfer-v3/inputs` | 200 M | dev-1 / dev-2 親の複製 + `dev{1,2}.yaml` | plan 0087 系譜 | sha256 一致確認済み（§3） | 3.5 GPU 時間 ×2 | `KEEP-CHEAP-TO-REBUILD` |
 | F4 | `ard-runs/.../unseen-confirm-c-*` | 約 1.1 G | plan 0091 の confirm-c 系 | plan 0091 | source SHA あり。Hamster に mirror 済み | 3.5 GPU 時間/本 | `KEEP-CHEAP-TO-REBUILD` |
 | F5 | `ard-analysis-inputs/chen-rslad-s0` | 5.1 G | 解析入力の複製 | chen-rslad 系 | 元データが F1 にある | 0 | `DELETE-CANDIDATE`（重複） |
@@ -254,7 +254,7 @@ Bartoldson 系は 4.37 分/エポック。run 数は `resolved_config.yaml` の�
 
 **この判定は保守的すぎる方向にも甘い方向にも外れうる。** 名前が出てこなくても、
 そのキャンペーンを扱った結果文書は存在しうる（例: `ffnr-attack-factorial` は参照 0 だが
-`docs/FFNR_ATTACK_FACTORIAL_RESULTS.md` は存在する）。逆に参照があっても、
+`docs/archive/ard-distillation-2026/FFNR_ATTACK_FACTORIAL_RESULTS.md` は存在する）。逆に参照があっても、
 それは「結果が git に入っている」という意味であって「バイナリが要る」という意味ではない。
 
 ### 参照ゼロで 500 MB を超えるもの（合計 18.6 GiB）
@@ -335,7 +335,7 @@ canary は起動ゲートの通過確認であって科学的成果物ではな�
 | 項目 | 所在 | 容量 | 状態 |
 |---|---|---|---|
 | 結果記録 | `docs/experiments/ard_i100_official_test_autoattack_v1.json` + `.sha256` | 8.4 K | **git 済み**（`cdaddef`）、リモートにも存在 |
-| 報告書 | `docs/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md` | — | git 済み |
+| 報告書 | `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md` | — | git 済み |
 | 証跡台帳の行 | `5260c2d` | — | git 済み |
 | 評価出力 | `ard-runtime/.../runs/i100-official-test-v1/eval/` 6 本 | 6.5 M | Hamster のみ |
 | mirror した arm | 同 `/arms/` 3 本 | 599 M | Hamster（原本は Ferret） |

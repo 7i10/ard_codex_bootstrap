@@ -1,7 +1,7 @@
 # Method directions, second derivation
 
 Date: 2026-09-07. Read-only analysis; this is the only file written. No GPU job was run. It replaces
-`docs/METHOD_DIRECTIONS.md`, which was written before five things were established (section 1) and
+`docs/archive/ard-distillation-2026/METHOD_DIRECTIONS.md`, which was written before five things were established (section 1) and
 is now out of date. The earlier file is left in place as history.
 
 Every factual claim carries one mark.
@@ -13,7 +13,7 @@ Every factual claim carries one mark.
 - **INFERRED**: my reasoning from the other two, with the arithmetic shown where there is any.
 
 No number below is quoted from prose alone. Section 8 lists where each one was read. None of the
-fourteen defects in `docs/NUMERIC_CONSISTENCY_AUDIT.md` is reused: the pooled `+0.864 pp`, the
+fourteen defects in `docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` is reused: the pooled `+0.864 pp`, the
 `0.25 pp` type-(c) floor, the `0.35 pp` provisional floor, the `0.25-0.50 pp` bracket and the
 `3.5 GPU-hours per parent` figure do not appear as inputs.
 
@@ -39,7 +39,7 @@ These are options for the human. None is a decision.
 | **CropShift, IDBH_WEAK** | two augmentation pipelines. CropShift is flip plus a random crop-and-shift. IDBH_WEAK is CropShift plus one random photometric or geometric operation plus RandomErasing with probability 0.5. IDBH_STRONG differs only in RandomErasing probability 1.0. |
 | **I100** | the project's one replicated method-agnostic result: CropShift for epochs 0-99, then IDBH_WEAK from e100. Canonical name `Aug(CropShift→IDBH_WEAK@e100) @all /none`. |
 | **hardness** | in IDBH's sense, how much an augmentation makes an image easier to attack for a fixed robust model. IDBH_WEAK is harder than CropShift. |
-| **state** | how one training image stands under the current student, in the canonical contract: **S1** safe-correct (correct under the training attack, margin above the tenth percentile of positive margins), **S2** fragile-correct (correct, margin below it), **S3** wrong under attack, **CW** clean-wrong. Teacher states: **T1** teacher correct under attack with margin above its tenth percentile, **T2** teacher correct but fragile, **T3** teacher wrong under attack. `docs/ARM_REGISTRY.md` Hazard 1 warns that the Stage-A lineage used different S1/S2/S3 definitions; this document uses only the canonical ones. |
+| **state** | how one training image stands under the current student, in the canonical contract: **S1** safe-correct (correct under the training attack, margin above the tenth percentile of positive margins), **S2** fragile-correct (correct, margin below it), **S3** wrong under attack, **CW** clean-wrong. Teacher states: **T1** teacher correct under attack with margin above its tenth percentile, **T2** teacher correct but fragile, **T3** teacher wrong under attack. `docs/archive/ard-distillation-2026/ARM_REGISTRY.md` Hazard 1 warns that the Stage-A lineage used different S1/S2/S3 definitions; this document uses only the canonical ones. |
 | **allocation** | which training images receive the richer augmentation. `@all` is I100. |
 | **matched random allocation** | the same number of images, with the same class counts, drawn at random instead of by state. If the state matters, this arm does nothing that the state-selected arm does. |
 | **fixed@e100** | membership computed once from the shared, treatment-free epoch-100 prefix and never recomputed. Plan 0087 froze its thresholds this way. |
@@ -54,7 +54,7 @@ Each item changes what is worth testing. Each is stated with what it rules in or
 
 AROID (Li, Qiu and Spratling, IJCV 2024, arXiv 2306.07197) learns an online, instance-wise augmentation
 policy inside adversarial training from a per-instance signal. VERIFIED by the prior-art report from the
-paper text (`docs/PRIOR_ART_STATE_CONDITIONED_AUGMENTATION.md`, verdict and section 1). What its signal
+paper text (`docs/archive/ard-distillation-2026/essays/PRIOR_ART_STATE_CONDITIONED_AUGMENTATION.md`, verdict and section 1). What its signal
 does matters for the designs below. The paper defines "Vulnerability" as the loss under attack minus the
 clean loss on the *augmented* image, says "a larger Vulnerability indicates that x becomes more vulnerable
 to adversarial attack after DA", and motivates it with "a common belief ... that AT benefits from
@@ -85,7 +85,7 @@ and MADAug abstracts, REPORTED for the third; prior-art report table 1).
 
 There is a second account that predicts the reverse. Robust overfitting is memorisation of hard,
 atypical samples (Rice et al. 2020, REPORTED), and the ICML 2026 paper on why robust teachers fail locates
-the damage on a student-specific unlearnable subset (VERIFIED in `docs/ARD_VERSUS_AT_ASSESSMENT.md`,
+the damage on a student-specific unlearnable subset (VERIFIED in `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md`,
 section 1.1 row). Under that reading augmentation should land where memorisation happens, on the hard
 images. Both accounts are coherent. Neither has been tested under an adversary with the other as an arm.
 That is why direction 1 runs both.
@@ -94,7 +94,7 @@ That is why direction 1 runs both.
 
 The strongest no-extra-data ResNet-18 AutoAttack result is DAT + AWP + SWA, 52.76 ± 0.14 over seven runs
 (NeurIPS 2024, Table 3), with IDBH + AWP + SWA at 52.31 ± 0.26 and DAJAT at 51.85 ± 0.26 re-measured in the
-same table. VERIFIED (`docs/SMALL_MODEL_AT_2024_2026.md`, section 0, from the arXiv PDF text). Every
+same table. VERIFIED (`docs/archive/ard-distillation-2026/SMALL_MODEL_AT_2024_2026.md`, section 0, from the arXiv PDF text). Every
 CIFAR-10 entry added to RobustBench in 2023-2024 is a WideResNet with generated data; the leaderboard is
 dormant since March 2025 (VERIFIED, same file, section 1). Fifteen distillation papers from 2025-2026
 compare against nothing newer than TRADES (2019) (VERIFIED, section 4).
@@ -103,14 +103,14 @@ Two same-engine anchors exist. This repository's PGD-AT scores 47.63 AutoAttack 
 DAT's Table 1 reports PGD-AT at 47.63 ± 0.08 over seven runs (VERIFIED both; commit `1d73bb5`). The
 repository's TRADES was four points low because the clean-side KL target was detached; the defect is fixed
 in commit `7666d77`, the 45.14 result is marked superseded, and **no corrected TRADES run exists yet**
-(VERIFIED, `docs/debugging/0028-trades-clean-target-detached.md`; `docs/EXPERIMENT_DASHBOARD.md` note).
+(VERIFIED, `docs/debugging/0028-trades-clean-target-detached.md`; `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md` note).
 A script to evaluate a foreign checkpoint through this pipeline exists; DAJAT's ResNet-18 scored 87.3 %
 clean on 512 images and has not yet been run through AutoAttack (VERIFIED, commit `914b10a`).
 **Superseded 2026-09-08: it has. The full official test ran on 2026-09-07 and gives clean 85.71 %
 and AutoAttack 52.45 % against a published 85.71 and 52.48, a difference of -0.03 pp. The result was
 not imported into `docs/` until 2026-09-08, which is why this line stood.** Record:
 `docs/experiments/dajat_rn18_foreign_checkpoint_official_test_v1.json`. AWP and SWA
-are not implemented (VERIFIED absence, `docs/ARD_VERSUS_AT_ASSESSMENT.md` section 2.1).
+are not implemented (VERIFIED absence, `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md` section 2.1).
 
 ### 1.4 The measured floor is the wrong kind for the historical contrasts
 
@@ -128,16 +128,16 @@ and pairs treated and control forks on the same seed, which is the design the 0.
 ### 1.5 The one real effect is absent at the horizon where the floor is sharp
 
 I100 against CropShift continued: +1.20 / +1.04 pp at e199 on the two development seeds (VERIFIED,
-`docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`, endpoint table). I100 against CropShift-then-RandomErasing:
+`docs/archive/ard-distillation-2026/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`, endpoint table). I100 against CropShift-then-RandomErasing:
 +0.78 / +0.68 / +0.62 pp at e199 and a mean of +0.24 pp at e149 on the three confirmation seeds (VERIFIED,
-`docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md`). On the official test set under AutoAttack, last checkpoint:
-+0.41 / +0.06 / +0.46 pp (VERIFIED, `docs/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md` and the record's
+`docs/archive/ard-distillation-2026/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md`). On the official test set under AutoAttack, last checkpoint:
++0.41 / +0.06 / +0.46 pp (VERIFIED, `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md` and the record's
 `decision.per_seed_pp`). At e149 the five-seed endpoint differences are +0.42 / +0.10 / +0.20 / +0.82 /
 +0.04 pp, the first three against CropShift-then-RandomErasing and the last two against CropShift
-(VERIFIED per-seed values in `docs/MEASUREMENT_DESIGN.md` section 2.5 from the five-seed cache; comparator
-split per `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2). Switching at e125 gives exactly the same e199
+(VERIFIED per-seed values in `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` section 2.5 from the five-seed cache; comparator
+split per `docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` finding 2). Switching at e125 gives exactly the same e199
 result as switching at e100 on both seeds, +1.20 / +1.04 (VERIFIED,
-`docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`), so nothing between e100 and e125 contributes, and switching at
+`docs/archive/ard-distillation-2026/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`), so nothing between e100 and e125 contributes, and switching at
 e150 keeps +0.76 / +0.90 (VERIFIED, stagewise report). Roughly three quarters of the gain is earned after
 the second decay. INFERRED from those rows.
 
@@ -154,7 +154,7 @@ degrees of freedom (VERIFIED plan text). Until then designs are sized at both en
   `runs/parents-v2/logs/materialize.log`, `epoch-metrics.jsonl` line counts). The parents run the full 200
   epochs, so they also produce six CropShift-throughout e199 references (VERIFIED, `parent.sh` comment).
 - Cost basis: 92.2 s per epoch for the I100-lineage control on Hamster (VERIFIED,
-  `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`, runtime table). A fork from e100 to e199 is 100
+  `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`, runtime table). A fork from e100 to e199 is 100
   epochs, 2.56 GPU-h; twelve such forks are 31 GPU-h; a fork to e149 is 1.28 GPU-h (DERIVED). A full
   200-epoch teacher-bearing run is about 4 GPU-h by the brief's figure and 5.1 GPU-h at 92.2 s/epoch; the
   larger figure is used for budgets (INFERRED).
@@ -172,7 +172,7 @@ degrees of freedom (VERIFIED plan text). Until then designs are sized at both en
   "PGD-AT + I100" and "TRADES + I100" are config-only arms.
 - Training-split cohort sizes at e99 on the development parents: Clean-Wrong 9,263 / 8,709 of 45,000
   (about 20 %), pilot S3×T1 7,898 / 8,907 (about 18-20 %) (VERIFIED,
-  `docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md` line 37). The online S2×T1 state occupies about 3.3 % of
+  `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md` line 37). The online S2×T1 state occupies about 3.3 % of
   sample-epochs over e100-e114 (VERIFIED, online-state report, mechanics table). S1 is the majority state
   after the decay; its exact size is a Stage-0 readout from the e100 prefix (INFERRED).
 
@@ -188,7 +188,7 @@ degrees of freedom (VERIFIED plan text). Until then designs are sized at both en
    parent, parent-level paired test on five degrees of freedom**, per `docs/MEASUREMENT_STANDARD.md` §2.
    Controls run inside the same plan. Plan 0093 forbids extension, so no design borrows its controls; the
    saving is noted where a human could choose to waive that.
-3. Canonical arm names, registered in `docs/ARM_REGISTRY.md` before a run; one plan, one family, one
+3. Canonical arm names, registered in `docs/archive/ard-distillation-2026/ARM_REGISTRY.md` before a run; one plan, one family, one
    primary arm; minimum effect declared before launch.
 4. **Both allocation directions are preregistered arms, and every state-selected allocation has a
    size- and class-matched random allocation as its control.** Without the random arm, "who is treated"
@@ -250,7 +250,7 @@ capacity account predicts the opposite allocation from AROID's reward. Against A
 two-policy rule with no policy network and no extra affinity model; if S1-rich wins it is a zero-cost method,
 and if location does not matter AROID's own +0.10 pp over IDBH (REPORTED, its Table 4) reads as a dose
 effect. Against the project's own history: the loss-lever treatments on S3 and CW produced large direct
-effects and no held-out effect (`docs/EVIDENCE_RECLASSIFICATION.md` row E8, STANDS); this moves the lever
+effects and no held-out effect (`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` row E8, STANDS); this moves the lever
 to augmentation, whose global form is the one thing that did transfer.
 
 **Smallest experiment that settles it.**
@@ -327,7 +327,7 @@ next to the finding that the loss lever's teacher gates never transferred either
 
 ## 5. Direction 3 — What does a robust teacher add to a ResNet-18 once the strongest teacher-free ingredients are present, and do those ingredients stack with the teacher?
 
-This is the comparison `docs/ARD_VERSUS_AT_ASSESSMENT.md` says nobody has made. It is measurement-shaped
+This is the comparison `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md` says nobody has made. It is measurement-shaped
 by nature; the method-shaped question inside it is whether AWP and SWA, which carry the teacher-free record,
 add anything to a distilled student. The student has said a measurement alone is a fallback. It is listed
 here because its first two steps cost almost nothing and every other direction depends on them, and
@@ -355,7 +355,7 @@ teacher-free band of 52.3-52.8 measured on 50,000 images (VERIFIED both; the spl
 TRADES + AWP + SWA + I100 at the same budget; wrong if RSLAD + I100 ≤ that arm + 0.2 pp, in which case the
 thesis's answer flips to "AT suffices on ResNet-18" and the reframed thesis still stands. (ii) AWP + SWA
 stack with the teacher by at least 0.5 pp; the one published data point is CAT's single-run RSLAD + AWP
-51.62 against RSLAD 51.49, +0.13 pp (VERIFIED in `docs/SMALL_MODEL_AT_2024_2026.md` from the CAT PDF), and
+51.62 against RSLAD 51.49, +0.13 pp (VERIFIED in `docs/archive/ard-distillation-2026/SMALL_MODEL_AT_2024_2026.md` from the CAT PDF), and
 SAAD applies SWA from epoch 95 without ablating it (VERIFIED in the assessment). Wrong if the stack is
 under 0.2 pp, which would say the teacher already supplies what AWP and SWA supply, itself a mechanism
 statement.
@@ -370,11 +370,11 @@ a robust teacher's.
   config-only, expected 49.0-49.4 AutoAttack at the best checkpoint (VERIFIED literature range, debugging note
   0028); if it lands elsewhere, stop and debug before anything uses TRADES. **It landed at 47.87, so the
   stop-and-debug condition tripped.** The initialization hypothesis was measured on 2026-09-08 and refuted
-  (`docs/experiments/trades_attack_initialization_differential_v1.md`); the gap is open.
+  (`docs/archive/ard-distillation-2026/experiments-full/trades_attack_initialization_differential_v1.md`); the gap is open.
   DAJAT's checkpoint through AutoAttack on the full test set, about one hour, expected 52.48 ± evaluation
   noise (VERIFIED published value); if it does not reproduce, the evaluation stack is wrong and every
   comparison waits. **It reproduced: clean 85.71 and AutoAttack 52.45, a difference of -0.03 pp
-  (`docs/experiments/dajat_rn18_foreign_checkpoint_official_test_v1.md`). The evaluation stack is
+  (`docs/archive/ard-distillation-2026/experiments-full/dajat_rn18_foreign_checkpoint_official_test_v1.md`). The evaluation stack is
   calibrated, which also rules it out as the explanation for the TRADES gap.**
 - *Step 1, about one week of attention.* AWP and SWA in the training step, through the scientific reviewer.
   AWP changes the optimiser step; SWA is small. Neither touches the attack.
@@ -382,10 +382,10 @@ a robust teacher's.
   common data order across arms; forty checkpoints (best and last) through AutoAttack at about one hour each
   (REPORTED cost, plan 0091).
 - Power: independent seeds. The e199 held-out two-run SDs on record are 0.29 pp (BASE), 0.48 pp (I100) and
-  0.72 pp (CropShift) (DERIVED in `docs/MEASUREMENT_DESIGN.md` §2.5 from the five-seed cache); official-test
+  0.72 pp (CropShift) (DERIVED in `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` §2.5 from the five-seed cache); official-test
   AutoAttack SD for I100 over three seeds is 0.218 pp last, 0.079 pp best (VERIFIED, audit finding 3). With
   per-run SD s, the standard error of a difference of two five-seed means is 0.63 s, so 0.13-0.32 pp; a
-  0.5 pp effect is resolvable if s is at or below about 0.28 pp (DERIVED). **Corrected 2026-09-08: the measured per-run SD is 0.339 pp (`docs/MEASUREMENT_DESIGN.md` line 298, I100 at epoch 199, five seeds), above that 0.28 pp condition, so at five seeds the resolvable effect is 0.60 pp and not 0.5.** Declare 0.6 pp, not 0.5 pp, as the minimum
+  0.5 pp effect is resolvable if s is at or below about 0.28 pp (DERIVED). **Corrected 2026-09-08: the measured per-run SD is 0.339 pp (`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` line 298, I100 at epoch 199, five seeds), above that 0.28 pp condition, so at five seeds the resolvable effect is 0.60 pp and not 0.5.** Declare 0.6 pp, not 0.5 pp, as the minimum
   and report the interval either way.
 
 **What it is worth if null.** A null on (i) is the thesis: a teacher adds less than half a point to a
@@ -469,21 +469,21 @@ still `chosen: null`.
 | number | where read | mark |
 | --- | --- | --- |
 | σ_d 0.092 / 0.124 / 0.159 pp at e114 / e109 / e104 | `docs/POST_DECAY_FLOOR.md`; audit says it matches `docs/experiments/ard_post_decay_floor_v1.json` | VERIFIED |
-| I100 − CropShift +1.20 / +1.04 pp, clean −0.30 / −0.18; I150 +0.76 / +0.90 | `docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`, endpoint table | VERIFIED |
-| I125 +1.20 / +1.04 | `docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`, fresh endpoint table | VERIFIED |
-| I100 − CROP_SUFFIX +0.78 / +0.68 / +0.62 at e199, mean +0.24 at e149, clean −0.06 / −0.22 / −0.46 | `docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md` | VERIFIED |
-| official-test AutoAttack +0.41 / +0.06 / +0.46 (last), 53.08 / 53.02 / 53.19 | `docs/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md`; record `decision.per_seed_pp` read directly | VERIFIED |
-| e149 five-seed differences +0.42 / +0.10 / +0.20 / +0.82 / +0.04 | per-seed values in `docs/MEASUREMENT_DESIGN.md` §2.5, quoted from the five-seed cache CSV; comparator split per audit finding 2 | VERIFIED values, DERIVED differences |
-| e199 two-run SDs 0.287 / 0.479 / 0.721 pp (BASE / I100 / CropShift) | `docs/MEASUREMENT_DESIGN.md` §2.5 | DERIVED there |
-| 92.2 s / epoch | `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`, runtime table, dev-1 CONTROL row | VERIFIED |
+| I100 − CropShift +1.20 / +1.04 pp, clean −0.30 / −0.18; I150 +0.76 / +0.90 | `docs/archive/ard-distillation-2026/ERT_RSLAD_STAGEWISE_AUGMENTATION.md`, endpoint table | VERIFIED |
+| I125 +1.20 / +1.04 | `docs/archive/ard-distillation-2026/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`, fresh endpoint table | VERIFIED |
+| I100 − CROP_SUFFIX +0.78 / +0.68 / +0.62 at e199, mean +0.24 at e149, clean −0.06 / −0.22 / −0.46 | `docs/archive/ard-distillation-2026/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md` | VERIFIED |
+| official-test AutoAttack +0.41 / +0.06 / +0.46 (last), 53.08 / 53.02 / 53.19 | `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_OFFICIAL_TEST_AUTOATTACK.md`; record `decision.per_seed_pp` read directly | VERIFIED |
+| e149 five-seed differences +0.42 / +0.10 / +0.20 / +0.82 / +0.04 | per-seed values in `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` §2.5, quoted from the five-seed cache CSV; comparator split per audit finding 2 | VERIFIED values, DERIVED differences |
+| e199 two-run SDs 0.287 / 0.479 / 0.721 pp (BASE / I100 / CropShift) | `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` §2.5 | DERIVED there |
+| 92.2 s / epoch | `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`, runtime table, dev-1 CONTROL row | VERIFIED |
 | S2×T1 state fraction 3.3 % | same report, mechanics table | VERIFIED |
-| Clean-Wrong 9,263 / 8,709; pilot S3×T1 7,898 / 8,907 | `docs/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md` line 37 | VERIFIED |
+| Clean-Wrong 9,263 / 8,709; pilot S3×T1 7,898 / 8,907 | `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ACTION_TRANSFER_SCREEN.md` line 37 | VERIFIED |
 | `continuation_seed: null` on plan 0087 arms | `docs/plans/0095-cohort-placebo-floor.md`, citing `arm-summary.json` | VERIFIED there |
-| DAT 52.76 ± 0.14; IDBH 52.31 ± 0.26; DAJAT 51.85 ± 0.26; PGD-AT 47.63 ± 0.08 | `docs/SMALL_MODEL_AT_2024_2026.md` §0, from the DAT PDF | VERIFIED there |
-| in-house PGD-AT 47.63; TRADES 45.14 (superseded) | `docs/EXPERIMENT_DASHBOARD.md` baseline table | VERIFIED |
+| DAT 52.76 ± 0.14; IDBH 52.31 ± 0.26; DAJAT 51.85 ± 0.26; PGD-AT 47.63 ± 0.08 | `docs/archive/ard-distillation-2026/SMALL_MODEL_AT_2024_2026.md` §0, from the DAT PDF | VERIFIED there |
+| in-house PGD-AT 47.63; TRADES 45.14 (superseded) | `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md` baseline table | VERIFIED |
 | TRADES defect and fix; no rerun yet | commits `ef61b69`, `7666d77`, `3ccd333`; `docs/debugging/0028-...md` | VERIFIED |
 | DAJAT checkpoint 87.3 % clean on 512 images, no AutoAttack yet | commit `914b10a` message | VERIFIED |
-| CAT: RSLAD + AWP 51.62 vs RSLAD 51.49 | `docs/SMALL_MODEL_AT_2024_2026.md` §4, from the CAT PDF | VERIFIED there |
+| CAT: RSLAD + AWP 51.62 vs RSLAD 51.49 | `docs/archive/ard-distillation-2026/SMALL_MODEL_AT_2024_2026.md` §4, from the CAT PDF | VERIFIED there |
 | AROID Vulnerability definition, motivation, PRN-18 50.57 vs IDBH 50.47 | arXiv HTML 2306.07197v2, quotes returned by the fetch tool | REPORTED |
 | parents-v2 progress | `runs/parents-v2/logs/materialize.log`, `epoch-metrics.jsonl` line counts at 04:29 JST | VERIFIED |
 | transforms id-keyed; erasing probability a parameter | `src/ard/data/datasets.py` | VERIFIED |

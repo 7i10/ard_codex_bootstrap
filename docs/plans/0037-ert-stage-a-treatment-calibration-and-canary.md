@@ -62,9 +62,9 @@ equal-rank dependency.
 
 ## Expected outputs
 
-- `docs/ERT_STAGE_A_CALIBRATION.md`
+- `docs/archive/ard-distillation-2026/ERT_STAGE_A_CALIBRATION.md`
 - `docs/experiments/ert_stage_a_calibration_v1.json`
-- `docs/ERT_STAGE_A_TREATMENT_RESULTS.md`
+- `docs/archive/ard-distillation-2026/ERT_STAGE_A_TREATMENT_RESULTS.md`
 - `docs/experiments/ert_stage_a_results_v1.json`
 
 No production run or official test is authorized by this plan until the

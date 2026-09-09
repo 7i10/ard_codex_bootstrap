@@ -465,7 +465,7 @@ different value of *this* scalar was trained under a matched design.
 | 4 | Stage A | `beta_cleance_weak` (CW1/CW2/CW3) | 0.07825280725955963 | none — CW1/2/3 share the identical value and differ only in the Clean-Wrong sub-mode | L2 held-out −1.300 / −1.460 / −1.440; L4 +0.440 / +0.100 / −0.580 | n/a | **unknown** |
 | 5 | Confirmatory | `beta_advce` | 0.075 (preregistered, never solved) | see #2 | L2 e84 held-out −0.14; L4 −0.04 | n/a | quasi-covered |
 | 6 | Confirmatory | `advkd_multiplier_t3` | 0.5 | Stage A ran 1.0 / 0.5 / 0.0 as a *design* grid (ST3K1/K05/K0), not a calibration | L2 held-out +0.680 / +0.980 / +0.300; L4 +1.820 / +1.280 / +1.700 | mixed | covered by design grid |
-| 7 | CW broad screen | `beta_bce` | 0.08891977369785309 | none | see `docs/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md` | n/a | **unknown** |
+| 7 | CW broad screen | `beta_bce` | 0.08891977369785309 | none | see `docs/archive/ard-distillation-2026/ERT_CLEAN_WRONG_BROAD_SCREEN_RESULTS.md` | n/a | **unknown** |
 | 8 | CW margin | `beta_advce` | 0.07726448029279709 | none | — | n/a | **unknown** |
 | 9 | CW margin | **margin lambda** | 0.2388051152229309 | **yes — 0, 0.10, 0.25, 0.50 and ±5%/±10%** | §3.2 | **no** | **covered (dense)** |
 | 10 | CW margin | target floor | 0.03221710026264191 | none — held fixed in every lambda arm | — | n/a | **unknown** |
@@ -826,7 +826,7 @@ Calibration artifacts read in full:
    resolved config sets `beta_advce: null` and `tau: 2.0`, i.e. it is a
    teacher-target softening arm governed by `alpha_soft`, not a larger AdvCE
    coefficient. VERIFIED from the resolved configs, but this is not stated in
-   `docs/ERT_STAGE_A_TREATMENT_RESULTS.md`, and reading the arm names alone would
+   `docs/archive/ard-distillation-2026/ERT_STAGE_A_TREATMENT_RESULTS.md`, and reading the arm names alone would
    suggest a weak/moderate/strong coefficient ladder that does not exist.
 3. **What distinguishes `CW1`, `CW2` and `CW3`.** All three carry the identical
    `beta_cleance = 0.07825280725955963`; they differ in a `clean_wrong_mode`

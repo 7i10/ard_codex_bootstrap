@@ -218,7 +218,7 @@ defective run.
 **Caveats.** Three, and they bound the claim tightly.
 
 1. **This is not an official-test result and cannot supersede one.** The
-   superseded row in `docs/EXPERIMENT_DASHBOARD.md` is official-test
+   superseded row in `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md` is official-test
    clean/PGD-20/AutoAttack (`81.35 / 47.83 / 45.14`). Only a saved-checkpoint
    official evaluation plus AutoAttack on this run's `best.pt` and `last.pt`
    can replace it. That has not been run and is not launched from postrun.

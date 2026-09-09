@@ -57,7 +57,7 @@ Ordering intervention, official test, or AutoAttack is permitted.
 - `docs/experiments/ert_rslad_five_seed_artifact_inventory_v1.json`
 - `docs/experiments/ert_rslad_five_seed_global_stochasticity_v1.json`
 - `docs/experiments/ert_rslad_five_seed_sample_stochasticity_v1.json`
-- `docs/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`
+- `docs/archive/ard-distillation-2026/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`
 
 ## Decision
 

@@ -50,7 +50,7 @@ every arm.  The frozen target floor/cap are `0.03221710026264191` and
   with the common CE-PGD20 attack identity.
 - Endpoint rows were collected without checkpoint files and validated for
   row count, checkpoint SHA, and attack SHA. The point report is
-  `docs/ERT_CW_MARGIN_LAMBDA_SENSITIVITY.md` with machine output at
+  `docs/archive/ard-distillation-2026/ERT_CW_MARGIN_LAMBDA_SENSITIVITY.md` with machine output at
   `docs/experiments/ert_cw_margin_lambda_sensitivity_v1.json`.
 
 ## Endpoint result snapshot

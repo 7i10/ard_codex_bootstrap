@@ -134,7 +134,7 @@ incident. That is not a product.
 
 Also VERIFIED: the leaderboard has stopped. The RobustBench repository's most
 recent commit of any kind is 2025-03-31, and this repository's own survey
-(`docs/SMALL_MODEL_AT_2024_2026.md`, 2026-09-08) already recorded the consequence:
+(`docs/archive/ard-distillation-2026/SMALL_MODEL_AT_2024_2026.md`, 2026-09-08) already recorded the consequence:
 "not on RobustBench" no longer means "does not exist."
 
 ### 1.5 Where the money actually went
@@ -157,7 +157,7 @@ models can actually reach good performance through it, and meaningless if they
 cannot.
 
 That is answerable today at zero GPU-hours, and this repository already wrote the
-answer down. VERIFIED, `docs/ARD_VERSUS_AT_ASSESSMENT.md` section 1.3:
+answer down. VERIFIED, `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md` section 1.3:
 
 > when the data that made the teacher strong is given directly to the small
 > network, the small network reaches 56.7 to 58.6 AA. When the same data reaches
@@ -406,7 +406,7 @@ bearing and untested.
    how big the gap between those two is. If it is large, the honest deliverable
    shrinks to an upper bound.
 4. **Cross-host bit-identity.** VERIFIED by me today, and it corrects the brief:
-   `docs/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md` establishes bit-identical
+   `docs/archive/ard-distillation-2026/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md` establishes bit-identical
    weights and optimiser state for two runs on the *same GPU and same host*, and
    its own limitations section lists cross-host agreement as not yet performed.
    The lab's distinguishing capability is real within a host and unproven across
@@ -541,7 +541,7 @@ themselves run unattended and cost almost no attention.
    ship only the cost sheet, which does not require a contrast to be valuable. For
    reference, VERIFIED in this repository: our measured five-seed endpoint standard
    deviations at CIFAR scale are 0.118, 0.272 and 0.532 points depending on the
-   arm (`docs/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`), so the floor is
+   arm (`docs/archive/ard-distillation-2026/ERT_RSLAD_FIVE_SEED_STOCHASTICITY.md`), so the floor is
    arm-dependent by a factor of four and must be measured per arm, not assumed.
 
 This repository's teacher-free TRADES baseline is still 1.2 to 1.5 points below

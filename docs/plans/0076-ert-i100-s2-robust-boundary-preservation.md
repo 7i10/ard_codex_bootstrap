@@ -109,5 +109,5 @@ all new files share one API and one campaign identity.
 
 ## Completion report
 
-Completion report: `docs/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md`.
+Completion report: `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CANONICAL_S2_ROBUST_BOUNDARY_PRESERVATION.md`.
 Machine result: `docs/experiments/ert_rslad_i100_s2_rbp_results_v1.json`.

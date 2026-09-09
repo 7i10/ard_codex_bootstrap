@@ -135,7 +135,7 @@ decomposition, and report are complete, stop and request human review.
 ## Completion report
 
 M0–M6 are complete. The descriptive result is in
-[`ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md`](../ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md)
+[`ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md`](../archive/ard-distillation-2026/ERT_RSLAD_SHUFFLE_AUGMENTATION_RESULTS.md)
 and machine form in
 [`ert_rslad_shuffle_augmentation_decomposition_results_v1.json`](../experiments/ert_rslad_shuffle_augmentation_decomposition_results_v1.json).
 No automatic stabilization run, new seed, official test, or AutoAttack was

@@ -27,7 +27,7 @@ changed after endpoint inspection.  The only training arms are fresh
 
 All 8 trajectories and 48 endpoint artifacts completed at Git SHA
 `8544fed4505d423cefe6e89ad789f45c52488aac`. The endpoint report is in
-`docs/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md` and the hash-bound machine
+`docs/archive/ard-distillation-2026/ERT_CW_RELIABILITY_GATED_CE015_RESULTS.md` and the hash-bound machine
 record is `docs/experiments/ert_cw_reliability_gated_ce015_v1.json`.
 Gating was not confirmed: G2 was positive versus G0 at epoch 94 only for L2
 (`+0.44 pp` robust validation accuracy) and negative for L4 (`-0.56 pp`);

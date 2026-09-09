@@ -74,6 +74,6 @@ No automatic winner selection follows the report.
 - Class-stratified paired bootstrap used 2,000 replicates with fixed seed
   `20260813`; no outcome was used to tune a route.
 - Outputs:
-  `docs/ERT_STAGE_A_EFFECT_DECOMPOSITION.md` and
+  `docs/archive/ard-distillation-2026/ERT_STAGE_A_EFFECT_DECOMPOSITION.md` and
   `docs/experiments/ert_stage_a_effect_decomposition_v1.json`.
 - No new training or automatic follow-up was started.

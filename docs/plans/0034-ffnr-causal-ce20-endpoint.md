@@ -50,7 +50,7 @@ source schema is registered.
   uniqueness, finite values, expected endpoint mapping, shared attack and
   inventory hashes, and S2 fail-closed status.
 - Results and per-bundle hashes are recorded in
-  `docs/FFNR_CAUSAL_HORIZON_CE20_RESULTS.md`.
+  `docs/archive/ard-distillation-2026/FFNR_CAUSAL_HORIZON_CE20_RESULTS.md`.
 
 ## Risks
 

@@ -21,7 +21,7 @@ that observation has an ordinary explanation.
 **The 0.94 / 1.78 pp observation is pre-decay.**  Both controls are measured at
 epoch 84, sixteen epochs before the learning-rate decay.  The pre-decay floor is
 independently measured at **1.14 to 1.25 pp** by five campaign families
-(`docs/MEASUREMENT_DESIGN.md` section 2.4).  The observation sits inside it.
+(`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` section 2.4).  The observation sits inside it.
 
 Three candidate mechanical explanations were checked and all three are dead:
 
@@ -64,7 +64,7 @@ All nine component hashes are identical across all three: `model`, `optimizer`,
 
 The checkpoint **file** hashes differ (`e3a3975f`, `6c8486cc`, `66cfd8dd`).  That
 is serialization, not science, and it is the second independent confirmation of
-`docs/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md`: a checkpoint file hash must
+`docs/archive/ard-distillation-2026/ERT_RSLAD_REAL_DATA_TRAINING_DETERMINISM.md`: a checkpoint file hash must
 never be used as a reproducibility test.
 
 ## Milestones

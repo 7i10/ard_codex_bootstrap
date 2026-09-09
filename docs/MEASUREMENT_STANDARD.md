@@ -1,8 +1,8 @@
 # 測定基準 v1
 
 - 状態: 発効（2026-09-06 合意）
-- 適用: これ以降に立てる全プラン。過去の結果は `docs/EVIDENCE_RECLASSIFICATION.md` の分類に従う
-- 位置づけ: `docs/MEASUREMENT_DESIGN.md` が「過去に何が起きたかの監査」、本書が「これから何をするかの規則」
+- 適用: これ以降に立てる全プラン。過去の結果は `docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` の分類に従う
+- 位置づけ: `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` が「過去に何が起きたかの監査」、本書が「これから何をするかの規則」
 
 この基準は、過去に 23 件の比較が検出力不足のまま結論として扱われ、
 陽性に見えたものが再現しなかったことへの対処として作られた。
@@ -67,7 +67,7 @@ PM の2候補は選択規則しか違わないので `PM(online)` と `PM(fixed@
 
 > **arm は、登録簿に登録されていなければ走らせられない。**
 
-新しい処置を走らせる前に `docs/ARM_REGISTRY.md` に正式名を書き込む。
+新しい処置を走らせる前に `docs/archive/ard-distillation-2026/ARM_REGISTRY.md` に正式名を書き込む。
 **そのとき既に同じ行があれば、それは新しい実験ではなく再実行である。**
 
 前提として canonical 状態の定義は1つに統一する。

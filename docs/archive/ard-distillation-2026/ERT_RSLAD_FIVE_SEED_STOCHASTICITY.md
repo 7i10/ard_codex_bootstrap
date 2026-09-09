@@ -18,7 +18,7 @@ row は、3 arm × 4 endpoint (`49, 99, 149, 199`) の全60 cellで揃い、stab
 > and each agrees internally to about 0.08 pp, so the split is real and not sampling noise.
 > Both comparisons are positive in every seed; what does not survive is the single number and
 > its `t(4) = 7.82`, which describe a quantity that does not exist.
-> See `docs/NUMERIC_CONSISTENCY_AUDIT.md` finding 2 and its verification section.
+> See `docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` finding 2 and its verification section.
 
 - epoch 199 の global training metric の5-seed SD/rangeは、`BASE
   0.272 pp / 0.62 pp`, `CROPSHIFT 0.532 pp / 1.18 pp`, `I100 0.118 pp /

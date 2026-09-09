@@ -187,7 +187,7 @@ mechanical canary hashing bug that was fixed locally.
   passed the complete attack, row-count, source-SHA, and contract checks.
 - 2026-08-24: Deterministic point aggregation and source decomposition were
   written to `docs/experiments/ert_rslad_rng_source_decomposition_v1_results.json`
-  and `docs/ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md`. The preregistered stop
+  and `docs/archive/ard-distillation-2026/ERT_RSLAD_RNG_SOURCE_DECOMPOSITION.md`. The preregistered stop
   boundary was reached; no stabilization run was started.
 
 ## Completion report

@@ -152,7 +152,7 @@ L1/L3で`.9090/.8936`（instantaneous margin `.8677/.8663`、teacher entropy
 
 各routeはhistory選択とclass/state/teacher-state/count-matched randomを2 seedで比較し、
 既存delayed-schedule controlを再利用する。仕様・停止基準は
-[Plan 0022](plans/0022-prescriptive-v3-intervention-screen.md)へ固定した。
+[Plan 0022](../../../plans/0022-prescriptive-v3-intervention-screen.md)へ固定した。
 
 ## 未確認事項と次の研究判断
 
@@ -167,4 +167,4 @@ L1/L3で`.9090/.8936`（instantaneous margin `.8677/.8663`、teacher entropy
 - full SAAD、TRADES、PGD-ATは提案法と独立したbaseline gapとして残る。
 
 事前登録した設計と停止規則は
-[Plan 0020](plans/0020-best-oriented-history-routing-v2.md)を参照する。
+[Plan 0020](../../../plans/0020-best-oriented-history-routing-v2.md)を参照する。

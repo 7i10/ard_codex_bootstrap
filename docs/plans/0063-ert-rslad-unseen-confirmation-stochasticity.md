@@ -130,7 +130,7 @@ source, attack, and split identity hashes. I100 exceeded CROP_SUFFIX on final
 robust accuracy, full trajectory AUC, and post-100 AUC for all three
 confirmation bundles; clean accuracy was near-neutral with a small negative
 mean difference. The complete result table and hashes are in
-`docs/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md` and
+`docs/archive/ard-distillation-2026/ERT_RSLAD_UNSEEN_CONFIRMATION_RESULTS.md` and
 `docs/experiments/ert_rslad_unseen_confirmation_results_v1.json`.
 
 The endpoint campaign had technical orchestration retries (epoch-label

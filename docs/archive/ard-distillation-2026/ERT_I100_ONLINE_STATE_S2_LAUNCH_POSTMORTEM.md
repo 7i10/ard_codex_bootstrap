@@ -132,6 +132,6 @@ Correction (2026-09-05): attempt-11 itself failed 30 minutes later when the
 working tree moved under the running DAG (8 jobs stopped by the clean-source
 guard); the bytes were completed by recovery14–17 and the record was committed
 on 2026-09-05. See `docs/plans/0087-i100-online-state-s2-preservation.md`
-(Completion report) and `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`.
+(Completion report) and `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md`.
 This document is an operational record only; it does not authorize a restart,
 retry, endpoint change, or scientific decision.

@@ -133,5 +133,5 @@ lineage, or results.
 
 Completed.  The machine-readable result is
 `docs/experiments/ard_experiment_execution_fast_path_v1.json`; the human
-contract is `docs/EXPERIMENT_FAST_PATH.md`.  A final documentation-only commit
+contract is `docs/archive/ard-distillation-2026/infra-superseded/EXPERIMENT_FAST_PATH.md`.  A final documentation-only commit
 will record the result after focused verification.

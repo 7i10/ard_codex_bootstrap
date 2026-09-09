@@ -116,7 +116,7 @@ This changes a baseline's identity, so:
 
 - the existing TRADES record is superseded, not edited, and the new run is a new
   record;
-- `docs/EXPERIMENT_DASHBOARD.md` and
+- `docs/archive/ard-distillation-2026/EXPERIMENT_DASHBOARD.md` and
   `docs/plans/0027-controlled-teacherless-baselines.md` gain a line saying the
   45.14 % figure came from a defective loss;
 - a regression test asserts that the TRADES outer objective produces a non-zero
@@ -128,7 +128,7 @@ This changes a baseline's identity, so:
 
 ## Why it matters beyond one number
 
-`docs/ARD_VERSUS_AT_ASSESSMENT.md` proposes making the missing fair comparison
+`docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md` proposes making the missing fair comparison
 between adversarial training and adversarial distillation the thesis question.
 That comparison rests on teacher-free baselines being correct.  **A TRADES four
 points below the literature would have made the teacher look four points better
@@ -172,14 +172,14 @@ split.
 - **The evaluation stack.**  DAJAT's published ResNet-18 through this pipeline on
   the official test set gives clean 85.71 % and AutoAttack 52.45 % against a
   published 85.71 and 52.48, a difference of -0.03 pp
-  (`docs/experiments/dajat_rn18_foreign_checkpoint_official_test_v1.md`,
+  (`docs/archive/ard-distillation-2026/experiments-full/dajat_rn18_foreign_checkpoint_official_test_v1.md`,
   2026-09-07).  The evaluation half is not the explanation.
 - **The attack initialization.**  This project starts the inner maximisation from
   a uniform draw on the epsilon-ball where official TRADES starts from
   0.001-scale Gaussian noise.  Measured on a fixed batch through one shared step
   loop, the local initialization makes the attack *stronger* -- inner KL +3.07 %
   at epoch 48 and +4.82 % at epoch 150
-  (`docs/experiments/trades_attack_initialization_differential_v1.md`,
+  (`docs/archive/ard-distillation-2026/experiments-full/trades_attack_initialization_differential_v1.md`,
   2026-09-08).  The sign is wrong for it to explain a number that is too low.
 
 What remains unmeasured, in the order the asymmetry argument ranks them: the
@@ -191,7 +191,7 @@ here and matches the literature.
 
 That gap is a fairness axis for any comparison between adversarial training and
 distillation, and it applies to both sides equally, so it is a labelling problem
-rather than a defect.  It is recorded in `docs/ARD_VERSUS_AT_ASSESSMENT.md` as
+rather than a defect.  It is recorded in `docs/archive/ard-distillation-2026/ARD_VERSUS_AT_ASSESSMENT.md` as
 something the comparison must state.
 
 Had the comparison been run before this fix, **the teacher would have looked

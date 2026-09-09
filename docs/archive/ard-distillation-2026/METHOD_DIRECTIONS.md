@@ -6,7 +6,7 @@ artifact, or a report that the numeric audit found clean, with the path), **DERI
 here from verified numbers, arithmetic shown), or **SPECULATIVE** (an estimate the records do
 not yet support, used only to size a design and never as a finding).
 
-Nothing below rests on a number that `docs/NUMERIC_CONSISTENCY_AUDIT.md` flags. In particular the
+Nothing below rests on a number that `docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` flags. In particular the
 pooled `+0.864 pp` I100 headline, the `0.25 pp` type-(c) floor derived from it, the `0.35 pp`
 provisional floor, the `0.25-0.50 pp` bracket, and the `3.5 GPU-hours per parent` figure are not
 used; where a cost per parent is needed the on-record Hamster figure is used instead.
@@ -27,7 +27,7 @@ These are options for the human to choose between. None of them is a decision.
 | **MDE** | minimum detectable effect: the smallest effect a design finds with 80% power at the 5% level. With k paired blocks and a known floor, `MDE ≈ 2.8 σ_d / √k`; with the floor estimated on four degrees of freedom the factor is 3.49 (`docs/POST_DECAY_FLOOR.md`). |
 | **block** | one treated run and one control run from the same parent. |
 | **horizon** | the epoch at which a number is measured. e114 is fourteen epochs past the first learning-rate decay at e100; the second decay is at e150; runs end at e199. |
-| **state** | how a training sample stands under the current student: S1 safe-correct, S2 fragile-correct (adversarially correct with a small margin), S3 wrong, CW clean-wrong. T1 marks samples the teacher gets right with a comfortable margin. Definitions differ between the Stage-A lineage and the I100 lineage (`docs/ARM_REGISTRY.md`, Hazard 1); this document stays inside the I100 lineage. |
+| **state** | how a training sample stands under the current student: S1 safe-correct, S2 fragile-correct (adversarially correct with a small margin), S3 wrong, CW clean-wrong. T1 marks samples the teacher gets right with a comfortable margin. Definitions differ between the Stage-A lineage and the I100 lineage (`docs/archive/ard-distillation-2026/ARM_REGISTRY.md`, Hazard 1); this document stays inside the I100 lineage. |
 | **state-conditional treatment** | an extra loss term applied only to samples in one state. |
 | **placebo arm** | the same extra loss applied to a class- and count-matched random set of samples instead of the selected state. If the state matters, the placebo does nothing. |
 | **V-CW, V-nonCW** | the held-out images that the parent got clean-wrong at e99 (about 1,140 of 5,000), and the rest. Fixed before treatment, so they are a legitimate subgroup. |
@@ -46,7 +46,7 @@ Plan 0092's replicate with `continuation_seed = 1` on dev-1 scores 56.06 / 56.94
 e104 / e109 / e114, and the replicate with `continuation_seed = 2` on dev-2 scores 55.80 / 56.40 /
 56.96 % (VERIFIED, `docs/experiments/ard_post_decay_floor_v1.json` → `replicates[].horizons`).
 Those are, to the last digit at all three horizons, the `I100_CONTROL` values that every e114 screen
-compared against (VERIFIED, `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md` held-out table).
+compared against (VERIFIED, `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md` held-out table).
 Plan 0094 shows why: training is bit-deterministic, and the old runs used the default streams.
 
 Two consequences follow.
@@ -71,7 +71,7 @@ instead of one.** DERIVED from the record and the three source reports:
 | CLEAN_WRONG_PLAIN_ADVCE | +0.44 / +0.10 | +0.44 / +0.03 | +0.233 |
 | CLEAN_WRONG_A7_MARGIN_ONLY | +0.44 / +0.08 | +0.44 / +0.01 | +0.223 |
 
-The "12 of 12 positive at e114" pattern that `docs/MEASUREMENT_DESIGN.md` §3.4 attributed to a low
+The "12 of 12 positive at e114" pattern that `docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` §3.4 attributed to a low
 control draw splits in two. On dev-2 that explanation holds: the control was 0.073 pp low and five of
 nine arms go to zero or below once corrected. On dev-1 it does not: the control sits exactly on its
 replicate mean, and all nine arms remain positive. Seven of the nine dev-1 arms exceed the highest
@@ -86,7 +86,7 @@ The plan 0087 record does not contain the string `continuation_seed` at all (VER
 shared attack starts, data order and augmentation view. That is a legitimate design, but its floor is
 not automatically the replicate floor: it is the floor of "how far does one small perturbation to the
 weights carry the trajectory by e114". Pre-decay, every perturbation type saturated at the same
-1.2 pp (`docs/MEASUREMENT_DESIGN.md` §2.4), and it is reasonable to expect the same saturation
+1.2 pp (`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` §2.4), and it is reasonable to expect the same saturation
 post-decay, but nobody has measured it. A placebo arm on the same streams measures exactly this.
 Direction 1 uses that.
 
@@ -135,8 +135,8 @@ Two further floors fall out of the same rows, both DERIVED and both previously u
 The I100 result — CropShift for epochs 0–99, then IDBH_WEAK — is the project's only replicated
 improvement. Its size at e199 is +1.20 / +1.04 pp on the two development seeds against CropShift
 continued, and +0.78 / +0.68 / +0.62 pp on the three confirmation seeds against CropShift-then-
-RandomErasing (VERIFIED, `docs/ERT_RSLAD_STAGEWISE_AUGMENTATION.md` endpoint table;
-`docs/NUMERIC_CONSISTENCY_AUDIT.md` verification §2). The audit is right that these are two different
+RandomErasing (VERIFIED, `docs/archive/ard-distillation-2026/ERT_RSLAD_STAGEWISE_AUGMENTATION.md` endpoint table;
+`docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` verification §2). The audit is right that these are two different
 questions; both are used below with their comparator named.
 
 The same runs' training logs give the paired difference at every epoch. DERIVED from
@@ -156,7 +156,7 @@ difference:
 The registered endpoint agrees where it exists. At e149 the per-seed differences are +0.82 / +0.04
 (dev, vs CropShift) and +0.42 / +0.10 / +0.20 (confirm, vs CROP_RE late); at e199 they are
 +1.20 / +1.04 and +0.78 / +0.68 / +0.62 (VERIFIED, five-seed cache values reproduced in
-`docs/MEASUREMENT_DESIGN.md` §2.5, comparator per the audit). About a third of the final gain exists at
+`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md` §2.5, comparator per the audit). About a third of the final gain exists at
 e149; at e114 the window means are all below the k = 2 MDE of 0.243 pp.
 
 The gain is not CropShift declining. Both arms keep improving after the second decay; I100 improves
@@ -170,7 +170,7 @@ faster. Window means of absolute validation robust accuracy (same files):
 | dev-2 I100 | 59.54 | 60.48 | +0.94 |
 
 The single-switch timing family says the same thing from the other side (VERIFIED,
-`docs/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`; e199 endpoint, difference from CropShift, seeds 1 / 2):
+`docs/archive/ard-distillation-2026/ERT_RSLAD_SINGLE_SWITCH_TIMING.md`; e199 endpoint, difference from CropShift, seeds 1 / 2):
 IDBH from e0 +1.12 / +0.46; from e50 +0.68 / +0.92; from e75 +0.96 / +1.02; from e100 +1.20 / +1.04;
 from e125 **+1.20 / +1.04** (identical to e100 on both seeds); from e150 +0.76 / +0.90. Exposure to
 IDBH before e100 adds nothing; exposure during e100–125 adds nothing; roughly three quarters of the
@@ -186,7 +186,7 @@ the number every direction below ultimately needs.
 
 ### 1.4 The state-conditional null has structure inside it
 
-`docs/ERT_RSLAD_I100_CW_HELDOUT_GENERALIZATION_GAP.md` decomposes the held-out effect of the two
+`docs/archive/ard-distillation-2026/ERT_RSLAD_I100_CW_HELDOUT_GENERALIZATION_GAP.md` decomposes the held-out effect of the two
 Clean-Wrong transfer arms into the images that were clean-wrong under the parent at e99 (V-CW, 1,138 /
 1,143 images) and the rest (V-nonCW). Over two seeds, two arms and five horizons (e129 … e199), the
 twenty V-CW effects have mean **+0.736 pp**, SD 0.440, **18 of 20 positive**; the twenty V-nonCW
@@ -209,15 +209,15 @@ also the best-supported unexplained pattern in the records, and it is cheap to t
 - Measured floors (VERIFIED, `ard_post_decay_floor_v1.json`): σ_d = 0.159 / 0.124 / **0.092 pp** at
   e104 / e109 / e114; held-out split, CE-PGD20, two dev parents, fourteen-epoch fork. k = 2 resolves
   0.243 pp at e114; k = 6 resolves 0.106 pp (normal) or 0.132 pp (t on 4 df).
-- Old working floor: 0.40 pp, k = 2 MDE 0.79 pp, k = 5 MDE 0.50 pp (`docs/MEASUREMENT_DESIGN.md`
+- Old working floor: 0.40 pp, k = 2 MDE 0.79 pp, k = 5 MDE 0.50 pp (`docs/archive/ard-distillation-2026/MEASUREMENT_DESIGN.md`
   Rule 5). "Why now" below always compares these two.
 - **The e199 paired fork floor is not measured.** The only hint is the within-comparator SD of the
   I100 contrasts at e199: 0.11 pp over the two dev seeds and 0.08 pp over the three confirmation
-  seeds (`docs/NUMERIC_CONSISTENCY_AUDIT.md` finding #2). Two and three observations are not a floor.
+  seeds (`docs/archive/ard-distillation-2026/NUMERIC_CONSISTENCY_AUDIT.md` finding #2). Two and three observations are not a floor.
   Where it is needed it is written as **SPECULATIVE, 0.08–0.25 pp**, and the design is sized at both
   ends.
 - Cost basis: the control arm trains at **92.2 s / epoch** on Hamster (VERIFIED,
-  `docs/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md` runtime table). A 14-epoch fork is 21.5 min =
+  `docs/archive/ard-distillation-2026/ERT_RSLAD_I100_ONLINE_STATE_S2_PRESERVATION.md` runtime table). A 14-epoch fork is 21.5 min =
   **0.36 GPU-h**; a 29-epoch fork to e129 is 0.74 GPU-h; a 100-epoch fork to e199 is **2.56 GPU-h**.
   Endpoint evaluations take minutes and are not counted. Generating one e99 parent is 100 epochs, so
   about 2.6 GPU-h at this rate; plan 0093's stated 3.5 GPU-h is untraced (audit) and the difference
@@ -235,7 +235,7 @@ also the best-supported unexplained pattern in the records, and it is cheap to t
 
 ### Direction 1 — Does a state-conditional loss move the held-out images in its own state, and pay for it elsewhere?
 
-**Revives** rows E6 and E7 of `docs/EVIDENCE_RECLASSIFICATION.md` in decomposed form, and rows E1,
+**Revives** rows E6 and E7 of `docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` in decomposed form, and rows E1,
 E2, E4, E5 as secondary. Observed effects against the new floor: E6's two Clean-Wrong arms have
 re-baselined two-seed means of +0.233 and +0.223 pp against a k = 2 MDE of 0.243 pp — just under, at
 the whole-split level; their V-CW subgroup effects average +0.74 pp against a subgroup k = 2 MDE of
@@ -495,7 +495,7 @@ One line each. Rejections are ordered roughly by how tempting they looked.
 - **A stronger IDBH policy, or other late policies as a family.** Effects of that kind were
   testable at the old floor with five seeds; the sharper floor changes nothing about them.
 - **Batch ordering (B7, B8).** The eight pure-order schedules at e114 span 0.31 and 0.24 pp on the
-  train split (VERIFIED, `docs/ERT_RSLAD_ORDERING_MECHANISM_DISCOVERY.md`); the expected range of eight
+  train split (VERIFIED, `docs/archive/ard-distillation-2026/ERT_RSLAD_ORDERING_MECHANISM_DISCOVERY.md`); the expected range of eight
   draws at the train floor (per-run SD 0.134/√2 = 0.095 pp, range ≈ 2.85 SD = 0.27 pp) is the same
   number. There is nothing to revive.
 - **Whether the treated-cohort direct effect is zero-sum on the training split (E8's mechanism).**
@@ -509,7 +509,7 @@ One line each. Rejections are ordered roughly by how tempting they looked.
 - **TPFM on Clean-Wrong moved post-decay (reclassification's rank 2).** Already run, as
   `CLEAN_WRONG_A7_MARGIN_ONLY` (+0.44 / +0.01 re-baselined); it is inside Direction 1, not separate.
 - **Coefficient neighbours for the Clean-Wrong arms.** After Direction 1 confirms an effect, not
-  before; a dose sweep around an unconfirmed effect is the pattern `docs/COEFFICIENT_AUDIT.md` warns
+  before; a dose sweep around an unconfirmed effect is the pattern `docs/archive/ard-distillation-2026/COEFFICIENT_AUDIT.md` warns
   about.
 - **Extending plan 0092's six replicates from e114 to e199 (about 13 GPU-h).** Superseded by §5
   item 1 if plan 0093's controls are evaluated at the extra horizons; a two-parent floor is worse than a
@@ -522,7 +522,7 @@ One line each. Rejections are ordered roughly by how tempting they looked.
 - **Attack-seed and evaluation noise (G5).** Per-sample margins reproduce to 1e-3 for the same
   weights and to 0.045 across replicates; neither limits any accuracy claim here.
 - **Teacher selection, learnability measures and the other proposals in
-  `docs/ARD_RESEARCH_ISSEUES_AND_PROPOSALS.md`.** Outside what the floor changed, and each would need
+  `docs/archive/ard-distillation-2026/essays/ARD_RESEARCH_ISSEUES_AND_PROPOSALS.md`.** Outside what the floor changed, and each would need
   a new lineage with its own floor.
 
 ---
@@ -543,7 +543,7 @@ That matters because the floor measured by plan 0092 is the spread between runs
 with **different** `continuation_seed` values.  A treated arm and a control that
 share the stream are not that kind of pair: with a treatment of exactly zero
 effect they would be bit-identical, so their floor is not 0.092 pp and is not
-known.  **`docs/POST_DECAY_FLOOR_RECLASSIFICATION.md` therefore applied a floor
+known.  **`docs/archive/ard-distillation-2026/POST_DECAY_FLOOR_RECLASSIFICATION.md` therefore applied a floor
 of the wrong kind to those nine contrasts.**  Its conclusion — that no verdict
 changes — was reached with a threshold that is probably too large, so it is
 conservative in the direction of leaving verdicts as UNDERPOWERED, but it is not

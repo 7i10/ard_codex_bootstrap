@@ -63,7 +63,7 @@ was recovered and hash-verified at
 stable copy at `.cache/analysis/ert-cw-l4-parent-recovery-audit/parent-epoch79.pt`.
 The observed source checkpoint `9b51...` remains provenance for the fork and is
 not substituted.  The complete recovery evidence is in
-`docs/ERT_CW_L4_PARENT_RECOVERY_AUDIT.md`.
+`docs/archive/ard-distillation-2026/ERT_CW_L4_PARENT_RECOVERY_AUDIT.md`.
 
 The no-update calibration must complete on the current clean source before
 the coefficient artifact is frozen.  A deterministic canary and all selected
@@ -73,11 +73,11 @@ mismatched lineage.  No endpoint result may alter calibration values.
 Calibration is now frozen in
 `docs/experiments/ert_cw_margin_calibration_v1.json` (artifact SHA
 `a625b43ec12277bbf698270193f27e0e1f62e0a2a9f9a6a49e7fc0702593b2b5`); the
-human-facing summary is `docs/ERT_CW_MARGIN_CALIBRATION.md`.
+human-facing summary is `docs/archive/ard-distillation-2026/ERT_CW_MARGIN_CALIBRATION.md`.
 
 ## Output
 
-- `docs/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md`
+- `docs/archive/ard-distillation-2026/ERT_CW_MARGIN_GENERALIZATION_SCREEN.md`
 - `docs/experiments/ert_cw_margin_generalization_screen_v1.json`
 
 The 18 trajectories and 108 endpoint artifacts are complete. The report

@@ -134,7 +134,7 @@ For an existing short runtime, the operational target is a detached controller
 within 30 minutes of the recorded request. A new runtime integration may use
 a 90-minute target, but the concrete blocker and estimate must be recorded
 before the target is exceeded. See
-[`EXPERIMENT_LAUNCH_DISCIPLINE.md`](EXPERIMENT_LAUNCH_DISCIPLINE.md).
+[`EXPERIMENT_LAUNCH_DISCIPLINE.md`](archive/ard-distillation-2026/infra-superseded/EXPERIMENT_LAUNCH_DISCIPLINE.md).
 
 ## Bounded real-host verification
 

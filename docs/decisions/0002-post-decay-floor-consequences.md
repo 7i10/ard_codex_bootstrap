@@ -15,7 +15,7 @@ chosen: B
 
 ## なぜこの問いが生じたか
 
-`docs/EVIDENCE_RECLASSIFICATION.md` は、過去のスクリーンの多くが**自分のノイズ床
+`docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md` は、過去のスクリーンの多くが**自分のノイズ床
 より小さい差で判定されていた**として、それらの No-Go を「反証された」ではなく
 「測っていない」に格下げした。
 
@@ -111,8 +111,8 @@ C は B の結果なしには arm を指名できないので、いま選べな�
 - 記録: `docs/experiments/ard_post_decay_floor_v1.json`
 - 報告: `docs/POST_DECAY_FLOOR.md`
 - 計画: `docs/plans/0092-post-decay-floor-calibration.md`
-- 再分類: `docs/EVIDENCE_RECLASSIFICATION.md`
-- 係数監査: `docs/COEFFICIENT_AUDIT.md`
+- 再分類: `docs/archive/ard-distillation-2026/EVIDENCE_RECLASSIFICATION.md`
+- 係数監査: `docs/archive/ard-distillation-2026/COEFFICIENT_AUDIT.md`
 
 
 ## この文書についての事故記録（2026-09-07）

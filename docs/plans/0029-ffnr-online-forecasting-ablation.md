@@ -234,7 +234,7 @@ one-checkpoint smoke.
   report hashes.  L1/L3 have no admissible centred GT; L2/L4 have 12/18.
   Chen cross-seed candidate Jaccard is `0.565--0.638`, so no GT was selected
   and no bootstrap was launched.  Results and the blocked GPU decision are in
-  `docs/FFNR_FORECASTING_STATUS.md`.
+  `docs/archive/ard-distillation-2026/FFNR_FORECASTING_STATUS.md`.
 - 2026-08-08: the first impact gate exposed an overly broad
   `configs/analysis/ -> T3` rule and attempted unrelated two-process training;
   three Gloo cases timed out because the isolated shell rejects localhost

@@ -28,7 +28,7 @@ ARD_PYTHON="$(python3 scripts/workspace_paths.py python)"
 The doctor is not a scientific launch gate: parent, Teacher, attack, mask, and
 checkpoint lineage are still checked by the production-launch gate.
 
-For long-task recovery, use the runtime-only [task-context protocol](TASK_CONTEXT_PROTOCOL.md).
+For long-task recovery, use the runtime-only [task-context protocol](archive/ard-distillation-2026/infra-superseded/TASK_CONTEXT_PROTOCOL.md).
 
 Historical roots such as `ard-runs`, `ard-analysis`, and
 `ard-campaign-runs` remain read-only because frozen reports/configs reference
