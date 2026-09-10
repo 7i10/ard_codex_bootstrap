@@ -3833,3 +3833,124 @@ is a multi-day unattended campaign, not a same-session one.
   Whether to retry as-is or to batch the line-213 forward first is the human's
   call and belongs to packet 0010, whose Option-C trigger this run fires for
   the third time. M1c and M2 stay unticked.
+- 2026-09-10 11:27Z: postrun of the `eval-6b2c6486fd99df2da5ac` terminal event
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s0/train/evaluation/
+  run-bundle/manifest.json`) — **arm 5 (ADR-TRADES) seed 0**, model weights,
+  lane A. **Nothing imported — no milestone closed.** `docs/experiments/` still
+  holds only `.gitkeep` and the M1b `historical/` archive, so the idempotency
+  check had nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan of that bundle's parent
+  returns `terminal: true`, `success: false`, `status: failed`,
+  `failure_class: unknown`, `completion_json: false`, error marker
+  "application failure recorded" on the line whose `path` is exactly the
+  `--state-path` the watcher passed. As in the four entries above, `unknown`
+  carries **no information** — `scripts/ardx/ardx_common.py:357` returns that
+  literal for every failed hand-run bundle. The classification comes from the
+  log and is unambiguous: **`technical_retryable`**, the same
+  `autoattack.py:213` defect as packet 0010. Nothing scientific is in question;
+  checkpoint, protocol and threat identity are untouched.
+  **Sixth identical failure, and the tightest one yet.** The five before it are
+  `r18_adr-s2`, `r18_trades_adr-s1`, `r18_adr-s1`, `mobilenetv2_adr-s1` and
+  `r18_trades_49k_validation-s0`. Traceback in `canon-eval-lane-A.log:167-227`,
+  innermost frame `registry.py:75` (`self.bn2(self.conv2(outputs))` inside
+  `layer1`), failed allocation **2.44 GiB** = `10000 × 64 × 32 × 32 × 4 B` —
+  identical to the three other ResNet-18 instances. GPU 0 at the moment of
+  failure had **378.56 MiB free** of 23.52 GiB, this process holding 8.46 GiB,
+  with two co-resident processes on the same physical 4090 (PID 2223691
+  13.13 GiB, PID 2298430 1.54 GiB). Free memory across the six now reads
+  0.37 (this) < 1.07 (`49k_validation-s0`) < 1.89 (`r18_adr-s1`) < 2.93 GiB
+  (`mobilenetv2_adr-s1`); the failure does not need contention to be extreme,
+  it needs only less than ~2.5 GiB of headroom. Wall clock `created_at`
+  08:59:09.895Z → `finished_at` 11:24:10.284Z = **2 h 25 m 00 s**, the longest
+  of the six, `exit=1` at 20:24:11+09:00.
+  **AutoAttack finished here too, and none of its output is usable.** The lane
+  log records the whole standard cascade completing: initial accuracy 83.68 %,
+  `robust accuracy after APGD-CE: 53.20%` (168.1 s), `after APGD-T: 49.17%`
+  (1460.2 s), `after FAB-T: 49.17%` (4641.8 s), `after SQUARE: 49.17%`
+  (8660.3 s), then `max Linf perturbation: 0.03137, nan in tensor: 0` and
+  `robust accuracy: 49.17%`. The traceback sits earlier in the file only
+  because stderr flushed ahead of buffered stdout. **That 49.17 % is a log
+  scrape from a run that never completed and must not enter any record, report
+  or table** — no `autoattack-best.json`, no `evaluation-results.json`, no
+  `completion.json` was written, and `last.pt` was never reached. `best.pt`'s
+  clean and CE-PGD-20 numbers were computed and thrown away with it, since
+  `results.append(...)` runs only after `run_autoattack` returns
+  (`src/ard/cli/evaluate.py:411-421`). Like arm 6 and unlike `r18_adr-s1`, this
+  arm has no earlier `early-check-eval-*` run, so there is not even a
+  reproducibility cross-check to note.
+  **Arm 5 now has zero official-test numbers, at 3/3 training complete.** Seed
+  1 died of this same defect (lane E, 20:01:15+09:00) and its evaluation
+  directory has since been deleted; seed 0 is this run; seed 2's evaluation
+  manifest still reads `running`. So the arm whose training is finished and
+  whose validation diagnostics looked most favourable is the arm with the least
+  evidence. This does not block the campaign's decisive leg — that is arm 3 vs
+  arm 2 on ResNet-18 — but it blocks the arm-5-vs-arm-4 TRADES leg entirely,
+  and that leg was already only directional (seed and optimizer both differ,
+  per this arm's own training postrun entry above).
+  **The lane-driver defect bit here, and it leaves a bundle that will never go
+  terminal.** Lane A started `weights=ema` at 20:24:11+09:00 — the same second
+  as the `exit=1` — as `eval-77f66adc6ec58702c412` into `evaluation-ema/`, and
+  that process was SIGTERM'd (`exit=143`) 56 s later at 20:25:07+09:00. Its
+  `run-bundle/manifest.json` is frozen at `"status": "running"` with
+  `created_at 11:24:13.628Z`, **no `finished_at` and no `error-marker.txt`**, so
+  `campaign_watch.py` reports `terminal: false` for it and will keep doing so
+  indefinitely: a SIGTERM writes no terminal state, unlike an exception.
+  Verified as a class, not a one-off — `cifar10_mobilenetv2_adr-s1`'s ema
+  bundle (`eval-74a8f5d0042ebea0b0d1`, `created_at 11:07:28.531Z`) was
+  SIGTERM'd at 20:10:21+09:00 and still read `"status": "running"` at 11:26Z,
+  16 minutes dead. **This corrects the 11:21Z census above**: at least two of
+  the nine evaluation directories it counted as "still running" are not running
+  at all, and a `running` manifest is from here on not sufficient evidence that
+  a run is alive — the lane log's `[eval-done] … exit=` line is. Both defects
+  (the driver not halting on a non-zero exit, and SIGTERM leaving a
+  permanently non-terminal bundle) are infra matters for a separate plan per
+  CLAUDE.md rule 3; neither is decided here.
+  **This run's evidence directory still exists — treat it as perishable.**
+  Three of the six failure directories are already gone (`r18_adr-s2`,
+  `r18_trades_adr-s1`, and `r18_adr-s1`, which was deleted rather than moved
+  aside). On disk here: `run-bundle/manifest.json` (status `failed`,
+  `failure_snapshot` with five hashed files, `directory_digest
+  20e54e2be819…`), `run-bundle/error-marker.txt`, `panel-best.jsonl`,
+  `sample-stats-best.parquet`, `resolved_evaluation_config.yaml`,
+  `evaluation-lineage.json` and the offline W&B segment
+  `offline-run-20260910_175910-eval-6b2c6486fd99df2da5ac`.
+  **One proposed retry command — not run by this postrun.** It must go on an
+  otherwise idle 4090, or it will hit the same allocation at the same point
+  after another two and a half hours:
+
+  ```bash
+  cd /home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/worktrees/source-cd0b571e4685
+  RUNS=/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1
+  mv "$RUNS/cifar10_r18_trades_adr-s0/train/evaluation" \
+     "$RUNS/cifar10_r18_trades_adr-s0/train/evaluation.failed-oom-eval-6b2c6486" && \
+  CUDA_VISIBLE_DEVICES=<idle-gpu> PYTHONPATH=src \
+    /home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.evaluate \
+    --config configs/evaluation/autoattack_saved_checkpoint.yaml \
+    --checkpoint-dir "$RUNS/cifar10_r18_trades_adr-s0/train" \
+    --output "$RUNS/cifar10_r18_trades_adr-s0/train/evaluation" \
+    --weights model --allow-autoattack
+  ```
+
+  This reproduces the failed run's manifest — `config_hash ecb8369d1244…`,
+  protocol `controlled_cifar10_r18_adr_v1` (Nesterov on), method `adr_trades`
+  v1, `teacher: null`, `evaluation_seed 0`, training seeds all 0 except the
+  fixed `split=20260722` and `evaluation_attack=0`, `world_size 1`, effective
+  global batch 128, source SHA `cd0b571e4685` with `dirty: false` and empty
+  diff `e3b0c442…`, external lock `05cfce4cf8db…`. The resolved evaluation
+  config confirms the protocol is not weakened: `checkpoints: both`, test
+  split, `autoattack: true`, `autoattack_batch_size: 128`, evaluation attack
+  CE-PGD-20 at `epsilon 8/255`, `step 2/255`, `random_start: true`, identity
+  normalization. `configs/evaluation/autoattack_saved_checkpoint.yaml`
+  (`2c94bc05…`), `src/ard/evaluation/autoattack.py` (`4d110410…`) and
+  `src/ard/cli/evaluate.py` (`33cff93e…`) are hash-identical between this
+  checkout and the pinned SHA, so the code read here is the code that ran.
+  `evaluation-lineage.json` binds it to the right training run
+  (`training_config_hash 7d9f2051b774…`, equal to that run's manifest
+  `config_hash`). The rename keeps the aggregator blind to the failed attempt
+  (it reads exactly `<run>/train/evaluation/`) while preserving the perishable
+  evidence above; the watcher will emit one more terminal-failed event under
+  the new path, and that event's answer is this entry, not a second postrun.
+  Whether to retry as-is or to batch the line-213 forward first is the human's
+  call and belongs to packet 0010, whose Option-C trigger this run fires for
+  the fourth time; `chosen` there is still null. M1c and M2 stay unticked.
