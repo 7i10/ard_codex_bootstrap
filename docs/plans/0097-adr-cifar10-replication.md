@@ -4233,3 +4233,92 @@ is a multi-day unattended campaign, not a same-session one.
   of those two runs, not an estimate of a distribution, and the pair cannot move
   toward a verdict until `mobilenetv2_adr` has evaluations — one of whose three
   training runs (seed 0) has not been launched at all. M1c and M2 stay unticked.
+- 2026-09-10 12:52Z: postrun of the `eval-7f2c13eb1eb778fd2e2a` terminal event —
+  the `--weights=model` contract evaluation of `cifar10_r18_trades_49k_validation-s0`
+  (arm 6, its only seed). **Nothing imported, nothing retried, no milestone
+  closed.** Re-derived from the watcher against the `--state-path` the event
+  carried: `terminal: true`, `success: false`, `status: failed`,
+  `failure_class: unknown` — which, as in every entry above, carries no
+  information (`scripts/ardx/ardx_common.py:357` hard-codes that literal for
+  failed hand-run bundles). The log classifies it unambiguously as
+  **`technical_retryable`**, the packet-0010 defect again: `autoattack.py:213`,
+  failed allocation **2.44 GiB** = `10000 × 64 × 32 × 32 × 4 B`, innermost frame
+  `registry.py:75` (`self.bn2(self.conv2(outputs))` in `layer1`), traceback at
+  `canon-eval-lane-J.log:167-227`. **Seventh identical failure.**
+  **What is new: this is the first retry of an already-failed evaluation, and it
+  failed the same way.** The same arm-seed was the fifth instance, on lane C
+  (`17:59:07+09:00` → `exit=1` at `20:20:49+09:00`, 2 h 21 m 42 s). At
+  `20:47:27+09:00` **lane J started the identical command again** and died at
+  `21:52:10+09:00`; the manifest reads `created_at 11:47:29.789Z` →
+  `finished_at 12:52:09.671Z` = **1 h 04 m 40 s**, the shortest of the seven.
+  The retry took neither of the two precautions this plan's own proposed retry
+  command specifies (the entry at 11:21Z above): it did not `mv` the failed
+  directory aside, and it did not wait for an idle 4090. GPU 0 at the moment of
+  failure had **688.38 MiB free** of 23.52 GiB with one 14.41 GiB co-tenant
+  (PID 2295765) and this process holding 8.40 GiB. Free memory across the seven
+  now reads 0.37 < **0.67 (this)** < 1.07 < 1.89 < 2.93 GiB. The failure needs
+  neither a long run nor extreme contention — only less than ≈ 2.5 GiB of
+  headroom at the very last step.
+  **The two attempts are numerically identical, which is the one genuinely new
+  measurement here.** Same checkpoint, same `evaluation_attack` seed 0, two
+  separate processes, different GPUs' load and roughly half the wall clock:
+  initial accuracy **79.85 %** both times, then `APGD-CE 50.76 %`,
+  `APGD-T 47.62 %`, `FAB-T 47.62 %`, `SQUARE 47.62 %`,
+  `max Linf perturbation: 0.03137, nan in tensor: 0`, `robust accuracy: 47.62 %`
+  — every figure equal to the last printed digit, with the same batch structure
+  (`square - 38/38 - … out of 26`, i.e. the same 4,762 surviving points entered
+  Square). Only the timings moved: APGD-CE 161.4 → 77.3 s, APGD-T 1408.5 →
+  573.5 s, FAB-T 4538.7 → 2094.3 s, SQUARE 8459.2 → 3858.0 s. So AutoAttack's
+  own returned robust accuracy is **reproducible across processes** on this
+  hardware, and the run-to-run spread of the quantity packet 0010 is arguing
+  about is, at least for this pair, zero. That bears directly on 0010: it makes
+  the exact-match precondition of Option A testable at no scientific cost, and
+  it removes run-to-run variance as an objection to the cheaper variant the
+  packet deliberately excluded (adopting AutoAttack's own number). **This
+  postrun does not choose; 0010's `chosen` is still null.**
+  **Still nothing importable, and the first attempt's evidence is gone.** The
+  bundle holds only `diff.patch`, `environment.json`, `error-marker.txt`
+  ("application failure recorded"), `external.lock.yaml` and
+  `resolved_config.yaml`; the directory has `panel-best.jsonl` and
+  `sample-stats-best.parquet` (so `best.pt`'s clean and CE-PGD-20 diagnostics
+  were computed) but no `evaluation-results.json`, no `autoattack-best.json` and
+  no `completion.json`, and `last.pt` was never reached — metrics are written
+  after the checkpoint loop (`src/ard/cli/evaluate.py:411-421`). The 47.62 % above
+  is a log fragment of a run that did not complete and **must not enter any
+  record, report or table**. Lane J started clean, with no
+  `FileExistsError: refusing to overwrite existing evaluation output` — so the
+  lane-C bundle had already been deleted before it ran, and no
+  `evaluation.failed-*` directory exists. Four of the seven failure directories
+  are now gone. Provenance that survives: source SHA `cd0b571e4685…`,
+  `dirty: false`, empty diff `e3b0c442…`, external lock `05cfce4cf8db…`,
+  `config_hash e3f5a60d269e…`, protocol
+  `controlled_cifar10_r18_trades_49k_validation_v1`, `teacher: null`,
+  `evaluation_seed 0`, training seeds all 0 except the fixed `split=20260722`,
+  world size 1, effective global batch 128. Training checkpoints are intact
+  (`best.pt`, `last.pt`, `epoch-{049,099,149,199}.pt`), so the retake remains
+  possible.
+  **One proposed retry command — not run by this postrun, and not proposed
+  as-is.** It is the same command as the 11:21Z entry (unchanged, so not
+  repeated here) with the failed directory moved to
+  `evaluation.failed-oom-eval-7f2c13eb-attempt2`. What this event adds is that
+  running it **without** an idle 4090 has now been tried once and cost
+  1 h 04 m 40 s for nothing, so it should not be re-queued until packet 0010 is
+  decided.
+  **Arm 6 is still the one hole that cannot be filled by another seed.** It is
+  single-seed by contract, and this was its only evaluation. The preregistered
+  49k-validation comparison (its official-test AutoAttack against arm 4 seed 0's
+  archived 47.87 best / 44.99 last) cannot be formed at all until this run is
+  retaken; its validation PGD at n = 1,000 has a 1.6 pp standard error and the
+  training postrun's refusal to judge from it stands.
+  **Campaign census at 12:54Z, from a full-root watcher scan plus a direct check
+  for `evaluation-results.json`.** Unchanged from the 12:02Z entry: contract
+  evaluations complete **8 of 20** on model weights and **1 of 9** on EMA.
+  Terminal-failed and still on disk: `mobilenetv2_adr-s1` and this run. Reading
+  `running`: `r18_trades-s1` (lane A), `r18_trades-s2` (lane B),
+  `r18_trades_adr-s2` (lane I) and `r18_trades_adr-s0` (lane K's retry) — plus
+  the three `evaluation-ema` bundles of `r18_adr-s1`, `mobilenetv2_adr-s1` and
+  `r18_trades_adr-s0` that are `running` but dead per the SIGTERM defect.
+  **Six distinct runs now need their model-weights evaluation retaken**
+  (`r18_adr-s1`, `r18_adr-s2`, `r18_trades_adr-s1`, `mobilenetv2_adr-s1`,
+  `r18_trades_49k_validation-s0`, and `r18_trades_adr-s0` if lane K's in-flight
+  retry also OOMs). M1c, M2 and M3 stay unticked.
