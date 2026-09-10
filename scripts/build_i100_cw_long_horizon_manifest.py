@@ -70,7 +70,7 @@ def main() -> int:
                          "--margin-target-mode", "teacher_floor", "--margin-coefficient", str(margin),
                          "--margin-floor", str(floor), "--margin-cap", str(cap)]
             jid = f"train-{seed}-{arm.lower()}"
-            cmd = ["/home/shunsukenaito/.conda/envs/adv/bin/python", "-m", "ard.cli.ert_stage_a_runtime",
+            cmd = ["/home/shunsukenaito/.conda/envs/ard-v2/bin/python", "-m", "ard.cli.ert_stage_a_runtime",
                    "--parent-config", str(configs[seed]), "--parent-checkpoint", str(parent),
                    "--calibration", str(args.calibration.resolve()), "--output", str(train_out), "--arm", arm,
                    "--epochs", "200", "--horizon-epochs", "129", "149", "169", "189", "199",
@@ -86,7 +86,7 @@ def main() -> int:
                          "retry_policy": {"max_attempts": 2}, "executor": {"type": "local"}})
             endpoint_id = f"endpoint-{seed}-{arm.lower()}"
             endpoint_out = train_out / "endpoints"
-            endpoint_cmd = ["/home/shunsukenaito/.conda/envs/adv/bin/python", "scripts/run_i100_cw_long_horizon_endpoints.py",
+            endpoint_cmd = ["/home/shunsukenaito/.conda/envs/ard-v2/bin/python", "scripts/run_i100_cw_long_horizon_endpoints.py",
                             "--config", str(configs[seed]), "--checkpoint-root", str(train_out / "checkpoints"),
                             "--output-root", str(endpoint_out), "--device", "cuda"]
             jobs.append({"job_id": endpoint_id, "run_id": f"ert-i100-cw-long-endpoint-{seed}-{arm.lower()}", "host": "ferret",
@@ -97,7 +97,7 @@ def main() -> int:
                          "retry_policy": {"max_attempts": 2}, "executor": {"type": "local"}})
     manifest = {"schema_version": 1, "campaign_id": "ert-rslad-i100-cw-long-horizon-v1", "source": {"git_sha": args.source_sha},
                 "state_path": str(root / "production.state.json"), "reservation_root": str(root / "locks"), "jobs": jobs,
-                "hosts": {"ferret": {"backend": "local", "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+                "hosts": {"ferret": {"backend": "local", "python": "/home/shunsukenaito/.conda/envs/ard-v2/bin/python",
                     "required_paths": [str(repo), str(root / "inputs"), "/home/shunsukenaito/workspace-local/datasets/ard/torchvision", str(repo / "teacher_cache")],
                     "gpus": [{"index": i, "uuid": GPU_UUIDS[i], "throughput": 600.0 if i == 0 else 607.0} for i in (0, 1)]}}}
     args.output.parent.mkdir(parents=True, exist_ok=True)

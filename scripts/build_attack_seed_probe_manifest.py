@@ -8,7 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 
-PYTHON = "/home/shunsukenaito/.conda/envs/adv/bin/python"
+PYTHON = "/home/shunsukenaito/.conda/envs/ard-v2/bin/python"
 REPO = Path(__file__).resolve().parents[1]
 PARENT = {
     1: REPO.parent / "ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1/seed1/s100/epoch-100.pt",

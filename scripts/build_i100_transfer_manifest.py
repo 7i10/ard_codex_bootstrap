@@ -59,7 +59,7 @@ def main() -> int:
             endpoint_out = train_out / "endpoints"
             job_id = f"train-{seed}-{arm.lower()}"
             command = [
-                "/home/shunsukenaito/.conda/envs/adv/bin/python", "-m", "ard.cli.ert_stage_a_runtime",
+                "/home/shunsukenaito/.conda/envs/ard-v2/bin/python", "-m", "ard.cli.ert_stage_a_runtime",
                 "--parent-config", str(config), "--parent-checkpoint", str(root / "inputs" / parent_name),
                 "--calibration", str(calibration), "--output", str(train_out), "--arm", arm,
                 # Trainer.fit uses an exclusive upper bound.  The scientific
@@ -88,7 +88,7 @@ def main() -> int:
             })
             endpoint_job_id = f"endpoint-{seed}-{arm.lower()}"
             endpoint_cmd = [
-                "/home/shunsukenaito/.conda/envs/adv/bin/python", "scripts/run_i100_action_transfer_endpoints.py",
+                "/home/shunsukenaito/.conda/envs/ard-v2/bin/python", "scripts/run_i100_action_transfer_endpoints.py",
                 "--config", str(config), "--checkpoint-root", str(train_out / "checkpoints"),
                 "--output-root", str(endpoint_out), "--device", "cuda",
             ]
@@ -107,7 +107,7 @@ def main() -> int:
     manifest = {
         "schema_version": 1, "campaign_id": "ert-rslad-i100-action-transfer-v1", "source": {"git_sha": args.source_sha},
         "state_path": str(root / "production.state.json"), "reservation_root": str(root / "locks"),
-        "hosts": {"ferret": {"backend": "local", "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+        "hosts": {"ferret": {"backend": "local", "python": "/home/shunsukenaito/.conda/envs/ard-v2/bin/python",
             "required_paths": [str(repo), str(root / "inputs"), "/home/shunsukenaito/workspace-local/datasets/ard/torchvision", str(repo / "teacher_cache")],
             "gpus": [{"index": 0, "uuid": "GPU-d6b53af2-a086-be46-30db-10976ef3b989", "throughput": 600.0},
                      {"index": 1, "uuid": "GPU-cf338b20-ad89-5bfd-bc79-74610aebc333", "throughput": 607.0}] }},

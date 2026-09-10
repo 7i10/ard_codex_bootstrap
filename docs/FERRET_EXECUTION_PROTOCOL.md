@@ -66,7 +66,7 @@ One independent GPU run selects one physical index. Two-GPU DDP for the current 
 
 ```bash
 ferret-launch --run-id chen-s0 --gpus 0,1 --launcher direct -- \
-  /home/shunsukenaito/.conda/envs/adv/bin/python -m torch.distributed.run \
+  /home/shunsukenaito/.conda/envs/ard-v2/bin/python -m torch.distributed.run \
   --standalone --nproc_per_node=2 --module ard.cli.train \
   --config configs/pilot/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml
 ```
@@ -84,7 +84,7 @@ Three GPUs are supported mechanically, including three independent single-GPU ru
 
 ## Verified host
 
-On 2026-07-23 BatchMode SSH authenticated through the `Ferret` alias to `islab-3gpu` as `shunsukenaito`. Read-only preflight verified three idle RTX 4090 GPUs, the exact GitHub origin, the synchronized repository, the pinned Torch/CUDA environment at `/home/shunsukenaito/.conda/envs/adv/bin/python`, `nohup`, `setsid`, `flock`, and more than 1 TB free disk. The system `/usr/bin/python3` is not an experiment runtime because it lacks Torch.
+On 2026-07-23 BatchMode SSH authenticated through the `Ferret` alias to `islab-3gpu` as `shunsukenaito`. Read-only preflight verified three idle RTX 4090 GPUs, the exact GitHub origin, the synchronized repository, the pinned Torch/CUDA environment at `/home/shunsukenaito/.conda/envs/adv/bin/python` (superseded 2026-09-10 by `ard-v2`, the fully-pinned closure — see `docs/BACKLOG.md`), `nohup`, `setsid`, `flock`, and more than 1 TB free disk. The system `/usr/bin/python3` is not an experiment runtime because it lacks Torch.
 
 The Ferret `adv` environment has Python 3.12.13, PyTorch 2.11.0+cu128, CUDA access to all three GPUs, torchvision, W&B 0.28.0, Pydantic, PyYAML, RobustBench, AutoAttack, and pytest. CIFAR-10 and both registered teacher checkpoints are present; their SHA-256 values match the Hamster registry. `pip check` reports no broken requirements, and train/evaluate CLI imports pass from a detached worktree.
 

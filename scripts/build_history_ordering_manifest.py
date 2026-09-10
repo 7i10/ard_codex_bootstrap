@@ -10,7 +10,7 @@ REPO = Path(__file__).resolve().parents[1]
 RUN_ROOT = Path(
     "/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-history-ordering-v2-final"
 )
-PYTHON = "/home/shunsukenaito/.conda/envs/adv/bin/python"
+PYTHON = "/home/shunsukenaito/.conda/envs/ard-v2/bin/python"
 SOURCE = "aafc5b7b18a557a027d9dcd4b0064bfcaf843404"
 ATTACK = "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2"
 PARENTS = {

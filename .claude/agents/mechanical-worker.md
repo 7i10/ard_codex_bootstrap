@@ -16,8 +16,8 @@ if the task cannot be completed without one, stop and report that instead.
   string form (`8/255`, not `0.0313`). Copy identity fields exactly; never round or reformat a number.
 - Do one batched pass. Do not produce a stream of small follow-up synchronizations.
 - Run the smallest deterministic check that covers the change and nothing more, e.g.
-  `PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m pytest -q <file> -p no:cacheprovider`, or
-  `/home/shunsukenaito/.conda/envs/adv/bin/python scripts/verify.py --changed`. No GPU runs, no full suites,
+  `PYTHONPATH=src /home/shunsukenaito/.conda/envs/ard-v2/bin/python -m pytest -q <file> -p no:cacheprovider`, or
+  `/home/shunsukenaito/.conda/envs/ard-v2/bin/python scripts/verify.py --changed`. No GPU runs, no full suites,
   no rerun of an unchanged passing command.
 - Never `git push`, never commit unless the parent asked, never touch `.external/` or runtime output roots.
 

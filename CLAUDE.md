@@ -23,7 +23,7 @@ Path-scoped rules load automatically from `.claude/rules/`. The Codex-era rulebo
 - `/experiment-postrun <campaign>` — verify completion, aggregate, import record + report, close plan, commit, write decision packet.
 - `/experiment-decide` — turn results into `docs/decisions/NNNN-*.md` and stop.
 - `/verify` — `scripts/verify.py --changed` with the project Python. `/ard-bug-hunt` — unexplained failures.
-- Python is `/home/shunsukenaito/.conda/envs/adv/bin/python` (bare `python` does not exist). `PYTHONPATH=src`.
+- Python is `/home/shunsukenaito/.conda/envs/ard-v2/bin/python` (bare `python` does not exist). `PYTHONPATH=src`.
 - First session in a checkout: accept the trust dialog once interactively, or `.claude/settings.json`
   `permissions.allow` is ignored and every Bash call prompts. Trust is keyed on the exact repo-root spelling,
   so the `/home/shunsukenaito/...` symlink path needs its own accepted entry.

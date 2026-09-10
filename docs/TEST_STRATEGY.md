@@ -110,7 +110,7 @@ Linux例:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 flock /tmp/ard-gpu-0.lock \
-  /home/shunsukenaito/.conda/envs/adv/bin/python -m pytest -q tests/smoke/test_gpu_pgd.py
+  /home/shunsukenaito/.conda/envs/ard-v2/bin/python -m pytest -q tests/smoke/test_gpu_pgd.py
 ```
 
 lock名と`CUDA_VISIBLE_DEVICES`を一致させます。GPU testを`pytest-xdist`で無条件並列化しません。

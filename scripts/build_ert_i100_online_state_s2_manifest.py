@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON = Path("/home/shunsukenaito/.conda/envs/adv/bin/python")
+PYTHON = Path("/home/shunsukenaito/.conda/envs/ard-v2/bin/python")
 RUN_ROOT = Path("/home/islab/workspace-local/shunsuke.naito/ard-runs/ard_codex_bootstrap/ert-rslad-stagewise-v1")
 RUNTIME_ROOT = Path("/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap")
 DATASET_ROOT = Path("/home/shunsukenaito/workspace-local/datasets/ard/torchvision")

@@ -14,7 +14,7 @@ else and say you ignored it.
 
    ```bash
    cd /home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap
-   PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python \
+   PYTHONPATH=src /home/shunsukenaito/.conda/envs/ard-v2/bin/python \
      scripts/verify.py --changed --dry-run
    ```
 
@@ -24,7 +24,7 @@ else and say you ignored it.
    and ask before running. Otherwise run it for real:
 
    ```bash
-   PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python \
+   PYTHONPATH=src /home/shunsukenaito/.conda/envs/ard-v2/bin/python \
      scripts/verify.py --changed
    ```
 

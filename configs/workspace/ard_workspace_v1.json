@@ -13,7 +13,7 @@
   "task_context_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/task-context",
   "lock_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/locks",
   "temp_root": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/tmp",
-  "python": "/home/shunsukenaito/.conda/envs/adv/bin/python",
+  "python": "/home/shunsukenaito/.conda/envs/ard-v2/bin/python",
   "historical_roots": {
     "legacy_lock_root": "/home/shunsukenaito/workspace-local/.ard-campaign-gpu-locks",
     "analysis_root": "/home/shunsukenaito/workspace-local/ard-analysis",

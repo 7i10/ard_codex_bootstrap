@@ -67,7 +67,7 @@ def main() -> None:
         "host": "hamster",
         "gpu_count": 0,
         "command": [
-            "/home/shunsukenaito/.conda/envs/adv/bin/python",
+            "/home/shunsukenaito/.conda/envs/ard-v2/bin/python",
             "scripts/aggregate_history_ordering_campaign.py",
             "--output-json",
             str(OUTPUT_JSON),

@@ -18,7 +18,7 @@ Scripts live under `.agents/skills/run-on-ferret/scripts/` (do not move them; te
   [--campaign-id <c> --job-id <j> --identity-hash <64-hex> \
    --execution-host ferret --expected-origin-host <remote-hostname>]
 .agents/skills/run-on-ferret/scripts/ferret-launch --run-id <id> --gpus 0 -- \
-  /usr/bin/env PYTHONPATH=src /home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.train --config <config>
+  /usr/bin/env PYTHONPATH=src /home/shunsukenaito/.conda/envs/ard-v2/bin/python -m ard.cli.train --config <config>
 .agents/skills/run-on-ferret/scripts/ferret-host-confirm --run-id <id> --campaign-id <c> --job-id <j> \
   --identity-hash <64-hex> --source-sha <40-hex> --host ferret --gpu-index 0 \
   --expected-origin-host <remote-hostname> --expected-command-json '["/remote/python", "-m", "ard.cli.train"]'
@@ -51,7 +51,7 @@ Scripts live under `.agents/skills/run-on-ferret/scripts/` (do not move them; te
 - Collect results before running cleanup.
 - Never silently change batch size, learning rate, schedule, seed semantics, attack settings, or DDP behavior; a
   3-GPU command is not automatically protocol-equivalent to a 2-GPU one.
-- Use the pinned `/home/shunsukenaito/.conda/envs/adv/bin/python` on Ferret (`/usr/bin/python3` has no Torch).
+- Use the pinned `/home/shunsukenaito/.conda/envs/ard-v2/bin/python` on Ferret (`/usr/bin/python3` has no Torch).
 - For a parameter matrix, prefer one tracked wrapper at the prepared SHA or one run bundle per cell; do not embed a
   generated `bash -lc` loop in a launcher argument.
 - For lower-level scheduling, use `multi-gpu-experiment-orchestrator`; for campaign freezing, use
