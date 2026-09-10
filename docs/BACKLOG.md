@@ -76,3 +76,46 @@ current direction.
 Not in scope for this item: `docs/archive/ard-distillation-2026/` is named
 that deliberately, to label it as the ARD-era historical record -- it should
 keep the name it has.
+
+## B-tier item added 2026-09-10: retire `adv`, standardize on `ard-v2`
+
+Both hosts' default conda environment (`adv`, referenced by CLAUDE.md,
+`docs/FERRET_EXECUTION_PROTOCOL.md`, `docs/TEST_STRATEGY.md`, and every
+hand-run driver script) has drifted from its Hamster/Ferret parity: a live
+`pip freeze` diff (2026-09-10) found `timm` at 1.0.27 on Hamster vs 1.0.9 on
+Ferret, and `robustbench` installed two different ways (editable git checkout
+vs a plain pip package). Core numerics-critical packages (`torch`,
+`torchvision`, `numpy`, `autoattack`'s pinned commit) still match exactly, and
+neither `timm` nor `robustbench` is imported anywhere under `src/ard/`, so
+this drift did not affect the ADR CIFAR-10 replication campaign (plan 0097) --
+but it is exactly the failure mode `ard-v2` (`requirements/environment.v2.freeze.txt`,
+created 2026-09-06, plan 0094) exists to prevent, and it will recur in `adv`
+indefinitely since `environment.lock` only pins direct dependencies.
+
+`ard-v2` is already installed on both hosts and independently confirmed
+bit-identical between them (a live `pip freeze` diff found nothing but a
+`packaging` metadata-representation quirk, same version both sides). Plan
+0094 already established that switching from `adv` to `ard-v2` does not
+change training determinism (bit-identical checkpoint component hashes).
+
+**Do not switch mid-campaign.** `docs/MEASUREMENT_STANDARD.md` forbids a
+comparison spanning two environment generations; plan 0097's evaluation
+phase is still using `adv`. Switch after plan 0097 reaches M3, as a single
+dedicated commit: update every `python` path reference (CLAUDE.md,
+`docs/FERRET_EXECUTION_PROTOCOL.md`, `docs/TEST_STRATEGY.md`, `.claude/skills/`,
+scratch/production driver scripts) from `envs/adv/` to `envs/ard-v2/`, mark
+`adv` deprecated (not deleted immediately, in case of rollback need), and
+remove it once nothing has needed it for a while. Natural pairing: bundle
+this with the ImageNet Stage 0 prep work already gated behind the same
+plan-0097 M3 decision.
+
+Also on 2026-09-10: found and removed an entirely unreferenced `saad-oracle`
+conda environment (zero hits anywhere in the repo). Its near-namesake,
+`saad-oracle-py311`, is real and load-bearing -- it's the Python-3.11
+runtime for the pinned upstream SAAD reproduction configs
+(`configs/upstream/saad_*.yaml`) and is asserted directly in
+`tests/unit/test_run_saad_upstream.py:112` -- but had no documentation
+anywhere explaining what it is or why it's separate from the main engine
+environment, which is how it looked like more of the same clutter at first
+glance. Worth a one-line mention somewhere discoverable (this entry is that,
+for now) rather than leaving it to be rediscovered by grep again later.
