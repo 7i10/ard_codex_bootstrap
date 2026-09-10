@@ -7,9 +7,10 @@
   `source-cd0b571e4685`, created 2026-09-09)
 - Current milestone: M0 and M1a complete; M1c execution under way (10 of the
   20 training runs have run dirs, 8 of them terminal and successful; 3 of the
-  20 contract evaluations are terminal — arm 2 seed 1, arm 3 seed 0 and arm 1
-  seed 1) and its checkbox stays unticked until the full 20-job launch is
-  verified; M1b and M2/M3 open
+  20 contract model-weights evaluations are terminal — arm 2 seed 1, arm 3
+  seed 0 and arm 1 seed 1 — plus 1 of the 9 ADR-family EMA-weights
+  evaluations, arm 3 seed 0) and its checkbox stays unticked until the full
+  20-job launch is verified; M1b and M2/M3 open
 - Last updated: 2026-09-10
 
 ## Goal
@@ -1097,3 +1098,160 @@ is a multi-day unattended campaign, not a same-session one.
   campaign. Use a genuinely unused `--state` path when re-deriving whole-
   campaign state, and treat a bundle count below the number of `run-bundle/
   manifest.json` files on disk as a cursor artefact, not as missing runs.
+- 2026-09-10: postrun of the `eval-897947924c804ba35ea7` terminal event
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s0/train/evaluation-ema/`) —
+  **the campaign's first EMA-weights ("ADR + WA") evaluation**: arm 3 (`adr`),
+  seed 0, `--weights=ema` against `best-ema.pt` and `last.pt`, clean +
+  CE-PGD-20 + AutoAttack on the official test set. **Nothing imported — no
+  milestone closed.** The campaign is mid-flight, `docs/experiments/` still
+  holds only `.gitkeep`, so the idempotency check had nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan over the run's parent
+  returns `terminal: true`, `success: true`, `status: completed`,
+  `failure_class: null` for exactly the `--state-path` the watcher passed;
+  `run-bundle/completion.json` is `{"status": "completed", "results": 2}` and
+  `error-marker.txt` reads "no application error recorded".
+  Bundle verified against the frozen contract. All seven declared artifacts
+  exist at their content-addressed `run-bundle/artifacts/…/<sha256>/` paths
+  (`resolved_evaluation_config.yaml` `5e668d12e2e0…`,
+  `evaluation-lineage.json` `80cb49d1432e…`, `evaluation-results.json`
+  `228ec0ee43b8…`, `panel-best-ema-ema.jsonl`, `panel-last-ema.jsonl`,
+  `sample-stats-best-ema-ema.parquet`, `sample-stats-last-ema.parquet`), plus
+  `autoattack-best-ema.json` and `autoattack-last.json` beside them. Artifact
+  hashes were again not recomputed — this session's sandbox refuses to hash
+  outside the repo root — so integrity rests on the content-addressed paths
+  matching the manifest; the aggregator owns the real check at M3.
+  Source SHA `cd0b571e4685…` clean (`dirty: false`, empty-diff `e3b0c442…`)
+  from worktree `source-cd0b571e4685`, external lock `05cfce4cf8db…`.
+  Lineage ties to the training run: `evaluation-lineage.json` records
+  `training_config_hash == training_runtime_config_hash == raw_mapping_hash ==
+  3121716496193f48…` with `applied: []` (no config migration), which is the
+  training bundle's own `config_hash`; `train_run_id` on both rows is
+  `adr-campaign-v1-cifar10_r18_adr-s0`, whose training bundle is terminal at
+  200/200 epochs with `best.pt`, `best-ema.pt`, `last.pt` and
+  `epoch-{049,099,149,199}.pt` all on disk — `best-ema.pt` present as an ADR
+  arm requires.
+  Contract fields match arm 3 exactly: protocol
+  `controlled_cifar10_r18_adr_v1` with `nesterov: true`, method `adr` v1,
+  `teacher: null`, ADR `ema_decay 0.995` / `temperature 2.5→2.0` /
+  `lambda 0.7→0.95`, `epochs=200`, `milestones=[100,150] gamma=0.1`,
+  `validation_fraction=0.1`, `world_size=1`, effective global batch 128,
+  identity normalization, `deterministic: true`. Evaluation identity:
+  `checkpoints: both`, `split: test`, `count: 10000` on both rows, CE-PGD-20 at
+  `epsilon=8/255 step=2/255 steps=20 random_start=true`, `evaluation_seed=0`,
+  threat hash `7081101693340e70…` — the **same** threat hash as every other
+  evaluated arm in this campaign, so the EMA rows are scored under a
+  byte-identical threat model to the student rows. AutoAttack is the
+  **standard** version with real provenance (`expected_commit == vcs_commit ==
+  a39220048b3c9f2cca9a4d3a54604793c68eca7e`), run in its own process at
+  `epsilon=8/255`, `Linf`, batch 128, seed 0. `weights: ema` on both rows;
+  `selection_weights` is `"ema"` for `best-ema.pt` and `"model"` for `last.pt`,
+  which is correct — `last.pt` is epoch-defined and selection-independent, so
+  its selection story is the student's while its read weights are the EMA's.
+
+  **Official CIFAR-10 test set (10,000 examples), EMA weights, arm 3 (`adr`)
+  seed 0 — clean, CE-PGD-20 and AutoAttack reported separately, best and last
+  kept separate:**
+
+  | checkpoint | sha256 (short) | clean | CE-PGD-20 | AutoAttack |
+  |---|---|---|---|---|
+  | `best-ema.pt` (EMA-selected epoch, not read — see below) | `64854fec10e0…` | 0.8338 | 0.5426 | 0.4961 |
+  | `last.pt` (epoch 199) | `6ac8293418d2…` | 0.8514 | 0.4858 | 0.4492 |
+
+  **The one clean model-vs-EMA measurement this campaign produces is nearly
+  null, and it is the reason this entry matters.** `last.pt`'s
+  `checkpoint_sha256` is `6ac8293418d2…` in **both** this bundle and the
+  student-weights `evaluation/` bundle — the same file, the same epoch 199,
+  with only the read weights switched. That is the only same-file
+  weights-only contrast in the campaign:
+
+  | epoch 199, `last.pt` | `--weights=model` | `--weights=ema` | delta |
+  |---|---|---|---|
+  | clean | 0.8489 | 0.8514 | +0.25 pp |
+  | CE-PGD-20 | 0.4842 | 0.4858 | +0.16 pp |
+  | **AutoAttack** | 0.4481 | 0.4492 | **+0.11 pp** |
+
+  +0.11 pp AutoAttack is roughly an eighth of arm 1's 0.85 pp two-seed range.
+  At epoch 199, reading the EMA shadow instead of the student buys essentially
+  nothing measurable for this seed.
+  **The best-checkpoint EMA gain looks eight times larger, and it is
+  confounded — the frozen contract cannot separate the two causes.**
+  `best-ema.pt` at `--weights=ema` (0.4961 AA) against `best.pt` at
+  `--weights=model` (0.4875 AA) is +0.86 pp, with +0.80 pp clean and +0.92 pp
+  CE-PGD-20. But per `docs/SCIENTIFIC_INVARIANTS.md`'s ADR section these are
+  two **independent selections** — the student's validation PGD accuracy picks
+  `best.pt` (val epoch 103) and the EMA shadow's own validation PGD accuracy
+  picks `best-ema.pt` — so in general they are different epochs, and the
+  +0.86 pp mixes "EMA weights are better" with "the EMA's validation picked a
+  different epoch". The invariants doc names the fix: evaluate `best-ema.pt`
+  at **both** `--weights=model` and `--weights=ema` (same file, same epoch,
+  weights only). **The frozen contract does not schedule that run**, so it does
+  not exist for this arm and will not exist for arms 5 or 8 either. Do not fix
+  this mid-campaign — the contract is frozen and the numbers above are valid
+  for what they measure — but the "ADR + WA" line in the eventual report must
+  carry this caveat, and the `last.pt` row is the honest weights-only number
+  to quote beside it.
+  **Robust-overfitting suppression survives the switch to EMA weights.**
+  Best-minus-last gap on this bundle: 5.68 pp CE-PGD-20, **4.69 pp
+  AutoAttack**. The baseline AutoAttack-gap band from the four student-weights
+  baseline readings is 6.09–7.27 pp, so 4.69 pp still sits below all of it, as
+  the student-weights ADR reading (3.94 pp) did. Note the EMA gap is 0.75 pp
+  **larger** than the student gap for the same run — expected, not
+  contradictory: `best-ema.pt` is the more optimistically selected end of its
+  own branch, so its best-minus-last spread is naturally wider.
+  **What this does *not* license.** Arm 3 seed 0's headline AutoAttack number
+  is now 0.4961 (`best-ema.pt` @ ema). Against arm 2 (`pgd_at_nesterov`) seed 1
+  `best.pt` @ model (0.4741) that is +2.20 pp — but that comparison is
+  seed-mismatched *and* weights-mismatched, making it the loosest in the
+  campaign, not the tightest. The preregistered rule's primary quantity reads
+  `best_checkpoint_model_weights`
+  (`scripts/aggregate_adr_cifar10_replication.py:353-357`); the EMA delta is a
+  named secondary
+  (`…:363-365`, `best_checkpoint_ema_weights`, ADR + WA pair only). Neither leg
+  has three seeds, and the primary leg is MobileNetV2 (arms 8 vs 7), which
+  still has no evaluation data at all. Report as directional; claim nothing.
+  **Not read: `best-ema.pt`'s selected epoch.** Recovering it needs
+  `val_pgd_accuracy_ema` from the training bundle's `metrics.jsonl`, and both
+  attempts to read that file were refused by this session's sandbox. The table
+  above therefore names the epoch for `last.pt` only. Nothing in this entry
+  depends on the missing number — the load-bearing comparison is the
+  same-file `last.pt` row — but a future postrun or the M3 aggregator should
+  fill it in, since it is exactly the quantity that would size the selection
+  confound described above.
+  **The aggregator's EMA leg is confirmed shape-correct against real data for
+  the first time.** `_load_arm_seed` reads
+  `run_dir / "evaluation-ema" / "evaluation-results.json"` with
+  `expect_weights="ema"` and normalizes the `best-ema` alias to `best`
+  (`scripts/aggregate_adr_cifar10_replication.py:225-237, 273-278`). Every one
+  of those checks passes on this bundle by inspection: `weights == "ema"` on
+  both rows, `count == 10000`, `split == "test"`, `runtime_method == "adr"`,
+  an AutoAttack block on each row, `attack_version == "standard"`,
+  `expected_commit` equal to the pinned upstream, and both aliases present
+  after normalization. **The directory-naming defect has a fourth instance and
+  is unchanged**: line 269 builds `adr-s0`, the real dir is
+  `cifar10_r18_adr-s0`. Left unfixed — this postrun imports nothing and
+  touches no code.
+  **Budget correction: the evaluation line omits the EMA evaluations
+  entirely.** This run took 00:47:14.3Z → 02:44:36.8Z, **1 h 57 min 22 s** for
+  two checkpoints × (clean + CE-PGD-20 + AutoAttack), contended with two
+  MobileNetV2 training jobs — consistent with the ≈1 GPU-h per AutoAttack
+  checkpoint line. But the GPU-hour table above charges arms 3/5/8 only
+  `18` evaluation GPU-h, i.e. 9 runs × 2 AutoAttack passes — one evaluation per
+  run. The frozen contract requires a **second**, EMA-weights evaluation for
+  every ADR-family run, which is 9 more jobs × 2 more AutoAttack passes ≈
+  **18 unbudgeted GPU-h**. The campaign's evaluation total is therefore ≈58
+  GPU-h, not 40, and the new-work total ≈114 GPU-h, not 96. This is an
+  arithmetic omission in the budget, not a contract change; the budget table is
+  left as written (it is the record of what was projected) and this line is the
+  correction.
+  Campaign state at the 02:47Z scan (`--include-hand-run`, fresh unused
+  cursor), **10 of 20 run dirs**: training terminal and successful for
+  `pgd_at-s1`, `-s2`, `pgd_at_nesterov-s0`, `-s1`, `adr-s0`, `adr-s1`,
+  `trades-s1`, `trades_adr-s0` (8 of 20); `mobilenetv2_adr-s1` running at
+  epoch 124 and `mobilenetv2_pgd_at-s0` at epoch 97. Contract (model-weights)
+  evaluations still **3 of 20** terminal — `pgd_at_nesterov-s1`, `adr-s0`,
+  `pgd_at-s1` — with `pgd_at-s2/evaluation` and
+  `pgd_at_nesterov-s0/evaluation` started and showing no progress row yet.
+  EMA-weights evaluations: **1 of 9** terminal (this one). Arm 6
+  (`trades_49k_validation`) and seed 2 of arms 2/3/4 have not started. M1b and
+  M1c stay unticked.
