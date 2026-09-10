@@ -839,6 +839,174 @@ watcher は hook を起動したが、その log は
 `chosen` は依然 null であり、決めるのは人間である。この postrun は何も
 起動していないし、何も止めていない。
 
+## 追記（2026-09-10 20:47Z）— 同じ arm の隣の seed は、1 回目で完走した
+
+`cifar10_r18_adr-s2` の model 重み評価（`eval-5709dc2e3701675af39e`、lane U）が
+**1 回目の試行で `exit=0`** になった。19:45Z の追記が扱った `-s1` と同じ arm・
+同じ config・同じ checkpoint 種別で、違うのは seed だけである。数字は plan 0097
+の 20:47Z エントリにある。
+
+分かったことは 4 つある。どれも証拠であって、選択ではない。
+
+1. **Option B の再現が 2 本目になった。** `created_at 19:36:21.081Z` →
+   `finished_at 20:39:10.159Z` で **1 時間 2 分 49 秒**。AutoAttack 自身の
+   stage 時間の合計 3,737.0 秒が壁時計の **99.2 %** を占め、2 つの checkpoint の
+   4 stage を「その stage に実際に入った入力数」で割ると **6.54 / 64.4 /
+   150.8 / 166.9 ms** 対 **6.53 / 65.0 / 153.3 / 169.5 ms**——**4 stage すべてで
+   差 1.7 % 以下**である。19:45Z の `-s1`（1 時間 4 分 9 秒）と合わせて、
+   arm 3 の専有時の AutoAttack 費用は **≒1 時間 3 分 ± 40 秒** で 2 回測れた。
+
+2. **「2 本同時でも危険ではない」がもう 1 例出た。** `canon-eval-lane-V.log` が
+   `r18_trades_adr-s1` の EMA 評価を **19:36:18Z——この run の 3 秒前**に開始し、
+   **20:42:32Z に `exit=0`**（1 時間 6 分 14 秒）で終えた。壁時計上ほぼ完全に
+   重なっているのに **どちらも遅くなっていない**。19:45Z の追記の結論
+   ——**危険なのは「同時に 2 本」ではなく「1 枚の device に 2 本」**——の、
+   独立した 2 例目である。これも累積時間マークと timestamp からの再構成であり、
+   process table からの読み取りではない。
+
+3. **推定量の照合は 18 件になり、上限は動かない。** 印字された robust accuracy と
+   `src/ard/evaluation/autoattack.py:213` の非バッチ再計算値の比較は、この run で
+   `best.pt` **48.22 % 対 48.22 %（2 度目の完全一致）**、`last.pt` **44.82 % 対
+   44.84 %**（+2 枚、+0.02 pp）。通算 **18 件中 13 件が不一致で、13 件すべて
+   同じ向き**（記録側が高い）、最大幅は依然 **0.09 pp** である。plan 0097 の
+   20:47Z エントリが報告するどの差よりも 1 桁小さく、どちらの推定量を使っても
+   結論は変わらない。
+
+4. **証拠が消える経路が、また 1 回動いた。** `canon-eval-lane-X.log` が
+   20:42:59Z に `r18_trades-s1` の評価を開始しようとして
+   `FileExistsError: refusing to overwrite existing evaluation output` で
+   `exit=1` になり、その **16 秒後**の 20:43:18Z に同じ lane が同じパスで
+   開始に成功している。つまりその間に **11:25:07Z に始まった lane A の試行の
+   出力ディレクトリが削除された**。16:16Z・18:32Z の追記が記録したのと同じ
+   パターンで、通算 3 例目である。
+
+**`chosen: null` のまま起動された scientific job は 9 件目と 10 件目になった。**
+`canon-eval-lane-W.log:1` が `r18_adr-s2` の EMA 評価を、この run が GPU を
+空けた **60 秒後**の 20:40:11Z に開始し、上記 lane X が 20:43:18Z に続いた。
+**この postrun は何も起動していないし、何も止めていない**；他の session の job を
+止めるのは人間の判断である。
+
+**headless postrun は依然として動いていない。** この run の hook log
+（`20260910T203921Z-eval-5709dc2e…_evaluation.log`）と `r18_trades_adr-s1` EMA の
+hook log（`20260910T204254Z-eval-533e04a8…_evaluation-ema.log`）は、どちらも
+*"this workspace has not been trusted"* の 1 行だけである。直し方は
+`/home/shunsukenaito/.claude.json` の
+`projects["/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap"].hasTrustDialogAccepted`
+を `true` にするか、その綴りで一度対話的に trust dialog を受理することだが、
+**これは user 側の設定変更なので、この postrun は行っていない**。
+
+`chosen` は依然 null であり、決めるのは人間である。
+
+## 追記（2026-09-10 21:48Z）— 同じ seed の EMA 側も 1 回目で完走した
+
+`cifar10_r18_adr-s2` の EMA 重み評価（`eval-669190483234c84c27f1`、lane W）が
+**1 回目の試行で `exit=0`** になった。20:47Z の追記が扱った同じ seed の model 側
+と、違うのは評価した checkpoint の種別だけである。数字は plan 0097 の 21:48Z
+エントリにある。
+
+分かったことは 4 つある。どれも証拠であって、選択ではない。
+
+1. **Option B の再現が 3 本目になった。** `created_at 20:40:14.085Z` →
+   `finished_at 21:43:34.709Z` で **1 時間 3 分 20.6 秒**。AutoAttack 自身の
+   stage 時間の合計 3,768.7 秒が壁時計の **99.2 %** を占め、2 つの checkpoint の
+   4 stage を「その stage に実際に入った入力数」で割ると **6.54 / 64.3 /
+   152.2 / 165.9 ms** 対 **6.50 / 64.5 / 152.0 / 168.0 ms**——**4 stage すべてで
+   差 1.3 % 以下**である。arm 3 の専有時の AutoAttack 費用は、これで
+   **≒1 時間 3 分 ± 40 秒** で 3 回測れたことになる（s1 model 1 時間 4 分 9 秒、
+   s2 model 1 時間 2 分 49 秒、s2 EMA 1 時間 3 分 21 秒）。**10 回の OOM を出した
+   のと同じ大きさの入力が、専有さえしていれば 3 回続けて 1 時間強で終わっている。**
+
+2. **「2 本同時でも危険ではない」が 3 例目になった。** `canon-eval-lane-X.log` が
+   `r18_trades-s1` の model 評価を **20:43:18Z から 21:47:15Z**（`exit=0`）まで
+   走らせ、この run のほぼ全区間と重なっている。それでも **どちらも遅くなって
+   いない**——この run は専有時の速度から 1.3 % しかずれておらず、lane X の
+   APGD-CE の単価（55.1 秒 ÷ 8,276 枚 = 6.66 ms）もこの run と同じ水準である。
+   **危険なのは「同時に 2 本」ではなく「1 枚の device に 2 本」**という 19:45Z の
+   結論の、独立した 3 例目である。これも累積時間マークと timestamp からの
+   再構成であり、process table からの読み取りではない。
+
+3. **推定量の照合は 20 件になり、上限は動かない。** 印字された robust accuracy と
+   `src/ard/evaluation/autoattack.py:213` の非バッチ再計算値の比較は、この run で
+   `best-ema.pt` **49.27 % 対 49.30 %**（+3 枚、+0.03 pp）、`last.pt`
+   **45.00 % 対 45.03 %**（+3 枚、+0.03 pp）。通算 **20 件中 15 件が不一致で、
+   15 件すべて同じ向き**（記録側が高い）、最大幅は依然 **0.09 pp** である。
+   plan 0097 の 21:48Z エントリが報告するどの差よりも 1 桁小さく、どちらの
+   推定量を使っても結論は変わらない。
+
+4. **証拠が消える経路が、また 1 回動いた。通算 4 例目である。**
+   `r18_trades_adr-s0` の EMA 評価は 11:24:11Z に lane A が開始し、その 56 秒後の
+   **11:25:07Z に `exit=143`（SIGTERM）で死んでいた**。bundle はそれ以来ずっと
+   `running` と読めていたが、実体は 10 時間以上前に死んだ job である。
+   21:44:08Z に lane Y が同じパスで開始し、**`FileExistsError` を出さずに走り
+   出した**——つまりその間に、死んだ試行の出力ディレクトリが削除されている。
+
+**`chosen: null` のまま起動された scientific job は 11 件目になった。**
+上記の lane Y が、この run が GPU を空けた **33 秒後**の 21:44:08Z に開始している。
+**この postrun は何も起動していないし、何も止めていない**；他の session の job を
+止めるのは人間の判断である。
+
+**headless postrun は依然として動いていない。** この run の hook log
+（`20260910T214345Z-eval-669190483234c84c27f1_evaluation-ema.log`）と
+`r18_trades-s1` model の hook log
+（`20260910T214718Z-eval-01e527cf…_evaluation.log`）は、どちらも
+*"this workspace has not been trusted"* の 1 行だけである。直し方は 20:47Z の
+追記と同じで、**これは user 側の設定変更なので、この postrun は行っていない**。
+
+`chosen` は依然 null であり、決めるのは人間である。
+
+## 追記（2026-09-10 22:55Z）— arm 5 seed 0 の EMA 評価が完走した
+
+`cifar10_r18_trades_adr-s0` の EMA 重み評価（`eval-77f66adc6ec58702c412`、lane Y）が
+`exit=0` で終わった。この bundle にとっては 2 回目の試行で、1 回目（lane A、
+11:24:11Z 開始）は 56 秒後に SIGTERM で止まっていた。数字は plan 0097 の
+22:55Z エントリにある。
+
+分かったことは 4 つある。どれも証拠であって、選択ではない。
+
+1. **専有時の費用を arm 5 で初めて測れた。** `created_at 21:44:10.347Z` →
+   `finished_at 22:49:41.819Z` で **1 時間 5 分 31.5 秒**。AutoAttack 自身の
+   stage 時間の合計 3,899.5 秒が壁時計の **99.2 %** を占める。2 つの checkpoint の
+   4 stage を「その stage に実際に入った入力数」で割ると **6.52 / 63.9 /
+   151.3 / 167.2 ms** 対 **6.52 / 63.7 / 151.3 / 167.0 ms** で、**4 stage すべてで
+   差 0.3 % 以下**である。arm 3 の 3 回（≒1 時間 3 分 ± 40 秒）より約 2 分長い。
+
+2. **「2 本同時でも危険ではない」が 4 例目になった。** `canon-eval-lane-Z.log` が
+   `r18_trades_adr-s2` の model 評価を **21:47:47Z** に開始し、この run が終わった
+   時点でもまだ走っていた。ほぼ 1 時間まるごと重なっていたのに、この run の
+   単価は専有時と 0.3 % しか違わない。**危険なのは「同時に 2 本」ではなく
+   「1 枚の device に 2 本」**という 19:45Z の結論の、独立した 4 例目である。
+   累積時間マークと timestamp からの再構成であり、process table からの読み取り
+   ではない。
+
+3. **推定量の照合は 22 件になり、上限は動かない。** 印字された robust accuracy と
+   `src/ard/evaluation/autoattack.py:213` の非バッチ再計算値の比較は、この run で
+   `best-ema.pt` **49.51 % 対 49.54 %**（+3 枚、+0.03 pp）、`last.pt`
+   **48.34 % 対 48.36 %**（+2 枚、+0.02 pp）。通算 **22 件中 17 件が不一致で、
+   17 件すべて同じ向き**（記録側が高い）、最大幅は依然 **0.09 pp** である。
+
+4. **証拠が消える経路が、さらに 2 回動いた（通算 5・6 例目）。** lane AA は
+   22:50:26Z に `r18_trades-s2` の model 評価を、lane B の 11:10:21Z の試行
+   （12:54:04Z に SIGTERM）が使っていたパスで、`FileExistsError` を出さずに
+   開始した。lane Z も、lane I の 09:09:31Z の試行が使っていたパスで同じように
+   開始した。どちらも、その間に古い出力ディレクトリが削除されたことになる。
+
+**`chosen: null` のまま起動された scientific job は 12 件目と 13 件目になった。**
+lane Z（21:47:47Z、lane X が GPU を空けた 32 秒後。21:48Z の追記は数えていない）と
+lane AA（22:50:26Z、この run が GPU を空けた 44 秒後）である。
+**この postrun は何も起動していないし、何も止めていない。**
+
+**訂正: headless postrun は動いている。** 19:45Z・20:47Z・21:48Z の追記は
+「trust されていないので headless session の Bash はすべて拒否される」と書いたが、
+これは誤りだった。`scripts/ardx/postrun_hook.sh:168-169` は allowlist を
+`--allowedTools` で直接渡しているので、trust の警告が捨てるのは settings
+ファイル側の写しだけで、allowlist にあるコマンドは動く。21:47:18Z の
+`eval-01e527cf…` の headless postrun は 70 turn 動いて終了状態を確かめ、
+別の session がちょうど plan とこの packet を編集していたので書き込みを見送っていた。
+この追記は headless postrun が書いた最初のものである。trust の設定変更は、
+headless postrun のためには不要である。
+
+`chosen` は依然 null であり、決めるのは人間である。
+
 ## 参照
 
 - plan: `docs/plans/0097-adr-cifar10-replication.md`（Progress log、2026-09-10 11:01Z）
