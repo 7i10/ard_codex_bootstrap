@@ -700,3 +700,115 @@ is a multi-day unattended campaign, not a same-session one.
   `evaluation-ema/` sibling (`has_ema`), which has not appeared. Arms 6 and 7
   (trades_49k_validation, mobilenetv2 pgd_at) and seed 2 of arms 2/3/4 have not
   started. M1b and M1c stay unticked.
+- 2026-09-10: postrun of the `adr-campaign-v1-cifar10_r18_trades_adr-s0`
+  terminal event (`runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s0/
+  train/`) — **the campaign's first arm-5 (ADR-TRADES) run**, seed 0, training
+  only. **Nothing imported — no milestone closed.** The campaign is mid-flight
+  (10 of 20 run dirs, 1 of 20 contract evaluations terminal), so there is no
+  campaign-level result to aggregate; `docs/experiments/` still holds only
+  `.gitkeep`, so the idempotency check had nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan of the campaign root returns
+  `terminal: true`, `success: true`, `failure_class: null` on the line whose
+  `path` is that manifest.
+  Verified for this bundle: `completion.json` `{"status": "completed"}`,
+  `manifest.status=sync_pending`, `error-marker.txt` reads "no application
+  error recorded", `epoch_metrics_complete: true` with 200/200 recorded epochs,
+  and `metrics.jsonl` really carries 200 rows ending at epoch 199 /
+  `global_step` 70400. Both declared artifacts are present at their
+  content-addressed paths under the manifest's own SHA-256
+  (`epoch-metrics.parquet` `6a725b7835ea…`, `sample-stats-train.parquet`
+  `ed200536ec2d…`); `config_hash` `7d9f2051b774…`. Source SHA
+  `cd0b571e4685…` clean (`dirty: false`, empty-diff `e3b0c442…`) from worktree
+  `source-cd0b571e4685`, external lock `05cfce4cf8db…` with `.external/adr` at
+  the pinned `515da0e0373f…`. Artifact hashes were not recomputed — this
+  session's sandbox refuses to hash outside the repo root — so integrity again
+  rests on the content-addressed paths matching the manifest; the aggregator
+  owns the real check at M3.
+  Checkpoint set on disk matches the contract exactly: `epoch-{049,099,149,
+  199}.pt` (`checkpoint_epochs`), `best.pt`, `last.pt`, **and `best-ema.pt`** —
+  the EMA checkpoint the aggregator's `has_ema: True` for `trades_adr` requires.
+  Contract fields match arm 5 of the frozen table exactly: protocol
+  `controlled_cifar10_r18_adr_v1` with `nesterov: true`, method `adr_trades`
+  v1, `teacher: null` (ADR distils from an internal EMA of the student, not an
+  external teacher), `trades_beta=6.0`, ADR block `ema_decay=0.995`,
+  `temperature 2.5→2.0`, `lambda 0.7→0.95` — the values fixed in the plan and
+  confirmed against the pinned official code. Training attack: KL loss,
+  `kl_target=student_clean`, `epsilon=8/255 step=2/255 steps=10
+  random_start=true` (the TRADES inner maximization); selection/evaluation
+  attack CE-PGD-20 at the same epsilon/step. `epochs=200`,
+  `milestones=[100,150] gamma=0.1`, `validation_fraction=0.1` (45,000 train /
+  5,000 validation, confirmed by `train_valid_examples: 45000`), `world_size=1`,
+  effective global batch 128, identity normalization, `deterministic: true`.
+  Training seeds all 0 except the fixed `split=20260722`. ADR is demonstrably
+  live: every row carries `val_clean_accuracy_ema` / `val_pgd_accuracy_ema`
+  alongside the student columns.
+
+  **Validation-only diagnostics (5,000 held-out *training* images, CE-PGD-20 —
+  not the official test set, not AutoAttack):**
+
+  | checkpoint | epoch | clean | CE-PGD-20 |
+  |---|---|---|---|
+  | best (selection) | 150 | 0.8474 | 0.5442 |
+  | last | 199 | 0.8488 | 0.5346 |
+
+  Both re-read from `metrics.jsonl` and they match the manifest summary.
+  Robust-overfit gap 0.0096; `val_pgd_slope_epoch_120_199` is +5.0e-05 per
+  epoch, i.e. flat, where robust overfitting would show a clear negative slope.
+  Set against arm 4 (`trades-s1`, logged at 23:11Z) — best clean 0.8322 / PGD
+  0.5164, last 0.8338 / 0.4844, gap 0.0320 — this run is +2.78 pp higher at
+  best and has a gap 2.2 pp smaller, exactly the direction ADR claims. **This
+  licenses no claim.** It is validation, not the official test; it is a
+  different seed (0 vs 1); and arms 4 and 5 differ in optimizer as well as
+  method (plain SGD vs Nesterov), which is precisely the confound the plan
+  already records as "no Nesterov-matched TRADES baseline exists yet, so this
+  leg is directional only". The decisive ResNet-18 leg remains arm 3 vs arm 2.
+  **The EMA branch is not redundant for this arm.** At the four epochs sampled
+  around the second LR drop and the end, EMA validation was clean/PGD 0.8484 /
+  **0.5486** (149), 0.8490 / 0.5448 (150), 0.8516 / 0.5368 (198), 0.8520 /
+  0.5372 (199). The EMA weights were therefore above the student's selected
+  best (0.5442) at least once, so the `evaluation-ema/` pass this arm still
+  owes is a real measurement and not a formality. (Only four epochs were read;
+  no claim is made about where the EMA branch actually peaked.)
+  **Cost — arm 5 is the most expensive arm measured so far, and the ADR budget
+  line is tight for it.** Uncontended (epochs 0-1) this run did **974-981 img/s,
+  45.9-46.2 s/epoch training loop**. Ranked against the arms already measured:
+  `pgd_at_nesterov` 1167 img/s / 38.6 s, `adr` 1106-1141 / 39.4-40.7, `trades`
+  998 / 45.1, `adr_trades` 974 / 46.2. Two readings fall out of that: ADR costs
+  a consistent ≈2% of throughput on both objectives (1167→1141 on PGD-AT,
+  998→974 on TRADES), and the TRADES objective's extra clean forward pass costs
+  ≈15%, which dominates. The budget table charges the ADR family ≈3.0 GPU-h per
+  run = 54 s per *full* epoch, leaving ≈8 s for validation — but this arm runs
+  **two** validation passes per epoch (student and EMA), so that allowance is
+  very likely too small, in the same way the 23:11Z entry found ≈2.6 GPU-h too
+  small for TRADES. It cannot be quantified from this run: the per-epoch rows
+  still carry no timestamps or validation-pass timing, so the uncontended full-
+  epoch cost cannot be separated from the training loop. This run's own wall
+  clock was **4 h 16 min 50 s** (20:13:15Z → 00:30:05Z, 77.1 s/epoch averaged),
+  but that is heavily inflated by contention — throughput fell from ≈980 img/s
+  to ≈724-728 by epoch 149 and stayed there — and is not the uncontended cost.
+  Contention changes only wall clock, not results: `deterministic: true`, fixed
+  seeds and fixed batch size make the numbers independent of throughput.
+  **The M3 aggregator defect logged at 00:10Z has a second instance here, and
+  it confirms the fix shape.** Arm 5's run dir is `cifar10_r18_trades_adr-s0`,
+  not the `trades_adr-s0` that `aggregate_adr_cifar10_replication.py:269`
+  builds from the `ARMS` key. Every run dir seen so far is `<config stem>-s<seed>`
+  (`cifar10_r18_` for arms 1-6, `cifar10_` for the two MobileNetV2 arms), so a
+  per-arm directory field keyed off the config stem is the right fix, and no
+  check in the script needs to change. Still left unfixed — this postrun imports
+  nothing and touches no code.
+  Campaign state at the 00:30Z scan (`--include-hand-run`), **10 of 20 run
+  dirs**: training terminal and successful for `pgd_at-s1`, `-s2`,
+  `pgd_at_nesterov-s0`, `-s1`, `adr-s0`, `adr-s1`, `trades-s1` and now
+  `trades_adr-s0` (8 of 20); `mobilenetv2_adr-s1` running at epoch 44 and
+  `cifar10_mobilenetv2_pgd_at-s0` — **the campaign's first arm-7 job** — newly
+  created with no progress row yet. Contract evaluations: `pgd_at_nesterov-s1`
+  terminal, `pgd_at-s1` started with no progress yet, and `adr-s0` flagged
+  `stale` at 66 min. The stale flag is **not** a failure: that job has already
+  written `panel-{best,last}.jsonl`, `sample-stats-{best,last}.parquet` and
+  `autoattack-best.json` but not `autoattack-last.json` or
+  `evaluation-results.json`, i.e. it is inside the `last.pt` AutoAttack pass,
+  which emits no progress rows. Watch it, do not retry it. `adr-s0` also still
+  owes its `evaluation-ema/` sibling, and `trades_adr-s0` now owes both
+  `evaluation/` and `evaluation-ema/`. Arm 6 (trades_49k_validation) and seed 2
+  of arms 2/3/4 have not started. M1b and M1c stay unticked.
