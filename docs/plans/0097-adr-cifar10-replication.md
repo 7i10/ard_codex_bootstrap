@@ -5505,3 +5505,139 @@ is a multi-day unattended campaign, not a same-session one.
   their own contracts define; arms 1, 3, 4, 5 and 8 are not** — arm 8 now has one
   model-weights seed and one EMA seed of three. M1c stays unticked until the full
   20-job launch is verified complete; M2 and M3 stay open.
+
+- **2026-09-10, 16:57Z — postrun of `eval-e2da1d97fcd3e5932fab`
+  (`cifar10_r18_adr-s1`, model weights) — FAILED, nothing imported, no milestone
+  closed, nothing launched or retried.** Lane O, the **third** attempt at this
+  arm-seed's model-weights evaluation. It failed in the same place as the first
+  two, and as the seven before them.
+  **Terminal status re-derived, not taken from the event.** A watcher scan of the
+  exact `--state-path`
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s1/train/evaluation/run-bundle/manifest.json`)
+  gives `terminal=true`, `success=false`, `failure_class=unknown`,
+  `manifest_status=failed`, `completion_json=false`, error marker
+  `application failure recorded`. The event hint said `--status failed`; the
+  re-derivation agrees. `failure_class` reads `unknown` because the bundle carries
+  no classified error, but the lane log makes the class unambiguous and it is not
+  a new one.
+  **This is the tenth failure with decision packet 0010's traceback.**
+  `canon-eval-lane-O.log:167-227`: `evaluate.py:411` → `autoattack.py:213` →
+  `registry.py:37` → `registry.py:108` (`self.layer1`) → `registry.py:75`
+  (`self.bn2(self.conv2(outputs))`) → `batchnorm.py:194` →
+  `torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.44 GiB`.
+  2.44 GiB is again exactly `10000 × 64 × 32 × 32 × 4 B = 2.441 GiB` — the
+  `layer1` activation for the whole test set, requested by the unbatched accuracy
+  recompute that runs *after* AutoAttack has already returned.
+  **New: the failure is not merely repeatable, it is arithmetically forced when
+  two ResNet-18 evaluations share one 4090.** The allocator's own numbers, at the
+  moment of death: capacity **23.52 GiB**, free **1.39 GiB**, the co-resident
+  process **13.71 GiB**, this process **8.40 GiB** in use (7.88 GiB allocated by
+  PyTorch). `13.71 + 8.40 + 2.44 = 24.55 GiB`, which exceeds the card by
+  **1.03 GiB**. So the last step cannot succeed — not "is likely to fail", cannot
+  succeed — while a second ResNet-18 AutoAttack evaluation is resident. 13.71 GiB
+  is the steady-state footprint of such an evaluation on this box: it was also
+  13.71 GiB behind attempt 2, where the neighbour was a *different* run
+  (`r18_trades_49k_validation-s0`, 15:21Z entry). MobileNetV2 needs 3.66 GiB
+  rather than 2.44 GiB at the same line (11:07Z entry), so it is worse there.
+  **New: attempts 2 and 3 died in byte-identical allocator states.** Free
+  1.39 GiB, neighbour 13.71 GiB, self 8.40 / 7.88 GiB, **reserved but unallocated
+  58.35 MiB** — every figure the same as the 15:21Z entry recorded for attempt 2,
+  from a different process with a different neighbour. The failure state is
+  determined, not stochastic. 58.35 MiB is also the **fourth** measurement of
+  reserved-but-unallocated against a 2.44 GiB request (58.34, 109.66, 58.35,
+  58.35), all two orders of magnitude short; `torch.cuda.empty_cache()`, which is
+  the whole of backlog item A8, reclaims tens of megabytes inside the victim while
+  the gigabytes sit in the neighbour. **A8 and packet 0010's Option A remain
+  complementary, not alternatives.**
+  **The neighbour is named, and it is the twin this run was launched beside.**
+  The allocator named **PID 2417286 at 13.71 GiB on GPU 0**. `nvidia-smi` at this
+  postrun shows PID 2417286 still alive at **14038 MiB** — the same 13.71 GiB —
+  and exactly two evaluation processes on the box; the other, PID 2427135 at
+  10442 MiB, is the later of the two. Lane P (`cifar10_r18_trades_adr-s1`,
+  `eval-fcaab229ec62f00f2a01`) started at `00:44:41+09:00` and lane Q
+  (`cifar10_mobilenetv2_adr-s1`, `eval-4615ede05d4f96adb48f`) at `01:17:10+09:00`,
+  so by PID order and by the memory match **PID 2417286 is lane P**. (This is
+  inference from PID ordering and the memory figure, not from the process table:
+  `ps` is not available to this session, unlike at the 15:21Z entry.) Lane P
+  started in the **same second** as lane O, on the **same GPU 0**. This is
+  therefore not contention with a leftover neighbour — the queue put two ResNet-18
+  AutoAttack evaluations on one card, and by the arithmetic above at least one of
+  them had to die at line 213. Both are on packet 0010's do-not-requeue list, and
+  both were launched while `chosen` is null. This postrun neither started nor
+  stopped either of them.
+  **New: the printed AutoAttack output reproduced digit-for-digit a third time on
+  this arm-seed.** Attempt 3 printed initial accuracy **82.82 %**,
+  `APGD-CE 52.78 %`, `APGD-T 48.66 %`, `FAB-T 48.65 %`, `SQUARE 48.65 %`,
+  `robust accuracy 48.65 %`, `max Linf perturbation 0.03137`, `nan in tensor 0`,
+  and the same Square batch structure (`39/39`, final batch of 1 example) — every
+  printed digit identical to attempts 1 and 2. Only the clock differed, and barely
+  between 2 and 3: AutoAttack's cumulative marks were **111.2 / 767.5 / 2272.3 /
+  4022.6 s** after APGD-CE / APGD-T / FAB-T / SQUARE, against attempt 2's
+  101.3 / 757.1 / 2257.3 / 4015.4 s and attempt 1's 194.6 / 1371.2 / 4093.4 /
+  7490.2 s. (These are cumulative elapsed times from the start of the standard
+  evaluation, not per-attack costs; the SQUARE mark matches the wall clock.)
+  `r18_trades_49k_validation-s0` has shown this across four processes and this
+  arm-seed now across three, on a different method. Packet 0010's Option A
+  preregisters "the batched and unbatched forms must agree down to the predicted-
+  label sequence"; that rule can be judged without run-to-run noise interfering.
+  **Those numbers are a log fragment, not a result, and must not enter any record,
+  report or table.** `48.65 %` belongs to a run that did not complete. On disk the
+  evaluation directory holds `panel-best.jsonl`, `sample-stats-best.parquet`,
+  `resolved_evaluation_config.yaml`, `evaluation-lineage.json` and the six
+  `run-bundle/` files, and **no** `evaluation-results.json`, `autoattack-best.json`
+  or `completion.json`. `best.pt`'s clean accuracy and CE-PGD-20 were computed and
+  thrown away with the exception; `last.pt` was never reached. There is nothing to
+  import.
+  **The 15:21Z entry's "this attempt's directory is intact; do not delete it" did
+  not survive thirty minutes.** Attempt 2's directory was deleted, not moved, when
+  lane O started at `15:44:43Z`: the only W&B segment left is
+  `offline-run-20260911_004444-…`, and attempt 2's `offline-run-20260910_230731-…`
+  is gone. That is the **eighth** lost failure directory, and the second
+  consecutive time the instruction was issued and then not followed. It supports
+  the 16:16Z entry's reading that this is a **consequence of the design** — the
+  evaluation run id is `sha256(train_run_id:evaluation_hash:checkpoint_set…)`, an
+  identifier of scientific identity rather than of an attempt, so a retake always
+  lands on the same path — rather than of one person's carelessness.
+  **This bundle is now the campaign's only surviving terminal-failed evaluation
+  bundle**, and therefore packet 0010's only on-disk exhibit; the 16:16Z entry
+  recorded that there were none left at all. Its `failure_snapshot.directory_digest`
+  is `2e3f896a96ea31ef09b4fef595b749ad2e4935080905c291b22f73a771ccabae` over five
+  hashed files. A fourth attempt at this identity would destroy it. **Anyone who
+  needs Option A's regression test needs this directory preserved first**; moving
+  it is a human action and this postrun did not take it. (Minor, noted not fixed,
+  as at 15:21Z: the snapshot hashes only `diff.patch`, `environment.json`,
+  `error-marker.txt`, `external.lock.yaml` and `resolved_config.yaml`, so
+  `panel-best.jsonl` and `sample-stats-best.parquet` sit in the directory without
+  being hash-bound.)
+  **Cost.** Bundle `created_at 15:44:43.758Z` → `finished_at 16:52:17.632Z` =
+  **1 h 07 m 34 s**, recording nothing. Across three attempts this single arm-seed
+  has consumed **about 4 h 21 m** (2 h 05 m 40 s + 1 h 07 m 25 s + 1 h 07 m 34 s)
+  for zero official-test numbers. The list of runs still needing a model-weights
+  retake is **four** — `r18_adr-s1`, `r18_adr-s2`, `r18_trades_adr-s1`,
+  `mobilenetv2_adr-s1` — unchanged, because the two in flight are not terminal. At
+  1.8–3.3 GPU hours each that is **about 7–13 GPU hours**.
+  **One proposed retry command — not run by this postrun, and blocked.** It is
+  unchanged from the 11:05Z and 15:21Z entries (`mv` the failed directory aside,
+  then the same `ard.cli.evaluate` invocation from worktree `source-cd0b571e4685`
+  with `--weights model --allow-autoattack`), with one precondition now sharpened
+  by the arithmetic above: **no second ResNet-18 AutoAttack evaluation may be
+  resident on the same card**, because 13.71 + 8.40 + 2.44 GiB does not fit in
+  23.52 GiB. It reproduces the same measurement — `config_hash 90da37ed2020d6f2…`,
+  protocol `controlled_cifar10_r18_adr_v1`, `evaluation_seed 0`, training seeds all
+  1 bar the fixed `split=20260722`, `world_size 1`, effective global batch 128,
+  source SHA `cd0b571e4685` with an empty diff — not a weakened one. **It must not
+  be run while packet 0010 is `chosen: null`**, and running it anyway has now cost
+  two hours and returned nothing twice.
+  **Census at 16:57Z, from a full-root watcher scan (45 bundle rows, fresh
+  cursor).** Training: **19 of 20 terminal and successful**;
+  `cifar10_mobilenetv2_adr-s0` still never launched. Contract evaluations:
+  **12 of 20** on model weights and **3 of 9** on EMA weights (`r18_adr-s0`,
+  `r18_adr-s1`, `mobilenetv2_adr-s2`) — both unchanged from 16:21Z, since this
+  run failed. **Seven bundles are non-terminal**: `mobilenetv2_adr-s1` model and
+  EMA, `r18_trades_adr-s1`, `r18_trades_adr-s2`, `r18_trades-s1`,
+  `r18_trades-s2` (`stale`), and `r18_trades_adr-s0` EMA; the watcher cannot tell
+  alive from dead for any of them, and only `mobilenetv2_adr-s1` (16:50:34Z) and
+  `r18_trades_adr-s1` (16:50:10Z) have fresh progress. **One is terminal-failed**:
+  this one. **One training-terminal run has no model-weights evaluation bundle on
+  disk at all**: `r18_adr-s2`. M1c stays unticked until the full 20-job launch is
+  verified complete; M2 and M3 stay open.
