@@ -258,6 +258,84 @@ arm-seed 1 本に費やした合計は 3 回で **約 4 時間 32 分**（2 時�
 何も起動していない。証拠の全文は plan 0097 の Progress log
 （2026-09-10 14:05Z のエントリ）。
 
+## 追記（2026-09-10 15:21Z）— 9 本目。取り直しが取り直しを殺した
+
+`cifar10_r18_adr-s1` の model 重み評価（`eval-e2da1d97fcd3e5932fab`、lane M）が、
+**同じ 213 行、同じ 2.44 GiB** で落ちた。11:21Z の追記で「3 本目」として書いた
+のと同じ arm-seed の **2 回目**である。`23:07:28+09:00` に始まり
+`00:14:56+09:00` に `exit=1`（`canon-eval-lane-M.log:1,269`）、manifest では
+`created_at 14:07:30.459Z` → `finished_at 15:14:55.280Z` = **1 時間 7 分 25 秒**。
+これで同一 traceback による失敗は **9 本**になる。
+
+新しく分かったことは 3 つある。
+
+1. **メモリを奪った相手の名前が分かった。しかも、この packet が「取り直すな」
+   と書いたもう一方の run である。** allocator のメッセージが名指しした
+   **PID 2388375（13.71 GiB）** は、この postrun の時点でもまだ生きており、
+   プロセステーブルがその正体を示している——
+   `ard.cli.evaluate … cifar10_r18_trades_49k_validation-s0 … --weights model`、
+   親は `run_eval_lane.sh J 0`、いま GPU 0 上で **14042 MiB**。つまり
+   **すでに 3 回同じ落ち方をしている run の 4 回目**である。
+   `chosen: null` のまま流された取り直しが、`chosen: null` のまま流された
+   別の取り直しを餓死させた。落ちた側の GPU 0 の空きは 23.52 GiB 中
+   **1.39 GiB**。この packet が記録してきた空き（0.37 / 0.67 / 1.07 / 1.39 /
+   1.89 / 2.93 GiB）の下から 4 番目で、**最後の一歩で 2.5 GiB 前後の余裕が
+   無ければ落ちる**という 12:52Z の結論はそのままである。
+
+2. **A8 では塞がらないことの 3 つ目の実測。** 落ちたプロセスの内側で
+   **reserved but unallocated は 58.35 MiB**（in use 8.40 GiB のうち 7.88 GiB が
+   PyTorch の allocated）。14:05Z の追記が別の run で測った 58.34 MiB、
+   この run の 1 回目が測った **109.66 MiB**（`canon-eval-lane-D.log:227`）と
+   合わせて 3 つ、どれも 2.44 GiB に対して 2 桁足りない。
+   `torch.cuda.empty_cache()`（＝ A8 の内容のすべて）が取り戻せるのは
+   犠牲者の内側の数十 MB であり、GiB は隣人が握っている。
+   **A8 と Option A は代替ではなく補完である**という 14:05Z の結論は動かない。
+
+3. **印字される AutoAttack の数字が、2 本目の arm-seed でもプロセスをまたいで
+   完全一致した。** 1 回目（lane D、`17:59:07+09:00` → `20:04:47+09:00`、
+   **2 時間 5 分 40 秒**）と 2 回目（lane M、上記）は、
+   initial accuracy **82.82 %**、`APGD-CE 52.78 %`、`APGD-T 48.66 %`、
+   `FAB-T 48.65 %`、`SQUARE 48.65 %`、`robust accuracy 48.65 %`、
+   `max Linf perturbation 0.03137`、`nan in tensor 0`、そして Square に入った
+   batch 構成（`39/39`、最後が 1 枚）まで、印字された最後の桁まで同一だった。
+   違ったのは時間だけ（APGD-CE 194.6→101.3 秒、APGD-T 1371.2→757.1 秒、
+   FAB-T 4093.4→2257.3 秒、SQUARE 7490.2→4015.4 秒）。
+   これまでこの再現性は `r18_trades_49k_validation-s0` の 3 プロセスでしか
+   示されていなかったが、**別の arm-seed、別の方法（素の TRADES ではなく ADR）**
+   でも成立した。Option A の事前規則——「バッチ版と非バッチ版が予測ラベル列まで
+   完全一致すること」——は run 間のばらつきに邪魔されずに判定できる、という
+   12:52Z・14:05Z の論点はこれで 2 例目の裏づけを得た。
+   **それでもここでは選ばない。`chosen` は null のままである。**
+
+**この `48.65 %` は完走しなかった run のログ片であって結果ではなく、どの record
+にも report にも表にも入れてはならない。** `evaluation-results.json`・
+`autoattack-best.json`・`completion.json` はいずれも書かれておらず、`last.pt`
+には到達していない。ディレクトリに残っているのは `panel-best.jsonl`、
+`sample-stats-best.parquet`、`resolved_evaluation_config.yaml`、
+`evaluation-lineage.json` と `run-bundle/` の 6 ファイルだけである。
+
+**11:05Z に書いた取り直しコマンドは、前提を 2 つとも外して流された。** あの
+コマンドは `evaluation.failed-oom-eval-e2da1d97` への `mv` から始まり、
+「空いている 4090 で流さなければ、また 2 時間後に同じ場所で落ちる」と明記して
+いた。どちらも守られていない。lane M は `FileExistsError` を出さずに始まって
+おり、ディレクトリには `offline-run-20260910_230731-…` の W&B segment しか
+無い——**1 回目の証拠ディレクトリは退避ではなく削除された**。11:21Z の追記が
+止めようとした損失がまた起きたということである。1 回目の数字が残っているのは、
+`canon-eval-lane-D.log` がディレクトリと一緒に消されなかったからにすぎない。
+**今回のディレクトリは無事である。消さないこと。**
+
+**コストの更新。** 今回は 1 時間 7 分 25 秒を消費して何も残さなかった。この
+arm-seed 1 本に費やした合計は 2 回で **約 3 時間 13 分**。取り直しが要る run は
+6 本から **5 本**に減った——`r18_trades_adr-s0` は lane K の再取得が
+`23:06:03+09:00` に `exit=0` で完走したためである。残るのは `r18_adr-s1`、
+`r18_adr-s2`、`r18_trades_adr-s1`、`mobilenetv2_adr-s1`、
+`r18_trades_49k_validation-s0` の 5 本、1 本 1.8–3.3 GPU 時間として
+**約 9–16.5 GPU 時間**。
+
+**`chosen` は依然 null であり、決めるのは人間である。** この postrun は何も
+起動していないし、何も止めていない。証拠の全文は plan 0097 の Progress log
+（2026-09-10 15:21Z のエントリ）。
+
 ## この packet は結果についてではない
 
 plan 0097 の M2/M3 はまだ開いており、`docs/experiments/` に取り込むべき

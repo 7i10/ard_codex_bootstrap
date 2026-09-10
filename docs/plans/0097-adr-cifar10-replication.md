@@ -4976,3 +4976,133 @@ is a multi-day unattended campaign, not a same-session one.
   **10 of 20** on model weights (the 14:08Z nine plus `mobilenetv2_pgd_at-s0`)
   and **3 of 9** on EMA weights (`r18_adr-s0`, `r18_adr-s1`,
   `mobilenetv2_adr-s2`), unchanged.
+
+- **2026-09-10, 15:21Z — postrun of `eval-e2da1d97fcd3e5932fab`
+  (`cifar10_r18_adr-s1`, model weights) — FAILED, nothing imported, no milestone
+  closed, nothing launched or retried.** This is lane M from the 14:08Z entry —
+  arm 3 (`cifar10_r18_adr`, ADR on ResNet-18) seed 1, the **second** attempt at
+  this arm-seed's model-weights evaluation. It failed in the same place as the
+  first, and as the eight before it.
+  **Terminal status re-derived, not taken from the event.** Watcher scan of the
+  exact `--state-path`
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s1/train/evaluation/run-bundle/manifest.json`)
+  gives `terminal=true`, `success=false`, `failure_class=unknown`,
+  `manifest_status=failed`, `completion_json=false`, error marker
+  `application failure recorded`. The event hint said `--status failed`, and the
+  re-derivation agrees. `failure_class` is reported as `unknown` because the
+  bundle carries no classified error, but the lane log makes the class
+  unambiguous, and it is not a new one.
+  **This is the ninth failure with packet 0010's traceback, byte-identical.**
+  `canon-eval-lane-M.log:167-227`: `evaluate.py:411` → `autoattack.py:213` →
+  `registry.py:37` → `registry.py:108` (`self.layer1`) → `registry.py:75`
+  (`self.bn2(self.conv2(outputs))`) → `batchnorm.py:194` →
+  `torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.44 GiB`.
+  2.44 GiB is again exactly `10000 × 64 × 32 × 32 × 4 B = 2.441 GiB` — the
+  `layer1` activation for the whole test set, requested by the unbatched
+  accuracy recompute that runs *after* AutoAttack has already finished. Nothing
+  about this run is new as a mechanism; what is new is below.
+  **Memory at the moment of failure, and the process that took it.** GPU 0 had
+  **1.39 GiB free** of 23.52 GiB. The dying process held 8.40 GiB (7.88 GiB
+  allocated by PyTorch). The co-resident process named in the allocator message,
+  **PID 2388375 at 13.71 GiB**, is still alive at this postrun's census and the
+  process table identifies it exactly: it is
+  `ard.cli.evaluate … cifar10_r18_trades_49k_validation-s0 … --weights model`,
+  child of `run_eval_lane.sh J 0`, holding **14042 MiB** on GPU 0 right now.
+  That is **attempt 4 of the run that has already failed this same way three
+  times** (11:21Z, 12:52Z, 14:05Z entries). So the run packet 0010 says should
+  not be re-queued while `chosen` is null is the run that starved the other run
+  packet 0010 says should not be re-queued while `chosen` is null. This postrun
+  neither started nor stopped either of them.
+  **A second measurement confirming that backlog A8 cannot close this hole.**
+  Inside the dying process, **reserved but unallocated was 58.35 MiB** against a
+  2.44 GiB request. The 14:05Z entry measured 58.34 MiB on a different run and
+  drew the same conclusion; attempt 1 of *this* run measured 109.66 MiB
+  (`canon-eval-lane-D.log:227`). Three readings, all two orders of magnitude
+  short. `torch.cuda.empty_cache()` in `src/ard/cli/evaluate.py` — which is all
+  A8 is — reclaims tens of megabytes inside the victim. The gigabytes are in the
+  neighbour. **A8 and packet 0010's Option A remain complementary, not
+  alternatives.**
+  **New evidence: the printed AutoAttack output reproduced digit-for-digit on a
+  second arm-seed, across processes.** Attempt 1 (lane D, `17:59:07+09:00` →
+  `20:04:47+09:00`, **2 h 05 m 40 s**) and attempt 2 (lane M,
+  `23:07:28+09:00` → `00:14:56+09:00`, **1 h 07 m 28 s**; manifest
+  `created_at 14:07:30.459Z` → `finished_at 15:14:55.280Z`) printed:
+  initial accuracy **82.82 %**, `APGD-CE 52.78 %`, `APGD-T 48.66 %`,
+  `FAB-T 48.65 %`, `SQUARE 48.65 %`, `robust accuracy 48.65 %`,
+  `max Linf perturbation 0.03137`, `nan in tensor 0` — identical to the last
+  printed digit, down to the Square batch structure (`39/39`, final batch of 1
+  example). Only the wall clock differed: APGD-CE 194.6 → 101.3 s, APGD-T
+  1371.2 → 757.1 s, FAB-T 4093.4 → 2257.3 s, SQUARE 7490.2 → 4015.4 s.
+  Until now this cross-process reproducibility had been shown only on
+  `r18_trades_49k_validation-s0` (three attempts, 12:52Z and 14:05Z entries).
+  It now holds on a **second arm-seed running a different method** — ADR rather
+  than plain TRADES. Packet 0010's Option A preregisters "the batched and
+  unbatched forms must agree down to the predicted-label sequence"; that rule
+  can be judged without run-to-run noise getting in the way, and this is the
+  second independent demonstration of it.
+  **Those numbers are a log fragment, not a result, and must not enter any
+  record, report or table.** `48.65 %` belongs to a run that did not complete.
+  On disk the evaluation directory holds `panel-best.jsonl`,
+  `sample-stats-best.parquet`, `resolved_evaluation_config.yaml`,
+  `evaluation-lineage.json` and the six `run-bundle/` files — and **no**
+  `evaluation-results.json`, `autoattack-best.json` or `completion.json`.
+  `best.pt`'s clean accuracy and CE-PGD-20 were computed and thrown away with
+  the exception; `last.pt` was never reached. There is nothing to import.
+  (Minor, noted not fixed: the bundle's `failure_snapshot` hashes only five
+  files, so `panel-best.jsonl` and `sample-stats-best.parquet` sit in the
+  directory without being hash-bound.)
+  **The 11:05Z entry's proposed retry command was run with both of its stated
+  preconditions dropped.** That command began with a `mv` to
+  `evaluation.failed-oom-eval-e2da1d97` and said it "must go on an otherwise
+  idle 4090, or it will hit the same allocation at the same point". Neither
+  happened. Lane M started without a `FileExistsError`, and the directory now
+  contains only the `offline-run-20260910_230731-…` W&B segment — so attempt 1's
+  evidence directory was **deleted, not moved**, exactly the loss the 11:21Z
+  addendum asked to stop. And the GPU was not idle: 13.71 GiB of it was lane J.
+  The entry predicted the outcome and the outcome arrived. Attempt 1's numbers
+  survive only because `canon-eval-lane-D.log` was not deleted with the
+  directory. **This attempt's directory is intact; do not delete it.**
+  **Cost.** This attempt burned 1 h 07 m 25 s and recorded nothing. Across two
+  attempts this single arm-seed has consumed **about 3 h 13 m** for zero
+  official-test numbers. The list of runs still needing a model-weights retake
+  is now **five**, not six — `r18_trades_adr-s0` was cleared by lane K's success
+  at `23:06:03+09:00` — leaving `r18_adr-s1`, `r18_adr-s2`, `r18_trades_adr-s1`,
+  `mobilenetv2_adr-s1` and `r18_trades_49k_validation-s0`. At 1.8–3.3 GPU hours
+  each that is **about 9–16.5 GPU hours**.
+  **One proposed retry command — not run by this postrun, and blocked.** It is
+  unchanged from the 11:05Z entry above (`mv` the failed directory aside, then
+  the same `ard.cli.evaluate` invocation from worktree `source-cd0b571e4685`
+  with `--weights model --allow-autoattack` on an otherwise idle 4090). It
+  reproduces the same measurement — `config_hash 90da37ed2020d6f2…`, protocol
+  `controlled_cifar10_r18_adr_v1`, `evaluation_seed 0`, training seeds all 1 bar
+  the fixed `split=20260722`, `world_size 1`, effective global batch 128, source
+  SHA `cd0b571e4685` with an empty diff — not a weakened one. **It must not be
+  run while packet 0010 is `chosen: null`**, and the evidence of this entry is
+  that running it anyway costs an hour and returns nothing.
+  **Two more lanes have died since the 15:12Z census, both without an exit
+  line.** Lane I (`r18_trades_adr-s2`, model, started `18:09:31+09:00`) last
+  printed `square - 4/38` after `FAB-T 48.52 %` (`canon-eval-lane-I.log:160-164`)
+  and has no `eval-done`; lane A (`r18_trades-s1`, model, started
+  `20:25:07+09:00`) never printed `initial accuracy` at all — its log ends at the
+  CIFAR-10 load warning (`canon-eval-lane-A.log:290-291`). **Neither appears in
+  the process table**, so unlike the 11:26Z rule's usual ambiguity these two are
+  confirmed dead; both bundles still read `running`. Per CLAUDE.md rule 3 this is
+  infrastructure for a separate plan and is recorded, not acted on.
+  **Census at 15:21Z, from a full-root watcher scan** (44 bundles). Training:
+  **19 of 20** terminal and successful; `cifar10_mobilenetv2_adr-s0` still never
+  launched. Contract evaluations, model weights: **10 of 20**, unchanged from
+  15:12Z. EMA weights: **3 of 9** (`r18_adr-s0`, `r18_adr-s1`,
+  `mobilenetv2_adr-s2`), unchanged. Terminal-failed and on disk: **2** —
+  `mobilenetv2_adr-s1` (model) and this run. Genuinely alive: **2** — lane J
+  (`r18_trades_49k_validation-s0` model, attempt 4, PID 2388375, 14042 MiB on
+  GPU 0) and lane N (`mobilenetv2_adr-s2` model, PID 2406790, 1710 MiB on
+  GPU 1). Non-terminal and dead: **5** — `mobilenetv2_adr-s1` EMA,
+  `r18_trades_adr-s0` EMA, `r18_trades_adr-s2` model, `r18_trades-s1` model (all
+  reading `running`) and `r18_trades-s2` model (`stale`). No model-weights
+  evaluation bundle on disk at all: `r18_adr-s2`, `r18_trades_adr-s1`.
+  **What this does not unlock.** Arm 3 seed 1 now has an EMA number and still no
+  model-weights number — the mirror image of arm 5's problem. The preregistered
+  primary quantity reads arm 8 − arm 7 against arm 3 − arm 2 on best-checkpoint
+  AutoAttack with **model** weights; arm 3 has one model-weights seed (s0) of
+  three, and arm 8 has none. **M1c, M2 and M3 stay unticked.** The evidence goes
+  to decision packet 0010, whose `chosen` is still null.
