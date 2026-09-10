@@ -1,0 +1,484 @@
+[
+  {
+    "autoattack": {
+      "attack_version": "standard",
+      "autoattack_accuracy": 0.4763000011444092,
+      "batch_size": 128,
+      "epsilon": 0.03137254901960784,
+      "norm": "Linf",
+      "provenance": {
+        "direct_url": {
+          "url": "https://github.com/fra31/auto-attack",
+          "vcs_info": {
+            "commit_id": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+            "vcs": "git"
+          }
+        },
+        "distribution": {
+          "name": "autoattack",
+          "version": "0.1"
+        },
+        "expected_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+        "licenses": [
+          {
+            "path": "autoattack-0.1.dist-info/licenses/LICENSE",
+            "sha256": "ff88cd04d9c3d141115d733ef17ed1b368d0ca10e0b58e15891c2385d1877b5d"
+          }
+        ],
+        "mode": "installed",
+        "source_paths": [
+          "__init__.py",
+          "autoattack.py",
+          "autopgd_base.py",
+          "checks.py",
+          "fab_base.py",
+          "fab_projections.py",
+          "fab_pt.py",
+          "fab_tf.py",
+          "other_utils.py",
+          "square.py",
+          "state.py",
+          "utils_tf.py",
+          "utils_tf2.py"
+        ],
+        "source_sha256": "e74d6dab0e34faf840f1bdfe0f77e9ddcc5f753a7426cbaa54b11bf17f896487",
+        "vcs_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e"
+      },
+      "seed": 0,
+      "version": "0.1"
+    },
+    "checkpoint": "best.pt",
+    "checkpoint_alias": "best",
+    "checkpoint_filename": "best.pt",
+    "checkpoint_sha256": "db8b9d6438c9c09314bb65f75ab024d159adedf9b90ef32768a03322a252536c",
+    "clean_accuracy": 0.8201,
+    "config_hash": "4f99a3f46498a162930dfc1b7ac9d16fd7afd6c0c70365da3857ec86a39c63ac",
+    "count": 10000,
+    "dataset": "cifar10",
+    "dataset_identity": {
+      "classes": 10,
+      "content_fingerprint": "c58f30108f718f92721af3b95e74349a",
+      "image_size": 32,
+      "name": "cifar10",
+      "split": "test",
+      "version": "torchvision-cifar10"
+    },
+    "dataset_provenance": {
+      "root": "/home/shunsukenaito/workspace-local/datasets/ard/torchvision"
+    },
+    "evaluation_protocol_identity": {
+      "attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 20,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true
+      },
+      "autoattack": {
+        "batch_size": 128,
+        "enabled": true
+      },
+      "loader_batch_size": 128,
+      "seed": 0
+    },
+    "evaluation_seed": 0,
+    "method": "pgd_at",
+    "method_identity": {
+      "attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 10,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true,
+        "trace_step_losses": false
+      },
+      "entropy_gamma": 1.0,
+      "frozen_oracle_manifest": null,
+      "frozen_oracle_manifest_sha256": null,
+      "id": "pgd_at",
+      "oracle_mask": false,
+      "selection_attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 20,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true,
+        "trace_step_losses": false
+      },
+      "student_ema_decay": 0.9,
+      "student_policy_warmup_epochs": 1,
+      "target_policy": null,
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "trades_beta": 6.0,
+      "version": 1
+    },
+    "panel": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/outputs/evaluation/pgd-at-controlled-s0-aa-f0c3ace/panel-best.jsonl",
+    "pgd_accuracy": 0.5112,
+    "runtime_method": "pgd_at",
+    "sample_stats": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/outputs/evaluation/pgd-at-controlled-s0-aa-f0c3ace/sample-stats-best.parquet",
+    "seed": 0,
+    "student": "saad_resnet18_cifar_v1",
+    "student_identity": {
+      "architecture": "saad_resnet18_cifar_v1",
+      "normalization": {
+        "input_domain": "pixel_0_1",
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "profile": "cifar10_raw_identity",
+        "provenance": "CIFAR-10 raw-pixel identity profile for clean-room SAAD student",
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "num_classes": 10,
+      "preprocessing_owner": "student_adapter"
+    },
+    "teacher": null,
+    "teacher_identity": null,
+    "threat_hash": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+    "threat_model": {
+      "epsilon": "8/255",
+      "epsilon_value": 0.03137254901960784,
+      "input_domain": "pixel_0_1",
+      "kl_target": null,
+      "loss": "ce",
+      "norm": "linf",
+      "random_start": true,
+      "step_size": "2/255",
+      "step_size_value": 0.00784313725490196,
+      "steps": 20,
+      "student_mode": "eval",
+      "teacher_mode": "eval",
+      "temperature": 1.0,
+      "temperature_squared": true
+    },
+    "train_run_id": "pgd-at-controlled-s0-c2220f1",
+    "training_config_migration": {
+      "applied": [],
+      "raw_mapping_hash": "4f99a3f46498a162930dfc1b7ac9d16fd7afd6c0c70365da3857ec86a39c63ac",
+      "runtime_method_id": "pgd_at",
+      "source_method_id": "pgd_at"
+    },
+    "training_dataset_identity": {
+      "classes": 10,
+      "content_fingerprint": "c58f30108f718f92721af3b95e74349a",
+      "image_size": 32,
+      "name": "cifar10",
+      "split": "train",
+      "version": "torchvision-cifar10"
+    },
+    "training_protocol_identity": {
+      "deterministic": true,
+      "epochs": 200,
+      "execution": {
+        "batchnorm_mode": "local_per_rank",
+        "effective_global_batch_size": 128,
+        "global_batch_size": 128,
+        "per_rank_batch_size": 128,
+        "world_size": 1
+      },
+      "id": "controlled_cifar10_r18_v1",
+      "optimizer": {
+        "id": "sgd",
+        "learning_rate": 0.1,
+        "momentum": 0.9,
+        "nesterov": false,
+        "weight_decay": 0.0005
+      },
+      "scheduler": {
+        "gamma": 0.1,
+        "id": "multistep",
+        "milestones": [
+          100,
+          150
+        ],
+        "step_at": "epoch_end"
+      },
+      "validation_fraction": 0.1
+    },
+    "training_seed": 0,
+    "training_seeds": {
+      "augmentation": 0,
+      "data_order": 0,
+      "evaluation_attack": 0,
+      "model_init": 0,
+      "qualitative_panel": 0,
+      "split": 20260722,
+      "train_attack": 0
+    }
+  },
+  {
+    "autoattack": {
+      "attack_version": "standard",
+      "autoattack_accuracy": 0.40359997749328613,
+      "batch_size": 128,
+      "epsilon": 0.03137254901960784,
+      "norm": "Linf",
+      "provenance": {
+        "direct_url": {
+          "url": "https://github.com/fra31/auto-attack",
+          "vcs_info": {
+            "commit_id": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+            "vcs": "git"
+          }
+        },
+        "distribution": {
+          "name": "autoattack",
+          "version": "0.1"
+        },
+        "expected_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+        "licenses": [
+          {
+            "path": "autoattack-0.1.dist-info/licenses/LICENSE",
+            "sha256": "ff88cd04d9c3d141115d733ef17ed1b368d0ca10e0b58e15891c2385d1877b5d"
+          }
+        ],
+        "mode": "installed",
+        "source_paths": [
+          "__init__.py",
+          "autoattack.py",
+          "autopgd_base.py",
+          "checks.py",
+          "fab_base.py",
+          "fab_projections.py",
+          "fab_pt.py",
+          "fab_tf.py",
+          "other_utils.py",
+          "square.py",
+          "state.py",
+          "utils_tf.py",
+          "utils_tf2.py"
+        ],
+        "source_sha256": "e74d6dab0e34faf840f1bdfe0f77e9ddcc5f753a7426cbaa54b11bf17f896487",
+        "vcs_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e"
+      },
+      "seed": 0,
+      "version": "0.1"
+    },
+    "checkpoint": "last.pt",
+    "checkpoint_alias": "last",
+    "checkpoint_filename": "last.pt",
+    "checkpoint_sha256": "41839880e6cb9de053fedc865a0baae3b2b6f82dc9eaf38bf467728c5e2f6261",
+    "clean_accuracy": 0.8446,
+    "config_hash": "4f99a3f46498a162930dfc1b7ac9d16fd7afd6c0c70365da3857ec86a39c63ac",
+    "count": 10000,
+    "dataset": "cifar10",
+    "dataset_identity": {
+      "classes": 10,
+      "content_fingerprint": "c58f30108f718f92721af3b95e74349a",
+      "image_size": 32,
+      "name": "cifar10",
+      "split": "test",
+      "version": "torchvision-cifar10"
+    },
+    "dataset_provenance": {
+      "root": "/home/shunsukenaito/workspace-local/datasets/ard/torchvision"
+    },
+    "evaluation_protocol_identity": {
+      "attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 20,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true
+      },
+      "autoattack": {
+        "batch_size": 128,
+        "enabled": true
+      },
+      "loader_batch_size": 128,
+      "seed": 0
+    },
+    "evaluation_seed": 0,
+    "method": "pgd_at",
+    "method_identity": {
+      "attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 10,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true,
+        "trace_step_losses": false
+      },
+      "entropy_gamma": 1.0,
+      "frozen_oracle_manifest": null,
+      "frozen_oracle_manifest_sha256": null,
+      "id": "pgd_at",
+      "oracle_mask": false,
+      "selection_attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 20,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true,
+        "trace_step_losses": false
+      },
+      "student_ema_decay": 0.9,
+      "student_policy_warmup_epochs": 1,
+      "target_policy": null,
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "trades_beta": 6.0,
+      "version": 1
+    },
+    "panel": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/outputs/evaluation/pgd-at-controlled-s0-aa-f0c3ace/panel-last.jsonl",
+    "pgd_accuracy": 0.4189,
+    "runtime_method": "pgd_at",
+    "sample_stats": "/home/islab/workspace-local/shunsuke.naito/ard_codex_bootstrap/outputs/evaluation/pgd-at-controlled-s0-aa-f0c3ace/sample-stats-last.parquet",
+    "seed": 0,
+    "student": "saad_resnet18_cifar_v1",
+    "student_identity": {
+      "architecture": "saad_resnet18_cifar_v1",
+      "normalization": {
+        "input_domain": "pixel_0_1",
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "profile": "cifar10_raw_identity",
+        "provenance": "CIFAR-10 raw-pixel identity profile for clean-room SAAD student",
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "num_classes": 10,
+      "preprocessing_owner": "student_adapter"
+    },
+    "teacher": null,
+    "teacher_identity": null,
+    "threat_hash": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+    "threat_model": {
+      "epsilon": "8/255",
+      "epsilon_value": 0.03137254901960784,
+      "input_domain": "pixel_0_1",
+      "kl_target": null,
+      "loss": "ce",
+      "norm": "linf",
+      "random_start": true,
+      "step_size": "2/255",
+      "step_size_value": 0.00784313725490196,
+      "steps": 20,
+      "student_mode": "eval",
+      "teacher_mode": "eval",
+      "temperature": 1.0,
+      "temperature_squared": true
+    },
+    "train_run_id": "pgd-at-controlled-s0-c2220f1",
+    "training_config_migration": {
+      "applied": [],
+      "raw_mapping_hash": "4f99a3f46498a162930dfc1b7ac9d16fd7afd6c0c70365da3857ec86a39c63ac",
+      "runtime_method_id": "pgd_at",
+      "source_method_id": "pgd_at"
+    },
+    "training_dataset_identity": {
+      "classes": 10,
+      "content_fingerprint": "c58f30108f718f92721af3b95e74349a",
+      "image_size": 32,
+      "name": "cifar10",
+      "split": "train",
+      "version": "torchvision-cifar10"
+    },
+    "training_protocol_identity": {
+      "deterministic": true,
+      "epochs": 200,
+      "execution": {
+        "batchnorm_mode": "local_per_rank",
+        "effective_global_batch_size": 128,
+        "global_batch_size": 128,
+        "per_rank_batch_size": 128,
+        "world_size": 1
+      },
+      "id": "controlled_cifar10_r18_v1",
+      "optimizer": {
+        "id": "sgd",
+        "learning_rate": 0.1,
+        "momentum": 0.9,
+        "nesterov": false,
+        "weight_decay": 0.0005
+      },
+      "scheduler": {
+        "gamma": 0.1,
+        "id": "multistep",
+        "milestones": [
+          100,
+          150
+        ],
+        "step_at": "epoch_end"
+      },
+      "validation_fraction": 0.1
+    },
+    "training_seed": 0,
+    "training_seeds": {
+      "augmentation": 0,
+      "data_order": 0,
+      "evaluation_attack": 0,
+      "model_init": 0,
+      "qualitative_panel": 0,
+      "split": 20260722,
+      "train_attack": 0
+    }
+  }
+]

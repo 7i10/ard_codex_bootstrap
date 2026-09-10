@@ -5,19 +5,23 @@
 - Owner: human (scientific decisions), Claude Code (execution)
 - Base SHA: `cd0b571e4685fbe02d7655a22b06397c7b8d9a28` (pinned worktree
   `source-cd0b571e4685`, created 2026-09-09)
-- Current milestone: M0 and M1a complete; M1c execution under way (10 of the
-  20 training runs have run dirs under the local campaign root, and **all 10**
-  are now terminal and successful — the tenth is
-  `cifar10_mobilenetv2_pgd_at-s0`, the campaign's **first arm-7 run, i.e. the
-  matched baseline of the decision rule's primary MobileNetV2 leg**; 5 of
-  the 20 contract model-weights evaluations are terminal — arm 2 seeds 1 and
-  0, arm 3 seed 0, arm 1 seeds 1 and 2 (arm 1's **full three-seed set**, the
-  campaign's first complete arm) — plus 1 of the 9 ADR-family EMA-weights
-  evaluations, arm 3 seed 0. Nothing is running on Hamster and **five**
-  terminal training runs have no contract evaluation; Ferret's three GPUs are
-  occupied by jobs this session cannot attribute to any local run dir) and its
-  checkbox stays unticked until the full 20-job launch is verified; M1b and
-  M2/M3 open
+- Current milestone: M0, M1a, M1b complete. M1c execution under way: on
+  Hamster, all 10 locally-run jobs are terminal and successful, and 7 of them
+  now have canonical contract evaluations (model weights, plus EMA weights
+  for the ADR-family arm) — every one checked against the literature/
+  consistency expectations in the standing autonomous-check instruction, with
+  **no deviation and no bug found in any of them**, including the primary
+  comparison's new Nesterov-matched baseline (`pgd_at_nesterov-s0`) and a
+  second ADR seed (`adr-s0`, EMA best 49.61% AA). On Ferret, several jobs are
+  terminal (needing evaluation and `ferret-collect`), several are still
+  running, and `mobilenetv2_pgd_at` seeds 1/2 were pulled forward from
+  Ferret's queue onto Hamster's now-idle GPUs once Hamster's own share
+  finished, to shorten the campaign's remaining wall-clock. M1c's checkbox
+  stays unticked until the full 20-job launch is verified complete; M2/M3
+  open. A real bug was found and fixed this session in
+  `scripts/aggregate_adr_cifar10_replication.py`'s `_load_arm_seed` (wrong
+  run-directory prefix for every arm, not just MobileNetV2 — see Progress
+  log) — fixed before it could break M3.
 - Last updated: 2026-09-10
 
 ## Goal
@@ -227,7 +231,7 @@ is a multi-day unattended campaign, not a same-session one.
   base SHA).
 - [x] M1a: resolve the historical-reuse question (confirmed above) and
   finalize seeds (0, 1, 2).
-- [ ] M1b: archive the two reused historical bundles (PGD-AT seed 0, TRADES
+- [x] M1b: archive the two reused historical bundles (PGD-AT seed 0, TRADES
   seed 0 fixed) out of `outputs/`/the runtime tree and into a committed
   record with `.sha256`, so this campaign's aggregation has something
   durable to read instead of only machine-emitted bundles outside the repo.
@@ -1888,3 +1892,66 @@ is a multi-day unattended campaign, not a same-session one.
   as a count of unlaunched work.** Launching anything, and queueing the five
   missing evaluations, is a decision for the human — this postrun launches
   nothing. M1b and M1c stay unticked.
+
+- **2026-09-10, M1b closed + evaluation sweep + Ferret-queue rebalancing +
+  aggregator bug fix.** Per the user's standing autonomous-check-and-fix
+  authorization:
+  - **M1b**: archived both reused historical bundles (PGD-AT
+    `pgd-at-controlled-s0-c2220f1`, TRADES `trades-fix-v1-s0-attempt2`) into
+    `docs/experiments/historical/{pgd_at_controlled_s0_c2220f1,trades_fix_v1_seed0}/`
+    — `evaluation-results-{pgd20,aa}.json`, `resolved_config.yaml`, a
+    hand-written `provenance.json`, and a bare-hash `.sha256` next to each
+    file. Before copying, independently recomputed `sha256sum` on both
+    runs' actual `best.pt`/`last.pt` and confirmed exact equality with the
+    `checkpoint_sha256` field already inside each evaluation-results.json
+    (not assumed) — both bundles' numbers are genuinely tied to the
+    checkpoints they claim to evaluate.
+  - **Evaluation sweep**: ran canonical contract evaluations (CE-PGD20 +
+    AutoAttack, `checkpoints: both`, model weights and — where the arm has
+    one — EMA weights) for every training-terminal, not-yet-evaluated
+    seed reachable at the time: `pgd_at-s1/-s2`, `pgd_at_nesterov-s0/-s1`
+    (Hamster) and `-s2` (Ferret), `adr-s0` (model + EMA). All 7 came back
+    sane against the literature/consistency expectations, no bug found:
+    `pgd_at` vs `pgd_at_nesterov` 3-seed mean best-AutoAttack differs by
+    0.04pp (contract predicts ~0); `adr-s0` best-AutoAttack 48.75%
+    (model) / 49.61% (EMA), both within ~0.1-0.9pp of seed 1's already-known
+    48.65%; AutoAttack ≤ CE-PGD20 by a sane margin everywhere; no clean-
+    accuracy collapse anywhere. Two Ferret seeds (`trades-s2`,
+    `trades_49k_validation-s0`) were left unevaluated — no literature
+    baseline was on hand to judge deviation for the `trades` arm in that
+    pass, out of scope, not a problem found.
+  - **Ferret-queue rebalancing**: found Hamster's own 10-job share complete
+    and both its GPUs idle while Ferret's queues still had
+    `mobilenetv2_pgd_at` seeds 1 and 2 queued (not missing — confirmed by
+    reading all three driver scripts' job lists end-to-end — just later in
+    each GPU's sequential queue, behind still-running jobs). Stopped the two
+    relevant local Ferret-driver polling loops (PIDs 1616152/1616153 — these
+    are local bash processes tracking remote job status, not the remote
+    training jobs themselves, which are detached and unaffected) with the
+    user's explicit permission, and launched both seeds directly on
+    Hamster's now-idle GPUs 0/1 instead, to avoid a redundant duplicate
+    launch once Ferret's queue would otherwise have reached them, and to
+    finish them sooner than waiting behind Ferret's remaining queue.
+  - **Aggregator bug found and fixed** (pre-existing, from this session's
+    earlier authoring of `scripts/aggregate_adr_cifar10_replication.py`, not
+    from a run — caught while cross-checking an earlier automated postrun's
+    note above about an "eighth instance" of a directory-naming defect):
+    `_load_arm_seed` built `run_root / f"{arm_key}-s{seed}"`, which is wrong
+    for **every** arm, not only MobileNetV2 — actual run directories carry a
+    `cifar10_r18_` prefix for arms 1-6 and `cifar10_` for arms 7-8, neither
+    of which matches the bare `ARMS` dict key. Fixed by adding a
+    `"dir_prefix"` field to every `ARMS` entry and using
+    `f"{arm['dir_prefix']}{arm_key}-s{seed}"`; smoke-tested against three
+    real run directories (`pgd_at`, `mobilenetv2_pgd_at`, `adr`) to confirm
+    the resolved paths now exist on disk. This would otherwise have broken
+    M3 for every arm, not just MobileNetV2, the moment the aggregator was
+    first run for real.
+  - Remaining before M1c can close: Ferret still has `mobilenetv2_adr-s0/-s2`
+    and `trades_adr-s2` running, plus `adr-s2`, `trades-s2`,
+    `trades_49k_validation-s0`, `trades_adr-s1`, and now-superseded-on-Ferret
+    `mobilenetv2_pgd_at-s1/-s2` sitting terminal-but-uncollected — all need
+    `ferret-collect` into the canonical local run root and then canonical
+    evaluation, matching the same literature/consistency check as above,
+    especially the still-unchecked `trades_adr` arm (never validated before,
+    teacher-free EMA + TRADES combination) and the `trades_49k_validation`
+    pilot (the diagnostic this campaign exists partly to answer).

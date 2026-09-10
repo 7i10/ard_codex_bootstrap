@@ -1,0 +1,38 @@
+{
+  "purpose": "Archive of a historical run reused as seed 0 of the 'pgd_at' arm in docs/plans/0097-adr-cifar10-replication.md, per that plan's 'Historical reuse - confirmed' section (2026-09-09). Not re-run for the ADR CIFAR-10 replication campaign.",
+  "run_id": "pgd-at-controlled-s0-c2220f1",
+  "source_git_sha_short": "c2220f1",
+  "original_train_bundle_path": "outputs/scientific/pgd-at-controlled-s0-c2220f1/ (gitignored, machine-emitted, not itself committed)",
+  "original_evaluation_bundle_paths": [
+    "outputs/evaluation/pgd-at-controlled-s0-pgd20-f0c3ace/evaluation-results.json",
+    "outputs/evaluation/pgd-at-controlled-s0-aa-f0c3ace/evaluation-results.json"
+  ],
+  "config": "configs/scientific/cifar10_r18_pgd_at.yaml",
+  "protocol": "controlled_cifar10_r18_v1",
+  "method": "pgd_at",
+  "seed": 0,
+  "checkpoints": {
+    "best": {
+      "filename": "best.pt",
+      "sha256": "db8b9d6438c9c09314bb65f75ab024d159adedf9b90ef32768a03322a252536c",
+      "clean_accuracy": 0.8201,
+      "pgd20_accuracy": 0.5112,
+      "autoattack_accuracy": 0.4763
+    },
+    "last": {
+      "filename": "last.pt",
+      "sha256": "41839880e6cb9de053fedc865a0baae3b2b6f82dc9eaf38bf467728c5e2f6261",
+      "clean_accuracy": 0.8446,
+      "pgd20_accuracy": 0.4189,
+      "autoattack_accuracy": 0.4036
+    }
+  },
+  "autoattack_provenance": {
+    "attack_version": "standard",
+    "vcs_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+    "count": 10000,
+    "split": "test"
+  },
+  "verification_2026-09-10": "checkpoint_sha256 in both archived evaluation-results.json files matches sha256sum of the actual best.pt/last.pt on disk at the original bundle path (recomputed directly, not assumed) before this archive was written. Not re-evaluated; only the existing, already-verified (2026-09-09, field-by-field contract equality) evaluation output is archived here.",
+  "reuse_gap_note": "Contract field equality against configs/scientific/cifar10_r18_pgd_at.yaml was established by a bug-investigator agent on 2026-09-09 (see plan 0097's 'Historical reuse - confirmed' section); config_hash differs from a fresh run because the config schema has gained fields since this run, which is expected and does not indicate a contract mismatch."
+}

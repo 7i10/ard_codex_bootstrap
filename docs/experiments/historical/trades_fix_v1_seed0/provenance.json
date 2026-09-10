@@ -1,0 +1,38 @@
+{
+  "purpose": "Archive of a historical run reused as seed 0 of the 'trades' arm in docs/plans/0097-adr-cifar10-replication.md, per that plan's 'Historical reuse - confirmed' section (2026-09-09). This is the bug-fixed TRADES run, NOT outputs/scientific/trades-controlled-s0-f0c3ace/ (the pre-fix defective run with a detached clean-target KL term, documented in docs/debugging/0028-trades-clean-target-detached.md). Not re-run for the ADR CIFAR-10 replication campaign.",
+  "run_id": "trades-fix-v1-s0-attempt2",
+  "source_git_sha_short": "ee9ced0",
+  "original_train_bundle_path": "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/ (outside the repo, in the runtime tree, not itself committed)",
+  "original_evaluation_bundle_paths": [
+    "<runtime tree>/trades-fix-v1/seed0/eval-pgd/evaluation-results.json",
+    "<runtime tree>/trades-fix-v1/seed0/eval-aa/evaluation-results.json"
+  ],
+  "config": "configs/scientific/cifar10_r18_trades.yaml",
+  "protocol": "controlled_cifar10_r18_v1",
+  "method": "trades",
+  "seed": 0,
+  "checkpoints": {
+    "best": {
+      "filename": "best.pt",
+      "sha256": "2b8d3b9deb06ba42a4bf63b018a173292daecf34e3ec8dc42c9ad1412c8b5937",
+      "clean_accuracy": 0.8235,
+      "pgd20_accuracy": 0.5066,
+      "autoattack_accuracy": 0.4787
+    },
+    "last": {
+      "filename": "last.pt",
+      "sha256": "144b45af3e838930d837051744322a0549c4fa29d0d2c94e5c178f5188668954",
+      "clean_accuracy": 0.8224,
+      "pgd20_accuracy": 0.4749,
+      "autoattack_accuracy": 0.4499
+    }
+  },
+  "autoattack_provenance": {
+    "attack_version": "standard",
+    "vcs_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+    "count": 10000,
+    "split": "test"
+  },
+  "verification_2026-09-10": "checkpoint_sha256 in both archived evaluation-results.json files matches sha256sum of the actual best.pt/last.pt on disk at the original bundle path (recomputed directly, not assumed) before this archive was written. Not re-evaluated; only the existing, already-verified (2026-09-09, field-by-field contract equality) evaluation output is archived here.",
+  "reuse_gap_note": "Contract field equality against configs/scientific/cifar10_r18_trades.yaml, including validation_fraction and seeds.split, was established by a bug-investigator agent on 2026-09-09 (see plan 0097's 'Historical reuse - confirmed' section); config_hash differs from a fresh run because the config schema has gained fields since this run, which is expected and does not indicate a contract mismatch. Known ~1.2-1.5pp AutoAttack gap vs. literature comparators (AdaAD 49.21%, RSLAD 49.23%, RSLAD-300 49.50%) is disclosed, not resolved -- it motivated the trades_49k_validation pilot arm in plan 0097, not a re-run of this seed."
+}

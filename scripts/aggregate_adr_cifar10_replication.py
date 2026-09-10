@@ -48,6 +48,7 @@ ARMS: dict[str, dict[str, Any]] = {
         "has_ema": False,
         "role": "baseline_r18_plain_sgd",
         "seeds": (0, 1, 2),
+        "dir_prefix": "cifar10_r18_",
     },
     "pgd_at_nesterov": {
         "protocol": "controlled_cifar10_r18_adr_v1",
@@ -55,6 +56,7 @@ ARMS: dict[str, dict[str, Any]] = {
         "has_ema": False,
         "role": "baseline_r18_nesterov_matched",
         "seeds": (0, 1, 2),
+        "dir_prefix": "cifar10_r18_",
     },
     "adr": {
         "protocol": "controlled_cifar10_r18_adr_v1",
@@ -62,6 +64,7 @@ ARMS: dict[str, dict[str, Any]] = {
         "has_ema": True,
         "role": "adr_r18",
         "seeds": (0, 1, 2),
+        "dir_prefix": "cifar10_r18_",
     },
     "trades": {
         "protocol": "controlled_cifar10_r18_v1",
@@ -69,6 +72,7 @@ ARMS: dict[str, dict[str, Any]] = {
         "has_ema": False,
         "role": "baseline_trades_r18",
         "seeds": (0, 1, 2),
+        "dir_prefix": "cifar10_r18_",
     },
     "trades_adr": {
         "protocol": "controlled_cifar10_r18_adr_v1",
@@ -76,6 +80,7 @@ ARMS: dict[str, dict[str, Any]] = {
         "has_ema": True,
         "role": "adr_trades_r18",
         "seeds": (0, 1, 2),
+        "dir_prefix": "cifar10_r18_",
     },
     "trades_49k_validation": {
         "protocol": "controlled_cifar10_r18_trades_49k_validation_v1",
@@ -83,6 +88,7 @@ ARMS: dict[str, dict[str, Any]] = {
         "has_ema": False,
         "role": "trades_49k_validation_pilot",
         "seeds": (0,),
+        "dir_prefix": "cifar10_r18_",
     },
     "mobilenetv2_pgd_at": {
         "protocol": "controlled_cifar10_mobilenetv2_adr_v1",
@@ -90,6 +96,7 @@ ARMS: dict[str, dict[str, Any]] = {
         "has_ema": False,
         "role": "baseline_mobilenetv2",
         "seeds": (0, 1, 2),
+        "dir_prefix": "cifar10_",
     },
     "mobilenetv2_adr": {
         "protocol": "controlled_cifar10_mobilenetv2_adr_v1",
@@ -97,6 +104,7 @@ ARMS: dict[str, dict[str, Any]] = {
         "has_ema": True,
         "role": "adr_mobilenetv2",
         "seeds": (0, 1, 2),
+        "dir_prefix": "cifar10_",
     },
 }
 
@@ -266,7 +274,7 @@ def _load_arm_seed(
             "model": {alias: dict(reused["checkpoints"][alias]) for alias in ALIASES},
             "ema": None,
         }
-    run_dir = run_root / f"{arm_key}-s{seed}" / "train"
+    run_dir = run_root / f"{arm['dir_prefix']}{arm_key}-s{seed}" / "train"
     bundle = _verify_bundle(run_dir, expected_protocol=arm["protocol"])
     model_rows = _load_rows(run_dir / "evaluation" / "evaluation-results.json", expected_method=arm["method"], expect_weights="model")
     model = {alias: _extract(model_rows[alias]) for alias in ALIASES}

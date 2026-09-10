@@ -1,0 +1,396 @@
+[
+  {
+    "autoattack": null,
+    "checkpoint": "best.pt",
+    "checkpoint_alias": "best",
+    "checkpoint_filename": "best.pt",
+    "checkpoint_sha256": "2b8d3b9deb06ba42a4bf63b018a173292daecf34e3ec8dc42c9ad1412c8b5937",
+    "clean_accuracy": 0.8235,
+    "config_hash": "cbed20a1330c49e9deb9efb84856550e7e47872e1157019c6e979d3111cc8299",
+    "count": 10000,
+    "dataset": "cifar10",
+    "dataset_identity": {
+      "classes": 10,
+      "content_fingerprint": "c58f30108f718f92721af3b95e74349a",
+      "image_size": 32,
+      "name": "cifar10",
+      "split": "test",
+      "version": "torchvision-cifar10"
+    },
+    "dataset_provenance": {
+      "root": "/home/shunsukenaito/workspace-local/datasets/ard/torchvision"
+    },
+    "evaluation_protocol_identity": {
+      "attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 20,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true
+      },
+      "autoattack": {
+        "batch_size": 128,
+        "enabled": false
+      },
+      "loader_batch_size": 128,
+      "seed": 0
+    },
+    "evaluation_seed": 0,
+    "method": "trades",
+    "method_identity": {
+      "attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": "student_clean",
+        "loss": "kl",
+        "norm": "linf",
+        "random_start": true,
+        "random_start_keying": "batch",
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 10,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true,
+        "trace_step_losses": false
+      },
+      "entropy_gamma": 1.0,
+      "frozen_oracle_manifest": null,
+      "frozen_oracle_manifest_sha256": null,
+      "id": "trades",
+      "oracle_mask": false,
+      "selection_attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "random_start_keying": "batch",
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 20,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true,
+        "trace_step_losses": false
+      },
+      "student_ema_decay": 0.9,
+      "student_policy_warmup_epochs": 1,
+      "target_policy": null,
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "trades_beta": 6.0,
+      "version": 1
+    },
+    "panel": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/eval-pgd/panel-best.jsonl",
+    "pgd_accuracy": 0.5066,
+    "runtime_method": "trades",
+    "sample_stats": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/eval-pgd/sample-stats-best.parquet",
+    "seed": 0,
+    "student": "saad_resnet18_cifar_v1",
+    "student_identity": {
+      "architecture": "saad_resnet18_cifar_v1",
+      "normalization": {
+        "input_domain": "pixel_0_1",
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "profile": "cifar10_raw_identity",
+        "provenance": "CIFAR-10 raw-pixel identity profile for clean-room SAAD student",
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "num_classes": 10,
+      "preprocessing_owner": "student_adapter"
+    },
+    "teacher": null,
+    "teacher_identity": null,
+    "threat_hash": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+    "threat_model": {
+      "epsilon": "8/255",
+      "epsilon_value": 0.03137254901960784,
+      "input_domain": "pixel_0_1",
+      "kl_target": null,
+      "loss": "ce",
+      "norm": "linf",
+      "random_start": true,
+      "step_size": "2/255",
+      "step_size_value": 0.00784313725490196,
+      "steps": 20,
+      "student_mode": "eval",
+      "teacher_mode": "eval",
+      "temperature": 1.0,
+      "temperature_squared": true
+    },
+    "train_run_id": "trades-fix-v1-s0-attempt2",
+    "training_config_migration": {
+      "applied": [],
+      "raw_mapping_hash": "cbed20a1330c49e9deb9efb84856550e7e47872e1157019c6e979d3111cc8299",
+      "runtime_method_id": "trades",
+      "source_method_id": "trades"
+    },
+    "training_dataset_identity": {
+      "classes": 10,
+      "content_fingerprint": "c58f30108f718f92721af3b95e74349a",
+      "image_size": 32,
+      "name": "cifar10",
+      "split": "train",
+      "version": "torchvision-cifar10"
+    },
+    "training_protocol_identity": {
+      "deterministic": true,
+      "epochs": 200,
+      "execution": {
+        "batchnorm_mode": "local_per_rank",
+        "effective_global_batch_size": 128,
+        "global_batch_size": 128,
+        "per_rank_batch_size": 128,
+        "world_size": 1
+      },
+      "id": "controlled_cifar10_r18_v1",
+      "optimizer": {
+        "id": "sgd",
+        "learning_rate": 0.1,
+        "momentum": 0.9,
+        "nesterov": false,
+        "weight_decay": 0.0005
+      },
+      "scheduler": {
+        "gamma": 0.1,
+        "id": "multistep",
+        "milestones": [
+          100,
+          150
+        ],
+        "step_at": "epoch_end"
+      },
+      "validation_fraction": 0.1
+    },
+    "training_seed": 0,
+    "training_seeds": {
+      "augmentation": 0,
+      "data_order": 0,
+      "evaluation_attack": 0,
+      "model_init": 0,
+      "qualitative_panel": 0,
+      "split": 20260722,
+      "train_attack": 0
+    }
+  },
+  {
+    "autoattack": null,
+    "checkpoint": "last.pt",
+    "checkpoint_alias": "last",
+    "checkpoint_filename": "last.pt",
+    "checkpoint_sha256": "144b45af3e838930d837051744322a0549c4fa29d0d2c94e5c178f5188668954",
+    "clean_accuracy": 0.8224,
+    "config_hash": "cbed20a1330c49e9deb9efb84856550e7e47872e1157019c6e979d3111cc8299",
+    "count": 10000,
+    "dataset": "cifar10",
+    "dataset_identity": {
+      "classes": 10,
+      "content_fingerprint": "c58f30108f718f92721af3b95e74349a",
+      "image_size": 32,
+      "name": "cifar10",
+      "split": "test",
+      "version": "torchvision-cifar10"
+    },
+    "dataset_provenance": {
+      "root": "/home/shunsukenaito/workspace-local/datasets/ard/torchvision"
+    },
+    "evaluation_protocol_identity": {
+      "attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 20,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true
+      },
+      "autoattack": {
+        "batch_size": 128,
+        "enabled": false
+      },
+      "loader_batch_size": 128,
+      "seed": 0
+    },
+    "evaluation_seed": 0,
+    "method": "trades",
+    "method_identity": {
+      "attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": "student_clean",
+        "loss": "kl",
+        "norm": "linf",
+        "random_start": true,
+        "random_start_keying": "batch",
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 10,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true,
+        "trace_step_losses": false
+      },
+      "entropy_gamma": 1.0,
+      "frozen_oracle_manifest": null,
+      "frozen_oracle_manifest_sha256": null,
+      "id": "trades",
+      "oracle_mask": false,
+      "selection_attack": {
+        "epsilon": "8/255",
+        "epsilon_value": 0.03137254901960784,
+        "input_domain": "pixel_0_1",
+        "kl_target": null,
+        "loss": "ce",
+        "norm": "linf",
+        "random_start": true,
+        "random_start_keying": "batch",
+        "step_size": "2/255",
+        "step_size_value": 0.00784313725490196,
+        "steps": 20,
+        "student_mode": "eval",
+        "teacher_mode": "eval",
+        "temperature": 1.0,
+        "temperature_squared": true,
+        "trace_step_losses": false
+      },
+      "student_ema_decay": 0.9,
+      "student_policy_warmup_epochs": 1,
+      "target_policy": null,
+      "temperature": 1.0,
+      "temperature_squared": true,
+      "trades_beta": 6.0,
+      "version": 1
+    },
+    "panel": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/eval-pgd/panel-last.jsonl",
+    "pgd_accuracy": 0.4749,
+    "runtime_method": "trades",
+    "sample_stats": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/eval-pgd/sample-stats-last.parquet",
+    "seed": 0,
+    "student": "saad_resnet18_cifar_v1",
+    "student_identity": {
+      "architecture": "saad_resnet18_cifar_v1",
+      "normalization": {
+        "input_domain": "pixel_0_1",
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "profile": "cifar10_raw_identity",
+        "provenance": "CIFAR-10 raw-pixel identity profile for clean-room SAAD student",
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "num_classes": 10,
+      "preprocessing_owner": "student_adapter"
+    },
+    "teacher": null,
+    "teacher_identity": null,
+    "threat_hash": "7081101693340e70d24d522563f3c26bb935198a72865a5a8a26a5f305dcc4f2",
+    "threat_model": {
+      "epsilon": "8/255",
+      "epsilon_value": 0.03137254901960784,
+      "input_domain": "pixel_0_1",
+      "kl_target": null,
+      "loss": "ce",
+      "norm": "linf",
+      "random_start": true,
+      "step_size": "2/255",
+      "step_size_value": 0.00784313725490196,
+      "steps": 20,
+      "student_mode": "eval",
+      "teacher_mode": "eval",
+      "temperature": 1.0,
+      "temperature_squared": true
+    },
+    "train_run_id": "trades-fix-v1-s0-attempt2",
+    "training_config_migration": {
+      "applied": [],
+      "raw_mapping_hash": "cbed20a1330c49e9deb9efb84856550e7e47872e1157019c6e979d3111cc8299",
+      "runtime_method_id": "trades",
+      "source_method_id": "trades"
+    },
+    "training_dataset_identity": {
+      "classes": 10,
+      "content_fingerprint": "c58f30108f718f92721af3b95e74349a",
+      "image_size": 32,
+      "name": "cifar10",
+      "split": "train",
+      "version": "torchvision-cifar10"
+    },
+    "training_protocol_identity": {
+      "deterministic": true,
+      "epochs": 200,
+      "execution": {
+        "batchnorm_mode": "local_per_rank",
+        "effective_global_batch_size": 128,
+        "global_batch_size": 128,
+        "per_rank_batch_size": 128,
+        "world_size": 1
+      },
+      "id": "controlled_cifar10_r18_v1",
+      "optimizer": {
+        "id": "sgd",
+        "learning_rate": 0.1,
+        "momentum": 0.9,
+        "nesterov": false,
+        "weight_decay": 0.0005
+      },
+      "scheduler": {
+        "gamma": 0.1,
+        "id": "multistep",
+        "milestones": [
+          100,
+          150
+        ],
+        "step_at": "epoch_end"
+      },
+      "validation_fraction": 0.1
+    },
+    "training_seed": 0,
+    "training_seeds": {
+      "augmentation": 0,
+      "data_order": 0,
+      "evaluation_attack": 0,
+      "model_init": 0,
+      "qualitative_panel": 0,
+      "split": 20260722,
+      "train_attack": 0
+    }
+  }
+]
