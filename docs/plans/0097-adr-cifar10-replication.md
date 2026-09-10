@@ -2967,6 +2967,151 @@ is a multi-day unattended campaign, not a same-session one.
   dialog once interactively at that exact path spelling, per CLAUDE.md. Left
   unchanged here: it is the user's own config, outside the repo, and not this
   skill's to edit.
+- 2026-09-10: postrun of the
+  `adr-campaign-v1-ferret-cifar10_r18_trades_49k_validation-s0` **training**
+  terminal event (`runs/adr-cifar10-campaign-v1/
+  cifar10_r18_trades_49k_validation-s0/train/run-bundle/manifest.json`) —
+  **arm 6, the 49k-validation TRADES pilot, and the only run this arm will
+  ever have** (the contract gives it one seed). **Nothing imported — no
+  milestone closed.** Training only: `docs/experiments/` holds `.gitkeep` and
+  the M1b `historical/` archive and no record for this contract, so the
+  idempotency check had nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan returns `terminal: true`,
+  `success: true`, `status: completed`, `failure_class: null` on exactly the
+  `--state-path` line the watcher passed.
+  Verified for this bundle: `completion.json` `{"status": "completed"}`,
+  `manifest.status=sync_pending`, `error-marker.txt` reads "no application
+  error recorded", `epoch_metrics_complete: true` with 200 of 200 expected
+  epochs, and `epoch-metrics.jsonl` really carries 200 rows ending at epoch
+  199 / `global_step` 76600. Both declared artifacts have a content-addressed
+  copy under `run-bundle/artifacts/<name>/<sha256>/` whose directory name
+  equals the manifest's own `sha256` (`epoch-metrics.parquet` `1d1cbcbfbe5c…`,
+  `sample-stats-train.parquet` `1863bfaac5f3…`). `best.pt`, `last.pt` and all
+  four periodic checkpoints (`epoch-049/099/149/199.pt`) are on disk; there is
+  **no** `best-ema.pt`, which is correct — `method.adr` is `null` for this arm.
+  Source SHA `cd0b571e4685…` clean (`dirty: false`, empty-diff `e3b0c442…`),
+  external lock `05cfce4cf8db…`, `config_hash 45b0eaa50b89…`. Artifact bytes
+  were not re-hashed (sandbox); the aggregator owns the real check at M3.
+  Contract fields match arm 6 exactly: protocol
+  `controlled_cifar10_r18_trades_49k_validation_v1`, student
+  `saad_resnet18_cifar_v1` with `cifar10_raw_identity` normalization, method
+  `trades` v1 (`trades_beta 6.0`, `adr: null`), `teacher: null`, **`nesterov:
+  false`**, `epochs=200`, `milestones=[100,150] gamma=0.1`, `lr=0.1
+  momentum=0.9 wd=5e-4`, **`validation_fraction=0.02`** — the one and only
+  field that distinguishes this arm from arm 4 — train attack KL/`student_clean`
+  10 steps at `8/255` step `2/255` random start, selection and evaluation
+  attack CE 20 steps at the same budget, `world_size=1`, effective global batch
+  128, `deterministic: true`, seeds all 0 except the fixed `split=20260722` and
+  `evaluation_attack=0`. `git diff cd0b571e4685 HEAD` is empty for
+  `configs/scientific/cifar10_r18_trades_49k_validation.yaml`,
+  `cifar10_r18_trades.yaml`, `src/ard/protocols/__init__.py` and
+  `src/ard/config/schema.py`, so the contract has not drifted since the pin.
+  **The 49k/1k split is confirmed three ways, not assumed**, which matters
+  because it is the entire intervention: `train_valid_examples: 49000` on every
+  epoch row; `global_step` 76600 = 200 × 383 = 200 × ceil(49000/128); and every
+  `val_*` figure in the run is an exact multiple of 0.001, i.e. measured on
+  1,000 images. (The resolved config also carries `dataset.num_samples: 16`;
+  that is a schema default and is inert here — 49,000 training images were
+  actually used.)
+  Held-out **validation** diagnostics only (not the official test set, not
+  reportable, and not comparable to any official-test table in this log). Both
+  rows re-read from `epoch-metrics.jsonl` and they match the manifest summary
+  exactly:
+
+  | checkpoint | epoch | clean | PGD |
+  |---|---|---|---|
+  | best | 102 | 0.825 | 0.528 |
+  | last | 199 | 0.858 | 0.495 |
+
+  **The headline "+1.1 pp over arm 4" that these numbers invite is mostly
+  selection noise, and the run's own data shows it.** Cutting validation from
+  5,000 to 1,000 images does not just shrink the held-out set — it makes
+  `best.pt` a noisier choice. At p≈0.5 the standard error of a validation-PGD
+  reading is 1.58 pp at n=1,000 against 0.71 pp at n=5,000, so the argmax over
+  ~100 post-drop epochs is pulled further above the truth here than in any
+  other arm. Three signs of that in this run: (i) the maximum 0.528 is a
+  **two-way tie** between epoch 102 and epoch 151, broken toward the earlier
+  epoch, with 0.526 (epoch 159) and 0.525 (epochs 119, 161) one to three
+  images behind; (ii) the epoch 100–199 mean is 0.50622 and the 150–199 mean
+  0.50852, so the selected 0.528 sits 2.18 pp above its own plateau; (iii) the
+  same statistic for arm 4's two fresh seeds is +1.52 pp (seed 1) and +1.53 pp
+  (seed 2), i.e. the small validation set inflates the argmax by an extra
+  **≈0.65 pp** here. Subtract that from the raw best-checkpoint difference
+  (0.528 versus arm 4's 0.5164/0.5166, **+1.15 pp**) and ≈**+0.50 pp** is left
+  — which is exactly the plateau-mean difference (0.50622 versus 0.50125 and
+  0.501314, **+0.49 pp**). Two independent routes agreeing at 0.01 pp is the
+  reason to trust the deflated number rather than the headline one.
+  **So the directional read on the pilot's actual question is: the extra 4,000
+  training images look worth roughly half a point, not the 1.2–1.5 pp the
+  literature gap needs — and even that is inside this arm's own noise.** The
+  preregistered comparison (see "Preregistered decision rule") is AutoAttack on
+  the official 10,000-image test set against arm 4 seed 0's archived 47.87 best
+  / 44.99 last, aiming at the literature range 49.21–49.50. Validation PGD is
+  the model-selection metric, on a different set, under a different attack, at
+  n=1,000 — **no verdict is licensed and none is offered.** The late-window
+  comparison is slightly friendlier to the pilot (150–199 mean 0.50852 versus
+  0.500036 and 0.500024, **+0.85 pp**) and the pilot does not decay after the
+  second LR drop where arm 4 mildly does (its own 100–149 mean is 0.50392,
+  below its 150–199 mean; slope over epochs 120–199 is −1.49e-05/epoch, i.e.
+  −0.12 pp across 80 epochs — flat). But a ±1.6 pp standard error swallows all
+  of these differences, and **averaging over epochs does not shrink it**: every
+  epoch scores the *same* 1,000 images, so the finite-set error is shared and
+  never averages away. That is the structural limit of this arm, and it is why
+  the official test — 10,000 images, where the pilot and arm 4 are on equal
+  footing — is the only thing that can answer it.
+  **Robust overfitting is unchanged by the intervention**: best−last gap 3.3 pp
+  here against 3.20 pp (arm 4 seed 1) and 3.14 pp (seed 2). Whatever 49k
+  training does, it does not move the gap.
+  **The evaluation that answers this arm is already running** — verified
+  directly, not inferred: `…/train/evaluation/` exists with a live W&B segment
+  `eval-7f2c13eb1eb778fd2e2a` opened 2026-09-10T08:59:10Z, `panel-best.jsonl`
+  and `sample-stats-best.parquet` already written and **no
+  `evaluation-results.json` yet**, so it is mid-flight and not terminal. Its
+  `resolved_evaluation_config.yaml` is the right one: `checkpoints: both`, CE
+  20 steps at `8/255` step `2/255` random start on the CIFAR-10 **test** split,
+  and **`autoattack: true`**, so one job will produce both the CE-PGD-20 and
+  the AutoAttack numbers this arm needs. `evaluation-lineage.json` binds it to
+  this training run — its `training_config_hash` `45b0eaa50b89…` equals the
+  training manifest's `config_hash`. Nothing to do but wait for its own
+  terminal event; this postrun launches nothing.
+  **Second confirmed instance of the Ferret artifact-path defect** logged in
+  the `r18_trades-s2` entry above, so that entry's fix is not
+  arm-specific. This run's manifest declares both artifacts at
+  `runs/adr-campaign-v1-ferret-cifar10_r18_trades_49k_validation-s0/outputs/
+  train/…`, a Ferret-side staging path with **no counterpart in the local
+  runtime tree**; only the bundle's content-addressed copies exist here.
+  `_verify_bundle` would raise `declared artifact is missing` and abort M3.
+  Nothing fixed here — this postrun touches no code.
+  **Budget — a measurement of the one cost knob this arm alone can isolate.**
+  Wall clock 12:16:39.1Z → 18:11:42.4Z = **5 h 55 min 03 s**, i.e. 106.5 s per
+  full epoch and **≈5.92 GPU-h**, against the plan's ≈2.6 GPU-h line for a
+  single-validation-pass ResNet-18 run — wrong here by 2.3×, for the Ferret
+  contention reason the `r18_trades-s2` entry already established. The new
+  information is that this run had a **perfectly concurrent twin**: arm 4 seed
+  2 ran 12:16:37.9Z → 18:32:04.0Z on the same host, same method, same
+  architecture, alongside the same third job (`pgd_at_nesterov-s2`,
+  12:14:47.5Z → 18:08:46.1Z), differing only in 49k/1k versus 45k/5k. The
+  pilot finished **5.4 % sooner** (21,303 s versus 22,526 s) *despite training
+  on 8.9 % more images* — dropping 4,000 validation images saves more than
+  adding 4,000 training images costs, because validation runs a 20-step attack
+  where TRADES training runs a 10-step one. Order of magnitude, from this run's
+  own numbers (`train_seconds` 96.0–108.8 s, settling at ≈102 s after the first
+  dozen epochs, so ≈4 s per epoch outside the training loop for a 1,000-image
+  pass plus checkpointing): a validation image costs somewhere between 1.2× and
+  1.7× a TRADES training image, the spread coming from not having measured arm
+  4 seed 2's own `train_seconds` mean. **Validation-set size is a first-order
+  budget knob, not a rounding error** — worth remembering before any ImageNet
+  costing.
+  Campaign state, from this session's own scans: **18 of 20 run dirs, all 18
+  training-terminal and successful**; `mobilenetv2_adr-s0` and `trades_adr-s2`
+  still have no run dir. Contract (model-weights) evaluations **6 of 20**
+  terminal (`pgd_at-s1`, `-s2`, `pgd_at_nesterov-s0`, `-s1`, `-s2`, `adr-s0`),
+  EMA-weights **1 of 9** (`adr-s0`), with this arm's evaluation among those now
+  running. The headless postrun path is still dead — re-checked directly,
+  `/home/shunsukenaito/.claude.json:968` `hasTrustDialogAccepted` is still
+  **`false`**, so this run's own watcher-fired postrun no-opped and this entry
+  is a hand-run one. M1c stays unticked.
 - 2026-09-10: postrun of the `adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s2`
   **training** terminal event (`runs/adr-cifar10-campaign-v1/
   cifar10_mobilenetv2_adr-s2/train/run-bundle/manifest.json`) — **arm 8 seed 2,
