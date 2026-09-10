@@ -12,9 +12,11 @@ recorded constants with named provenance, not re-derived here.
 The JSON record and the Markdown report are rendered from one result dict.
 Every fresh run's bundle is re-verified before use (hand-run completion
 contract, declared artifact hashes, dataset/split/count, threat identity,
-AutoAttack provenance); a reused historical result is checked for internal
-consistency against its recorded provenance instead, since no run bundle for
-it survives.
+AutoAttack provenance); a reused historical result is loaded and hash-verified
+from its archived record under docs/experiments/historical/ instead (M1b,
+2026-09-10) -- no run-bundle manifest survives for either, but the evaluation
+result, resolved config and a hand-written provenance note do, each bound by
+a committed .sha256.
 """
 
 from __future__ import annotations
@@ -118,37 +120,6 @@ COMPARISON_PAIRS = {
     "resnet18_trades_vs_plain_sgd_baseline": {"treatment": "trades_adr", "baseline": "trades"},
 }
 
-# Historical reuse, confirmed field-by-field identical to the current
-# controlled_cifar10_r18_v1 contract (docs/plans/0097's "Historical reuse --
-# confirmed" section). No run bundle survives for either; these are recorded
-# constants with named provenance, matching the pattern already used by
-# scripts/aggregate_controlled_trades_fix_official_test.py for its own
-# "defective" comparison row.
-REUSED: dict[tuple[str, int], dict[str, Any]] = {
-    ("pgd_at", 0): {
-        "run_id": "pgd-at-controlled-s0-c2220f1",
-        "source_git_sha_short": "c2220f1",  # only this 7-char prefix is on record, not a full 40-char SHA
-        "provenance": "outputs/scientific/pgd-at-controlled-s0-c2220f1/ (local, uncommitted); docs/plans/0097 M1a investigation, 2026-09-09",
-        "checkpoints": {
-            "best": {"clean_accuracy": 0.8201, "pgd_accuracy": 0.5112, "autoattack_accuracy": 0.4763},
-            "last": {"clean_accuracy": 0.8446, "pgd_accuracy": 0.4189, "autoattack_accuracy": 0.4036},
-        },
-    },
-    ("trades", 0): {
-        "run_id": "trades-fix-v1-s0-attempt2",
-        "source_git_sha_short": "ee9ced0",  # only this 7-char prefix is on record, not a full 40-char SHA
-        "provenance": (
-            "/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap/runs/trades-fix-v1/seed0/ "
-            "(local, uncommitted); NOT outputs/scientific/trades-controlled-s0-f0c3ace (pre-fix defective run, "
-            "docs/debugging/0028-trades-clean-target-detached.md); docs/plans/0097 M1a investigation, 2026-09-09"
-        ),
-        "checkpoints": {
-            "best": {"clean_accuracy": 0.8235, "pgd_accuracy": 0.5066, "autoattack_accuracy": 0.4787},
-            "last": {"clean_accuracy": 0.8224, "pgd_accuracy": 0.4749, "autoattack_accuracy": 0.4499},
-        },
-    },
-}
-
 ALIASES = ("best", "last")
 
 
@@ -162,6 +133,91 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1 << 20), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+# Historical reuse, confirmed field-by-field identical to the current
+# controlled_cifar10_r18_v1 contract (docs/plans/0097's "Historical reuse --
+# confirmed" section). Both bundles are archived in-repo under
+# docs/experiments/historical/ with hash-bound evaluation records (M1b,
+# 2026-09-10) -- the dict below is populated by _load_reused_bundle() from
+# those files, not hand-typed literals, so a transcription slip cannot pool
+# a wrong number silently. docs/experiments/historical/<dir>/ is the record
+# of authority; this dict is a cache of what it contains.
+HISTORICAL_DIR = ROOT / "docs/experiments/historical"
+
+
+def _load_reused_bundle(
+    *, historical_dir: str, run_id: str, source_git_sha_short: str, expected_method: str, note: str
+) -> dict[str, Any]:
+    """Load and hash-verify one archived historical bundle's AutoAttack results."""
+    base = HISTORICAL_DIR / historical_dir
+    for name in ("provenance.json", "resolved_config.yaml", "evaluation-results-pgd20.json", "evaluation-results-aa.json"):
+        path = base / name
+        sha_path = base / f"{name}.sha256"
+        if not path.is_file() or not sha_path.is_file():
+            raise AggregationError(f"missing archived historical file: {path}")
+        expected_sha = sha_path.read_text(encoding="utf-8").strip()
+        actual_sha = _sha256(path)
+        if actual_sha != expected_sha:
+            raise AggregationError(f"{path}: sha256 {actual_sha} does not match {sha_path} ({expected_sha})")
+    rows = json.loads((base / "evaluation-results-aa.json").read_text(encoding="utf-8"))
+    checkpoints: dict[str, dict[str, float]] = {}
+    for row in rows:
+        if int(row["count"]) != OFFICIAL_TEST_COUNT:
+            raise AggregationError(f"{base}: expected the official {OFFICIAL_TEST_COUNT}-example test split")
+        if row["dataset_identity"]["split"] != "test":
+            raise AggregationError(f"{base}: split is not the official test split")
+        if row["runtime_method"] != expected_method:
+            raise AggregationError(f"{base}: method is {row['runtime_method']!r}, expected {expected_method!r}")
+        # These historical bundles predate evaluate.py always writing an
+        # explicit "model" string into `weights` -- None here means the
+        # same thing "model" means in every fresh run, not a missing field.
+        if row.get("weights") not in (None, "model"):
+            raise AggregationError(f"{base}: weights is {row.get('weights')!r}, expected model/None (legacy)")
+        auto = row.get("autoattack")
+        if not isinstance(auto, dict):
+            raise AggregationError(f"{base}: AutoAttack did not run for checkpoint {row['checkpoint_alias']!r}")
+        if auto["attack_version"] != "standard":
+            raise AggregationError(f"{base}: AutoAttack version is {auto['attack_version']!r}, not standard")
+        commit = auto.get("provenance", {}).get("expected_commit")
+        if commit != AUTOATTACK_COMMIT:
+            raise AggregationError(f"{base}: AutoAttack commit {commit} is not the pinned upstream")
+        alias = "best" if row["checkpoint_alias"] == "best-ema" else row["checkpoint_alias"]
+        checkpoints[alias] = {
+            "clean_accuracy": float(row["clean_accuracy"]),
+            "pgd_accuracy": float(row["pgd_accuracy"]),
+            "autoattack_accuracy": float(auto["autoattack_accuracy"]),
+        }
+    missing = set(ALIASES) - set(checkpoints)
+    if missing:
+        raise AggregationError(f"{base}: missing checkpoint aliases {sorted(missing)}")
+    return {
+        "run_id": run_id,
+        "source_git_sha_short": source_git_sha_short,
+        "provenance": f"docs/experiments/historical/{historical_dir}/ (hash-verified); {note}",
+        "checkpoints": checkpoints,
+    }
+
+
+REUSED: dict[tuple[str, int], dict[str, Any]] = {
+    ("pgd_at", 0): _load_reused_bundle(
+        historical_dir="pgd_at_controlled_s0_c2220f1",
+        run_id="pgd-at-controlled-s0-c2220f1",
+        source_git_sha_short="c2220f1",  # only this 7-char prefix is on record, not a full 40-char SHA
+        expected_method="pgd_at",
+        note="docs/plans/0097 M1a investigation, 2026-09-09",
+    ),
+    ("trades", 0): _load_reused_bundle(
+        historical_dir="trades_fix_v1_seed0",
+        run_id="trades-fix-v1-s0-attempt2",
+        source_git_sha_short="ee9ced0",  # only this 7-char prefix is on record, not a full 40-char SHA
+        expected_method="trades",
+        note=(
+            "NOT outputs/scientific/trades-controlled-s0-f0c3ace (pre-fix defective run, "
+            "docs/debugging/0028-trades-clean-target-detached.md); docs/plans/0097 M1a investigation, 2026-09-09"
+        ),
+    ),
+}
 
 
 def _require_clean_source(expected: str) -> None:
