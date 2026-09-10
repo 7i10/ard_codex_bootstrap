@@ -1960,6 +1960,524 @@ is a multi-day unattended campaign, not a same-session one.
     teacher-free EMA + TRADES combination) and the `trades_49k_validation`
     pilot (the diagnostic this campaign exists partly to answer).
 
+- 2026-09-10: postrun of the `adr-campaign-v1-ferret-cifar10_r18_trades-s2`
+  **training** terminal event (`runs/adr-cifar10-campaign-v1/
+  cifar10_r18_trades-s2/train/run-bundle/manifest.json`) — **arm 4 seed 2, and
+  the first postrun in this campaign of a run that executed on Ferret rather
+  than Hamster**. It also completes arm 4's training side: seed 0 is the reused
+  historical bundle, seeds 1 and 2 are now both terminal, so TRADES is the
+  first arm with all three seeds trained. **Nothing imported — no milestone
+  closed.** Training only: the run has no `evaluation/` output, so it produces
+  no official-test number, and `docs/experiments/` holds only `.gitkeep` and
+  the M1b `historical/` archive, neither of which is this contract's record —
+  so the idempotency check had nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan returns `terminal: true`,
+  `success: true`, `status: completed`, `failure_class: null` on exactly the
+  `--state-path` line the watcher passed.
+  Verified for this bundle: `completion.json` `{"status": "completed"}`,
+  `manifest.status=sync_pending`, `error-marker.txt` reads "no application
+  error recorded", `epoch_metrics_complete: true` with 200 of 200 expected
+  epochs, and 200 epoch rows really present in **both** `epoch-metrics.jsonl`
+  and `run-bundle/metrics.jsonl`, ending at epoch 199 / `global_step` 70400.
+  Both declared artifacts have a content-addressed copy under
+  `run-bundle/artifacts/<name>/<sha256>/`, and each directory name equals the
+  manifest's own `sha256` for that artifact (`epoch-metrics.parquet`
+  `650edbe2cb3d…`, `sample-stats-train.parquet` `a9a655f17a62…`). `best.pt`,
+  `last.pt` and all four periodic checkpoints (`epoch-049/099/149/199.pt`) are
+  on disk; there is **no** `best-ema.pt`, which is correct — `method.adr` is
+  `null` for arm 4. Source SHA `cd0b571e4685…` clean (`dirty: false`,
+  empty-diff `e3b0c442…`), external lock `05cfce4cf8db…` with `adr` pinned at
+  `515da0e0373f…`, `config_hash dc73a1bf0190…`. Artifact bytes were not
+  re-hashed — this session's sandbox refuses any Bash read outside the repo
+  root — so integrity rests on that path-equals-hash correspondence; the
+  aggregator owns the real check at M3.
+  Contract fields match arm 4 exactly: protocol `controlled_cifar10_r18_v1`,
+  student `saad_resnet18_cifar_v1` with `cifar10_raw_identity` normalization,
+  method `trades` v1 (`trades_beta 6.0`, `adr: null`), `teacher: null`,
+  **`nesterov: false`** as arm 4 requires, `epochs=200`, `milestones=[100,150]
+  gamma=0.1`, `lr=0.1 momentum=0.9 wd=5e-4`, `validation_fraction=0.1`, train
+  attack KL/`student_clean` 10 steps at `8/255` step `2/255` random start,
+  selection and evaluation attack CE 20 steps at the same budget,
+  `world_size=1`, effective global batch 128, `deterministic: true`, seeds all
+  2 except the fixed `split=20260722` and `evaluation_attack=0`. `git diff
+  cd0b571e4685 HEAD` is empty for `configs/scientific/cifar10_r18_trades.yaml`,
+  `src/ard/protocols/__init__.py` and `src/ard/config/schema.py`, so the
+  contract has not drifted since the pin.
+  **A second, different M3-blocking aggregator defect — this one caused by
+  `ferret-collect`, and it is not the `dir_prefix` bug fixed above.**
+  `_verify_bundle` resolves each artifact from the manifest's own absolute
+  `path` field (`scripts/aggregate_adr_cifar10_replication.py:201`). For a
+  Hamster run that field points at the canonical run dir and the file is there.
+  For a **Ferret-collected** run it still points at the host-side staging dir
+  the job actually wrote to — here
+  `runs/adr-campaign-v1-ferret-cifar10_r18_trades-s2/outputs/train/
+  epoch-metrics.parquet` — which **does not exist in the local runtime tree at
+  all** (checked: no `runs/adr-campaign-v1-ferret-*` directory exists). The
+  aggregator would therefore raise `declared artifact is missing` and abort M3.
+  This affects every run whose `run_id` carries the `-ferret-` infix, which is
+  already **6 of the 18 terminal training runs**: `r18_trades-s2` (this one),
+  `r18_adr-s2`, `r18_pgd_at_nesterov-s2`, `r18_trades_adr-s1`,
+  `r18_trades_49k_validation-s0` and `mobilenetv2_adr-s2` — including three
+  arms' entire seed-2 leg. The one-line fix is to fall back to the bundle's own
+  content-addressed copy when the declared path is absent, i.e. in
+  `_verify_bundle`, `if not path.is_file(): path = bundle / entry["local_path"]
+  / path.name`. That copy exists locally for this run and travels with the
+  bundle by construction. It does **not** weaken the check: the `sha256`
+  comparison against the manifest still runs on whichever file is found, so a
+  corrupted or substituted artifact still fails. Left unfixed here: this
+  postrun imports nothing and touches no code.
+  Held-out **validation** diagnostics only (not the official test set, not
+  reportable, and not comparable to any official-test table in this log). Both
+  rows re-read from `epoch-metrics.jsonl` and they match the manifest summary
+  exactly:
+
+  | checkpoint | epoch | clean | PGD |
+  |---|---|---|---|
+  | best | 102 | 0.8102 | 0.5166 |
+  | last | 199 | 0.8432 | 0.4852 |
+
+  **Cross-seed agreement within arm 4 is unusually tight.** Against seed 1
+  (Hamster, logged above): best PGD 0.5166 versus 0.5164 (**0.02 pp** apart),
+  last PGD 0.4852 versus 0.4844 (0.08 pp), robust-overfit gap 0.0314 versus
+  0.0320 (0.06 pp). Only clean accuracy differs materially (best 0.8102 versus
+  0.8322, last 0.8432 versus 0.8338), which is what the differing argmax epoch
+  below predicts. Two seeds on validation give a directional reading for those
+  two seeds and nothing more, but the arm's robust level and its
+  robust-overfitting gap both look seed-stable.
+  **This corrects the arm-7 entry's summary of when each arm peaks.** That
+  entry concluded "selected epoch tracks the method and architecture together:
+  R18 PGD-AT/ADR 101–104, R18 TRADES 157, MobileNetV2 ADR 151, MobileNetV2
+  PGD-AT 175". The "R18 TRADES 157" cell was one seed. **This seed peaks at
+  epoch 102**, squarely inside the 101–104 window every R18 PGD-AT and ADR run
+  occupies. So R18 TRADES does not peak late as an arm property — seed 1
+  happened to. The mechanism is visible in this run's curve: validation PGD has
+  two nearly equal plateaus, one just past the first LR drop (epoch 102 = 0.5166,
+  epoch 105 = 0.5162) and one just past the second (epoch 151 = 0.5126, epoch
+  157 = 0.5114), separated by only **0.4 pp**. Which plateau wins the argmax is
+  within seed noise, so the selected epoch is close to arbitrary between them
+  and no method-level or architecture-level story should be built on it. The
+  same caution the arm-7 entry raised about its own flat argmax applies here,
+  and it now applies to the ResNet-18 TRADES arm too.
+  **First recorded environment asymmetry between the two hosts — logged, not a
+  new confound, and the human should know it is there.** This run's
+  `environment.json` reports Python **3.12.13 (Anaconda)** on kernel
+  `7.0.0-28-generic`; arm 4 seed 1, run on Hamster, reports Python **3.11.15
+  (conda-forge)** on kernel `7.0.0-31-generic`. `torch 2.11.0+cu128`, CUDA
+  12.8, cuDNN 91900 and the GPU model (RTX 4090) are identical on both, and
+  every other Ferret run in this campaign carries the same 3.12.13 record
+  (checked `r18_adr-s2`). The campaign therefore pools seeds across two hosts
+  with different interpreters — arms 2, 3, 4 and 8 each have their seed 2 on
+  Ferret and their other seeds on Hamster. Plan 0094 already tested exactly
+  these two axes (Hamster versus Ferret, and environment generation versus
+  environment generation) and found the epoch-114 checkpoint **component hashes
+  bit-identical**, so this is a sanctioned configuration rather than a fresh
+  threat; but 0094 tested a 15-epoch continuation, not a 200-epoch run, and it
+  is not recorded anywhere in this plan that the two hosts differ at all. The
+  0.02 pp seed-1-versus-seed-2 agreement above is a weak consistency check in
+  the same direction, not a controlled test. **No number in this campaign
+  should be pooled across hosts without stating the host**, and the M3 record
+  should carry the environment block per arm-seed so a reader can see it.
+  **Budget finding — the plan's cost table is Hamster-derived and a
+  Ferret-executed run costs about twice as much wall clock, but the GPU is not
+  the reason.** This run's wall clock was 12:16:37.9Z → 18:32:04.0Z, **6 h 15
+  min 26 s** (112.6 s/epoch averaged, ≈6.3 GPU-h as executed), against arm 4
+  seed 1's 3 h 27 min on Hamster (62.2 s/epoch, ≈3.5 GPU-h) — **1.8×**. The
+  training loop alone tells the same story: 191 of 200 epochs ran at **420–490
+  img/s** (`train_seconds` ≈ 92–107 s), where Hamster ran the same arm at 998
+  img/s / ≈45.1 s. **But nine epochs ran faster, and the fastest, epoch 97, hit
+  1026 img/s** — at or above Hamster's uncontended figure for this arm. A GPU
+  that can do 1026 img/s for one epoch is not a slower GPU, so the ≈2.1×
+  per-epoch penalty is host contention while three training jobs shared Ferret,
+  most plausibly dataloader CPU (three jobs × `num_workers: 8`) or the
+  remote-NUMA path already recorded for Ferret's GPU2 in
+  `.claude/rules/execution-plane.md`. That is an inference from one fast epoch,
+  not a measurement of the cause. Practical consequence for the remaining
+  campaign: budget Ferret-executed runs at roughly 2× the table's Hamster
+  figure at 3-way concurrency, or run two jobs per host instead of three.
+  Contention changes only wall clock, not results: `deterministic: true`, fixed
+  seeds and fixed batch size make the numbers independent of throughput.
+  Campaign state at the 08:59Z scan (`--include-hand-run`, fresh unused
+  cursor), and it has moved a long way since the previous entry: **18 of 20 run
+  dirs now exist and all 18 are training-terminal and successful** —
+  `pgd_at-s1/-s2`, `pgd_at_nesterov-s0/-s1/-s2`, `adr-s0/-s1/-s2`,
+  `trades-s1/-s2`, `trades_adr-s0/-s1`, `trades_49k_validation-s0`,
+  `mobilenetv2_adr-s1/-s2`, `mobilenetv2_pgd_at-s0/-s1/-s2` (the last two
+  finished at 08:53Z). Only **`mobilenetv2_adr-s0` and `trades_adr-s2`** have
+  no run dir. Contract (model-weights) evaluations **6 of 20** terminal —
+  `pgd_at-s1`, `-s2`, `pgd_at_nesterov-s0`, `-s1`, `-s2`, `adr-s0`; EMA-weights
+  evaluations **1 of 9** (`adr-s0`). **Six evaluations are running**
+  (`adr-s1`, `adr-s2`, `trades_adr-s0`, `trades_adr-s1`,
+  `trades_49k_validation-s0`, `mobilenetv2_adr-s1`) against five busy GPUs
+  (Hamster 2 at 100 %, Ferret 3 at 99 %), so at least one is queued rather than
+  computing. **Six terminal training runs still have no evaluation of any
+  kind**: `trades-s1`, `trades-s2` (this run), `mobilenetv2_adr-s2`,
+  `mobilenetv2_pgd_at-s0`, `-s1` and `-s2` — the whole arm-7 leg and both
+  trained TRADES seeds.
+  Open for the human, none of it actioned here: launch the two missing training
+  runs, queue the six missing evaluations, and fix the artifact-path fallback
+  before M3 is attempted. This postrun launches nothing and changes no code.
+  M1c stays unticked.
+- 2026-09-10: postrun of the `adr-campaign-v1-ferret-cifar10_r18_adr-s2`
+  **training** terminal event (`runs/adr-cifar10-campaign-v1/
+  cifar10_r18_adr-s2/train/run-bundle/manifest.json`) — **arm 3 seed 2, which
+  completes arm 3 (ResNet-18 ADR) at all three seeds and, together with arm 2's
+  three terminal seeds, gives the ResNet-18 half of the primary leg its first
+  seed-matched three-seed reading.** **Nothing imported — no milestone
+  closed.** Training only: this bundle carries no official-test number, and
+  `docs/experiments/` still holds only `.gitkeep` and `historical/`, so the
+  idempotency check had nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan returns `terminal: true`,
+  `success: true`, `status: completed`, `failure_class: null` on exactly the
+  `--state-path` line the watcher passed.
+  Verified for this bundle: `completion.json` `{"status": "completed"}`,
+  `manifest.status=sync_pending`, `error-marker.txt` reads "no application
+  error recorded", `epoch_metrics_complete: true` with 200 of 200 expected
+  epochs, and `epoch-metrics.jsonl` really carries 200 rows ending at epoch 199
+  / `global_step` 70400. Both declared artifacts have a content-addressed copy
+  under `run-bundle/artifacts/<name>/<sha256>/`, each directory name equalling
+  the manifest's own `sha256` for that artifact (`epoch-metrics.parquet`
+  `9663b843988b…`, `sample-stats-train.parquet` `1daccafa8c5a…`), and both also
+  sit in the canonical run dir (`train/epoch-metrics.parquet`,
+  `train/sample-stats-train.parquet`). `best.pt`, `best-ema.pt`, `last.pt` and
+  all four periodic checkpoints (`epoch-049/099/149/199.pt`) are on disk.
+  Source SHA `cd0b571e4685…` clean (`dirty: false`, empty-diff `e3b0c442…`),
+  external lock `05cfce4cf8db…` with `.external/adr` at the pinned
+  `515da0e0373f…`, `config_hash c0a28b33d36f…`. Artifact bytes were not
+  re-hashed — this session's sandbox refuses any Bash read outside the repo
+  root — so integrity rests on that path-equals-hash correspondence; the
+  aggregator owns the real check at M3.
+  **This run is an instance of the `ferret-collect` artifact-path defect the
+  `trades-s2` entry above diagnoses, and it is worth stating explicitly for
+  this arm.** The manifest's artifact `path` fields still point at the
+  Ferret-side staging dir
+  `runs/adr-campaign-v1-ferret-cifar10_r18_adr-s2/outputs/train/`, and no
+  `runs/adr-campaign-v1-ferret-*` directory exists in the local runtime tree at
+  all — so `_verify_bundle`'s declared-path lookup
+  (`scripts/aggregate_adr_cifar10_replication.py:201`) would abort M3 on this
+  run. The bytes are present; only the pointer is stale. With this run counted,
+  the defect covers **arm 3's entire seed-2 leg as well as arm 2's and arm 4's**,
+  and the fallback that entry proposes (use the bundle's content-addressed copy
+  when the declared path is absent, keeping the `sha256` comparison) resolves it
+  here too. Left unfixed: this postrun imports nothing and touches no code.
+  Contract fields match arm 3 exactly: protocol `controlled_cifar10_r18_adr_v1`,
+  student `saad_resnet18_cifar_v1`, normalization `cifar10_raw_identity`,
+  method `adr` v1, `teacher: null`, `nesterov: true`, `epochs=200`,
+  `milestones=[100,150] gamma=0.1`, `lr=0.1 momentum=0.9 wd=5e-4`,
+  `validation_fraction=0.1`, ADR `ema_decay=0.995` `T 2.5→2.0`
+  `lambda 0.7→0.95`, train attack KL/rectified 10 steps at `8/255` step
+  `2/255` random start, selection attack CE 20 steps at the same budget,
+  `world_size=1`, effective global batch 128, `deterministic: true`, seeds all
+  2 except the fixed `split=20260722` and `evaluation_attack=0`. `git diff
+  cd0b571e4685 HEAD` is empty for `configs/scientific/cifar10_r18_adr.yaml`,
+  `cifar10_r18_pgd_at_nesterov.yaml`, `src/ard/protocols/__init__.py`,
+  `src/ard/config/schema.py`, `src/ard/objectives/` and `src/ard/policies/`, so
+  the contract has not drifted since the pin.
+  **ADR stop-rule checks pass.** EMA validation ran every epoch and never
+  crashed: all 200 rows carry `val_clean_accuracy_ema` and
+  `val_pgd_accuracy_ema`. `best-ema.pt` was selected independently of the
+  student — EMA's best validation epoch is **98**, the student's is **103**.
+  Held-out **validation** diagnostics only (not the official test set, not
+  reportable, and not comparable to any official-test table in this log). All
+  rows re-read from `epoch-metrics.jsonl`; the student rows match the manifest
+  summary exactly:
+
+  | weights | checkpoint | epoch | clean | PGD |
+  |---|---|---|---|---|
+  | student | best | 103 | 0.8436 | 0.5434 |
+  | student | last | 199 | 0.8638 | 0.5062 |
+  | EMA | best-ema | 98 | 0.8148 | 0.5476 |
+  | EMA | last | 199 | 0.8642 | 0.5042 |
+
+  **`best-ema.pt` for this seed is a pre-LR-drop checkpoint, and that is worth
+  knowing before the EMA evaluation lands.** The first LR drop is at epoch 100.
+  Seeds 0 and 1 put their EMA argmax just after it (epoch 104 at 0.5506, epoch
+  109 at 0.5498); this seed puts it at epoch 98, *before* it, and its two
+  highest EMA epochs (98 at 0.5476, 96 at 0.5470) are both pre-drop. The margin
+  is thin: the best post-drop EMA epoch is 104 at 0.5466, i.e. the selection
+  crossed the LR drop on **0.10 pp** of validation PGD. It bought that 0.10 pp
+  at a cost of **2.92 pp of EMA clean accuracy** (0.8148 at epoch 98 versus
+  0.8440 at epoch 104). The selection rule was applied correctly — argmax
+  validation PGD is what the contract specifies — but expect this seed's
+  "ADR + WA" official-test clean number to sit well below seeds 0 and 1's, and
+  do not read that as an ADR property. It is one seed landing on the far side
+  of a near-tie.
+  **Arm 3 is now complete at three seeds, and so is arm 2. Seed-matched
+  validation comparison, directional only:**
+
+  | seed | arm 2 best PGD | arm 3 best PGD | ADR − baseline | arm 2 gap | arm 3 gap |
+  |---|---|---|---|---|---|
+  | 0 | 0.5184 (ep 102) | 0.5394 (ep 103) | +2.10 pp | 0.0888 | 0.0456 |
+  | 1 | 0.5188 (ep 101) | 0.5396 (ep 103) | +2.08 pp | 0.0864 | 0.0408 |
+  | 2 | 0.5184 (ep 105) | 0.5434 (ep 103) | +2.50 pp | 0.0882 | 0.0372 |
+  | mean | 0.51853 | 0.54080 | **+2.23 pp** | 0.0878 | 0.0412 |
+
+  Every seed-matched pair is positive and the three differences span 0.42 pp.
+  Arm 3's own seed spread is 0.40 pp (0.5394–0.5434) and arm 2's is 0.04 pp
+  (0.5184–0.5188), so the +2.23 pp mean is far outside either arm's seed noise
+  — on this metric. **The preregistered rule is AutoAttack on the official
+  10,000-example test set, best checkpoint; every number in that table is
+  validation, CE-PGD-20, and the very metric these runs' checkpoint selection
+  optimized against, so it flatters the treatment arm. No verdict is
+  licensed.** The same table also shows ADR roughly halving the
+  robust-overfitting gap at ResNet-18, 8.78 pp → 4.12 pp on three seeds each,
+  with within-arm spreads of 0.24 pp and 0.84 pp.
+  **Correction to the `mobilenetv2_pgd_at-s0` entry, two ways.** That entry
+  quoted the ResNet-18 leg as "+2.06 to +2.12 pp"; those are the *cross*-paired
+  differences (arm 3 seed 0 against arm 2 seed 1 and vice versa). Seed-matched
+  they are +2.10 and +2.08, and seed 2 now adds +2.50.
+  More substantially, that entry concluded from a single unmatched pair (ADR
+  seed 1's 0.76 pp gap against baseline seed 0's 0.62 pp) that MobileNetV2's
+  tiny robust-overfitting gap "is a property of MobileNetV2 … not an ADR
+  effect". Arms 7 and 8 now have enough terminal seeds to check that pairing
+  properly, and the comparison it rested on was inside the baseline's own seed
+  noise: arm 7's three gaps are 0.62 / 1.32 / 1.18 pp (seeds 0/1/2), a 0.70 pp
+  spread, larger than the 0.14 pp difference the conclusion was drawn from.
+  Seed-matched, ADR's gap is the *smaller* one in both available pairs (seed 1
+  0.76 vs 1.32 pp, seed 2 0.68 vs 1.18 pp). The claim that survives is weaker
+  and in both directions: **MobileNetV2 at this capacity and horizon barely
+  robustly overfits at all** (≈0.6–1.3 pp either arm, against 3.7–8.9 pp at
+  ResNet-18), and at that scale the ADR-versus-baseline difference (≈0.5 pp) is
+  the same size as the baseline's own seed spread, so **no attribution is
+  licensed at MobileNetV2 in either direction**. The ResNet-18 halving above,
+  three seeds per arm, is the finding that is actually supported.
+  **The MobileNetV2 leg is now seed-matched too, which is what the previous
+  entry asked for.** Arm 8 minus arm 7 at each seed's own best checkpoint,
+  validation PGD: seed 1 0.4850 − 0.4502 = **+3.48 pp**, seed 2
+  0.4830 − 0.4494 = **+3.36 pp** (the previous entry's +3.54 pp was arm 8 seed 1
+  against arm 7 seed 0, unmatched). Both exceed the ResNet-18 mean of +2.23 pp
+  and every individual ResNet-18 pair, which is the "sign confirmed" direction
+  of the preregistered rule — **on the wrong metric, the wrong split and two
+  seeds, so it is a shape, not a result**. Arm 8 seed 0 is the one training run
+  that would make this leg three-seed complete.
+  **Budget — the ADR cost line holds on Hamster and does not transfer to
+  Ferret, and this run independently confirms the `trades-s2` entry's diagnosis
+  that the cause is contention, not a slower GPU.** The plan charges ADR-family
+  runs ≈54 s per full epoch (≈3.0 GPU-h), confirmed for ResNet-18 on Hamster
+  (`adr-s1` 39.4 s, `adr-s0` 40.7 s training-loop, ≈1140 img/s). This run's
+  training loop sat at **90.7–101.9 s/epoch** at **441.8–496.1 img/s** for
+  almost every epoch, and its wall clock was 2026-09-09T18:09:29.3Z →
+  2026-09-10T01:06:03.6Z, **6 h 56 min 34 s** (125.0 s/epoch averaged, ≈6.9
+  GPU-h as executed) — roughly 2.3× Hamster's per-epoch cost for identical
+  work. **But six epochs ran far faster, and epoch 22 hit 1048.4 img/s**
+  (epoch 37: 987.1), within 8 % of Hamster's uncontended figure for the same
+  arm. That is the same signature the `trades-s2` entry found on a different
+  arm (its epoch 97 at 1026 img/s), from a different Ferret GPU, so the ≈2.3×
+  penalty is host contention while multiple training jobs shared Ferret — not
+  hardware, and not the workspace registry's stale per-GPU figures
+  (`configs/workspace/ard_workspace_v1.json` lists Ferret at 599.65 / 607.05 /
+  424.99 img/s and Hamster at 679.1; both are well below what either host
+  actually delivers uncontended). **Budget Ferret-executed ADR runs at ≈2× the
+  table's Hamster line at 3-way concurrency, or run two jobs per host.**
+  Contention changes only wall clock, not results: `deterministic: true`, fixed
+  seeds and fixed batch size make the numbers independent of throughput.
+  Campaign state at this postrun's own scan (`--include-hand-run`, fresh unused
+  cursor over the campaign root), taken a few minutes after the `trades-s2`
+  entry's 08:59Z scan and superseding its evaluation counts. **18 of 20 run
+  dirs, and all 18 trainings terminal and successful** — unchanged. Missing
+  entirely: **`cifar10_r18_trades_adr-s2` and `cifar10_mobilenetv2_adr-s0`**,
+  which have no run dir on either host. Evaluations terminal: **7**
+  (`pgd_at-s1/-s2`, `pgd_at_nesterov-s0/-s1/-s2`, `adr-s0` model, `adr-s0`
+  EMA) — one more than the entry above, because `pgd_at_nesterov-s2`'s
+  evaluation finished at 08:56Z — of which exactly **one** is an EMA-weights
+  evaluation. **Eight evaluations are in flight** — `adr-s1`, `adr-s2`,
+  `trades_adr-s0/-s1`, `trades_49k_validation-s0`, `mobilenetv2_adr-s1`,
+  `mobilenetv2_pgd_at-s1/-s2`, the last two having started since that scan —
+  against five busy GPUs (Hamster 2 × 100 %, Ferret 3 × ~100 %), so three are
+  queued rather than computing. This run's own contract evaluation
+  (`eval-5709dc2e3701675af39e`) is among them. **Four** terminal training runs
+  now have no evaluation of any kind: `trades-s1`, `trades-s2`,
+  `mobilenetv2_adr-s2` and `mobilenetv2_pgd_at-s0`.
+  **Gap to flag for the human: the "ADR + WA" comparator is missing for eight
+  of the nine ADR-family runs.** `evaluation-ema/` exists only for `adr-s0`; no
+  in-flight job is an EMA evaluation. The frozen contract requires
+  `--weights=ema` against `best-ema.pt`/`last.pt` for every `adr` and
+  `adr_trades` run, so arms 3, 5 and 8 each still need EMA evaluations before
+  M2, on top of the two unlaunched trainings. Launching anything, and queueing
+  those, is a decision for the human — this postrun launches nothing. M1b's
+  archive is committed (see the entry above) but M1c stays unticked: two
+  trainings and most evaluations are outstanding.
+
+- **2026-09-10, postrun of `eval-3bfb6a2f65ef77e308e1` — arm 2
+  (`pgd_at_nesterov`) seed 2 evaluation. Arm 2 is now the campaign's first arm
+  with all three contract evaluations complete.** Terminal status re-derived
+  from the run bundle the watcher pointed at
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s2/train/
+  evaluation/run-bundle/manifest.json`): `terminal: true`, `success: true`,
+  `failure_class: null`, `status: completed`. `completion.json` reads
+  `{"status": "completed", "results": 2}` and `error-marker.txt` reads "no
+  application error recorded". The manifest's own `status` field says
+  `sync_pending`, which is the offline-W&B sync state and not a completion
+  signal — the bundle markers are. **Nothing imported.** The campaign is still
+  mid-flight (6 of 20 contract evaluations terminal), so there is no
+  campaign-level result to aggregate; `docs/experiments/` has no record for
+  this contract and none was created.
+
+  Every declared `expected_output` is present: all seven manifest artifacts
+  resolve under `run-bundle/artifacts/`, and the flat copies the M3 aggregator
+  actually reads (`train/evaluation/evaluation-results.json` and siblings)
+  exist in the local run root with identical numbers to the bundle artifact
+  (checked field by field: both `checkpoint_alias` rows, `count: 10000`,
+  `split: "test"`, all six accuracies). **The aggregator's directory-naming
+  defect fixed in the previous entry is confirmed to resolve this run**:
+  `dir_prefix "cifar10_r18_"` + `pgd_at_nesterov` + `-s2` is the real directory,
+  and `_load_arm_seed`'s `run_dir / "evaluation" / "evaluation-results.json"`
+  exists for all three arm-2 seeds. No new M3 blocker.
+
+  AutoAttack is the **standard** version with real provenance
+  (`expected_commit == vcs_commit == a39220048b3c9f2cca9a4d3a54604793c68eca7e`),
+  run in its own process at `epsilon=8/255`, `Linf`, batch 128, seed 0.
+  `weights: model` and `selection_weights: model` on both rows. Training seeds
+  all 2 except the fixed `split=20260722` and `evaluation_attack=0`. Source SHA
+  `cd0b571e4685`, `dirty: false`, empty diff.
+  **Checkpoint SHA-256 was not independently recomputed this session** — the
+  sandbox refuses `sha256sum` outside the repo working directory, so the
+  `checkpoint_sha256` values below are the evaluation record's own declared
+  values, not a second measurement. Earlier entries in this plan did recompute
+  such hashes; this one could not, and says so rather than implying it did.
+
+  **Official CIFAR-10 test set (10,000 examples), student weights, arm 2
+  (`pgd_at_nesterov`) seed 2 — clean, CE-PGD-20 and AutoAttack reported
+  separately, best and last kept separate:**
+
+  | checkpoint | sha256 (short) | clean | CE-PGD-20 | AutoAttack |
+  |---|---|---|---|---|
+  | `best.pt` (val epoch 105) | `d3372ac5ff6b…` | 0.8267 | 0.5086 | 0.4737 |
+  | `last.pt` (epoch 199) | `418a8ef34b65…` | 0.8415 | 0.4254 | 0.4082 |
+
+  The selected epoch is read directly from the training bundle's
+  `metrics.jsonl`: `val_pgd_accuracy` peaks at 0.5184 on epoch 105
+  (`val_clean_accuracy` 0.8424) and no other epoch in the run reaches 0.51 at
+  all. The runner-up is 0.5128 on epoch 103, so the peak wins by 0.56 pp —
+  a real peak, not the near-arbitrary plateau argmax seen on the MobileNetV2
+  baseline (0.28 pp). Validation then decays to 0.4302 by epoch 199, an 8.82 pp
+  fall that tracks the 8.32 pp test CE-PGD-20 gap below, the same
+  validation-tracks-test pattern seed 0 showed (8.88 vs 8.44 pp).
+  **This corrects the "101–104 window" claim by one epoch.** Selected epochs
+  for the ResNet-18 PGD-AT/ADR readings are now 101, 102, 103, 103, 104 and
+  **105**; the window is 101–105, still tight and still just past the first LR
+  drop at epoch 100, but the earlier entry's "four-epoch window" is now a
+  five-epoch one. Note also that all three arm-2 seeds peak at essentially the
+  same validation height — 0.5184 (s0), 0.5188 (s1), 0.5184 (s2) — while
+  disagreeing about which epoch gets there. Selection is picking equivalent
+  models from different points in the same post-LR-drop ridge.
+
+  **(a) Arm 2's three-seed spread, all same source SHA `cd0b571e4685`, same
+  protocol, same evaluation identity, only `ARD_SEED` differing.** This is the
+  campaign's first complete three-seed arm and the first same-SHA three-seed
+  spread available for the ResNet-18 leg of the preregistered rule.
+
+  | quantity | seed 0 | seed 1 | seed 2 | mean | range |
+  |---|---|---|---|---|---|
+  | best clean | 0.8232 | 0.8219 | 0.8267 | 0.8239 | 0.48 pp |
+  | best CE-PGD-20 | 0.5081 | 0.5097 | 0.5086 | 0.5088 | 0.16 pp |
+  | **best AutoAttack** | 0.4719 | 0.4741 | 0.4737 | **0.4732** | **0.22 pp** |
+  | last clean | 0.8424 | 0.8406 | 0.8415 | 0.8415 | 0.18 pp |
+  | last CE-PGD-20 | 0.4237 | 0.4196 | 0.4254 | 0.4229 | 0.58 pp |
+  | last AutoAttack | 0.4057 | 0.4041 | 0.4082 | 0.4060 | 0.41 pp |
+
+  The third seed did **not** widen the best-AutoAttack range: seed 2's 0.4737
+  lands between the two existing seeds, leaving the range at 0.22 pp with all
+  three points in. The previous entry set the condition "quote arm 1's 0.85 pp
+  as the campaign's conservative noise floor until arm 2 has its third seed",
+  and that condition is now met. The two floors measure different things and
+  both should be kept: **arm 2's 0.22 pp is seed noise alone** (three runs, one
+  SHA, one protocol), while **arm 1's 0.85 pp bundles seed noise with SHA
+  drift** (its seed 0 is the reused historical run at a different SHA), so it is
+  an upper bound on total run-to-run variation rather than a measurement of
+  seed spread. The decision rule compares arm 3 against arm 2, so arm 2's own
+  0.22 pp is the directly relevant number. Neither is a population estimate:
+  a three-point range is still a lower bound on the true spread, and the stop
+  rules forbid a fourth seed without a new decision packet, so it will not be
+  tightened further in this campaign.
+
+  **(b) The ADR-vs-matched-baseline gap now reads against a complete baseline,
+  and the conclusion does not depend on which floor is used.** Arm 3 (`adr`)
+  seed 0's contract `best.pt` AutoAttack is 0.4875. Against arm 2's three-seed
+  mean 0.4732 that is **+1.43 pp**; against arm 2's strongest seed (seed 1,
+  0.4741) **+1.34 pp**; against its weakest (seed 0, 0.4719) **+1.56 pp**. The
+  whole +1.34/+1.56 pp band sits above arm 1's conservative 0.85 pp floor and
+  roughly 6× above arm 2's own three-seed 0.22 pp range. **This is still not
+  the preregistered result.** Arm 3 has one contract evaluation to arm 2's
+  three, and the primary MobileNetV2 leg has none at all; the rule needs three
+  seeds on both sides of both legs. What changed is only that the ResNet-18
+  baseline side is finished, so the remaining uncertainty on that leg is
+  entirely on the ADR side — and `adr-s1` and `adr-s2` evaluations are running
+  as of this entry.
+
+  **(c) Robust-overfitting suppression is unchanged and remains the sturdier
+  claim, now with a complete baseline band.** This run's best-minus-last gap is
+  **8.32 pp** on CE-PGD-20 and **6.55 pp** on AutoAttack. Arm 2's three seeds
+  therefore span **6.55–7.00 pp** on AutoAttack (mean 6.72 pp) and **8.32–9.01
+  pp** on CE-PGD-20 (mean 8.59 pp). Seed 2 sets the low end of the AutoAttack
+  band without breaking it. Arm 3 seed 0's 3.94 pp remains 2.61 pp below the
+  nearest baseline reading. As established in the arm-7 entry, this is a
+  ResNet-18 claim only — MobileNetV2 barely robustly overfits at this horizon
+  regardless of method.
+
+  **`environment.json`'s kernel string is a reliable host discriminator for
+  this campaign, and it settles where this evaluation ran.** Hamster reports
+  `Linux-7.0.0-31-generic`, Ferret `Linux-7.0.0-28-generic`. Arm 2 seed 0's
+  evaluation bundle carries -31 (Hamster, as logged); this run's *training*
+  bundle carries -28 (Ferret, as logged) and so does its *evaluation* bundle —
+  confirming the previous entry's statement that the `-s2` evaluation was
+  dispatched to Ferret. Worth reusing: every bundle in this campaign can be
+  attributed to a host from a field it already records, without asking either
+  machine.
+
+  **Budget finding — Ferret's three-way packing costs more aggregate throughput
+  than it buys, and the plan's non-ADR training line holds only on Hamster.**
+  Training ran 2026-09-09T12:14:47.5Z → 18:08:46.1Z, **5 h 53 min 58.5 s** for
+  200 epochs = **106.2 s per full epoch** (exact, from the manifest's own
+  timestamps), i.e. **≈5.9 GPU-h as executed** against the budget table's 2.6
+  GPU-h line for arm 2. Sampled per-epoch training-loop times (`train_seconds`,
+  16 of 200 epochs at both ends of the run) fall in **80.7–96.5 s** and do not
+  trend down over the run, against **38.6 s/epoch at 1167 img/s** already
+  recorded on Hamster for *this same arm* at seed 1 — a 2.1–2.5× slowdown on
+  identical hardware (both hosts are RTX 4090s). Taking the exact wall-clock
+  figures: Ferret running three jobs at once delivers 3 runs / 5.9 h ≈ **0.51
+  runs/h**, while Hamster running two at once delivers 2 runs / ≈2.6 h ≈ **0.77
+  runs/h**. Ferret has 50% more GPUs and produces about a third *less*
+  finished work per hour. That retroactively supports the previous entry's
+  decision to pull `mobilenetv2_pgd_at` seeds 1/2 off Ferret's queue onto idle
+  Hamster GPUs, and it argues against three-way packing on Ferret in future
+  campaigns. **Caveat**: Ferret is a shared lab host and other users' load is
+  not observable from these bundles, so "three-way packing" is the most likely
+  cause of the slowdown, not a demonstrated one. Contention changes only wall
+  clock, never results — `deterministic: true`, fixed seeds and fixed batch
+  size make the numbers independent of throughput.
+  The *evaluation* half shows the opposite pattern and sharpens the guess. This
+  run's evaluation took 21:33:03.0Z → 23:23:32.6Z, **1 h 50 min 29.6 s** on
+  Ferret, against **1 h 48 min** for seed 0's evaluation on Hamster — within
+  2 minutes of each other for the same two-checkpoint × (clean + CE-PGD-20 +
+  AutoAttack) workload. Evaluation is essentially host-insensitive here while
+  training is 2.3× slower, which points at dataloader or CPU contention during
+  training rather than GPU saturation. The two evaluations' concurrency levels
+  are not established from these bundles, so this is a hypothesis worth one
+  cheap measurement, not a finding.
+
+  **Campaign state at the 09:0xZ scan** (`--include-hand-run`, fresh unused
+  cursor over the campaign root). **18 of 20 training run dirs**, and every one
+  of the 18 is terminal and successful — up from 10 at the previous scan:
+  `pgd_at-s1/-s2`, `pgd_at_nesterov-s0/-s1/-s2`, `adr-s0/-s1/-s2`,
+  `trades-s1/-s2`, `trades_adr-s0/-s1`, `trades_49k_validation-s0`,
+  `mobilenetv2_pgd_at-s0/-s1/-s2`, `mobilenetv2_adr-s1/-s2`. The two absent
+  from the local root are **`trades_adr-s2`** and **`mobilenetv2_adr-s0`**,
+  both of which the previous entry listed as still running on Ferret.
+  Contract (model-weights) evaluations **6 of 20** terminal —
+  `pgd_at_nesterov-s0/-s1/-s2`, `adr-s0`, `pgd_at-s1`, `pgd_at-s2`;
+  EMA-weights evaluations **1 of 9** (`adr-s0`). **Six evaluations are in
+  flight right now**: `adr-s1`, `adr-s2`, `trades_adr-s0`, `trades_adr-s1`,
+  `trades_49k_validation-s0`, `mobilenetv2_adr-s1`. All five GPUs across both
+  hosts are busy (Hamster 4876/3924 MiB at 100%, Ferret 6773/8171/9928 MiB at
+  99%), consistent with five of those six running and one queued. The
+  evaluation queue that had drained at the previous entry is full again, and
+  this postrun launched nothing.
+  M1c stays unticked (18 of 20 run dirs). M2 stays unticked (14 of 20 contract
+  evaluations outstanding, and the `trades_adr` and `trades_49k_validation`
+  arms are still unchecked against any expectation). M3 unopened.
+
 - 2026-09-10: postrun of the
   `adr-campaign-v1-ferret-cifar10_r18_trades_adr-s1` **training** terminal
   event (`runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s1/train/
@@ -2174,19 +2692,27 @@ is a multi-day unattended campaign, not a same-session one.
   | 7 `mobilenetv2_pgd_at` | 0.4496 | 0.4502 | 0.4494 | 0.4497 |
   | 8 `mobilenetv2_adr` | *running* | 0.4850 | 0.4830 | 0.4840 (2 seeds) |
 
-  **This retracts the previous entry's robust-overfitting conclusion, and the
-  retraction is the main finding of this postrun.** That entry compared arm 7
-  seed 0's best-minus-last gap (0.62 pp) against arm 8 seed 1's (0.76 pp) and
-  concluded that "MobileNetV2 at 200 epochs simply does not robustly overfit
-  much — the suppression claim is a ResNet-18 result, not a general one".
-  With three arm-7 seeds the within-arm spread of that statistic is **0.70 pp**
-  (0.62 / 1.32 / 1.18, mean 1.04), five times the 0.14 pp difference the
-  conclusion rested on. Arm 8's two readings are 0.76 and 0.68 (mean 0.72).
-  So the ordering actually reverses on the means — ADR's gap is *smaller*,
-  and much more tightly clustered — but the difference (0.32 pp) is still
-  inside the baseline's own seed spread (0.70 pp). **Neither the previous
-  entry's claim nor its reversal is licensed.** The correct statement is that
-  best-minus-last is too noisy at this capacity to separate the arms.
+  **The previous entry's robust-overfitting conclusion was really two claims,
+  and they now come apart — separating them is the main finding of this
+  postrun.** That entry compared arm 7 seed 0's best-minus-last gap (0.62 pp)
+  against arm 8 seed 1's (0.76 pp) and concluded that "MobileNetV2 at 200
+  epochs simply does not robustly overfit much — the suppression claim is a
+  ResNet-18 result, not a general one".
+  **The architecture half survives and strengthens.** All five MobileNetV2
+  readings now available span 0.62–1.32 pp, against 4.08–4.56 pp for ADR and
+  8.64–8.88 pp for the Nesterov-matched baseline at ResNet-18. Not one
+  MobileNetV2 run comes within a factor of three of the *smallest* ResNet-18
+  reading, so "MobileNetV2 at this capacity and horizon barely robustly
+  overfits, and ADR's gap-halving is a ResNet-18 result" is well supported.
+  **The arm-versus-arm half does not survive.** With three arm-7 seeds the
+  within-arm spread of that statistic is **0.70 pp** (0.62 / 1.32 / 1.18,
+  mean 1.04), five times the 0.14 pp difference the ordering rested on. Arm
+  8's two readings are 0.76 and 0.68 (mean 0.72) and sit *inside* arm 7's
+  range. The ordering in fact reverses on the means — ADR's gap is smaller,
+  and much more tightly clustered — but that difference (0.32 pp) is itself
+  inside the baseline's seed spread. **Neither "ADR fails to suppress robust
+  overfitting at MobileNetV2" nor its reversal is licensed**: at this capacity
+  best-minus-last is too noisy to separate the two arms at all.
   **The mechanism is identifiable, and it is the `last` endpoint, not the
   arms.** Decomposing each gap into (best − late-plateau mean over epochs
   150–199) + (late mean − last):
