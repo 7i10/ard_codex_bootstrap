@@ -3632,3 +3632,80 @@ is a multi-day unattended campaign, not a same-session one.
   one. Whether to retry as-is or to batch the line-213 forward first is the
   human's call; the question is packet 0010's, and this entry is the evidence
   its Option-C rule asked for. M1c and M2 stay unticked.
+- 2026-09-10 11:09Z: postrun of the `eval-e2da1d97fcd3e5932fab` terminal event
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s1/train/evaluation/`) — arm 3
+  (`adr`) seed 1, model weights, lane D. **Nothing imported — no milestone
+  closed.** `docs/experiments/` still holds only `.gitkeep` and `historical/`,
+  so the idempotency check had nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan returns `terminal: true`,
+  `success: false`, `status: failed`, `failure_class: unknown` on the line
+  whose `path` is that manifest, with `completion_json: false` and error
+  marker "application failure recorded". `unknown` carries **no information**
+  here: `scripts/ardx/ardx_common.py:357` hard-codes that literal for every
+  failed hand-run bundle, because only an orchestrator attempt record can
+  carry a real classification. The classification therefore comes from the log,
+  and the log is unambiguous — **`technical_retryable`**, the same
+  `autoattack.py:213` defect already written up in packet 0010 and in the two
+  entries above. Nothing scientific is in question: the checkpoint, the
+  protocol and the threat identity are untouched.
+  This run's own numbers, for the record: traceback in
+  `canon-eval-lane-D.log:167-227`, innermost frame `registry.py:75`
+  (`self.bn2(self.conv2(outputs))` inside `layer1`), failed allocation
+  **2.44 GiB** = `10000 × 64 × 32 × 32 × 4 B`, with **1.89 GiB free** of
+  23.52 GiB and a co-resident 13.13 GiB process (PID 2223692) on the same
+  physical 4090. Wall clock `created_at` 08:59:09Z → `finished_at` 11:04:46Z,
+  2 h 05 m, `exit=1` at 20:04:47+09:00.
+  **AutoAttack finished here too.** `canon-eval-lane-D.log` shows Square
+  running to `39/39` and AutoAttack printing its own `robust accuracy after
+  SQUARE: 48.65% (total time 7490.2 s)` / `robust accuracy: 48.65%`; the
+  traceback sits earlier in the file only because stderr flushed ahead of
+  buffered stdout. **That 48.65 % is a log scrape from a run that never
+  completed and must not enter any record, report or table** — no
+  `autoattack-best.json`, no `evaluation-results.json`, no `completion.json`
+  was written, and `last.pt` was never reached.
+  Worth noting only as a reproducibility check, not as evidence: it equals the
+  `early-check-eval-aa-best-model` AutoAttack figure 0.4865 already logged
+  above for the *same* `best.pt` (sha `9181001647cb…`). Two separate processes
+  agree to four digits, which is what a fixed `evaluation_attack: 0` on a saved
+  checkpoint should give — so a retry is expected to land on the same number,
+  and the two hours are being re-paid purely to obtain a written record and the
+  missing `last.pt` half.
+  **This run's evidence directory still exists**, unlike `r18_adr-s2`'s and
+  `r18_trades_adr-s1`'s, which were gone by the 11:05Z rescan. On disk:
+  `run-bundle/manifest.json` (status `failed`, `failure_snapshot` with five
+  hashed files), `run-bundle/error-marker.txt`, `panel-best.jsonl`,
+  `sample-stats-best.parquet`, `resolved_evaluation_config.yaml`,
+  `evaluation-lineage.json` and the offline W&B segment
+  `offline-run-20260910_175910-eval-e2da1d97fcd3e5932fab`. A retry therefore
+  **must not write into that path in place** — move it aside first, both to
+  keep the failure evidence and because a record path is written once.
+  **One proposed retry command — not run by this postrun.** It must go on an
+  otherwise idle 4090, or it will hit the same allocation at the same point
+  after another two hours:
+
+  ```bash
+  cd /home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/worktrees/source-cd0b571e4685
+  RUNS=/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1
+  mv "$RUNS/cifar10_r18_adr-s1/train/evaluation" \
+     "$RUNS/cifar10_r18_adr-s1/train/evaluation.failed-oom-eval-e2da1d97" && \
+  CUDA_VISIBLE_DEVICES=<idle-gpu> PYTHONPATH=src \
+    /home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.evaluate \
+    --config configs/evaluation/autoattack_saved_checkpoint.yaml \
+    --checkpoint-dir "$RUNS/cifar10_r18_adr-s1/train" \
+    --output "$RUNS/cifar10_r18_adr-s1/train/evaluation" \
+    --weights model --allow-autoattack
+  ```
+
+  This reproduces the failed run's manifest — `config_hash`
+  `90da37ed2020d6f2…`, protocol `controlled_cifar10_r18_adr_v1` (Nesterov on),
+  `evaluation_seed 0`, training seeds all 1 except the fixed `split=20260722`
+  and `evaluation_attack=0`, `world_size 1`, effective global batch 128, source
+  SHA `cd0b571e4685` with an empty diff — so it re-runs the same measurement,
+  not a weakened one. The rename keeps the aggregator blind to the failed
+  attempt (it reads exactly `<run>/train/evaluation/`), but the watcher will
+  emit one more terminal-failed event under the new path; that event's answer
+  is this entry, not a second postrun.
+  Whether to retry as-is or to batch the line-213 forward first is the human's
+  call and belongs to packet 0010, whose Option-C trigger this run also fires.
+  M1c and M2 stay unticked.
