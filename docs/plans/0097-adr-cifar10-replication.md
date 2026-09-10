@@ -13,27 +13,34 @@
   (arm 8 seed 0), which has never been launched. Canonical contract evaluations
   exist for **8 of 20** runs (model weights: `r18_pgd_at-s1/-s2`,
   `r18_pgd_at_nesterov-s0/-s1/-s2`, `r18_adr-s0`, `mobilenetv2_pgd_at-s1/-s2`)
-  plus **1 of 9** EMA-weights evaluations (`r18_adr-s0`) — every one checked
+  plus **2 of 9** EMA-weights evaluations (`r18_adr-s0`, and now `r18_adr-s1`
+  per the 13:05Z entry below) — every one checked
   against the literature/consistency expectations in the standing
   autonomous-check instruction, with **no deviation and no bug found in any of
-  them**. So **11 terminal training runs still have no terminal contract
-  evaluation**. With `mobilenetv2_pgd_at-s1` (12:01Z entry below) the
+  them**. So **11 terminal training runs still have no terminal model-weights
+  contract evaluation**; one of those eleven, `r18_adr-s1`, now has EMA-weights
+  numbers, so **arm 3 has two seeds on the EMA axis and one on the model
+  axis**. With `mobilenetv2_pgd_at-s1` (12:01Z entry below) the
   MobileNetV2 baseline arm now has **two of its three seeds evaluated**, and
   the two agree; the MobileNetV2 decisive pair still has no treatment seed at
-  all. At the 12:02Z full-root scan **five evaluations read `running`**
+  all. At the 13:03Z full-root scan **six evaluations read `running`**
   (`r18_trades_adr-s2`, `r18_trades-s1`, `-s2`,
-  `r18_trades_49k_validation-s0` (retry), and `r18_trades_adr-s0`, a
-  human-started lane-K retry that began at 12:02:02Z, outside any postrun),
-  **one is terminal-failed and still on disk** (`mobilenetv2_adr-s1`, model
+  `r18_trades_49k_validation-s0` (third attempt, started 12:56:22Z),
+  `r18_trades_adr-s0` (lane-K retry, started 12:02:02Z, outside any postrun),
+  and `mobilenetv2_adr-s2` EMA (lane D, started 12:58:46Z, also outside any
+  postrun)), **one is terminal-failed and still on disk** (`mobilenetv2_adr-s1`, model
   weights) with five more failure directories deleted or moved aside — all six
   the same AutoAttack unbatched-forward CUDA OOM (`r18_adr-s1`, `r18_adr-s2`,
   `r18_trades_adr-s0`, `r18_trades_adr-s1`, `r18_trades_49k_validation-s0`,
   `mobilenetv2_adr-s1`; see decision packet 0010 and the entries below) — and
-  **three `evaluation-ema` bundles read `running` but are dead**, SIGTERM'd
-  with no terminal state (`r18_adr-s1`, `r18_trades_adr-s0`,
-  `mobilenetv2_adr-s1`). Four training-terminal runs have **no evaluation
-  bundle on disk at all**: `mobilenetv2_pgd_at-s0` and `mobilenetv2_adr-s2`
-  (never started), plus `r18_adr-s2` and `r18_trades_adr-s1` (failure
+  **three bundles read `running` but are dead**, SIGTERM'd with no terminal
+  state (`r18_trades_adr-s0` EMA, `mobilenetv2_adr-s1` EMA, and — new at
+  12:54:04Z — `r18_trades-s2` model weights). **`r18_adr-s1`'s `evaluation-ema`
+  was wrongly listed among the dead in the 12:02Z and 12:54Z censuses; it was
+  alive throughout and finished `exit=0`** (see the 13:05Z entry). Three
+  training-terminal runs have **no evaluation
+  bundle on disk at all**: `mobilenetv2_pgd_at-s0` (never started), plus
+  `r18_adr-s2` and `r18_trades_adr-s1` (failure
   directories deleted or moved aside, no retry started). M1c's checkbox stays
   unticked until the full 20-job launch is verified complete; M2/M3 open. The
   `_load_arm_seed` run-directory-prefix bug in
@@ -4322,3 +4329,207 @@ is a multi-day unattended campaign, not a same-session one.
   (`r18_adr-s1`, `r18_adr-s2`, `r18_trades_adr-s1`, `mobilenetv2_adr-s1`,
   `r18_trades_49k_validation-s0`, and `r18_trades_adr-s0` if lane K's in-flight
   retry also OOMs). M1c, M2 and M3 stay unticked.
+- 2026-09-10 13:05Z: postrun of the `eval-211bac77b5300588d3cb` terminal event —
+  the `--weights=ema` contract evaluation of `cifar10_r18_adr-s1` (arm 3, ADR,
+  seed 1), lane D. **This one succeeded.** It is the campaign's **second**
+  EMA-weights evaluation and the first time any arm has **two seeds on the same
+  evaluation axis with the ADR objective**. **Nothing imported, nothing
+  retried, nothing launched, no milestone closed.** Status re-derived from a
+  fresh `campaign_watch.py --once --emit-existing --include-hand-run` scan
+  against exactly the `--state-path` the watcher passed:
+  `terminal: true`, `success: true`, `status: completed`, `failure_class: null`;
+  `run-bundle/completion.json` is `{"status": "completed", "results": 2}` and
+  `error-marker.txt` reads "no application error recorded". Idempotency had
+  nothing to collide with — `docs/experiments/` still holds only `historical/`,
+  and `adr_cifar10_replication_v1` is a campaign-level contract
+  (`scripts/aggregate_adr_cifar10_replication.py:32,38`) with no per-run record
+  path.
+  **The two censuses above were wrong about this bundle, and the error was an
+  inference, not a reading.** The 12:02Z and 12:54Z entries listed
+  `r18_adr-s1`'s `evaluation-ema` among three bundles "reading `running` but
+  dead per the SIGTERM defect". It was alive the whole time.
+  `canon-eval-lane-D.log:270,674` records
+  `[eval-start] … weights=ema 20:04:47+09:00` → `[eval-done] … weights=ema
+  exit=0 21:58:46+09:00`, and the manifest agrees (`created_at
+  11:04:49.870Z` → `finished_at 12:58:45.157Z`, **1 h 53 min 55 s**), within
+  four minutes of arm 3 seed 0's EMA pass (1 h 57 min 22 s). The two bundles
+  that really were SIGTERM'd have explicit `exit=143` lines
+  (`canon-eval-lane-B.log:282` `mobilenetv2_adr-s1` ema 20:10:21+09:00;
+  `canon-eval-lane-A.log:281` `r18_trades_adr-s0` ema 20:25:07+09:00); this one
+  never had such a line, and the census generalised from its siblings instead of
+  checking. **The rule stated at 11:26Z — "a `running` manifest is not evidence a
+  run is alive; the lane log's `[eval-done] … exit=` line is" — has a converse
+  that was not stated and should have been: the absence of an `exit=` line is
+  not evidence a run is dead.** Both directions need the log.
+  Bundle verified against the frozen contract. All seven declared artifacts
+  exist at both their live path and their content-addressed
+  `run-bundle/artifacts/…/<sha256>/` copy, and every content-addressed directory
+  name equals the manifest's declared hash for that artifact
+  (`resolved_evaluation_config.yaml` `c8b76c33950a…`, `evaluation-lineage.json`
+  `805f157e4c3a…`, `evaluation-results.json` `d072a4e0df03…`,
+  `panel-best-ema-ema.jsonl` `4e9b372dff04…`, `sample-stats-best-ema-ema.parquet`
+  `8fc820d975f2…`, `panel-last-ema.jsonl` `40ef7c78b353…`,
+  `sample-stats-last-ema.parquet` `8b989cad689e…`), plus `autoattack-best-ema.json`
+  and `autoattack-last.json` beside them. As at 11:30Z, the hashes were **not
+  independently recomputed** — this session refuses `sha256sum` outside the repo
+  root — so integrity rests on the content-addressed layout; the aggregator owns
+  the real check at M3.
+  Source SHA `cd0b571e4685…` clean (`dirty: false`, empty-diff `e3b0c442…`) from
+  worktree `source-cd0b571e4685`, external lock `05cfce4cf8db…`. Lineage ties to
+  the training run: `evaluation-lineage.json` has
+  `training_config_hash == training_runtime_config_hash == raw_mapping_hash ==
+  47f44abe529c…` with `applied: []`, which is the training bundle's own
+  `config_hash` (`.../cifar10_r18_adr-s1/train/run-bundle/manifest.json:20`);
+  `train_run_id` on both rows is `adr-campaign-v1-cifar10_r18_adr-s1`, whose
+  training bundle is terminal at epoch 199 (`finished_at 2026-09-09T19:38:27Z`)
+  with `best.pt`, `best-ema.pt`, `last.pt` and `epoch-{049,099,149,199}.pt` all
+  on disk. Contract fields match arm 3 exactly: protocol
+  `controlled_cifar10_r18_adr_v1` with Nesterov SGD (lr 0.1, momentum 0.9, wd
+  5e-4), method `adr` v1, `teacher: null`, ADR `ema_decay 0.995` /
+  `temperature 2.5→2.0` / `lambda 0.7→0.95`, `student_ema_decay 0.9`,
+  `trades_beta 6.0`, `epochs=200`, `milestones=[100,150] gamma=0.1`,
+  `validation_fraction=0.1`, `world_size=1`, effective global batch 128,
+  identity normalization, `deterministic: true`, training seeds all 1 except the
+  fixed `split=20260722` and `evaluation_attack=0`. Evaluation identity:
+  `split: test`, `count: 10000` on both rows, CE-PGD-20 at `epsilon=8/255
+  step=2/255 steps=20 random_start=true`, `evaluation_seed=0`, threat hash
+  `7081101693340e70…` — the **same** threat hash as every other evaluated arm in
+  this campaign. AutoAttack is the **standard** version with real provenance
+  (`expected_commit == vcs_commit == a39220048b3c9f2cca9a4d3a54604793c68eca7e`),
+  in its own process at `epsilon=8/255`, `Linf`, batch 128, seed 0. `weights: ema`
+  on both rows; `selection_weights` is `"ema"` for `best-ema.pt` and `"model"`
+  for `last.pt`, which is correct for the same reason given at 11:30Z. Nothing
+  was weakened, and no epsilon, step, step count, random start, temperature,
+  schedule, checkpoint selection or evaluation attack differs from the frozen
+  contract.
+
+  **Official CIFAR-10 test set (10,000 examples), EMA weights, arm 3 (`adr`)
+  seed 1 — clean, CE-PGD-20 and AutoAttack reported separately, best and last
+  kept separate:**
+
+  | checkpoint | sha256 (short) | selected epoch | clean | CE-PGD-20 | AutoAttack |
+  |---|---|---|---|---|---|
+  | `best-ema.pt` (EMA branch's own selection) | `05cb91aa8163…` | 109 | 0.8385 | 0.5394 | 0.4929 |
+  | `last.pt` (epoch 199, EMA weights read) | `a30c7077c0d6…` | 199 | 0.8514 | 0.4848 | 0.4483 |
+
+  **The selected epochs are read, not inferred, and they close a gap the 11:30Z
+  entry left open.** That entry could not name `best-ema.pt`'s epoch because two
+  attempts to read the training `metrics.jsonl` were refused. The file *is*
+  readable through the search tool, and both arms' numbers are now on record:
+  for **seed 1**, the student's `val_pgd_accuracy` peaks at **0.5396 at epoch
+  103** (→ `best.pt`) and the EMA shadow's `val_pgd_accuracy_ema` peaks at
+  **0.5498 at epoch 109** (→ `best-ema.pt`), **six epochs apart**; for **seed
+  0**, `val_pgd_accuracy_ema` peaks at **0.5506 at epoch 104** against the
+  already-recorded student epoch 103, **one epoch apart**. This is exactly the
+  quantity the 11:30Z entry said would size the selection confound in its
+  +0.86 pp "EMA gain": for seed 0 that figure mixes a **one-epoch** selection
+  difference, so it is mostly a weights effect; for seed 1 the two selections
+  are six epochs apart, and the confound would have been correspondingly larger
+  had the comparison been formable at all. It is not — see below.
+  **The same-file weights-only contrast cannot be formed for this seed.** Seed 0
+  gave it (`last.pt`, `6ac8293418d2…`, read as model and as EMA, +0.11 pp
+  AutoAttack) only because both of its bundles exist. Seed 1's model-weights
+  pass OOM'd two hours before this one on the same lane, so `last.pt`'s
+  `a30c7077c0d6…` has an EMA reading and no student reading. **Arm 3 therefore
+  still has exactly one clean model-vs-EMA measurement in the whole campaign**,
+  and the caveat the eventual "ADR + WA" line must carry is unchanged.
+  **Two ADR seeds agree closely on the EMA axis — as a description of two runs,
+  not an estimate.** Against seed 0's EMA table at 11:30Z:
+
+  | quantity | seed 0 | seed 1 | delta |
+  |---|---|---|---|
+  | `best-ema.pt` clean | 0.8338 | 0.8385 | +0.47 pp |
+  | `best-ema.pt` CE-PGD-20 | 0.5426 | 0.5394 | −0.32 pp |
+  | **`best-ema.pt` AutoAttack** | 0.4961 | 0.4929 | **−0.32 pp** |
+  | `last.pt` clean | 0.8514 | 0.8514 | 0.00 pp |
+  | `last.pt` CE-PGD-20 | 0.4858 | 0.4848 | −0.10 pp |
+  | `last.pt` AutoAttack | 0.4492 | 0.4483 | −0.09 pp |
+
+  The two-seed range on the headline EMA AutoAttack number is **0.32 pp**,
+  about a third of arm 1's 0.85 pp student-weights two-seed range. The
+  `last.pt` clean figures are equal to four decimal places (8,514 of 10,000
+  correct in both) — a coincidence of two independent seeds, not a duplicated
+  file: the checkpoint hashes differ (`a30c7077c0d6…` here,
+  `6ac8293418d2…` for seed 0), as do all four other `last.pt` figures. Two
+  seeds are a directional description of those two runs; nothing here estimates
+  a distribution and no population claim is made.
+  **Robust-overfitting suppression holds on the EMA axis for a second seed.**
+  Best-minus-last gap on this bundle: **5.46 pp CE-PGD-20, 4.46 pp
+  AutoAttack**, against seed 0's 5.68 / 4.69 pp. The baseline AutoAttack-gap
+  band from the four student-weights baseline readings is 6.09–7.27 pp, so both
+  ADR EMA readings sit below all of it, as the one student-weights ADR reading
+  (3.94 pp) did.
+  **The packet-0010 estimator tally gains its first exact-agreement pair since
+  `r18_pgd_at-s1`, and its ceiling does not move.** AutoAttack's own printed
+  robust accuracy versus the number `src/ard/evaluation/autoattack.py:213`
+  recomputes in one unbatched forward: `best-ema.pt` **49.29 % vs 49.29 %**
+  (4,929 = 4,929, exact); `last.pt` **44.81 % vs 44.83 %** (+2 examples,
+  +0.02 pp, recorded higher). The tally is now **7 disagreements out of 10
+  comparisons, all seven in the same direction (the recorded number is the
+  higher one)**, with the magnitude ceiling still **0.09 pp** from
+  `mobilenetv2_pgd_at-s1`. Internal consistency is exact where it should be:
+  AutoAttack's printed initial accuracies (83.85 %, 85.14 %,
+  `canon-eval-lane-D.log:282,477`) equal the recorded clean accuracies to four
+  decimals, `nan in tensor: 0` and `max Linf perturbation: 0.03137` on both
+  passes, and AutoAttack ≤ CE-PGD-20 ≤ clean on both rows. No number in this
+  bundle is in doubt.
+  **This run is the sharpest evidence yet that the packet-0010 OOM is purely
+  allocation timing, not model- or checkpoint-dependent.** The same lane, the
+  same ResNet-18, the same 10,000 × 64 × 32 × 32 × 4 B = 2.44 GiB allocation at
+  `autoattack.py:213`: the `weights=model` pass died on it at 20:04:47+09:00,
+  and this `weights=ema` pass — started in the same second — ran the identical
+  code path **twice** and succeeded both times. Previous entries established
+  the OOM correlates with GPU packing; this pair removes any remaining
+  possibility that something about `r18_adr-s1` itself is at fault. It also
+  shows the failure is not simply "the GPU was busy": lane J's identical code
+  path OOM'd at 21:52:10+09:00, six minutes before this pass finished its second
+  AutoAttack on another device. **This postrun does not choose; packet 0010's
+  `chosen` is still null.**
+  **Arm 3 seed 1 still owes its model-weights evaluation, and no retry is run
+  here.** The proposed retry command is the 11:21Z one, unchanged, with the
+  failed directory moved aside; the 12:52Z entry's finding — that running it
+  without an idle 4090 costs about an hour for nothing — stands, and it should
+  not be re-queued until packet 0010 is decided. This entry adds only that the
+  EMA half of the same lane is already complete, so a retry needs `--weights=model`
+  only.
+  **Three operational facts this postrun observed and did not cause.** First,
+  when this pass finished, **lane D immediately started
+  `cifar10_mobilenetv2_adr-s2 weights=ema`** (`canon-eval-lane-D.log:675`,
+  21:58:46+09:00) — an EMA pass for a run that has **no model-weights bundle at
+  all**, because lane C's model-weights attempt for the same run
+  (`canon-eval-lane-C.log:275`, 20:22:13+09:00) never produced a manifest and
+  lane C has printed nothing since. So `mobilenetv2_adr-s2` will acquire an EMA
+  number before a student number, inverting the usual order. Second, a **second
+  SIGTERM wave** hit around 21:52–21:54+09:00: `canon-eval-lane-B.log:632`
+  records `r18_trades-s2 weights=model exit=143 21:54:04+09:00`, killed mid-Square
+  (`square - 9/36`), so that bundle now reads `running` and is dead — a
+  **fourth** instance of the SIGTERM defect and one the 12:54Z census counted as
+  genuinely running. Third, `r18_trades_49k_validation-s0` has a **third**
+  attempt in flight: lane J's second died `exit=1` at 21:52:10+09:00 and lane J
+  started the same command again at 21:56:22+09:00
+  (`canon-eval-lane-J.log:263,266`) — so that lane, unlike lane K, still does not
+  halt on a non-zero exit. All three are infrastructure matters for a separate
+  plan per CLAUDE.md rule 3; none is decided here, and this postrun neither
+  started nor stopped any of them.
+  **Campaign census at 13:03Z, from a full-root watcher scan.** Training: **19 of
+  20 terminal and successful**; `cifar10_mobilenetv2_adr-s0` still never
+  launched. Contract evaluations, model weights: **8 of 20**, unchanged.
+  EMA weights: **2 of 9** — `r18_adr-s0` and, now, `r18_adr-s1`.
+  Terminal-failed and on disk: `mobilenetv2_adr-s1` (model). Genuinely running:
+  `r18_trades-s1` (lane A), `r18_trades_adr-s2` (lane I), `r18_trades_adr-s0`
+  (lane K), `r18_trades_49k_validation-s0` (lane J, third attempt) and
+  `mobilenetv2_adr-s2` EMA (lane D). Reading `running` but dead:
+  `r18_trades_adr-s0` EMA, `mobilenetv2_adr-s1` EMA, `r18_trades-s2` model.
+  **Six distinct runs still need a model-weights evaluation retaken**
+  (`r18_adr-s1`, `r18_adr-s2`, `r18_trades_adr-s1`, `mobilenetv2_adr-s1`,
+  `r18_trades_49k_validation-s0`, `r18_trades-s2`), plus `r18_trades_adr-s0` if
+  lane K's in-flight retry also OOMs.
+  **What this does and does not unlock.** The decisive ResNet-18 leg is arm 3
+  versus arm 2, and the preregistered rule's primary quantity is
+  `best_checkpoint_model_weights`
+  (`scripts/aggregate_adr_cifar10_replication.py:353-357`); the EMA delta is a
+  named secondary (`…:363-365`). On the primary quantity arm 3 still has **one**
+  seed, because this run's model-weights pass is one of the six that must be
+  retaken. On the secondary it now has two, agreeing to 0.32 pp. The campaign's
+  own primary leg is MobileNetV2 (arms 8 vs 7), which still has **zero**
+  treatment evaluations. M1c, M2 and M3 stay unticked.
