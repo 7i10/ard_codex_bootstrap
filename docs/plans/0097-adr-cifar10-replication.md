@@ -15,11 +15,12 @@
   `r18_pgd_at_nesterov-s0/-s1/-s2`, `r18_adr-s0`, `r18_trades_adr-s0/-s1`,
   `r18_trades_49k_validation-s0`, `mobilenetv2_pgd_at-s0/-s1/-s2`,
   `mobilenetv2_adr-s1/-s2`) plus **3 of 9** EMA-weights evaluations
-  (`r18_adr-s0`, `r18_adr-s1`, `mobilenetv2_adr-s2`). **Three of those results
+  (`r18_adr-s0`, `r18_adr-s1`, `mobilenetv2_adr-s2`). **Two of those results
   have never been recorded and owe their own postruns**: the `mobilenetv2_adr-s1`
-  and `r18_trades_adr-s1` model-weights bundles, which both turned terminal and
-  successful between 16:57Z and 17:27Z, and `mobilenetv2_adr-s2`'s EMA bundle
-  (`eval-b89d6f7f0682d8cb3248`), terminal since 14:06Z. **One training-terminal
+  model-weights bundle, terminal and successful since 17:23:59Z, and
+  `mobilenetv2_adr-s2`'s EMA bundle (`eval-b89d6f7f0682d8cb3248`), terminal since
+  14:06Z. (`r18_trades_adr-s1`'s model-weights bundle was the third; it is
+  recorded in the 17:26Z entry below.) **One training-terminal
   run still has no model-weights evaluation bundle on disk at all**
   (`r18_adr-s2`); **one is terminal-failed** (`r18_adr-s1`, the third AutoAttack
   unbatched-forward CUDA OOM, decision packet 0010); **four are non-terminal**
@@ -37,7 +38,12 @@
   is not the explanation for this project's TRADES-vs-literature gap. Arm 3 has
   two seeds on the EMA axis and one on the model axis; arm 5 (`adr_trades`) has
   two on the model axis and none on the EMA axis; arm 8 has two on the model
-  axis and one on the EMA axis.
+  axis and one on the EMA axis. **Arm 5's two model-weights seeds read
+  best-checkpoint AutoAttack 49.19 (s0) and 48.45 (s1)** — a 0.74 pp spread that
+  is 1.05× the ≈0.71 pp two-run sampling noise, so it is not yet a measurement of
+  seed variance; its seed-matched gap over arm 4's archived seed 0 is **+1.32 pp**
+  at seed 0 only, and confounded by Nesterov since no Nesterov-matched TRADES
+  baseline exists (17:26Z entry).
   **On the preregistered primary quantity — official-test AutoAttack, best
   checkpoint — each leg still has exactly one matched pair**: arm 8 s2 **42.56**
   against arm 7 s2 **40.18** (**+2.38 pp**), and arm 3 s0 **48.75** against arm 2
@@ -5630,6 +5636,209 @@ is a multi-day unattended campaign, not a same-session one.
   this one. **One training-terminal run has no model-weights evaluation bundle on
   disk at all**: `r18_adr-s2`. M1c stays unticked until the full 20-job launch is
   verified complete; M2 and M3 stay open.
+
+- **2026-09-10, 17:26Z — postrun of `eval-fcaab229ec62f00f2a01`
+  (`cifar10_r18_trades_adr-s1`, model weights) — SUCCEEDED. Nothing imported, no
+  milestone closed, nothing launched or retried.** Lane P: arm 5 (`adr_trades`,
+  ADR-TRADES), seed 1, student (model) weights, both checkpoints, official
+  CIFAR-10 test set. This is **arm 5's second seed on the model axis**, and it is
+  the run the 16:57Z entry identified — by PID order and by a 13.71 GiB memory
+  match — as the co-resident neighbour whose presence made lane O's OOM
+  arithmetically unavoidable. **Both of that pair's outcomes are now known: one
+  died, this one completed.**
+
+  **Terminal status re-derived, not taken from the event.** A watcher scan of the
+  exact `--state-path`
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s1/train/evaluation/run-bundle/manifest.json`)
+  gives `terminal=true`, `success=true`, `failure_class=null`,
+  `manifest_status=sync_pending`, `completion_json=true`, error marker "no
+  application error recorded". The event hint said `--status completed`; the
+  re-derivation agrees. `canon-eval-lane-P.log:407` closes with `exit=0`.
+
+  **Numbers (official CIFAR-10 test set, all 10,000 examples, `split: test`,
+  student/model weights, method `adr_trades`, no teacher, training seed 1,
+  evaluation seed 0, `world_size=1`, `effective_global_batch_size=128`, protocol
+  `controlled_cifar10_r18_adr_v1`, `validation_fraction=0.1`), beside arm 5's
+  own seed 0 (`eval-6b2c6486fd99df2da5ac`, 14:08Z entry):**
+
+  | checkpoint | quantity | arm 5 s0 | arm 5 s1 (this run) | seed spread |
+  |---|---|---|---|---|
+  | best | clean | 83.68 | 81.88 | 1.80 |
+  | best | CE-PGD20 | 53.73 | 53.08 | 0.65 |
+  | best | AutoAttack | 49.19 | **48.45** | **0.74** |
+  | last | clean | 83.72 | 83.66 | 0.06 |
+  | last | CE-PGD20 | 52.79 | 51.83 | 0.96 |
+  | last | AutoAttack | 48.11 | **47.68** | **0.43** |
+
+  Sanity against the standing autonomous-check instruction: AutoAttack ≤ CE-PGD20
+  ≤ clean at both checkpoints (48.45 ≤ 53.08 ≤ 81.88; 47.68 ≤ 51.83 ≤ 83.66);
+  AutoAttack ≤ its own APGD-CE stage ≤ the contract's CE-PGD20 (48.44 ≤ 52.68 ≤
+  53.08; 47.65 ≤ 51.17 ≤ 51.83), i.e. the adaptive attack is the stronger one
+  everywhere; best-checkpoint AutoAttack above last by 0.77 pp, the expected
+  robust-overfitting direction; `max Linf perturbation 0.03137`, `nan in tensor
+  0`, `max 1.00000 / min 0.00000` on both checkpoints, so inputs stayed inside the
+  `pixel_0_1` domain; printed initial accuracies (81.88 %, 83.66 %,
+  `canon-eval-lane-P.log:13,204`) equal the recorded clean accuracies to four
+  decimals, and the per-stage survivor counts reconstruct each stage's own
+  headline exactly (APGD-CE fed 8,188 and 8,366 examples, APGD-T 5,268 and 5,117,
+  FAB-T/SQUARE 4,844 and 4,765). **No deviation, no bug found.**
+
+  One oddity, recorded and not treated as a defect: **this seed's best checkpoint
+  sits 1.78 pp below its own last checkpoint on clean accuracy** (81.88 against
+  83.66), where seed 0's two checkpoints differ by 0.04 pp. Best is selected by
+  CE-PGD20 on a held-out slice, so clean accuracy is free to move against it; this
+  is the same effect the 15:46Z entry recorded for arm 6 at 3.02 pp, and there on
+  a 1,000-image slice rather than this arm's 5,000. It costs nothing here — the
+  robust numbers are what the rule reads — but it means arm 5's *clean* seed
+  spread (1.80 pp at best) is not a measurement of run-to-run noise.
+
+  **What this does and does not say about the science.**
+  1. **It does not touch the preregistered primary quantity.** That quantity is
+     the best-checkpoint AutoAttack gain of `adr` over matched plain-AT compared
+     between MobileNetV2 (arm 8 − arm 7) and ResNet-18 (arm 3 − arm 2). Arm 5 is
+     `adr_trades` and appears nowhere in it. The 16:16Z entry's reading of the
+     rule is unchanged and still not a verdict.
+  2. **Arm 5's two-seed spread is 0.74 pp on the primary metric, and that is not
+     yet evidence of a noisy arm.** Binomial sampling error alone on a single
+     10,000-image AutoAttack number at p≈0.49 is ≈0.50 pp, so the gap between two
+     such numbers carries ≈0.71 pp of pure sampling noise. 0.74 pp is 1.05× that.
+     Arm 5 needs its third seed before its spread can be compared against arm 2's
+     0.22 pp or arm 7's 0.45 pp, both of which are three-seed figures. **Two seeds
+     are a directional statement about these two runs, not a distribution.**
+  3. **The secondary TRADES leg (arm 5 against arm 4) gains a second seed but no
+     second matched pair.** Arm 4's only official-test number is its archived
+     seed 0 (`docs/experiments/historical/trades_fix_v1_seed0/`: best AA 47.87,
+     last 44.99); `r18_trades-s1` and `-s2` evaluations are still non-terminal, so
+     **seed 1 has no baseline to be matched against**. The one seed-matched pair
+     stays seed 0: 49.19 − 47.87 = **+1.32 pp** best-checkpoint AutoAttack. As
+     this plan's own rule section states, this leg has **no Nesterov-matched
+     TRADES baseline**, so any arm-5-minus-arm-4 gap confounds ADR-TRADES with
+     Nesterov and is directional only.
+  4. **The robust-overfitting reading is the more interesting secondary, and both
+     arm-5 seeds agree on it.** Best-minus-last AutoAttack is **1.08 pp** (s0) and
+     **0.77 pp** (s1) for ADR-TRADES, against **2.88 pp** for arm 4 seed 0's
+     TRADES. On last checkpoints the gap to arm 4 s0 widens to +3.12 / +2.69 pp,
+     against +1.32 / (unmatched) at best. That is what ADR claims its
+     rectification does — hold the late-training model closer to its own best —
+     and here two seeds move together by roughly 2 pp, well outside both the
+     ≈0.5 pp per-run sampling error and arms 2/7's measured seed spreads. It is
+     still confounded by Nesterov and still rests on one baseline seed. **Recorded
+     as directional; not a verdict, and not the plan's decisive question.**
+  5. **Orientation only:** arm 5's two best-checkpoint numbers (49.19, 48.45,
+     two-seed mean 48.82) straddle the low edge of the literature band this plan
+     uses for TRADES-family comparison (AdaAD 49.21 / RSLAD 49.23 / RSLAD-300
+     49.50). Those are teacher-distillation methods, not this arm's teacher-free
+     objective, so this is a bearing, not a comparison.
+
+  **Lineage verified for this bundle**: all seven declared artifacts present both
+  as live files and as content-addressed copies under
+  `run-bundle/artifacts/<name>/<sha256>/`; `completion.json` reads
+  `{"status": "completed", "results": 2}`; source SHA `cd0b571e4685…` with
+  `dirty=false` and `diff_sha256` equal to the SHA-256 of the empty string, i.e. a
+  clean checkout of worktree `source-cd0b571e4685`; `external.lock` `05cfce4c…`
+  with all five pinned upstreams at their expected commits and empty status;
+  `evaluation-lineage.json`'s `training_config_hash` `0c3852c4…` equal to the
+  `config_hash` inside both result entries and to `training_runtime_config_hash`,
+  with `training_config_migration.applied=[]` and source method id == runtime
+  method id == `adr_trades`, so no silent method remap; `train_run_id`
+  `adr-campaign-v1-ferret-cifar10_r18_trades_adr-s1`, matching the training bundle
+  this evaluation claims (whose own postrun is the 2026-09-10 entry above);
+  AutoAttack provenance is the standard version of `autoattack` 0.1 at commit
+  `a392200…` matching its own `expected_commit`, ε `8/255`, Linf, seed 0, batch
+  size 128; evaluation attack CE, 20 steps, ε `8/255`, step `2/255`, random start,
+  `pixel_0_1`, against a training attack of KL with `kl_target: student_clean` at
+  10 steps and a CE/20-step selection attack — all matching the frozen contract
+  for arm 5; `trades_beta 6.0`, `adr` block `ema_decay 0.995 / T_high 2.5 /
+  T_low 2.0 / λ_low 0.7 / λ_high 0.95`, `student_ema_decay 0.9`,
+  `oracle_mask false`, `frozen_oracle_manifest null`, `teacher: null` as
+  self-distillation requires, `nesterov: true`, `epochs=200`,
+  `milestones=[100,150] gamma=0.1`, `validation_fraction=0.1`; both entries
+  `weights=model`, no EMA claim; seeds all 1 except `evaluation_attack=0` and the
+  fixed `split=20260722`; `count: 10000` and `threat_hash 7081101693…` identical
+  across both checkpoints and equal to arms 6/7/8's. **One check could not be
+  run**, as at 15:12Z, 15:46Z and 16:16Z: the two evaluated checkpoints' SHA-256
+  (`best.pt` `bbf560c5…`, `last.pt` `016a2bc1…`) were **not independently
+  recomputed** — this session's sandbox refuses to hash files outside the
+  repository root and the runtime tree is outside it. They are asserted by the
+  producer and internally consistent, not confirmed here. Re-confirm before M2
+  signs off checkpoint lineage.
+
+  **The AutoAttack-versus-recompute offset held, for the eleventh and twelfth
+  time.** AutoAttack's own printed robust accuracy was best **48.44 %** / last
+  **47.65 %** (`canon-eval-lane-P.log:201,405`); this project's post-attack
+  unbatched recompute recorded **48.45** / **47.68**. The differences are
+  **+0.01 pp and +0.03 pp**, 1 and 3 images out of 10,000, both in the positive
+  direction the 11:47Z and 15:46Z entries already measured (non-batched always
+  reads higher, at most 0.09 pp). Arm 5 seed 0's own log agrees: printed 49.17 /
+  48.10 (`canon-eval-lane-K.log:218,423`) against recorded 49.19 / 48.11, +0.02
+  and +0.01 pp. This is **not a new phenomenon and does not change any number
+  here** — 0.01–0.03 pp is one to two orders of magnitude below every spread this
+  plan compares — but it is the same starting point packet 0010's Option A
+  regression test will need, and Option A's own preregistered check (batched
+  versus unbatched recompute) is still a different comparison that nobody has
+  measured.
+
+  **New, and the sharpest cost measurement this campaign has produced: co-residency
+  did not merely kill lane O, it halved this survivor.** The four AutoAttack stages
+  ran, per checkpoint (best → last): APGD-CE 109.8 → 71.5 s, APGD-T 654.4 →
+  330.9 s, FAB-T 1481.7 → 721.4 s, SQUARE 1649.3 → 798.3 s. That is **1.54×,
+  1.98×, 2.05× and 2.07×** — a near-uniform factor of two, in the same process,
+  on the same card, against the same model family. **Workload does not explain
+  it**: APGD-CE processed *more* examples in the second half (8,366 against 8,188)
+  and still finished in 65 % of the time, and APGD-T/FAB-T/SQUARE differ by only
+  1.6–2.9 % in input count. The timeline does explain it. Working back from
+  `finished_at 17:22:32.9Z` through SQUARE's own 1922.1 s cumulative mark, the
+  last-checkpoint AutoAttack began about **16:50:30Z**, and lane O
+  (`eval-e2da1d97fcd3e5932fab`) died at **16:52:17.6Z** — so the best-checkpoint
+  half ran alongside a second ResNet-18 AutoAttack evaluation for essentially its
+  whole life, and the last-checkpoint half ran with that neighbour gone for 94 %
+  of its own. (Lane Q, `mobilenetv2_adr-s1`, was resident from 16:17Z throughout;
+  the variable that changed is the ResNet-18 neighbour.) **This is a reconstruction
+  from AutoAttack's cumulative timing marks and the bundle timestamps, not from a
+  process table** — `ps` is not available to this session. Read with the 16:57Z
+  entry's allocator arithmetic, packet 0010's defect now has two costs, not one:
+  the job that loses the race returns nothing, and the job that wins it takes
+  about twice as long. The GPU-hour budget in this plan assumed neither.
+
+  **`mobilenetv2_adr-s1`'s model-weights evaluation also succeeded, and owes its
+  own postrun.** `eval-4615ede05d4f96adb48f` — the 16:16Z entry's overwrite of
+  packet 0010's lost exhibit — reads `terminal=true, success=true` as of
+  17:23:59Z, with `evaluation-results.json` on disk. **Its lineage has not been
+  verified by this postrun and its numbers are not recorded here.** It is arm 8's
+  second model-weights seed; once recorded, the MobileNetV2 leg of the
+  preregistered rule will have two of three seeds. Its postrun should be run next.
+
+  **Census at 17:26Z, from a full-root watcher scan (47 bundle rows, fresh
+  cursor).** **Training: 20 of 20 terminal and successful — for the first time,
+  every planned training run in this campaign is done.**
+  `cifar10_mobilenetv2_adr-s0`, which every entry since 11:47Z recorded as "never
+  launched", reached epoch 199 at **17:19:02Z** as
+  `adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s0`, and its model-weights
+  evaluation started at 17:23Z (`eval-750b3422e05de8434c22`, running). **Every arm
+  now has its full seed count trained.** That training run's own postrun ran
+  **concurrently with this one in a separate headless session** and committed
+  `a301573` while this entry was being written; the 17:27Z entry below is its
+  work, and it verifies the arm-8 seed-0 bundle field by field. Its
+  "owes a postrun" list names `r18_trades_adr-s1` because it was written a minute
+  after this scan and before this entry landed; **this entry closes that item.**
+  Contract evaluations:
+  **14 of 20** on model weights (the 16:21Z twelve plus this run and
+  `mobilenetv2_adr-s1`) and **3 of 9** on EMA weights (`r18_adr-s0`,
+  `r18_adr-s1`, `mobilenetv2_adr-s2`), unchanged. **One evaluation bundle is
+  terminal-failed**: `r18_adr-s1` model weights, still the campaign's only on-disk
+  exhibit for packet 0010. **Six are non-terminal**: `mobilenetv2_adr-s0` model
+  (new), `r18_trades-s1`, `r18_trades_adr-s2`, `mobilenetv2_adr-s1` EMA and
+  `r18_trades_adr-s0` EMA (`running`), and `r18_trades-s2` (`stale`); the watcher
+  cannot tell alive from dead for any of them. **One training-terminal run still
+  has no model-weights evaluation bundle on disk at all**: `r18_adr-s2` — and four
+  EMA evaluations have never been launched (`r18_adr-s2`, `r18_trades_adr-s1`,
+  `r18_trades_adr-s2`, `mobilenetv2_adr-s0`).
+  **M1c's training half is complete and its evaluation half is not**, so the
+  checkbox stays unticked: M1c covers launching the 20 training *and* evaluation
+  jobs, and `r18_adr-s2`'s model-weights evaluation plus those four EMA
+  evaluations have never been started. M2 and M3 stay open. **Arms 2, 6 and 7 are
+  complete on every axis their own contracts define; arms 1, 3, 4, 5 and 8 are
+  not** — arm 5 now has two model-weights seeds and no EMA seed.
 
 - **2026-09-10, 17:27Z — postrun of the training run
   `adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s0` (arm 8, seed 0) —
