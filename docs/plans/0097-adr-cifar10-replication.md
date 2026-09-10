@@ -6,12 +6,14 @@
 - Base SHA: `cd0b571e4685fbe02d7655a22b06397c7b8d9a28` (pinned worktree
   `source-cd0b571e4685`, created 2026-09-09)
 - Current milestone: M0 and M1a complete; M1c execution under way (10 of the
-  20 training runs have run dirs, 8 of them terminal and successful; 5 of the
-  20 contract model-weights evaluations are terminal — arm 2 seeds 1 and 0,
-  arm 3 seed 0, arm 1 seeds 1 and 2 (arm 1's **full three-seed set**, the
+  20 training runs have run dirs, **9** of them terminal and successful — the
+  ninth is `cifar10_mobilenetv2_adr-s1`, the campaign's **first MobileNetV2
+  run and the first job of any kind on the primary decision-rule leg**; 5 of
+  the 20 contract model-weights evaluations are terminal — arm 2 seeds 1 and
+  0, arm 3 seed 0, arm 1 seeds 1 and 2 (arm 1's **full three-seed set**, the
   campaign's first complete arm) — plus 1 of the 9 ADR-family EMA-weights
-  evaluations, arm 3 seed 0. Arm 2, the baseline the ResNet-18 decision rule
-  actually uses, now has **two** evaluated seeds) and its checkbox stays
+  evaluations, arm 3 seed 0. No evaluation is running, and arm 8 seed 1 has
+  no `evaluation/` or `evaluation-ema/` output yet) and its checkbox stays
   unticked until the full 20-job launch is verified; M1b and M2/M3 open
 - Last updated: 2026-09-10
 
@@ -1589,3 +1591,139 @@ is a multi-day unattended campaign, not a same-session one.
   MobileNetV2 jobs finishing within the hour the hosts will go idle unless
   the next batch is launched. That is a launch decision for the human, not
   this postrun. M1b and M1c stay unticked.
+- 2026-09-10: postrun of the `adr-campaign-v1-cifar10_mobilenetv2_adr-s1`
+  **training** terminal event (`runs/adr-cifar10-campaign-v1/
+  cifar10_mobilenetv2_adr-s1/train/run-bundle/manifest.json`) — **the
+  campaign's first MobileNetV2 run, and the first job of any kind on arm 8,
+  the treatment side of the rule's primary leg**. **Nothing imported — no
+  milestone closed.** This is training only: the run has no `evaluation/` or
+  `evaluation-ema/` output at all, so it produces no official-test number, and
+  `docs/experiments/` still holds only `.gitkeep`, so the idempotency check had
+  nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan of the campaign root returns
+  `terminal: true`, `success: true`, `status: completed`, `failure_class: null`
+  on exactly the `--state-path` line the watcher passed.
+  Verified for this bundle: `completion.json` `{"status": "completed"}`,
+  `manifest.status=sync_pending`, `error-marker.txt` reads "no application
+  error recorded", `epoch_metrics_complete: true` with 200 of 200 expected
+  epochs, and `epoch-metrics.jsonl` really carries 200 rows ending at epoch 199
+  / `global_step` 70400. Both declared artifacts exist at their source paths
+  and at their content-addressed `run-bundle/artifacts/<name>/<sha256>/` paths,
+  and each directory name equals the manifest's own `sha256` for that artifact
+  (`epoch-metrics.parquet` `825545921ef0…`, `sample-stats-train.parquet`
+  `4f651d5dd886…`). `best.pt`, `best-ema.pt`, `last.pt` and all four periodic
+  checkpoints (`epoch-049/099/149/199.pt`) are on disk. Source SHA
+  `cd0b571e4685…` clean (`dirty: false`, empty-diff `e3b0c442…`) from worktree
+  `source-cd0b571e4685`, external lock `05cfce4cf8db…` with `.external/adr` at
+  the pinned `515da0e0373f…`. Artifact bytes were not re-hashed — this
+  session's sandbox refuses to run a hash over paths outside the repo root — so
+  integrity rests on that path-equals-hash correspondence; the aggregator owns
+  the real check at M3.
+  Contract fields match arm 8 exactly: protocol
+  `controlled_cifar10_mobilenetv2_adr_v1`, student `mobilenet_v2_cifar`,
+  method `adr` v1, `teacher: null`, `nesterov: true`, `epochs=200`,
+  `milestones=[100,150] gamma=0.1`, `lr=0.1 momentum=0.9 wd=5e-4`,
+  `validation_fraction=0.1`, ADR `ema_decay=0.995` `T 2.5→2.0`
+  `lambda 0.7→0.95`, train attack KL/rectified 10 steps at `8/255` step
+  `2/255` random start, selection attack CE 20 steps at the same budget,
+  `world_size=1`, effective global batch 128, `deterministic: true`, seeds all
+  1 except the fixed `split=20260722` and `evaluation_attack=0`.
+  `git diff cd0b571e4685 HEAD` is empty for
+  `configs/scientific/cifar10_mobilenetv2_{adr,pgd_at}.yaml` and for the
+  protocol's own definition (`src/ard/protocols/__init__.py`,
+  `src/ard/config/schema.py`), so the contract has not drifted since the pin.
+  **Normalization asymmetry, logged deliberately and not a confound for the
+  rule.** Both MobileNetV2 arms declare `normalization: {profile:
+  cifar10_standard}` (mean/std), while all six ResNet-18 arms declare
+  `cifar10_raw_identity`. The preregistered rule compares an ADR-minus-baseline
+  *gain* at MobileNetV2 against the same gain at ResNet-18, and within each
+  architecture the treatment and its matched baseline share the profile
+  (arms 7 and 8 both `cifar10_standard`; arms 2 and 3 both
+  `cifar10_raw_identity`), so neither gain is confounded. What it does mean is
+  that the two architectures differ in input-normalization convention as well
+  as capacity, so no *level* may be read across architectures — only gains.
+  **ADR stop-rule checks pass.** EMA validation ran every epoch and never
+  crashed: all 200 rows carry `val_clean_accuracy_ema` and
+  `val_pgd_accuracy_ema`. And `best-ema.pt` was selected independently of the
+  student — EMA's best validation epoch is **141**, the student's is **151** —
+  which is what `docs/SCIENTIFIC_INVARIANTS.md`'s ADR section requires.
+  Held-out **validation** diagnostics only (not the official test set, not
+  reportable, and not comparable to any official-test table in this log):
+
+  | weights | checkpoint | epoch | clean | PGD |
+  |---|---|---|---|---|
+  | student | best | 151 | 0.7666 | 0.4850 |
+  | student | last | 199 | 0.7672 | 0.4774 |
+  | EMA | best-ema | 141 | 0.7586 | 0.4914 |
+  | EMA | last | 199 | 0.7708 | 0.4792 |
+
+  EMA is ahead of the student at each arm's own best checkpoint (+0.64 pp
+  validation PGD), the same direction as both ResNet-18 ADR seeds — a
+  consistency check on the selection logic, not independent evidence.
+  **Two things about this run look different from every ResNet-18 run so far,
+  and both are single-seed observations on validation data.**
+  1. **The student's best epoch is 151, not ~102.** Every ResNet-18 arm
+     measured so far peaked in a four-epoch window just past the *first* LR
+     drop at 100 (arm 2 seed 1 = 101, arm 2 seed 0 = 102, arm 1 seed 2 = 103,
+     arm 3 seed 0 = 103, arm 3 seed 1 = 103, arm 1 seed 1 = 104). This run
+     peaks one epoch past the *second* drop at 150. The EMA peaks at 141, also
+     well after the ResNet-18 window.
+  2. **The robust-overfitting gap is 0.76 pp, an order of magnitude below
+     anything else on record.** Student best-minus-last validation PGD is
+     0.4850 − 0.4774 = 0.0076, against 0.0408/0.0456 for ResNet-18 ADR and
+     0.0864/0.0888 for the Nesterov-matched ResNet-18 baseline. Validation PGD
+     is essentially flat from epoch 150 to 199 (`val_pgd_late_mean_epoch_150_
+     199` 0.4802 versus a 0.4850 peak). **This cannot yet be attributed to
+     ADR**: arm 7, the matched MobileNetV2 baseline, has no terminal run — its
+     seed 0 was at epoch 185 at the 04:46Z scan — so there is no way to
+     separate "ADR suppresses robust overfitting at this capacity" from
+     "MobileNetV2 at 200 epochs does not robustly overfit much in the first
+     place". The arm 7 seed 0 run finishing within the hour is the single
+     cheapest observation that would tell those two apart on validation, ahead
+     of any AutoAttack number.
+  Clean accuracy sits ≈7 pp below the ResNet-18 ADR arms (0.767 versus
+  0.839/0.840 validation clean at best), which is the expected capacity cost
+  and not a finding.
+  **Budget finding — the plan's ADR cost line does not fit MobileNetV2.** The
+  budget table charges every ADR-family run ≈54 s per full epoch (≈3.0 GPU-h),
+  a figure extrapolated from the ResNet-18 ADR canary and since confirmed for
+  ResNet-18 (`adr-s1` 39.4 s, `adr-s0` 40.7 s training-loop). This run's
+  training loop alone ran **61.2–87.1 s/epoch**, settling at **61.2–63.5 s for
+  its last 37 epochs** (163–199), the least-contended stretch of the run. The
+  training loop by itself is therefore ≈62 s/epoch at best observed — already
+  above the 54 s full-epoch allowance — so ≈3.0 GPU-h per run is too low for
+  the six MobileNetV2 runs (arms 7 and 8); **≈4 GPU-h is the better estimate**,
+  which adds roughly 6 GPU-h to the campaign total. Wall clock for this run was
+  23:10:45.1Z → 04:43:21.1Z, **5 h 32 min 36 s** (99.8 s/epoch averaged), but
+  that figure is inflated by contention — up to two other MobileNetV2/ResNet-18
+  training jobs and two concurrent AutoAttack evaluations shared the host — and
+  the per-epoch rows carry no validation-pass timing, so the uncontended
+  *full*-epoch cost cannot be isolated from this run. Contention changes only
+  wall clock, not results: `deterministic: true`, fixed seeds and fixed batch
+  size make the numbers independent of throughput.
+  **The M3 aggregator directory-naming defect has a seventh instance and needs
+  no further evidence.** `_load_arm_seed` builds
+  `run_root / f"{arm_key}-s{seed}"` (`scripts/aggregate_adr_cifar10_
+  replication.py:269`), i.e. `mobilenetv2_adr-s1`, while the real dir is
+  `cifar10_mobilenetv2_adr-s1`. This is the first instance on a MobileNetV2
+  arm, which is the case the fix must get right: arms 1-6 need the
+  `cifar10_r18_` prefix and arms 7-8 need `cifar10_` (the config file stem),
+  so a single global prefix will not do. Left unfixed: this postrun imports
+  nothing and touches no code.
+  Campaign state at the 04:46Z scan (`--include-hand-run`, fresh unused
+  cursor — 19 bundles), **10 of 20 run dirs**: training terminal and
+  successful for `pgd_at-s1`, `-s2`, `pgd_at_nesterov-s0`, `-s1`, `adr-s0`,
+  `adr-s1`, `trades-s1`, `trades_adr-s0` and now `mobilenetv2_adr-s1` (**9 of
+  20**); `mobilenetv2_pgd_at-s0` running at epoch 185, the only job on either
+  host. Contract (model-weights) evaluations **5 of 20** terminal —
+  `pgd_at_nesterov-s1`, `adr-s0`, `pgd_at-s1`, `pgd_at-s2`,
+  `pgd_at_nesterov-s0`; EMA-weights evaluations **1 of 9**. No evaluation is
+  running, and **four** terminal training runs have no contract evaluation:
+  `adr-s1` (its three `early-check-eval-*` bundles are diagnostics the
+  aggregator does not read), `trades-s1`, `trades_adr-s0` and this run. Arm 6
+  (`trades_49k_validation`) and seed 2 of arms 2/3/4 have not started.
+  **Both hosts go idle within the hour**: `mobilenetv2_pgd_at-s0` is 15 epochs
+  from done and 10 training runs still have no run dir. Launching the next
+  batch, and queueing the missing evaluations, is a decision for the human —
+  this postrun launches nothing. M1b and M1c stay unticked.
