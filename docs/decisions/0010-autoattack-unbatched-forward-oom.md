@@ -16,6 +16,52 @@ recommendation: A
 chosen: null
 ---
 
+## 追記（2026-09-10 11:07Z）— Option C の事前規則が発火した
+
+この packet を書いた時点で「走行中だった 7 本」のうちの 1 本、
+`cifar10_mobilenetv2_adr-s1` の model 重み評価
+（`eval-4615ede05d4f96adb48f`）が、**まったく同じ場所で同じように**落ちた。
+Option C の事前規則は「7 本のうち 1 本でも同じ OOM で落ちたら A を必須と
+する」だった。したがって **C は選択肢から外れる**。`chosen` は null のまま、
+決めるのは人間である。
+
+新しく分かったことは 2 つある。
+
+1. **これは ResNet-18 だけの話ではなく、MobileNetV2 のほうが 1.5 倍危ない。**
+   失敗した allocation は **3.66 GiB**、これは
+   `10000 × 96 × 32 × 32 × 4 B = 3.662 GiB` とバイト単位で一致する。
+   `src/ard/models/registry.py:126` が `mobilenet_v2_cifar` の stem stride を
+   `(1,1)` にしているので解像度が 32×32 のまま保たれ、`features[2]` の
+   expansion conv（expand_ratio 6）が全 10,000 枚ぶんの **96**×32×32 を
+   一度に確保しようとする。ResNet-18 の 2.44 GiB
+   （`10000 × 64 × 32 × 32 × 4 B`）と同じ機構で、係数だけが大きい。
+   残っている MobileNetV2 の評価は、この欠陥に対して最も脆い部類に入る。
+
+2. **落ちているのは冗長な再計算だけで、AutoAttack 自体は完走している。**
+   lane log では Square が `34/34` まで進み、AutoAttack 自身が
+   `robust accuracy after SQUARE: 42.84% (total time 7656.5 s)` を出力して
+   いる（traceback がログ上で先に見えるのは stderr が先に flush された
+   だけ）。つまり `run_standard_evaluation` は正常に返り、その次の 213 行で
+   死んでいる。**この 42.84 % は完走しなかった run のログ片であって結果では
+   なく、どの record にも report にも表にも入れてはならない。**
+   `evaluation-results.json`・`autoattack-best.json`・`completion.json` は
+   いずれも書かれておらず、`last.pt` には到達していない。2 時間 8 分
+   （08:59:09Z → 11:07:25Z）ぶんの GPU 時間から取り込めるものは何もない。
+
+落ちたときの GPU 0 は 23.52 GiB 中 **2.93 GiB** 空き、プロセスが 5 本
+（13.12 + 1.74 + 1.74 + 1.71 GiB ＋ この run の 2.25 GiB）同居していた。
+
+**レーンドライバの second defect も再現した。** lane B は `exit=1` の
+3 秒後（20:07:26+09:00）にそのまま `--weights=ema`
+（`eval-74a8f5d0042ebea0b0d1`）を開始している。これは前述のとおり別 plan の
+インフラ案件で、この packet では決めない。
+
+証拠の全文は plan 0097 の Progress log（2026-09-10 11:07Z のエントリ）。
+これで同一 traceback による失敗は **4 本**（`r18_adr-s2`、
+`r18_trades_adr-s1`、`r18_adr-s1`、`mobilenetv2_adr-s1`）になった。
+取り直しの見積もりは A・B とも 3 本ではなく 4 本ぶん、
+**約 7–13 GPU 時間**に増える。
+
 ## この packet は結果についてではない
 
 plan 0097 の M2/M3 はまだ開いており、`docs/experiments/` に取り込むべき

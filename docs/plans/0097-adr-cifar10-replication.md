@@ -17,10 +17,14 @@
   literature/consistency expectations in the standing autonomous-check
   instruction, with **no deviation and no bug found in any of them**. So **13
   terminal training runs still have no terminal contract evaluation**,
-  including every MobileNetV2 run — though **9 of those 13 have an evaluation
-  running** at the 09:12Z scan (`r18_adr-s1`, `r18_adr-s2`, `r18_trades_adr-s0`,
-  `-s1`, `-s2`, `r18_trades_49k_validation-s0`, `mobilenetv2_adr-s1`,
-  `mobilenetv2_pgd_at-s1`, `-s2`). Four training-terminal runs still have **no
+  including every MobileNetV2 run. At the 11:09Z scan **7 evaluations are
+  running** (`r18_trades_adr-s0`, `-s2`, `r18_trades_49k_validation-s0`,
+  `mobilenetv2_pgd_at-s1`, `-s2`, plus the EMA halves of `r18_adr-s1` and
+  `mobilenetv2_adr-s1`) and **4 have failed** with the same AutoAttack
+  unbatched-forward CUDA OOM — `r18_adr-s1`, `r18_adr-s2`,
+  `r18_trades_adr-s1`, `mobilenetv2_adr-s1`, all model weights, all within
+  six minutes of each other (see decision packet 0010 and the 11:09Z entry
+  below). Four training-terminal runs still have **no
   evaluation of any kind**: `r18_trades-s1`, `r18_trades-s2`,
   `mobilenetv2_pgd_at-s0`, `mobilenetv2_adr-s2`. M1c's checkbox stays
   unticked until the full 20-job launch is verified complete; M2/M3 open. The
@@ -3548,3 +3552,83 @@ is a multi-day unattended campaign, not a same-session one.
   as-is, or to batch the line-213 forward first so the campaign's remaining
   ~13 AutoAttack evaluations stop being contention-fragile, is the human's
   call; see the decision packet. M1c and M2 stay unticked.
+- 2026-09-10 11:07Z: postrun of the `eval-4615ede05d4f96adb48f` terminal
+  event — the `--weights=model` contract evaluation of
+  `cifar10_mobilenetv2_adr-s1` (bundle
+  `runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_adr-s1/train/evaluation/run-bundle/manifest.json`).
+  **Nothing imported — no milestone closed.** Watcher rescan of that bundle
+  (`--once --emit-existing --include-hand-run`): `terminal=true`,
+  `success=false`, `status=failed`, `failure_class=unknown`, error marker
+  "application failure recorded". `failure_class` is `unknown` only because a
+  hand-run bundle carries no per-attempt classification — the log evidence
+  below is unambiguously technical and retryable, and it is the **same defect
+  already written up in packet 0010**, not a new one.
+
+  **This is the fourth arm to die at `autoattack.py:213`, and the first
+  MobileNetV2 one.** Traceback in `canon-eval-lane-B.log:167-248`, innermost
+  frame `torchvision/models/mobilenetv2.py:64 return self.conv(x)` inside an
+  `InvertedResidual`, reached from `evaluate.py:411 run_autoattack` →
+  `autoattack.py:213`. The failed allocation was **3.66 GiB**, which is exactly
+  `10000 × 96 × 32 × 32 × 4 B = 3.662 GiB`: `build_architecture` sets
+  `model.features[0][0].stride = (1,1)` for `mobilenet_v2_cifar`
+  (`src/ard/models/registry.py:126`), so the stem keeps 32×32, `features[1]`
+  emits 16×32×32, and `features[2]`'s expansion conv (expand_ratio 6) emits
+  **96**×32×32 for the whole test set at once. Same mechanism as the ResNet-18
+  failures, whose 2.44 GiB matched `10000 × 64 × 32 × 32 × 4 B`; MobileNetV2
+  simply demands **1.5×** the peak, so this arm is the *most* exposed of the
+  eight, not the least.
+
+  **The OOM is in the redundant recompute alone — AutoAttack itself finished.**
+  The lane log shows Square running to `34/34` and AutoAttack printing its own
+  `robust accuracy after SQUARE: 42.84% (total time 7656.5 s)` (the traceback
+  appears earlier in the file only because stderr flushed ahead of buffered
+  stdout). So `run_standard_evaluation` returned and the process then died on
+  line 213's unbatched `model(adversarial)`. That 42.84 % is **a log scrape
+  from a run that never completed and must not enter any record, report or
+  table** — no `evaluation-results.json`, no `autoattack-best.json`, no
+  `completion.json` was written, and `last.pt` was never reached. On disk the
+  evaluation dir holds only `panel-best.jsonl`, `sample-stats-best.parquet`,
+  `resolved_evaluation_config.yaml` and `evaluation-lineage.json`; a completed
+  evaluation (e.g. `cifar10_r18_pgd_at-s1`) additionally has
+  `autoattack-best.json`, `panel-last.jsonl`, `sample-stats-last.parquet`,
+  `autoattack-last.json`, `evaluation-results.json`, `run-bundle/metrics.jsonl`
+  and `run-bundle/completion.json`. 2 h 08 m of GPU time (created_at
+  08:59:09Z → finished_at 11:07:25Z) produced nothing importable.
+
+  **Contention, again from the 9-lane driver.** At the failure GPU 0 had
+  23.52 GiB total, **2.93 GiB free**, and *five* resident processes
+  (13.12 + 1.74 + 1.74 + 1.71 GiB plus this run's 2.25 GiB).
+
+  **Packet 0010's Option-C trigger has fired.** Option C's preregistered rule
+  was: *"if even one of the 7 in-flight evaluations dies of the same OOM,
+  Option A becomes mandatory."* This run was one of those seven. Two further
+  lanes are also `exit=1` with the identical traceback
+  (`canon-eval-lane-{D,E,F}.log`), and lanes E and F's EMA passes were
+  SIGTERM'd (`exit=143`) at 20:04:24+09:00 — the second defect (the lane driver
+  not halting on a non-zero exit) recurs here too: lane B started
+  `--weights=ema` (`eval-74a8f5d0042ebea0b0d1`) at 20:07:26+09:00, three
+  seconds after `exit=1`.
+
+  **One proposed retry command — not run by this postrun.** As with the other
+  three arms it must go on an otherwise idle 4090; under the present packing it
+  would hit the same allocation at the same point after another two hours, and
+  for MobileNetV2 it needs 3.66 GiB of headroom rather than 2.44 GiB:
+
+  ```bash
+  cd /home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/worktrees/source-cd0b571e4685
+  RUNS=/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1
+  CUDA_VISIBLE_DEVICES=<idle-gpu> PYTHONPATH=src \
+    /home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.evaluate \
+    --config configs/evaluation/autoattack_saved_checkpoint.yaml \
+    --checkpoint-dir "$RUNS/cifar10_mobilenetv2_adr-s1/train" \
+    --output "$RUNS/cifar10_mobilenetv2_adr-s1/train/evaluation" \
+    --weights model --allow-autoattack
+  ```
+
+  This reproduces the failed run's manifest (`config_hash`
+  `2cab228100f2…`, protocol `controlled_cifar10_mobilenetv2_adr_v1`,
+  `evaluation_seed 0`, `world_size 1`, effective global batch 128, source SHA
+  `cd0b571e4685` with an empty diff) — the same measurement, not a weakened
+  one. Whether to retry as-is or to batch the line-213 forward first is the
+  human's call; the question is packet 0010's, and this entry is the evidence
+  its Option-C rule asked for. M1c and M2 stay unticked.
