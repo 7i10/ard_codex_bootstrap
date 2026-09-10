@@ -11,26 +11,30 @@
   1–6) is training-complete at its full seed count**, as is arm 7; **exactly
   one training run is left in the whole campaign**, `cifar10_mobilenetv2_adr-s0`
   (arm 8 seed 0), which has never been launched. Canonical contract evaluations
-  exist for **7 of 20** runs (model weights: `r18_pgd_at-s1/-s2`,
-  `r18_pgd_at_nesterov-s0/-s1/-s2`, `r18_adr-s0`, `mobilenetv2_pgd_at-s2`)
+  exist for **8 of 20** runs (model weights: `r18_pgd_at-s1/-s2`,
+  `r18_pgd_at_nesterov-s0/-s1/-s2`, `r18_adr-s0`, `mobilenetv2_pgd_at-s1/-s2`)
   plus **1 of 9** EMA-weights evaluations (`r18_adr-s0`) — every one checked
   against the literature/consistency expectations in the standing
   autonomous-check instruction, with **no deviation and no bug found in any of
-  them**. So **12 terminal training runs still have no terminal contract
-  evaluation**. `mobilenetv2_pgd_at-s2` (11:47Z entry below) is the first
-  MobileNetV2 evaluation to land and the first success after six consecutive
-  OOM failures; it supplies the baseline half, seed 2 only, of the MobileNetV2
-  decisive pair. At the 11:47Z full-root scan **five evaluations are genuinely
-  running** (`r18_trades_adr-s2`, `r18_trades-s1`, `-s2`,
-  `r18_trades_49k_validation-s0` (retry), `mobilenetv2_pgd_at-s1`), **six have
-  failed** with the same AutoAttack unbatched-forward CUDA OOM — `r18_adr-s1`,
-  `r18_adr-s2`, `r18_trades_adr-s0`, `r18_trades_adr-s1`,
-  `r18_trades_49k_validation-s0`, `mobilenetv2_adr-s1`, all model weights (see
-  decision packet 0010 and the entries below) — and **three `evaluation-ema`
-  bundles read `running` but are dead**, SIGTERM'd with no terminal state
-  (`r18_adr-s1`, `r18_trades_adr-s0`, `mobilenetv2_adr-s1`). Four training-terminal runs still have **no
-  evaluation of any kind**: `r18_trades-s1`, `r18_trades-s2`,
-  `mobilenetv2_pgd_at-s0`, `mobilenetv2_adr-s2`. M1c's checkbox stays
+  them**. So **11 terminal training runs still have no terminal contract
+  evaluation**. With `mobilenetv2_pgd_at-s1` (12:01Z entry below) the
+  MobileNetV2 baseline arm now has **two of its three seeds evaluated**, and
+  the two agree; the MobileNetV2 decisive pair still has no treatment seed at
+  all. At the 12:02Z full-root scan **five evaluations read `running`**
+  (`r18_trades_adr-s2`, `r18_trades-s1`, `-s2`,
+  `r18_trades_49k_validation-s0` (retry), and `r18_trades_adr-s0`, a
+  human-started lane-K retry that began at 12:02:02Z, outside any postrun),
+  **one is terminal-failed and still on disk** (`mobilenetv2_adr-s1`, model
+  weights) with five more failure directories deleted or moved aside — all six
+  the same AutoAttack unbatched-forward CUDA OOM (`r18_adr-s1`, `r18_adr-s2`,
+  `r18_trades_adr-s0`, `r18_trades_adr-s1`, `r18_trades_49k_validation-s0`,
+  `mobilenetv2_adr-s1`; see decision packet 0010 and the entries below) — and
+  **three `evaluation-ema` bundles read `running` but are dead**, SIGTERM'd
+  with no terminal state (`r18_adr-s1`, `r18_trades_adr-s0`,
+  `mobilenetv2_adr-s1`). Four training-terminal runs have **no evaluation
+  bundle on disk at all**: `mobilenetv2_pgd_at-s0` and `mobilenetv2_adr-s2`
+  (never started), plus `r18_adr-s2` and `r18_trades_adr-s1` (failure
+  directories deleted or moved aside, no retry started). M1c's checkbox stays
   unticked until the full 20-job launch is verified complete; M2/M3 open. The
   `_load_arm_seed` run-directory-prefix bug in
   `scripts/aggregate_adr_cifar10_replication.py` was found and fixed earlier
@@ -4093,3 +4097,139 @@ is a multi-day unattended campaign, not a same-session one.
   the leg is no longer at zero, but it is not near a verdict either.
   Nothing was launched, retried or aggregated by this postrun. M1c and M2 stay
   unticked.
+- 2026-09-10 12:01Z: postrun of the `eval-ef9c002c70291c816de2` terminal event
+  (`runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s1/train/evaluation/
+  run-bundle/manifest.json`) — **arm 7 (MobileNetV2 PGD-AT) seed 1**, model
+  weights, lane G. **Succeeded.** It is the second MobileNetV2 evaluation and
+  the second consecutive success after the six OOM failures. **Still nothing
+  imported and no milestone closed** — the "why no import" reasoning in the
+  11:47Z entry applies unchanged: `adr_cifar10_replication_v1` is a
+  campaign-level contract with no per-run record path.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan of that bundle's parent
+  returns `terminal: true`, `success: true`, `status: completed`,
+  `failure_class: null`, `completion_json: true`, error marker "no application
+  error recorded" on the line whose `path` is exactly the `--state-path` the
+  watcher passed. The lane log agrees: `[lane-G][eval-done]
+  cifar10_mobilenetv2_pgd_at-s1 weights=model exit=0 2026-09-10T21:00:38+09:00`.
+  Wall clock `created_at` 09:00:58.602Z → `finished_at` 12:00:37.584Z =
+  **2 h 59 m 39 s**, of which AutoAttack itself is 10,703.7 s (2 h 58 m 24 s):
+  7,177.5 s on `best.pt` and 3,526.2 s on `last.pt`.
+  **The hand-run completion contract is satisfied in full.**
+  `run-bundle/completion.json` reads `{"status": "completed", "results": 2}`;
+  the manifest reads `status: sync_pending` (an accepted terminal value — the
+  offline W&B segment has not been synced, a tracking matter, not a scientific
+  one); `error-marker.txt` is the clean marker. All **seven declared artifacts
+  exist** at their declared paths — `resolved_evaluation_config.yaml`,
+  `evaluation-lineage.json`, `evaluation-results.json`, `panel-best.jsonl`,
+  `panel-last.jsonl`, `sample-stats-best.parquet`, `sample-stats-last.parquet`
+  — each also present under its content-addressed
+  `run-bundle/artifacts/<name>/<sha256>/` copy, plus `autoattack-best.json` and
+  `autoattack-last.json`. (As in the 11:47Z entry, the per-file re-hash that
+  `aggregate_adr_cifar10_replication.py::_verify_bundle` performs was not run
+  here — this session's Bash cannot hash files under the runtime root. The
+  aggregator will do it at M3 from the pinned worktree, and that is the check
+  of authority.)
+  **The numbers, both checkpoints, official 10,000-example test split.**
+
+  | checkpoint | clean | CE-PGD-20 | AutoAttack (record) | AutoAttack (own print) |
+  |---|---|---|---|---|
+  | `best.pt` (`3bef7eec…`) | 74.34 % | 44.28 % | 39.86 % | 39.78 % |
+  | `last.pt` (`c73f6f1d…`) | 74.30 % | 43.39 % | 39.26 % | 39.17 % |
+
+  AutoAttack's own `initial accuracy` prints — 74.34 % and 74.30 % — match the
+  recorded clean accuracies exactly, so both checkpoints were loaded as
+  intended.
+  Identity, checked field by field against the aggregator's `ARMS` entry rather
+  than assumed: protocol `controlled_cifar10_mobilenetv2_adr_v1` ✓, runtime
+  method `pgd_at` ✓, `weights: model` ✓, both `best`/`last` aliases present ✓,
+  `count 10000` on `split: test` ✓, AutoAttack `version: standard` with
+  `expected_commit a39220048b3c…` = the pinned upstream ✓, `has_ema: False` for
+  this arm so no `evaluation-ema/` is owed ✓ (and none was started). Source SHA
+  `cd0b571e4685` with `dirty: false` and empty diff `e3b0c442…`, external lock
+  `05cfce4cf8db…`. `evaluation-lineage.json` binds the evaluation to the right
+  training run: `training_config_hash d8e8ad98277c…`, equal to that run's own
+  manifest `config_hash`. `git diff cd0b571e4685 -- src/ard/evaluation/
+  src/ard/cli/evaluate.py configs/protocols/` is empty in this checkout, so the
+  evaluation code read here is the code that ran. The resolved evaluation config
+  confirms the protocol is not weakened: `checkpoints: both`, test split,
+  `autoattack: true`, `autoattack_batch_size: 128`, evaluation attack CE-PGD-20
+  at `epsilon 8/255`, `step 2/255`, `steps: 20`, `random_start: true`,
+  `loss: ce`, both modes `eval`, images in `pixel_0_1` with `cifar10_standard`
+  normalization owned by the student adapter. That 20-step evaluation attack is
+  exactly the training config's `selection_attack`, as the evaluation invariant
+  requires. Seeds: training 1 throughout, `evaluation_attack 0`,
+  `split 20260722`, AutoAttack seed 0. World size 1, per-rank batch 128,
+  effective global batch 128. (`evaluation.dataset.num_samples: 16` in the
+  resolved config is the same vestigial field noted at 11:47Z; the record's
+  `count: 10000` is what actually ran and is what the aggregator gates on.)
+  **Consistency checks, all clean.** Against the sibling seed
+  `mobilenetv2_pgd_at-s2` (`best.pt` clean 73.23 %, CE-PGD-20 44.40 %,
+  AutoAttack 40.18 %): the two MobileNetV2 baseline seeds differ by +1.11 pp
+  clean, −0.12 pp CE-PGD-20 and −0.32 pp AutoAttack — a spread consistent with
+  seed noise, and far too small to suggest a defect in either. Against the
+  Nesterov-matched ResNet-18 baseline (`pgd_at_nesterov-s0/-s1` `best.pt`:
+  clean 82.32 / 82.19 %, AutoAttack 47.19 / 47.40 %): MobileNetV2 sits ≈ 8 pp
+  lower clean and ≈ 7.5 pp lower under AutoAttack, the expected cost of the much
+  smaller model and in line with published MobileNetV2 adversarial-training
+  numbers on CIFAR-10 (the residual clean deficit is this project's 10 %
+  held-out split — training sees 45,000 images, not 50,000). Under AutoAttack
+  the usual best/last ordering holds, `best.pt` above `last.pt` by 0.60 pp; the
+  clean ordering is the opposite of seed 2's (`last.pt` is 0.04 pp — four
+  examples — *below* `best.pt` here, where in seed 2 it was 1.48 pp above), which
+  is not an anomaly: `best.pt` is selected on robust validation accuracy and
+  places no constraint on clean accuracy, so the clean gap is free to take
+  either sign. No deviation, no anomaly, nothing here needs a bug hunt.
+  **The packet-0010 estimator bias now has six of six disagreements in one
+  direction, and this run is the largest yet.** As established at 11:47Z,
+  `src/ard/evaluation/autoattack.py:213` discards AutoAttack's own count and
+  recomputes accuracy in a single unbatched forward over all 10,000 adversarial
+  images, while AutoAttack computed its own number in batches of 128; in eval
+  mode the two are mathematically identical, and the gap is cuDNN kernel and
+  reduction-order noise on borderline examples. The tally across every run that
+  has both figures, both checkpoints: `r18_pgd_at-s1` agrees exactly (46.78 /
+  40.69 %); `r18_adr-s0` records +2 examples on each; `mobilenetv2_pgd_at-s2`
+  records +5 and +4; **this run records +8 and +9** (39.86 vs 39.78 %, 39.26 vs
+  39.17 %). Six disagreements out of eight comparisons, **all six in the same
+  direction — the recorded number is the higher one**, which is what the
+  mechanism predicts. The magnitude ceiling rises from 0.05 pp to **0.09 pp**,
+  still far below any noise floor this campaign compares against, so no recorded
+  number is in doubt and nothing needs re-running for this reason alone. The
+  interaction with packet 0010 is unchanged and now slightly sharper: batching
+  that line would move recorded AutoAttack accuracies by roughly this much, so
+  runs evaluated before and after the fix would be measured by two slightly
+  different estimators inside one aggregate. Packet 0010's `chosen` is still
+  null; this postrun does not choose.
+  **One operational fact this postrun did not cause.** At 12:01:38Z a lane K
+  appeared and started a retry of `r18_trades_adr-s0`'s model-weights
+  evaluation. Its first attempt died in 3 s on
+  `FileExistsError: refusing to overwrite existing evaluation output` (the
+  guard in `evaluate.py:299` doing its job against the old failed directory);
+  after that directory was cleared the retry restarted at 12:02:02Z and is
+  running. Two things follow. First, the lane driver now prints
+  `[lane-K][STOPPING] non-zero exit, not auto-continuing to next queued job` —
+  the "does not stop on a non-zero exit" defect recorded in the earlier entries
+  is fixed in this driver. Second, that retry runs the same unbatched-forward
+  code path that OOM'd six times, because packet 0010 has not been decided; if
+  it OOMs again that is the expected outcome, not new information. **This
+  postrun launched, retried and aggregated nothing.**
+  **Campaign census at 12:02Z, re-derived from a full-root watcher scan.**
+  Training: **19 of 20 terminal and successful**; the one missing is still
+  `cifar10_mobilenetv2_adr-s0`, never launched. Contract evaluations, model
+  weights: **8 of 20 complete** — `r18_pgd_at-s1/-s2`,
+  `r18_pgd_at_nesterov-s0/-s1/-s2`, `r18_adr-s0`, `mobilenetv2_pgd_at-s2`, and
+  now `mobilenetv2_pgd_at-s1`. EMA weights: **1 of 9**, still only `r18_adr-s0`.
+  Terminal-failed and still on disk: `mobilenetv2_adr-s1` only. Reading
+  `running`: `r18_trades-s1` (lane A), `r18_trades-s2` (lane B),
+  `r18_trades_49k_validation-s0` (lane J), `r18_trades_adr-s2` (lane I) and
+  `r18_trades_adr-s0` (lane K, the new retry). Reading `running` but **dead**,
+  per the SIGTERM defect: the `evaluation-ema` bundles of `r18_adr-s1`,
+  `mobilenetv2_adr-s1` and `r18_trades_adr-s0`. No evaluation bundle of any kind
+  exists for `mobilenetv2_pgd_at-s0`, `mobilenetv2_adr-s2`, `r18_adr-s2` or
+  `r18_trades_adr-s1`.
+  **What this does and does not unlock.** The MobileNetV2 decisive pair
+  (`mobilenetv2_adr` vs `mobilenetv2_pgd_at`) now has **two of three baseline
+  seeds** and **zero treatment seeds**. Two seeds of one arm are a description
+  of those two runs, not an estimate of a distribution, and the pair cannot move
+  toward a verdict until `mobilenetv2_adr` has evaluations — one of whose three
+  training runs (seed 0) has not been launched at all. M1c and M2 stay unticked.
