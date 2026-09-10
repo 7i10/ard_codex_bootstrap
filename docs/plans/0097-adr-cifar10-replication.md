@@ -3452,3 +3452,99 @@ is a multi-day unattended campaign, not a same-session one.
   relaunch any of them. Launching `mobilenetv2_adr-s0` and queueing the four
   missing evaluations plus the eight outstanding EMA passes are decisions for
   the human — this postrun launches nothing. M1c stays unticked.
+- 2026-09-10 11:01Z: **failure postrun — `eval-5709dc2e3701675af39e`
+  (`cifar10_r18_adr-s2`, `train/evaluation`, `--weights=model`) died of CUDA
+  OOM inside AutoAttack. Nothing imported, nothing retried, no milestone
+  ticked.** Terminal status re-derived from the bundle the watcher named
+  (`train/evaluation/run-bundle/manifest.json`): `terminal true`,
+  `success false`, `failure_class unknown`. Wall clock 08:59:10Z → 11:01:18Z,
+  **2 h 02 min 08 s**, from the pinned worktree `source-cd0b571e4685`.
+
+  **`unknown` here does not mean the cause is unclear.** `campaign_watch.py`
+  takes `failure_class` from the orchestrator's per-attempt evidence
+  (`scripts/ardx/campaign_watch.py:111`); a hand-run bundle has no attempt
+  record, so the hand-run path can only ever emit `unknown`. The lane log
+  resolves it unambiguously, and this one is `technical_retryable` in
+  substance.
+
+  **Root cause — an unbatched forward over the whole test set, not a capacity
+  limit.** `torch.OutOfMemoryError` raised at
+  `src/ard/evaluation/autoattack.py:213`:
+
+  ```python
+  adversarial = adversary.run_standard_evaluation(images, labels, bs=batch_size)
+  with torch.no_grad():
+      accuracy = model(adversarial).argmax(1).eq(labels).float().mean().item()   # line 213
+  ```
+
+  `bs=128` is honoured *inside* AutoAttack; the accuracy recomputation on the
+  next line ignores it and pushes all 10,000 adversarial images through the
+  student in **one** forward. The allocation that failed was **2.44 GiB**,
+  which is exactly `10000 × 64 × 32 × 32 × 4 B = 2.441 GiB` — ResNet-18
+  `layer1`'s activation for the full set (the traceback's innermost frame is
+  `registry.py:75`, `self.bn2(self.conv2(outputs))` inside `layer1`). So the
+  peak sits at the very end of a two-hour job, after all four AutoAttack
+  stages have already been paid for, and it scales with the test-set size
+  rather than with `autoattack_batch_size`. Both files are hash-identical
+  between this checkout and the pinned SHA (`autoattack.py`
+  `4d110410…`, `cli/evaluate.py` `33cff93e…`), so the code read here is the
+  code that ran.
+
+  **What tipped it over.** GPU contention from the 9-lane hand-run evaluation
+  driver: at the failure the 4090 had 23.52 GiB total and **155 MiB free**,
+  across three processes (1.73 + 8.46 + 13.13 GiB). The unbatched forward
+  needs several GiB of headroom it cannot get when two other AutoAttack
+  evaluations are resident on the same device.
+
+  **Scope — at least three arms, not one.** `canon-eval-lane-E.log` records
+  the identical traceback for `cifar10_r18_trades_adr-s1` (`exit=1`,
+  20:01:15+09:00), three seconds before lane F's `exit=1` at 20:01:19+09:00.
+  At the 11:05Z rescan `cifar10_r18_adr-s1/train/evaluation` (lane D) is
+  `failed` as well.
+
+  **Second defect — the lane driver does not stop on a non-zero exit.** Both
+  lanes started their `--weights=ema` pass immediately after `exit=1`
+  (`[lane-E][eval-start] … weights=ema 20:01:15`, `[lane-F][…] 20:01:19`), so
+  a failed model-weights pass silently advances to the next stage instead of
+  halting the lane. Both EMA passes were then SIGTERM'd (`exit=143`) at
+  20:04:24+09:00.
+
+  **Nothing importable was produced, and the log numbers are not results.**
+  `results.append(...)` runs only after `run_autoattack` returns
+  (`src/ard/cli/evaluate.py:411-421`) and the metrics file is written after
+  the checkpoint loop, so the clean and CE-PGD-20 numbers for `best.pt` were
+  computed and then lost together with AutoAttack; `last.pt` was never
+  reached. The lane log's AutoAttack intermediates for `best.pt` — initial
+  accuracy 83.32 %, 48.22 % after APGD-T, 48.22 % after FAB-T, Square at batch
+  2/38 when it died — are log scrapes from a run that never completed and
+  **must not be entered into any record, report or table**.
+
+  **The evidence directory has since been removed.** At the 11:05Z rescan
+  `cifar10_r18_adr-s2/train/evaluation` and `…/evaluation-ema` no longer
+  exist, and neither do either of `cifar10_r18_trades_adr-s1`'s evaluation
+  directories; only the training bundles remain. The failure evidence now
+  survives only in `canon-eval-lane-{D,E,F}.log` and in this entry, which is
+  why it is recorded here in full.
+
+  **One proposed retry command — not run by this postrun.** It must go on an
+  otherwise idle 4090, because a retry under the same packing will hit the
+  same allocation at the same point after another two hours:
+
+  ```bash
+  cd /home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/worktrees/source-cd0b571e4685
+  RUNS=/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1
+  CUDA_VISIBLE_DEVICES=<idle-gpu> PYTHONPATH=src \
+    /home/shunsukenaito/.conda/envs/adv/bin/python -m ard.cli.evaluate \
+    --config configs/evaluation/autoattack_saved_checkpoint.yaml \
+    --checkpoint-dir "$RUNS/cifar10_r18_adr-s2/train" \
+    --output "$RUNS/cifar10_r18_adr-s2/train/evaluation" \
+    --weights model --allow-autoattack
+  ```
+
+  `configs/evaluation/autoattack_saved_checkpoint.yaml` is hash-identical at
+  the pinned SHA (`2c94bc05…`), and its `checkpoints: both`, `seed: 0`,
+  `autoattack_batch_size: 128` reproduce the failed run's manifest exactly —
+  so this re-runs the same measurement, not a weakened one. Whether to retry
+  as-is, or to batch the line-213 forward first so the campaign's remaining
+  ~13 AutoAttack evaluations stop being contention-fragile, is the human's
+  call; see the decision packet. M1c and M2 stay unticked.
