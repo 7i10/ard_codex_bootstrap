@@ -6,9 +6,9 @@
 - Base SHA: `cd0b571e4685fbe02d7655a22b06397c7b8d9a28` (pinned worktree
   `source-cd0b571e4685`, created 2026-09-09)
 - Current milestone: M0 and M1a complete; M1c execution under way (9 of the
-  20 training runs have run dirs, 7 of them terminal and successful) and its
-  checkbox stays unticked until the full 20-job launch is verified; M1b and
-  M2/M3 open
+  20 training runs have run dirs, 7 of them terminal and successful; the first
+  contract evaluation, arm 2 seed 1, is terminal) and its checkbox stays
+  unticked until the full 20-job launch is verified; M1b and M2/M3 open
 - Last updated: 2026-09-10
 
 ## Goal
@@ -596,3 +596,107 @@ is a multi-day unattended campaign, not a same-session one.
   first arm-8 job, and the campaign's first MobileNetV2 run — just started. Arms
   6 and 7 (trades_49k_validation, mobilenetv2 pgd_at) and seed 2 of arms 2/3/4
   have not started. M1b and M1c stay unticked.
+- 2026-09-10: postrun of the `eval-ef916db6bef00134891b` terminal event
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s1/train/
+  evaluation/`) — **the campaign's first complete contract evaluation**: arm 2
+  (Nesterov-matched PGD-AT baseline), seed 1, both checkpoints, clean +
+  CE-PGD-20 + AutoAttack on the official test set. **Nothing imported — no
+  milestone closed.** The campaign is still mid-flight (9 of 20 run dirs, one
+  of 20 contract evaluations terminal), so there is no campaign-level result to
+  aggregate; `docs/experiments/` is still empty apart from `.gitkeep`, so the
+  idempotency check had nothing to collide with.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py --once
+  --emit-existing --include-hand-run` scan returns `terminal: true`,
+  `success: true`, `failure_class: null` on the line whose `path` is that
+  manifest.
+  Verified for this bundle: `completion.json` `{"status": "completed",
+  "results": 2}`, `manifest.status=sync_pending`, `error-marker.txt` reads "no
+  application error recorded", all seven declared artifacts present on disk with
+  their content-addressed copies under the manifest's own SHA-256 paths
+  (`resolved_evaluation_config.yaml`, `evaluation-lineage.json`,
+  `evaluation-results.json`, `panel-{best,last}.jsonl`,
+  `sample-stats-{best,last}.parquet`), plus `autoattack-{best,last}.json`.
+  Source SHA `cd0b571e4685…` clean (`dirty: false`, empty-diff `e3b0c442…`) from
+  worktree `source-cd0b571e4685`. Artifact hashes were not recomputed — this
+  session's sandbox refuses to hash outside the repo root — so integrity rests
+  on the content-addressed paths matching the manifest; the aggregator owns the
+  real check at M3.
+  Contract fields match arm 2 of the frozen plan exactly: protocol
+  `controlled_cifar10_r18_adr_v1` with **`nesterov: true`**, method `pgd_at`
+  (`adr: null`), `epochs=200`, `milestones=[100,150] gamma=0.1`,
+  `validation_fraction=0.1`, `world_size=1`, effective global batch 128,
+  identity normalization, `deterministic: true`. Evaluation identity:
+  `evaluation.autoattack: true`, `checkpoints: both`, dataset `split: test`,
+  `count: 10000` on both rows, CE-PGD-20 at `epsilon=8/255 step=2/255 steps=20
+  random_start=true`, `evaluation_seed=0`, `weights: model`. AutoAttack is the
+  **standard** version with real (non-injected) provenance —
+  `expected_commit == vcs_commit == a39220048b3c9f2cca9a4d3a54604793c68eca7e`,
+  the pinned upstream the aggregator requires — run in its own process at
+  `epsilon=8/255`, `Linf`, batch 128, seed 0. Training seeds all 1 except the
+  fixed `split=20260722` and `evaluation_attack=0`.
+
+  **Official CIFAR-10 test set (10,000 examples), student weights, arm 2
+  (`pgd_at_nesterov`) seed 1 — clean, CE-PGD-20 and AutoAttack reported
+  separately, best and last kept separate:**
+
+  | checkpoint | sha256 (short) | clean | CE-PGD-20 | AutoAttack |
+  |---|---|---|---|---|
+  | `best.pt` | `47dbfc493a62…` | 0.8219 | 0.5097 | 0.4741 |
+  | `last.pt` | `db5fac975459…` | 0.8406 | 0.4196 | 0.4041 |
+
+  Robust-overfitting gap (best minus last): 9.01 pp on CE-PGD-20, 7.00 pp on
+  AutoAttack. This is the campaign's first reportable baseline number, and it
+  sits close to the historical plain-SGD PGD-AT seed 0 reused in the "Historical
+  reuse" section (best AA 0.4763) — but those are different arms (Nesterov on
+  vs off) and different seeds, so that is a sanity check, not a comparison.
+
+  **The `adr-s1` early-check AutoAttack number, previously unreadable, is now
+  logged.** The 20:15Z entry above recorded that this session's sandbox could
+  not open `early-check-eval-aa-best-model`; it can now.
+  `eval-2e106980f84b326999a1` gives arm 3 (`adr`) seed 1, `best.pt`
+  (`9181001647cb…`, the same checkpoint as the `early-check-eval-model` rows
+  above), student weights, official test, count 10000, standard AutoAttack at
+  the same pinned commit: **AutoAttack 0.4865**, clean 0.8282.
+  Set beside arm 2 seed 1's `best.pt` AutoAttack 0.4741, ADR is **+1.24 pp**
+  over its Nesterov-matched baseline. **This is not the preregistered
+  comparison**, which is three seeds per arm, and it mixes a contract
+  evaluation (arm 2) with a diagnostic early check (arm 3). It is directional
+  for seed 1 only and licenses no ADR-vs-baseline claim; the ResNet-18 leg of
+  the decision rule stays open until arms 2 and 3 each have three contract
+  evaluations, and the primary MobileNetV2 leg has no data at all yet.
+
+  **Aggregator defect — M3 blocker, found while checking this bundle against
+  it.** `scripts/aggregate_adr_cifar10_replication.py:269` builds each run
+  directory as `run_root / f"{arm_key}-s{seed}" / "train"`, with `arm_key` taken
+  from the `ARMS` dict (`pgd_at`, `pgd_at_nesterov`, `adr`, `trades`,
+  `trades_adr`, `trades_49k_validation`, `mobilenetv2_pgd_at`,
+  `mobilenetv2_adr`). The campaign writes run dirs named after the config stem
+  instead — `cifar10_r18_pgd_at_nesterov-s1`, `cifar10_r18_adr-s0`,
+  `cifar10_mobilenetv2_adr-s1`, and so on — so **no arm resolves** and the
+  aggregation will fail with "missing run bundle manifest" on the first arm.
+  The fix is a directory field per arm (`cifar10_r18_` prefix for arms 1-6,
+  `cifar10_` for the two MobileNetV2 arms, i.e. the config file stem), not a
+  change to any check. Nothing else about the script is wrong on this bundle:
+  its row validation (`count == 10000`, `split == "test"`,
+  `runtime_method == "pgd_at"`, `weights == "model"`, AutoAttack block present,
+  `attack_version == "standard"`, `expected_commit` equal to the pinned upstream,
+  both `best` and `last` aliases present) passes on every field by inspection.
+  Left unfixed here — this postrun imports nothing and touches no code; the fix
+  belongs to M3 alongside a `--run-root` smoke test against the real layout.
+  Cost: this evaluation ran 21:32:29Z → 00:09:35Z, 2 h 37 min wall clock for two
+  checkpoints × (clean + CE-PGD-20 + AutoAttack) under GPU contention. The
+  plan's budget line charges ≈1 GPU-h per AutoAttack checkpoint, ≈2 GPU-h per
+  run; the measured figure is above that but includes the clean/PGD passes and
+  contention, so the ≈40 GPU-h evaluation total stands as a lower bound rather
+  than a refuted estimate. Watch the next uncontended evaluation before
+  revising the line.
+  Campaign state at the 00:10Z scan (`--include-hand-run`), 9 of 20 run dirs:
+  training terminal and successful for `pgd_at-s1`, `-s2`,
+  `pgd_at_nesterov-s0`, `-s1`, `adr-s0`, `adr-s1`, `trades-s1`;
+  `trades_adr-s0` running at epoch 184 and `mobilenetv2_adr-s1` at epoch 33.
+  Contract evaluations: `pgd_at_nesterov-s1` terminal (this entry),
+  `cifar10_r18_adr-s0/train/evaluation` and
+  `cifar10_r18_pgd_at-s1/train/evaluation` running. `adr-s0` still needs its
+  `evaluation-ema/` sibling (`has_ema`), which has not appeared. Arms 6 and 7
+  (trades_49k_validation, mobilenetv2 pgd_at) and seed 2 of arms 2/3/4 have not
+  started. M1b and M1c stay unticked.
