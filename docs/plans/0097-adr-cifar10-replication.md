@@ -6,11 +6,12 @@
 - Base SHA: `cd0b571e4685fbe02d7655a22b06397c7b8d9a28` (pinned worktree
   `source-cd0b571e4685`, created 2026-09-09)
 - Current milestone: M0 and M1a complete; M1c execution under way (10 of the
-  20 training runs have run dirs, 8 of them terminal and successful; 4 of the
-  20 contract model-weights evaluations are terminal — arm 2 seed 1, arm 3
-  seed 0, arm 1 seed 1 and arm 1 seed 2, which completes **arm 1's full
-  three-seed set**, the campaign's first complete arm — plus 1 of the 9
-  ADR-family EMA-weights evaluations, arm 3 seed 0) and its checkbox stays
+  20 training runs have run dirs, 8 of them terminal and successful; 5 of the
+  20 contract model-weights evaluations are terminal — arm 2 seeds 1 and 0,
+  arm 3 seed 0, arm 1 seeds 1 and 2 (arm 1's **full three-seed set**, the
+  campaign's first complete arm) — plus 1 of the 9 ADR-family EMA-weights
+  evaluations, arm 3 seed 0. Arm 2, the baseline the ResNet-18 decision rule
+  actually uses, now has **two** evaluated seeds) and its checkbox stays
   unticked until the full 20-job launch is verified; M1b and M2/M3 open
 - Last updated: 2026-09-10
 
@@ -1415,3 +1416,176 @@ is a multi-day unattended campaign, not a same-session one.
   not contract evaluations and are not read by the aggregator. Arm 6
   (`trades_49k_validation`) and seed 2 of arms 2/3/4 have not started. M1b and
   M1c stay unticked.
+- 2026-09-10: postrun of the `eval-2d9fade14b51c95852f5` terminal event
+  (`runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s0/train/
+  evaluation/`) — arm 2 (`pgd_at_nesterov`, the Nesterov-matched baseline)
+  seed 0, `--weights=model` against `best.pt` and `last.pt`, clean +
+  CE-PGD-20 + AutoAttack on the official CIFAR-10 test set. **Nothing
+  imported — no milestone closed.** The campaign is mid-flight and
+  `docs/experiments/` still holds only `.gitkeep`, so the idempotency check
+  had nothing to collide with. **This is the second evaluated seed of arm 2 —
+  the first time the baseline that the ResNet-18 decision rule actually uses
+  has a seed spread of its own** (`COMPARISON_PAIRS["resnet18_nesterov_
+  matched"] = {"treatment": "adr", "baseline": "pgd_at_nesterov"}`,
+  `scripts/aggregate_adr_cifar10_replication.py:106-108`). Every earlier
+  ADR-vs-baseline number in this log was read against a single arm-2 seed or
+  against arm 1, which the rule excludes.
+  Status re-derived, not taken from the event: a fresh `campaign_watch.py
+  --once --emit-existing --include-hand-run` scan over the run's parent
+  returns `terminal: true`, `success: true`, `status: completed`,
+  `failure_class: null` for exactly the `--state-path` the watcher passed;
+  `run-bundle/completion.json` is `{"status": "completed", "results": 2}` and
+  `error-marker.txt` reads "no application error recorded".
+  Bundle verified against the frozen contract. All seven declared artifacts
+  exist both at their source paths and at their content-addressed
+  `run-bundle/artifacts/<name>/<sha256>/` paths, and every one of those
+  directory names equals the manifest's own `sha256` field for that artifact
+  (`resolved_evaluation_config.yaml` `d8e1474d41ba…`,
+  `evaluation-lineage.json` `59291ebfde13…`, `evaluation-results.json`
+  `6df4129d14dd…`, `panel-best.jsonl` `0c40534f75cb…`,
+  `sample-stats-best.parquet` `50462a44c8b4…`, `panel-last.jsonl`
+  `39075962892a…`, `sample-stats-last.parquet` `8720d9d9694c…`), plus
+  `autoattack-best.json` and `autoattack-last.json` beside them. Artifact
+  bytes were again not re-hashed — this session's sandbox refuses to run a
+  hash over paths outside the repo root — so integrity rests on that
+  path-equals-hash correspondence; the aggregator owns the real check at M3.
+  Source SHA `cd0b571e4685…` clean (`dirty: false`, empty-diff `e3b0c442…`)
+  from worktree `source-cd0b571e4685`, external lock `05cfce4cf8db…` with
+  `.external/adr` at the pinned `515da0e0373f…`.
+  Lineage ties to the training run: `evaluation-lineage.json` records
+  `training_config_hash == training_runtime_config_hash == raw_mapping_hash ==
+  4181914e3e4b…` with `applied: []` (no config migration), which is the
+  training bundle's own `config_hash`; `train_run_id` on both rows is
+  `adr-campaign-v1-cifar10_r18_pgd_at_nesterov-s0`, whose training bundle is
+  terminal (`epoch_metrics_complete: true`, 200 rows in `metrics.jsonl`
+  ending at epoch 199 / `global_step` 70400, finished 2026-09-09T16:39:16Z)
+  with `best.pt`, `last.pt` and `epoch-{049,099,149,199}.pt` on disk and **no
+  `best-ema.pt`**, which is correct — arm 2 has no EMA leg
+  (`has_ema: False`), so the aggregator will not look for an
+  `evaluation-ema/` sibling here.
+  Contract fields match arm 2 exactly: protocol
+  `controlled_cifar10_r18_adr_v1` with **`nesterov: true`**, method `pgd_at`
+  v1 (`adr: null`), `teacher: null`, `epochs=200`, `milestones=[100,150]
+  gamma=0.1`, `lr=0.1 momentum=0.9 wd=5e-4`, `validation_fraction=0.1`,
+  `world_size=1`, effective global batch 128, identity normalization,
+  `deterministic: true`. Evaluation identity: `split: test`, `count: 10000`
+  on both rows, CE-PGD-20 at `epsilon=8/255 step=2/255 steps=20
+  random_start=true`, `evaluation_seed=0`, threat hash `7081101693340e70…` —
+  the **same** threat hash as every other evaluated arm in this campaign.
+  AutoAttack is the **standard** version with real provenance
+  (`expected_commit == vcs_commit ==
+  a39220048b3c9f2cca9a4d3a54604793c68eca7e`), run in its own process at
+  `epsilon=8/255`, `Linf`, batch 128, seed 0. `weights: model` and
+  `selection_weights: model` on both rows. Training seeds all 0 except the
+  fixed `split=20260722`.
+
+  **Official CIFAR-10 test set (10,000 examples), student weights, arm 2
+  (`pgd_at_nesterov`) seed 0 — clean, CE-PGD-20 and AutoAttack reported
+  separately, best and last kept separate:**
+
+  | checkpoint | sha256 (short) | clean | CE-PGD-20 | AutoAttack |
+  |---|---|---|---|---|
+  | `best.pt` (val epoch 102) | `0c6a451e1c63…` | 0.8232 | 0.5081 | 0.4719 |
+  | `last.pt` (epoch 199) | `aecb953d38cb…` | 0.8424 | 0.4237 | 0.4057 |
+
+  The selected epoch is read directly from the training bundle's
+  `metrics.jsonl`: `val_pgd_accuracy` peaks at 0.5184 on epoch 102
+  (`val_clean_accuracy` 0.8292) and never recovers, ending at 0.4296 on epoch
+  199 — an 8.88 pp validation decay that tracks the 8.44 pp test CE-PGD-20
+  gap below. Re-reading arm 2 seed 1's `metrics.jsonl` the same way gives
+  epoch **101** (peak 0.5188), a number that entry did not record. Every
+  selected epoch measured so far sits in a four-epoch window just past the
+  first LR drop at 100: arm 2 seed 1 = 101, arm 2 seed 0 = 102, arm 1 seed 2
+  = 103, arm 3 seed 0 = 103, arm 1 seed 1 = 104. Best-checkpoint selection is
+  behaving identically across arms and optimizers, which is what makes the
+  best-vs-last contrast readable at all.
+
+  **(a) Arm 2's own seed spread is 0.22 pp on best AutoAttack — but it is a
+  two-seed range and must not be read as the floor.** Both runs are the same
+  source SHA `cd0b571e4685`, same protocol, same evaluation identity;
+  only `ARD_SEED` differs.
+
+  | quantity | seed 0 | seed 1 | mean | range |
+  |---|---|---|---|---|
+  | best clean | 0.8232 | 0.8219 | 0.8226 | 0.13 pp |
+  | best CE-PGD-20 | 0.5081 | 0.5097 | 0.5089 | 0.16 pp |
+  | **best AutoAttack** | 0.4719 | 0.4741 | **0.4730** | **0.22 pp** |
+  | last clean | 0.8424 | 0.8406 | 0.8415 | 0.18 pp |
+  | last CE-PGD-20 | 0.4237 | 0.4196 | 0.4217 | 0.41 pp |
+  | last AutoAttack | 0.4057 | 0.4041 | 0.4049 | 0.16 pp |
+
+  Arm 1 is the reason to distrust 0.22 pp as a floor: its own two same-SHA
+  seeds spanned 0.65 pp on best AutoAttack, and adding the third seed widened
+  the (mixed-SHA) range to 0.85 pp. A two-point range is a lower bound on
+  spread, not an estimate of it. No mean/sd is quoted here for two runs, per
+  the claims-discipline rule. **Quote arm 1's 0.85 pp as the campaign's
+  conservative noise floor until arm 2 has its third seed**; arm 2's 0.22 pp
+  is one draw of a two-point range and nothing more.
+
+  **(b) The ADR-vs-matched-baseline gap now clears every floor on record, and
+  the arithmetic is finally against the right baseline.** Arm 3 (`adr`) seed
+  0's contract `best.pt` AutoAttack is 0.4875. Against arm 2's two-seed mean
+  0.4730 that is **+1.45 pp**; against arm 2's better seed (seed 1, 0.4741)
+  **+1.34 pp**; against its weaker seed (seed 0, 0.4719) **+1.56 pp**. The
+  whole +1.34/+1.56 pp band sits above the 0.85 pp conservative floor and
+  roughly 6× above arm 2's own two-seed 0.22 pp range. On `last.pt` the gap
+  is far larger — arm 3 seed 0's 0.4481 against arm 2's 0.4041/0.4057 is
+  **+4.24 to +4.40 pp** — which is the robust-overfitting effect in (c)
+  showing up as accuracy, not an independent finding.
+  **This still is not the preregistered result, and the missing half is now
+  entirely on the treatment side.** The rule needs three contract evaluations
+  per arm on arms 2 and 3; arm 2 has two, arm 3 has **one** (plus the
+  `early-check-eval-aa-best-model` diagnostic at 0.4865, giving an ADR-side
+  two-point spread of 0.10 pp that mixes a contract evaluation with a
+  non-contract one). And the *primary* leg of the rule is MobileNetV2 (arm 8
+  vs arm 7), which still has **no evaluation data at all** — both its
+  training runs are the two jobs currently on the GPUs. Report as
+  directional; claim nothing.
+
+  **(c) Robust-overfitting suppression is unchanged and remains the sturdier
+  claim.** Best-minus-last gap for this run: **8.44 pp CE-PGD-20, 6.62 pp
+  AutoAttack**. The five baseline readings that now exist — arm 1 seed 0
+  (9.23 / 7.27 pp), seed 1 (7.98 / 6.09 pp), seed 2 (8.83 / 7.24 pp), arm 2
+  seed 1 (9.01 / 7.00 pp), arm 2 seed 0 (8.44 / 6.62 pp) — keep the baseline
+  AutoAttack-gap band at **6.09–7.27 pp**, which this run sits inside rather
+  than widening, and the CE-PGD-20 band at 7.98–9.23 pp. Arm 3 (`adr`) seed
+  0's 3.94 pp AutoAttack gap is still 2.15 pp below the nearest baseline
+  reading — further below the band than the band is wide, and now measured
+  against a band that includes two seeds of the matched-optimizer arm rather
+  than one.
+  **Cost.** This evaluation ran 02:44:40.1Z → 04:33:01.9Z, **1 h 48 min 22 s**
+  for two checkpoints × (clean + CE-PGD-20 + AutoAttack) — the fastest of the
+  six measured so far. It corrects one reading in the previous entry: the arm
+  1 seed 2 evaluation (01:59:34Z → 03:51:02Z) was *not* uncontended for its
+  second half, because this one started at 02:44:40Z and the two overlapped
+  for 1 h 06 min alongside both MobileNetV2 training jobs. Four of the six
+  evaluations now cluster at 1 h 48 min – 1 h 57 min and a second concurrent
+  evaluation did not move them, so the ≈1 GPU-h per AutoAttack checkpoint
+  line holds and the ≈58 GPU-h corrected evaluation total stands.
+  **The M3 aggregator directory-naming defect has a sixth instance and needs
+  no further evidence.** `_load_arm_seed` builds
+  `run_root / f"{arm_key}-s{seed}"` (`…:269`), i.e. `pgd_at_nesterov-s0`,
+  while the real dir is `cifar10_r18_pgd_at_nesterov-s0`. Everything else in
+  the script passes on this bundle by inspection (`count == 10000`,
+  `split == "test"`, `runtime_method == "pgd_at"`, `weights == "model"`, an
+  AutoAttack block on each row, `attack_version == "standard"`,
+  `expected_commit` equal to the pinned upstream, both aliases present), and
+  `has_ema: False` correctly means no `evaluation-ema/` lookup. Left unfixed:
+  this postrun imports nothing and touches no code.
+  Campaign state at the 04:40Z scan (`--include-hand-run`, fresh unused
+  cursor — 20 bundles), **10 of 20 run dirs**: training terminal and
+  successful for `pgd_at-s1`, `-s2`, `pgd_at_nesterov-s0`, `-s1`, `adr-s0`,
+  `adr-s1`, `trades-s1`, `trades_adr-s0` (8 of 20); `mobilenetv2_adr-s1`
+  running at epoch 193 and `mobilenetv2_pgd_at-s0` at epoch 175. Contract
+  (model-weights) evaluations **5 of 20** terminal — `pgd_at_nesterov-s1`,
+  `adr-s0`, `pgd_at-s1`, `pgd_at-s2`, `pgd_at_nesterov-s0`. EMA-weights
+  evaluations: **1 of 9** terminal. **No evaluation is running for the first
+  time since 2026-09-09**: every evaluable terminal training run has been
+  evaluated, so the evaluation queue has drained and the campaign is now
+  gated purely on training. The three `adr-s1/early-check-eval-*` bundles are
+  terminal but are not contract evaluations and are not read by the
+  aggregator. Arm 6 (`trades_49k_validation`) and seed 2 of arms 2/3/4 have
+  not started — **10 training runs still have no run dir**, and with the two
+  MobileNetV2 jobs finishing within the hour the hosts will go idle unless
+  the next batch is launched. That is a launch decision for the human, not
+  this postrun. M1b and M1c stay unticked.
