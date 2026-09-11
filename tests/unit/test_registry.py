@@ -23,6 +23,7 @@ pytestmark = pytest.mark.t1
 @pytest.mark.parametrize(
     ("architecture", "expected_type"),
     [
+        ("resnet18_imagenet", ResNet),
         ("resnet50_imagenet", ResNet),
         ("mobilenet_v2_imagenet", MobileNetV2),
         ("mobilenet_v3_small_imagenet", MobileNetV3),
@@ -35,9 +36,10 @@ def test_imagenet_architectures_build_the_expected_torchvision_type(
     assert isinstance(model, expected_type)
 
 
-def test_resnet50_imagenet_is_the_unpatched_native_stem() -> None:
+@pytest.mark.parametrize("architecture", ["resnet18_imagenet", "resnet50_imagenet"])
+def test_resnet_imagenet_is_the_unpatched_native_stem(architecture: str) -> None:
     """The CIFAR entries patch conv1/maxpool because CIFAR is 32px; ImageNet must not be."""
-    model = build_architecture("resnet50_imagenet", num_classes=1000)
+    model = build_architecture(architecture, num_classes=1000)
     assert isinstance(model, ResNet)
     assert model.conv1.kernel_size == (7, 7)
     assert model.conv1.stride == (2, 2)
@@ -51,7 +53,8 @@ def test_mobilenet_v2_imagenet_is_the_unpatched_native_stem() -> None:
 
 
 @pytest.mark.parametrize(
-    "architecture", ["resnet50_imagenet", "mobilenet_v2_imagenet", "mobilenet_v3_small_imagenet"]
+    "architecture",
+    ["resnet18_imagenet", "resnet50_imagenet", "mobilenet_v2_imagenet", "mobilenet_v3_small_imagenet"],
 )
 def test_imagenet_architectures_round_trip_a_native_resolution_forward_pass(architecture: str) -> None:
     model = build_architecture(architecture, num_classes=1000)

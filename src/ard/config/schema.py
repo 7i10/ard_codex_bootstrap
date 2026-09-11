@@ -384,6 +384,7 @@ class ModelConfig(StrictModel):
         # torchvision definitions -- no 32px conv1/maxpool patch). Available
         # for a future config to select; this does not itself pick Stage 1's
         # architecture, see docs/plans/0099-imagenet-stage0-prep.md.
+        "resnet18_imagenet",
         "resnet50_imagenet",
         "mobilenet_v2_imagenet",
         "mobilenet_v3_small_imagenet",

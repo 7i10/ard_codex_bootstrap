@@ -127,6 +127,13 @@ def build_architecture(architecture: str, num_classes: int) -> nn.Module:
         return model
     if architecture == "fixture_cnn":
         return FixtureCNN(num_classes)
+    if architecture == "resnet18_imagenet":
+        # Plain, unpatched torchvision definition -- see resnet50_imagenet's
+        # comment. Added post-plan-0099 to match the ADR paper's own
+        # ResNet-18 (~11.2M params) as the "larger" reference point
+        # docs/MOBILE_ROBUSTNESS_METHOD_PROPOSAL.md's Stage 0 recipe assumes,
+        # distinct from resnet50_imagenet (~25.6M params).
+        return models.resnet18(weights=None, num_classes=num_classes)
     if architecture == "resnet50_imagenet":
         # Plain, unpatched torchvision definition: the CIFAR entries above
         # patch conv1/maxpool specifically because CIFAR is 32px; ImageNet's
