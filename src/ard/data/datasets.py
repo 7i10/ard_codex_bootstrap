@@ -584,16 +584,115 @@ class ImageNetDataset(Dataset[tuple[Image.Image, int]]):
         path, label = self.samples[index]
         with Image.open(path) as image:
             rgb = image.convert("RGB")
-        # ImageNet's native JPEGs vary in resolution; every other adapter in
-        # this module (CIFAR, Tiny-ImageNet) hands the shared `_to_tensor` /
-        # augmentation pipeline images that are already a fixed size, so this
-        # is where that invariant is restored. This is a plain, deterministic
-        # resize -- no crop, no randomness -- purely to produce a fixed
-        # tensor shape; it is not a preprocessing or augmentation policy
-        # choice for an actual training run, which plan 0099 leaves open.
-        if rgb.size != (self.image_size, self.image_size):
-            rgb = rgb.resize((self.image_size, self.image_size), Image.Resampling.BILINEAR)
+        # Plan 0100: deliberately NOT resized here (plan 0099's original
+        # direct-squash resize was found, in scientific review, to both
+        # forbid any real crop-based augmentation and to disagree with the
+        # pretrained weights' own preprocessing convention). Native,
+        # variable resolution is preserved; fixed-size, aspect-ratio-
+        # preserving resize/crop is the transform pipeline's job now (see
+        # EpochImageNetTransform for training, ImageNetEvalTransform for
+        # validation/evaluation), matching every other adapter's own
+        # separation of "read the sample" from "shape it for a batch".
         return rgb, label
+
+
+class ImageNetEvalTransform:
+    """Deterministic ImageNet-standard preprocessing: resize the shorter side
+    to ``image_size * 256/224`` (preserving aspect ratio), then center-crop
+    to ``image_size``. No randomness, no epoch/source dependency -- used for
+    validation-during-training and for the official evaluation split, so it
+    intentionally does not implement ``set_epoch``/``set_seed``
+    (``IndexedDataset`` only calls those when present, per
+    ``ard.data.indexed``). Matches the preprocessing convention pretrained
+    torchvision ImageNet-1k weights were themselves trained under -- plan
+    0100's scientific review found the plain squash-resize this replaces
+    left pretrained initialization starting several points of clean
+    accuracy below its published number.
+    """
+
+    def __init__(self, *, image_size: int) -> None:
+        if image_size < 1:
+            raise ValueError("ImageNet eval transform image_size must be a positive integer")
+        self.image_size = image_size
+
+    def __call__(self, image: Any) -> torch.Tensor:
+        resize_size = round(self.image_size * 256 / 224)
+        resized = transform_functional.resize(image, resize_size)
+        cropped = transform_functional.center_crop(resized, self.image_size)
+        return _to_tensor(cropped)
+
+
+class EpochImageNetTransform:
+    """Deterministic ImageNet RandomResizedCrop + horizontal flip, keyed by
+    seed, epoch, and source ID -- same discipline as ``EpochSourceTransform``'s
+    CIFAR augmentation above (a resumed epoch must reproduce the same
+    augmented view for every source ID, independent of worker/sampler
+    order). torchvision's own ``RandomResizedCrop.get_params`` draws from the
+    global RNG with no injectable generator, so the crop-parameter search
+    (up to 10 attempts, log-uniform aspect ratio in [3/4, 4/3], uniform area
+    fraction in [0.08, 1.0], falling back to a centered square crop of the
+    shorter side if no attempt fits) is reimplemented here against a local
+    ``torch.Generator``, matching torchvision's own algorithm
+    (``torchvision.transforms.RandomResizedCrop``) parameter-for-parameter.
+    """
+
+    _SCALE = (0.08, 1.0)
+    _LOG_RATIO = (math.log(3.0 / 4.0), math.log(4.0 / 3.0))
+    _ATTEMPTS = 10
+
+    def __init__(self, *, augmentation_seed: int, image_size: int) -> None:
+        if image_size < 1:
+            raise ValueError("ImageNet augmentation image_size must be a positive integer")
+        self.augmentation_seed = augmentation_seed
+        self.image_size = image_size
+        self.epoch = 0
+        self.source_id_keyed = True
+
+    def set_epoch(self, epoch: int) -> None:
+        if epoch < 0:
+            raise ValueError("augmentation epoch must be non-negative")
+        self.epoch = epoch
+
+    def set_seed(self, seed: int) -> None:
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise ValueError("augmentation seed must be a non-negative integer")
+        self.augmentation_seed = seed
+
+    def _crop_box(self, image: Any, generator: torch.Generator) -> tuple[int, int, int, int]:
+        width, height = transform_functional.get_image_size(image)
+        area = width * height
+        for _ in range(self._ATTEMPTS):
+            target_area = area * (
+                self._SCALE[0] + (self._SCALE[1] - self._SCALE[0]) * torch.rand((), generator=generator).item()
+            )
+            aspect_ratio = math.exp(
+                self._LOG_RATIO[0] + (self._LOG_RATIO[1] - self._LOG_RATIO[0]) * torch.rand((), generator=generator).item()
+            )
+            candidate_width = int(round(math.sqrt(target_area * aspect_ratio)))
+            candidate_height = int(round(math.sqrt(target_area / aspect_ratio)))
+            if 0 < candidate_width <= width and 0 < candidate_height <= height:
+                top = int(torch.randint(0, height - candidate_height + 1, (), generator=generator).item())
+                left = int(torch.randint(0, width - candidate_width + 1, (), generator=generator).item())
+                return top, left, candidate_height, candidate_width
+        # Fallback (matches torchvision's own): a centered square crop of the shorter side.
+        side = min(width, height)
+        top = (height - side) // 2
+        left = (width - side) // 2
+        return top, left, side, side
+
+    def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
+        # Independent of worker order, sampler order, rank, and process RNG
+        # state -- see EpochSourceTransform's identical rationale above.
+        generator = torch.Generator().manual_seed(
+            self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
+        )
+        top, left, height, width = self._crop_box(image, generator)
+        cropped = transform_functional.resized_crop(
+            image, top, left, height, width, [self.image_size, self.image_size]
+        )
+        if bool(torch.randint(0, 2, (), generator=generator).item()):
+            cropped = transform_functional.hflip(cropped)
+        return _to_tensor(cropped)
 
 
 def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
@@ -681,7 +780,18 @@ def load_stagewise_late_mask(path: Path) -> frozenset[int]:
 def build_dataset(config: DatasetConfig, *, transform: Callable[[Any], torch.Tensor] | None = None) -> IndexedDataset:
     """Build one indexed view; callers needing train/validation use views below."""
     base = build_raw_dataset(config)
-    indexed = IndexedDataset(base, transform or _to_tensor)
+    if transform is not None:
+        default_transform: Callable[[Any], torch.Tensor] = transform
+    elif config.name == "imagenet":
+        # Unlike CIFAR/Tiny-ImageNet, ImageNetDataset no longer hands out a
+        # fixed-size image (plan 0100) -- a caller that doesn't supply its
+        # own transform needs the deterministic eval-standard resize/crop,
+        # not bare _to_tensor, which would receive variable-resolution
+        # images and fail to batch.
+        default_transform = ImageNetEvalTransform(image_size=config.image_size)
+    else:
+        default_transform = _to_tensor
+    indexed = IndexedDataset(base, default_transform)
     if isinstance(base, (TinyImageNetDataset, ImageNetDataset)):
         indexed.content_identity = base.content_identity
     return indexed
@@ -756,10 +866,15 @@ def build_train_validation_views(
             )
         else:  # pragma: no cover - DatasetConfig rejects unknown literals
             raise ValueError(f"unsupported CIFAR augmentation policy: {config.augmentation_policy}")
+    elif config.name == "imagenet":
+        train_transform = EpochImageNetTransform(augmentation_seed=augmentation_seed, image_size=config.image_size)
     else:
         train_transform = _to_tensor
+    validation_transform: IndexedTransform = (
+        ImageNetEvalTransform(image_size=config.image_size) if config.name == "imagenet" else _to_tensor
+    )
     train_view = IndexedDataset(raw, train_transform)
-    validation_view = IndexedDataset(raw, _to_tensor)
+    validation_view = IndexedDataset(raw, validation_transform)
     return (
         SourceIndexedSubset(train_view, list(split_train.indices)),
         SourceIndexedSubset(validation_view, list(split_validation.indices)),

@@ -21,9 +21,10 @@
   adversarial fine-tuning, not 100; use 3-step training-time PGD; 3 seeds per
   arm from the start (not staged up from 1-2), the human's explicit call
   after this session raised the seed-count question and recommended staging.
-- Current milestone: design, this document. No code written for this plan
-  yet beyond what plan 0099 already built. No source SHA frozen for this
-  plan's own protocol identity.
+- Current milestone: implementation complete, scientific review complete,
+  all findings resolved (see Progress log). No canary run has succeeded
+  yet against the corrected recipe — the first canary attempt (killed
+  mid-run) used the pre-review recipe and its results are void.
 
 ## Goal
 
@@ -55,11 +56,14 @@ per-sample rectification (paper Eq. 3-5), τ and λ both annealed by the
 existing per-iteration cosine schedule (`lambda_source: cosine`, the
 default — **not** plan 0098's shelved `gap_adaptive` variant, which never
 reached a working state; decision packet 0012). No new engine code for the
-mechanism itself. `method.adr` config block: `ema_decay: 0.995,
-temperature_high: 2.5, temperature_low: 2.0, lambda_low: 0.7, lambda_high: 0.95`
-— identical values to the CIFAR-10 configs, since nothing about the
-mechanism's own hyperparameters is dataset-specific in how it was derived
-(the paper's own defaults).
+mechanism itself. `method.adr` config block:
+`ema_decay: 0.995, temperature_high: 2.0, temperature_low: 1.5, lambda_low: 0.5, lambda_high: 0.9`
+— **not** the CIFAR-10 configs' values (`temperature_high: 2.5,
+temperature_low: 2.0, lambda_low: 0.7, lambda_high: 0.95`); see the Progress
+log's P0-1 entry for why the original draft's assumption that these are
+dataset-independent was wrong, and why this plan instead uses the pinned
+upstream's own Tiny-ImageNet (200-class) setting as the closest published
+anchor to this plan's 1000 classes.
 
 ## Recipe: sourced from literature, not invented this session
 
@@ -77,15 +81,25 @@ model per CLAUDE.md rule 6:
 | Evaluation (official test) | AutoAttack, standard, from a saved checkpoint, separate process, `--allow-autoattack` | This project's own standing rule (CLAUDE.md rule 6, `.claude/rules/scientific-core.md`) |
 | Batch size | 128 per rank, uniform across every arm/architecture | Measured this session: all three benchmarked architectures (ResNet-18, ResNet-50, MobileNetV3-Small) are GPU-compute-bound at batch 128 on a 4090 — doubling batch size or DataLoader workers produced no measurable throughput change (ResNet-50: 99.5 vs 99.2 img/s at batch 128 vs 192; ResNet-18: 302.8 vs 297.9 img/s at 8 vs 16 workers) — so a uniform batch size costs nothing and matches this project's standing convention that batch size/world size are part of a run's frozen execution identity (`.claude/rules/scientific-core.md`) |
 
-**Not sourced from a citation, this project's own existing convention,
-carried over from the CIFAR configs unchanged**: SGD, Nesterov momentum 0.9,
-weight decay 1e-4. **LR schedule**: multistep, scaled proportionally from
-this project's own CIFAR 200-epoch schedule (milestones at 100/150, i.e.
-50%/75% of the horizon) to this recipe's 50-epoch horizon: milestones at
-[25, 38], gamma 0.1. Base LR 0.1, matching both the CIFAR configs and
-standard ImageNet SGD convention. **Held-out validation fraction**: 0.02
-(≈25,600 images), deliberately smaller than the CIFAR default (0.25) —
-at ImageNet scale a 25% held-out slice would materially inflate the
+**Not sourced from a citation, this project's own existing convention**:
+SGD, Nesterov momentum 0.9. **Changed from the CIFAR configs, not carried
+over unchanged as an earlier draft of this table claimed**: weight decay
+1e-4 (CIFAR configs use 5e-4 — a real, deliberate ImageNet-convention value,
+not an oversight, but flagged since the first draft mischaracterized it as
+unchanged). **LR schedule**: `warmup_multistep` (`src/ard/schedules/__init__.py`) —
+a linear warmup over the first 10 of 50 epochs (~20%, matching
+Singh/Croce/Hein 2023's own pretrained-init recipe shape, see the Progress
+log's P1-5 entry), reaching the base LR exactly at epoch 10, then multistep
+decay at milestones [25, 38] (both past the warmup window; proportionally
+scaled from this project's own CIFAR 200-epoch schedule's 50%/75% points),
+gamma 0.1. Base LR **0.05**, the standard linear-scaling-rule value (Goyal
+et al. 2017) for this plan's batch size of 128 against the conventional
+ImageNet batch-256/LR-0.1 anchor — not the CIFAR configs' 0.1, and not
+Singh/Croce/Hein's own 1e-3 (an AdamW/ConvNeXt-family value that does not
+transfer numerically to this plan's SGD recipe). **Held-out validation fraction**: 0.02
+(≈25,600 images), deliberately smaller than the CIFAR scientific configs'
+own 0.1 (an earlier draft of this line misstated that default as 0.25) —
+at ImageNet scale even a 10% held-out slice would materially inflate the
 per-epoch selection-attack cost for no real gain in selection reliability;
 this is a cost engineering choice, not a change to any of CLAUDE.md rule 6's
 protected fields. **Selection attack**: PGD-10, hard-label CE, eval mode —
@@ -232,3 +246,150 @@ milestone this session.
    discipline (`.claude/rules/results-records.md`) — a new aggregator
    script for this campaign's own contract, following
    `scripts/aggregate_adr_cifar10_replication.py`'s shape.
+
+## Progress log
+
+- 2026-09-11/12: implementation (`853aa76`) and a first canary attempt.
+  scientific-reviewer ran on the full diff before any canary was allowed to
+  count, per this project's standing rule. **Verdict: two P0 findings, hold
+  on the canary.** The two running canary processes (`imagenet_r18_adr`,
+  `imagenet_mobilenetv3_adr`, both mid-flight on the pre-review recipe) were
+  killed immediately once the review returned; their partial results are
+  void and were never recorded anywhere. All findings below were resolved
+  before any further GPU time was spent.
+  - **P0-1 (ADR temperature/lambda copied from CIFAR-10 unchanged).** The
+    pinned upstream ADR code (`.external/adr/config/`) lowers
+    temperature/lambda monotonically as class count rises (CIFAR-10 10cls:
+    T=[2.0,2.5] lambda=[0.7,0.95]; CIFAR-100 100cls: T=[1.0,1.5]
+    lambda=[0.7,0.95]; Tiny-ImageNet 200cls: T=[?,2.0] lambda=[0.5,0.9] SGD,
+    or [1.5,2.0]/[0.3,0.9] with AWP) -- this plan's original configs used
+    the 10-class corner (T=[2.0,2.5], lambda=[0.7,0.95]) for a 1000-class
+    problem, the least appropriate of the three published settings. Softmax
+    entropy at fixed T grows with class count, so this risked degenerating
+    the rectified target into near-uniform 999-way label smoothing late in
+    training -- exactly the campaign's measured quantity (adr's gain over
+    pgd_at) getting silently suppressed by mistuning, not absence of effect.
+    **Resolved**: found and fixed a typo in the pinned upstream's own Tiny-
+    ImageNet SGD gin config (`resnet18_pgd_sgd_adr.gin:24`,
+    `AdvTrainer.tmperature_low = 1.5` -- misspelled key, so gin never
+    actually binds it) -- the AWP sibling config sets the same field
+    correctly to 1.5, so 1.5 is the best-evidenced reading of the SGD
+    variant's real intent. Adopted **temperature_high=2.0,
+    temperature_low=1.5, lambda_low=0.5, lambda_high=0.9** (Tiny-ImageNet's
+    200-class setting, the closest published anchor to this plan's 1000
+    classes) in both `imagenet_r18_adr.yaml` and `imagenet_mobilenetv3_adr.yaml`.
+    Also added a permanent, cheap diagnostic (`train_rectified_true_class_mass`,
+    `src/ard/engine/trainer.py`) logging the rectified target's own mean
+    true-class probability mass every epoch, for every future adr run, not
+    just this campaign -- a value near 1/num_classes would mean the
+    mechanism has degenerated for whatever class count is in use. The human
+    explicitly declined a general CIFAR-side auto-calibration system for
+    temperature/lambda (reasoning: the three published points aren't a
+    clean function of class count -- Tiny-ImageNet's jump from CIFAR-100
+    doesn't fit a simple log(K) extrapolation from the two CIFAR points --
+    and CIFAR's own resolution/domain wouldn't de-risk extrapolating to
+    ImageNet-1k/224px anyway); the diagnostic plus the closest published
+    anchor was judged sufficient, checked at the next real canary.
+  - **P0-2 (zero data augmentation for imagenet, `augmentation_policy:
+    canonical` recorded but not applied).** `build_train_validation_views`
+    had no branch for `config.name == "imagenet"` -- every epoch of all 50
+    planned epochs would have trained on the exact same deterministically-
+    resized image, no crop, no flip, while the resolved config still claimed
+    `canonical`. **Resolved**: `ImageNetDataset.__getitem__` no longer
+    resizes at all (returns the native-resolution image); a new
+    `EpochImageNetTransform` (`src/ard/data/datasets.py`) implements
+    deterministic, per-epoch/per-source-ID-keyed RandomResizedCrop + random
+    horizontal flip (torchvision's own algorithm, scale=[0.08,1.0],
+    ratio=[3/4,4/3], 10 attempts then a centered-square fallback, reimplemented
+    against a local `torch.Generator` since torchvision's own
+    `RandomResizedCrop.get_params` has no injectable generator) for training,
+    and a new `ImageNetEvalTransform` (deterministic resize-256/224-crop,
+    matching the pretrained weights' own preprocessing convention) for
+    validation-during-training and the official evaluation split. Both are
+    exported from `ard.data`. New tests confirm the training view actually
+    varies epoch to epoch (the reviewer's own suggested targeted test),
+    reproduces exactly for a fixed epoch/source ID (resume correctness), and
+    that the validation view stays unaugmented and epoch-invariant.
+  - **P1-3 (`ard.cli.evaluate` had no ImageNet branch)**: `_dataset_identity`
+    (`src/ard/cli/evaluate.py`) gained an `imagenet` branch mirroring
+    `tiny_imagenet`'s exactly (manifest-based fingerprint, `observed`-vs-
+    `expected-unverified` verification shape). Every one of this campaign's
+    12 evaluations would otherwise have failed immediately on
+    "evaluation dataset requires an explicit portable content fingerprint" --
+    discoverable only after ~270 GPU-hours of training. New direct unit tests
+    (`tests/unit/test_evaluation.py`) cover both the observed and
+    expected-only paths and the still-correct rejection when neither is given.
+  - **P1-4 (AutoAttack materializes the full evaluation set on GPU, ~30 GB
+    for ImageNet's 50k val images, guaranteed OOM)**: new
+    `EvaluationConfig.autoattack_sample_count` (default `None`, preserving
+    every existing CIFAR config's exact behavior of attacking every image)
+    and a new `_autoattack_loader` helper (`src/ard/cli/evaluate.py`) that
+    takes a fixed-seed **uniform random** subset -- not a prefix, since
+    `ImageNetDataset`'s own sample ordering is grouped by class and a prefix
+    would silently concentrate on the first few classes only. All four
+    configs set `autoattack_sample_count: 5000` (RobustBench's own
+    ImageNet-scale convention). New unit tests cover the unaffected default,
+    the random-not-prefix property, determinism for a fixed seed, and the
+    sample-count-exceeds-dataset-size fallback.
+  - **P1-5 (LR=0.1 with no warmup applied directly to pretrained weights)**:
+    a follow-up literature check found Singh/Croce/Hein 2023's own
+    pretrained-init recipe uses a **linear warmup over the first ~20% of
+    the run (10 of 50 epochs), reaching peak LR exactly at epoch 10, then
+    decay** -- their literal LR (1e-3) is an AdamW/ConvNeXt-family value and
+    does not transfer numerically to this plan's SGD/ResNet-18/MobileNetV3
+    recipe, but the warmup *shape* does. New `SchedulerConfig` id
+    `warmup_multistep` plus `warmup_epochs` field
+    (`src/ard/config/schema.py`), implemented via a pure
+    `warmup_multistep_multiplier` function and `LambdaLR`
+    (`src/ard/schedules/__init__.py`), unit-tested against a hand-computed
+    sequence and a resume/state_dict-exactness test mirroring the existing
+    `multistep` scheduler's own test. All four configs now use
+    `warmup_multistep` with `warmup_epochs: 10`, milestones unchanged at
+    `[25, 38]` (both already past the warmup window). Base LR also lowered
+    from 0.1 to **0.05**, applying the standard linear-scaling rule (Goyal
+    et al. 2017) for this plan's batch size of 128 against the
+    literature's conventional batch-256 anchor -- a well-established,
+    directly-citable SGD convention, not a guess.
+  - **P2-7 (regression: `pretrained=False` no longer bit-identical to
+    before `701d3d5` when `num_classes != 1000`)**: `_with_replaced_head`
+    was called unconditionally on both the pretrained and non-pretrained
+    branches in `build_architecture`; fixed to only run inside the
+    `pretrained=True` branch. New regression test confirms `pretrained=False`
+    at a non-1000 class count constructs bit-identical initial weights to
+    the pre-`701d3d5` behavior (same manual seed, same resulting head
+    parameters) -- this had no effect on any of this campaign's own
+    committed configs (all `num_classes: 1000`), only on future dev-scale
+    use of these architectures.
+  - **P2-9 (`amp: true` was a silent no-op)**: confirmed by reading every
+    `torch.autocast` call site in `src/` -- all are `enabled=False`
+    (deliberately, for detached diagnostic forwards); nothing ever enables
+    real mixed-precision compute. `GradScaler` alone without autocast
+    provides no speedup and only adds an unbounded-then-halving loss-scale
+    walk with a negligible (~1-in-2000-step) skipped-update rate, identical
+    in expectation across arms. Real autocast wiring would need its own
+    scientific review (confirming no rectified-target/EMA/attack computation
+    silently drops to FP16) and is out of scope here; the safe fix taken was
+    to set `amp: false` in all four configs, matching what the engine
+    actually does today rather than what the flag implies. Plan 0099's own
+    throughput numbers, measured under this same (effectively FP32) regime,
+    are unaffected and remain the basis for this plan's GPU-hour budget.
+  - **P2-12 (no safety net once the strict protocol contract was skipped)**:
+    added `test_the_four_imagenet_stage01_configs_are_field_identical_except_architecture_method_and_group`
+    (`tests/unit/test_config.py`) -- loads and normalizes all four configs,
+    asserting every field agrees except `student.architecture`, `method`,
+    and `tracking.group`. A future edit to only one of the four (epochs,
+    epsilon, batch size, etc.) now fails `scripts/verify.py --changed`
+    instead of silently breaking the controlled comparison.
+  - **Not done, deliberately deferred**: P2-8 (pinning a SHA-256 of the
+    fetched pretrained-weight state_dict in run lineage) and pre-warming/
+    verifying the torch hub weights cache on Ferret before launch --
+    real gaps, but neither blocks a canary run on Hamster (which already
+    has both architectures' pretrained weights cached from this session's
+    canary attempts).
+  - `scripts/verify.py --changed` green across every fix above (T0-T3).
+  - **Next action**: a real GPU canary against this corrected recipe,
+    covering all four arm/architecture combinations (both killed canaries
+    this round were `adr` runs; `pgd_at` has never been canaried against
+    the fixed augmentation/warmup/LR recipe at all), logging the new
+    `train_rectified_true_class_mass` diagnostic to confirm P0-1's fix is
+    not itself degenerate, before committing to the full 12-run campaign.

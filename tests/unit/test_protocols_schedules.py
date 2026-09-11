@@ -6,13 +6,14 @@ from pathlib import Path
 import pytest
 import torch
 import yaml
+from pydantic import ValidationError
 from torch import nn
 from torch.optim import SGD
 
 from ard.cli import train as train_cli
 from ard.config.schema import ExperimentConfig, MethodConfig, SchedulerConfig
 from ard.protocols import ensure_local_trainable, get_protocol
-from ard.schedules import build_scheduler
+from ard.schedules import build_scheduler, warmup_multistep_multiplier
 
 pytestmark = pytest.mark.t1
 
@@ -361,3 +362,81 @@ def test_epoch_end_multistep_boundaries_and_state_dict_resume_are_exact() -> Non
         resumed.step()
         assert resumed_optimizer.param_groups[0]["lr"] == uninterrupted_lr
         assert resumed.state_dict() == uninterrupted_state
+
+
+def test_warmup_multistep_multiplier_matches_a_hand_computed_sequence() -> None:
+    """Plan 0100 (scientific review finding P1-5): linear warmup to the base
+    LR at epoch=warmup_epochs, matching Singh/Croce/Hein 2023's own
+    pretrained-init recipe shape (peak LR attained at epoch 10 of 50)."""
+    kwargs = {"warmup_epochs": 10, "milestones": (25, 38), "gamma": 0.1}
+    observed = {epoch: warmup_multistep_multiplier(epoch, **kwargs) for epoch in (0, 1, 9, 10, 24, 25, 37, 38, 49)}
+    assert observed == pytest.approx(
+        {
+            0: 0.1,  # (0+1)/10
+            1: 0.2,  # (1+1)/10
+            9: 1.0,  # (9+1)/10 -- warmup complete, full LR
+            10: 1.0,  # first post-warmup epoch, no milestone reached yet
+            24: 1.0,
+            25: 0.1,  # first milestone
+            37: 0.1,
+            38: 0.01,  # second milestone
+            49: 0.01,
+        }
+    )
+
+
+def _lr_after_completed_warmup_epochs(completed: int) -> tuple[float, dict[str, object]]:
+    parameter = nn.Parameter(torch.ones(()))
+    optimizer = SGD([parameter], lr=0.1)
+    scheduler = build_scheduler(
+        optimizer,
+        SchedulerConfig(id="warmup_multistep", milestones=(25, 38), gamma=0.1, step_at="epoch_end", warmup_epochs=10),
+    )
+    for _ in range(completed):
+        optimizer.step()
+        scheduler.step()
+    return optimizer.param_groups[0]["lr"], scheduler.state_dict()
+
+
+def test_warmup_multistep_scheduler_boundaries_and_resume_are_exact() -> None:
+    # As with MultiStepLR, construction itself applies lr_lambda(0) before any
+    # .step() call, so "N completed epochs" reflects lr_lambda(N), not
+    # lr_lambda(N-1) -- completed=0 already carries epoch 0's warmup LR.
+    observed = {epoch: _lr_after_completed_warmup_epochs(epoch)[0] for epoch in (0, 9, 10, 24, 25, 37, 38, 49)}
+    assert observed == pytest.approx(
+        {0: 0.01, 9: 0.1, 10: 0.1, 24: 0.1, 25: 0.01, 37: 0.01, 38: 0.001, 49: 0.001}, abs=0, rel=1e-12
+    )
+    for boundary in (9, 10, 24, 25, 37, 38):
+        resumed_parameter = nn.Parameter(torch.ones(()))
+        resumed_optimizer = SGD([resumed_parameter], lr=0.1)
+        resumed = build_scheduler(
+            resumed_optimizer,
+            SchedulerConfig(
+                id="warmup_multistep", milestones=(25, 38), gamma=0.1, step_at="epoch_end", warmup_epochs=10
+            ),
+        )
+        lr_at_boundary, state = _lr_after_completed_warmup_epochs(boundary)
+        resumed_optimizer.param_groups[0]["lr"] = lr_at_boundary
+        resumed.load_state_dict(state)
+        uninterrupted_lr, uninterrupted_state = _lr_after_completed_warmup_epochs(boundary + 1)
+        resumed_optimizer.step()
+        resumed.step()
+        assert resumed_optimizer.param_groups[0]["lr"] == pytest.approx(uninterrupted_lr)
+        assert resumed.state_dict()["last_epoch"] == uninterrupted_state["last_epoch"]
+
+
+def test_warmup_multistep_requires_warmup_epochs() -> None:
+    with pytest.raises(ValidationError, match="warmup_multistep requires warmup_epochs"):
+        SchedulerConfig(id="warmup_multistep", milestones=(25, 38), gamma=0.1, step_at="epoch_end")
+
+
+def test_warmup_epochs_is_rejected_for_identity_and_multistep() -> None:
+    with pytest.raises(ValidationError, match="warmup_epochs is only defined for warmup_multistep"):
+        SchedulerConfig(id="identity", milestones=(), gamma=1.0, step_at="epoch_end", warmup_epochs=10)
+    with pytest.raises(ValidationError, match="warmup_epochs is only defined for warmup_multistep"):
+        SchedulerConfig(id="multistep", milestones=(25,), gamma=0.1, step_at="epoch_end", warmup_epochs=10)
+
+
+def test_warmup_multistep_rejects_a_milestone_inside_the_warmup_window() -> None:
+    with pytest.raises(ValidationError, match="must not occur during warmup"):
+        SchedulerConfig(id="warmup_multistep", milestones=(5, 38), gamma=0.1, step_at="epoch_end", warmup_epochs=10)

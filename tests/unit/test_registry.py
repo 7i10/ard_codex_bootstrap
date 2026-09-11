@@ -166,6 +166,29 @@ def test_pretrained_true_replaces_the_head_for_a_non_1000_class_config(
     assert logits.shape == (2, 5)
 
 
+@pytest.mark.parametrize("architecture", ["resnet18_imagenet", "mobilenet_v3_small_imagenet"])
+def test_pretrained_false_at_a_non_1000_class_count_does_not_consume_extra_rng_or_change_initial_weights(
+    architecture: str,
+) -> None:
+    """Regression test for a real bug scientific review found in plan
+    0100's first draft: _with_replaced_head was called on BOTH branches, so
+    even pretrained=False (the default) built a second nn.Linear and
+    silently consumed extra global RNG draws whenever num_classes != 1000 --
+    breaking the "bit-identical to before" guarantee this project's own
+    convention requires for a new default-False field."""
+    torch.manual_seed(0)
+    baseline = build_architecture(architecture, num_classes=5)
+    fc_name = "fc" if architecture == "resnet18_imagenet" else "classifier"
+    baseline_head = getattr(baseline, fc_name)[-1] if fc_name == "classifier" else baseline.fc
+
+    torch.manual_seed(0)
+    current = build_architecture(architecture, num_classes=5, pretrained=False)
+    current_head = getattr(current, fc_name)[-1] if fc_name == "classifier" else current.fc
+
+    assert torch.equal(baseline_head.weight, current_head.weight)
+    assert torch.equal(baseline_head.bias, current_head.bias)
+
+
 @pytest.mark.parametrize("architecture", ["resnet50_imagenet", "mobilenet_v2_imagenet", "convnext_tiny_imagenet"])
 def test_pretrained_true_is_rejected_for_unsupported_architectures(architecture: str) -> None:
     with pytest.raises(ValueError, match="pretrained=True is not supported"):

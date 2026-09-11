@@ -90,18 +90,38 @@ class OptimizerConfig(StrictModel):
 class SchedulerConfig(StrictModel):
     """Scheduler identity frozen before M1 supplies concrete schedules."""
 
-    id: Literal["identity", "multistep"]
+    id: Literal["identity", "multistep", "warmup_multistep"]
     milestones: tuple[int, ...]
     gamma: float = Field(gt=0)
     step_at: Literal["epoch_end"]
+    # Plan 0100 (scientific review finding P1-5): a linear LR warmup over the
+    # first warmup_epochs epochs, reaching the base LR exactly at epoch
+    # warmup_epochs, before multistep decay -- only defined for
+    # "warmup_multistep". Singh/Croce/Hein 2023's own pretrained-init recipe
+    # (this project's own literature source for the 50-epoch horizon) uses
+    # exactly this shape: linear warmup for the first ~20% of a 50-epoch
+    # run, then decay -- see ard.schedules.warmup_multistep_multiplier.
+    warmup_epochs: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def validate_schedule(self) -> SchedulerConfig:
         if self.id == "identity":
             if self.milestones or self.gamma != 1.0:
                 raise ValueError("identity scheduler requires milestones=[] and gamma=1.0")
-        elif not self.milestones or tuple(sorted(set(self.milestones))) != self.milestones or self.milestones[0] < 0:
-            raise ValueError("multistep scheduler requires strictly increasing non-negative milestones")
+            if self.warmup_epochs is not None:
+                raise ValueError("warmup_epochs is only defined for warmup_multistep")
+        elif self.id == "multistep":
+            if not self.milestones or tuple(sorted(set(self.milestones))) != self.milestones or self.milestones[0] < 0:
+                raise ValueError("multistep scheduler requires strictly increasing non-negative milestones")
+            if self.warmup_epochs is not None:
+                raise ValueError("warmup_epochs is only defined for warmup_multistep")
+        else:
+            if not self.milestones or tuple(sorted(set(self.milestones))) != self.milestones or self.milestones[0] < 0:
+                raise ValueError("warmup_multistep scheduler requires strictly increasing non-negative milestones")
+            if self.warmup_epochs is None:
+                raise ValueError("warmup_multistep requires warmup_epochs")
+            if self.milestones[0] < self.warmup_epochs:
+                raise ValueError("warmup_multistep's first decay milestone must not occur during warmup")
         return self
 
 
@@ -1157,6 +1177,18 @@ class EvaluationConfig(StrictModel):
     write_sample_stats: bool = False
     panel_size: int = Field(default=24, ge=0)
     autoattack_batch_size: int = Field(default=128, ge=1)
+    # Plan 0100 (scientific review finding P1-4): AutoAttack materializes its
+    # full evaluation set on the GPU as one tensor before attacking --
+    # ~123 MB for CIFAR-10's 10k test images (never a problem), ~30 GB for
+    # ImageNet's 50k val images (guaranteed CUDA OOM on any single GPU this
+    # project has). None (default) preserves today's exact behavior --
+    # attack every image the loader yields, unchanged for every existing
+    # CIFAR config. When set, only a fixed-seed uniform-random subset of
+    # this size (drawn from the full evaluation.dataset, keyed on
+    # evaluation.seed) is attacked -- not a prefix of the dataset, since
+    # ImageNetDataset's own sample ordering is grouped by class and a
+    # prefix would concentrate on only the first few classes.
+    autoattack_sample_count: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def validate_attack(self) -> EvaluationConfig:

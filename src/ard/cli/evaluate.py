@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, save_resolved_config
@@ -147,6 +147,26 @@ def _dataset_identity(dataset: Any, *, observed: dict[str, object] | None = None
                 "expected_sha256": dataset.content_sha256,
                 "verification": "expected-unverified",
             }
+    if dataset.name == "imagenet":
+        # Same shape as tiny_imagenet immediately above, but the manifest is
+        # path/label/size-keyed, not a full byte hash -- see
+        # ard.data.datasets.ImageNetDataset's own docstring (plan 0099's
+        # "Design question") for why, and plan 0100's scientific review for
+        # why this branch was missing until now (every evaluation of an
+        # ImageNet-trained checkpoint failed fast here).
+        fingerprint = dataset.content_sha256
+        if observed is not None:
+            observed_fingerprint = observed.get("observed_sha256")
+            verification = observed
+            if not isinstance(observed_fingerprint, str):
+                raise ValueError("ImageNet adapter did not expose a content digest")
+            fingerprint = observed_fingerprint
+        else:
+            verification = {
+                "algorithm": "imagenet-manifest-v1",
+                "expected_sha256": dataset.content_sha256,
+                "verification": "expected-unverified",
+            }
     if fingerprint is None:
         raise ValueError("evaluation dataset requires an explicit portable content fingerprint")
     identity: dict[str, object] = {
@@ -159,12 +179,43 @@ def _dataset_identity(dataset: Any, *, observed: dict[str, object] | None = None
             "cifar10": "torchvision-cifar10",
             "cifar100": "torchvision-cifar100",
             "tiny_imagenet": "tiny-layout-v1",
+            "imagenet": "imagenet-1k-layout-v1",
         }[dataset.name],
         "content_fingerprint": fingerprint,
     }
     if verification is not None:
         identity["content_verification"] = verification
     return identity
+
+
+def _autoattack_loader(
+    dataset: Any, *, sample_count: int | None, seed: int, batch_size: int, num_workers: int
+) -> DataLoader[IndexedBatch]:
+    """The (possibly subsetted) loader AutoAttack materializes in full.
+
+    ``sample_count=None`` (every existing CIFAR config) attacks every image
+    the dataset yields, unchanged from before this function existed. A
+    fixed-seed uniform random subset, never a prefix -- see
+    ``EvaluationConfig.autoattack_sample_count``'s docstring for why a
+    prefix would silently bias an ImageNet-scale pass toward the first few
+    classes only (``ImageNetDataset``'s own sample ordering is grouped by
+    class).
+    """
+    autoattack_dataset: Any = dataset
+    if sample_count is not None and sample_count < len(dataset):
+        generator = torch.Generator().manual_seed(seed)
+        indices = torch.randperm(len(dataset), generator=generator)[:sample_count].tolist()
+        autoattack_dataset = Subset(dataset, indices)
+    return cast(
+        DataLoader[IndexedBatch],
+        DataLoader(
+            autoattack_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            collate_fn=collate_indexed,
+        ),
+    )
 
 
 def _validate_evaluation_tracking_identity(config: ExperimentConfig, training_config: ExperimentConfig) -> None:
@@ -367,6 +418,7 @@ def main(argv: list[str] | None = None) -> int:
             "autoattack": {
                 "enabled": config.evaluation.autoattack,
                 "batch_size": config.evaluation.autoattack_batch_size,
+                "sample_count": config.evaluation.autoattack_sample_count,
             },
         }
     except Exception:
@@ -403,7 +455,14 @@ def main(argv: list[str] | None = None) -> int:
                 # for the raw student instead.
                 load_saved_student_checkpoint(checkpoint, student, weights_key=args.weights)
                 student.to(device).eval()
-                batches = [batch.to(device) for batch in loader]
+                autoattack_loader = _autoattack_loader(
+                    dataset,
+                    sample_count=config.evaluation.autoattack_sample_count,
+                    seed=config.evaluation.seed,
+                    batch_size=training_config.training.per_rank_batch_size,
+                    num_workers=training_config.training.num_workers,
+                )
+                batches = [batch.to(device) for batch in autoattack_loader]
                 images = torch.cat([batch.images for batch in batches])
                 labels = torch.cat([batch.labels for batch in batches])
                 epsilon = attack_config.epsilon_value

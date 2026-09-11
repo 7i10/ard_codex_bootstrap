@@ -13,9 +13,11 @@ from ard.data import (
     EpochCropReTransform,
     EpochCropshiftTransform,
     EpochIdbhWeakTransform,
+    EpochImageNetTransform,
     EpochShuffleSampler,
     EpochStagewiseAugmentationTransform,
     HistoryBalancedSampler,
+    ImageNetEvalTransform,
     IndexedDataset,
     SyntheticCIFAR,
     build_dataset,
@@ -426,6 +428,80 @@ def test_imagenet_dataset_resizes_native_resolution_images_deterministically(tmp
     dataset = build_dataset(config)
     image, _, _ = dataset[0]
     assert image.shape == (3, 32, 32)
+
+
+def _imagenet_layout_textured(root: Path, *, split: str = "train", size: int = 64) -> None:
+    """Like _imagenet_layout, but with a real per-pixel gradient rather than
+    a solid fill -- a solid-color fixture is invariant to crop/flip, which
+    would make an augmentation-varies-by-epoch test pass vacuously."""
+    import numpy as np
+
+    gradient = np.fromfunction(lambda y, x, c: (x + y * 2 + c * 40) % 256, (size, size, 3), dtype=np.float64).astype(
+        "uint8"
+    )
+    for wnid in ("n001", "n002"):
+        class_dir = root / split / wnid
+        class_dir.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(gradient, mode="RGB").save(class_dir / f"{wnid}_0.JPEG")
+        Image.fromarray(gradient, mode="RGB").save(class_dir / f"{wnid}_1.JPEG")
+
+
+def test_imagenet_training_view_actually_varies_between_epochs(tmp_path: Path) -> None:
+    """Plan 0100 / scientific review: the pre-fix training view was the
+    identity transform for imagenet (bit-identical every epoch). This is the
+    reviewer's own suggested targeted test -- it must fail before the fix and
+    pass after."""
+    _imagenet_layout_textured(tmp_path, split="train", size=64)
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="train", num_classes=2, image_size=32)
+    train_view, _ = build_train_validation_views(config, validation_fraction=0.34, split_seed=1, augmentation_seed=7)
+    train_view.set_epoch(0)
+    image_epoch_0, _, source_id = train_view[0]
+    train_view.set_epoch(1)
+    image_epoch_1, _, source_id_again = train_view[0]
+    assert source_id == source_id_again
+    assert not torch.equal(image_epoch_0, image_epoch_1)
+
+
+def test_imagenet_training_view_is_deterministic_for_a_fixed_epoch_and_source_id(tmp_path: Path) -> None:
+    """A resumed epoch must reproduce the same augmented view -- same
+    discipline as EpochSourceTransform's own CIFAR guarantee."""
+    _imagenet_layout(tmp_path, split="train", size=64)
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="train", num_classes=3, image_size=32)
+    first_view, _ = build_train_validation_views(config, validation_fraction=0.34, split_seed=1, augmentation_seed=7)
+    second_view, _ = build_train_validation_views(config, validation_fraction=0.34, split_seed=1, augmentation_seed=7)
+    first_view.set_epoch(3)
+    second_view.set_epoch(3)
+    first_image, first_label, first_id = first_view[0]
+    second_image, second_label, second_id = second_view[0]
+    assert first_id == second_id
+    assert first_label == second_label
+    assert torch.equal(first_image, second_image)
+
+
+def test_imagenet_validation_view_is_not_augmented_and_matches_the_eval_transform(tmp_path: Path) -> None:
+    _imagenet_layout(tmp_path, split="train", size=64)
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="train", num_classes=3, image_size=32)
+    train_view, validation_view = build_train_validation_views(
+        config, validation_fraction=0.34, split_seed=1, augmentation_seed=7
+    )
+    validation_view.set_epoch(0)
+    image_epoch_0, _, source_id = validation_view[0]
+    validation_view.set_epoch(1)
+    image_epoch_1, _, source_id_again = validation_view[0]
+    assert source_id == source_id_again
+    assert torch.equal(image_epoch_0, image_epoch_1)
+    expected = ImageNetEvalTransform(image_size=32)(train_view.dataset.dataset[validation_view.indices[0]][0])
+    assert torch.equal(image_epoch_0, expected)
+
+
+def test_epoch_image_net_transform_falls_back_to_a_centered_square_crop_when_nothing_fits(tmp_path: Path) -> None:
+    """A pathologically extreme aspect ratio can exhaust all 10 sampling
+    attempts -- confirm the fallback (matching torchvision's own
+    RandomResizedCrop) runs without error rather than crashing or looping."""
+    transform = EpochImageNetTransform(augmentation_seed=1, image_size=16)
+    extreme = Image.new("RGB", (1000, 4))
+    tensor = transform(extreme, source_id=0)
+    assert tensor.shape == (3, 16, 16)
 
 
 def test_imagenet_class_to_index_is_sorted_wnid_order_and_class_names_json_is_provenance_only(

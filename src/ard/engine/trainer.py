@@ -106,8 +106,8 @@ def _reduce_epoch_observability(
     local_cuda_peak_reserved_bytes: int,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     """Apply the epoch SUM/MAX contract and derive globally valid throughput."""
-    if local_totals.shape != (7,):
-        raise ValueError("epoch totals must contain seven scalar accumulators")
+    if local_totals.shape != (8,):
+        raise ValueError("epoch totals must contain eight scalar accumulators")
     global_totals = reduce_sums(local_totals)
     rank_max = reduce_max(
         torch.tensor(
@@ -130,6 +130,10 @@ def _reduce_epoch_observability(
         # model exists (adr/adr_trades); 0.0 for every other method, where
         # the accumulator this divides is never incremented.
         "ema_student_agreement": (float(global_totals[6].item()) / valid_examples) if valid_examples > 0 else 0.0,
+        # Diagnostic only (plan 0100), meaningful only for adr/adr_trades;
+        # see _rectified_target's caching note for what a near-chance-level
+        # value would indicate.
+        "rectified_true_class_mass": (float(global_totals[7].item()) / valid_examples) if valid_examples > 0 else 0.0,
     }
 
 
@@ -378,6 +382,8 @@ class Trainer:
         # end of the same iteration once the post-optimizer-step student
         # clean forward is available. Never read by the attack or objective.
         self._pending_ema_clean_argmax: torch.Tensor | None = None
+        # Diagnostic only (plan 0100): see _rectified_target's caching note.
+        self._pending_rectified_true_class_mass: torch.Tensor | None = None
         self.adversarial_kd_multiplier = adversarial_kd_multiplier
         self.adversarial_ce_coefficient = adversarial_ce_coefficient
         self.clean_ce_coefficient = clean_ce_coefficient
@@ -768,9 +774,17 @@ class Trainer:
         # pre-step forward.) A real temporal mismatch, plausibly small given
         # the EMA's slow decay, but not zero.
         self._pending_ema_clean_argmax = ema_logits.argmax(1).detach()
-        return rectify_label(
+        rectified = rectify_label(
             ema_clean_logits=ema_logits, labels=labels, temperature=temperature, lambda_floor=lambda_floor
         )
+        # Diagnostic only (plan 0100 scientific review, finding P0-1): the
+        # rectified target's own true-class probability mass. If this sits
+        # near 1/num_classes (chance level) the mechanism has degenerated
+        # into near-uniform label smoothing -- exactly the failure mode a
+        # temperature/lambda pair tuned for a much smaller class count risks
+        # at a much larger one. Never read by the attack or objective.
+        self._pending_rectified_true_class_mass = rectified.detach().gather(1, labels[:, None]).squeeze(1)
+        return rectified
 
     def _flush_sample_store(self) -> None:
         """Replicate valid sparse observations before a checkpoint is written."""
@@ -991,7 +1005,7 @@ class Trainer:
         # Loss sum, clean-correct, robust-correct, valid examples, and actual
         # detached clean/adv teacher forwards.  One final SUM makes the
         # count telemetry global without adding a hot-loop collective.
-        totals = torch.zeros(7, dtype=torch.float64, device=self.device)
+        totals = torch.zeros(8, dtype=torch.float64, device=self.device)
         for batch_index, batch in enumerate(loader):
             if not isinstance(batch, IndexedBatch):
                 raise TypeError("trainer requires IndexedBatch batches")
@@ -1531,6 +1545,12 @@ class Trainer:
                 else float(((self._pending_ema_clean_argmax == clean_logits.argmax(1)).to(mask.dtype) * mask).sum())
             )
             self._pending_ema_clean_argmax = None
+            rectified_true_class_mass_sum = (
+                0.0
+                if self._pending_rectified_true_class_mass is None
+                else float((self._pending_rectified_true_class_mass * mask).sum())
+            )
+            self._pending_rectified_true_class_mass = None
             totals += torch.tensor(
                 [
                     float((terms.total.detach() * mask).sum()),
@@ -1540,6 +1560,7 @@ class Trainer:
                     teacher_clean_forward_calls,
                     self._teacher_adversarial_forward_calls,
                     ema_student_agreement_sum,
+                    rectified_true_class_mass_sum,
                 ],
                 dtype=torch.float64,
                 device=self.device,
@@ -1777,6 +1798,13 @@ class Trainer:
                 # raw_gap/severity signal gap-adaptive lambda uses. Gates
                 # nothing.
                 epoch_metrics["train_ema_student_agreement"] = train_metrics["ema_student_agreement"]
+            if self.adr_config is not None:
+                # Diagnostic only (plan 0100, scientific review finding
+                # P0-1): the rectified target's mean true-class probability
+                # mass. A value near 1/num_classes indicates the
+                # temperature/lambda pair has degenerated the mechanism into
+                # near-uniform label smoothing for this dataset's class count.
+                epoch_metrics["train_rectified_true_class_mass"] = train_metrics["rectified_true_class_mass"]
             if self.adr_config is not None and self.adr_config.lambda_source == "gap_adaptive":
                 # Observation only: the schedule's own inputs/outputs, so the
                 # canary/campaign's independent variable is a first-class

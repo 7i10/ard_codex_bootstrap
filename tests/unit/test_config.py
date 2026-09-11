@@ -675,3 +675,43 @@ def test_new_adr_protocols_actually_enforce_their_pinned_contract(
     config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
     with pytest.raises(ValueError, match=message):
         load_config(config_dir / config_name, overrides)
+
+
+def test_the_four_imagenet_stage01_configs_are_field_identical_except_architecture_method_and_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0100 (scientific review finding P2-12): controlled_imagenet_stage01_r18_mobilenetv3_adr_v1
+    is deliberately NOT added to _validate_protocol_contract's strict
+    field-matching allowlist (real engineering cost, judged disproportionate
+    for a 12-run campaign) -- so nothing else catches one of these four
+    configs drifting from the others during the campaign's life except this
+    test. Confirm the four configs agree on every field but the three that
+    are supposed to differ."""
+    teacher_checkpoint = tmp_path / "teacher.pt"
+    teacher_checkpoint.write_bytes(b"fixture checkpoint")
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    names = [
+        "imagenet_r18_pgd_at.yaml",
+        "imagenet_r18_adr.yaml",
+        "imagenet_mobilenetv3_pgd_at.yaml",
+        "imagenet_mobilenetv3_adr.yaml",
+    ]
+    normalized = []
+    for name in names:
+        payload = load_config(config_dir / name).model_dump(mode="json")
+        payload["student"].pop("architecture")
+        payload.pop("method")
+        payload["tracking"].pop("group")
+        normalized.append(payload)
+    assert all(candidate == normalized[0] for candidate in normalized[1:])

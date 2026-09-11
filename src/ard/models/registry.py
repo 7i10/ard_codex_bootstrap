@@ -159,9 +159,8 @@ def build_architecture(architecture: str, num_classes: int, *, pretrained: bool 
         # 0100's Recipe table). weights=None (the default) is unaffected.
         if pretrained:
             model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-        else:
-            model = models.resnet18(weights=None, num_classes=num_classes)
-        return _with_replaced_head(model, architecture=architecture, num_classes=num_classes)
+            return _with_replaced_head(model, architecture=architecture, num_classes=num_classes)
+        return models.resnet18(weights=None, num_classes=num_classes)
     if architecture == "resnet50_imagenet":
         # Plain, unpatched torchvision definition: the CIFAR entries above
         # patch conv1/maxpool specifically because CIFAR is 32px; ImageNet's
@@ -174,9 +173,8 @@ def build_architecture(architecture: str, num_classes: int, *, pretrained: bool 
         # Plan 0100: pretrained initialization, see resnet18_imagenet's comment.
         if pretrained:
             model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
-        else:
-            model = models.mobilenet_v3_small(weights=None, num_classes=num_classes)
-        return _with_replaced_head(model, architecture=architecture, num_classes=num_classes)
+            return _with_replaced_head(model, architecture=architecture, num_classes=num_classes)
+        return models.mobilenet_v3_small(weights=None, num_classes=num_classes)
     if architecture == "convnext_tiny_imagenet":
         # NOT torchvision.models.convnext_tiny. Registered to validate this
         # project's AutoAttack evaluation pipeline at ImageNet scale against

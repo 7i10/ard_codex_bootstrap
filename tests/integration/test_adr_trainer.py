@@ -32,6 +32,7 @@ from ard.engine.checkpoint import REQUIRED_KEYS
 from ard.engine.trainer import Trainer
 from ard.models import build_student
 from ard.objectives import ADRObjective, ADRTRADESObjective, PGDATObjective
+from ard.objectives.adr import rectify_label
 from ard.schedules.gap_adaptive import gap_adaptive_step
 
 pytestmark = pytest.mark.t3
@@ -449,6 +450,7 @@ def test_gap_adaptive_lambda_moves_with_a_real_train_val_gap(tmp_path: Path) -> 
             "clean_accuracy": 0.5,
             "robust_accuracy": next(train_robust_accuracies),
             "ema_student_agreement": 0.0,
+            "rectified_true_class_mass": 0.0,
         }
 
     def fake_validate_epoch(loader, *, model=None):
@@ -699,3 +701,43 @@ def test_ema_student_agreement_excludes_padded_rows_from_both_numerator_and_deno
     metrics = trainer.train_epoch([batch])
     assert metrics["valid_examples"] == 1.0
     assert metrics["ema_student_agreement"] in (0.0, 1.0)
+
+
+def test_rectified_true_class_mass_matches_a_hand_computed_rectify_label_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0100 scientific review: a temperature/lambda pair mistuned for
+    the wrong class count can degenerate the rectified target toward
+    near-uniform label smoothing. This diagnostic exists to catch that --
+    verify it actually reports the real rectify_label output, not a stub."""
+    output = tmp_path / "rectified-true-class-mass"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=1)
+    loader, validation_loader, _ = _loaders()
+    batch = next(iter(loader))
+
+    captured: dict[str, torch.Tensor] = {}
+    real_ema_clean_logits = trainer._ema_clean_logits
+
+    def spy_ema_clean_logits(images: torch.Tensor) -> torch.Tensor:
+        logits = real_ema_clean_logits(images)
+        captured["logits"] = logits
+        return logits
+
+    monkeypatch.setattr(trainer, "_ema_clean_logits", spy_ema_clean_logits)
+    metrics = trainer.train_epoch([batch])
+
+    assert trainer.adr_config is not None
+    expected_rectified = rectify_label(
+        ema_clean_logits=captured["logits"],
+        labels=batch.labels,
+        temperature=trainer.adr_config.temperature_high,  # iteration 0: cosine_anneal(start) exactly
+        lambda_floor=trainer.adr_config.lambda_low,  # iteration 0, lambda_source=cosine (default)
+    )
+    mask = Trainer._mask(batch)
+    expected_mass = expected_rectified.gather(1, batch.labels[:, None]).squeeze(1)
+    expected_mean = float((expected_mass * mask).sum()) / float(mask.sum())
+    assert metrics["rectified_true_class_mass"] == pytest.approx(expected_mean)
+    # Sanity bound: this must be a real probability mass, not a stub -- and
+    # for a 3-class fixture, comfortably above chance (1/3) confirms the
+    # mechanism is not already degenerate at this fixture's tiny scale.
+    assert 0.0 <= metrics["rectified_true_class_mass"] <= 1.0

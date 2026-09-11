@@ -7,14 +7,23 @@ import pytest
 
 from ard.analysis import ParquetDependencyError, fixed_panel_ids, summarize_checkpoint_groups, write_sample_parquet
 from ard.cli.evaluate import (
+    _autoattack_loader,
     _checkpoint_paths,
+    _dataset_identity,
     _evaluation_preflight_config,
     _evaluation_run_id_weights_suffix,
     _evaluation_tracker_config,
     _validate_evaluation_tracking_identity,
 )
 from ard.config.loader import load_resolved_config_for_evaluation
-from ard.config.schema import ExperimentConfig, TrainingConfig, training_execution_identity, validate_global_batch_size
+from ard.config.schema import (
+    DatasetConfig,
+    ExperimentConfig,
+    TrainingConfig,
+    training_execution_identity,
+    validate_global_batch_size,
+)
+from ard.data import IndexedDataset, SyntheticCIFAR
 from ard.engine.checkpoint import REQUIRED_KEYS, config_digest
 from ard.evaluation.autoattack import AutoAttackProvenanceError, autoattack_provenance, run_autoattack
 from ard.evaluation.saved_checkpoint import load_saved_student_checkpoint, validate_checkpoint_lineage
@@ -892,3 +901,85 @@ def test_checkpoint_aggregation_rejects_local_batchnorm_execution_profile_mixing
         }
     with pytest.raises(ValueError, match="mixed experiment identities"):
         summarize_checkpoint_groups(rows, metric="robust")
+
+
+def test_dataset_identity_has_no_imagenet_branch_was_the_plan_0100_bug(tmp_path: Path) -> None:
+    """Scientific review of plan 0100 (finding P1-3): before this branch
+    existed, every evaluation of an ImageNet-trained checkpoint failed here,
+    discoverable only after the fact. This pins the fix, mirroring
+    tiny_imagenet's own identity shape exactly."""
+    config = DatasetConfig(
+        name="imagenet",
+        root=tmp_path,
+        split="val",
+        num_classes=1000,
+        image_size=224,
+        content_sha256="a" * 64,
+    )
+    identity = _dataset_identity(config)
+    assert identity["name"] == "imagenet"
+    assert identity["version"] == "imagenet-1k-layout-v1"
+    assert identity["content_fingerprint"] == "a" * 64
+    assert identity["content_verification"] == {
+        "algorithm": "imagenet-manifest-v1",
+        "expected_sha256": "a" * 64,
+        "verification": "expected-unverified",
+    }
+
+
+def test_dataset_identity_imagenet_prefers_the_observed_digest_when_given(tmp_path: Path) -> None:
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="val", num_classes=1000, image_size=224)
+    observed = {"algorithm": "imagenet-manifest-v1", "observed_sha256": "b" * 64, "verification": "computed"}
+    identity = _dataset_identity(config, observed=observed)
+    assert identity["content_fingerprint"] == "b" * 64
+    assert identity["content_verification"] == observed
+
+
+def test_dataset_identity_imagenet_without_any_digest_is_rejected(tmp_path: Path) -> None:
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="val", num_classes=1000, image_size=224)
+    with pytest.raises(ValueError, match="explicit portable content fingerprint"):
+        _dataset_identity(config)
+
+
+def test_autoattack_loader_with_no_sample_count_attacks_every_image() -> None:
+    """None (every existing CIFAR config) must be unaffected by this
+    plan-0100 addition -- same discipline as every other default-preserving
+    field this session added."""
+    dataset = IndexedDataset(SyntheticCIFAR(size=37, num_classes=5, image_size=4, seed=1))
+    loader = _autoattack_loader(dataset, sample_count=None, seed=0, batch_size=8, num_workers=0)
+    total = sum(batch.images.shape[0] for batch in loader)
+    assert total == 37
+
+
+def test_autoattack_loader_with_a_sample_count_takes_a_random_subset_not_a_prefix() -> None:
+    """Plan 0100 (scientific review finding P1-4): a prefix would silently
+    concentrate on whichever classes ImageNetDataset happens to list
+    first. Confirm the selected source IDs are not simply range(count)."""
+    dataset = IndexedDataset(SyntheticCIFAR(size=200, num_classes=10, image_size=4, seed=1))
+    loader = _autoattack_loader(dataset, sample_count=20, seed=7, batch_size=8, num_workers=0)
+    source_ids = sorted(int(sample_id) for batch in loader for sample_id in batch.sample_ids.tolist())
+    assert len(source_ids) == 20
+    assert len(set(source_ids)) == 20
+    assert source_ids != list(range(20))
+
+
+def test_autoattack_loader_sample_count_is_deterministic_for_a_fixed_seed() -> None:
+    dataset = IndexedDataset(SyntheticCIFAR(size=200, num_classes=10, image_size=4, seed=1))
+    first = sorted(
+        int(sample_id)
+        for batch in _autoattack_loader(dataset, sample_count=20, seed=7, batch_size=8, num_workers=0)
+        for sample_id in batch.sample_ids.tolist()
+    )
+    second = sorted(
+        int(sample_id)
+        for batch in _autoattack_loader(dataset, sample_count=20, seed=7, batch_size=8, num_workers=0)
+        for sample_id in batch.sample_ids.tolist()
+    )
+    assert first == second
+
+
+def test_autoattack_loader_sample_count_larger_than_the_dataset_attacks_everything() -> None:
+    dataset = IndexedDataset(SyntheticCIFAR(size=12, num_classes=3, image_size=4, seed=1))
+    loader = _autoattack_loader(dataset, sample_count=1000, seed=0, batch_size=8, num_workers=0)
+    total = sum(batch.images.shape[0] for batch in loader)
+    assert total == 12
