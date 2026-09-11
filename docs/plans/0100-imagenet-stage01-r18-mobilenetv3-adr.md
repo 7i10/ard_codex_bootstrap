@@ -22,9 +22,11 @@
   arm from the start (not staged up from 1-2), the human's explicit call
   after this session raised the seed-count question and recommended staging.
 - Current milestone: implementation complete, scientific review complete,
-  all findings resolved (see Progress log). No canary run has succeeded
-  yet against the corrected recipe — the first canary attempt (killed
-  mid-run) used the pre-review recipe and its results are void.
+  all findings resolved, and a real 4-arm GPU canary against the corrected
+  recipe succeeded (see Progress log) — pretrained features preserved, no
+  sign of the degenerate rectified-target smoothing P0-1 was worried about.
+  Proceeding to launch the full 12-run campaign via `/experiment-launch`,
+  starting on Hamster's 2 GPUs (Ferret occupied by another user).
 
 ## Goal
 
@@ -146,31 +148,53 @@ campaign's own first measurement of it, not an assumed prior value. State
 this explicitly in the eventual report; do not read n=3 as more decisive
 than it is (`.claude/rules/results-records.md`).
 
-## GPU-hour budget (from this session's real measurements, not a guess)
+## Stop rules
 
-Benchmarked this session on a single Hamster RTX 4090, real ImageNet images,
-AMP on: ResNet-18 at 7-step PGD/batch 128 measured 302.8 img/s; scaling to
-this plan's 3-step training attack by relative per-image attack cost
-(≈1.93x fewer forward/backward passes) gives an estimated **≈580 img/s**.
-MobileNetV3-Small measured 612.6 img/s at 7-step, scaling to **≈1,180 img/s**
-at 3-step. At 50 epochs (not 100) and ≈1.25M training images/epoch
-(1.28M × 0.98, after the 0.02 validation hold-out):
+A checkpoint failing lineage validation, an attack-identity mismatch between
+training and evaluation, or a run whose resolved config diverges from its
+three sibling configs (caught by
+`test_the_four_imagenet_stage01_configs_are_field_identical_except_architecture_method_and_group`,
+since this campaign's protocol identity deliberately carries no strict
+field-matching contract of its own) blocks that job's result from being
+reported; technical failures may retry with the identical scientific
+identity. An `adr` run whose `train_rectified_true_class_mass` diagnostic
+decays toward chance level (~1/1000) rather than stabilizing at a level
+meaningfully above it is a scientific stop for that arm, not a silent
+continuation — it means the temperature/lambda pair chosen in the Progress
+log's P0-1 entry has degenerated for this run's actual dynamics, and the
+human decides the fix (not a new schedule invented mid-campaign). Weak or
+null results (sign not confirmed, or REVERSED per the decision rule above)
+are reported as such and do not trigger a fourth seed, a new architecture,
+or scope expansion without a fresh decision packet.
 
-| architecture | est. img/s (3-step) | est. hours/run (50 epochs) | 6 runs (3 seeds × 2 arms) |
-|---|---:|---:|---:|
-| ResNet-18 | ≈580 | ≈30 | ≈180 GPU-hours |
-| MobileNetV3-Small | ≈1,180 | ≈15 | ≈90 GPU-hours |
+## GPU-hour budget (from real 3-step canary measurements, superseding the earlier 7-step-scaled estimate)
 
-**Total ≈270 GPU-hours training**, plus AutoAttack (this project's own
-existing anchor is ≈1 GPU-hour/checkpoint on a 5k-image subset at CIFAR
-scale; ImageNet-scale AutoAttack cost has not been measured by this project
-and should be treated as unverified until a real evaluation run measures
-it — do not silently reuse the CIFAR anchor across datasets). Across 5 GPUs
-(Hamster ×2, Ferret ×3), training alone is roughly ≈54 hours (**≈2.3 days**)
-of wall clock if evenly distributed. This is an estimate scaled from a
-7-step measurement, not a direct 3-step measurement — a real 3-step canary
-(Verification step 2 below) should confirm it before the full campaign is
-costed as final.
+The 3-epoch, 4-arm canary run this session (Progress log) measured real
+throughput under the *actual* recipe (3-step PGD, real RandomResizedCrop
+augmentation, pretrained init, `warmup_multistep`) on a single Hamster
+RTX 4090 — lower than the earlier 7-step-scaled estimate, because that
+estimate didn't account for augmentation's own per-iteration CPU cost,
+which doesn't shrink when attack steps do:
+
+| architecture | method | measured img/s | hours/run (50 epochs, ≈1.256M train images/epoch) | 3 seeds |
+|---|---|---:|---:|---:|
+| ResNet-18 | `pgd_at` | ≈505 | ≈34.5 | ≈104 GPU-hours |
+| ResNet-18 | `adr` | ≈460 | ≈37.9 | ≈114 GPU-hours |
+| MobileNetV3-Small | `pgd_at` | ≈910 | ≈19.2 | ≈58 GPU-hours |
+| MobileNetV3-Small | `adr` | ≈830 | ≈21.0 | ≈63 GPU-hours |
+
+**Total ≈338 GPU-hours training** (not the earlier ≈270-hour estimate),
+plus AutoAttack (this project's own existing anchor is ≈1 GPU-hour/checkpoint
+on a 5k-image subset at CIFAR scale; ImageNet-scale AutoAttack cost has not
+been measured by this project and should be treated as unverified until a
+real evaluation run measures it — do not silently reuse the CIFAR anchor
+across datasets). On Hamster's 2 GPUs alone, training alone is roughly
+**≈7 days** of wall clock if evenly distributed; adding Ferret's 3 GPUs
+(unavailable to this campaign as of the decision to launch — another user
+is running work there) would bring this to **≈2.8 days**. The human's
+explicit decision (chat, this session): start now on Hamster's 2 GPUs alone
+rather than wait for Ferret, and fold Ferret's GPUs into the same campaign's
+remaining jobs once it frees up.
 
 ## Implementation checklist
 
@@ -393,3 +417,27 @@ milestone this session.
     the fixed augmentation/warmup/LR recipe at all), logging the new
     `train_rectified_true_class_mass` diagnostic to confirm P0-1's fix is
     not itself degenerate, before committing to the full 12-run campaign.
+- 2026-09-12: real 3-epoch, 4-arm canary against the corrected recipe, all
+  four succeeded with no crashes (worktree `source-9b8705235327`, sha
+  `9b870523532761c09c9d280bb45e641c5c633c36`, Hamster GPUs 0/1, run outputs
+  under scratch, never committed). Pretrained features survived the
+  warmup+lowered-LR fix (val clean accuracy 37-48% across all four arms by
+  epoch 2, nowhere near the ~0.1% chance level a destroyed init would show).
+  `train_rectified_true_class_mass` (P0-1's diagnostic): ResNet-18 adr
+  0.472/0.307/0.141 across epochs 0-2, MobileNetV3-Small adr
+  0.473/0.306/0.139 -- nearly identical trajectories across architectures,
+  all epochs comfortably above the ~0.001 chance level for 1000 classes, no
+  sign of the degenerate near-uniform smoothing P0-1 was worried about. The
+  declining trend across just 3 epochs is explained by the EMA teacher
+  rapidly becoming better-calibrated early in fine-tuning (`train_ema_student_agreement`
+  rising 0.82->0.89 for both `adr` arms over the same 3 epochs) --
+  per-sample lambda_i rising with teacher confidence pulls the blended
+  target's true-class mass down from near-1.0 (one-hot-dominated) toward
+  the teacher's own (correctly, <1.0) softened value, which is the intended
+  mechanism, not a bug. Only 3 epochs of evidence; this diagnostic keeps
+  being logged for the full 50-epoch runs and stays a live stop-rule check,
+  not a one-time canary box to tick. Real throughput used to correct the
+  GPU-hour budget above. Human decision (chat): launch the full 12-run
+  campaign now on Hamster's 2 GPUs, not waiting for Ferret (occupied by
+  another user), folding Ferret in once free. Proceeding to
+  `/experiment-launch`.
