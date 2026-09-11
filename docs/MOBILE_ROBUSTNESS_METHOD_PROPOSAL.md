@@ -141,6 +141,37 @@ correction above, treat none of this as measured; it is preserved here only
 so the original (unverified) claim is visible next to its correction, not
 silently deleted.
 
+**Correction, 2026-09-11: real measurement (plan 0099, decision packet 0011
+option A prep).** The engine now has working ImageNet data loading, three
+registered ImageNet-scale architectures, and AMP actually wired (previously
+implemented but hardcoded off) -- see `docs/plans/0099-imagenet-stage0-prep.md`.
+Benchmarked directly on Hamster (RTX 4090), one epoch each, real (not
+synthetic) ImageNet JPEGs from a 50-class/64,421-image subset of the actual
+local dataset, `pgd_at` method, Linf eps=4/255 step=1/255 **7-step** PGD
+(the literature-cited eps convention, §1; step count chosen only to exercise
+a representative multi-step attack workload, not a Stage 0/1 decision),
+AMP on, batch 128, single GPU, `num_workers=8`:
+
+| Architecture (params) | measured img/s | peak GPU memory | 100-epoch estimate @ 1.28M img/epoch, 1 GPU |
+|---|---:|---:|---:|
+| ResNet-18 (~11.2M) | **302.8** | 4.09 GB | ~117 h (~4.9 days) |
+| ResNet-50 (~25.6M) | **99.5** | 12.87 GB | ~357 h (~14.9 days) |
+| MobileNetV3-Small (~2.5M) | **612.6** | 2.74 GB | ~58 h (~2.4 days) |
+
+All three ran the full attack-in-the-loop pipeline (real PGD-7 generation,
+real backward pass, AMP `GradScaler`, checkpoint + held-out validation) end
+to end without error; none of these are throwaway clean-only numbers. Even
+the *previously corrected* estimate above (~1,300 img/s guessed for
+ResNet-18 at 3 steps) was still too optimistic once actually measured:
+scaling this session's 7-step ResNet-18 number to 3 steps by relative
+attack-step cost gives roughly ~580 img/s, well under half that guess.
+**Use the table above for any future costing; discard every number before
+it in this section, corrected or not.** Peak memory (4-13 GB of 24 GB) has
+headroom to try a larger batch size in a future benchmark, which was not
+attempted here. Single-GPU wall-clock only; this project's existing
+multi-GPU DDP support divides it roughly by world size for an actual
+multi-seed campaign (2 GPUs on Hamster, 3 on Ferret).
+
 ---
 
 ## 2. The proposed method: teacher-free self-distillation, tested for a capacity-inverse effect
@@ -290,15 +321,22 @@ the standard 5,000-image RobustBench ImageNet subset, then the full 50,000 for
 the surviving arm. **This alone answers whether the field's small-model deficit
 is a recipe artifact — nobody has this number.**
 
-- Cost: **the "4 h / 7 h" figures below are unverified and likely wrong by
-  roughly 4-7x** -- see the correction after §1's throughput paragraph. Do
-  not schedule or promise anything from them; re-benchmark this engine on
-  real 224px ImageNet-shaped batches under the actual intended attack step
-  count before costing Stage 0. (Original, uncorrected claim, kept only for
-  visibility: roughly 4 h (ResNet-18) to 7 h (mobile arch) per 100-epoch run
-  per GPU; three seeds each across five GPUs fits in under two days of wall
-  clock, plus AutoAttack (~1 GPU-h per checkpoint on the 5k subset, per this
-  project's existing anchor).)
+- Cost: **now measured (2026-09-11 correction, §1)**, not the "4 h / 7 h"
+  guess this bullet originally carried. At 7-step PGD, one GPU, one
+  100-epoch run: **~117 h (ResNet-18), ~58 h (MobileNetV3-Small)** --
+  roughly 15-30x the original guess, not 4-7x, though the true multiplier
+  depends on the step count Stage 0 actually adopts (a 2-3 step attack, if
+  chosen, would cost proportionally less; re-derive from §1's table rather
+  than re-guessing). Three seeds per architecture across Hamster's 2 GPUs +
+  Ferret's 3 GPUs (5 GPUs total, data-parallel by run not by DDP across
+  hosts) puts one architecture's 3-seed sweep at roughly 1.5-2 wall-clock
+  epochs' worth of runs per GPU-slot, i.e. **order 1-2 weeks of wall clock
+  for ResNet-18 alone at 100 epochs**, before AutoAttack (~1 GPU-h per
+  checkpoint on the 5k subset, per this project's existing anchor). This is
+  the real cost floor for a full-length campaign; a shorter epoch horizon
+  or a smaller attack-step count are the two levers that actually move it,
+  and picking either is a scientific decision for the eventual Stage 0
+  decision packet, not decided here.
 - Preregistered rule (to be confirmed by the reviewer, not asserted here):
   compare against Salman2020Do_R18's 25.32% as the stale-recipe floor and
   Singh2023's ConvNeXt-T 49.46% as the modern-recipe large-model ceiling; a

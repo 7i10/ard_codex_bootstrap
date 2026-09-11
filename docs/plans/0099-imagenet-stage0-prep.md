@@ -145,3 +145,44 @@ be written down here rather than decided silently inside a diff.
 4. This plan's own completion does not launch a Stage 1 campaign; that needs
    its own plan and a decision packet costing it against the throughput this
    plan measures.
+
+## Completion report
+
+Checklist items 1-4 implemented and tested (`8a9a3e0`, plus the follow-on
+`resnet18_imagenet` registration to match the ADR paper's own reference
+architecture, since the original registration only added ResNet-50).
+`scripts/verify.py --changed` green throughout.
+
+Item 5 (throughput benchmark) done as a dev-tier hand-run, not a campaign,
+per the plan's own scope: a new unconstrained protocol identity
+(`imagenet_stage0_dev_v1`, `runnable_locally=True`, no strict field-matching
+metadata -- see `src/ard/protocols/__init__.py`) so the config schema didn't
+need a scientifically-decided protocol contract for a pipeline check. Ran
+one real epoch each of `pgd_at` (Linf eps=4/255 step=1/255, 7-step PGD, AMP
+on, batch 128, single Hamster RTX 4090) for `resnet18_imagenet`,
+`resnet50_imagenet`, and `mobilenet_v3_small_imagenet`, on a real (not
+synthetic) 50-class/64,421-image subset of the local ImageNet dataset
+(copied, not symlinked -- `ImageNetDataset`'s manifest-based content
+identity rejects symlinks by design, matching `TinyImageNetDataset`'s
+existing convention). Source SHA `8a9a3e0352676d21e00b2dbf4d06e8634bb5206f`,
+worktree `source-8a9a3e035267`. Measured throughput and full 100-epoch cost
+projections are recorded in
+`docs/MOBILE_ROBUSTNESS_METHOD_PROPOSAL.md`'s 2026-09-11 correction
+(replacing both the original fabricated figure and the earlier FLOP-derived
+guess, which was itself still roughly 2x optimistic once measured): ResNet-18
+302.8 img/s, ResNet-50 99.5 img/s, MobileNetV3-Small 612.6 img/s -- all
+comfortably under the 24 GB GPU memory ceiling (2.7-12.9 GB peak), leaving
+headroom to try a larger batch size in a future benchmark (not attempted
+here). The full pipeline (data loading, resize-to-224, unpatched-stem
+forward/backward, real multi-step PGD attack, AMP `GradScaler`, checkpoint +
+held-out validation) ran end to end on real images without error for all
+three architectures.
+
+**Not done, and explicitly out of scope for this plan**: no Stage 1
+self-distillation arm, no epsilon/epoch-horizon/architecture decision for an
+actual scientific campaign, no evaluation-CLI ImageNet wiring (`ard.cli.evaluate`'s
+`_dataset_identity` has no `"imagenet"` branch yet -- found during
+implementation, affects evaluating a saved ImageNet checkpoint, not training).
+This plan's own completion does not authorize a Stage 0/1 campaign; that is
+a separate decision packet, now costable from real numbers instead of a
+guess.
