@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import pytest
 import torch
+from pydantic import ValidationError
 from torch import nn
+from torchvision import models as torchvision_models
 from torchvision.models import MobileNetV2, MobileNetV3, ResNet
 
 from ard.config.schema import ModelConfig, NormalizationConfig
 from ard.models import build_architecture, build_student
+from ard.models import registry as registry_module
 
 pytestmark = pytest.mark.t1
 
@@ -92,6 +95,86 @@ def test_imagenet_architectures_round_trip_a_native_resolution_forward_pass(arch
     with torch.no_grad():
         logits = model(images)
     assert logits.shape == (2, 1000)
+
+
+@pytest.mark.parametrize(
+    ("architecture", "constructor_name", "weights_enum"),
+    [
+        ("resnet18_imagenet", "resnet18", "ResNet18_Weights"),
+        ("mobilenet_v3_small_imagenet", "mobilenet_v3_small", "MobileNet_V3_Small_Weights"),
+    ],
+)
+def test_pretrained_false_default_still_passes_weights_none(
+    monkeypatch: pytest.MonkeyPatch, architecture: str, constructor_name: str, weights_enum: str
+) -> None:
+    """Plan 0100: pretrained defaults to False and must reproduce today's
+    exact behavior (weights=None) for every config that never mentions it --
+    same discipline as plan 0098/0099's own default-preserving fields."""
+    captured: dict[str, object] = {}
+    real_constructor = getattr(torchvision_models, constructor_name)
+
+    def spy(*, weights, num_classes):
+        captured["weights"] = weights
+        return real_constructor(weights=None, num_classes=num_classes)
+
+    monkeypatch.setattr(registry_module.models, constructor_name, spy)
+    build_architecture(architecture, num_classes=1000)
+    assert captured["weights"] is None
+
+
+@pytest.mark.parametrize(
+    ("architecture", "constructor_name", "weights_enum"),
+    [
+        ("resnet18_imagenet", "resnet18", "ResNet18_Weights"),
+        ("mobilenet_v3_small_imagenet", "mobilenet_v3_small", "MobileNet_V3_Small_Weights"),
+    ],
+)
+def test_pretrained_true_requests_the_torchvision_imagenet1k_weights(
+    monkeypatch: pytest.MonkeyPatch, architecture: str, constructor_name: str, weights_enum: str
+) -> None:
+    """No real download in a unit test: substitute a cheap weights=None
+    construction whenever pretrained weights are requested, and assert only
+    that our own wiring asked for the right weights enum member."""
+    captured: dict[str, object] = {}
+    real_constructor = getattr(torchvision_models, constructor_name)
+    expected_weights = getattr(torchvision_models, weights_enum).IMAGENET1K_V1
+
+    def spy(*, weights):
+        captured["weights"] = weights
+        return real_constructor(weights=None)
+
+    monkeypatch.setattr(registry_module.models, constructor_name, spy)
+    model = build_architecture(architecture, num_classes=1000, pretrained=True)
+    assert captured["weights"] is expected_weights
+    assert isinstance(model, ResNet if architecture == "resnet18_imagenet" else MobileNetV3)
+
+
+@pytest.mark.parametrize(
+    ("architecture", "constructor_name"),
+    [("resnet18_imagenet", "resnet18"), ("mobilenet_v3_small_imagenet", "mobilenet_v3_small")],
+)
+def test_pretrained_true_replaces_the_head_for_a_non_1000_class_config(
+    monkeypatch: pytest.MonkeyPatch, architecture: str, constructor_name: str
+) -> None:
+    real_constructor = getattr(torchvision_models, constructor_name)
+    monkeypatch.setattr(registry_module.models, constructor_name, lambda *, weights: real_constructor(weights=None))
+
+    model = build_architecture(architecture, num_classes=5, pretrained=True)
+    model.eval()
+    with torch.no_grad():
+        logits = model(torch.rand(2, 3, 224, 224))
+    assert logits.shape == (2, 5)
+
+
+@pytest.mark.parametrize("architecture", ["resnet50_imagenet", "mobilenet_v2_imagenet", "convnext_tiny_imagenet"])
+def test_pretrained_true_is_rejected_for_unsupported_architectures(architecture: str) -> None:
+    with pytest.raises(ValueError, match="pretrained=True is not supported"):
+        build_architecture(architecture, num_classes=1000, pretrained=True)
+
+
+def test_model_config_rejects_pretrained_true_for_unsupported_architectures() -> None:
+    with pytest.raises(ValidationError, match="pretrained=True is not supported"):
+        ModelConfig(architecture="resnet50_imagenet", num_classes=1000, pretrained=True)
 
 
 def test_build_student_wires_an_imagenet_architecture_through_the_normalization_adapter() -> None:

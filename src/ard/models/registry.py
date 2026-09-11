@@ -113,7 +113,27 @@ class SAADResNet18CIFAR(nn.Module):
         return self.linear(torch.flatten(outputs, 1))
 
 
-def build_architecture(architecture: str, num_classes: int) -> nn.Module:
+def _with_replaced_head(model: nn.Module, *, architecture: str, num_classes: int) -> nn.Module:
+    """A pretrained torchvision model's final layer is fixed at 1000 classes
+    (ImageNet-1k). Standard transfer-learning practice: keep the pretrained
+    backbone, replace only the final linear layer when a different class
+    count is actually requested (a no-op for this project's real ImageNet-1k
+    campaign, needed only for dev/test-scale configs)."""
+    if num_classes == 1000:
+        return model
+    if architecture == "resnet18_imagenet":
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        return model
+    if architecture == "mobilenet_v3_small_imagenet":
+        final = model.classifier[-1]
+        model.classifier[-1] = nn.Linear(final.in_features, num_classes)
+        return model
+    raise ValueError(f"pretrained head replacement is not defined for architecture: {architecture}")
+
+
+def build_architecture(architecture: str, num_classes: int, *, pretrained: bool = False) -> nn.Module:
+    if pretrained and architecture not in {"resnet18_imagenet", "mobilenet_v3_small_imagenet"}:
+        raise ValueError(f"pretrained=True is not supported for architecture: {architecture}")
     if architecture == "saad_resnet18_cifar_v1":
         return SAADResNet18CIFAR(num_classes)
     if architecture in {"torchvision_resnet18_cifar_norm_v1", "resnet18_cifar"}:
@@ -133,7 +153,15 @@ def build_architecture(architecture: str, num_classes: int) -> nn.Module:
         # ResNet-18 (~11.2M params) as the "larger" reference point
         # docs/MOBILE_ROBUSTNESS_METHOD_PROPOSAL.md's Stage 0 recipe assumes,
         # distinct from resnet50_imagenet (~25.6M params).
-        return models.resnet18(weights=None, num_classes=num_classes)
+        # Plan 0100: pretrained (non-robust ImageNet-1k) initialization,
+        # per Singh/Croce/Hein 2023's own recipe -- torchvision's standard
+        # weights are an explicitly-sanctioned in-kind substitute (see plan
+        # 0100's Recipe table). weights=None (the default) is unaffected.
+        if pretrained:
+            model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+        else:
+            model = models.resnet18(weights=None, num_classes=num_classes)
+        return _with_replaced_head(model, architecture=architecture, num_classes=num_classes)
     if architecture == "resnet50_imagenet":
         # Plain, unpatched torchvision definition: the CIFAR entries above
         # patch conv1/maxpool specifically because CIFAR is 32px; ImageNet's
@@ -143,7 +171,12 @@ def build_architecture(architecture: str, num_classes: int) -> nn.Module:
     if architecture == "mobilenet_v2_imagenet":
         return models.mobilenet_v2(weights=None, num_classes=num_classes)
     if architecture == "mobilenet_v3_small_imagenet":
-        return models.mobilenet_v3_small(weights=None, num_classes=num_classes)
+        # Plan 0100: pretrained initialization, see resnet18_imagenet's comment.
+        if pretrained:
+            model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+        else:
+            model = models.mobilenet_v3_small(weights=None, num_classes=num_classes)
+        return _with_replaced_head(model, architecture=architecture, num_classes=num_classes)
     if architecture == "convnext_tiny_imagenet":
         # NOT torchvision.models.convnext_tiny. Registered to validate this
         # project's AutoAttack evaluation pipeline at ImageNet scale against
@@ -169,4 +202,5 @@ def build_architecture(architecture: str, num_classes: int) -> nn.Module:
 def build_student(config: ModelConfig, *, tier: str = "dev") -> PixelModel:
     if config.architecture == "fixture_cnn" and tier not in {"dev", "smoke"}:
         raise ValueError("fixture_cnn is restricted to dev/smoke tiers")
-    return PixelModel(build_architecture(config.architecture, config.num_classes), config.normalization)
+    model = build_architecture(config.architecture, config.num_classes, pretrained=config.pretrained)
+    return PixelModel(model, config.normalization)

@@ -399,6 +399,21 @@ class ModelConfig(StrictModel):
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
     preprocessing_owner: Literal["student_adapter"] = "student_adapter"
+    # Plan 0100: initialize from standard (non-robust) ImageNet-1k pretrained
+    # weights before adversarial fine-tuning, per Singh/Croce/Hein 2023's own
+    # recipe (torchvision's public weights are their explicitly-sanctioned
+    # in-kind substitute for "standard models from the timm library or the
+    # original papers"). Default False reproduces today's exact behavior
+    # (weights=None) for every existing config that never mentions this
+    # field. Only defined for the two architectures plan 0100 actually uses;
+    # see registry.py's build_architecture for the enforced allowlist.
+    pretrained: bool = False
+
+    @model_validator(mode="after")
+    def validate_pretrained(self) -> ModelConfig:
+        if self.pretrained and self.architecture not in {"resnet18_imagenet", "mobilenet_v3_small_imagenet"}:
+            raise ValueError(f"pretrained=True is not supported for architecture: {self.architecture}")
+        return self
 
 
 class TeacherConfig(StrictModel):
