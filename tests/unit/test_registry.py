@@ -52,9 +52,38 @@ def test_mobilenet_v2_imagenet_is_the_unpatched_native_stem() -> None:
     assert model.features[0][0].stride == (2, 2)
 
 
+def test_convnext_tiny_imagenet_is_timm_not_torchvision() -> None:
+    """Registered for the AutoAttack pipeline validation check (Singh/Croce/Hein 2023, arXiv 2303.01870).
+
+    Their released ConvNeXt-T eps=4/255 checkpoint's state_dict uses timm's
+    ConvNeXt naming (stem/stages/blocks/conv_dw/gamma/head.norm/head.fc), not
+    torchvision's (features/block/layer_scale/classifier) -- confirmed by
+    direct key/shape comparison against the downloaded checkpoint. This test
+    locks in the resulting library choice so a future refactor toward
+    torchvision (matching every other registered architecture) does not
+    silently break loading that external checkpoint.
+    """
+    import timm
+
+    model = build_architecture("convnext_tiny_imagenet", num_classes=1000)
+    assert isinstance(model, timm.models.convnext.ConvNeXt)
+    assert not isinstance(model, (ResNet, MobileNetV2, MobileNetV3))
+    state_dict_keys = set(model.state_dict().keys())
+    assert "stem.0.weight" in state_dict_keys
+    assert "stages.0.blocks.0.conv_dw.weight" in state_dict_keys
+    assert "stages.0.blocks.0.gamma" in state_dict_keys
+    assert "head.fc.weight" in state_dict_keys
+
+
 @pytest.mark.parametrize(
     "architecture",
-    ["resnet18_imagenet", "resnet50_imagenet", "mobilenet_v2_imagenet", "mobilenet_v3_small_imagenet"],
+    [
+        "resnet18_imagenet",
+        "resnet50_imagenet",
+        "mobilenet_v2_imagenet",
+        "mobilenet_v3_small_imagenet",
+        "convnext_tiny_imagenet",
+    ],
 )
 def test_imagenet_architectures_round_trip_a_native_resolution_forward_pass(architecture: str) -> None:
     model = build_architecture(architecture, num_classes=1000)

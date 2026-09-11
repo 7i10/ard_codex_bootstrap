@@ -144,6 +144,25 @@ def build_architecture(architecture: str, num_classes: int) -> nn.Module:
         return models.mobilenet_v2(weights=None, num_classes=num_classes)
     if architecture == "mobilenet_v3_small_imagenet":
         return models.mobilenet_v3_small(weights=None, num_classes=num_classes)
+    if architecture == "convnext_tiny_imagenet":
+        # NOT torchvision.models.convnext_tiny. Registered to validate this
+        # project's AutoAttack evaluation pipeline at ImageNet scale against
+        # a known published result: the Singh/Croce/Hein 2023 ("Revisiting
+        # Adversarial Training for ImageNet", arXiv 2303.01870) reference
+        # ConvNeXt-T eps=4/255 checkpoint. Direct state_dict key/shape
+        # comparison confirmed that checkpoint is built on timm's ConvNeXt
+        # (`stem`/`stages`/`blocks`/`conv_dw`/`gamma`/`head.norm`/`head.fc`
+        # naming), not torchvision's (`features`/`block`/`layer_scale`/
+        # `classifier` naming) -- the two are architecturally equivalent
+        # (plain "original" PatchStem ConvNeXt-Tiny, not their ConvStem
+        # "CvSt" variant) but not state_dict-compatible. timm is already a
+        # pinned project dependency (requirements/environment.lock, used by
+        # .external/robustbench) but not previously imported directly from
+        # src/ard; imported lazily here rather than at module level since
+        # every other architecture in this file only needs torch/torchvision.
+        import timm
+
+        return timm.create_model("convnext_tiny", pretrained=False, num_classes=num_classes)
     raise ValueError(f"unknown architecture: {architecture}")
 
 

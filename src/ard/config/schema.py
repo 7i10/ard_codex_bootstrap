@@ -388,6 +388,13 @@ class ModelConfig(StrictModel):
         "resnet50_imagenet",
         "mobilenet_v2_imagenet",
         "mobilenet_v3_small_imagenet",
+        # timm's ConvNeXt-Tiny (not torchvision's -- see registry.py's
+        # build_architecture comment). Registered to evaluate the
+        # Singh/Croce/Hein 2023 (arXiv 2303.01870) published eps=4/255
+        # ConvNeXt-T checkpoint through this project's own AutoAttack
+        # pipeline as a pipeline-correctness check, not to select an
+        # architecture for any ImageNet training campaign.
+        "convnext_tiny_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
