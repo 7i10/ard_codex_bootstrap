@@ -1,4 +1,4 @@
-PYTHON ?= /home/shunsukenaito/.conda/envs/adv/bin/python
+PYTHON ?= /home/shunsukenaito/.conda/envs/ard-v2/bin/python
 export PYTHONPATH := $(CURDIR)/src
 
 .PHONY: lint test-changed smoke verify-milestone status
