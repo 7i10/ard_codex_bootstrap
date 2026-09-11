@@ -256,7 +256,20 @@ def _verify_bundle(run_dir: Path, *, expected_protocol: str) -> dict[str, Any]:
     for entry in manifest.get("artifacts", []):
         path = Path(entry["path"])
         if not path.is_file():
-            raise AggregationError(f"{manifest_path}: declared artifact is missing: {path}")
+            # Runs trained on Ferret and collected onto Hamster keep the
+            # manifest's originally-recorded staging path, which no longer
+            # exists locally after collection. Every declared artifact also
+            # has a content-addressed copy under run-bundle/<local_path>/
+            # (basename preserved) specifically so it survives exactly this
+            # relocation -- fall back to that before declaring it missing.
+            # This does not change what is verified, only where the same
+            # declared file is found.
+            local_path = entry.get("local_path")
+            relocated = (bundle / local_path / path.name) if local_path else None
+            if relocated is not None and relocated.is_file():
+                path = relocated
+            else:
+                raise AggregationError(f"{manifest_path}: declared artifact is missing: {path}")
         actual = _sha256(path)
         if actual != entry["sha256"]:
             raise AggregationError(f"{path}: sha256 {actual} does not match the manifest {entry['sha256']}")
