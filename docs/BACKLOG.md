@@ -34,7 +34,7 @@ A 段が尽きたときは、B 段を始めるのではなく**決定パケッ�
 | A5 | 作業領域の掃除。刈れる worktree が 23 個、`.cache/analysis` が 146 GB でうち約 10 GiB は明白な一時物 | ディスクと、成果物の所在の見通し | 机上 1 時間 | 走行中のキャンペーンがその worktree を使っていないこと |
 | A6 | 凍結済み制御面サブシステムの物理削除（reconciler、PR #1 イベントバス、fast path、`launch_ledger.py`、`task_context.py`）。文書は退役済みだがコードは残っている | 呼ばれてはならないものが呼べる状態を解消する | 机上 半日 | A4 の後（impact map が参照している可能性） |
 | A7 | 再生成不能な成果物の W&B 退避。対象は「ソース SHA・環境世代・親系譜のいずれかを特定できない過去の checkpoint」に限る | 単一ディスク依存の解消 | 転送のみ | A5 の後 |
-| A8 | `src/ard/cli/evaluate.py`（best/last チェックポイント間、可能なら AutoAttack の各段間）に `torch.cuda.empty_cache()` を追加する。原因は `docs/debugging/0029-adr-cifar10-eval-oom-cascade.md` — PyTorch のキャッシュアロケータが断片化し、AutoAttack評価が実行時間とともに（アーキテクチャ非依存で）13〜15GB まで肥大化し、plan 0097 で複数回 OOM クラッシュを起こした | 計算結果（数値・RNG・攻撃挙動）に一切影響しない——キャッシュ解放のみ。並列評価時の OOM 再発を防ぐ | 机上 1 時間 + 単体テストでの確認 | 走行中のキャンペーンが無いこと（評価コードの変更はソース SHA を変える）。plan 0097 の評価フェーズ完了後 |
+| A8 | `src/ard/cli/evaluate.py`（best/last チェックポイント間、可能なら AutoAttack の各段間）に `torch.cuda.empty_cache()` を追加する。原因は `docs/debugging/0029-adr-cifar10-eval-oom-cascade.md` — PyTorch のキャッシュアロケータが断片化し、AutoAttack評価が実行時間とともに（アーキテクチャ非依存で）13〜15GB まで肥大化し、plan 0097 で複数回 OOM クラッシュを起こした。**訂正 2026-09-11**: `docs/decisions/0010-autoattack-unbatched-forward-oom.md` が実測で示した通り、**これだけでは今回のクラッシュ経路を塞げない**——落ちたプロセス自身の「解放済みだが未割当」領域は 58〜110 MiB しかなく、必要な 2.44〜3.66 GiB（`autoattack.py:213` の一括 forward、`10000×channels×32×32×4B`）には二桁足りない。A8 が縮めるのは自分自身の断片化（供給側）、パケット 0010 の Option A（同じ行をバッチ化）が縮めるのは一括確保そのもの（需要側）——**両方揃って初めて閉じる可能性がある。片方だけで直ると読んではいけない** | 計算結果（数値・RNG・攻撃挙動）に一切影響しない——キャッシュ解放のみ。単独では今回の OOM 経路を防げないが、断片化由来の別の劣化は減らせる | 机上 1 時間 + 単体テストでの確認 | 走行中のキャンペーンが無いこと（評価コードの変更はソース SHA を変える）。plan 0097 の評価フェーズ完了後。**decision packet 0010（`chosen: null`）と対で判断すること** |
 
 ## B 段 — 決定パケットが先に要る
 
