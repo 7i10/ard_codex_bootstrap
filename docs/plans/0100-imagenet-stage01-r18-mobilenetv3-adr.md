@@ -441,3 +441,42 @@ milestone this session.
   campaign now on Hamster's 2 GPUs, not waiting for Ferret (occupied by
   another user), folding Ferret in once free. Proceeding to
   `/experiment-launch`.
+- 2026-09-12: launched the full 12-run campaign, `/experiment-launch` steps
+  3-6. One mechanical fix was needed before pinning: `ard.cli.train` has no
+  `--epochs` flag (only a `training.epochs=N` dot-path override), but the
+  launch gate's `_replace_epoch_bound` unconditionally rewrites a literal
+  `--epochs` token in every training job's command -- every prior gated
+  campaign wrapped its own launcher script for the same reason (e.g.
+  `scripts/run_ert_i100_online_state_s2.py`); this is the first plain,
+  non-forked `ard.cli.train` campaign through the gate, so it needed the
+  same treatment. Added `scripts/run_imagenet_stage01_train.py` (execution-
+  plane only, no `src/ard/` change): forwards `--epochs` verbatim as
+  `training.epochs=<value>`, confirmatory since all four configs already
+  set 50. Committed as `ae4dd7c`; pinned worktree `source-ae4dd7c82d80`
+  (sha `ae4dd7c82d801ae39cfe41a89ec5427e59e202ce`). Campaign spec: 12
+  training jobs (4 arms x seeds 0/1/2), `teacher: {identity: "none"}` (both
+  methods are teacher-free per this plan's own design -- the gate has no
+  "no teacher" sentinel, so this is the honest declaration),
+  `operational_profile: FULL_NEW_INTEGRATION`, host `hamster` only (2
+  GPUs), no evaluation/aggregation nodes (per this project's convention,
+  those are `/experiment-postrun`'s job). Attempt1
+  (`imagenet-stage01-r18-mobilenetv3-adr-v1-attempt1`): preflight, dry-run
+  and a first `--canary-only` all passed, but `--launch` failed -- its own
+  internal canary re-run hit `ard.cli.train`'s `_guard_output` ("refusing
+  to overwrite existing output directory without --resume"), because the
+  canary's `--dry-run` had already written `resolved_config.yaml` into the
+  fixed `gate_dir/canary/<job_id>` path during the prior `--canary-only`
+  pass, and the gate reruns every canary entry on both `--canary-only` and
+  `--launch` against that same path. Fixed by having each canary command
+  `mktemp -d` its own scratch output directory (verified idempotent
+  standalone) instead of a fixed path; no gate check was weakened.
+  Attempt2 (`imagenet-stage01-r18-mobilenetv3-adr-v1-attempt2`): preflight,
+  dry-run, canary and launch all passed cleanly. Resolved-manifest SHA-256
+  `4d392e360b89c722864c38270ba142fae611ffc45fdb099735a0324630fc946c`, gate
+  dir
+  `<runtime>/runs/imagenet-stage01-r18-mobilenetv3-adr-v1-attempt2/launch-gate`,
+  controller PID 3559429. Confirmed handoff: `orchestrate.py status` shows
+  the campaign `running` with `r18_adr-s0`/`r18_adr-s1` already `running`
+  (Hamster's 2 GPUs) and the other 10 jobs `pending`; `ardx-watch.service`
+  is `active`. `/experiment-postrun` closes this out once the watcher
+  reports the campaign terminal.
