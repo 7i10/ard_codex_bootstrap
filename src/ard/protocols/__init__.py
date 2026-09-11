@@ -470,6 +470,20 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             local_train_reason=None,
             metadata=_TRADES_49K_VALIDATION_METADATA,
         ),
+        "imagenet_stage0_dev_v1": ProtocolSpec(
+            id="imagenet_stage0_dev_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Deliberately unconstrained (plan 0099): this identity is for
+            # dev-tier ImageNet Stage 0 pipeline/throughput verification
+            # only, not a controlled scientific protocol, so it is not part
+            # of _validate_protocol_contract's strict CIFAR-protocol
+            # allowlist and carries no fixed field-matching metadata. Any
+            # future ImageNet scientific campaign needs its own, separately
+            # decided and reviewed protocol identity -- this one must never
+            # be reused for a `tier` other than `dev`.
+            metadata=MappingProxyType({"purpose": "imagenet_stage0_dev_verification_only"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,

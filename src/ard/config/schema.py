@@ -54,6 +54,7 @@ class ProtocolConfig(StrictModel):
         "controlled_cifar10_mobilenetv2_adr_v1",
         "controlled_cifar10_r18_trades_49k_validation_v1",
         "synthetic_smoke_v2",
+        "imagenet_stage0_dev_v1",
     ]
 
 
