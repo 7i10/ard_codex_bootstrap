@@ -210,7 +210,19 @@ def run_autoattack(
         adversary.seed = seed
         adversarial = adversary.run_standard_evaluation(images, labels, bs=batch_size)
         with torch.no_grad():
-            accuracy = model(adversarial).argmax(1).eq(labels).float().mean().item()
+            # Batched to match run_standard_evaluation's own bs=batch_size --
+            # a single model(adversarial) forward over the full evaluation
+            # set allocates one huge activation tensor (all N images at
+            # once) and was the proximate cause of repeated CUDA OOM crashes
+            # under GPU contention (decision packet 0010). The model is in
+            # eval() mode (no_grad, BatchNorm on running stats, no dropout),
+            # so batching this recomputation changes only memory shape, not
+            # any computed value -- verified bit-identical in
+            # tests/unit/test_autoattack_batched_recompute.py.
+            predictions = torch.cat(
+                [model(adversarial[start : start + batch_size]).argmax(1) for start in range(0, adversarial.shape[0], batch_size)]
+            )
+            accuracy = predictions.eq(labels).float().mean().item()
     finally:
         model.train(was_training)
     output_path.parent.mkdir(parents=True, exist_ok=True)

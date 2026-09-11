@@ -406,6 +406,65 @@ def test_autoattack_adapter_restores_mode_when_injected_adapter_raises(tmp_path:
     assert model.training
 
 
+def test_autoattack_recompute_batched_matches_unbatched_predictions(tmp_path: Path) -> None:
+    """decision packet 0010's prereg rule for its Option A: batching the
+    post-attack accuracy recomputation (autoattack.py, run_autoattack) must
+    not change a single predicted label versus one whole-tensor forward."""
+    import torch
+    from torch import nn
+
+    torch.manual_seed(0)
+    model = nn.Sequential(
+        nn.Conv2d(3, 4, 3, padding=1),
+        nn.BatchNorm2d(4),
+        nn.ReLU(),
+        nn.Flatten(),
+        nn.Linear(4 * 2 * 2, 3),
+    )
+    # BatchNorm running stats must differ from init, or eval-mode behavior
+    # (which the fix relies on being batch-size-invariant) wouldn't be
+    # exercised meaningfully.
+    model.train()
+    for _ in range(5):
+        model(torch.rand(6, 3, 2, 2))
+    model.eval()
+
+    n = 21  # deliberately not a multiple of batch_size, to exercise a short final batch
+    images = torch.rand(n, 3, 2, 2)
+    labels = torch.randint(0, 3, (n,))
+
+    with torch.no_grad():
+        expected_predictions = model(images).argmax(1)
+    expected_accuracy = expected_predictions.eq(labels).float().mean().item()
+
+    class ReturnInputAA:
+        def __init__(self, model: nn.Module, **kwargs: object) -> None:
+            del model, kwargs
+
+        def run_standard_evaluation(self, images: torch.Tensor, labels: torch.Tensor, bs: int) -> torch.Tensor:
+            del labels, bs
+            return images
+
+    result = run_autoattack(
+        model=model,
+        images=images,
+        labels=labels,
+        norm="linf",
+        epsilon=8 / 255,
+        seed=0,
+        batch_size=8,
+        output_path=tmp_path / "aa.json",
+        autoattack_cls=ReturnInputAA,
+    )
+
+    assert result["autoattack_accuracy"] == expected_accuracy
+    with torch.no_grad():
+        batched_predictions = torch.cat(
+            [model(images[start : start + 8]).argmax(1) for start in range(0, n, 8)]
+        )
+    assert torch.equal(batched_predictions, expected_predictions)
+
+
 def _lineage_payload(*, boundary: str = "end", world_size: object = 1) -> dict[str, object]:
     payload: dict[str, object] = {key: None for key in REQUIRED_KEYS}
     payload.update(

@@ -484,6 +484,14 @@ def main(argv: list[str] | None = None) -> int:
                     "eval_pgd_accuracy": result.pgd_accuracy,
                 }
             )
+            if device.type == "cuda":
+                # A8 (docs/BACKLOG.md): release this checkpoint's cached
+                # allocator blocks before the next one starts. Complementary
+                # to decision packet 0010's Option A (batching the AutoAttack
+                # recomputation forward), not a substitute for it -- this
+                # reduces cross-checkpoint fragmentation within one process,
+                # it does not shrink any single allocation.
+                torch.cuda.empty_cache()
         (output_dir / "evaluation-results.json").write_text(
             json.dumps(results, sort_keys=True, indent=2) + "\n", encoding="utf-8"
         )
