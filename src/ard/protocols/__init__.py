@@ -484,6 +484,25 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # be reused for a `tier` other than `dev`.
             metadata=MappingProxyType({"purpose": "imagenet_stage0_dev_verification_only"}),
         ),
+        "controlled_imagenet_stage01_r18_mobilenetv3_adr_v1": ProtocolSpec(
+            id="controlled_imagenet_stage01_r18_mobilenetv3_adr_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0100's first real ImageNet scientific campaign identity --
+            # deliberately NOT added to _validate_protocol_contract's strict
+            # CIFAR-protocol field-matching allowlist (unlike
+            # controlled_cifar10_r18_adr_v1 and its siblings). Building out
+            # the full dataset/student/training/seeds/evaluation/optimizer/
+            # scheduler/attack metadata contract those protocols enforce was
+            # judged disproportionate engineering for this campaign's own
+            # 12-run scope (documented tradeoff, plan 0100 checklist item 2);
+            # the four configs sharing this identity are instead protected by
+            # being generated from one shared template that differs only in
+            # method.id/method.adr and student.architecture. A future
+            # ImageNet protocol reused across more campaigns should revisit
+            # adding the strict contract.
+            metadata=MappingProxyType({"purpose": "imagenet_stage01_r18_mobilenetv3_adr_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,
