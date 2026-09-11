@@ -468,6 +468,134 @@ class TinyImageNetDataset(Dataset[tuple[Image.Image, int]]):
             return image.convert("RGB"), label
 
 
+class ImageNetDataset(Dataset[tuple[Image.Image, int]]):
+    """Read the standard ImageNet-1k ``train/<wnid>/*.JPEG`` / ``val/<wnid>/*.JPEG`` layout.
+
+    Structurally this follows ``TinyImageNetDataset`` above (root, split,
+    class-to-index map, ``samples``, ``targets``, ``content_identity``), but
+    its content identity is deliberately **not** a full byte-level SHA-256 of
+    every image, unlike ``TinyImageNetDataset``. Plan 0099's "Design
+    question" (docs/plans/0099-imagenet-stage0-prep.md) worked out why: at
+    Tiny-ImageNet's ~100k images, hashing every file's bytes on every dataset
+    construction (i.e. every job launch) is already a real cost; at
+    ImageNet-1k's ~1.28M images / 146GB, doing that on every process start is
+    not viable. Instead this adapter hashes a **manifest** -- one
+    ``(relative_path, label, file_size)`` record per sample, from a cheap
+    ``os.stat`` per file, no file bytes read and no image opened -- which
+    takes seconds rather than minutes-to-tens-of-minutes over the full set.
+    This is a deliberate change to what ``content_sha256`` means for this one
+    dataset (a manifest digest, not a full-content digest); the full
+    byte-level digest plan 0099 recommends pinning once, offline, alongside
+    the manifest digest is a separate, future maintenance command, not
+    implemented here -- this adapter never computes it on the hot launch
+    path. This is intentional, not an oversight: do not "fix" it by adding a
+    full re-hash back onto the construction path.
+
+    Class-to-index mapping: the standard convention (and this dataset's own
+    ``class_names.json``, when present at the dataset root) orders ImageNet's
+    1000 synsets by ascending WordNet ID (wnid) string -- confirmed by
+    inspecting the real on-disk ``class_names.json`` during this plan's
+    implementation, whose order is byte-identical to ``sorted()`` of its own
+    wnids. So ``class_names.json`` is not load-bearing for index correctness:
+    this adapter derives the canonical class order directly from the sorted
+    class-directory names actually present under ``root/<split>/`` (mirroring
+    ``TinyImageNetDataset``'s plain ``wnids.txt`` listing, and letting a
+    synthetic test fixture omit ``class_names.json`` entirely). When
+    ``class_names.json`` is present, its human-readable names are attached to
+    ``content_identity`` purely as provenance metadata and are not otherwise
+    used.
+    """
+
+    def __init__(self, root: Path, split: str, *, image_size: int) -> None:
+        self.root = root
+        self._resolved_root = root.resolve()
+        if split == "test":
+            raise ValueError("ImageNet has no implicit test-to-validation alias; provide an official test adapter")
+        if split not in {"train", "val"}:
+            raise ValueError(f"unsupported ImageNet split: {split}")
+        if image_size < 1:
+            raise ValueError("ImageNet image_size must be a positive integer")
+        self.image_size = image_size
+        split_dir = root / split
+        if not split_dir.is_dir():
+            raise FileNotFoundError(f"ImageNet {split} directory missing: {split_dir}")
+        classes = sorted(entry.name for entry in split_dir.iterdir() if entry.is_dir())
+        if not classes:
+            raise FileNotFoundError(f"no ImageNet class directories found under {split_dir}")
+        self.class_to_index = {wnid: index for index, wnid in enumerate(classes)}
+        samples = [
+            (path, self.class_to_index[wnid])
+            for wnid in classes
+            for path in sorted((split_dir / wnid).glob("*"))
+            if path.is_file()
+        ]
+        if not samples:
+            raise FileNotFoundError(f"ImageNet {split} images are missing under {split_dir}")
+        self.samples = samples
+        self.targets = tuple(label for _, label in self.samples)
+        self.class_names = self._read_class_names(root / "class_names.json", classes)
+        self.content_identity = self._content_identity(split, classes, samples)
+
+    @staticmethod
+    def _read_class_names(path: Path, classes: list[str]) -> dict[str, str] | None:
+        """Best-effort, provenance-only human-readable names; never required."""
+        if not path.is_file():
+            return None
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        if not isinstance(payload, dict):
+            return None
+        by_wnid: dict[str, str] = {}
+        for entry in payload.values():
+            if isinstance(entry, list) and len(entry) == 2 and all(isinstance(value, str) for value in entry):
+                by_wnid[entry[0]] = entry[1]
+        return {wnid: by_wnid[wnid] for wnid in classes if wnid in by_wnid} or None
+
+    def _content_identity(
+        self, split: str, classes: list[str], samples: list[tuple[Path, int]]
+    ) -> dict[str, object]:
+        digest = hashlib.sha256()
+        header = {"algorithm": "imagenet-manifest-v1", "split": split, "classes": classes}
+        digest.update(json.dumps(header, sort_keys=True, separators=(",", ":")).encode() + b"\n")
+        for path, label in sorted(samples, key=lambda item: item[0].relative_to(self.root).as_posix()):
+            if path.is_symlink():
+                raise ValueError(f"ImageNet content manifest rejects symlink: {path}")
+            resolved = path.resolve()
+            if self._resolved_root not in resolved.parents:
+                raise ValueError(f"ImageNet content manifest rejects out-of-root path: {path}")
+            record = {
+                "path": path.relative_to(self.root).as_posix(),
+                "label": label,
+                "size": path.stat().st_size,
+            }
+            digest.update(json.dumps(record, sort_keys=True, separators=(",", ":")).encode() + b"\n")
+        return {
+            "algorithm": "imagenet-manifest-v1",
+            "observed_sha256": digest.hexdigest(),
+            "verification": "computed",
+        }
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, index: int) -> tuple[Image.Image, int]:
+        path, label = self.samples[index]
+        with Image.open(path) as image:
+            rgb = image.convert("RGB")
+        # ImageNet's native JPEGs vary in resolution; every other adapter in
+        # this module (CIFAR, Tiny-ImageNet) hands the shared `_to_tensor` /
+        # augmentation pipeline images that are already a fixed size, so this
+        # is where that invariant is restored. This is a plain, deterministic
+        # resize -- no crop, no randomness -- purely to produce a fixed
+        # tensor shape; it is not a preprocessing or augmentation policy
+        # choice for an actual training run, which plan 0099 leaves open.
+        if rgb.size != (self.image_size, self.image_size):
+            rgb = rgb.resize((self.image_size, self.image_size), Image.Resampling.BILINEAR)
+        return rgb, label
+
+
 def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
     if config.name == "synthetic_cifar":
         return SyntheticCIFAR(
@@ -494,6 +622,23 @@ def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
                 "verification": "computed-and-matched",
             }
         return base
+    if config.name == "imagenet":
+        imagenet_base = ImageNetDataset(config.root, config.split, image_size=config.image_size)
+        if len(imagenet_base.class_to_index) != config.num_classes:
+            raise ValueError(
+                "ImageNet class count mismatch: "
+                f"config={config.num_classes}, layout={len(imagenet_base.class_to_index)}"
+            )
+        observed = imagenet_base.content_identity["observed_sha256"]
+        if config.content_sha256 is not None and config.content_sha256 != observed:
+            raise ValueError("ImageNet content_sha256 does not match adapter-visible manifest")
+        if config.content_sha256 is not None:
+            imagenet_base.content_identity = {
+                **imagenet_base.content_identity,
+                "expected_sha256": config.content_sha256,
+                "verification": "computed-and-matched",
+            }
+        return imagenet_base
     raise ValueError(f"unknown dataset: {config.name}")
 
 
@@ -537,7 +682,7 @@ def build_dataset(config: DatasetConfig, *, transform: Callable[[Any], torch.Ten
     """Build one indexed view; callers needing train/validation use views below."""
     base = build_raw_dataset(config)
     indexed = IndexedDataset(base, transform or _to_tensor)
-    if isinstance(base, TinyImageNetDataset):
+    if isinstance(base, (TinyImageNetDataset, ImageNetDataset)):
         indexed.content_identity = base.content_identity
     return indexed
 

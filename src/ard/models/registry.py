@@ -127,6 +127,16 @@ def build_architecture(architecture: str, num_classes: int) -> nn.Module:
         return model
     if architecture == "fixture_cnn":
         return FixtureCNN(num_classes)
+    if architecture == "resnet50_imagenet":
+        # Plain, unpatched torchvision definition: the CIFAR entries above
+        # patch conv1/maxpool specifically because CIFAR is 32px; ImageNet's
+        # native resolution needs the untouched stem. See plan 0099 checklist
+        # item 3.
+        return models.resnet50(weights=None, num_classes=num_classes)
+    if architecture == "mobilenet_v2_imagenet":
+        return models.mobilenet_v2(weights=None, num_classes=num_classes)
+    if architecture == "mobilenet_v3_small_imagenet":
+        return models.mobilenet_v3_small(weights=None, num_classes=num_classes)
     raise ValueError(f"unknown architecture: {architecture}")
 
 

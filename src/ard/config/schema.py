@@ -121,10 +121,19 @@ class AdrConfig(StrictModel):
     Adversarial Training", ICLR 2024, arXiv:2305.12118.  Defaults match the
     paper's CIFAR-10 configuration exactly (its §5.1 and the official code's
     per-dataset gin configs, github.com/yuyuwu5/ADR); this is a fixed decay
-    updated once per training iteration (not per epoch), and temperature/
-    lambda anneal by the same per-iteration cosine schedule
+    updated once per training iteration (not per epoch).  Temperature always
+    anneals by the per-iteration cosine schedule
     (``ard.schedules.cosine_value.cosine_anneal``), covering the full
-    training run.  The EMA-decay is a genuinely separate piece of state from
+    training run.  Lambda does too **only** when ``lambda_source="cosine"``
+    (the default -- every existing config validates unchanged); when a
+    config explicitly opts into ``lambda_source="gap_adaptive"`` (plan 0098),
+    lambda instead comes from ``ard.schedules.gap_adaptive``, recomputed once
+    per epoch boundary from that epoch's own train/val robust-accuracy gap
+    and held fixed through the next epoch's iterations -- see
+    ``docs/plans/0098-gap-adaptive-adr-cifar10.md`` and
+    ``docs/SCIENTIFIC_INVARIANTS.md``'s ADR section for what that gap
+    actually measures (a live scientific-review open question, not settled
+    by this schema).  The EMA-decay is a genuinely separate piece of state from
     ``MethodConfig.student_ema_decay`` (a per-sample robust-margin EMA used
     by an unrelated risk-weighting mechanism) and must not be confused with
     it.
@@ -135,6 +144,15 @@ class AdrConfig(StrictModel):
     temperature_low: float = Field(default=2.0, gt=0)
     lambda_low: float = Field(default=0.7, ge=0, le=1)
     lambda_high: float = Field(default=0.95, ge=0, le=1)
+    # Plan 0098: replaces lambda's *source* only. "cosine" (default) is
+    # exactly plan 0097's validated behavior -- a pure function of epoch
+    # index, unchanged. "gap_adaptive" drives lambda instead from a live,
+    # self-normalizing measurement of train/val robust-accuracy gap
+    # (ard.schedules.gap_adaptive), recomputed once per epoch boundary and
+    # held fixed through that epoch's iterations. Temperature's own cosine
+    # anneal is untouched either way.
+    lambda_source: Literal["cosine", "gap_adaptive"] = "cosine"
+    gap_smoothing_beta: float = Field(default=0.9, gt=0.0, lt=1.0)
 
     @model_validator(mode="after")
     def validate_bounds(self) -> AdrConfig:
@@ -142,6 +160,8 @@ class AdrConfig(StrictModel):
             raise ValueError("temperature_low must not exceed temperature_high (temperature anneals downward)")
         if self.lambda_low > self.lambda_high:
             raise ValueError("lambda_low must not exceed lambda_high (lambda anneals upward)")
+        if self.lambda_source == "cosine" and self.gap_smoothing_beta != 0.9:
+            raise ValueError("gap_smoothing_beta is only meaningful when lambda_source=gap_adaptive")
         return self
 
 
@@ -156,6 +176,7 @@ class NormalizationConfig(StrictModel):
         "robustbench_cifar10_bartoldson_embedded",
         "cifar100_standard",
         "tiny_imagenet_standard",
+        "imagenet_standard",
         "custom",
     ] = "fixture_unit"
     mean: tuple[float, float, float] | None = None
@@ -186,6 +207,11 @@ class NormalizationConfig(StrictModel):
                 (0.4802, 0.4481, 0.3975),
                 (0.2302, 0.2265, 0.2262),
                 "Tiny-ImageNet repository profile",
+            ),
+            "imagenet_standard": (
+                (0.485, 0.456, 0.406),
+                (0.229, 0.224, 0.225),
+                "Standard ILSVRC-2012 mean/std convention (torchvision.models default preprocessing)",
             ),
         }
         if self.profile == "custom":
@@ -294,7 +320,7 @@ class AttackConfig(StrictModel):
 
 
 class DatasetConfig(StrictModel):
-    name: Literal["synthetic_cifar", "cifar10", "cifar100", "tiny_imagenet"] = "synthetic_cifar"
+    name: Literal["synthetic_cifar", "cifar10", "cifar100", "tiny_imagenet", "imagenet"] = "synthetic_cifar"
     root: Path | None = None
     split: Literal["train", "val", "test"] = "train"
     download: bool = False
@@ -329,6 +355,8 @@ class DatasetConfig(StrictModel):
                 raise ValueError("a stagewise late mask only applies to the stagewise augmentation policy")
         if self.name == "tiny_imagenet" and self.root is None:
             raise ValueError("tiny_imagenet requires an explicit root")
+        if self.name == "imagenet" and self.root is None:
+            raise ValueError("imagenet requires an explicit root")
         if self.augmentation_policy != "canonical" and self.name not in {"cifar10", "cifar100"}:
             raise ValueError("non-canonical augmentation policies are currently defined only for CIFAR datasets")
         if self.augmentation_policy == "stagewise":
@@ -351,6 +379,13 @@ class ModelConfig(StrictModel):
         "resnet18_cifar",
         "mobilenet_v2_cifar",
         "fixture_cnn",
+        # ImageNet-scale, native-resolution (plan 0099 prep; unpatched
+        # torchvision definitions -- no 32px conv1/maxpool patch). Available
+        # for a future config to select; this does not itself pick Stage 1's
+        # architecture, see docs/plans/0099-imagenet-stage0-prep.md.
+        "resnet50_imagenet",
+        "mobilenet_v2_imagenet",
+        "mobilenet_v3_small_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
@@ -568,6 +603,14 @@ class TrainingConfig(StrictModel):
     global_batch_size: int = Field(ge=1)
     num_workers: int = Field(default=0, ge=0)
     device: Literal["auto", "cpu", "cuda"] = "auto"
+    # Default false reproduces today's exact behavior (scaler=None,
+    # unconditionally, regardless of device) for every existing config that
+    # never mentions this field -- see docs/plans/0099-imagenet-stage0-prep.md
+    # checklist item 4 and docs/decisions/0011-post-cifar-adr-next-step.md.
+    # Only meaningful on a CUDA device; enabling it on CPU constructs a
+    # disabled (no-op) GradScaler rather than erroring, matching the
+    # existing "auto" device-resolution pattern elsewhere in this config.
+    amp: bool = False
     deterministic: bool = True
     validation_fraction: float = Field(default=0.25, gt=0, lt=1)
     # This is a protocol identity, not a performance option. Ordinary DDP
@@ -1173,6 +1216,12 @@ class ExperimentConfig(StrictModel):
             and not self.dataset.content_sha256
         ):
             raise ValueError("repro/pilot/production Tiny-ImageNet requires dataset.content_sha256")
+        if (
+            self.tier in {"repro", "pilot", "production"}
+            and self.dataset.name == "imagenet"
+            and not self.dataset.content_sha256
+        ):
+            raise ValueError("repro/pilot/production ImageNet requires dataset.content_sha256")
         if self.student.num_classes != self.dataset.num_classes:
             raise ValueError("student and dataset num_classes must match")
         if self.teacher is not None and self.teacher.num_classes != self.dataset.num_classes:
@@ -1226,6 +1275,7 @@ class ExperimentConfig(StrictModel):
             "cifar10": "cifar10_standard",
             "cifar100": "cifar100_standard",
             "tiny_imagenet": "tiny_imagenet_standard",
+            "imagenet": "imagenet_standard",
         }[self.dataset.name]
         if self.student.architecture == "saad_resnet18_cifar_v1" and self.dataset.name == "cifar10":
             expected_profile = "cifar10_raw_identity"

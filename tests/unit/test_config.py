@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from ard.cli.train import _build_method
 from ard.config import load_config, save_resolved_config
-from ard.config.schema import AttackConfig, ExperimentConfig, MethodConfig, NormalizationConfig
+from ard.config.schema import AttackConfig, DatasetConfig, ExperimentConfig, MethodConfig, NormalizationConfig
 from ard.config.teacher_audit import load_teacher_audit_config
 from ard.engine.checkpoint import config_digest
 from ard.tracking.adapter import canonical_run_group
@@ -471,6 +471,77 @@ def test_synthetic_identity_and_cifar100_provenance_are_explicit(
     assert NormalizationConfig(profile="cifar100_standard").provenance == (
         "CIFAR-100 repository profile; not claimed upstream-exact"
     )
+
+
+def test_imagenet_dataset_requires_an_explicit_root() -> None:
+    with pytest.raises(ValidationError, match="imagenet requires an explicit root"):
+        DatasetConfig(name="imagenet")
+
+
+def test_imagenet_normalization_profile_matches_ilsvrc_convention() -> None:
+    profile = NormalizationConfig(profile="imagenet_standard")
+    assert profile.mean == (0.485, 0.456, 0.406)
+    assert profile.std == (0.229, 0.224, 0.225)
+
+
+def _imagenet_config(tmp_path: Path, **overrides: object) -> dict:
+    base = base_config()
+    base.update(
+        {
+            # Any protocol whose contract does not pin dataset/student/tier
+            # fields works here; this repository's own convention for such
+            # "just exercise the schema" tests is the audit-only, non-runnable
+            # protocol id (see test_real_dataset_normalization_is_required...
+            # above), which skips the versioned-protocol contract entirely.
+            "protocol": {"id": "saad_code_295121c_audit_v1"},
+            "dataset": {"name": "imagenet", "root": str(tmp_path), "num_classes": 5},
+            "student": {
+                "architecture": "resnet50_imagenet",
+                "num_classes": 5,
+                "normalization": {"profile": "imagenet_standard"},
+            },
+            "output_dir": str(tmp_path / "output"),
+        }
+    )
+    base.update(overrides)
+    return base
+
+
+def test_imagenet_dataset_requires_its_own_normalization_profile(tmp_path: Path) -> None:
+    data = _imagenet_config(tmp_path)
+    data["student"]["normalization"] = {"profile": "cifar10_standard"}
+    path = tmp_path / "imagenet-wrong-profile.yaml"
+    write_yaml(path, data)
+    with pytest.raises(ValidationError, match="requires student normalization profile imagenet_standard"):
+        load_config(path)
+
+
+def test_imagenet_dataset_with_the_matching_profile_validates(tmp_path: Path) -> None:
+    path = tmp_path / "imagenet-ok.yaml"
+    write_yaml(path, _imagenet_config(tmp_path))
+    config = load_config(path)
+    assert config.dataset.name == "imagenet"
+    assert config.student.architecture == "resnet50_imagenet"
+    assert config.student.normalization.mean == (0.485, 0.456, 0.406)
+
+
+@pytest.mark.parametrize("tier", ["repro", "pilot", "production"])
+def test_imagenet_requires_content_sha256_at_repro_pilot_and_production_tiers(tmp_path: Path, tier: str) -> None:
+    data = _imagenet_config(tmp_path, tier=tier)
+    data["tracking"] = {
+        "mode": "online",
+        "project": "ard-test",
+        "entity": "ard-test",
+        "group": "imagenet-test",
+    }
+    path = tmp_path / f"imagenet-{tier}.yaml"
+    write_yaml(path, data)
+    with pytest.raises(ValidationError, match="requires dataset.content_sha256"):
+        load_config(path)
+
+    data["dataset"]["content_sha256"] = "a" * 64
+    write_yaml(path, data)
+    assert load_config(path).dataset.content_sha256 == "a" * 64
 
 
 def test_repository_experiment_configs_resolve() -> None:

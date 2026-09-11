@@ -30,6 +30,7 @@ from ard.policies import (
     teacher_risk_from_entropy,
 )
 from ard.schedules.cosine_value import cosine_anneal
+from ard.schedules.gap_adaptive import GapAdaptiveState, gap_adaptive_step, lambda_from_state
 from ard.signals import (
     RobustMarginSignal,
     TeacherConfidenceBatch,
@@ -105,8 +106,8 @@ def _reduce_epoch_observability(
     local_cuda_peak_reserved_bytes: int,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     """Apply the epoch SUM/MAX contract and derive globally valid throughput."""
-    if local_totals.shape != (6,):
-        raise ValueError("epoch totals must contain six scalar accumulators")
+    if local_totals.shape != (7,):
+        raise ValueError("epoch totals must contain seven scalar accumulators")
     global_totals = reduce_sums(local_totals)
     rank_max = reduce_max(
         torch.tensor(
@@ -125,6 +126,10 @@ def _reduce_epoch_observability(
         "cuda_peak_reserved_bytes": float(rank_max[2].item()),
         "teacher_clean_forward_calls": float(global_totals[4].item()),
         "teacher_adversarial_forward_calls": float(global_totals[5].item()),
+        # Diagnostic only (plan 0098), meaningful only when an EMA-of-student
+        # model exists (adr/adr_trades); 0.0 for every other method, where
+        # the accumulator this divides is never incremented.
+        "ema_student_agreement": (float(global_totals[6].item()) / valid_examples) if valid_examples > 0 else 0.0,
     }
 
 
@@ -359,6 +364,20 @@ class Trainer:
                 parameter.requires_grad_(False)
                 parameter.grad = None
             self.ema_model.eval()
+        if self.adr_config is not None and self.adr_config.lambda_source == "gap_adaptive":
+            self._gap_adaptive_state: GapAdaptiveState | None = None
+            # No epoch has finished yet, so there is no measured gap: start
+            # at severity 0 (lambda_low), matching cosine's own starting
+            # point at iteration 0.
+            self._current_lambda_floor: float | None = self.adr_config.lambda_low
+        else:
+            self._gap_adaptive_state = None
+            self._current_lambda_floor = None
+        # Diagnostic only (plan 0098): the EMA's clean-image argmax on this
+        # iteration's batch, cached by _rectified_target and consumed at the
+        # end of the same iteration once the post-optimizer-step student
+        # clean forward is available. Never read by the attack or objective.
+        self._pending_ema_clean_argmax: torch.Tensor | None = None
         self.adversarial_kd_multiplier = adversarial_kd_multiplier
         self.adversarial_ce_coefficient = adversarial_ce_coefficient
         self.clean_ce_coefficient = clean_ce_coefficient
@@ -726,13 +745,29 @@ class Trainer:
             iteration=self.global_step,
             total_iterations=self.total_iterations,
         )
-        lambda_floor = cosine_anneal(
-            start=self.adr_config.lambda_low,
-            end=self.adr_config.lambda_high,
-            iteration=self.global_step,
-            total_iterations=self.total_iterations,
-        )
+        if self.adr_config.lambda_source == "gap_adaptive":
+            assert self._current_lambda_floor is not None
+            lambda_floor = self._current_lambda_floor
+        else:
+            lambda_floor = cosine_anneal(
+                start=self.adr_config.lambda_low,
+                end=self.adr_config.lambda_high,
+                iteration=self.global_step,
+                total_iterations=self.total_iterations,
+            )
         ema_logits = self._ema_clean_logits(images)
+        # Diagnostic only (plan 0098): see the caching note on
+        # self._pending_ema_clean_argmax. Known caveat, disclosed rather than
+        # hidden, and applying equally to BOTH adr and adr_trades -- this is
+        # the one and only call site of _rectified_target, so both objectives
+        # get the same pre-optimizer-step EMA forward compared later in the
+        # same iteration against a post-step student forward. (adr_trades
+        # separately has a genuine pre-step clean student forward available
+        # via requires_clean_student_logits; this diagnostic does not use it,
+        # so do not read this metric as adr_trades-specific or as using that
+        # pre-step forward.) A real temporal mismatch, plausibly small given
+        # the EMA's slow decay, but not zero.
+        self._pending_ema_clean_argmax = ema_logits.argmax(1).detach()
         return rectify_label(
             ema_clean_logits=ema_logits, labels=labels, temperature=temperature, lambda_floor=lambda_floor
         )
@@ -956,7 +991,7 @@ class Trainer:
         # Loss sum, clean-correct, robust-correct, valid examples, and actual
         # detached clean/adv teacher forwards.  One final SUM makes the
         # count telemetry global without adding a hot-loop collective.
-        totals = torch.zeros(6, dtype=torch.float64, device=self.device)
+        totals = torch.zeros(7, dtype=torch.float64, device=self.device)
         for batch_index, batch in enumerate(loader):
             if not isinstance(batch, IndexedBatch):
                 raise TypeError("trainer requires IndexedBatch batches")
@@ -1490,6 +1525,12 @@ class Trainer:
             self._update_ema()
             with _evaluation_mode(self.model), torch.no_grad():
                 clean_logits = self.model(batch.images)
+            ema_student_agreement_sum = (
+                0.0
+                if self._pending_ema_clean_argmax is None
+                else float(((self._pending_ema_clean_argmax == clean_logits.argmax(1)).to(mask.dtype) * mask).sum())
+            )
+            self._pending_ema_clean_argmax = None
             totals += torch.tensor(
                 [
                     float((terms.total.detach() * mask).sum()),
@@ -1498,6 +1539,7 @@ class Trainer:
                     float(mask.sum()),
                     teacher_clean_forward_calls,
                     self._teacher_adversarial_forward_calls,
+                    ema_student_agreement_sum,
                 ],
                 dtype=torch.float64,
                 device=self.device,
@@ -1653,6 +1695,25 @@ class Trainer:
                     self.selection_metadata_ema["selected_epoch"] = epoch
                     self.selection_metadata_ema["selected_clean_accuracy"] = ema_validation_metrics["clean_accuracy"]
                     self.selection_metadata_ema["selected_pgd_accuracy"] = ema_validation_metrics["pgd_accuracy"]
+            if self.adr_config is not None and self.adr_config.lambda_source == "gap_adaptive":
+                # Computed once per epoch boundary from this epoch's own
+                # train/val metrics, applied to every iteration of the next
+                # epoch (plan 0098). Folded into fork_lineage before the
+                # checkpoints below are written, so a resume restores the
+                # exact gap_ema/running_max this epoch produced, matching
+                # the pattern the other per-run router states already use.
+                self._gap_adaptive_state, self._current_lambda_floor = gap_adaptive_step(
+                    train_robust_accuracy=train_metrics["robust_accuracy"],
+                    val_pgd_accuracy=validation_metrics["pgd_accuracy"],
+                    previous_state=self._gap_adaptive_state,
+                    beta=self.adr_config.gap_smoothing_beta,
+                    lambda_low=self.adr_config.lambda_low,
+                    lambda_high=self.adr_config.lambda_high,
+                )
+                self.fork_lineage = {
+                    **({} if self.fork_lineage is None else self.fork_lineage),
+                    "gap_adaptive_state": self._gap_adaptive_state.to_dict(),
+                }
             common = dict(
                 epoch=epoch,
                 model=self.model,
@@ -1710,6 +1771,24 @@ class Trainer:
             if ema_validation_metrics is not None:
                 epoch_metrics["val_clean_accuracy_ema"] = ema_validation_metrics["clean_accuracy"]
                 epoch_metrics["val_pgd_accuracy_ema"] = ema_validation_metrics["pgd_accuracy"]
+            if self.ema_model is not None:
+                # Diagnostic only (plan 0098): a train-only candidate signal,
+                # logged for comparison against the validation-based
+                # raw_gap/severity signal gap-adaptive lambda uses. Gates
+                # nothing.
+                epoch_metrics["train_ema_student_agreement"] = train_metrics["ema_student_agreement"]
+            if self.adr_config is not None and self.adr_config.lambda_source == "gap_adaptive":
+                # Observation only: the schedule's own inputs/outputs, so the
+                # canary/campaign's independent variable is a first-class
+                # column in epoch-metrics.parquet rather than something that
+                # can only be reconstructed from fork_lineage inside a
+                # checkpoint. This is the lambda that GOVERNS THE NEXT epoch
+                # (computed from this epoch's own metrics), matching
+                # self._current_lambda_floor's own semantics.
+                assert self._gap_adaptive_state is not None
+                epoch_metrics["train_lambda_floor"] = self._current_lambda_floor
+                epoch_metrics["train_gap_ema"] = self._gap_adaptive_state.gap_ema
+                epoch_metrics["train_gap_running_max"] = self._gap_adaptive_state.running_max
             # Boundary diagnostics are computed in the common training loop
             # and must survive into the metrics callback/W&B path.  This is
             # observability only: the full-batch objective and checkpoint
@@ -1765,6 +1844,20 @@ class Trainer:
             ):
                 raise ValueError("online S2 resume checkpoint lacks immutable routing state")
             self.online_state_s2_router.load_state_dict(self.fork_lineage["online_state_s2_state"])
+        if self.adr_config is not None and self.adr_config.lambda_source == "gap_adaptive":
+            if not isinstance(self.fork_lineage, dict) or not isinstance(
+                self.fork_lineage.get("gap_adaptive_state"), dict
+            ):
+                raise ValueError("gap-adaptive ADR resume checkpoint lacks its lambda schedule state")
+            self._gap_adaptive_state = GapAdaptiveState.from_dict(self.fork_lineage["gap_adaptive_state"])
+            # Recomputed from the restored state, not cached, so a resumed
+            # run's lambda trajectory is bit-identical to an uninterrupted
+            # one by construction.
+            self._current_lambda_floor = lambda_from_state(
+                self._gap_adaptive_state,
+                lambda_low=self.adr_config.lambda_low,
+                lambda_high=self.adr_config.lambda_high,
+            )
         if self.sample_store is not None:
             self.sample_store.load_state_dict(state.sample_state)
             self.sample_state = self.sample_store.state_dict()

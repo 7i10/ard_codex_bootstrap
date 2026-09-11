@@ -406,6 +406,23 @@ def _selection_metric(value: object, *, name: str) -> float:
     return float(value)
 
 
+def _build_grad_scaler(*, amp: bool, device: torch.device) -> torch.amp.GradScaler | None:
+    """Return the AMP gradient scaler ``Trainer`` receives, or ``None``.
+
+    ``amp=False`` (the default for every config that predates plan 0099) must
+    reproduce today's exact behavior: ``None``, unconditionally. Only
+    ``amp=True`` reaches a real ``GradScaler`` at all, and even then it is
+    constructed ``enabled=(device.type == "cuda")`` -- on a CPU device this is
+    a harmless no-op scaler (``scale()``/``step()``/``update()`` degrade to
+    plain pass-throughs) rather than a device error, which is what lets the
+    unit suite exercise the wiring without CUDA hardware. Real mixed-precision
+    numerics are a CUDA-only concern and out of this plan's unit-test scope.
+    """
+    if not amp:
+        return None
+    return torch.amp.GradScaler(device="cuda", enabled=(device.type == "cuda"))
+
+
 def _build_method(
     config: ExperimentConfig,
 ) -> tuple[DistillationObjective, WeightPolicy | None, SampleStateStore | None, TeacherTargetPolicy | None]:
@@ -916,7 +933,7 @@ def main(argv: list[str] | None = None) -> int:
             model=student,
             optimizer=optimizer,
             scheduler=scheduler,
-            scaler=None,
+            scaler=_build_grad_scaler(amp=config.training.amp, device=device),
             attack=LinfPGD(config.method.attack),
             selection_attack=LinfPGD(selection_attack_config),
             objective=objective,

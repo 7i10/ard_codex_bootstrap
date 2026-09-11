@@ -187,12 +187,22 @@ Training" (ICLR 2024, arXiv:2305.12118)。公式実装は `.external/adr`
   `num_batches_tracked`含む)に対し、optimizer.step()の直後、1 iterationに1回**行う
   (timm `ModelEmaV2`と同じ規約)。整数バッファは補間後に丸めて型を戻す。
   epoch単位や一部パラメータのみの更新に変更しない。
-- **温度τ(2.5→2.0)とλ(0.7→0.95)の per-iteration cosine anneal はwarmupなし**
+- **温度τ(2.5→2.0)は常にper-iteration cosine anneal、warmupなし**
   (公式コードの`cosine_scheduler`はwarmup対応だが、ADRのCIFAR-10設定は
   `warmup_epochs=0`で呼んでいる)。`total_iterations`は`len(loader) * training.epochs`
   から起動のたびに解決済みconfigだけで再計算し、チェックポイントには保存しない
   ——world_size/config_hashの既存drift検知がこの値の一貫性を保証する前提であり、
   それらのチェックを弱めた場合はこの前提も崩れる。
+  **λ(0.7→0.95)はデフォルト(`method.adr.lambda_source: cosine`)で同じper-iteration
+  cosine anneal だが、plan 0098 の`lambda_source: gap_adaptive`を明示的に選んだ
+  configに限り、epoch境界ごとに`ard.schedules.gap_adaptive`で計算した値へ置き換わり
+  ——1エポック内では一定値になる(反復ごとの補間ではない)。この場合のλは
+  `train_robust_accuracy`/`val_pgd_accuracy`という2つの異なる脅威モデル・BNモードで
+  測った量の差に依存する、学習時観測に基づく量である点に注意
+  (`docs/plans/0098-gap-adaptive-adr-cifar10.md`参照。この差が本当に
+  train/val汎化ギャップを表しているかは、この計画のscientific reviewで
+  指摘された未解決の論点)。`lambda_source`を指定しない既存configの挙動は
+  この変更で一切変わらない。
 - **評価対象の重み(student vs EMA)はデフォルトstudent**。`ard.cli.evaluate --weights
   {model,ema}`で切替可能(公式実装の`--ema`フラグに対応)。**チェックポイント選択は
   studentとEMAで完全に独立**——`ard.engine.trainer`はstudentのvalidation PGD精度で

@@ -22,6 +22,7 @@ from ard.attacks import LinfPGD
 from ard.config.schema import AdrConfig, AttackConfig, ModelConfig
 from ard.data import (
     EpochShuffleSampler,
+    IndexedBatch,
     IndexedDataset,
     SyntheticCIFAR,
     collate_indexed,
@@ -31,6 +32,7 @@ from ard.engine.checkpoint import REQUIRED_KEYS
 from ard.engine.trainer import Trainer
 from ard.models import build_student
 from ard.objectives import ADRObjective, ADRTRADESObjective, PGDATObjective
+from ard.schedules.gap_adaptive import gap_adaptive_step
 
 pytestmark = pytest.mark.t3
 
@@ -81,7 +83,13 @@ def _trades_shaped_attack() -> LinfPGD:
 
 
 def _adr_trainer(
-    output: Path, *, objective: object, epochs: int, seed: int = 7, attack: LinfPGD | None = None
+    output: Path,
+    *,
+    objective: object,
+    epochs: int,
+    seed: int = 7,
+    attack: LinfPGD | None = None,
+    adr_config: AdrConfig | None = None,
 ) -> Trainer:
     torch.manual_seed(123)
     model = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="smoke")
@@ -106,8 +114,24 @@ def _adr_trainer(
         config_hash="b" * 64,
         seed=seed,
         tracker_run_id="offline-fixture-adr",
-        adr_config=AdrConfig(ema_decay=0.9, temperature_high=2.0, temperature_low=1.0, lambda_low=0.5, lambda_high=0.9),
+        adr_config=(
+            adr_config
+            if adr_config is not None
+            else AdrConfig(ema_decay=0.9, temperature_high=2.0, temperature_low=1.0, lambda_low=0.5, lambda_high=0.9)
+        ),
         total_iterations=total_iterations,
+    )
+
+
+def _gap_adaptive_adr_config() -> AdrConfig:
+    return AdrConfig(
+        ema_decay=0.9,
+        temperature_high=2.0,
+        temperature_low=1.0,
+        lambda_low=0.5,
+        lambda_high=0.9,
+        lambda_source="gap_adaptive",
+        gap_smoothing_beta=0.5,
     )
 
 
@@ -405,3 +429,273 @@ def test_resuming_a_non_adr_checkpoint_with_an_ema_model_fails_closed(tmp_path: 
     _, _, sampler = _loaders()
     with pytest.raises(ValueError, match="carries no 'ema' state"):
         adr_trainer.resume(output / "last.pt", sampler=sampler)
+
+
+def test_gap_adaptive_lambda_moves_with_a_real_train_val_gap(tmp_path: Path) -> None:
+    """Plan 0098's canary check, exercised deterministically: lambda actually
+    responds to the epoch's own train/val gap, matching the schedule
+    primitive's own math bit-for-bit -- not just "some function ran"."""
+    output = tmp_path / "gap-adaptive-moves"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=3, adr_config=_gap_adaptive_adr_config())
+    loader, validation_loader, _ = _loaders()
+
+    train_robust_accuracies = iter([0.9, 0.9, 0.9])
+    val_pgd_accuracies = iter([0.5, 0.5, 0.5])
+
+    def fake_train_epoch(loader, **kwargs):
+        del loader, kwargs
+        return {
+            "loss": 0.0,
+            "clean_accuracy": 0.5,
+            "robust_accuracy": next(train_robust_accuracies),
+            "ema_student_agreement": 0.0,
+        }
+
+    def fake_validate_epoch(loader, *, model=None):
+        del loader
+        if model is trainer.ema_model:
+            return {"clean_accuracy": 0.5, "pgd_accuracy": 0.5}
+        return {"clean_accuracy": 0.5, "pgd_accuracy": next(val_pgd_accuracies)}
+
+    trainer.train_epoch = fake_train_epoch
+    trainer.validate_epoch = fake_validate_epoch
+
+    observed_lambdas: list[float] = []
+    trainer.fit(
+        loader,
+        validation_loader=validation_loader,
+        epochs=3,
+        on_epoch_end=lambda metrics, improved: observed_lambdas.append(trainer._current_lambda_floor),
+    )
+
+    expected_lambdas = []
+    state = None
+    for _ in range(3):
+        state, lambda_value = gap_adaptive_step(
+            train_robust_accuracy=0.9,
+            val_pgd_accuracy=0.5,
+            previous_state=state,
+            beta=0.5,
+            lambda_low=0.5,
+            lambda_high=0.9,
+        )
+        expected_lambdas.append(lambda_value)
+    assert observed_lambdas == pytest.approx(expected_lambdas)
+    assert trainer.fork_lineage is not None
+    assert trainer.fork_lineage["gap_adaptive_state"] == pytest.approx(state.to_dict())
+
+
+def test_gap_adaptive_state_round_trips_exactly_through_save_and_resume(tmp_path: Path) -> None:
+    output = tmp_path / "gap-adaptive-resume"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=2, adr_config=_gap_adaptive_adr_config())
+    loader, validation_loader, _ = _loaders()
+    trainer.fit(loader, validation_loader=validation_loader, epochs=1)
+    expected_state = trainer._gap_adaptive_state
+    expected_lambda = trainer._current_lambda_floor
+    assert expected_state is not None
+
+    resumed = _adr_trainer(output, objective=ADRObjective(), epochs=2, adr_config=_gap_adaptive_adr_config())
+    _, _, sampler = _loaders()
+    resumed.resume(output / "last.pt", sampler=sampler)
+    assert resumed._gap_adaptive_state == expected_state
+    assert resumed._current_lambda_floor == pytest.approx(expected_lambda)
+
+
+def test_gap_adaptive_resume_matches_an_uninterrupted_runs_lambda_trajectory(tmp_path: Path) -> None:
+    """The real regression this plan requires: resume must not merely avoid
+    crashing, it must reproduce the exact lambda an uninterrupted run would
+    have used for the epoch after resume."""
+    adr_config = _gap_adaptive_adr_config()
+    uninterrupted_output = tmp_path / "uninterrupted"
+    uninterrupted = _adr_trainer(uninterrupted_output, objective=ADRObjective(), epochs=2, adr_config=adr_config)
+    loader, validation_loader, _ = _loaders()
+    uninterrupted.fit(loader, validation_loader=validation_loader, epochs=2)
+    uninterrupted_second_epoch_lambda = uninterrupted._current_lambda_floor
+
+    interrupted_output = tmp_path / "interrupted"
+    interrupted = _adr_trainer(interrupted_output, objective=ADRObjective(), epochs=2, adr_config=adr_config)
+    loader, validation_loader, _ = _loaders()
+    interrupted.fit(loader, validation_loader=validation_loader, epochs=1)
+
+    resumed = _adr_trainer(interrupted_output, objective=ADRObjective(), epochs=2, adr_config=adr_config)
+    _, _, sampler = _loaders()
+    state = resumed.resume(interrupted_output / "last.pt", sampler=sampler)
+    loader, validation_loader, _ = _loaders()
+    resumed.fit(loader, validation_loader=validation_loader, start_epoch=state.next_epoch, epochs=2)
+
+    assert resumed._current_lambda_floor == pytest.approx(uninterrupted_second_epoch_lambda)
+
+
+def test_resuming_a_cosine_checkpoint_with_a_gap_adaptive_trainer_fails_closed(tmp_path: Path) -> None:
+    """A checkpoint written by a cosine-lambda ADR run has no
+    ``gap_adaptive_state`` -- a gap-adaptive trainer resuming it must fail
+    closed and specifically, not silently start its own schedule from
+    scratch mid-training (the same discipline as the existing plain-EMA
+    fail-closed resume tests above)."""
+    output = tmp_path / "cosine-then-gap-adaptive"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=1)
+    loader, validation_loader, _ = _loaders()
+    trainer.fit(loader, validation_loader=validation_loader, epochs=1)
+
+    gap_trainer = _adr_trainer(output, objective=ADRObjective(), epochs=1, adr_config=_gap_adaptive_adr_config())
+    _, _, sampler = _loaders()
+    with pytest.raises(ValueError, match="lambda schedule state"):
+        gap_trainer.resume(output / "last.pt", sampler=sampler)
+
+
+def test_cosine_lambda_is_applied_per_iteration_matching_cosine_anneal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Scientific review of plan 0098 flagged that no test pins which lambda
+    value is actually *applied* during training (only post-hoc state was
+    checked). Spy on the one call site that consumes lambda_floor
+    (rectify_label) and confirm the applied value matches cosine_anneal at
+    every iteration, not just at epoch boundaries."""
+    from ard.engine import trainer as trainer_module
+    from ard.schedules.cosine_value import cosine_anneal
+
+    output = tmp_path / "cosine-lambda-applied"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=2)
+    loader, validation_loader, _ = _loaders()
+    real_rectify_label = trainer_module.rectify_label
+    observed: list[tuple[int, float]] = []
+
+    def spy_rectify_label(*, ema_clean_logits, labels, temperature, lambda_floor):
+        observed.append((trainer.global_step, lambda_floor))
+        return real_rectify_label(
+            ema_clean_logits=ema_clean_logits, labels=labels, temperature=temperature, lambda_floor=lambda_floor
+        )
+
+    monkeypatch.setattr(trainer_module, "rectify_label", spy_rectify_label)
+    trainer.fit(loader, validation_loader=validation_loader, epochs=2)
+
+    assert len(observed) == trainer.total_iterations
+    for global_step, lambda_floor in observed:
+        expected = cosine_anneal(
+            start=trainer.adr_config.lambda_low,
+            end=trainer.adr_config.lambda_high,
+            iteration=global_step,
+            total_iterations=trainer.total_iterations,
+        )
+        assert lambda_floor == pytest.approx(expected)
+    # Confirms the schedule actually varies (a constant lambda_floor would
+    # trivially satisfy the assertion above too).
+    assert len({round(value, 9) for _, value in observed}) > 1
+
+
+def test_gap_adaptive_lambda_is_constant_within_an_epoch_and_lags_by_one_epoch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other half of the same review finding, for gap-adaptive mode:
+    confirm the lambda applied to every iteration of epoch e+1 is exactly
+    what gap_adaptive_step computes from epoch e's own real train/val
+    metrics -- not epoch e+1's own (not-yet-known) metrics, and not merely
+    correct at the end-of-epoch snapshot checked by the other gap-adaptive
+    tests above."""
+    from ard.engine import trainer as trainer_module
+    from ard.schedules.gap_adaptive import gap_adaptive_step
+
+    output = tmp_path / "gap-adaptive-lambda-applied"
+    adr_config = _gap_adaptive_adr_config()
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=3, adr_config=adr_config)
+    loader, validation_loader, _ = _loaders()
+    real_rectify_label = trainer_module.rectify_label
+    observed_by_step: dict[int, float] = {}
+
+    def spy_rectify_label(*, ema_clean_logits, labels, temperature, lambda_floor):
+        observed_by_step[trainer.global_step] = lambda_floor
+        return real_rectify_label(
+            ema_clean_logits=ema_clean_logits, labels=labels, temperature=temperature, lambda_floor=lambda_floor
+        )
+
+    monkeypatch.setattr(trainer_module, "rectify_label", spy_rectify_label)
+    epoch_metrics_log: list[dict[str, float]] = []
+    trainer.fit(
+        loader,
+        validation_loader=validation_loader,
+        epochs=3,
+        on_epoch_end=lambda metrics, improved: epoch_metrics_log.append(dict(metrics)),
+    )
+
+    iterations_per_epoch = len(loader)
+    assert len(observed_by_step) == trainer.total_iterations
+    for step in range(iterations_per_epoch):
+        assert observed_by_step[step] == pytest.approx(adr_config.lambda_low)
+
+    state = None
+    for epoch_index, metrics in enumerate(epoch_metrics_log[:-1]):
+        state, expected_lambda = gap_adaptive_step(
+            train_robust_accuracy=metrics["train_robust_accuracy"],
+            val_pgd_accuracy=metrics["val_pgd_accuracy"],
+            previous_state=state,
+            beta=adr_config.gap_smoothing_beta,
+            lambda_low=adr_config.lambda_low,
+            lambda_high=adr_config.lambda_high,
+        )
+        for step in range((epoch_index + 1) * iterations_per_epoch, (epoch_index + 2) * iterations_per_epoch):
+            assert observed_by_step[step] == pytest.approx(expected_lambda)
+
+
+def test_ema_student_agreement_matches_a_hand_computed_pre_vs_post_step_comparison(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Scientific review of plan 0098 flagged that every existing test feeds
+    or asserts a literal 0.0 for train_ema_student_agreement, never
+    exercising the real argmax comparison, masking, or division. Substitute
+    the EMA forward with the student's own pre-optimizer-step forward (same
+    call timing the production code uses) -- a valid stand-in for verifying
+    the accumulation/masking/division logic, not real EMA numerics -- then
+    independently recompute the expected agreement from a manual pre-step
+    vs. post-step comparison on the same batch."""
+    from ard.engine.trainer import Trainer
+
+    output = tmp_path / "ema-agreement-hand-computed"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=1)
+    loader, validation_loader, _ = _loaders()
+    batch = next(iter(loader))
+
+    pre_step_argmax_holder: dict[str, torch.Tensor] = {}
+
+    def spy_ema_clean_logits(images: torch.Tensor) -> torch.Tensor:
+        with torch.no_grad():
+            logits = trainer.model(images.float()).detach().float()
+        pre_step_argmax_holder["argmax"] = logits.argmax(1)
+        return logits
+
+    monkeypatch.setattr(trainer, "_ema_clean_logits", spy_ema_clean_logits)
+    metrics = trainer.train_epoch([batch])
+
+    with torch.no_grad():
+        trainer.model.eval()
+        post_step_argmax = trainer.model(batch.images).argmax(1)
+        trainer.model.train()
+
+    mask = Trainer._mask(batch)
+    expected_matches = float(((pre_step_argmax_holder["argmax"] == post_step_argmax).to(mask.dtype) * mask).sum())
+    expected_valid = float(mask.sum())
+    assert metrics["ema_student_agreement"] == pytest.approx(expected_matches / expected_valid)
+
+
+def test_ema_student_agreement_excludes_padded_rows_from_both_numerator_and_denominator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "ema-agreement-masked"
+    trainer = _adr_trainer(output, objective=ADRObjective(), epochs=1)
+    loader, validation_loader, _ = _loaders()
+    batch = next(iter(loader))
+    # Half the batch is padding: must contribute to neither the numerator
+    # nor the denominator, regardless of whether it happens to "agree".
+    padded_mask = torch.zeros(batch.labels.shape[0], dtype=torch.bool)
+    padded_mask[0] = True
+    batch = IndexedBatch(
+        images=batch.images, labels=batch.labels, sample_ids=batch.sample_ids, state_update_mask=padded_mask
+    )
+
+    def spy_ema_clean_logits(images: torch.Tensor) -> torch.Tensor:
+        with torch.no_grad():
+            return trainer.model(images.float()).detach().float()
+
+    monkeypatch.setattr(trainer, "_ema_clean_logits", spy_ema_clean_logits)
+    metrics = trainer.train_epoch([batch])
+    assert metrics["valid_examples"] == 1.0
+    assert metrics["ema_student_agreement"] in (0.0, 1.0)

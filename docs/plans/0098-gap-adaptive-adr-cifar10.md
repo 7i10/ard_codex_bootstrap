@@ -5,8 +5,20 @@
 - Owner: human (scientific decisions), Claude Code (execution)
 - Depends on: decision packet 0011 (`chosen: B`), plan 0097 (SIGN_CONFIRMED,
   fully closed — this plan reuses its arms rather than re-running them)
-- Current milestone: design + implementation, pre-review. No GPU job launched
-  yet; no source SHA frozen.
+- **Shelved (decision packet 0012, `chosen: C`, 2026-09-11).** Implementation
+  and tests are complete and green (see Progress log), but scientific review
+  plus an offline replay against plan 0097's own recorded epoch trajectories
+  found the λ-severity mechanism as specified saturates almost immediately
+  (epoch 15-25/200) on a spurious early signal, then stays pinned near
+  λ_high for 43-75% of training — not the continuously-adaptive schedule
+  this plan intended. No fix found this session (free or costed) resolves
+  the core issue, since real robust overfitting is itself monotonic once it
+  starts, defeating any "compare against your own historical worst"
+  normalization regardless of measurement cleanliness. No GPU job launched;
+  no source SHA frozen. The code (schedule primitive, config fields, Trainer
+  wiring, checkpoint round-trip, tests) is left in place, uncommitted, for a
+  future session to build on if a magnitude-sensitive (not history-relative)
+  severity formulation is found.
 
 ## Goal
 
@@ -202,3 +214,129 @@ implementation did in plan 0097's M0.
    campaign.
 4. Full campaign per the experimental design above once the above pass and
    scientific review is complete.
+
+## Progress log
+
+- 2026-09-11: implementation complete against this plan's checklist:
+  `src/ard/schedules/gap_adaptive.py` (new), `AdrConfig.lambda_source`/
+  `gap_smoothing_beta` (`src/ard/config/schema.py`), `Trainer` epoch-boundary
+  wiring + checkpoint round-trip + `train_ema_student_agreement` diagnostic
+  (`src/ard/engine/trainer.py`), two new configs
+  (`configs/scientific/cifar10_r18_adr_gap.yaml`,
+  `configs/scientific/cifar10_mobilenetv2_adr_gap.yaml`), and unit +
+  integration tests (`tests/unit/test_gap_adaptive_schedule.py`,
+  `tests/unit/test_adr_config_lambda_source.py`,
+  `tests/integration/test_adr_trainer.py`, `tests/unit/test_pilot_observability.py`).
+  `scripts/verify.py --changed` green (all impacted T0-T3 tiers). No source
+  SHA frozen yet, no GPU touched.
+- 2026-09-11: scientific-reviewer ran on the full uncommitted diff.
+  **Verdict: conditional fail — do not freeze a SHA for the 6-run campaign
+  yet.** No P0. Five P2 items were fixed directly in this session (none
+  changed the mechanism): `train_lambda_floor`/`train_gap_ema`/
+  `train_gap_running_max` are now logged per epoch (previously only
+  reconstructable from a checkpoint's `fork_lineage`); the
+  pre-vs-post-optimizer-step temporal-mismatch caveat comment was corrected
+  to state it applies to `adr_trades` too, not only plain `adr`; two new
+  integration tests pin the *actually applied* per-iteration lambda in both
+  `cosine` and `gap_adaptive` modes (closing a real gap — every prior test
+  only checked post-epoch state, never what iteration `e` actually used);
+  two new tests exercise `train_ema_student_agreement`'s real argmax/mask/
+  division logic (every prior test fed or asserted a literal `0.0`);
+  `docs/SCIENTIFIC_INVARIANTS.md` and `AdrConfig`'s docstring were corrected
+  — they previously asserted lambda *always* anneals by per-iteration
+  cosine, which is now conditionally true only for `lambda_source: cosine`.
+  **Two P1 items were left open — mechanism-design questions, not code bugs,
+  and per CLAUDE.md rule 7 the human decides them, not this session:**
+  1. **The severity ratchet.** `running_max` in `gap_adaptive_step` includes
+     the *current* epoch's `gap_ema` before dividing (correct per this
+     plan's own formula, `running_max(gap_ema_0..e)` inclusive of `e`), so
+     `severity == 1.0` (`λ = λ_high`) on every epoch that sets a new
+     smoothed-gap high. Since robust overfitting typically widens
+     monotonically after the LR decay, the likely real trajectory is
+     `λ = λ_low` until the gap first turns positive, then `λ ≈ λ_high` for
+     most of the rest of training — closer to a one-time step than a
+     continuously adaptive schedule. An IMPROVED result under this plan's
+     preregistered rule would then be hard to attribute to *adaptivity*
+     specifically, versus simply "λ reaches 0.95 earlier than cosine does."
+  2. **What `raw_gap` actually measures.** `train_robust_accuracy` (10-step
+     `kl`/`rectified` attack, `model.train()` batch-norm statistics,
+     epoch-averaged over updating weights) and `val_pgd_accuracy` (20-step
+     `ce` selection attack, eval-mode running-statistics batch-norm,
+     post-epoch snapshot weights) differ in threat identity and model mode,
+     not only in split. Their difference is not a clean train/val
+     generalization gap; it is dominated by "a weaker attack in train-mode
+     BN vs. a stronger attack in eval-mode BN," which independently drives
+     finding 1's early ratchet.
+  Three further P2 items remain open, deferred rather than fixed, since
+  none blocks correctness of what is already implemented and two depend on
+  how the P1 items resolve: (a) the campaign's own eventual aggregator
+  (not yet written — plan 0097's `scripts/aggregate_adr_cifar10_replication.py`
+  covers only its own 8 arms) must assert `method.adr.lambda_source` as an
+  identity field, since `adr_gap`/`mobilenetv2_adr_gap` are otherwise
+  indistinguishable from plan 0097's vanilla-ADR arms by protocol+method id
+  alone; (b) adding `AdrConfig.lambda_source`/`gap_smoothing_beta` changed
+  `config_hash` for every existing ADR config (defaults are digested too),
+  so no plan-0097 ADR checkpoint can be *resumed* at a source SHA including
+  this diff — evaluation of already-completed 0097 checkpoints is
+  unaffected (it hashes the saved YAML mapping, not this schema); this must
+  be stated in this plan's own completion notes so it isn't a mid-campaign
+  surprise; (c) a mixed-schema `epoch-metrics.parquet` read is untested
+  (harmless today only because (b) already refuses the resume that would
+  trigger it).
+  **Next action is the human's**: decide how to resolve P1-1/P1-2 (redesign
+  `raw_gap`'s inputs to share threat identity and BN mode; redefine
+  `severity`'s normalization to not saturate at 1.0 on every new high; run
+  the mechanism as specified and treat the interpretability caveat as a
+  disclosed limitation; or decide the offline check the plan already asked
+  for — replaying real plan-0097 `train_robust_accuracy`/`val_pgd_accuracy`
+  columns through this formula — settles it well enough to proceed as-is).
+  No GPU canary launches and no source SHA freezes until that decision is
+  made.
+- 2026-09-11: the human requested the offline check directly. Replayed
+  `gap_adaptive_step` (β=0.9, λ_low=0.7, λ_high=0.95) against all six
+  already-recorded plan-0097 ADR epoch trajectories
+  (`runs/adr-cifar10-campaign-v1/cifar10_{r18,mobilenetv2}_adr-s{0,1,2}/
+  train/epoch-metrics.parquet`), zero GPU time. **P1-1 confirmed
+  dramatically**: λ reaches λ_high by epoch 15-17/200 (ResNet-18) or
+  21-25/200 (MobileNetV2) and stays there 68-75% / 43-46% of the full run.
+  Root cause, confirmed by inspecting the per-epoch `train_robust_accuracy`/
+  `val_pgd_accuracy` values directly (not just the aggregate schedule
+  output): the real run shows two distinct regimes — a small, roughly flat
+  gap (~0.02-0.07) through epoch ~15-99, then a sharp, sustained,
+  monotonically worsening explosion starting exactly at epoch 100 (the
+  first configured LR-decay milestone) through epoch 199 — the classical
+  "robust overfitting accelerates right after LR decay" signature. The
+  severity mechanism saturates during the small early plateau (epoch
+  15-25), not the large post-100 event, because a causal "compare to your
+  own historical worst" metric cannot distinguish "a new record because
+  history is still short" from "a new record because something dramatic
+  happened" — it reacts to the first, tiny rise and has no headroom left
+  when the real, large one arrives. The human further asked whether P1-1
+  is downstream of P1-2: very likely yes for the *timing* of the false
+  trigger (the small pre-100 plateau is a plausible fingerprint of the
+  train/val measurement mismatch — real robust overfitting classically
+  should not move much before the first LR decay), but P1-1's saturation
+  *itself* is independent of P1-2 and does not resolve if only P1-2 is
+  fixed: real post-100 robust overfitting is itself monotonic, so any
+  running-max-based normalization saturates on it too, cleanly measured or
+  not. Two candidate fixes were explored offline against the same six
+  trajectories: (a) decaying the running-max reference — **made things
+  worse** (ceiling occupancy rose to 85-93%), confirming mathematically
+  that lowering the reference only makes the current value exceed it
+  sooner; (b) restarting gap/severity tracking at the scheduler's own first
+  LR-decay milestone (epoch 100 here, no new hyperparameter) instead of
+  epoch 0 — removes the spurious early trigger, but the restarted series'
+  first tracked point is trivially "the worst so far" by construction, so
+  ResNet-18 saturates within 1 epoch of the restart and MobileNetV2 within
+  9, landing at 82-100% ceiling occupancy for the rest of training — i.e.
+  close to a two-value step function keyed to the LR-decay epoch, not the
+  continuously-adaptive schedule this plan intended, even though it is a
+  legitimate, zero-cost, well-motivated design in its own right.
+  **Decision (decision packet 0012, `chosen: C`): shelve.** Neither the
+  free fix (epoch-100 restart, reduces to a step function) nor the costed
+  fix (matching train/val measurement, does not touch the saturation
+  itself) resolves what this plan actually wanted to test. No further work
+  on this mechanism this session; implementation stays in place,
+  uncommitted, for a future session with a magnitude-sensitive (not
+  historical-max-relative) severity formulation. See decision packet 0012
+  for the full evidence and reasoning.

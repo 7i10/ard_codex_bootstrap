@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from ard.data import (
     IndexedDataset,
     SyntheticCIFAR,
     build_dataset,
+    build_raw_dataset,
     build_train_validation_views,
     collate_indexed,
     stratified_train_validation_split,
@@ -370,3 +372,129 @@ def test_official_test_is_never_part_of_train_validation_selection(
     config = DatasetConfig(name="cifar10", root=tmp_path, split="train", download=False, num_classes=10)
     build_train_validation_views(config, validation_fraction=0.25, split_seed=7, augmentation_seed=11)
     assert calls == [True]
+
+
+def _imagenet_layout(
+    root: Path, *, classes: tuple[str, ...] = ("n001", "n002", "n003"), split: str = "train", size: int = 16
+) -> None:
+    """A tiny synthetic on-disk fixture in the real ``train/<wnid>/*.JPEG`` layout.
+
+    Real, small, valid JPEGs (via PIL), never faked bytes -- so the adapter's
+    own ``Image.open``/manifest logic is exercised end to end, just at a scale
+    of a handful of files instead of ImageNet's real 1.28M.
+    """
+    for class_index, wnid in enumerate(classes):
+        class_dir = root / split / wnid
+        class_dir.mkdir(parents=True, exist_ok=True)
+        for image_index in range(2):
+            color = (10 + class_index * 20, 20 + image_index * 5, 30)
+            Image.new("RGB", (size, size), color=color).save(class_dir / f"{wnid}_{image_index}.JPEG")
+
+
+def test_imagenet_dataset_adapter_train_and_val_splits(tmp_path: Path) -> None:
+    _imagenet_layout(tmp_path, split="train")
+    _imagenet_layout(tmp_path, split="val")
+    for split in ("train", "val"):
+        config = DatasetConfig(name="imagenet", root=tmp_path, split=split, num_classes=3, image_size=8)
+        dataset = build_dataset(config)
+        assert len(dataset) == 6
+        image, label, sample_id = dataset[0]
+        assert image.shape == (3, 8, 8)
+        assert 0 <= label < 3
+        assert image.min() >= 0 and image.max() <= 1
+        assert isinstance(sample_id, int)
+        assert sorted(set(dataset.dataset.targets)) == [0, 1, 2]
+
+
+def test_imagenet_dataset_has_no_implicit_test_split_alias(tmp_path: Path) -> None:
+    _imagenet_layout(tmp_path, split="train")
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="test", num_classes=3)
+    with pytest.raises(ValueError, match="no implicit test-to-validation alias"):
+        build_raw_dataset(config)
+
+
+def test_imagenet_class_count_mismatch_is_rejected(tmp_path: Path) -> None:
+    _imagenet_layout(tmp_path, split="train")
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="train", num_classes=7)
+    with pytest.raises(ValueError, match="ImageNet class count mismatch"):
+        build_raw_dataset(config)
+
+
+def test_imagenet_dataset_resizes_native_resolution_images_deterministically(tmp_path: Path) -> None:
+    _imagenet_layout(tmp_path, split="train", size=250)
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="train", num_classes=3, image_size=32)
+    dataset = build_dataset(config)
+    image, _, _ = dataset[0]
+    assert image.shape == (3, 32, 32)
+
+
+def test_imagenet_class_to_index_is_sorted_wnid_order_and_class_names_json_is_provenance_only(
+    tmp_path: Path,
+) -> None:
+    _imagenet_layout(tmp_path, split="train", classes=("n003", "n001", "n002"))
+    config = DatasetConfig(name="imagenet", root=tmp_path, split="train", num_classes=3, image_size=8)
+
+    # No class_names.json: index order comes from the sorted wnid directory
+    # listing alone, exactly like TinyImageNetDataset's wnids.txt.
+    without_names = build_raw_dataset(config)
+    assert without_names.class_to_index == {"n001": 0, "n002": 1, "n003": 2}
+    assert without_names.class_names is None
+
+    # class_names.json present, deliberately in a different key order: it is
+    # provenance metadata only and must not change the index mapping (the
+    # real dataset's own class_names.json happens to already agree with
+    # sorted(wnids), confirmed during this plan's implementation, so this
+    # deliberately scrambles it to prove the adapter does not depend on it).
+    (tmp_path / "class_names.json").write_text(
+        json.dumps({"0": ["n003", "clownfish"], "1": ["n001", "goldfish"], "2": ["n002", "hammerhead"]}),
+        encoding="utf-8",
+    )
+    with_names = build_raw_dataset(config)
+    assert with_names.class_to_index == {"n001": 0, "n002": 1, "n003": 2}
+    assert with_names.class_names == {"n001": "goldfish", "n002": "hammerhead", "n003": "clownfish"}
+
+
+def test_imagenet_content_manifest_is_stable_and_detects_membership_and_size_changes(tmp_path: Path) -> None:
+    first, second = tmp_path / "one", tmp_path / "two"
+    _imagenet_layout(first, split="train")
+    _imagenet_layout(second, split="train")
+    config = DatasetConfig(name="imagenet", root=first, split="train", num_classes=3, image_size=8)
+    first_dataset = build_dataset(config)
+    second_dataset = build_dataset(config.model_copy(update={"root": second}))
+    assert first_dataset.content_identity == second_dataset.content_identity
+    observed = first_dataset.content_identity
+    assert observed is not None
+    assert observed["algorithm"] == "imagenet-manifest-v1"
+    assert observed["verification"] == "computed"
+
+    # Adding an image changes the manifest.
+    Image.new("RGB", (16, 16), color=(1, 2, 3)).save(second / "train" / "n001" / "extra.JPEG")
+    added = build_dataset(config.model_copy(update={"root": second}))
+    assert added.content_identity != observed
+    (second / "train" / "n001" / "extra.JPEG").unlink()
+
+    # Removing an existing image changes the manifest.
+    (second / "train" / "n002" / "n002_0.JPEG").unlink()
+    removed = build_dataset(config.model_copy(update={"root": second}))
+    assert removed.content_identity != observed
+    _imagenet_layout(second, split="train")
+
+    # Resizing an existing file (changing its on-disk byte size) changes the
+    # manifest -- this is a path+size manifest, not a full byte hash, so this
+    # is exactly the kind of change plan 0099's design question says it must
+    # still catch.
+    _imagenet_layout(second, split="train", size=64)
+    resized = build_dataset(config.model_copy(update={"root": second}))
+    assert resized.content_identity != observed
+    _imagenet_layout(second, split="train")
+    restored = build_dataset(config.model_copy(update={"root": second}))
+    assert restored.content_identity == observed
+
+    expected = observed["observed_sha256"]
+    assert isinstance(expected, str)
+    matched = build_dataset(config.model_copy(update={"content_sha256": expected}))
+    assert matched.content_identity is not None
+    assert matched.content_identity["verification"] == "computed-and-matched"
+
+    with pytest.raises(ValueError, match="does not match adapter-visible manifest"):
+        build_dataset(config.model_copy(update={"content_sha256": "0" * 64}))
