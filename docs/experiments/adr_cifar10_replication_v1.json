@@ -1,0 +1,1689 @@
+{
+  "arms": {
+    "adr": {
+      "dir_prefix": "cifar10_r18_",
+      "has_ema": true,
+      "method": "adr",
+      "protocol": "controlled_cifar10_r18_adr_v1",
+      "role": "adr_r18",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "mobilenetv2_adr": {
+      "dir_prefix": "cifar10_",
+      "has_ema": true,
+      "method": "adr",
+      "protocol": "controlled_cifar10_mobilenetv2_adr_v1",
+      "role": "adr_mobilenetv2",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "mobilenetv2_pgd_at": {
+      "dir_prefix": "cifar10_",
+      "has_ema": false,
+      "method": "pgd_at",
+      "protocol": "controlled_cifar10_mobilenetv2_adr_v1",
+      "role": "baseline_mobilenetv2",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "pgd_at": {
+      "dir_prefix": "cifar10_r18_",
+      "has_ema": false,
+      "method": "pgd_at",
+      "protocol": "controlled_cifar10_r18_v1",
+      "role": "baseline_r18_plain_sgd",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "pgd_at_nesterov": {
+      "dir_prefix": "cifar10_r18_",
+      "has_ema": false,
+      "method": "pgd_at",
+      "protocol": "controlled_cifar10_r18_adr_v1",
+      "role": "baseline_r18_nesterov_matched",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "trades": {
+      "dir_prefix": "cifar10_r18_",
+      "has_ema": false,
+      "method": "trades",
+      "protocol": "controlled_cifar10_r18_v1",
+      "role": "baseline_trades_r18",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "trades_49k_validation": {
+      "dir_prefix": "cifar10_r18_",
+      "has_ema": false,
+      "method": "trades",
+      "protocol": "controlled_cifar10_r18_trades_49k_validation_v1",
+      "role": "trades_49k_validation_pilot",
+      "seeds": [
+        0
+      ]
+    },
+    "trades_adr": {
+      "dir_prefix": "cifar10_r18_",
+      "has_ema": true,
+      "method": "adr_trades",
+      "protocol": "controlled_cifar10_r18_adr_v1",
+      "role": "adr_trades_r18",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    }
+  },
+  "autoattack_upstream_commit": "a39220048b3c9f2cca9a4d3a54604793c68eca7e",
+  "contract": "adr_cifar10_replication_v1",
+  "dataset_scope": {
+    "count": 10000,
+    "name": "cifar10",
+    "split": "test"
+  },
+  "decision_packet_input": "docs/decisions/0009-mobile-robustness-direction-and-first-step.md",
+  "per_arm_summary": {
+    "adr": {
+      "best_ema_autoattack_pp": {
+        "best": 49.61,
+        "count": 3,
+        "mean": 49.4,
+        "std": 0.18193405398660323,
+        "worst": 49.29
+      },
+      "best_model_autoattack_pp": {
+        "best": 48.75,
+        "count": 3,
+        "mean": 48.54,
+        "std": 0.2816025568065748,
+        "worst": 48.22
+      },
+      "best_model_clean_pp": {
+        "best": 83.32,
+        "count": 3,
+        "mean": 82.90666666666665,
+        "std": 0.37753587026047164,
+        "worst": 82.58
+      },
+      "last_ema_autoattack_pp": {
+        "best": 45.03,
+        "count": 3,
+        "mean": 44.92666666666667,
+        "std": 0.10016652800877948,
+        "worst": 44.83
+      },
+      "last_model_autoattack_pp": {
+        "best": 44.84,
+        "count": 3,
+        "mean": 44.826666666666675,
+        "std": 0.015275252316519529,
+        "worst": 44.81
+      },
+      "last_model_clean_pp": {
+        "best": 85.29,
+        "count": 3,
+        "mean": 85.08333333333333,
+        "std": 0.20033305601755944,
+        "worst": 84.89
+      },
+      "role": "adr_r18",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "mobilenetv2_adr": {
+      "best_ema_autoattack_pp": {
+        "best": 43.34,
+        "count": 3,
+        "mean": 43.10666666666666,
+        "std": 0.21733231083604387,
+        "worst": 42.91
+      },
+      "best_model_autoattack_pp": {
+        "best": 42.88,
+        "count": 3,
+        "mean": 42.71666666666667,
+        "std": 0.16010413278030455,
+        "worst": 42.56
+      },
+      "best_model_clean_pp": {
+        "best": 75.98,
+        "count": 3,
+        "mean": 75.79,
+        "std": 0.17349351572897664,
+        "worst": 75.64
+      },
+      "last_ema_autoattack_pp": {
+        "best": 42.67,
+        "count": 3,
+        "mean": 42.42333333333334,
+        "std": 0.2218858565419018,
+        "worst": 42.24
+      },
+      "last_model_autoattack_pp": {
+        "best": 42.78,
+        "count": 3,
+        "mean": 42.449999999999996,
+        "std": 0.3576310948449537,
+        "worst": 42.07
+      },
+      "last_model_clean_pp": {
+        "best": 76.34,
+        "count": 3,
+        "mean": 76.19,
+        "std": 0.22605309110914285,
+        "worst": 75.93
+      },
+      "role": "adr_mobilenetv2",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "mobilenetv2_pgd_at": {
+      "best_model_autoattack_pp": {
+        "best": 40.18,
+        "count": 3,
+        "mean": 39.92333333333334,
+        "std": 0.23158871590242452,
+        "worst": 39.73
+      },
+      "best_model_clean_pp": {
+        "best": 74.34,
+        "count": 3,
+        "mean": 73.78333333333335,
+        "std": 0.5550075074567308,
+        "worst": 73.23
+      },
+      "last_model_autoattack_pp": {
+        "best": 39.5,
+        "count": 3,
+        "mean": 39.33,
+        "std": 0.14798648586948895,
+        "worst": 39.23
+      },
+      "last_model_clean_pp": {
+        "best": 74.71,
+        "count": 3,
+        "mean": 74.44999999999999,
+        "std": 0.22605309110914282,
+        "worst": 74.3
+      },
+      "role": "baseline_mobilenetv2",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "pgd_at": {
+      "best_model_autoattack_pp": {
+        "best": 47.63,
+        "count": 3,
+        "mean": 47.28,
+        "std": 0.4444097208657798,
+        "worst": 46.78
+      },
+      "best_model_clean_pp": {
+        "best": 82.85,
+        "count": 3,
+        "mean": 82.54333333333334,
+        "std": 0.46360903068569315,
+        "worst": 82.01
+      },
+      "last_model_autoattack_pp": {
+        "best": 40.69,
+        "count": 3,
+        "mean": 40.413333333333334,
+        "std": 0.25423086620891105,
+        "worst": 40.19
+      },
+      "last_model_clean_pp": {
+        "best": 84.46,
+        "count": 3,
+        "mean": 84.32666666666667,
+        "std": 0.135030860670192,
+        "worst": 84.19
+      },
+      "role": "baseline_r18_plain_sgd",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "pgd_at_nesterov": {
+      "best_model_autoattack_pp": {
+        "best": 47.41,
+        "count": 3,
+        "mean": 47.32333333333333,
+        "std": 0.11718930554164583,
+        "worst": 47.19
+      },
+      "best_model_clean_pp": {
+        "best": 82.67,
+        "count": 3,
+        "mean": 82.39333333333333,
+        "std": 0.24826061575154196,
+        "worst": 82.19
+      },
+      "last_model_autoattack_pp": {
+        "best": 40.82,
+        "count": 3,
+        "mean": 40.599999999999994,
+        "std": 0.20663978319771995,
+        "worst": 40.41
+      },
+      "last_model_clean_pp": {
+        "best": 84.24,
+        "count": 3,
+        "mean": 84.15,
+        "std": 0.0899999999999963,
+        "worst": 84.06
+      },
+      "role": "baseline_r18_nesterov_matched",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "trades": {
+      "best_model_autoattack_pp": {
+        "best": 47.89,
+        "count": 3,
+        "mean": 47.553333333333335,
+        "std": 0.5658916268450468,
+        "worst": 46.9
+      },
+      "best_model_clean_pp": {
+        "best": 82.76,
+        "count": 3,
+        "mean": 81.65,
+        "std": 1.5808541994757124,
+        "worst": 79.84
+      },
+      "last_model_autoattack_pp": {
+        "best": 45.8,
+        "count": 3,
+        "mean": 45.473333333333336,
+        "std": 0.42712215270731607,
+        "worst": 44.99
+      },
+      "last_model_clean_pp": {
+        "best": 83.0,
+        "count": 3,
+        "mean": 82.58666666666666,
+        "std": 0.38436094147732464,
+        "worst": 82.24
+      },
+      "role": "baseline_trades_r18",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "trades_49k_validation": {
+      "best_model_autoattack_pp": {
+        "best": 47.64,
+        "count": 1,
+        "mean": 47.64,
+        "std": 0.0,
+        "worst": 47.64
+      },
+      "best_model_clean_pp": {
+        "best": 79.85,
+        "count": 1,
+        "mean": 79.85,
+        "std": 0.0,
+        "worst": 79.85
+      },
+      "last_model_autoattack_pp": {
+        "best": 46.37,
+        "count": 1,
+        "mean": 46.37,
+        "std": 0.0,
+        "worst": 46.37
+      },
+      "last_model_clean_pp": {
+        "best": 82.87,
+        "count": 1,
+        "mean": 82.87,
+        "std": 0.0,
+        "worst": 82.87
+      },
+      "role": "trades_49k_validation_pilot",
+      "seeds": [
+        0
+      ]
+    },
+    "trades_adr": {
+      "best_ema_autoattack_pp": {
+        "best": 49.54,
+        "count": 3,
+        "mean": 49.49666666666667,
+        "std": 0.040414518843272795,
+        "worst": 49.46
+      },
+      "best_model_autoattack_pp": {
+        "best": 49.19,
+        "count": 3,
+        "mean": 48.73,
+        "std": 0.40149719799769296,
+        "worst": 48.45
+      },
+      "best_model_clean_pp": {
+        "best": 83.68,
+        "count": 3,
+        "mean": 82.89999999999999,
+        "std": 0.9236882591004445,
+        "worst": 81.88
+      },
+      "last_ema_autoattack_pp": {
+        "best": 48.36,
+        "count": 3,
+        "mean": 48.089999999999996,
+        "std": 0.3534119409414467,
+        "worst": 47.69
+      },
+      "last_model_autoattack_pp": {
+        "best": 48.11,
+        "count": 3,
+        "mean": 47.96,
+        "std": 0.24269322199023285,
+        "worst": 47.68
+      },
+      "last_model_clean_pp": {
+        "best": 84.17,
+        "count": 3,
+        "mean": 83.85000000000001,
+        "std": 0.2787471972953295,
+        "worst": 83.66
+      },
+      "role": "adr_trades_r18",
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    }
+  },
+  "plan": "docs/plans/0097-adr-cifar10-replication.md",
+  "preregistered_comparison": {
+    "comparisons": {
+      "mobilenetv2": {
+        "baseline": "mobilenetv2_pgd_at",
+        "best_checkpoint_ema_weights": {
+          "deltas_pp": [
+            3.34,
+            3.48,
+            2.73
+          ],
+          "seeds": [
+            0,
+            1,
+            2
+          ],
+          "summary": {
+            "best": 3.48,
+            "count": 3,
+            "mean": 3.1833333333333336,
+            "std": 0.3987898360456712,
+            "worst": 2.73
+          }
+        },
+        "best_checkpoint_model_weights": {
+          "deltas_pp": [
+            2.98,
+            3.02,
+            2.38
+          ],
+          "seeds": [
+            0,
+            1,
+            2
+          ],
+          "summary": {
+            "best": 3.02,
+            "count": 3,
+            "mean": 2.793333333333333,
+            "std": 0.3585154575933001,
+            "worst": 2.38
+          }
+        },
+        "treatment": "mobilenetv2_adr"
+      },
+      "resnet18_nesterov_matched": {
+        "baseline": "pgd_at_nesterov",
+        "best_checkpoint_ema_weights": {
+          "deltas_pp": [
+            2.42,
+            1.88,
+            1.93
+          ],
+          "seeds": [
+            0,
+            1,
+            2
+          ],
+          "summary": {
+            "best": 2.42,
+            "count": 3,
+            "mean": 2.0766666666666667,
+            "std": 0.2983845393671283,
+            "worst": 1.88
+          }
+        },
+        "best_checkpoint_model_weights": {
+          "deltas_pp": [
+            1.56,
+            1.24,
+            0.85
+          ],
+          "seeds": [
+            0,
+            1,
+            2
+          ],
+          "summary": {
+            "best": 1.56,
+            "count": 3,
+            "mean": 1.2166666666666666,
+            "std": 0.3555746522649405,
+            "worst": 0.85
+          }
+        },
+        "treatment": "adr"
+      },
+      "resnet18_trades_vs_plain_sgd_baseline": {
+        "baseline": "trades",
+        "best_checkpoint_model_weights": {
+          "deltas_pp": [
+            1.32,
+            0.56,
+            1.65
+          ],
+          "seeds": [
+            0,
+            1,
+            2
+          ],
+          "summary": {
+            "best": 1.65,
+            "count": 3,
+            "mean": 1.1766666666666667,
+            "std": 0.5589573627150225,
+            "worst": 0.56
+          }
+        },
+        "treatment": "trades_adr"
+      }
+    },
+    "mobilenetv2_mean_gain_pp": 2.793333333333333,
+    "primary_endpoint": "best-checkpoint official-test AutoAttack accuracy, ADR minus matched plain-AT baseline",
+    "resnet18_mean_gain_pp": 1.2166666666666666,
+    "rule": "SIGN_CONFIRMED if MobileNetV2's mean gain is positive and exceeds ResNet-18's (Nesterov-matched pair); NOT_CONFIRMED if MobileNetV2's gain is <= ResNet-18's and <= 0; otherwise MIXED",
+    "verdict": "SIGN_CONFIRMED"
+  },
+  "runs": {
+    "adr": [
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_r18_adr-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s0/train/epoch-metrics.parquet",
+              "sha256": "672945480269b0cacc8aadd8b31ae3112c5ec19891a3a0fffd6275192d1e265d"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_r18_adr-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s0/train/sample-stats-train.parquet",
+              "sha256": "e388f071cd40bf72bef92bc61ff1430a3af5b8701e49ab61da91bf9f248b6a34"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T19:43:22.790741+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s0/train/run-bundle/manifest.json",
+          "manifest_sha256": "4fc574e63ad4be1263dea85d88ed7b3997e98985ebdc533259d9a011be9fd647",
+          "run_id": "adr-campaign-v1-cifar10_r18_adr-s0",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.49609997868537903,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "64854fec10e0d2916ab7dc05ef0086189ad7d7876b234048b6aeda941abf68fa",
+            "clean_accuracy": 0.8338,
+            "pgd_accuracy": 0.5426
+          },
+          "last": {
+            "autoattack_accuracy": 0.44919997453689575,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "6ac8293418d29f6a41e884b6b7dc4c3804f3ba7a40fa76337cb985132f87aefe",
+            "clean_accuracy": 0.8514,
+            "pgd_accuracy": 0.4858
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.48749998211860657,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "b5444a7fb8b8b1037a9f8d67b966bd6046b4449c23ece767fb3b2e9fe0728901",
+            "clean_accuracy": 0.8258,
+            "pgd_accuracy": 0.5334
+          },
+          "last": {
+            "autoattack_accuracy": 0.4481000006198883,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "6ac8293418d29f6a41e884b6b7dc4c3804f3ba7a40fa76337cb985132f87aefe",
+            "clean_accuracy": 0.8489,
+            "pgd_accuracy": 0.4842
+          }
+        },
+        "seed": 0
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_r18_adr-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s1/train/epoch-metrics.parquet",
+              "sha256": "fab2fe25f2a628799e0267644590c8ae0f87ebf35e9a1ad598c5b7e74ddc1314"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_r18_adr-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s1/train/sample-stats-train.parquet",
+              "sha256": "664090fafb37f8a843dbeae980ab2a770a829ebf33568a282fae1396ece3940c"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T19:38:27.423498+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s1/train/run-bundle/manifest.json",
+          "manifest_sha256": "4ed64407e788bf56157e0e75de15c65184cd92878bd3b2a3b3d7fed0bea21df1",
+          "run_id": "adr-campaign-v1-cifar10_r18_adr-s1",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.49289998412132263,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "05cb91aa8163688d03b6b45c79c6d6f0f710dfd02cf3775194536cd9c219f7bb",
+            "clean_accuracy": 0.8385,
+            "pgd_accuracy": 0.5394
+          },
+          "last": {
+            "autoattack_accuracy": 0.44829997420310974,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "a30c7077c0d67368abd14fe854813f02a7efee7f69d153e2280ae60aa5a7e9f8",
+            "clean_accuracy": 0.8514,
+            "pgd_accuracy": 0.4848
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.48649999499320984,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "9181001647cb952c93475bafaa44e14f34ec5e23c2b0f36ec3aa9d0c96f0af7e",
+            "clean_accuracy": 0.8282,
+            "pgd_accuracy": 0.5334
+          },
+          "last": {
+            "autoattack_accuracy": 0.44829997420310974,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "a30c7077c0d67368abd14fe854813f02a7efee7f69d153e2280ae60aa5a7e9f8",
+            "clean_accuracy": 0.8507,
+            "pgd_accuracy": 0.4823
+          }
+        },
+        "seed": 1
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-ferret-cifar10_r18_adr-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_adr-s2/outputs/train/epoch-metrics.parquet",
+              "sha256": "9663b843988bb1e21b1169db513a9bc7d2223d4f71e60bdfa1204d0f83cc7ce9"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-ferret-cifar10_r18_adr-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_adr-s2/outputs/train/sample-stats-train.parquet",
+              "sha256": "1daccafa8c5a036ccd8c019a9931d59225d4201fa08ba554fb6e06320f55a375"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T01:06:03.646771+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_adr-s2/train/run-bundle/manifest.json",
+          "manifest_sha256": "7297ecd879b8341ddbc865aec177c07fd5d71947c67bd11b6d73cd022fcf001e",
+          "run_id": "adr-campaign-v1-ferret-cifar10_r18_adr-s2",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.49300000071525574,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "8cfed4b72b380eca11fcc1a0506f7ea82872162c4b9f9f4aa26282841115139a",
+            "clean_accuracy": 0.7954,
+            "pgd_accuracy": 0.5432
+          },
+          "last": {
+            "autoattack_accuracy": 0.4502999782562256,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "9bc3ae45d4233ff383833fcfa86aee49a90ca74c6f07e59349707f35074fafff",
+            "clean_accuracy": 0.8524,
+            "pgd_accuracy": 0.4883
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4821999967098236,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "6d8b22be3022450dd6cd7ef73fead18f8ada629e17e2d94417606693b0bd4fcb",
+            "clean_accuracy": 0.8332,
+            "pgd_accuracy": 0.5335
+          },
+          "last": {
+            "autoattack_accuracy": 0.44839999079704285,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "9bc3ae45d4233ff383833fcfa86aee49a90ca74c6f07e59349707f35074fafff",
+            "clean_accuracy": 0.8529,
+            "pgd_accuracy": 0.4866
+          }
+        },
+        "seed": 2
+      }
+    ],
+    "mobilenetv2_adr": [
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s0/outputs/train/epoch-metrics.parquet",
+              "sha256": "68dfc6e05d08152ee0f16b592efbbc6c6431c3de1b4ed0f8e29fd874043119e0"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s0/outputs/train/sample-stats-train.parquet",
+              "sha256": "d9bfa380b40821aee1f53ad77c53b124d11abb903b1de808d19bcb9d0dae25df"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T17:19:02.023494+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_adr-s0/train/run-bundle/manifest.json",
+          "manifest_sha256": "49e8a94c5aedc12d0d264c46c62807e75c96e4c4267aaef6947e69794169a6dc",
+          "run_id": "adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s0",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.4306999742984772,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "901dfa0bfc2b8e8b4a5126c36a502d425bc624ed01829a8cdcb719b68b31451e",
+            "clean_accuracy": 0.7469,
+            "pgd_accuracy": 0.4881
+          },
+          "last": {
+            "autoattack_accuracy": 0.4235999882221222,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "f1418f59820d0f8203f616ebec2dcfbb6398d9ef7e0fcaf5f09f60c9f3d9fe85",
+            "clean_accuracy": 0.7608,
+            "pgd_accuracy": 0.4786
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4271000027656555,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "8a8c67dae52d5c8c031b9cc944abaa3cf6acb122acee0d00f743a6061bed9fad",
+            "clean_accuracy": 0.7564,
+            "pgd_accuracy": 0.4836
+          },
+          "last": {
+            "autoattack_accuracy": 0.42499998211860657,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "f1418f59820d0f8203f616ebec2dcfbb6398d9ef7e0fcaf5f09f60c9f3d9fe85",
+            "clean_accuracy": 0.7593,
+            "pgd_accuracy": 0.4802
+          }
+        },
+        "seed": 0
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_mobilenetv2_adr-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_adr-s1/train/epoch-metrics.parquet",
+              "sha256": "825545921ef09fd75a24189df7ba59d40969dddfe91ab6c9507d871b709c5ba2"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_mobilenetv2_adr-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_adr-s1/train/sample-stats-train.parquet",
+              "sha256": "4f651d5dd8864eeaccabb277240de405819747f8d74c822e76254e7f3d1e2fc2"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T04:43:21.064464+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_adr-s1/train/run-bundle/manifest.json",
+          "manifest_sha256": "30bfe2a6a15e3589ba17e6924ac63901fbcadc45d3bc71e3de17905870cb5353",
+          "run_id": "adr-campaign-v1-cifar10_mobilenetv2_adr-s1",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.4333999752998352,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "5b47ecdd082238fd3adc2f4b389bcefd841e4600616e82fece0e3934637b293f",
+            "clean_accuracy": 0.7513,
+            "pgd_accuracy": 0.4901
+          },
+          "last": {
+            "autoattack_accuracy": 0.42669999599456787,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "7690f0806ed353dc0fab4848dcbc6cf02bd36fc93d5a87e7d212a0e50f6f9f21",
+            "clean_accuracy": 0.7642,
+            "pgd_accuracy": 0.4788
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.42879998683929443,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "995625a17f16cca82fd61ddedeae937760549421dee45b30232e39fcf1761f0c",
+            "clean_accuracy": 0.7598,
+            "pgd_accuracy": 0.4865
+          },
+          "last": {
+            "autoattack_accuracy": 0.4277999997138977,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "7690f0806ed353dc0fab4848dcbc6cf02bd36fc93d5a87e7d212a0e50f6f9f21",
+            "clean_accuracy": 0.7634,
+            "pgd_accuracy": 0.482
+          }
+        },
+        "seed": 1
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s2/outputs/train/epoch-metrics.parquet",
+              "sha256": "eddbb1bb3d3851e51b589fcd42013a22924a150bc9f39bad137a6447fcef82e8"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s2/outputs/train/sample-stats-train.parquet",
+              "sha256": "d61d1f0fc5590e212b98ae525287ea14f5aeb17de5eab229b29db7b9a255346d"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T08:23:35.633687+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_adr-s2/train/run-bundle/manifest.json",
+          "manifest_sha256": "213358d163cee5dc269466bc37c1952a05eec63bf1d568314a82a956c9c0f9de",
+          "run_id": "adr-campaign-v1-ferret-cifar10_mobilenetv2_adr-s2",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.429099977016449,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "d6c7792afcef480eac8ccdb0578545162ed6a087d7ce764f20db62e81f9d42da",
+            "clean_accuracy": 0.7499,
+            "pgd_accuracy": 0.4873
+          },
+          "last": {
+            "autoattack_accuracy": 0.42239999771118164,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "8285debf5fe4f17e73f6af5b95c793f5f594aa40e4f06d819e4e90ea2537e56a",
+            "clean_accuracy": 0.7628,
+            "pgd_accuracy": 0.4773
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.42559999227523804,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "5743059b53dd81c3afc26ac72da0dcdf4203993ed866db86470bd2b1eb5f1fed",
+            "clean_accuracy": 0.7575,
+            "pgd_accuracy": 0.4809
+          },
+          "last": {
+            "autoattack_accuracy": 0.42069998383522034,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "8285debf5fe4f17e73f6af5b95c793f5f594aa40e4f06d819e4e90ea2537e56a",
+            "clean_accuracy": 0.763,
+            "pgd_accuracy": 0.477
+          }
+        },
+        "seed": 2
+      }
+    ],
+    "mobilenetv2_pgd_at": [
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s0/train/epoch-metrics.parquet",
+              "sha256": "71a71b9ad4def91be5a859d8ecef53e62354e7fccd0431541879457dae6c7714"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s0/train/sample-stats-train.parquet",
+              "sha256": "c5b3b5bdd1deef358dfd02307a2862650a041e879f5b5f80dd0d3df61f8cfc02"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T05:01:28.486620+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s0/train/run-bundle/manifest.json",
+          "manifest_sha256": "2a6c8cdeabd5d47cb8f00031b1f83a6f81166fbebb50c8cc61a9936545b20e4e",
+          "run_id": "adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s0",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.39729997515678406,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "fb269f9e14b1d193f42041739d39f1b40880c375259ea4f2eaa47913978f054d",
+            "clean_accuracy": 0.7378,
+            "pgd_accuracy": 0.4387
+          },
+          "last": {
+            "autoattack_accuracy": 0.39229997992515564,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "ce62cc849013fe18bd49412d924c8da2f641010e401985607d574ebaf514f273",
+            "clean_accuracy": 0.7434,
+            "pgd_accuracy": 0.4393
+          }
+        },
+        "seed": 0
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s1/train/epoch-metrics.parquet",
+              "sha256": "e8713f4b9de1491ab18a1fa7e5a787be469f7cc500907c39fde6b68914aa586f"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s1/train/sample-stats-train.parquet",
+              "sha256": "c6f316c6269551caffa953eb4ac4d81d681f96506ed16938abe0641bd520a128"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T08:53:54.560760+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s1/train/run-bundle/manifest.json",
+          "manifest_sha256": "4f5ad8f5b3ae81f41ce9cc40387810384e20fdefbb28b58794ae120bcf5ee4bb",
+          "run_id": "adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s1",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.3985999822616577,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "3bef7eec052d109ebb8f6e30b78d869c9c8d16075c7afa41e31d99389d3ae520",
+            "clean_accuracy": 0.7434,
+            "pgd_accuracy": 0.4428
+          },
+          "last": {
+            "autoattack_accuracy": 0.39259999990463257,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "c73f6f1de52a6e9a56e3be2fdb2987fc339c62c00c9cf20c44349f92c0f9add4",
+            "clean_accuracy": 0.743,
+            "pgd_accuracy": 0.4339
+          }
+        },
+        "seed": 1
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s2/train/epoch-metrics.parquet",
+              "sha256": "49ca0bf57477d5ac81170b0927ed66fbca7974f102c9502b035d37461a918823"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s2/train/sample-stats-train.parquet",
+              "sha256": "01b03f218724e296a8ea3bd5dec030e16e2f073546e0842298ba15df0c0ebc79"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T08:53:26.064315+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_mobilenetv2_pgd_at-s2/train/run-bundle/manifest.json",
+          "manifest_sha256": "3595df358b3426cdd38a6399b996a057c1f1946c32a78deedea6ca3dc4f9c3db",
+          "run_id": "adr-campaign-v1-cifar10_mobilenetv2_pgd_at-s2",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4017999768257141,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "8071280ff8640124119898a8407f1c39ea204f068e05a9d706caedaabd4a5836",
+            "clean_accuracy": 0.7323,
+            "pgd_accuracy": 0.444
+          },
+          "last": {
+            "autoattack_accuracy": 0.39499998092651367,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "2baebfb202e8f00f9022495515f4a723b2b1e7520e53418ca87a27c9d05b67f8",
+            "clean_accuracy": 0.7471,
+            "pgd_accuracy": 0.4424
+          }
+        },
+        "seed": 2
+      }
+    ],
+    "pgd_at": [
+      {
+        "ema": null,
+        "kind": "reused_historical",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4763000011444092,
+            "clean_accuracy": 0.8201,
+            "pgd_accuracy": 0.5112
+          },
+          "last": {
+            "autoattack_accuracy": 0.40359997749328613,
+            "clean_accuracy": 0.8446,
+            "pgd_accuracy": 0.4189
+          }
+        },
+        "provenance": "docs/experiments/historical/pgd_at_controlled_s0_c2220f1/ (hash-verified); docs/plans/0097 M1a investigation, 2026-09-09",
+        "run_id": "pgd-at-controlled-s0-c2220f1",
+        "seed": 0,
+        "source_git_sha_short": "c2220f1"
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_r18_pgd_at-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at-s1/train/epoch-metrics.parquet",
+              "sha256": "966fa350684f132f2eaa45355111b22282eee66640d63ea01a6aeb8d7bee8619"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_r18_pgd_at-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at-s1/train/sample-stats-train.parquet",
+              "sha256": "ea6f8936f6652ffbf621601d5ec153b13aa56300da22496e0da9f12eef0d7733"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T14:02:51.941519+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at-s1/train/run-bundle/manifest.json",
+          "manifest_sha256": "743803a9d45f7add5a05b8a718398da276231e2822769a08be39dd105d9381e9",
+          "run_id": "adr-campaign-v1-cifar10_r18_pgd_at-s1",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.46779999136924744,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "40893eacef8133be0142cee8e3cb01a82bc805311d4d122e2d0d1eb1422cfb24",
+            "clean_accuracy": 0.8277,
+            "pgd_accuracy": 0.5045
+          },
+          "last": {
+            "autoattack_accuracy": 0.40689998865127563,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "b55709944b113dd55f4ec1c85885c12a2f44df882001ab4e1173acba569b795b",
+            "clean_accuracy": 0.8433,
+            "pgd_accuracy": 0.4247
+          }
+        },
+        "seed": 1
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_r18_pgd_at-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at-s2/train/epoch-metrics.parquet",
+              "sha256": "f90ad5e4e261bf090aad8929faaa3951955b656bfc57d34ca31613fab9937850"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_r18_pgd_at-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at-s2/train/sample-stats-train.parquet",
+              "sha256": "a51426cb97f6eaa668a16b3f0067d47c9b0938fcf4cf23f9387116b13030eee0"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T14:09:58.665383+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at-s2/train/run-bundle/manifest.json",
+          "manifest_sha256": "ce95189b6b595b7f215d40146e9419b2568f431c829ec342ccbccab2af60662c",
+          "run_id": "adr-campaign-v1-cifar10_r18_pgd_at-s2",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.47429999709129333,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "ab4912bc25695413b73054e15d42101a456c8cfd56761254b38880961934195e",
+            "clean_accuracy": 0.8285,
+            "pgd_accuracy": 0.5103
+          },
+          "last": {
+            "autoattack_accuracy": 0.4018999934196472,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "4d758cf35a516c3fdad84740e56670dd1818b9205274c8676a3cd1dbead57b1e",
+            "clean_accuracy": 0.8419,
+            "pgd_accuracy": 0.422
+          }
+        },
+        "seed": 2
+      }
+    ],
+    "pgd_at_nesterov": [
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_r18_pgd_at_nesterov-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s0/train/epoch-metrics.parquet",
+              "sha256": "66e80436ab0c4c244b15dcb4472867171e88672e8f33ae4efc436a8dcc9526b5"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_r18_pgd_at_nesterov-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s0/train/sample-stats-train.parquet",
+              "sha256": "5c29c99eb54694f26aed9ddbfca436cc8b132e29314509a189fface9d354bdfc"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T16:39:16.752107+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s0/train/run-bundle/manifest.json",
+          "manifest_sha256": "3c51a835bfb404529118abe02509959fc97c8f377bddee539b47233bd8d097a6",
+          "run_id": "adr-campaign-v1-cifar10_r18_pgd_at_nesterov-s0",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.47189998626708984,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "0c6a451e1c63b09d37e9d7c1307b906255033be5e72371062c10ecbd64747faa",
+            "clean_accuracy": 0.8232,
+            "pgd_accuracy": 0.5081
+          },
+          "last": {
+            "autoattack_accuracy": 0.4056999981403351,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "aecb953d38cb3b9d2d953d2840323fe2f294680d56beda9d71f516e8e3a664db",
+            "clean_accuracy": 0.8424,
+            "pgd_accuracy": 0.4237
+          }
+        },
+        "seed": 0
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_r18_pgd_at_nesterov-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s1/train/epoch-metrics.parquet",
+              "sha256": "90d8cee461974c4686adf496658895668d1088d4992782582ba842bf30baf7c8"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_r18_pgd_at_nesterov-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s1/train/sample-stats-train.parquet",
+              "sha256": "f6e393555caefa02d84fdbd8281d61f25bcfc7b01ff17b96049eb089627fcb9d"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T16:39:51.656930+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s1/train/run-bundle/manifest.json",
+          "manifest_sha256": "cd747554bb05b5920f76aecbb79d35ea2eaee24254d6629ef8135c8931dc05a5",
+          "run_id": "adr-campaign-v1-cifar10_r18_pgd_at_nesterov-s1",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4740999937057495,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "47dbfc493a62fd21c830958e013104679e5348e3a7321995c1833216d1dc95f3",
+            "clean_accuracy": 0.8219,
+            "pgd_accuracy": 0.5097
+          },
+          "last": {
+            "autoattack_accuracy": 0.4041000008583069,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "db5fac975459d1354b74b0931087e0727cf91280caa87fec28107e2044aac49f",
+            "clean_accuracy": 0.8406,
+            "pgd_accuracy": 0.4196
+          }
+        },
+        "seed": 1
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-ferret-cifar10_r18_pgd_at_nesterov-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_pgd_at_nesterov-s2/outputs/train/epoch-metrics.parquet",
+              "sha256": "888f8b1d58fca3d7e1b44cd05c7ca4b988bfc9665fc9a127505046b3e4671d2d"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-ferret-cifar10_r18_pgd_at_nesterov-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_pgd_at_nesterov-s2/outputs/train/sample-stats-train.parquet",
+              "sha256": "1ff2ac36388caf80b5d0b32fb284f256198752e2bab69b08d3962d2df92c66aa"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T18:08:46.063210+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_pgd_at_nesterov-s2/train/run-bundle/manifest.json",
+          "manifest_sha256": "c9902199fb5af6a5d646010c0bb72094065858582d16ff4c9dcbc03d5e6d90c8",
+          "run_id": "adr-campaign-v1-ferret-cifar10_r18_pgd_at_nesterov-s2",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.47369998693466187,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "d3372ac5ff6b1833352fe5c2775d231f160becba211df5a4bf2580536a40e1d3",
+            "clean_accuracy": 0.8267,
+            "pgd_accuracy": 0.5086
+          },
+          "last": {
+            "autoattack_accuracy": 0.4081999957561493,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "418a8ef34b65717e28f4a5a7df733c643f95b4920ee38901cb9edf83e363b793",
+            "clean_accuracy": 0.8415,
+            "pgd_accuracy": 0.4254
+          }
+        },
+        "seed": 2
+      }
+    ],
+    "trades": [
+      {
+        "ema": null,
+        "kind": "reused_historical",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4786999821662903,
+            "clean_accuracy": 0.8235,
+            "pgd_accuracy": 0.5066
+          },
+          "last": {
+            "autoattack_accuracy": 0.4499000012874603,
+            "clean_accuracy": 0.8224,
+            "pgd_accuracy": 0.4749
+          }
+        },
+        "provenance": "docs/experiments/historical/trades_fix_v1_seed0/ (hash-verified); NOT outputs/scientific/trades-controlled-s0-f0c3ace (pre-fix defective run, docs/debugging/0028-trades-clean-target-detached.md); docs/plans/0097 M1a investigation, 2026-09-09",
+        "run_id": "trades-fix-v1-s0-attempt2",
+        "seed": 0,
+        "source_git_sha_short": "ee9ced0"
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_r18_trades-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades-s1/train/epoch-metrics.parquet",
+              "sha256": "5c19a2d991792234ce55ccda8d91ac589df389cca9e56ba3fcc2c555690fa7e8"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_r18_trades-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades-s1/train/sample-stats-train.parquet",
+              "sha256": "7cafdf05f0a7b46de26f07230104711cc8bc18814daa13d8aa4175331bb196af"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T23:10:41.793526+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades-s1/train/run-bundle/manifest.json",
+          "manifest_sha256": "6b2fa4cf262aaa2f810ae2981672a1140572438addf42d925aa9c52cc2c5fff4",
+          "run_id": "adr-campaign-v1-cifar10_r18_trades-s1",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4788999855518341,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "f48510db55bfabfc348535467595230c6e5b8b32b67a9e73ce91192f9458ec08",
+            "clean_accuracy": 0.8276,
+            "pgd_accuracy": 0.5067
+          },
+          "last": {
+            "autoattack_accuracy": 0.4562999904155731,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "c4ce086ea45786023eb04e0377a031b154915560c2e8de2f43f1dd03e262ba97",
+            "clean_accuracy": 0.8252,
+            "pgd_accuracy": 0.482
+          }
+        },
+        "seed": 1
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-ferret-cifar10_r18_trades-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_trades-s2/outputs/train/epoch-metrics.parquet",
+              "sha256": "650edbe2cb3d3a6a411cfbe2beab1dc8a91697b12b947b80c6d9a266d08d0a14"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-ferret-cifar10_r18_trades-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_trades-s2/outputs/train/sample-stats-train.parquet",
+              "sha256": "a9a655f17a62e2f6b0f596111dc05481a1eda95931c4072670bf3719884abf69"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T18:32:04.048210+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades-s2/train/run-bundle/manifest.json",
+          "manifest_sha256": "a33d63fa4fbe62c52ab7a4938f5037493b8840c779257c04aab4e48c125fee07",
+          "run_id": "adr-campaign-v1-ferret-cifar10_r18_trades-s2",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.468999981880188,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "c00bc3d658df4fed7325e2bebfb5089a205fb4546e0abf5769209e65d40e13ec",
+            "clean_accuracy": 0.7984,
+            "pgd_accuracy": 0.5055
+          },
+          "last": {
+            "autoattack_accuracy": 0.45799997448921204,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "af19f4467ad8a10c467ac235b58c5bf72183de3bb84d3b38b98d95023701a671",
+            "clean_accuracy": 0.83,
+            "pgd_accuracy": 0.4858
+          }
+        },
+        "seed": 2
+      }
+    ],
+    "trades_49k_validation": [
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-ferret-cifar10_r18_trades_49k_validation-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_trades_49k_validation-s0/outputs/train/epoch-metrics.parquet",
+              "sha256": "1d1cbcbfbe5c76eef4fdb4783dd0f9baef1787fbe9e129ba0249d7dd5daa0b41"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-ferret-cifar10_r18_trades_49k_validation-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_trades_49k_validation-s0/outputs/train/sample-stats-train.parquet",
+              "sha256": "1863bfaac5f345c5c13420f6b0b3a96851955342f34b450613612ef906bd00b3"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-09T18:11:42.369653+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades_49k_validation-s0/train/run-bundle/manifest.json",
+          "manifest_sha256": "294fab2936af56f3a5914c46b270d5e358a46173250acc045332517934b41f8c",
+          "run_id": "adr-campaign-v1-ferret-cifar10_r18_trades_49k_validation-s0",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": null,
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4763999879360199,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "391919379fd4dea5e3c10da8615cd307796746af486b1f5f06b64d0aae572bfb",
+            "clean_accuracy": 0.7985,
+            "pgd_accuracy": 0.5119
+          },
+          "last": {
+            "autoattack_accuracy": 0.46369999647140503,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "dd56637f81f92baff9bf5b30ca138ceb09901de6eb5c5a28e964c5fcf5c0d9a6",
+            "clean_accuracy": 0.8287,
+            "pgd_accuracy": 0.4899
+          }
+        },
+        "seed": 0
+      }
+    ],
+    "trades_adr": [
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-cifar10_r18_trades_adr-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s0/train/epoch-metrics.parquet",
+              "sha256": "6a725b7835ea0475975bc928b3909b0e9e5f09e69441506ff492c1cc0c644a88"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-cifar10_r18_trades_adr-s0",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s0/train/sample-stats-train.parquet",
+              "sha256": "ed200536ec2d4f0dc740d9a8b347089aa012a272c00bde154b045ebcf8a9a690"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T00:30:05.571529+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s0/train/run-bundle/manifest.json",
+          "manifest_sha256": "fd76674a2b961d7d5df2f193f6fb40f5e71b8fcd0e3d8b7307038a3dd9e19d77",
+          "run_id": "adr-campaign-v1-cifar10_r18_trades_adr-s0",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.49539998173713684,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "095f2046c0eb015c97843b68a44dc1d1a553309c577c6ef2b407c42ca32e4b3e",
+            "clean_accuracy": 0.8357,
+            "pgd_accuracy": 0.5401
+          },
+          "last": {
+            "autoattack_accuracy": 0.483599990606308,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "16eb791e54742f98da19b9ec51d5cb8fc9d4c58aec0ad587a92363ff5e1a696e",
+            "clean_accuracy": 0.8393,
+            "pgd_accuracy": 0.5304
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4918999969959259,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "0c441422c9340826f7eabc57fea9b7aa7a7c77f4d4400906cf410a89d6dcb360",
+            "clean_accuracy": 0.8368,
+            "pgd_accuracy": 0.5373
+          },
+          "last": {
+            "autoattack_accuracy": 0.4810999929904938,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "16eb791e54742f98da19b9ec51d5cb8fc9d4c58aec0ad587a92363ff5e1a696e",
+            "clean_accuracy": 0.8372,
+            "pgd_accuracy": 0.5279
+          }
+        },
+        "seed": 0
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-ferret-cifar10_r18_trades_adr-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_trades_adr-s1/outputs/train/epoch-metrics.parquet",
+              "sha256": "7acd25981887b5630c6bad16489f35db851bb883b55114127b09ad15c2e59924"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-ferret-cifar10_r18_trades_adr-s1",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_trades_adr-s1/outputs/train/sample-stats-train.parquet",
+              "sha256": "379255e25d3753ccf16fecc07b092a8e1ce6e35ac6512a071baf1485993723b8"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T02:15:04.433772+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s1/train/run-bundle/manifest.json",
+          "manifest_sha256": "b00bbc65c7b338ec8e603177884d041cdc9141c4cafd6a1e5ddb26778235f756",
+          "run_id": "adr-campaign-v1-ferret-cifar10_r18_trades_adr-s1",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.4948999881744385,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "6b6b6d14734a386c4463f9950c17b364134215d7a344cd982c377ab80ca71373",
+            "clean_accuracy": 0.8274,
+            "pgd_accuracy": 0.5399
+          },
+          "last": {
+            "autoattack_accuracy": 0.47689998149871826,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "016a2bc133702343ed3d9709c0b436180020632a8005649bc341d3b851765627",
+            "clean_accuracy": 0.838,
+            "pgd_accuracy": 0.519
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.484499990940094,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "bbf560c5e0ca625995113b767fa7172dcc9d362db25052ac2ae6e63fd8ed6785",
+            "clean_accuracy": 0.8188,
+            "pgd_accuracy": 0.5308
+          },
+          "last": {
+            "autoattack_accuracy": 0.47679999470710754,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "016a2bc133702343ed3d9709c0b436180020632a8005649bc341d3b851765627",
+            "clean_accuracy": 0.8366,
+            "pgd_accuracy": 0.5183
+          }
+        },
+        "seed": 1
+      },
+      {
+        "bundle": {
+          "artifacts": [
+            {
+              "name": "epoch-metrics-adr-campaign-v1-ferret-cifar10_r18_trades_adr-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_trades_adr-s2/outputs/train/epoch-metrics.parquet",
+              "sha256": "3c68312b651f708fab1aa61bbd656824aae5f6441b31b050c35c000ed4f47633"
+            },
+            {
+              "name": "sample-stats-adr-campaign-v1-ferret-cifar10_r18_trades_adr-s2",
+              "path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-campaign-v1-ferret-cifar10_r18_trades_adr-s2/outputs/train/sample-stats-train.parquet",
+              "sha256": "a30c84b53596aed09bfc13643e4d056a0df3c20b70581cdb4b2ba925730d80ae"
+            }
+          ],
+          "execution": {
+            "batchnorm_mode": "local_per_rank",
+            "effective_global_batch_size": 128,
+            "global_batch_size": 128,
+            "per_rank_batch_size": 128,
+            "world_size": 1
+          },
+          "finished_at": "2026-09-10T09:08:47.691187+00:00",
+          "manifest_path": "/home/islab/workspace-local/shunsuke.naito/ard-runtime/ard_codex_bootstrap/runs/adr-cifar10-campaign-v1/cifar10_r18_trades_adr-s2/train/run-bundle/manifest.json",
+          "manifest_sha256": "c74e05767ad968fe8dc9505e4664323ebd57d9d547c39e6ab79dbe494e1e72ef",
+          "run_id": "adr-campaign-v1-ferret-cifar10_r18_trades_adr-s2",
+          "source_git_sha": "cd0b571e4685fbe02d7655a22b06397c7b8d9a28"
+        },
+        "ema": {
+          "best": {
+            "autoattack_accuracy": 0.49459999799728394,
+            "checkpoint_filename": "best-ema.pt",
+            "checkpoint_sha256": "85f9176ec30008514534da303eeab5a458d9fbbf88a3153b09f75080f0336dce",
+            "clean_accuracy": 0.8302,
+            "pgd_accuracy": 0.5436
+          },
+          "last": {
+            "autoattack_accuracy": 0.4821999967098236,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "f7ab5d70686bf17015ccbd89c5b09ad0ec7d6477a2d20c53f8cc67f25d41c6a4",
+            "clean_accuracy": 0.8394,
+            "pgd_accuracy": 0.5239
+          }
+        },
+        "kind": "fresh_run",
+        "model": {
+          "best": {
+            "autoattack_accuracy": 0.4854999780654907,
+            "checkpoint_filename": "best.pt",
+            "checkpoint_sha256": "6afc68a81c4898b83fefac21bd431df7350bec5f8c63e5400ff64c5a6d5d0040",
+            "clean_accuracy": 0.8314,
+            "pgd_accuracy": 0.5296
+          },
+          "last": {
+            "autoattack_accuracy": 0.48089998960494995,
+            "checkpoint_filename": "last.pt",
+            "checkpoint_sha256": "f7ab5d70686bf17015ccbd89c5b09ad0ec7d6477a2d20c53f8cc67f25d41c6a4",
+            "clean_accuracy": 0.8417,
+            "pgd_accuracy": 0.5242
+          }
+        },
+        "seed": 2
+      }
+    ]
+  },
+  "schema_version": 1,
+  "source_git_sha": "836b3aef02e76a788a3f0f09082958ace61ccadf",
+  "stop": "this contract measures three seeds (one pilot arm at one seed) at one protocol family; it authorizes no promotion, no ImageNet launch, and no method claim beyond the preregistered sign comparison -- see the plan's preregistered decision rule for the full scope"
+}

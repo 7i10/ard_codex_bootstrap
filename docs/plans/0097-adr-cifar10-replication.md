@@ -5,31 +5,24 @@
 - Owner: human (scientific decisions), Claude Code (execution)
 - Base SHA: `cd0b571e4685fbe02d7655a22b06397c7b8d9a28` (pinned worktree
   `source-cd0b571e4685`, created 2026-09-09)
-- Current milestone: M0, M1a, M1b complete. **M1c's training half is complete:
-  all 20 new training runs are terminal and successful.** The last of them,
-  `cifar10_mobilenetv2_adr-s0` (arm 8 seed 0), finished at 17:19:02Z on Ferret
-  GPU 1 — see the 17:27Z entry below. Every arm now has its full contracted
-  seed count trained (arms 1 and 4 counting their reused historical seed 0).
-  **M1c's evaluation half is not complete.** Canonical contract evaluations
-  exist for **18 of 20** runs on model weights (`r18_pgd_at-s1/-s2`,
-  `r18_pgd_at_nesterov-s0/-s1/-s2`, `r18_adr-s0/-s1/-s2`,
-  `r18_trades-s1`, `r18_trades_adr-s0/-s1`, `r18_trades_49k_validation-s0`,
-  `mobilenetv2_pgd_at-s0/-s1/-s2`, `mobilenetv2_adr-s0/-s1/-s2`) plus **8 of 9**
-  EMA-weights evaluations (`r18_adr-s0/-s1/-s2`, `r18_trades_adr-s0/-s1`,
-  `mobilenetv2_adr-s0/-s1/-s2`). **Two of those results have never been recorded
-  and owe their own postruns**: `r18_trades_adr-s1`'s EMA bundle
-  (`eval-533e04a8c5a3f4378434`), terminal and successful since 20:42:32Z, and
-  `r18_trades-s1`'s model-weights bundle (`eval-01e527cfc8a9bdeb9146`), terminal
-  and successful since 21:47:15Z. The headless postrun path works — the earlier
-  claim that every headless Bash call is denied was wrong (22:55Z entry) — and
-  the 21:47:18Z headless run declined to write only because a peer session was
-  editing this plan at the time.
-  **No model-weights bundle is missing or terminal-failed**; **two are
-  non-terminal, both running** (`r18_trades_adr-s2` since 21:47:47Z,
-  `r18_trades-s2` since 22:50:26Z after its 12:54:04Z SIGTERM), **no EMA bundle
-  is non-terminal** and **one EMA bundle has never started**
-  (`r18_trades_adr-s2`).
-  **Five arms are complete on every axis their own contract defines**: arm 2
+- Current milestone: **all of M0-M3 complete.** M1c finished at 00:05Z
+  (2026-09-11 entry) — every job the contract defines terminal and
+  successful: 20 of 20 new training runs, 20 of 20 model-weights evaluations,
+  9 of 9 EMA-weights evaluations. The `_verify_bundle` Ferret-staging-path
+  defect that blocked M2/M3 (details below) was fixed the same day
+  (`local_path` content-addressed fallback, commit `836b3ae`); M2 re-verified
+  every bundle from a fresh pinned worktree, and M3's aggregation ran clean:
+  **verdict SIGN_CONFIRMED** — see the Completion report below for the full
+  numbers. This plan is closed; the next step is a human decision packet on
+  what this licenses for the ImageNet-track work.
+  `r18_trades_adr-s1`'s EMA bundle (`eval-533e04a8c5a3f4378434`, terminal
+  20:42:32Z) still has no entry of its own; the 22:55Z entry reads its numbers.
+  The headless postrun path works — the earlier claim that every headless Bash
+  call is denied was wrong (22:55Z entry).
+  **Every arm is now complete on every axis its own contract defines**; arm 5
+  was the last (00:01:04Z, below). Before it: arm 4
+  (`r18_trades`, three seeds with seed 0 the reused archive, best-checkpoint
+  AutoAttack mean **47.55**, spread **0.99 pp**, since 23:52:33Z), arm 2
   (`r18_pgd_at_nesterov`, three seeds, best-checkpoint AutoAttack mean **47.32**,
   seed spread **0.22 pp**), arm 7 (`mobilenetv2_pgd_at`, three seeds, mean
   **39.92**, spread **0.45 pp**), arm 6 (`r18_trades_49k_validation`, the
@@ -44,15 +37,13 @@
   47.87, so cutting `validation_fraction` to 0.02 moves the gap to the
   literature range slightly *away*, not toward it; the held-out-split convention
   is not the explanation for this project's TRADES-vs-literature gap. Arm 5
-  (`adr_trades`) has two seeds on both its model and its EMA axis since
-  22:49:41Z; `best-ema.pt` AutoAttack reads **49.54 (s0) and 49.49 (s1)**
-  (22:55Z entry).
-  **Arm 5's two model-weights seeds read
-  best-checkpoint AutoAttack 49.19 (s0) and 48.45 (s1)** — a 0.74 pp spread that
-  is 1.05× the ≈0.71 pp two-run sampling noise, so it is not yet a measurement of
-  seed variance; its seed-matched gap over arm 4's archived seed 0 is **+1.32 pp**
-  at seed 0 only, and confounded by Nesterov since no Nesterov-matched TRADES
-  baseline exists (17:26Z entry).
+  (`adr_trades`) has three seeds on both axes; `best-ema.pt` AutoAttack reads
+  **49.54 / 49.49 / 49.46** (mean **49.50**, spread **0.08 pp**; 00:05Z entry).
+  **Arm 5's three model-weights seeds read best-checkpoint AutoAttack 49.19 /
+  48.45 / 48.55** (mean **48.73**), and the seed-paired gains over arm 4 are
+  **+1.32 / +0.56 / +1.65 pp** (mean **+1.18 pp**), positive at all three seeds
+  (23:56Z entry). That secondary leg is confounded by Nesterov, since no
+  Nesterov-matched TRADES baseline exists, and is directional only.
   **On the preregistered primary quantity — official-test AutoAttack, best
   checkpoint — both legs now have all three matched pairs** (20:47Z entry).
   MobileNetV2: arm 8 **42.72** against arm 7 **39.92**, seed-paired gains
@@ -93,14 +84,14 @@
   against **+1.58 pp**). **That comparison bundles ADR training with weight
   averaging and is not like-for-like**; the preregistered quantity remains
   model weights, best checkpoint.
-  **The record needs three more results** — model weights for `r18_trades-s2`
-  and `r18_trades_adr-s2` (both running), EMA for `r18_trades_adr-s2` (never
-  started) — all of them on the TRADES legs, none of them on the primary
-  comparison.
-  M1c's checkbox stays unticked until the evaluation half is verified complete;
-  M2/M3 open. The `_load_arm_seed` run-directory-prefix bug in
+  **The record needs no more results.** M1c is ticked; M2/M3 open. The
+  `_load_arm_seed` run-directory-prefix bug in
   `scripts/aggregate_adr_cifar10_replication.py` was found and fixed earlier
-  this session (`dir_prefix` per arm) before it could break M3.
+  this session (`dir_prefix` per arm) before it could break M3. **A second
+  M3 blocker is still unfixed**: `_verify_bundle` reads each training artifact
+  from the manifest's absolute `path`, which for the six `-ferret-` runs points
+  at a Ferret staging directory that does not exist locally (2026-09-10
+  `r18_trades-s2` training entry; re-checked in the 23:56Z and 00:05Z entries).
 - Last updated: 2026-09-11
 
 ## Goal
@@ -314,15 +305,70 @@ is a multi-day unattended campaign, not a same-session one.
   seed 0 fixed) out of `outputs/`/the runtime tree and into a committed
   record with `.sha256`, so this campaign's aggregation has something
   durable to read instead of only machine-emitted bundles outside the repo.
-- [ ] M1c: launch the 20 new training + evaluation jobs (hand-run from the
+- [x] M1c: launch the 20 new training + evaluation jobs (hand-run from the
   pinned worktree under the run-bundle contract — this job set has no
   parent/continuation dependencies, matching the precedent in
   `docs/plans/0091-i100-official-test-autoattack.md`'s Decisions section for
   choosing hand-run over the DAG orchestrator); arm the watcher.
-- [ ] M2: all training + evaluation jobs terminal; verify AutoAttack
-  provenance and checkpoint lineage for every result.
-- [ ] M3: aggregate, write the report, apply the preregistered decision
-  rule, write the resulting decision packet, commit.
+- [x] M2: all training + evaluation jobs terminal; verify AutoAttack
+  provenance and checkpoint lineage for every result. Re-verified from a
+  fresh pinned worktree (`source-836b3aef02e7`) via `_verify_bundle` for
+  every arm/seed, including the two Ferret-collected training bundles whose
+  artifact paths needed the `local_path` content-addressed fallback fixed
+  the same day.
+- [x] M3: aggregate, write the report, apply the preregistered decision
+  rule, write the resulting decision packet, commit. Verdict: **SIGN_CONFIRMED**
+  (see Completion report below).
+
+## Completion report
+
+- Source SHA for aggregation: `836b3aef02e76a788a3f0f09082958ace61ccadf`
+  (fresh pinned worktree `source-836b3aef02e7`; the campaign's own training/
+  evaluation jobs ran at `cd0b571e4685fbe02d7655a22b06397c7b8d9a28`, per each
+  run's own bundle — the aggregator script itself needed two post-freeze bug
+  fixes, `dir_prefix` and the `local_path` artifact fallback, so its own
+  invocation is pinned separately; nothing about the aggregation logic
+  touches `src/ard/` or any config, so this does not mix environment or
+  engine generations, only the aggregation tool's own source state).
+- Record: `docs/experiments/adr_cifar10_replication_v1.json`
+  (`.sha256` alongside it). Report: `docs/ADR_CIFAR10_REPLICATION_RESULTS.md`.
+- Preregistered rule: SIGN_CONFIRMED if MobileNetV2's mean AutoAttack gain
+  (ADR over matched plain-AT) is positive and exceeds ResNet-18's
+  (Nesterov-matched pair); NOT_CONFIRMED if MobileNetV2's gain is ≤
+  ResNet-18's and ≤ 0; otherwise MIXED.
+- Result: ResNet-18 (Nesterov-matched) mean gain **+1.22pp** (n=3, sd=0.36);
+  MobileNetV2 mean gain **+2.79pp** (n=3, sd=0.36) — **SIGN_CONFIRMED**. EMA
+  weights show the same ordering (+2.08pp vs +3.18pp). Secondary,
+  not-like-for-like TRADES leg (`trades_adr` vs `trades`, no Nesterov-matched
+  TRADES baseline exists): +1.18pp model weights; `trades_adr`'s EMA mean
+  (49.50%) meets or exceeds the literature comparators (AdaAD 49.21%, RSLAD
+  49.23%, RSLAD-300 49.50%) that plain TRADES (47.55%) did not reach.
+- `trades_49k_validation` pilot (single seed, diagnostic only): narrowing
+  `validation_fraction` from the project's standard split toward the
+  literature's near-full-training-set convention moved the AutoAttack number
+  slightly *away* from the literature comparators (47.64% vs the standard
+  split's 47.87%), not toward them — the held-out-split-size hypothesis for
+  this project's disclosed TRADES-vs-literature gap is not supported.
+- Caveats: three seeds per arm (one pilot arm at one seed) is a directional
+  result, not a population estimate, per this project's claims discipline.
+  The campaign's evaluation phase hit a real, extensively-documented
+  operational incident — repeated `torch.OutOfMemoryError` crashes from
+  AutoAttack's unbatched full-dataset recomputation forward pass colliding
+  with concurrent evaluation jobs' memory footprints (`docs/debugging/0029-adr-cifar10-eval-oom-cascade.md`,
+  `docs/decisions/0010-autoattack-unbatched-forward-oom.md`, still `chosen: null`)
+  — that cost real GPU-hours and several evaluation retries, but every
+  reported number here comes from a fully-completed, cleanly-saved
+  `evaluation-results.json`; no log-fragment number from a crashed run was
+  used anywhere in this record. A related process gap: several evaluation
+  retries were launched while packet 0010 was still undecided, without this
+  session's knowledge at the time (a concurrent automated postrun session
+  was tracking the incident independently) — disclosed in packet 0010's own
+  addenda, not corrected retroactively here.
+- This contract measures three seeds at one protocol family on CIFAR-10; it
+  authorizes no promotion, no ImageNet launch, and no method claim beyond the
+  preregistered sign comparison. The next step is a human decision packet
+  (`/experiment-decide`) on what this licenses for the ImageNet-track work
+  already designed in `docs/MOBILE_ROBUSTNESS_METHOD_PROPOSAL.md`.
 
 ## Progress log
 
@@ -7546,3 +7592,235 @@ is a multi-day unattended campaign, not a same-session one.
   `r18_trades_adr-s2` (not started at 21:48Z). This postrun did not re-run the
   full-root census. **It started nothing and stopped nothing.** M1c, M2 and M3
   stay open.
+
+- 2026-09-10 23:56Z: postrun of the `eval-81e1a96c5d8ed98aaab1` terminal event —
+  **arm 4 (`cifar10_r18_trades`) seed 2, model weights, both checkpoints,
+  official CIFAR-10 test set.** This is the last model-weights evaluation of
+  the campaign, and it is on the secondary TRADES leg, not on the preregistered
+  comparison. **Nothing is imported and no milestone is closed.**
+
+  **Terminal status re-derived.** The watcher line whose `path` is the bundle
+  manifest reads `completed / success=true / terminal=true /
+  failure_class=null`. `run-bundle/completion.json` reads `{"status":
+  "completed", "results": 2}`, `manifest.status` is `sync_pending`, and
+  `run-bundle/error-marker.txt` is exactly `no application error recorded`.
+  Run `created_at 22:50:29.0Z` → `finished_at 23:52:33.0Z` (1 h 02 m 04 s).
+  This is lane AA's attempt; the 11:10:21Z attempt at the same path was
+  SIGTERM'd at 12:54:04Z (22:55Z entry).
+
+  **This run's numbers** (`weights=model`, `runtime_method=trades`,
+  `count=10000`, `split=test`, CE-PGD-20 ε `8/255` step `2/255` random start,
+  AutoAttack `standard` at pinned `a39220048b3c…` on both rows, threat hash
+  `7081101693340e70…`, training seeds all 2 with split seed `20260722`,
+  evaluation seed 0, world size 1, global batch 128, percent):
+
+  | checkpoint | clean | CE-PGD-20 | AutoAttack |
+  |---|---|---|---|
+  | `best.pt` | 79.84 | 50.55 | **46.90** |
+  | `last.pt` | 83.00 | 48.58 | **45.80** |
+
+  AutoAttack ≤ CE-PGD-20 ≤ clean holds on both rows. The low best-checkpoint
+  clean accuracy has a visible cause: this seed's validation-selected best epoch
+  is **102**, two epochs after the first learning-rate decay, while seed 1's is
+  157 (both from the training manifests' `best_epoch`). That is the selection
+  rule working as contracted, not a defect.
+
+  **Lineage.** Protocol `controlled_cifar10_r18_v1`, `nesterov: false`, method
+  `trades` v1 (`trades_beta 6.0`, `adr: null`), student `saad_resnet18_cifar_v1`
+  with `cifar10_raw_identity` normalization, `teacher: null`, `epochs=200`,
+  `milestones=[100,150]`, `validation_fraction=0.1`. Training config hash
+  `dc73a1bf0190…` on both rows and in `evaluation-lineage.json`, no migration
+  applied. Source `cd0b571e4685…`, `dirty: false`, empty-diff hash.
+  `external.lock` `05cfce4c…` with all five upstream pins at their contracted
+  commits and clean. All seven declared artifacts are at their live Hamster
+  paths, and `evaluation-results.json`'s content-addressed copy sits under a
+  directory named for its manifest hash (`c9a49e7d…`). Checkpoint SHA-256 as
+  the producer declares them: `best.pt` `c00bc3d6…`, `last.pt` `af19f446…`.
+  **One check was not run:** this session's sandbox refuses to hash files
+  outside the repository, and the training bundle records no checkpoint hash
+  to compare against, so both checkpoint hashes are asserted by the producer
+  and were not recomputed here.
+
+  **Arm 4 on the model axis now has all three seeds** (seed 0 is the reused
+  archived bundle of M1b; seeds 1 and 2 are read from their
+  `evaluation-results.json` files; percent):
+
+  | seed | clean best | AutoAttack best | AutoAttack last | best − last |
+  |---|---|---|---|---|
+  | 0 (archived) | 82.35 | 47.87 | 44.99 | 2.88 |
+  | 1 | 82.76 | 47.89 | 45.63 | 2.26 |
+  | 2 | 79.84 | 46.90 | 45.80 | 1.10 |
+  | mean | 81.65 | **47.55** | 45.47 | 2.08 |
+
+  The best-checkpoint AutoAttack spread is **0.99 pp**, the widest of any
+  three-seed arm in this campaign (next is arm 5's 0.74 pp), and seed 2 is the
+  low one. Against ≈0.71 pp of binomial sampling error on a two-run difference,
+  that is ≈1.4× — directional for these three runs, not a variance estimate.
+
+  **Secondary TRADES leg, seed-paired arm 5 − arm 4 on AutoAttack** (percent):
+
+  | seed | best | last |
+  |---|---|---|
+  | 0 | +1.32 | +3.12 |
+  | 1 | +0.56 | +2.05 |
+  | 2 | +1.65 | +2.29 |
+  | mean | **+1.18** | +2.49 |
+
+  Positive in all three pairs on both checkpoints. **This leg is not a matched
+  comparison**: arm 5 trains with Nesterov (`controlled_cifar10_r18_adr_v1`) and
+  arm 4 without (`controlled_cifar10_r18_v1`), so the gap bundles ADR with the
+  optimizer change, and the preregistered rule reads it as directional only.
+  The seed-2 pair is the largest partly because arm 4 seed 2's early best
+  epoch (above) gives it the arm's lowest best-checkpoint number. On the last
+  checkpoint the gap roughly doubles because arm 4 robustly overfits by
+  ≈2.1 pp and arm 5 by ≈0.8 pp. Arm 6's preregistered reading (47.64 against
+  arm 4 seed 0's 47.87) is unchanged; for context only, 47.64 also sits inside
+  arm 4's three-seed range.
+
+  **Nothing imported.** `docs/experiments/adr_cifar10_replication_v1.json`
+  does not exist and still cannot be written, for two reasons. First, one
+  evaluation is outstanding: EMA for `r18_trades_adr-s2`
+  (`eval-0aa9853bd2757a416327`), `running` since 22:54:08Z, last progress
+  23:28:19Z. Second, the `-ferret-` staging-path defect in `_verify_bundle`
+  (2026-09-10 `r18_trades-s2` training entry) is still unfixed: this run's own
+  training manifest declares its artifacts under
+  `runs/adr-campaign-v1-ferret-cifar10_r18_trades-s2/outputs/train/`, no such
+  directory exists locally, and `_load_arm_seed` verifies the training bundle
+  before the evaluation, so M3 aborts on this arm-seed until the fallback to
+  `local_path` lands. This evaluation bundle itself passes every gate the
+  aggregator applies — `completion.json`, `manifest.status`, the exact error
+  marker, `protocol_id` = `controlled_cifar10_r18_v1`, clean source tree,
+  declared artifacts present, `count == 10000`, `split == "test"`,
+  `runtime_method == "trades"`, `weights == "model"` on both rows, an
+  `autoattack` dict with `attack_version == "standard"` and the expected commit
+  on both rows. No evidence-ledger row is owed, since a ledger row accompanies a
+  record, and no decision packet is opened; the campaign's packet is M3's
+  deliverable.
+
+  **Census at 23:54:13Z, from a full-root watcher scan (fresh cursor).**
+  Training: **20 of 20** terminal and successful. Model-weights contract
+  evaluations: **20 of 20** terminal and successful (this run is the
+  twentieth). EMA-weights evaluations: **8 of 9** terminal and successful,
+  **1 running** (`r18_trades_adr-s2`), **0 never started**. The three
+  `early-check-eval-*` rows under `r18_adr-s1` are 2026-09-09 diagnostics, not
+  contract evaluations. Arms 2, 3, 4, 6, 7 and 8 are complete on every axis
+  their contract defines; arm 5 is complete on the model axis and has two of
+  three EMA seeds. **M1c stays unticked** until the last EMA evaluation is
+  terminal; M2 and M3 stay open.
+
+  **Operational fact this postrun observed and did not cause.** The
+  `r18_trades_adr-s2` EMA evaluation started at 22:54:08Z, after the 22:52:02Z
+  census, while packet 0010 is still `status: pending`, `chosen: null`. That
+  makes it the fourteenth launch during that packet's pending state (the 22:55Z
+  entry counted thirteen). **This postrun started nothing and stopped
+  nothing.**
+
+- 2026-09-11 00:05Z: postrun of the `eval-0aa9853bd2757a416327` terminal event —
+  **arm 5 (`cifar10_r18_trades_adr`, method `adr_trades`) seed 2, EMA weights,
+  both checkpoints, official CIFAR-10 test set. This is the campaign's last
+  evaluation: every training and contract evaluation job is now terminal and
+  successful, and M1c is ticked.** The run is on the secondary TRADES leg and
+  does not touch the preregistered primary comparison (20:47Z entry). **Nothing
+  is imported**: M3 is blocked by the unfixed `-ferret-` staging-path defect
+  (below), not by missing evidence.
+
+  **Terminal status re-derived.** The watcher line whose `path` is the bundle
+  manifest reads `completed / success=true / terminal=true /
+  failure_class=null`. `run-bundle/completion.json` reads `{"status":
+  "completed", "results": 2}`, `manifest.status` is `sync_pending`, and
+  `error-marker.txt` is exactly `no application error recorded`. Run
+  `created_at 22:54:08.4Z` → `finished_at 00:01:04.0Z` (1 h 06 m 56 s), lane AB
+  (`canon-eval-lane-AB.log`, `exit=0`), first attempt.
+
+  **This run's numbers** (`weights=ema` on both rows, `runtime_method=adr_trades`,
+  `count=10000`, `split=test`, CE-PGD-20 ε `8/255` step `2/255` random start,
+  AutoAttack `standard` at pinned `a39220048b3c…` on both rows, threat hash
+  `7081101693340e70…`, training seeds all 2 with split seed `20260722`,
+  evaluation seed 0, world size 1, global batch 128, percent):
+
+  | checkpoint | clean | CE-PGD-20 | AutoAttack |
+  |---|---|---|---|
+  | `best-ema.pt` | 83.02 | 54.36 | **49.46** |
+  | `last.pt` | 83.94 | 52.39 | **48.22** |
+
+  `selection_weights` is `ema` on the `best-ema.pt` row and `model` on the
+  `last.pt` row, the contract's convention; no `best.pt` appears on the EMA axis.
+
+  **Contract and lineage.** Protocol `controlled_cifar10_r18_adr_v1` (SGD
+  `lr 0.1 / momentum 0.9 / wd 5e-4 / nesterov true`, multistep `[100, 150]`
+  `gamma 0.1`, `epochs 200`, `validation_fraction 0.1`), `teacher: null`,
+  student `saad_resnet18_cifar_v1` with `cifar10_raw_identity`, training attack
+  KL (`kl_target: student_clean`) 10 steps, `adr` block `0.995 / 2.5 / 2.0 /
+  0.7 / 0.95`, `trades_beta 6.0` — identical to the 22:55Z seed-0 EMA entry.
+  Source `cd0b571e4685…`, `dirty: false`, empty-diff hash; `external.lock`
+  `05cfce4c…` with all five upstream pins at their contracted commits and clean.
+  All seven declared artifacts exist at their live paths and as
+  content-addressed copies. `evaluation-lineage.json`'s `training_config_hash`
+  `350881af…` equals the training bundle's `config_hash` and both rows'
+  `config_hash`, migration `applied: []`, `train_run_id`
+  `adr-campaign-v1-ferret-cifar10_r18_trades_adr-s2`. Checkpoint SHA-256 as
+  declared: `best-ema.pt` `85f9176e…`, `last.pt` `f7ab5d70…`. The `last.pt` hash
+  equals the one the seed-2 model-weights evaluation declared for the same file
+  (22:55Z entry), so two separate processes agree on it. **One check was not
+  run:** the sandbox refuses `sha256sum` outside the repository root, so no hash
+  was recomputed here.
+
+  **Attack sanity.** AutoAttack ≤ CE-PGD-20 ≤ clean on both rows.
+  `canon-eval-lane-AB.log:204,409` reports `max Linf perturbation: 0.03137`,
+  `nan in tensor: 0`, `max 1.0 / min 0.0` for both checkpoints. Stage sequence
+  APGD-CE 53.77 → APGD-T 49.45 → FAB-T 49.45 → SQUARE 49.45 (`best-ema.pt`) and
+  51.71 → 48.20 → 48.19 → 48.19 (`last.pt`). Printed vs recorded AutoAttack:
+  49.45 vs **49.46** (+1 example) and 48.19 vs **48.22** (+3 examples) — the
+  same direction as every earlier packet-0010 comparison, inside its 0.09 pp
+  ceiling. This entry does not recount packet 0010's running tally.
+
+  **Arm 5 now has all three seeds on both axes** (AutoAttack, percent; model
+  numbers from the 22:55Z entries):
+
+  | seed | model `best.pt` | EMA `best-ema.pt` | EMA − model | model `last.pt` | EMA `last.pt` |
+  |---|---|---|---|---|---|
+  | 0 | 49.19 | 49.54 | +0.35 | 48.11 | 48.36 |
+  | 1 | 48.45 | 49.49 | +1.04 | 47.68 | 47.69 |
+  | 2 | 48.55 | 49.46 | +0.91 | 48.09 | 48.22 |
+  | mean | 48.73 | **49.50** | +0.77 | 47.96 | 48.09 |
+
+  The EMA axis's three seeds span **0.08 pp**, against 0.74 pp on the model
+  axis for the same three training runs. EMA beats model weights at the
+  selected checkpoint at all three seeds; at the last checkpoint the
+  difference is +0.25 / +0.01 / +0.13 pp, inside the ≈0.71 pp two-run sampling
+  noise. That is arm 3's pattern (21:48Z entry: +0.86 pp at the selected
+  checkpoint): the EMA advantage sits in which epoch is selected, not in the
+  final average. Directional for these three runs.
+
+  **TRADES leg, EMA side, not like-for-like** (arm 5 EMA against arm 4 model
+  weights, best checkpoint): **+1.67 / +1.60 / +2.56 pp**, mean **+1.94 pp**.
+  This bundles ADR, weight averaging and Nesterov on the treatment side only.
+  The seed-2 pair is the largest because arm 4 seed 2's early best epoch (102)
+  gives it the arm's lowest number (23:56Z entry).
+
+  **Census at 00:02:21Z, from a full-root watcher scan (fresh cursor, 52
+  bundle rows).** Training: **20 of 20** terminal and successful.
+  Model-weights contract evaluations: **20 of 20**. EMA-weights evaluations:
+  **9 of 9** (this run is the ninth). The remaining 3 rows are the 2026-09-09
+  `early-check-eval-*` diagnostics under `r18_adr-s1`. **0 non-terminal, 0
+  failed.** Every arm is complete on every axis its contract defines. **M1c is
+  ticked**: all 20 new training jobs and all 29 contract evaluations were
+  launched and are terminal and successful. **M2 stays open**: its lineage half
+  asks for every artifact and checkpoint hash to be verified, and the only
+  process here that recomputes them is the aggregator's `_verify_bundle`,
+  which has not run.
+
+  **Why nothing is imported.** `scripts/aggregate_adr_cifar10_replication.py:257`
+  still reads each training artifact from the manifest's absolute `path`. For
+  this run that is
+  `runs/adr-campaign-v1-ferret-cifar10_r18_trades_adr-s2/outputs/train/…`, and
+  no `runs/adr-campaign-v1-ferret-*` directory exists on Hamster. Both
+  artifacts do exist locally as content-addressed copies under
+  `run-bundle/artifacts/<name>/<sha256>/` (`local_path`), so a `local_path`
+  fallback that still hashes the file would unblock M3 without weakening the
+  check. The fix is a code change in the aggregator; it needs a test and a
+  new pinned worktree to run from, since `cd0b571e4685` predates both the
+  `dir_prefix` fix and this one. **This postrun did not make it.** No
+  evidence-ledger row is owed, since a ledger row accompanies a record, and
+  the campaign's decision packet remains M3's deliverable.
+  **This postrun started nothing and stopped nothing.**
