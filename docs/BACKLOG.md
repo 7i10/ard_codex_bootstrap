@@ -78,7 +78,12 @@ Not in scope for this item: `docs/archive/ard-distillation-2026/` is named
 that deliberately, to label it as the ARD-era historical record -- it should
 keep the name it has.
 
-## B-tier item added 2026-09-10: retire `adv`, standardize on `ard-v2`
+## B-tier item added 2026-09-10: retire `adv`, standardize on `ard-v2` — **完了 2026-09-11**
+
+plan 0097 の M3（`836b3ae`）まで待ってから切り替え、参照箇所を一括修正
+（`757851f`、後日 `Makefile`・`configs/remote/ferret.example.env` の見落とし2箇所を
+`4aa8de9` で追加修正）、その後 `adv` を Hamster・Ferret 両方で完全に削除した
+（本人指示、2026-09-11）。以下は削除前の判断根拠として残す。
 
 Both hosts' default conda environment (`adv`, referenced by CLAUDE.md,
 `docs/FERRET_EXECUTION_PROTOCOL.md`, `docs/TEST_STRATEGY.md`, and every
