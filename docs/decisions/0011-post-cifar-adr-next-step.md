@@ -1,6 +1,6 @@
 ---
 id: 0011
-status: pending
+status: decided
 created: 2026-09-11
 campaign: adr-cifar10-campaign-v1
 question: plan 0097's preregistered CIFAR-10 comparison returned SIGN_CONFIRMED
@@ -29,8 +29,14 @@ options:
     the concurrent automated postrun session accumulated in this plan. 0
     GPU-hours.
 recommendation: B
-chosen: null
+chosen: B
 ---
+
+## 決定（2026-09-11、本人）
+
+**B を選択。** 先に Option C（decision packet 0010 を A で決定、A8 も同時実装、
+`adv` 環境の完全撤去）を片付けてから着手する。ImageNet Stage 0/1（Option A）は
+このまま保留。
 
 ## Evidence
 

@@ -1,6 +1,6 @@
 ---
 id: 0010
-status: pending
+status: decided
 created: 2026-09-10
 campaign: adr-cifar10-campaign-v1（plan 0097、`cifar10_r18_adr-s2` の
   model 重み評価 `eval-5709dc2e3701675af39e` が AutoAttack 内の CUDA OOM で失敗。
@@ -13,8 +13,19 @@ options:
   B: コードは変えず、空いた 4090 を 1 本ずつ専有して 3 本を取り直す。GPU 約 5.5–10 時間＋ GPU 専有の待ち時間。決まること = その 3 本の数字だけ。残り 18 本の脆弱性はそのまま。事前規則 = 1 本目が完走したら残り 2 本も同じ専有条件で流す。1 本目がまた OOM したら B を捨てて A へ。
   C: 何もせず、走行中の 7 本が terminal になるまで待ってから判断し直す。GPU 追加 0 時間。決まること = この OOM が「3 本の事故」なのか「同時実行しているかぎり必ず出る」のかが分かる。事前規則 = 7 本のうち 1 本でも同じ OOM で落ちたら A を必須とする。全部完走したら B で足りる。
 recommendation: A
-chosen: null
+chosen: A
 ---
+
+## 決定（2026-09-11、本人）
+
+**A を選択。** `autoattack.py:213` の forward を `autoattack_batch_size` でバッチ化し、
+回帰テストでバッチ版・非バッチ版の予測ラベル列が完全一致することを示す。
+A8（`torch.cuda.empty_cache()`）も同時に入れる——本 packet の 21:48Z/23:52Z 追記が
+示した通り、A と A8 は代替ではなく補完であり、どちらか一方では今回の欠陥経路は
+塞がらない。取り直しは不要（plan 0097 の全 22 run は既にクリーンな
+`evaluation-results.json` を保存済み、`docs/experiments/adr_cifar10_replication_v1.json`
+で確定済み）——この決定は今後のキャンペーン（次は decision packet 0011 の
+Option B）に向けた恒久修正である。
 
 ## 追記（2026-09-10 11:07Z）— Option C の事前規則が発火した
 
