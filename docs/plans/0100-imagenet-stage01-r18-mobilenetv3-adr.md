@@ -480,3 +480,96 @@ milestone this session.
   (Hamster's 2 GPUs) and the other 10 jobs `pending`; `ardx-watch.service`
   is `active`. `/experiment-postrun` closes this out once the watcher
   reports the campaign terminal.
+- 2026-09-12 (chat, ~90 min into attempt2): human reconsidered the pacing
+  of this plan against the project's own CIFAR-first iteration philosophy
+  (decision packets 0009/0011) and chose to restructure before committing
+  the full 7-day/338-GPU-hour budget. Rationale: only a 3-epoch canary had
+  been run against the corrected recipe (P0-1's diagnostic, epoch-25/38 LR
+  decay milestones, and the full AutoAttack evaluation pipeline against a
+  real 50-epoch checkpoint were all still unverified at full horizon), and
+  attempt2 had both Hamster GPUs running the *same* arm (`r18_adr` seeds
+  0/1) rather than covering all four arm/architecture configs first.
+  Decision: abort attempt2 and restructure to a staged design -- **stage 1:
+  4 arms x seed 0 only** (one job per arm/architecture, all four configs
+  exercised end-to-end once each) on Hamster's 2 GPUs; only after stage 1's
+  four jobs each complete a full 50-epoch run with a clean AutoAttack
+  evaluation does seed 1/2 (8 more jobs) get launched as a follow-up
+  campaign. This mirrors the human's own stated preference going forward:
+  new ImageNet-scale questions start at 1 seed / shorter horizon before
+  scaling to the full seed count, rather than committing 3 seeds x full
+  epochs from the first launch.
+  Aborted attempt2 cleanly: `kill -TERM 3559429` (controller only, verified
+  dead before touching workers -- killing a worker first risks the live
+  controller marking a job `orphaned`/`failed`, a terminal `jobs[*].status`
+  that would make `classify_campaign` (`scripts/ardx/ardx_common.py:186`,
+  read directly to confirm) declare the whole campaign `failed` and
+  fire `postrun_hook.sh`'s headless `/experiment-postrun`, which is exactly
+  what must not happen for a deliberate human abort). Then `kill -TERM
+  -3559433` / `-3559434` (negative PID = process group, confirmed via `ps
+  -o pgid` that each worker and its `run_imagenet_stage01_train.py` child
+  share one PGID, no `setsid` in between) to take down both worker+trainer
+  trees. Verified clean: no matching PID in `ps`, `nvidia-smi
+  --query-compute-apps` empty on both Hamster GPUs. `state.json` for
+  attempt2 is left as-is (still shows `r18_adr-s0`/`s1` `running` with a
+  dead `controller_pid` -- a known, harmless census artifact per
+  `ardx_common.py`; the other 10 jobs stay `pending` forever, so
+  `classify_campaign` never marks this campaign terminal and no postrun
+  automation fires). `r18_adr-s0/train` and `r18_adr-s1/train` under
+  `<runtime>/runs/imagenet-stage01-r18-mobilenetv3-adr-v1/` hold ~50 min of
+  partial checkpoints each and are abandoned, not resumed -- the stage-1
+  restructuring uses a fresh campaign id so these paths are never reused.
+  Total sunk cost: ~3 GPU-hours (2 GPUs x ~1.5h), negligible against the
+  full 338 GPU-hour budget. No source or config change; `ae4dd7c` and
+  worktree `source-ae4dd7c82d80` remain valid for stage 1. Proceeding to
+  `/experiment-launch` again with a new campaign id for stage 1 (4 jobs:
+  `r18_baseline-s0`, `r18_adr-s0`, `mobilenetv3_baseline-s0`,
+  `mobilenetv3_adr-s0`).
+- 2026-09-12: launched stage 1 (4 jobs, seed 0 only) as a fresh campaign,
+  `imagenet-stage01-r18-mobilenetv3-adr-v2`, reusing the same source SHA and
+  pinned worktree (no re-pin needed -- confirmed no scientific-core files
+  changed). Hand-authored a new campaign spec (the original 12-job spec was
+  never committed, per the launch skill's own convention of committing only
+  the plan file, and was lost with the prior session) by reverse-engineering
+  the input shape from attempt2's `resolved-manifest.json` plus
+  `.agents/skills/production-launch-gate/references/campaign-spec.md`.
+  Verified byte-for-byte before trusting it: each of the four jobs'
+  `identity_hash` in the newly resolved manifest matches attempt2's
+  corresponding seed-0 job hash exactly (`dcf21aece735...`,
+  `62f8fd07e5e7...`, `e11c6aebec78...`, `8c994d18adf9...`), confirming the
+  scientific identity (arms, attack fields, augmentation, rng, dataset,
+  epoch bounds, source SHA) is unchanged from the original 12-job contract --
+  this launch differs only in which subset of jobs runs now. Two spec bugs
+  caught and fixed in one batch before the first gate attempt: (1) a job
+  needs `config_sha256` explicitly (the gate does not auto-hash a
+  `scientific_config` role when the field is omitted, unlike mask/teacher
+  roles), confirmed by reading `validate_artifact` directly; (2) per-job
+  `rng` is not a real field -- the gate reads `rng_contract` from the
+  **top-level spec** (`spec.get("rng_contract", job.get("rng_contract"))`,
+  read directly from `launch_gate.py`), not from a job-level `rng` key.
+  Attempt1's preflight passed with both fields silently null; caught by
+  inspecting the resolved manifest rather than trusting the "pass" status
+  alone, fixed both, re-ran clean from `--preflight-only` as attempt2.
+  Attempt2's `--canary-only` then failed for an unrelated reason: the
+  static-cli `--help` smoke hit `ModuleNotFoundError: No module named
+  'ard'` -- `launch_gate.py`'s `_run_static_cli_entry` calls
+  `subprocess.run(command, cwd=job["cwd"], ...)` with no `env=` override,
+  so it inherits the gate process's own ambient environment rather than the
+  job's declared `env` dict; CLAUDE.md's own standing instruction to always
+  run this project's Python with `PYTHONPATH=src` turns out to be exactly
+  what makes this work (a *relative* `PYTHONPATH=src` resolves against
+  the child's cwd at interpreter start, which the gate sets to the
+  worktree, landing on `<worktree>/src` correctly) -- this launch simply
+  hadn't set it in-session. Fixed by exporting `PYTHONPATH=src` before
+  invoking the gate; re-ran clean from `--preflight-only` as attempt3.
+  Attempt3: preflight, dry-run, canary and launch all passed.
+  Resolved-manifest SHA-256
+  `99465e2c596b0c8d651fc4e06f31d872df24ede543384451c03c0be0f755bf2a`, gate
+  dir
+  `<runtime>/runs/imagenet-stage01-r18-mobilenetv3-adr-v2-attempt3/launch-gate`.
+  Confirmed handoff: `orchestrate.py status` shows the campaign `running`
+  with `mobilenetv3_adr-s0`/`mobilenetv3_baseline-s0` already `running`
+  (Hamster's 2 GPUs) and `r18_adr-s0`/`r18_baseline-s0` `pending` (queued
+  for the next free GPU); `ardx-watch.service` is `active`. Once all four
+  stage-1 jobs complete with a clean AutoAttack evaluation (via
+  `/experiment-postrun`), the human decides whether to launch stage 2
+  (seeds 1/2, 8 more jobs) as a follow-up campaign.
