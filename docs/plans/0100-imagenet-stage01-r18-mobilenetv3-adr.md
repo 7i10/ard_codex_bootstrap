@@ -573,3 +573,52 @@ milestone this session.
   stage-1 jobs complete with a clean AutoAttack evaluation (via
   `/experiment-postrun`), the human decides whether to launch stage 2
   (seeds 1/2, 8 more jobs) as a follow-up campaign.
+- 2026-09-13 (~24h after launch): `mobilenetv3_baseline-s0` completed
+  cleanly (`completion.json` present, `expected_outputs` all on disk).
+  `r18_adr-s0` (the orchestrated attempt) came back `failed` after only
+  ~5 seconds of execution -- root-caused from
+  `orchestration/.../r18_adr-s0.attempt-1.log`: `wandb.errors.errors.UsageError:
+  ... The value 'never' is not a valid option for resuming a run
+  (imagenet-stage01-r18_adr-s0) that already exists.` The hand-authored v2
+  spec copied `ARD_RUN_ID` verbatim from the old (aborted) v1 attempt2
+  resolved manifest without re-namespacing it to the new campaign id; since
+  `r18_adr-s0` (unlike the other three stage-1 jobs) had actually reached
+  the tracker-init step under v1 before that campaign was aborted, a W&B
+  run named `imagenet-stage01-r18_adr-s0` already existed server-side, and
+  `resume=never` refused to reuse it. A purely execution-plane naming bug,
+  not a scientific one -- the orchestrator classified it `failure_class:
+  unknown`, `retryable: false` (its classifier doesn't pattern-match this
+  W&B error, so it did not auto-retry despite `max_attempts: 2` allowing
+  one more attempt). Both remaining GPUs were occupied
+  (`mobilenetv3_adr-s0` near-finished on GPU 0 at epoch 43/49,
+  `r18_baseline-s0` freshly started on GPU 1) with nothing pending in this
+  manifest, so no orchestrated retry would occur even if it were
+  reclassified -- an idle GPU would sit unused once `mobilenetv3_adr-s0`
+  finished. Per CLAUDE.md rule 3 (infra blocking a ready campaign -> hand-run
+  from the worktree with the run-bundle contract), fixed and hand-launched
+  a replacement rather than waiting for the automated postrun's decision-packet
+  path to fire on a bug already root-caused: moved the failed attempt's
+  (checkpoint-free, tracker-init-only) output dir aside to
+  `r18_adr-s0/train.attempt1-wandb-collision-failed`, then hand-ran the
+  identical command (`run_imagenet_stage01_train.py --config
+  imagenet_r18_adr.yaml --epochs 50 --output .../r18_adr-s0/train`, same
+  worktree, same config, seed 0) with `ARD_RUN_ID` fully namespaced
+  (`imagenet-stage01-r18-mobilenetv3-adr-v2-r18_adr-s0-handrun1`) and
+  `CUDA_VISIBLE_DEVICES=0` -- deliberately co-located on GPU 0 with the
+  near-finished `mobilenetv3_adr-s0` (ample headroom, ~4-6GB used of 24GB)
+  rather than GPU 1's `r18_baseline-s0`, which has ~34 hours left; this
+  costs at most ~2-3 hours of shared throughput before GPU 0 is exclusive
+  again, versus co-locating for the full remaining ~34 hours on GPU 1.
+  Confirmed past the tracker-init failure point (alive past 28s, actively
+  running) before moving on. **Reconciliation note for
+  `/experiment-postrun`**: this campaign's orchestrated manifest
+  (`imagenet-stage01-r18-mobilenetv3-adr-v2`) will show `r18_adr-s0` as a
+  terminal `failed` job once the other two orchestrated jobs finish,
+  classifying the whole campaign `failed` -- that classification is stale.
+  The real `r18_adr-s0` result is this hand-run
+  (`ARD_RUN_ID=imagenet-stage01-r18-mobilenetv3-adr-v2-r18_adr-s0-handrun1`,
+  output at the same `r18_adr-s0/train` path, same `identity_hash` inputs:
+  config sha256 `56ed12e5f86fb1c62663d778c99da4e42ae13b2d2a5bf5994d3d046e0c83d951`,
+  seed 0, source SHA `ae4dd7c82d801ae39cfe41a89ec5427e59e202ce`) and must be
+  picked up via the hand-run path (`campaign_watch.py --include-hand-run`)
+  once it completes, not read as a campaign failure.
