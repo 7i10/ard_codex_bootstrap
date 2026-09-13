@@ -56,6 +56,11 @@ class ProtocolConfig(StrictModel):
         "synthetic_smoke_v2",
         "imagenet_stage0_dev_v1",
         "controlled_imagenet_stage01_r18_mobilenetv3_adr_v1",
+        # Plan 0101: mobile-scale clean-accuracy-floor recipe (modern
+        # checkpoint + optional epsilon warmup), deliberately a separate
+        # protocol identity from plan 0100's -- not a modification of that
+        # plan's own frozen contract.
+        "controlled_imagenet_stage01_mobilenetv4_pgd_at_v1",
     ]
 
 
@@ -409,6 +414,10 @@ class ModelConfig(StrictModel):
         "resnet50_imagenet",
         "mobilenet_v2_imagenet",
         "mobilenet_v3_small_imagenet",
+        # Plan 0101: modern (2024) mobile-scale replacement for
+        # mobilenet_v3_small_imagenet -- see registry.py's build_architecture
+        # comment.
+        "mobilenetv4_conv_small_imagenet",
         # timm's ConvNeXt-Tiny (not torchvision's -- see registry.py's
         # build_architecture comment). Registered to evaluate the
         # Singh/Croce/Hein 2023 (arXiv 2303.01870) published eps=4/255
@@ -432,7 +441,11 @@ class ModelConfig(StrictModel):
 
     @model_validator(mode="after")
     def validate_pretrained(self) -> ModelConfig:
-        if self.pretrained and self.architecture not in {"resnet18_imagenet", "mobilenet_v3_small_imagenet"}:
+        if self.pretrained and self.architecture not in {
+            "resnet18_imagenet",
+            "mobilenet_v3_small_imagenet",
+            "mobilenetv4_conv_small_imagenet",
+        }:
             raise ValueError(f"pretrained=True is not supported for architecture: {self.architecture}")
         return self
 
@@ -661,6 +674,17 @@ class TrainingConfig(StrictModel):
     # This is a protocol identity, not a performance option. Ordinary DDP
     # computes BatchNorm statistics independently on each rank.
     batchnorm_mode: Literal["local_per_rank"] = "local_per_rank"
+    # Plan 0101: linear, epoch-indexed ramp of the *training* attack's
+    # epsilon from 0 up to the method's configured target over the first
+    # ``epsilon_warmup_epochs`` epochs (Debenedetti, Sehwag, Mittal,
+    # arXiv:2209.07399; see ard.schedules.epsilon_warmup for the exact
+    # verified mechanism and this project's one deliberate deviation from
+    # it). Default None reproduces today's exact behavior -- no warmup, the
+    # full configured epsilon from epoch 0 -- for every existing config that
+    # never mentions this field. Never applied to the selection or
+    # evaluation attack, only the training attack (CLAUDE.md rule 6: the
+    # evaluated threat model never changes).
+    epsilon_warmup_epochs: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def validate_batch_identity(self) -> TrainingConfig:
@@ -669,6 +693,8 @@ class TrainingConfig(StrictModel):
         ordered = tuple(sorted(set(self.checkpoint_epochs)))
         if any(epoch < 1 for epoch in self.checkpoint_epochs) or ordered != self.checkpoint_epochs:
             raise ValueError("checkpoint_epochs must be strictly increasing positive epoch numbers")
+        if self.epsilon_warmup_epochs is not None and self.epsilon_warmup_epochs > self.epochs:
+            raise ValueError("epsilon_warmup_epochs must not exceed the total number of training epochs")
         return self
 
 

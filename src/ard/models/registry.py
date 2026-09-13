@@ -132,7 +132,11 @@ def _with_replaced_head(model: nn.Module, *, architecture: str, num_classes: int
 
 
 def build_architecture(architecture: str, num_classes: int, *, pretrained: bool = False) -> nn.Module:
-    if pretrained and architecture not in {"resnet18_imagenet", "mobilenet_v3_small_imagenet"}:
+    if pretrained and architecture not in {
+        "resnet18_imagenet",
+        "mobilenet_v3_small_imagenet",
+        "mobilenetv4_conv_small_imagenet",
+    }:
         raise ValueError(f"pretrained=True is not supported for architecture: {architecture}")
     if architecture == "saad_resnet18_cifar_v1":
         return SAADResNet18CIFAR(num_classes)
@@ -175,6 +179,26 @@ def build_architecture(architecture: str, num_classes: int, *, pretrained: bool 
             model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
             return _with_replaced_head(model, architecture=architecture, num_classes=num_classes)
         return models.mobilenet_v3_small(weights=None, num_classes=num_classes)
+    if architecture == "mobilenetv4_conv_small_imagenet":
+        # Plan 0101: MobileNetV4-Conv-Small (Howard et al./Google,
+        # arXiv:2404.10518, 2024), 3.77M params -- a modern (2024) recipe
+        # replacement for mobilenet_v3_small_imagenet's 2019-era checkpoint,
+        # adopted specifically to raise the achievable clean-accuracy
+        # ceiling before adversarial fine-tuning (plan 0100 found the old
+        # checkpoint's post-AT clean accuracy, ~46%, well below what a
+        # modern mobile-scale recipe should support). Unlike
+        # resnet18_imagenet/mobilenet_v3_small_imagenet (torchvision, needs
+        # _with_replaced_head), timm's own create_model(..., pretrained=True,
+        # num_classes=N) already replaces the classifier head correctly for
+        # N != 1000 -- no separate head-replacement branch needed. Same
+        # lazy-import precedent as convnext_tiny_imagenet below (timm is
+        # already a pinned dependency, not previously imported for a
+        # *pretrained* architecture from src/ard).
+        import timm
+
+        return timm.create_model(
+            "mobilenetv4_conv_small.e1200_r224_in1k", pretrained=pretrained, num_classes=num_classes
+        )
     if architecture == "convnext_tiny_imagenet":
         # NOT torchvision.models.convnext_tiny. Registered to validate this
         # project's AutoAttack evaluation pipeline at ImageNet scale against

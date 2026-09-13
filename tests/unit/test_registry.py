@@ -10,6 +10,7 @@ between them.
 from __future__ import annotations
 
 import pytest
+import timm
 import torch
 from pydantic import ValidationError
 from torch import nn
@@ -78,6 +79,19 @@ def test_convnext_tiny_imagenet_is_timm_not_torchvision() -> None:
     assert "head.fc.weight" in state_dict_keys
 
 
+def test_mobilenetv4_conv_small_imagenet_is_timm_not_torchvision() -> None:
+    """Plan 0101: a modern (2024) mobile-scale replacement for
+    mobilenet_v3_small_imagenet -- see registry.py's build_architecture
+    comment. Confirmed this session: 3,774,024 params (matches the paper's
+    3.8M), plain small-stride conv stem (not a patchify stem -- ConvStem,
+    Singh/Croce/Hein 2023, is deliberately not applicable here)."""
+    model = build_architecture("mobilenetv4_conv_small_imagenet", num_classes=1000)
+    assert not isinstance(model, (ResNet, MobileNetV2, MobileNetV3))
+    assert sum(p.numel() for p in model.parameters()) == 3_774_024
+    state_dict_keys = set(model.state_dict().keys())
+    assert "conv_stem.weight" in state_dict_keys
+
+
 @pytest.mark.parametrize(
     "architecture",
     [
@@ -86,6 +100,7 @@ def test_convnext_tiny_imagenet_is_timm_not_torchvision() -> None:
         "mobilenet_v2_imagenet",
         "mobilenet_v3_small_imagenet",
         "convnext_tiny_imagenet",
+        "mobilenetv4_conv_small_imagenet",
     ],
 )
 def test_imagenet_architectures_round_trip_a_native_resolution_forward_pass(architecture: str) -> None:
@@ -147,6 +162,42 @@ def test_pretrained_true_requests_the_torchvision_imagenet1k_weights(
     model = build_architecture(architecture, num_classes=1000, pretrained=True)
     assert captured["weights"] is expected_weights
     assert isinstance(model, ResNet if architecture == "resnet18_imagenet" else MobileNetV3)
+
+
+def test_mobilenetv4_pretrained_true_requests_timm_pretrained_weights(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No real download in a unit test: substitute a cheap pretrained=False
+    construction, and assert only that our own wiring asked timm for the
+    right checkpoint tag and pretrained=True -- mirroring
+    test_pretrained_true_requests_the_torchvision_imagenet1k_weights's
+    torchvision-side pattern, since mobilenetv4_conv_small_imagenet goes
+    through timm.create_model instead (registry.py's build_architecture
+    comment: timm's own pretrained=True already replaces the head
+    correctly, so unlike the two torchvision entries above there is no
+    separate _with_replaced_head call to spy on)."""
+    captured: dict[str, object] = {}
+    real_create_model = timm.create_model
+
+    def spy(name: str, *, pretrained: bool, num_classes: int):
+        captured["name"] = name
+        captured["pretrained"] = pretrained
+        captured["num_classes"] = num_classes
+        return real_create_model(name, pretrained=False, num_classes=num_classes)
+
+    monkeypatch.setattr(timm, "create_model", spy)
+    model = build_architecture("mobilenetv4_conv_small_imagenet", num_classes=1000, pretrained=True)
+    assert captured == {"name": "mobilenetv4_conv_small.e1200_r224_in1k", "pretrained": True, "num_classes": 1000}
+    assert not isinstance(model, (ResNet, MobileNetV2, MobileNetV3))
+
+
+def test_mobilenetv4_pretrained_true_replaces_the_head_for_a_non_1000_class_config() -> None:
+    """Real (small, timm-cached-after-first-download) checkpoint: timm's own
+    create_model(pretrained=True, num_classes=N) replaces the head in one
+    call, unlike the torchvision entries' separate _with_replaced_head."""
+    model = build_architecture("mobilenetv4_conv_small_imagenet", num_classes=5, pretrained=True)
+    model.eval()
+    with torch.no_grad():
+        logits = model(torch.rand(2, 3, 224, 224))
+    assert logits.shape == (2, 5)
 
 
 @pytest.mark.parametrize(

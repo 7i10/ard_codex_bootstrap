@@ -951,6 +951,7 @@ def main(argv: list[str] | None = None) -> int:
             anchor_model=anchor_model,
             adr_config=config.method.adr,
             total_iterations=total_iterations,
+            epsilon_warmup_epochs=config.training.epsilon_warmup_epochs,
             prescriptive_v3_route=(
                 "pf_retention"
                 if config.prescriptive_v3 is not None and config.prescriptive_v3.arm.startswith("PF_")

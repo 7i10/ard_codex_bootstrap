@@ -503,6 +503,20 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # adding the strict contract.
             metadata=MappingProxyType({"purpose": "imagenet_stage01_r18_mobilenetv3_adr_v1"}),
         ),
+        "controlled_imagenet_stage01_mobilenetv4_pgd_at_v1": ProtocolSpec(
+            id="controlled_imagenet_stage01_mobilenetv4_pgd_at_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0101's mobile-scale clean-accuracy-floor identity --
+            # deliberately a separate protocol from plan 0100's own
+            # (controlled_imagenet_stage01_r18_mobilenetv3_adr_v1), not a
+            # modification of that plan's frozen contract. Same rationale as
+            # that entry for omission from _validate_protocol_contract's
+            # strict CIFAR-protocol field-matching allowlist -- this plan's
+            # single config is not part of a shared-template multi-config
+            # set the way plan 0100's four configs are.
+            metadata=MappingProxyType({"purpose": "imagenet_stage01_mobilenetv4_pgd_at_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,

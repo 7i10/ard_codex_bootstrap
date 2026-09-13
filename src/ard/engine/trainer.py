@@ -30,6 +30,7 @@ from ard.policies import (
     teacher_risk_from_entropy,
 )
 from ard.schedules.cosine_value import cosine_anneal
+from ard.schedules.epsilon_warmup import epsilon_warmup_value
 from ard.schedules.gap_adaptive import GapAdaptiveState, gap_adaptive_step, lambda_from_state
 from ard.signals import (
     RobustMarginSignal,
@@ -171,6 +172,7 @@ class Trainer:
         clean_wrong_attack_skip: bool = False,
         selected_attack_epsilon: float | None = None,
         selected_attack_step_size: float | None = None,
+        epsilon_warmup_epochs: int | None = None,
         extra_clean_ce_coefficient: float | None = None,
         adversarial_bce_coefficient: float | None = None,
         adaptive_advkd_gamma: float | None = None,
@@ -301,6 +303,10 @@ class Trainer:
                 raise ValueError(f"{name} must be finite and non-negative")
         if (selected_attack_epsilon is None) != (selected_attack_step_size is None):
             raise ValueError("selected attack epsilon and step size must be supplied together")
+        if epsilon_warmup_epochs is not None and epsilon_warmup_epochs < 0:
+            raise ValueError("epsilon_warmup_epochs must be non-negative")
+        if epsilon_warmup_epochs is not None and selected_attack_epsilon is not None:
+            raise ValueError("epsilon warmup and the mixed selected-attack budget are not specified together")
         if teacher_clean_reliability_mask is not None and intervention_mask is None:
             raise ValueError("teacher reliability mask requires a selected treatment mask")
         if boundary_intervention not in {None, "pair_margin", "detached_boundary_distance", "secant_boundary_distance"}:
@@ -391,6 +397,7 @@ class Trainer:
         self.clean_wrong_attack_skip = clean_wrong_attack_skip
         self.selected_attack_epsilon = selected_attack_epsilon
         self.selected_attack_step_size = selected_attack_step_size
+        self.epsilon_warmup_epochs = epsilon_warmup_epochs
         self.extra_clean_ce_coefficient = extra_clean_ce_coefficient
         self.adversarial_bce_coefficient = adversarial_bce_coefficient
         self.adaptive_advkd_gamma = adaptive_advkd_gamma
@@ -1080,6 +1087,32 @@ class Trainer:
                         dtype=batch.images.dtype,
                     ),
                     torch.as_tensor(baseline_step, device=batch.images.device, dtype=batch.images.dtype),
+                )
+            elif self.epsilon_warmup_epochs is not None and self.current_epoch < self.epsilon_warmup_epochs:
+                # Plan 0101: linear epoch-indexed epsilon warmup (Debenedetti
+                # et al., arXiv:2209.07399; see ard.schedules.epsilon_warmup
+                # for the exact verified mechanism). Deliberately couples
+                # step size to the *current* ramped epsilon via this
+                # config's own step:epsilon ratio, not Debenedetti's
+                # fixed-at-target step size -- see that module's docstring
+                # for why. Uniform across the batch: every sample gets the
+                # same, epoch-scalar ramped budget, unlike the per-sample
+                # mixed-budget screen above (mutually exclusive with it, see
+                # __init__'s validation).
+                attack_config = getattr(self.attack, "config", None)
+                baseline_epsilon = getattr(attack_config, "epsilon_value", None)
+                baseline_step = getattr(attack_config, "step_size_value", None)
+                if baseline_epsilon is None or baseline_step is None:
+                    raise ValueError("epsilon warmup requires a resolved PGD attack with a fixed epsilon/step budget")
+                ramped_epsilon = epsilon_warmup_value(
+                    self.current_epoch, warmup_epochs=self.epsilon_warmup_epochs, target_epsilon=baseline_epsilon
+                )
+                ramped_step = (baseline_step / baseline_epsilon) * ramped_epsilon
+                epsilon_override = torch.full(
+                    (batch.images.shape[0],), ramped_epsilon, device=batch.images.device, dtype=batch.images.dtype
+                )
+                step_override = torch.full(
+                    (batch.images.shape[0],), ramped_step, device=batch.images.device, dtype=batch.images.dtype
                 )
             rectified_target = self._rectified_target(batch.images, batch.labels) if requires_rectified_target else None
             skip_selected = (
