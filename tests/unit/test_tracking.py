@@ -866,7 +866,7 @@ def test_fixed_qualitative_contract_and_run_aggregation(tmp_path: Path) -> None:
 
 def test_production_guard_accepts_auditable_tracked_dirty_state(tmp_path: Path) -> None:
     root, cfg = _lineage_repository(tmp_path)
-    validate_tracking_guard(cfg, root=root)
+    validate_tracking_guard(cfg, root=root, output_dir=cfg.output_dir)
 
 
 @pytest.mark.parametrize(
@@ -910,7 +910,62 @@ def test_production_guard_rejects_incomplete_lineage(tmp_path: Path, case: str, 
         (external / "source.txt").write_text("dirty external\n", encoding="utf-8")
 
     with pytest.raises(TrackingError, match=message):
-        validate_tracking_guard(cfg, root=root)
+        validate_tracking_guard(cfg, root=root, output_dir=cfg.output_dir)
+
+
+class _StaleRunFoundWandb:
+    class Api:
+        def run(self, path: str) -> object:
+            del path
+            return object()
+
+
+class _StaleRunMissingWandb:
+    class Api:
+        def run(self, path: str) -> object:
+            del path
+            raise RuntimeError("not found")
+
+
+class _ExplodingWandb:
+    """Proves a code path never touches wandb: any attribute access fails."""
+
+    def __getattr__(self, name: str) -> object:
+        raise AssertionError(f"must not touch wandb at all (accessed {name!r})")
+
+
+def _online_config(cfg: ExperimentConfig, *, run_id: str) -> ExperimentConfig:
+    return cfg.model_copy(update={"tracking": cfg.tracking.model_copy(update={"mode": "online", "run_id": run_id})})
+
+
+def test_online_guard_rejects_fresh_start_colliding_with_remote_run(tmp_path: Path) -> None:
+    """Decision 0004: a fresh start whose run ID already has remote history must fail in preflight."""
+    root, cfg = _lineage_repository(tmp_path)
+    cfg = _online_config(cfg, run_id="stale-run-id")
+    with pytest.raises(TrackingError, match="already has remote history"):
+        validate_tracking_guard(cfg, root=root, output_dir=cfg.output_dir, wandb_module=_StaleRunFoundWandb())
+
+
+def test_online_guard_allows_fresh_start_when_remote_run_is_absent(tmp_path: Path) -> None:
+    root, cfg = _lineage_repository(tmp_path)
+    cfg = _online_config(cfg, run_id="new-run-id")
+    validate_tracking_guard(cfg, root=root, output_dir=cfg.output_dir, wandb_module=_StaleRunMissingWandb())
+
+
+def test_online_guard_skips_remote_check_when_local_manifest_exists(
+    tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """A legitimate resume has both a local manifest and matching remote history; never query wandb for it."""
+    root, cfg = _lineage_repository(tmp_path)
+    cfg = _online_config(cfg, run_id="resumed-run-id")
+    # Outside `root`'s git tree: writing the resume manifest under output_dir must not itself
+    # trip the unrelated "production rejects untracked repository files" lineage check.
+    output_dir = tmp_path_factory.mktemp("resume-output")
+    cfg = cfg.model_copy(update={"output_dir": output_dir})
+    bundle = output_dir / "run-bundle"
+    bundle.mkdir(parents=True)
+    (bundle / "manifest.json").write_text("{}", encoding="utf-8")
+    validate_tracking_guard(cfg, root=root, output_dir=output_dir, wandb_module=_ExplodingWandb())
 
 
 def test_repro_offline_sync_fails_when_wandb_init_raises(tmp_path: Path) -> None:

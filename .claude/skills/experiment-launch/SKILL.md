@@ -35,6 +35,27 @@ campaign's `WANDB_GROUP_*` (a detached controller inherits nothing from your she
 every terminal node — training, endpoint evaluation, collection, aggregation,
 report — in this one spec before the first gate run.
 
+**Always set `state_path` explicitly**, to an absolute path under the workspace
+registry's `orchestration_root` (`configs/workspace/ard_workspace_v1.json`), e.g.
+`<orchestration_root>/<campaign_id>.state.json`. The gate's own default
+(`.orchestration/<campaign_id>.state.json`) resolves *relative to the spec
+file's own directory* — if the spec is authored under a session scratchpad
+(common when reconstructing or hand-authoring a spec), the controller's state
+lands outside every root `campaign_watch.py`/`ardx-watch.service` scans by
+default, and campaign-level postrun never fires automatically even though the
+campaign completes cleanly (confirmed recurrence: plan 0100 stage 1, both the
+original and a reconstructed spec).
+
+**Never copy `env.ARD_RUN_ID` (or any `tracking.run_id`) verbatim from a prior
+campaign's resolved manifest**, including an aborted one — the W&B run ID is a
+fixed remote identity independent of the output directory; reusing a string
+that ever reached `wandb.init` collides at start (decision 0004, recurred at
+least four times) even under a brand-new campaign ID and output path. Give
+every fresh campaign its own namespaced run IDs. `validate_tracking_guard`
+(`src/ard/tracking/adapter.py`) now catches this in preflight before any
+GPU/fork-seed work, once that fix is scientific-reviewer-approved and part of
+the pinned source SHA — but avoid triggering it in the first place.
+
 ## 4. Gate, in order, with fresh directories
 
 `GATE=<runtime>/runs/<campaign>-attemptN/launch-gate` (N = next unused attempt), plus a fresh canary output dir.

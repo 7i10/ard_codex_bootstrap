@@ -1037,7 +1037,9 @@ def coordinated_tracker_action(
     _rng_preserving_rank_zero_phase(lambda: action(tracker), phase=phase)
 
 
-def validate_tracking_guard(config: ExperimentConfig, *, root: Path) -> None:
+def validate_tracking_guard(
+    config: ExperimentConfig, *, root: Path, output_dir: Path, wandb_module: Any | None = None
+) -> None:
     """Reject incomplete tracked lineage before creating any output."""
     if config.tier not in {"repro", "pilot", "production"}:
         return
@@ -1046,6 +1048,7 @@ def validate_tracking_guard(config: ExperimentConfig, *, root: Path) -> None:
         raise TrackingError("repro/pilot/production requires a real Git HEAD for lineage")
     if config.tracking.mode not in {"online", "offline_sync"}:
         raise TrackingError("repro/pilot/production requires online or offline_sync tracking")
+    _reject_stale_remote_run_id(config, output_dir=output_dir, wandb_module=wandb_module)
     if config.tier == "pilot" and (
         not config.tracking.project or not config.tracking.entity or not config.tracking.group
     ):
@@ -1088,6 +1091,46 @@ def validate_tracking_guard(config: ExperimentConfig, *, root: Path) -> None:
             raise TrackingError("production rejects untracked repository files")
         if git["dirty"] and not git["diff"]:
             raise TrackingError("production tracked dirty state requires an exact binary diff")
+
+
+def _reject_stale_remote_run_id(
+    config: ExperimentConfig, *, output_dir: Path, wandb_module: Any | None = None
+) -> None:
+    """Fail before any GPU or fork-seed work if a fresh run's ID already has remote history.
+
+    Resume correctness in this module rests entirely on a *local* run-bundle
+    manifest (``prior`` in ``LocalTracker.__init__``); the W&B run ID is a
+    fixed string in config, independent of the output directory. Moving or
+    recreating an output directory drops the local resume evidence while a
+    same-ID remote run survives, so the next fresh start collides at
+    ``wandb.init(resume="never")`` only after GPU time and fork-seed work are
+    already spent (decision 0004, recurred at least four times). This catches
+    that exact scenario earlier, before either happens.
+    """
+    if config.tracking.mode != "online" or config.tracking.run_id is None:
+        return
+    if not config.tracking.entity or not config.tracking.project:
+        return
+    if (output_dir / "run-bundle" / "manifest.json").is_file():
+        return  # a local manifest means this is a legitimate resume; remote history is expected.
+    module = wandb_module
+    if module is None:
+        try:
+            import wandb
+
+            module = wandb
+        except ImportError:
+            return  # _start_wandb raises the authoritative "package missing" error later.
+    path = f"{config.tracking.entity}/{config.tracking.project}/{config.tracking.run_id}"
+    try:
+        module.Api().run(path)
+    except Exception:
+        return  # not found, or the check itself could not run -- no confirmed collision.
+    raise TrackingError(
+        f"W&B run {path!r} already has remote history but no local run-bundle manifest exists at "
+        f"{output_dir}; a fresh start under this run ID would collide (decision 0004) -- move the "
+        "output directory aside intentionally, or choose a new tracking.run_id"
+    )
 
 
 def _validate_robustbench_teacher_preflight(config: ExperimentConfig, *, root: Path) -> None:

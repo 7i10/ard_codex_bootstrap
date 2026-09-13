@@ -290,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
     # Only use the evaluation host's already-verified checkpoint location for
     # the local RobustBench preflight.
     preflight_config = _evaluation_preflight_config(config, training_config)
-    validate_tracking_guard(preflight_config, root=Path.cwd())
+    validate_tracking_guard(preflight_config, root=Path.cwd(), output_dir=preflight_config.output_dir)
     evaluation_dataset = config.evaluation.dataset
     training_dataset = training_config.dataset
     if (evaluation_dataset.name, evaluation_dataset.num_classes, evaluation_dataset.image_size) != (

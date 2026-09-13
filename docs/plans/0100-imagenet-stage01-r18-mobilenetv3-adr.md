@@ -622,3 +622,120 @@ milestone this session.
   seed 0, source SHA `ae4dd7c82d801ae39cfe41a89ec5427e59e202ce`) and must be
   picked up via the hand-run path (`campaign_watch.py --include-hand-run`)
   once it completes, not read as a campaign failure.
+- 2026-09-13T00:43Z: `mobilenetv3_adr-s0` completed (`/experiment-postrun`,
+  run-bundle path). Terminal re-derived via `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, 50/50 epoch rows.
+  `completion.json` (its only declared `expected_output`) present with
+  `identity_hash` `8c994d18adf9...` and source SHA `ae4dd7c82d80`, matching
+  the attempt3 resolved manifest; `best.pt`, `best-ema.pt`, `last.pt` on disk.
+  **Nothing imported**: no aggregator for this contract exists yet
+  (Verification step 5), no AutoAttack evaluation has run (step 4), and stage 1
+  is not complete (`r18_baseline-s0` and the `r18_adr-s0` hand-run still
+  training). No record, report, ledger row or milestone tick.
+  **Stop-rule check (P0-1 diagnostic)**: `train_rectified_true_class_mass`
+  fell smoothly from 0.508 (epoch 0) to 0.105 (epoch 49), flattening over the
+  last 5 epochs (0.117 -> 0.105), about 100x the 1/1000 chance level. Not the
+  preregistered stop, but see below.
+  **Internal validation only (held-out 2% slice, PGD-10; not an official
+  result, n=1)**, same arch/seed/recipe, `adr` vs `pgd_at`:
+  | run | best epoch | best clean / PGD | last clean / PGD |
+  |---|---:|---|---|
+  | `mobilenetv3_baseline-s0` (`pgd_at`) | 46 | 0.459 / 0.253 | 0.460 / 0.252 |
+  | `mobilenetv3_adr-s0` (`adr`) | 3 | 0.423 / 0.219 | 0.321 / 0.208 |
+  Both arms lose clean accuracy during warmup and the peak-LR phase (roughly
+  0.45 -> 0.27-0.33) and recover at the epoch-25 decay. `pgd_at` recovers to
+  0.46 clean after decay; `adr` only reaches 0.33. `adr`'s best checkpoint is
+  therefore a warmup-phase epoch (3), not an end-of-schedule one. A plausible
+  but unverified reading is that the late rectified target (~0.1 true-class
+  mass) under-fits, a milder form of P0-1's concern. For the human at the
+  stage-1 decision, after AutoAttack; no action taken.
+- 2026-09-13 (chat): human flagged the `adr` clean-accuracy gap as too large
+  to be seed noise and asked for root cause before stage 2. Independently
+  corroborated the automated postrun's finding above by diffing
+  `mobilenetv3_adr-s0` against `mobilenetv3_baseline-s0`'s full per-epoch
+  trajectories: the dip-then-recover shape (clean accuracy crashing during
+  the warmup/peak-LR window, epochs ~5-20, then climbing back after the
+  epoch-25 LR decay) is **identical in both arms** -- not `adr`-specific, a
+  normal consequence of fine-tuning a pretrained model through
+  `warmup_multistep`. What *is* `adr`-specific: `pgd_at` recovers essentially
+  back to its pre-dip level (45.9% clean) by epoch 45; `adr` does not
+  (32.4%, below even its own pre-dip 41-43%). This tracks
+  `train_rectified_true_class_mass` and `train_ema_student_agreement`
+  directly: from epoch 25 on, agreement rises sharply (0.58 -> 0.96) while
+  mass keeps falling (0.30 -> 0.11) through the entire recovery window --
+  consistent with a self-reinforcing loop (student/EMA-teacher converge on
+  each other's predictions; when that shared prediction under-weights the
+  true class, the rectified target's hard-label signal keeps shrinking right
+  when LR decay needs a strong corrective push). Verified `total_iterations`
+  in `src/ard/engine/trainer.py`/`ard/cli/train.py:909`
+  (`len(loader) * epochs`, real per-epoch batch count) is computed correctly
+  -- not an implementation bug in the schedule's iteration count. Flagged as
+  a real, unverified-but-plausible design interaction instead: the lambda
+  cosine anneal spans the *entire* run, so its fastest-change point (cosine
+  midpoint) falls at exactly 50% of training -- the same point as this plan's
+  first LR-decay milestone (epoch 25/50, itself proportionally scaled from
+  CIFAR's 50%/75% convention). Two independently-reasonable schedule choices
+  compound at the same epoch. Also flagged: `lambda_low/high` and
+  `temperature_high/low` are analogically transferred from the pinned ADR
+  upstream's 200-class Tiny-ImageNet setting to this plan's 1000-class
+  problem (already noted as an open assumption in the Mechanism section
+  above); softmax entropy at a fixed temperature scales with class count, a
+  plausible contributing factor to the low true-class mass, separate from
+  the schedule-interaction hypothesis. Not yet distinguishable: whether this
+  is capacity-specific (the proposal's actual hypothesis, just in the wrong
+  direction) or shared across architectures -- `r18_adr-s0`'s hand-run and
+  `mobilenetv3_adr-s0` show nearly identical `train_rectified_true_class_mass`
+  through epoch 8 (0.479 vs 0.478), so the early trajectory is not yet
+  capacity-dependent; whether R18 recovers better than MobileNetV3-Small
+  after its own epoch-25 decay is the most direct pending test and needs
+  `r18_adr-s0` to reach that epoch. On baseline health: `mobilenetv3_baseline-s0`'s
+  46% clean / ~25% training-PGD is in the expected range for this budget
+  (Salman et al. 2020's ResNet-18 -- a larger architecture -- reports 25.32%
+  official AutoAttack robust accuracy at this same epsilon; a smaller
+  MobileNetV3-Small landing near that on a weaker proxy attack is not a
+  failure). A literature survey on 2020+ SOTA for adversarially-trained and
+  standard-trained mobile-scale ImageNet architectures was launched
+  (background) to check whether this project's recipe is leaving known
+  accuracy on the table independent of the `adr`/schedule question above;
+  findings to follow in a later entry.
+- 2026-09-13 (chat): implemented decision 0004's option B (chosen
+  2026-09-08, never actually built -- confirmed by grep before this session,
+  and independently rediscovered by the automated postrun's decision packet
+  `0013` for this exact campaign's `r18_adr-s0` failure, its fourth
+  recurrence). Added `_reject_stale_remote_run_id` to
+  `validate_tracking_guard` (`src/ard/tracking/adapter.py`): when
+  `tracking.mode == "online"` and `tracking.run_id` is explicit and no local
+  `run-bundle/manifest.json` exists yet (a fresh start, not a resume), query
+  `wandb.Api().run(f"{entity}/{project}/{run_id}")` before any GPU or
+  fork-seed work; any successful lookup (remote history exists) raises
+  `TrackingError` immediately, matching this project's existing
+  dependency-injectable `wandb_module` pattern (`_start_wandb`) for
+  testability. Deliberately fails **open** on an inconclusive check (lookup
+  raises, e.g. not-found or a transient network error) rather than closed --
+  the goal is only to catch the specific known collision shape earlier, not
+  to make every online launch depend on W&B's API being reachable at
+  preflight time; a missed collision still fails exactly as before, just
+  later. Threaded a new required `output_dir` parameter through both call
+  sites (`ard/cli/train.py:674`, `ard/cli/evaluate.py:293`) and the two
+  existing tests. Added three regression tests
+  (`tests/unit/test_tracking.py::test_online_guard_*`): rejects a fresh
+  start against a remote-run-found fake wandb module, allows one against a
+  not-found fake, and proves a legitimate resume (local manifest present)
+  never touches wandb at all (`_ExplodingWandb`, any attribute access
+  raises). `scripts/verify.py --changed` green across T0/T1/T3 (61 tracking
+  unit tests, all touched integration/regression tiers). **This touches
+  `src/ard/tracking/` (W&B lineage) and needs scientific-reviewer per
+  CLAUDE.md before its SHA is frozen for stage 2** -- not yet requested.
+  Separately, fixed the recurrence vector for a second issue this session
+  surfaced (this campaign's own orchestrator `state.json` living under the
+  session scratchpad, invisible to `campaign_watch.py`'s default scan
+  roots, `docs/decisions/0013-...`'s "何が起きたか" addendum): added an
+  explicit instruction to `.claude/skills/experiment-launch/SKILL.md` step 3
+  to always set `state_path` to an absolute path under the workspace
+  registry's `orchestration_root`, and to never copy `env.ARD_RUN_ID`
+  verbatim from a prior campaign's resolved manifest. This campaign's own
+  live controller cannot be relocated retroactively; `/experiment-postrun`
+  for this campaign must pass `--state-path
+  /tmp/claude-1001/-home-islab-workspace-local-shunsuke-naito-ard-codex-bootstrap/027b5ec8-8da5-43a8-b31a-028296996632/scratchpad/.orchestration/imagenet-stage01-r18-mobilenetv3-adr-v2.state.json`
+  explicitly once `r18_baseline-s0` and the `r18_adr-s0` hand-run finish --
+  automatic discovery will not find it.

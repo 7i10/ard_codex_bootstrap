@@ -671,7 +671,7 @@ def main(argv: list[str] | None = None) -> int:
         config_hash = config_digest(resolved_config_dict(config))
 
         def _validate_output_guard() -> None:
-            validate_tracking_guard(config, root=Path.cwd())
+            validate_tracking_guard(config, root=Path.cwd(), output_dir=output_dir)
             _guard_output(output_dir, resume=args.resume, config_hash=config_hash)
             _validate_intervention_resume(args.resume, config, config_hash=config_hash)
             _validate_required_fork_resume(args.resume, config, config_hash=config_hash)
