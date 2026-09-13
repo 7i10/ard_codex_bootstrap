@@ -216,29 +216,44 @@ configured; not a combination this plan uses). Selection and evaluation
 attacks are structurally untouched (their `AttackRequest` construction in
 `validate_epoch` never sets these fields at all).
 
-### 3. New config
+### 3. New configs (two, after the P1-1 fix -- see Staged verification)
 
-`configs/scientific/imagenet_mobilenetv4_pgd_at.yaml` — same dataset,
+`configs/scientific/imagenet_mobilenetv4_pgd_at.yaml` (Stage B arm B) and
+`imagenet_mobilenetv4_pgd_at_no_warmup.yaml` (arm A) — same dataset,
 threat model, optimizer, and LR schedule as plan 0100's
-`imagenet_mobilenetv3_pgd_at.yaml`; two deltas: `student.architecture` and
-`training.epsilon_warmup_epochs: 10`. Loads and resolves end to end
-(verified this session via `ard.config.loader.load_config`).
+`imagenet_mobilenetv3_pgd_at.yaml`; deltas: `student.architecture` (both)
+and `training.epsilon_warmup_epochs` (arm B only, `: 10`; arm A leaves it
+unset). Both load and resolve end to end (verified via
+`ard.config.loader.load_config`) and are proven field-identical to each
+other and to plan 0100's config except the intended deltas
+(`tests/unit/test_config.py`).
 
 ## Tests
 
 - `tests/unit/test_epsilon_warmup_schedule.py` — hand-computed values at
-  epoch 0/mid/post-warmup, the `warmup_epochs=0` no-op case, negative-input
-  rejection.
+  the first ramp fraction/mid/last-warmup-epoch/post-warmup, the
+  `warmup_epochs=0` no-op case, negative-input rejection.
 - `tests/integration/test_epsilon_warmup_trainer.py` — fixture-scale
-  (`fixture_cnn`/`SyntheticCIFAR`, CPU), proves the trainer actually
-  threads the ramped values into the training attack only (never
-  selection), and that Option 1's coupling never trips
-  `LinfPGD.generate`'s guard, at epoch 0 and mid-ramp.
+  (`fixture_cnn`/`SyntheticCIFAR`, CPU), proves: the trainer threads exact
+  ramped values into the training attack only (never selection) at epoch
+  0 and mid-ramp; the realized perturbation (`AttackResult.max_abs_delta`)
+  stays inside the ramped ball, not the full target; an epoch at/past
+  `warmup_epochs` is indistinguishable from an unwarmed config; the
+  realized budget is reported in the epoch metrics, always, even when
+  warmup isn't configured; and the mutual-exclusivity guard against the
+  mixed-selected-attack-budget mechanism actually fires.
 - `tests/unit/test_registry.py` — new architecture builds via timm (not
   torchvision), round-trips a forward pass, `pretrained=True` requests the
-  right timm checkpoint tag (mocked, no download) and replaces the head
-  for a non-1000-class config (real, small, cached checkpoint).
-- `scripts/verify.py --changed` green across T0-T3 after every file group.
+  right timm checkpoint tag (mocked, no download, matching every sibling
+  test's discipline), replaces the head for a non-1000-class config
+  (mocked), and `pretrained=False` default still passes `pretrained=False`
+  to timm.
+- `tests/unit/test_config.py` — the two mobilenetv4 configs are field-
+  identical to each other and to plan 0100's mobilenetv3 config except the
+  intended deltas.
+- `scripts/verify.py --changed` green across T0-T3 after every file group,
+  including a real regression it caught (`test_checkpoint_resume.py`'s
+  exact-key-set assertion, updated for the two new always-on metrics).
 
 ## Staged verification
 
@@ -254,16 +269,37 @@ not a pipeline bug). Confirms the registry wiring and this project's own
 data/normalization pipeline are both correct for this checkpoint, before
 any training epoch is spent.
 
-**Stage B — cheap short canary, real GPU but bounded. Not yet launched.**
-A short (3-5 epoch) PGD-AT-only (no `adr`) adversarial fine-tuning canary
-on `mobilenetv4_conv_small_imagenet` with ε-warmup enabled, matching plan
-0100's own 3-epoch canary precedent. Compare the early clean-accuracy
-trajectory directly against MobileNetV3-Small's already-recorded epoch
-0-3 numbers (plan 0100 Progress log: baseline ~42-46%, `adr` ~41-43%) as
-the go/no-go signal. **Blocked on**: (a) the human confirming Option 1 vs.
-Option 2 above, (b) scientific review of the ε-warmup/registry/schema/
-trainer changes (requested this session, pending as of this plan's
-creation).
+**Stage B — cheap short canary, real GPU but bounded. Not yet launched.
+Redesigned this session per scientific review finding P1-1 (blocking).**
+The original single-arm design (mobilenetv4 + ε-warmup, readout against
+plan 0100's recorded epoch 0-3 numbers) was confounded: at epoch 0 of a
+10-epoch warmup, the ramped ε is a small fraction of the target (this
+project's own convention, `(epoch+1)/warmup_epochs`; see the schedule
+module's docstring), so a higher early clean accuracy there is *guaranteed
+by the weak attack itself*, independent of the architecture -- the canary
+could not tell "MobileNetV4 lifts the floor" apart from "we barely
+attacked it," and two variables (architecture, ε schedule) moved at once.
+
+**Corrected design: two arms**, both short (3-5 epoch) PGD-AT-only (no
+`adr`) canaries:
+- **Arm A** (`configs/scientific/imagenet_mobilenetv4_pgd_at_no_warmup.yaml`):
+  MobileNetV4-Conv-Small, no ε-warmup -- directly comparable to plan
+  0100's recorded MobileNetV3-Small epoch 0-3 numbers (baseline ~42-46%,
+  `adr` ~41-43%), isolating the architecture's own effect.
+- **Arm B** (`configs/scientific/imagenet_mobilenetv4_pgd_at.yaml`):
+  MobileNetV4-Conv-Small with ε-warmup -- compared against Arm A (not
+  against plan 0100) to isolate the warmup's own incremental effect on top
+  of the architecture change.
+
+Both configs verified field-identical to each other (except
+`training.epsilon_warmup_epochs` and `tracking.group`) and to plan 0100's
+`imagenet_mobilenetv3_pgd_at.yaml` (except `student.architecture`,
+`protocol.id`, and those same two fields) --
+`tests/unit/test_config.py::test_mobilenetv4_pgd_at_configs_are_field_identical_except_the_intended_deltas`.
+**Blocked on**: (a) the human confirming Option 1 vs. Option 2 above (Arm
+B only), (b) scientific review of the ε-warmup/registry/schema/trainer
+changes (requested and returned this session with one blocking finding,
+now fixed -- see Progress log).
 
 **Stage C — decision point.** Only after Stage B: decide, with the human,
 whether to commit a full 50-epoch PGD-AT run (and how many seeds) on the
@@ -278,8 +314,52 @@ This touches `src/ard/attacks/` request wiring (reusing, not adding, the
 override fields), `src/ard/config/schema.py`, `src/ard/engine/trainer.py`,
 `src/ard/models/registry.py`, and `src/ard/protocols/__init__.py`. Per
 CLAUDE.md standing rule, routed through scientific-reviewer before
-freezing a source SHA for Stage B's GPU canary. Requested this session;
-outcome to be recorded in the Progress log below.
+freezing a source SHA for Stage B's GPU canary. Ran this session; one
+blocking finding (P1-1, the Stage B design confound above) and ten
+non-blocking findings, all recorded and addressed or explicitly deferred
+below (Progress log has the full account).
+
+## Known, deliberately-not-fixed gaps (documented, not silent)
+
+- **Pretrained checkpoint is an unhashed campaign input** (review P2-5).
+  `mobilenetv4_conv_small.e1200_r224_in1k` resolves from the HF hub at run
+  time with no revision pin, and nothing records its resolved SHA-256 in
+  the run bundle -- the results-records rule wants hash-bound lineage for
+  every consumed input, and here the pretrained weights *are* the claim
+  (Stage A's 73.41%). Pre-exists for `resnet18_imagenet`/
+  `mobilenet_v3_small_imagenet` too; not fixed here (real engineering, out
+  of this plan's scope), but flagged before trusting Stage B's numbers on
+  a host with a cold cache (e.g. Ferret) -- record the cache file's
+  SHA-256 and pinned `timm` version alongside Stage B's result.
+- **Preprocessing interpolation is not this checkpoint's own default**
+  (review P2-6). timm declares `interpolation='bicubic'` for this exact
+  checkpoint tag; `ImageNetEvalTransform` resizes with torchvision's
+  default bilinear. Very likely the source of Stage A's 73.41% vs. 73.8%
+  residual, and it applies to training augmentation too. Not a bug, but an
+  explicit, recorded choice for a plan whose entire subject is the clean-
+  accuracy floor -- changing it later would also move plan 0100's own
+  numbers, so any future change here must not be silent.
+- **Config-digest churn** (review P2-9): `epsilon_warmup_epochs` entering
+  every config's hash means checkpoints written before commit `d81064d`
+  cannot resume at a SHA including it (official evaluation of old
+  checkpoints is unaffected -- confirmed by the reviewer, it hashes the
+  saved YAML directly). Same consequence plan 0100's own `pretrained`
+  field had. Operational note: resume plan 0100's own stage-1/stage-2 jobs
+  only from their own already-pinned SHA, not a SHA that includes this
+  plan's changes.
+- **The Debenedetti mechanism is reported as "inspired by," not
+  replicated** (review P2-11): `dedeswim/vits-robustness-torch` is not
+  pinned in `.external/` the way every other adopted baseline is, so this
+  plan's epoch-indexed reading of the paper's schedule could not be
+  independently re-verified against the actual upstream code in-repo.
+  Combined with the already-documented step-size and PGD-step deviations,
+  any report from this plan must say "an epsilon warmup inspired by
+  Debenedetti et al.," never "we replicated arXiv:2209.07399."
+- **Not guarded, no current impact**: combining `epsilon_warmup_epochs`
+  with `adr`/`rslad_student|joint` (per-sample EMA state and the
+  rectified target both assume a fixed threat) is not prevented by any
+  validator -- this plan doesn't use that combination, but a future plan
+  that does should add the guard first.
 
 ## Also fixed this session, unrelated to this plan's own content
 
@@ -304,3 +384,49 @@ eventual source freeze; it is not part of this plan's own scope.
   changes. Stage B intentionally not launched — needs the human's
   confirmation of the Option 1/Option 2 fork first, and the scientific
   review to land.
+- 2026-09-13 (chat, same autonomous session): scientific review returned.
+  **P1-1 (blocking)**: Stage B's single-arm design was confounded (epoch 0
+  of a 10-epoch warmup attacks at a small fraction of target ε, so a
+  higher clean accuracy there is guaranteed by attack weakness, not
+  architecture). Fixed by splitting Stage B into two arms (no-warmup vs.
+  warmup, new config `imagenet_mobilenetv4_pgd_at_no_warmup.yaml`) and
+  adding a 3-way config drift-guard test
+  (`tests/unit/test_config.py::test_mobilenetv4_pgd_at_configs_are_field_identical_except_the_intended_deltas`).
+  Ten non-blocking findings, all addressed:
+  - **P2-8** (schedule docstring wrong -- claimed to mirror
+    `warmup_multistep_multiplier` but didn't, off by one at both ends):
+    fixed the ramp formula itself to `(epoch+1)/warmup_epochs`, matching
+    that convention exactly (never exactly 0 at epoch 0, reaches target at
+    the last warmup epoch) -- this doubles as part of the P1-1 fix, since
+    it removes the fully-non-adversarial epoch-0 case entirely.
+  - **P2-1**: added `train_attack_epsilon`/`train_attack_step_size` to the
+    per-epoch metrics (`Trainer.train_epoch`/`fit`), computed once per
+    epoch, always populated. Updated the one existing test with an exact-
+    key-set assertion (`tests/integration/test_checkpoint_resume.py`).
+  - **P2-2**: added an exact-value test at epoch 0, an exact-value test
+    mid-ramp, and (the highest-priority missing case) a test proving an
+    epoch at/past `warmup_epochs` is indistinguishable from an unwarmed
+    config, via the realized `AttackResult.max_abs_delta`, not just the
+    request tensors (which correctly become `None` post-ramp, falling
+    through to the config's own resolved budget).
+  - **P2-3**: added a regression test constructing a `Trainer` with both
+    `epsilon_warmup_epochs` and `selected_attack_epsilon` set, confirming
+    the existing (previously untested) guard fires.
+  - **P2-4**: the one real-network-download unit test
+    (`test_registry.py`) now mocks `timm.create_model` like every sibling
+    test in that file; added the missing `pretrained=False` default-
+    preserving test for this architecture too.
+  - **P2-5, P2-6, P2-9, P2-11**: no code change (real engineering or
+    genuinely out of scope); recorded explicitly under "Known,
+    deliberately-not-fixed gaps" above rather than left silent.
+  - **P2-7**: superseded by the P1-1 fix's 3-way drift-guard test.
+  - **P2-10(a)**: recorded as a caveat above (no guard needed for this
+    plan's own scope). **P2-10(b)** (an `epsilon: "0"` config would hit
+    `ZeroDivisionError` instead of a clear guard message): fixed with an
+    explicit `baseline_epsilon <= 0` check raising `ValueError`, matching
+    this method's existing exception style.
+  `scripts/verify.py --changed` green again after all fixes (T0-T3,
+  including the newly-caught `test_checkpoint_resume.py` key-set
+  regression). Stage B still not launched -- still needs the human's
+  Option 1/Option 2 confirmation; the engine-change review itself is now
+  resolved.

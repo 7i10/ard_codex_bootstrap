@@ -1013,6 +1013,35 @@ class Trainer:
         # detached clean/adv teacher forwards.  One final SUM makes the
         # count telemetry global without adding a hot-loop collective.
         totals = torch.zeros(8, dtype=torch.float64, device=self.device)
+        # Plan 0101 (scientific review P2-1): the realized training-attack
+        # budget, computed once per epoch (constant across its batches) so
+        # a warmup-ramped epoch's train_robust_accuracy is not silently
+        # measured under a different threat identity than its name implies.
+        # Always populated (even without epsilon_warmup_epochs configured),
+        # from the resolved AttackConfig's own fixed values, so the metric
+        # is self-describing regardless of config.
+        epoch_attack_epsilon = 0.0
+        epoch_attack_step_size = 0.0
+        if self.epsilon_warmup_epochs is not None and self.selected_attack_epsilon is None:
+            attack_config = getattr(self.attack, "config", None)
+            baseline_epsilon = getattr(attack_config, "epsilon_value", None)
+            baseline_step = getattr(attack_config, "step_size_value", None)
+            if baseline_epsilon is None or baseline_step is None:
+                raise ValueError("epsilon warmup requires a resolved PGD attack with a fixed epsilon/step budget")
+            if baseline_epsilon <= 0:
+                raise ValueError("epsilon warmup requires a positive target epsilon")
+            if self.current_epoch < self.epsilon_warmup_epochs:
+                epoch_attack_epsilon = epsilon_warmup_value(
+                    self.current_epoch, warmup_epochs=self.epsilon_warmup_epochs, target_epsilon=baseline_epsilon
+                )
+                epoch_attack_step_size = (baseline_step / baseline_epsilon) * epoch_attack_epsilon
+            else:
+                epoch_attack_epsilon = baseline_epsilon
+                epoch_attack_step_size = baseline_step
+        else:
+            attack_config = getattr(self.attack, "config", None)
+            epoch_attack_epsilon = float(getattr(attack_config, "epsilon_value", 0.0) or 0.0)
+            epoch_attack_step_size = float(getattr(attack_config, "step_size_value", 0.0) or 0.0)
         for batch_index, batch in enumerate(loader):
             if not isinstance(batch, IndexedBatch):
                 raise TypeError("trainer requires IndexedBatch batches")
@@ -1089,30 +1118,22 @@ class Trainer:
                     torch.as_tensor(baseline_step, device=batch.images.device, dtype=batch.images.dtype),
                 )
             elif self.epsilon_warmup_epochs is not None and self.current_epoch < self.epsilon_warmup_epochs:
-                # Plan 0101: linear epoch-indexed epsilon warmup (Debenedetti
-                # et al., arXiv:2209.07399; see ard.schedules.epsilon_warmup
-                # for the exact verified mechanism). Deliberately couples
-                # step size to the *current* ramped epsilon via this
-                # config's own step:epsilon ratio, not Debenedetti's
-                # fixed-at-target step size -- see that module's docstring
-                # for why. Uniform across the batch: every sample gets the
-                # same, epoch-scalar ramped budget, unlike the per-sample
-                # mixed-budget screen above (mutually exclusive with it, see
-                # __init__'s validation).
-                attack_config = getattr(self.attack, "config", None)
-                baseline_epsilon = getattr(attack_config, "epsilon_value", None)
-                baseline_step = getattr(attack_config, "step_size_value", None)
-                if baseline_epsilon is None or baseline_step is None:
-                    raise ValueError("epsilon warmup requires a resolved PGD attack with a fixed epsilon/step budget")
-                ramped_epsilon = epsilon_warmup_value(
-                    self.current_epoch, warmup_epochs=self.epsilon_warmup_epochs, target_epsilon=baseline_epsilon
-                )
-                ramped_step = (baseline_step / baseline_epsilon) * ramped_epsilon
+                # Plan 0101: an epsilon warmup inspired by Debenedetti et al.
+                # (arXiv:2209.07399), not a faithful reproduction -- see
+                # ard.schedules.epsilon_warmup's docstring for the three
+                # deliberate deviations (epoch indexing and its exact
+                # convention, step:epsilon coupling, training PGD step
+                # count). epoch_attack_epsilon/step_size are this epoch's
+                # already-resolved, constant-across-batches values (computed
+                # once above the batch loop). Uniform across the batch:
+                # every sample gets the same, epoch-scalar ramped budget,
+                # unlike the per-sample mixed-budget screen above (mutually
+                # exclusive with it, see __init__'s validation).
                 epsilon_override = torch.full(
-                    (batch.images.shape[0],), ramped_epsilon, device=batch.images.device, dtype=batch.images.dtype
+                    (batch.images.shape[0],), epoch_attack_epsilon, device=batch.images.device, dtype=batch.images.dtype
                 )
                 step_override = torch.full(
-                    (batch.images.shape[0],), ramped_step, device=batch.images.device, dtype=batch.images.dtype
+                    (batch.images.shape[0],), epoch_attack_step_size, device=batch.images.device, dtype=batch.images.dtype
                 )
             rectified_target = self._rectified_target(batch.images, batch.labels) if requires_rectified_target else None
             skip_selected = (
@@ -1617,6 +1638,12 @@ class Trainer:
             "loss": float(totals[0].item()) / count,
             "clean_accuracy": float(totals[1].item()) / count,
             "robust_accuracy": float(totals[2].item()) / count,
+            # Plan 0101 (scientific review P2-1): the realized training
+            # attack budget this epoch actually used -- self-describing so
+            # "robust_accuracy" is never silently measured under a smaller
+            # threat during an epsilon-warmup ramp than its name implies.
+            "attack_epsilon": epoch_attack_epsilon,
+            "attack_step_size": epoch_attack_step_size,
             **observability,
             **self._boundary_epoch_stats,
         }
@@ -1817,6 +1844,11 @@ class Trainer:
                 "train_cuda_peak_reserved_bytes": train_metrics.get("cuda_peak_reserved_bytes", 0.0),
                 "train_teacher_clean_forward_calls": train_metrics.get("teacher_clean_forward_calls", 0.0),
                 "train_teacher_adversarial_forward_calls": train_metrics.get("teacher_adversarial_forward_calls", 0.0),
+                # Plan 0101 (scientific review P2-1): the realized training
+                # attack budget this epoch, self-describing regardless of
+                # whether epsilon_warmup_epochs is configured.
+                "train_attack_epsilon": train_metrics.get("attack_epsilon", 0.0),
+                "train_attack_step_size": train_metrics.get("attack_step_size", 0.0),
                 "val_clean_accuracy": validation_metrics["clean_accuracy"],
                 "val_pgd_accuracy": validation_metrics["pgd_accuracy"],
                 "learning_rate": epoch_learning_rate,

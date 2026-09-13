@@ -137,6 +137,24 @@ def test_pretrained_false_default_still_passes_weights_none(
     assert captured["weights"] is None
 
 
+def test_mobilenetv4_pretrained_false_default_still_passes_pretrained_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    """timm counterpart of test_pretrained_false_default_still_passes_weights_none
+    above (scientific review P2-4): a hardcoded pretrained=True in the
+    registry branch would otherwise be caught by nothing, since every
+    other test that reaches this architecture either doesn't set
+    pretrained=True or mocks the download away."""
+    captured: dict[str, object] = {}
+    real_create_model = timm.create_model
+
+    def spy(name: str, *, pretrained: bool, num_classes: int):
+        captured["pretrained"] = pretrained
+        return real_create_model(name, pretrained=False, num_classes=num_classes)
+
+    monkeypatch.setattr(timm, "create_model", spy)
+    build_architecture("mobilenetv4_conv_small_imagenet", num_classes=1000)
+    assert captured["pretrained"] is False
+
+
 @pytest.mark.parametrize(
     ("architecture", "constructor_name", "weights_enum"),
     [
@@ -189,10 +207,22 @@ def test_mobilenetv4_pretrained_true_requests_timm_pretrained_weights(monkeypatc
     assert not isinstance(model, (ResNet, MobileNetV2, MobileNetV3))
 
 
-def test_mobilenetv4_pretrained_true_replaces_the_head_for_a_non_1000_class_config() -> None:
-    """Real (small, timm-cached-after-first-download) checkpoint: timm's own
-    create_model(pretrained=True, num_classes=N) replaces the head in one
-    call, unlike the torchvision entries' separate _with_replaced_head."""
+def test_mobilenetv4_pretrained_true_replaces_the_head_for_a_non_1000_class_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No real download in a unit test (scientific review P2-4 -- every
+    other test in this module avoids one; a t1 tier test must not depend on
+    network access or a warm cache): substitute a cheap pretrained=False
+    construction, and assert only that timm's own create_model(pretrained=True,
+    num_classes=N) is asked to replace the head in one call, unlike the
+    torchvision entries' separate _with_replaced_head."""
+    real_create_model = timm.create_model
+
+    def spy(name: str, *, pretrained: bool, num_classes: int):
+        del pretrained
+        return real_create_model(name, pretrained=False, num_classes=num_classes)
+
+    monkeypatch.setattr(timm, "create_model", spy)
     model = build_architecture("mobilenetv4_conv_small_imagenet", num_classes=5, pretrained=True)
     model.eval()
     with torch.no_grad():

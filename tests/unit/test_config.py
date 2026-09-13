@@ -715,3 +715,55 @@ def test_the_four_imagenet_stage01_configs_are_field_identical_except_architectu
         payload["tracking"].pop("group")
         normalized.append(payload)
     assert all(candidate == normalized[0] for candidate in normalized[1:])
+
+
+def test_mobilenetv4_pgd_at_configs_are_field_identical_except_the_intended_deltas(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0101 (scientific review findings P1-1, P2-7): Stage B needs two
+    mobilenetv4 arms -- with and without epsilon warmup -- so the
+    architecture's own effect (vs plan 0100's imagenet_mobilenetv3_pgd_at.yaml)
+    can be measured in isolation from the warmup's effect (an epoch-0
+    canary of the warmed arm alone cannot tell them apart: at epoch 0 the
+    ramped epsilon is a small fraction of the target, so a higher clean
+    accuracy there is guaranteed by the weak attack, independent of the
+    architecture). controlled_imagenet_stage01_mobilenetv4_pgd_at_v1 is,
+    like plan 0100's protocol id, deliberately NOT added to
+    _validate_protocol_contract's strict field-matching allowlist --
+    nothing else enforces "identical except architecture/warmup/group"
+    over the plan's life except this test."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    mobilenetv3 = load_config(config_dir / "imagenet_mobilenetv3_pgd_at.yaml").model_dump(mode="json")
+    mobilenetv4_warmup = load_config(config_dir / "imagenet_mobilenetv4_pgd_at.yaml").model_dump(mode="json")
+    mobilenetv4_no_warmup = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(
+        mode="json"
+    )
+    # The two mobilenetv4 arms must be identical except the warmup and
+    # group -- this is the pair Stage B actually compares to isolate the
+    # warmup's own effect.
+    v4_a, v4_b = mobilenetv4_no_warmup.copy(), mobilenetv4_warmup.copy()
+    for payload in (v4_a, v4_b):
+        payload["tracking"] = {**payload["tracking"], "group": None}
+        payload["training"] = {**payload["training"], "epsilon_warmup_epochs": None}
+    assert v4_a == v4_b
+    # And both must be identical to plan 0100's mobilenetv3 config except
+    # architecture/protocol/group (warmup is separately allowed to differ,
+    # already proven equal to each other above) -- the pair that isolates
+    # the architecture's own effect.
+    for payload in (mobilenetv3, mobilenetv4_no_warmup):
+        payload.pop("protocol")
+        payload["student"] = {**payload["student"], "architecture": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+        payload["training"] = {**payload["training"], "epsilon_warmup_epochs": None}
+    assert mobilenetv3 == mobilenetv4_no_warmup

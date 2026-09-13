@@ -404,6 +404,11 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
         "train_cuda_peak_reserved_bytes",
         "train_teacher_clean_forward_calls",
         "train_teacher_adversarial_forward_calls",
+        # Plan 0101 (scientific review P2-1): the realized training attack
+        # budget, always reported regardless of whether epsilon warmup is
+        # configured.
+        "train_attack_epsilon",
+        "train_attack_step_size",
         "val_clean_accuracy",
         "val_pgd_accuracy",
         "learning_rate",

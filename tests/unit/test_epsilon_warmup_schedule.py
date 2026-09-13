@@ -5,22 +5,27 @@ import pytest
 from ard.schedules.epsilon_warmup import epsilon_warmup_value
 
 
-def test_epsilon_warmup_starts_at_zero() -> None:
-    assert epsilon_warmup_value(0, warmup_epochs=10, target_epsilon=4 / 255) == pytest.approx(0.0)
+def test_epsilon_warmup_epoch_zero_is_the_first_ramp_fraction_not_zero() -> None:
+    """Matches warmup_multistep_multiplier's convention: never exactly the
+    zero endpoint at epoch 0 (a fully-unattacked epoch would be a training-
+    time confound, scientific review P1-1/P2-8)."""
+    target = 4 / 255
+    assert epsilon_warmup_value(0, warmup_epochs=10, target_epsilon=target) == pytest.approx(target / 10)
 
 
-def test_epsilon_warmup_reaches_target_exactly_at_warmup_epochs() -> None:
-    assert epsilon_warmup_value(10, warmup_epochs=10, target_epsilon=4 / 255) == pytest.approx(4 / 255)
+def test_epsilon_warmup_reaches_target_at_the_last_warmup_epoch() -> None:
+    target = 4 / 255
+    assert epsilon_warmup_value(9, warmup_epochs=10, target_epsilon=target) == pytest.approx(target)
 
 
 def test_epsilon_warmup_matches_hand_computed_midpoint() -> None:
     target = 4 / 255
-    assert epsilon_warmup_value(5, warmup_epochs=10, target_epsilon=target) == pytest.approx(0.5 * target)
+    assert epsilon_warmup_value(4, warmup_epochs=10, target_epsilon=target) == pytest.approx(0.5 * target)
 
 
 def test_epsilon_warmup_stays_at_target_past_warmup_epochs() -> None:
     target = 4 / 255
-    assert epsilon_warmup_value(11, warmup_epochs=10, target_epsilon=target) == pytest.approx(target)
+    assert epsilon_warmup_value(10, warmup_epochs=10, target_epsilon=target) == pytest.approx(target)
     assert epsilon_warmup_value(49, warmup_epochs=10, target_epsilon=target) == pytest.approx(target)
 
 
