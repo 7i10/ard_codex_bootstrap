@@ -1038,9 +1038,24 @@ def coordinated_tracker_action(
 
 
 def validate_tracking_guard(
-    config: ExperimentConfig, *, root: Path, output_dir: Path, wandb_module: Any | None = None
+    config: ExperimentConfig,
+    *,
+    root: Path,
+    output_dir: Path,
+    wandb_module: Any | None = None,
+    check_remote_run_collision: bool = True,
 ) -> None:
-    """Reject incomplete tracked lineage before creating any output."""
+    """Reject incomplete tracked lineage before creating any output.
+
+    ``check_remote_run_collision`` must be false when ``config`` is not the
+    identity of the run about to start at ``output_dir`` -- e.g.
+    ``ard.cli.evaluate``'s own preflight call reuses the *training* run's
+    config for unrelated lineage checks (RobustBench teacher, external
+    lock, git dirty state); that training run's own W&B history is expected
+    to exist and is not a collision. Callers in that position run
+    ``reject_stale_remote_run_id`` separately, once their own fresh run's
+    real identity (run ID, output dir) is known.
+    """
     if config.tier not in {"repro", "pilot", "production"}:
         return
     git = collect_git_state(root)
@@ -1048,7 +1063,15 @@ def validate_tracking_guard(
         raise TrackingError("repro/pilot/production requires a real Git HEAD for lineage")
     if config.tracking.mode not in {"online", "offline_sync"}:
         raise TrackingError("repro/pilot/production requires online or offline_sync tracking")
-    _reject_stale_remote_run_id(config, output_dir=output_dir, wandb_module=wandb_module)
+    if check_remote_run_collision:
+        reject_stale_remote_run_id(
+            mode=config.tracking.mode,
+            run_id=config.tracking.run_id,
+            entity=config.tracking.entity,
+            project=config.tracking.project,
+            output_dir=output_dir,
+            wandb_module=wandb_module,
+        )
     if config.tier == "pilot" and (
         not config.tracking.project or not config.tracking.entity or not config.tracking.group
     ):
@@ -1093,8 +1116,14 @@ def validate_tracking_guard(
             raise TrackingError("production tracked dirty state requires an exact binary diff")
 
 
-def _reject_stale_remote_run_id(
-    config: ExperimentConfig, *, output_dir: Path, wandb_module: Any | None = None
+def reject_stale_remote_run_id(
+    *,
+    mode: str,
+    run_id: str | None,
+    entity: str | None,
+    project: str | None,
+    output_dir: Path,
+    wandb_module: Any | None = None,
 ) -> None:
     """Fail before any GPU or fork-seed work if a fresh run's ID already has remote history.
 
@@ -1106,10 +1135,16 @@ def _reject_stale_remote_run_id(
     ``wandb.init(resume="never")`` only after GPU time and fork-seed work are
     already spent (decision 0004, recurred at least four times). This catches
     that exact scenario earlier, before either happens.
+
+    Takes the identity as plain scalars rather than an ``ExperimentConfig``
+    so a caller whose "current config" and "current run identity" differ
+    (``ard.cli.evaluate``: the training config drives most preflight checks,
+    but the run about to start is the *evaluation* run) can pass the run's
+    real identity explicitly instead of the wrong config's fields.
     """
-    if config.tracking.mode != "online" or config.tracking.run_id is None:
+    if mode != "online" or run_id is None:
         return
-    if not config.tracking.entity or not config.tracking.project:
+    if not entity or not project:
         return
     if (output_dir / "run-bundle" / "manifest.json").is_file():
         return  # a local manifest means this is a legitimate resume; remote history is expected.
@@ -1121,7 +1156,7 @@ def _reject_stale_remote_run_id(
             module = wandb
         except ImportError:
             return  # _start_wandb raises the authoritative "package missing" error later.
-    path = f"{config.tracking.entity}/{config.tracking.project}/{config.tracking.run_id}"
+    path = f"{entity}/{project}/{run_id}"
     try:
         module.Api().run(path)
     except Exception:

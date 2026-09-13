@@ -914,9 +914,25 @@ def test_production_guard_rejects_incomplete_lineage(tmp_path: Path, case: str, 
 
 
 class _StaleRunFoundWandb:
-    class Api:
+    """Fake ``wandb`` module whose ``Api().run(path)`` reports a found run.
+
+    ``queried_paths`` lives on the *module* fake, not the per-call ``Api()``
+    instance (real ``wandb.Api()`` is also called fresh each time), so a
+    test can inspect exactly what the guard queried after the fact.
+    """
+
+    def __init__(self) -> None:
+        self.queried_paths: list[str] = []
+
+    def Api(self) -> "_StaleRunFoundWandb._Lookup":
+        return self._Lookup(self.queried_paths)
+
+    class _Lookup:
+        def __init__(self, sink: list[str]) -> None:
+            self._sink = sink
+
         def run(self, path: str) -> object:
-            del path
+            self._sink.append(path)
             return object()
 
 
@@ -927,10 +943,19 @@ class _StaleRunMissingWandb:
             raise RuntimeError("not found")
 
 
-class _ExplodingWandb:
-    """Proves a code path never touches wandb: any attribute access fails."""
+class _AccessRecordingWandb:
+    """Proves a code path never touches wandb: records access rather than
+    relying on an exception, since a raised exception alone is
+    indistinguishable from this module's own deliberate fail-open handling
+    (a mutation that deletes the fail-open short-circuit would otherwise
+    still pass a test that only asserts ``pytest.raises`` or trusts a
+    swallowed ``AssertionError``)."""
+
+    def __init__(self) -> None:
+        self.accessed = False
 
     def __getattr__(self, name: str) -> object:
+        self.accessed = True
         raise AssertionError(f"must not touch wandb at all (accessed {name!r})")
 
 
@@ -942,8 +967,13 @@ def test_online_guard_rejects_fresh_start_colliding_with_remote_run(tmp_path: Pa
     """Decision 0004: a fresh start whose run ID already has remote history must fail in preflight."""
     root, cfg = _lineage_repository(tmp_path)
     cfg = _online_config(cfg, run_id="stale-run-id")
+    fake = _StaleRunFoundWandb()
     with pytest.raises(TrackingError, match="already has remote history"):
-        validate_tracking_guard(cfg, root=root, output_dir=cfg.output_dir, wandb_module=_StaleRunFoundWandb())
+        validate_tracking_guard(cfg, root=root, output_dir=cfg.output_dir, wandb_module=fake)
+    # Pins the exact query string against what _start_wandb actually sends to
+    # wandb.init (adapter.py's kwargs["id"]/"project"/"entity") -- transposing
+    # entity and project here would silently fail open forever otherwise.
+    assert fake.queried_paths == [f"{cfg.tracking.entity}/{cfg.tracking.project}/{cfg.tracking.run_id}"]
 
 
 def test_online_guard_allows_fresh_start_when_remote_run_is_absent(tmp_path: Path) -> None:
@@ -965,7 +995,20 @@ def test_online_guard_skips_remote_check_when_local_manifest_exists(
     bundle = output_dir / "run-bundle"
     bundle.mkdir(parents=True)
     (bundle / "manifest.json").write_text("{}", encoding="utf-8")
-    validate_tracking_guard(cfg, root=root, output_dir=output_dir, wandb_module=_ExplodingWandb())
+    recorder = _AccessRecordingWandb()
+    validate_tracking_guard(cfg, root=root, output_dir=output_dir, wandb_module=recorder)
+    assert recorder.accessed is False
+
+
+def test_online_guard_skips_remote_check_entirely_when_disabled(tmp_path: Path) -> None:
+    """ard.cli.evaluate's own preflight call: config identity != the run about to start."""
+    root, cfg = _lineage_repository(tmp_path)
+    cfg = _online_config(cfg, run_id="a-training-run-with-real-remote-history")
+    recorder = _AccessRecordingWandb()
+    validate_tracking_guard(
+        cfg, root=root, output_dir=cfg.output_dir, wandb_module=recorder, check_remote_run_collision=False
+    )
+    assert recorder.accessed is False
 
 
 def test_repro_offline_sync_fails_when_wandb_init_raises(tmp_path: Path) -> None:

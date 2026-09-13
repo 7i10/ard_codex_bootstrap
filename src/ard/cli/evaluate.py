@@ -29,7 +29,13 @@ from ard.evaluation import (
     validate_checkpoint_lineage,
 )
 from ard.models import build_student
-from ard.tracking import LocalTracker, create_tracker, should_upload_run_bundle, validate_tracking_guard
+from ard.tracking import (
+    LocalTracker,
+    create_tracker,
+    reject_stale_remote_run_id,
+    should_upload_run_bundle,
+    validate_tracking_guard,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -290,7 +296,16 @@ def main(argv: list[str] | None = None) -> int:
     # Only use the evaluation host's already-verified checkpoint location for
     # the local RobustBench preflight.
     preflight_config = _evaluation_preflight_config(config, training_config)
-    validate_tracking_guard(preflight_config, root=Path.cwd(), output_dir=preflight_config.output_dir)
+    # check_remote_run_collision=False: preflight_config still carries the
+    # *training* run's own tracking.run_id/output_dir here (reused only for
+    # the RobustBench/external-lock/git-dirty checks below), not this
+    # evaluation's own identity. That training run's W&B history is
+    # expected to exist -- checking it here would reject every ordinary
+    # evaluation. The evaluation's own run ID is checked separately, once
+    # its output_dir exists, right before create_tracker.
+    validate_tracking_guard(
+        preflight_config, root=Path.cwd(), output_dir=preflight_config.output_dir, check_remote_run_collision=False
+    )
     evaluation_dataset = config.evaluation.dataset
     training_dataset = training_config.dataset
     if (evaluation_dataset.name, evaluation_dataset.num_classes, evaluation_dataset.image_size) != (
@@ -374,6 +389,19 @@ def main(argv: list[str] | None = None) -> int:
         + hashlib.sha256(f"{train_run_id}:{evaluation_hash}:{checkpoint_set}{weights_suffix}".encode()).hexdigest()[
             :20
         ]
+    )
+    # This evaluation's own real identity, now that output_dir exists and is
+    # confirmed empty (line above): the counterpart the training-config-based
+    # check above deliberately skipped. evaluation_run_id is deterministic in
+    # (train_run_id, evaluation_hash, checkpoint_set, weights) -- a re-run
+    # from a fresh --output dir after an earlier attempt reached create_tracker
+    # would otherwise collide exactly like decision 0004.
+    reject_stale_remote_run_id(
+        mode=tracker_config.tracking.mode,
+        run_id=evaluation_run_id,
+        entity=tracker_config.tracking.entity,
+        project=tracker_config.tracking.project,
+        output_dir=output_dir,
     )
     evaluation_tracker = create_tracker(
         config=tracker_config,
