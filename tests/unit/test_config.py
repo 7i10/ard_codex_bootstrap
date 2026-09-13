@@ -767,3 +767,40 @@ def test_mobilenetv4_pgd_at_configs_are_field_identical_except_the_intended_delt
         payload["tracking"] = {**payload["tracking"], "group": None}
         payload["training"] = {**payload["training"], "epsilon_warmup_epochs": None}
     assert mobilenetv3 == mobilenetv4_no_warmup
+
+
+def test_mobilenetv4_1step_config_is_field_identical_to_the_warmup_config_except_training_steps(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0101, Stage B arm C (human decision, chat): test directly
+    whether 1-step training PGD differs from 3-step under the same
+    epsilon-warmup recipe and the same evaluation protocol, rather than
+    assume an answer. This config must differ from arm B
+    (imagenet_mobilenetv4_pgd_at.yaml) in exactly method.attack.steps and
+    tracking.group -- in particular, the selection attack and the official
+    evaluation attack (both steps: 10) must be untouched, per CLAUDE.md
+    rule 6 (the evaluated threat model never changes)."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    arm_b_3step = load_config(config_dir / "imagenet_mobilenetv4_pgd_at.yaml").model_dump(mode="json")
+    arm_c_1step = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_1step.yaml").model_dump(mode="json")
+    assert arm_c_1step["method"]["attack"]["steps"] == 1
+    assert arm_b_3step["method"]["attack"]["steps"] == 3
+    assert arm_c_1step["method"]["selection_attack"]["steps"] == 10
+    assert arm_b_3step["method"]["selection_attack"]["steps"] == 10
+    assert arm_c_1step["evaluation"]["attack"]["steps"] == 10
+    assert arm_b_3step["evaluation"]["attack"]["steps"] == 10
+    for payload in (arm_b_3step, arm_c_1step):
+        payload["method"] = {**payload["method"], "attack": {**payload["method"]["attack"], "steps": None}}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert arm_b_3step == arm_c_1step

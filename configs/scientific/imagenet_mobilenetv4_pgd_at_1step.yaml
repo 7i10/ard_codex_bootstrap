@@ -1,0 +1,27 @@
+# Plan 0101, Stage B arm C (human decision, chat): identical to
+# imagenet_mobilenetv4_pgd_at.yaml (arm B, epsilon warmup + 3-step training
+# PGD) except method.attack.steps: 1 -- single-step FGSM-with-random-start
+# training, matching Debenedetti et al.'s own step count, still under this
+# project's Option 1 step-size coupling (not their fixed-at-target step
+# size; see ard.schedules.epsilon_warmup's docstring). Exists to test the
+# human's own question directly rather than assume an answer: does 1-step
+# training PGD differ from 3-step (or more) under the same evaluation
+# protocol, or do they land within noise of each other? The selection
+# attack (steps: 10) and the official-test evaluation attack (steps: 10)
+# are unchanged -- only the *training* attack's step count varies between
+# arm B and this arm, per CLAUDE.md rule 6 (the evaluated threat model
+# never changes). Shares its protocol id with arms A and B -- three arms
+# of the same campaign.
+schema_version: 2
+protocol: {id: controlled_imagenet_stage01_mobilenetv4_pgd_at_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: true, normalization: {profile: imagenet_standard}}
+method: {id: pgd_at, version: 1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 1, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: sgd, learning_rate: 0.05, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
+scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, epsilon_warmup_epochs: 10}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-pgd-at-1step-controlled, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

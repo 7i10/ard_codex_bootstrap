@@ -8,13 +8,21 @@
   contract (decided in chat: a new plan, not an amendment). Plan 0100's own
   stage-1 outcome and this plan's outcome are compared side by side, not
   merged.
-- Current milestone: Stage A (zero-training-cost pretrained-checkpoint
-  clean-accuracy sanity check) passed. Engine changes (architecture
-  registration, ε-warmup schedule, trainer wiring) implemented and tested
-  (`scripts/verify.py --changed` green). Scientific review requested before
-  Stage B (a real, bounded GPU canary) — **Stage B itself has not launched**;
-  it needs the human to confirm the "Option 1 vs. Option 2" ε-warmup design
-  fork below before any GPU time is spent on it.
+- Current milestone: Stage A passed (73.41% top-1, real val split). Engine
+  changes implemented, tested, and scientific-reviewed (one blocking
+  finding, P1-1, fixed by redesigning Stage B to three arms — see Progress
+  log). The design fork is resolved: step-size coupling stays Option 1 for
+  all arms; the training-attack step-count question (1-step vs. 3-step,
+  the other half of the original fork) is no longer a design choice made
+  in advance — it is Arm C's own empirical question (human decision,
+  chat). **Stage B's design is finalized and ready to launch**, but has
+  **not launched**: both of Hamster's GPUs are occupied by plan 0100's own
+  stage-1 jobs (`r18_baseline-s0`, `r18_adr-s0`, ~epoch 15-19/49 as of this
+  note), and a multi-epoch canary would meaningfully contend with those
+  already-24h-invested runs rather than share briefly the way Stage A's
+  40-second forward-pass-only check did. Launch once a GPU frees (plan
+  0100 stage 1 completing, or Ferret becoming available) — not blocked on
+  any further human decision.
 
 ## Context
 
@@ -280,26 +288,42 @@ by the weak attack itself*, independent of the architecture -- the canary
 could not tell "MobileNetV4 lifts the floor" apart from "we barely
 attacked it," and two variables (architecture, ε schedule) moved at once.
 
-**Corrected design: two arms**, both short (3-5 epoch) PGD-AT-only (no
+**Corrected design: three arms**, all short (3-5 epoch) PGD-AT-only (no
 `adr`) canaries:
 - **Arm A** (`configs/scientific/imagenet_mobilenetv4_pgd_at_no_warmup.yaml`):
-  MobileNetV4-Conv-Small, no ε-warmup -- directly comparable to plan
-  0100's recorded MobileNetV3-Small epoch 0-3 numbers (baseline ~42-46%,
-  `adr` ~41-43%), isolating the architecture's own effect.
+  MobileNetV4-Conv-Small, no ε-warmup, 3-step training PGD -- directly
+  comparable to plan 0100's recorded MobileNetV3-Small epoch 0-3 numbers
+  (baseline ~42-46%, `adr` ~41-43%), isolating the architecture's own
+  effect.
 - **Arm B** (`configs/scientific/imagenet_mobilenetv4_pgd_at.yaml`):
-  MobileNetV4-Conv-Small with ε-warmup -- compared against Arm A (not
-  against plan 0100) to isolate the warmup's own incremental effect on top
-  of the architecture change.
+  MobileNetV4-Conv-Small with ε-warmup, 3-step training PGD -- compared
+  against Arm A (not against plan 0100) to isolate the warmup's own
+  incremental effect on top of the architecture change.
+- **Arm C** (`configs/scientific/imagenet_mobilenetv4_pgd_at_1step.yaml`,
+  human decision, chat): identical to Arm B except 1-step training PGD
+  (FGSM-with-random-start, matching Debenedetti et al.'s own step count)
+  instead of 3-step -- compared against Arm B, under the *same* evaluation
+  protocol, to test directly whether 1-step training differs measurably
+  from 3-step rather than assuming an answer either way. Still uses this
+  project's Option 1 step-size coupling (not Debenedetti's fixed-at-target
+  step size); only the training attack's step count varies from Arm B --
+  the selection attack and the official evaluation attack (both `steps:
+  10`) are unchanged in every arm, per CLAUDE.md rule 6.
 
-Both configs verified field-identical to each other (except
-`training.epsilon_warmup_epochs` and `tracking.group`) and to plan 0100's
+All three configs verified field-identical to each other (Arms A/B except
+`training.epsilon_warmup_epochs` and `tracking.group`; Arms B/C except
+`method.attack.steps` and `tracking.group`) and Arms A/B to plan 0100's
 `imagenet_mobilenetv3_pgd_at.yaml` (except `student.architecture`,
-`protocol.id`, and those same two fields) --
-`tests/unit/test_config.py::test_mobilenetv4_pgd_at_configs_are_field_identical_except_the_intended_deltas`.
-**Blocked on**: (a) the human confirming Option 1 vs. Option 2 above (Arm
-B only), (b) scientific review of the ε-warmup/registry/schema/trainer
+`protocol.id`, and those same fields) --
+`tests/unit/test_config.py::test_mobilenetv4_pgd_at_configs_are_field_identical_except_the_intended_deltas`
+and `::test_mobilenetv4_1step_config_is_field_identical_to_the_warmup_config_except_training_steps`.
+**Blocked on**: scientific review of the ε-warmup/registry/schema/trainer
 changes (requested and returned this session with one blocking finding,
-now fixed -- see Progress log).
+now fixed -- see Progress log). The step-size-coupling half of the
+original Option 1/Option 2 fork is resolved (keep Option 1, i.e. couple
+to the current ramped epsilon, for all three arms); the step-count
+question that was the other half of that fork is now Arm C's own
+empirical question, not a design choice made in advance.
 
 **Stage C — decision point.** Only after Stage B: decide, with the human,
 whether to commit a full 50-epoch PGD-AT run (and how many seeds) on the
@@ -430,3 +454,25 @@ eventual source freeze; it is not part of this plan's own scope.
   regression). Stage B still not launched -- still needs the human's
   Option 1/Option 2 confirmation; the engine-change review itself is now
   resolved.
+- 2026-09-13 (chat): human answered the remaining design fork directly:
+  prefers keeping 3-step training PGD, and separately wants to test
+  whether 1-step training measurably differs from 3-step (or more) under
+  the same evaluation protocol, rather than assume either answer. Added a
+  third Stage B arm, `configs/scientific/imagenet_mobilenetv4_pgd_at_1step.yaml`
+  (identical to Arm B except `method.attack.steps: 1`, still under Option
+  1's step-size coupling; selection/evaluation attacks unchanged) and a
+  config drift-guard test pinning it to Arm B except that one field plus
+  `tracking.group`
+  (`tests/unit/test_config.py::test_mobilenetv4_1step_config_is_field_identical_to_the_warmup_config_except_training_steps`).
+  No source changes needed -- `steps: 1` on this project's existing
+  `LinfPGD` with `random_start: true` is already structurally FGSM-with-
+  random-start, no new attack-layer code. `scripts/verify.py --changed`
+  green. This resolves the design side of the original Option 1/Option 2
+  fork entirely (step-size coupling: Option 1, for all arms; step count:
+  now an empirical question Arm C answers rather than a decision made in
+  advance) -- **Stage B's design is finalized**. Not yet launched: checked
+  GPU status, both Hamster GPUs are at 97-98% utilization running plan
+  0100's own stage-1 jobs (`r18_baseline-s0` epoch 19/49, `r18_adr-s0`
+  epoch 15/49); a multi-epoch canary would meaningfully contend with those
+  runs rather than share briefly the way Stage A's 40-second check did.
+  Will launch once a GPU frees.
