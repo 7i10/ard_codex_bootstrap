@@ -232,3 +232,20 @@ config.
     pattern as plan 0101's own protocol entry), and a config-identity test
     (`tests/unit/test_config.py::test_mobilenetv4_trades_beta_configs_are_field_identical_except_beta`).
     `scripts/verify.py --changed` run; result recorded in the next entry.
+  `scripts/verify.py --changed` green (all suites passed). Pinned a fresh
+  worktree at HEAD `3e7224ce0e3f...` and launched both TRADES-beta arms as
+  local hand-runs on Hamster's two idle 4090s (GPU0: beta=1.0, GPU1:
+  beta=6.0), 12 epochs each -- matching plan 0101 Stage B's own canary
+  horizon so the result is directly comparable to plan 0101's recorded
+  Arm A (no-warmup PGD-AT) epoch-11 numbers (37.8% clean / 19.4% PGD-10).
+  `run_imagenet_stage01_train.py --epochs 12` (confirmatory forward of
+  `training.epochs=12`, same wrapper plan 0101 used), `ARD_NUM_WORKERS=8`,
+  local ImageNet root. Both processes confirmed launched; GPU utilization
+  ramp-up being confirmed separately (Monitor). Queued for later, not yet
+  started: the MixedNUTS-style post-hoc logit-mixing diagnostic
+  (recommendation 4) on the already-completed plan 0100 pgd_at checkpoints
+  -- deferred this round in favor of getting the TRADES canaries running
+  first; it needs a small custom PGD loop against the mixed-softmax
+  forward pass (this project's `LinfPGD.generate()` is not written for a
+  two-model mixture), so it will get its own throwaway script, not a
+  scientific-record config.
