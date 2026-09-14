@@ -8,21 +8,18 @@
   contract (decided in chat: a new plan, not an amendment). Plan 0100's own
   stage-1 outcome and this plan's outcome are compared side by side, not
   merged.
-- Current milestone: Stage A passed (73.41% top-1, real val split). Engine
-  changes implemented, tested, and scientific-reviewed (one blocking
-  finding, P1-1, fixed by redesigning Stage B to three arms — see Progress
-  log). The design fork is resolved: step-size coupling stays Option 1 for
-  all arms; the training-attack step-count question (1-step vs. 3-step,
-  the other half of the original fork) is no longer a design choice made
-  in advance — it is Arm C's own empirical question (human decision,
-  chat). **Stage B's design is finalized and ready to launch**, but has
-  **not launched**: both of Hamster's GPUs are occupied by plan 0100's own
-  stage-1 jobs (`r18_baseline-s0`, `r18_adr-s0`, ~epoch 15-19/49 as of this
-  note), and a multi-epoch canary would meaningfully contend with those
-  already-24h-invested runs rather than share briefly the way Stage A's
-  40-second forward-pass-only check did. Launch once a GPU frees (plan
-  0100 stage 1 completing, or Ferret becoming available) — not blocked on
-  any further human decision.
+- Current milestone: Stage A passed (73.41% top-1, real val split). Stage B
+  ran on Ferret (idle at the time; launched via `run-on-ferret` rather than
+  waiting for Hamster, which was occupied by plan 0100's own stage-1 jobs)
+  — all three arms completed 12/12 epochs cleanly
+  (`completed`/`exit_code: 0`). The design fork is resolved: step-size
+  coupling stays Option 1 for all arms; the training-attack step-count
+  question (1-step vs. 3-step, the other half of the original fork) is
+  Arm C's own empirical question, now answered directionally (1-step
+  trades clean accuracy for robustness relative to 3-step) though not
+  converged (only 12 of 50 epochs, before the LR decay) — see Progress log
+  for the full early-trajectory results. **Stage C (commit a fuller run —
+  which arm(s), how many epochs) is the open decision, not yet made.**
 
 ## Context
 
@@ -476,3 +473,44 @@ eventual source freeze; it is not part of this plan's own scope.
   epoch 15/49); a multi-epoch canary would meaningfully contend with those
   runs rather than share briefly the way Stage A's 40-second check did.
   Will launch once a GPU frees.
+- 2026-09-13/14 (Ferret, hand-run via `run-on-ferret`): Ferret was found
+  idle (another user's job had finished) and used instead of waiting for
+  Hamster. Pushed the 18 commits this session had accumulated locally
+  (human approved) so `ferret-prepare` could fetch by SHA. All three Stage
+  B arms launched at 12 epochs each (raised from the original 3-5 epoch
+  estimate: `epsilon_warmup_epochs: 10` cannot fit inside a shorter canary
+  -- this project's own new validator correctly refused a first 5-epoch
+  attempt; a first launch attempt also missed `ARD_JOB_OUTPUT_DIR`, caught
+  before any epoch ran). One session-side false alarm along the way: local
+  filesystem checks against `/home/islab/workspace-local/...` returned "no
+  data" because Ferret is a *separate physical host* -- unlike Hamster,
+  its filesystem is not locally visible, so the check needed `ssh Ferret`
+  and was silently checking a path that could never exist. All three arms
+  were actually healthy and progressing the whole time; a corrective
+  notice was sent once caught. **All three arms completed 12/12 epochs
+  cleanly** (`ferret-status`: `completed`, `exit_code: 0`, all three).
+  Final epoch (11) internal validation (held-out slice, PGD-10 selection
+  attack; not AutoAttack, n=1, only 12 of 50 epochs -- well before the
+  epoch-25 LR decay this plan's schedule shares with plan 0100, so this is
+  early-trajectory-only, not a converged result):
+  | arm | epoch 11 clean | epoch 11 PGD |
+  |---|---:|---:|
+  | A (no warmup, 3-step) | 37.8% | 19.4% |
+  | B (warmup, 3-step) | 38.2% | 19.2% |
+  | C (warmup, 1-step) | 44.4% | 15.2% |
+  Two readable signals even at this early, unconverged horizon: (1) **A
+  vs. B are statistically indistinguishable** (0.4pp clean, 0.2pp PGD) --
+  one epoch past the warmup window closing, ε-warmup shows no early
+  advantage or penalty over no-warmup at matched step count, for n=1; (2)
+  **B vs. C show a real, non-trivial gap**: 1-step training PGD trades
+  +6.2pp clean for -4.0pp PGD relative to 3-step, at matched warmup. This
+  is exactly the question the human asked Arm C to answer (whether 1-step
+  differs from 3-step) -- at this horizon, for n=1, it does: 1-step is
+  measurably weaker at conferring PGD robustness, consistent with a
+  materially weaker training attack (FGSM-with-random-start vs. 3-step
+  PGD) rather than an artifact. Not yet knowable from 12 epochs: whether
+  ranking holds after the epoch-25 decay, or whether A/B's near-tie
+  persists once ε-warmup has had epochs to matter beyond its own window.
+  **Stage C decision, now due**: commit a fuller run (which arm(s), how
+  many epochs, whether to extend past 12 to see the LR-decay recovery
+  before deciding) is a human call, not made here.
