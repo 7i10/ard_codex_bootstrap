@@ -249,3 +249,26 @@ config.
   forward pass (this project's `LinfPGD.generate()` is not written for a
   two-model mixture), so it will get its own throwaway script, not a
   scientific-record config.
+- 2026-09-15 (`/experiment-postrun`, run-bundle path): `plan0102-trades-beta1-v1`
+  completed. Terminal status re-derived with `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, `failure_class: null`.
+  All 12 of 12 epoch rows are present. `run-bundle/completion.json` says `completed`.
+  Source SHA `3e7224ce0e3f` (clean worktree). World size 1, global batch 128,
+  seed 0, protocol `controlled_imagenet_stage01_mobilenetv4_trades_v1`.
+  `best.pt` / `last.pt` were not checked from this session, because the
+  sandbox blocks reads under `ard-runtime/`.
+  **Nothing imported.** No aggregator exists for this contract, no AutoAttack
+  has run, and the sibling arm `plan0102-trades-beta6-v1` is still training
+  (bundle `running`, epoch 11 in progress at 22:07Z). No record, report,
+  ledger row or milestone tick.
+  **Internal validation only (held-out slice, PGD-10; not an official
+  result, n=1)**, from the run-bundle summary, beta=1.0: best epoch 2, clean /
+  PGD 0.531 / 0.108. Last epoch (11): clean / PGD 0.457 / 0.107.
+  Next to plan 0101 Stage B Arm A (no-warmup PGD-AT, epoch 11: 37.8% clean /
+  19.4% PGD-10), beta=1.0 is about 8 pp higher on clean accuracy and about 9 pp
+  lower on PGD accuracy. Robust accuracy has not moved since epoch 2, and
+  clean accuracy fell from 53.1% to 45.7% over the same span. So at this
+  12-epoch horizon, beta=1.0 buys clean accuracy with robust accuracy; it
+  does not raise both. Compare the arms only once beta=6.0 finishes, and
+  only after confirming that both runs used the same validation slice and
+  attack as Arm A.
