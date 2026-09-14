@@ -739,3 +739,28 @@ milestone this session.
   /tmp/claude-1001/-home-islab-workspace-local-shunsuke-naito-ard-codex-bootstrap/027b5ec8-8da5-43a8-b31a-028296996632/scratchpad/.orchestration/imagenet-stage01-r18-mobilenetv3-adr-v2.state.json`
   explicitly once `r18_baseline-s0` and the `r18_adr-s0` hand-run finish --
   automatic discovery will not find it.
+- 2026-09-14T08:46Z: `r18_baseline-s0` completed (`/experiment-postrun`,
+  run-bundle path). Terminal re-derived via `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, 50/50 epoch rows.
+  `completion.json` (its only declared `expected_output`) present with
+  `identity_hash` `dcf21aece735...` and source SHA `ae4dd7c82d80`, matching
+  the attempt3 resolved manifest; `best.pt`, `last.pt` on disk; world size 1,
+  global batch 128. With this, the orchestrated campaign state (scratchpad
+  `state.json`) is now terminal and classified `failed` (3 completed, 1
+  failed). As recorded above, that classification is stale: the `failed` job
+  is the W&B-collision attempt of `r18_adr-s0`, whose real result is the
+  hand-run, still training (epoch 42/49 at 08:44Z). A headless postrun fired
+  by that campaign-level event must not write a failure packet for it.
+  **Nothing imported**, for the same reasons as `mobilenetv3_adr-s0`: no
+  aggregator for this contract exists (Verification step 5), no AutoAttack
+  evaluation has run (step 4), and stage 1 is not complete (`r18_adr-s0`
+  hand-run). No record, report, ledger row or milestone tick.
+  **Internal validation only (held-out 2% slice, PGD-10; not an official
+  result, n=1)**, from the run-bundle summary: best epoch 48, best clean /
+  PGD 0.551 / 0.321; last (epoch 49) clean / PGD 0.553 / 0.319. Best and
+  last are almost the same (gap 0.2 pp), so no robust overfitting is visible
+  on this slice. The ResNet-18 `pgd_at` arm therefore ends well above the
+  MobileNetV3-Small `pgd_at` arm (0.459 / 0.253 best) on the same slice.
+  The pending `adr`-vs-`pgd_at` comparison for ResNet-18 (does ResNet-18's
+  `adr` clean accuracy recover after the epoch-25 decay, unlike
+  MobileNetV3-Small's) needs `r18_adr-s0` to finish.
