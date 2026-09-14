@@ -272,3 +272,42 @@ config.
   does not raise both. Compare the arms only once beta=6.0 finishes, and
   only after confirming that both runs used the same validation slice and
   attack as Arm A.
+- 2026-09-15 (`/experiment-postrun`, run-bundle path): `plan0102-trades-beta6-v1`
+  completed. Terminal status re-derived with `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, `failure_class: null`.
+  All 12 of 12 epoch rows are present. `run-bundle/completion.json`, `best.pt`,
+  `last.pt`, `epoch-metrics.parquet` and `sample-stats-train.parquet` exist.
+  Source SHA `3e7224ce0e3f` (clean worktree). World size 1, global batch 128,
+  seed 0, protocol `controlled_imagenet_stage01_mobilenetv4_trades_v1`.
+  **Nothing imported**, for the same reason as beta=1.0: no aggregator exists
+  for this contract, and no AutoAttack has run. No record, report, ledger row
+  or milestone tick.
+  **Comparability check.** `imagenet_mobilenetv4_trades_beta6.yaml` differs
+  from Arm A's `imagenet_mobilenetv4_pgd_at_no_warmup.yaml` only in the header
+  comment, `protocol.id`, `tracking.group` and `method`. Inside `method`, the
+  `selection_attack` is the same: CE loss, eps 4/255, step 8/765, 10 steps,
+  random start, eval mode. So the validation data and attack match Arm A.
+  The training objective and the inner attack loss (KL instead of CE) differ
+  on purpose. Arm A ran on Ferret, and this session did not re-read its bundle
+  to confirm world size 1 / global batch 128. Same config batch, one GPU per arm.
+  **Internal validation only (held-out slice, PGD-10; not an official result,
+  n=1, 12 of 50 epochs, before the LR decay)**, from the run-bundle summaries:
+  | arm | best epoch | best clean / PGD | epoch 11 (last) clean / PGD |
+  |---|---:|---:|---:|
+  | PGD-AT, Arm A (plan 0101) | — | — | 37.8% / 19.4% |
+  | TRADES beta=1.0 | 2 | 53.1% / 10.8% | 45.7% / 10.7% |
+  | TRADES beta=6.0 | 2 | 45.4% / 18.7% | 39.5% / 16.7% |
+  Reading, for these single runs at this horizon: beta=6.0 is +1.7 pp clean
+  and -2.7 pp PGD against Arm A at epoch 11. Neither TRADES arm raised both
+  clean and robust accuracy over PGD-AT. Beta moves along the tradeoff:
+  going from 1.0 to 6.0 costs 6.2 pp clean and buys 6.0 pp PGD at the last
+  epoch. Both TRADES arms picked epoch 2 as their best checkpoint. After
+  that, beta=6.0 lost 2.0 pp PGD and 5.9 pp clean by epoch 11 (beta=1.0:
+  -0.1 pp PGD, -7.4 pp clean). So through epoch 11, both arms mostly
+  lost ground after an early peak while the LR stayed at 0.05. The epoch-25
+  decay might reverse this, as it did for plan 0100's `r18_baseline`; these
+  12-epoch runs cannot tell. The beta=6.0 gap to Arm A (1.7 / 2.7 pp) is only
+  a little larger than the 0.16-1.88 pp control-vs-control spread seen on
+  CIFAR screens. No ImageNet noise floor exists yet, and each arm is one
+  run. The safe reading is "TRADES beta=6.0 lands near PGD-AT at epoch 11,
+  slightly more clean and slightly less PGD". That is not a ranking.
