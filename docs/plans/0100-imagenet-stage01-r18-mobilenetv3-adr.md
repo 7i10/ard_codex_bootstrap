@@ -764,3 +764,49 @@ milestone this session.
   The pending `adr`-vs-`pgd_at` comparison for ResNet-18 (does ResNet-18's
   `adr` clean accuracy recover after the epoch-25 decay, unlike
   MobileNetV3-Small's) needs `r18_adr-s0` to finish.
+- 2026-09-14T14:18Z: `r18_adr-s0` hand-run
+  (`imagenet-stage01-r18-mobilenetv3-adr-v2-r18_adr-s0-handrun1`) completed
+  (`/experiment-postrun`, run-bundle path). Terminal re-derived via
+  `campaign_watch.py --once --include-hand-run`: `terminal: true`,
+  `success: true`, `failure_class: null`, 50/50 epoch rows. Manifest source SHA
+  `ae4dd7c82d80`, `dirty: false`, seed 0, world size 1, global batch 128 --
+  the same source and execution identity as the other three stage-1 jobs.
+  `run-bundle/completion.json`, `best.pt`, `best-ema.pt`, `last.pt`,
+  `epoch-metrics.parquet` and `sample-stats-train.parquet` on disk. A hand-run
+  has no orchestrator `completion.json`, so there is no `identity_hash` to
+  compare; the config's sha256 could not be re-hashed from this session
+  (outside the permitted directories), so config identity rests on the pinned
+  clean worktree and the launch command recorded above.
+  **All four stage-1 training runs are now complete.** The orchestrated
+  campaign's `failed` classification stays stale, as recorded above.
+  **Nothing imported**, for the same reasons as the other three: no
+  aggregator for this contract exists (Verification step 5) and no AutoAttack
+  evaluation has run (step 4). No record, report, ledger row or milestone tick.
+  **Stop-rule check (P0-1 diagnostic)**: `train_rectified_true_class_mass`
+  was 0.110 at epoch 49, about 100x the 1/1000 chance level and almost the
+  same as `mobilenetv3_adr-s0`'s 0.105. Not the preregistered stop.
+  `train_ema_student_agreement` 0.957 at epoch 49.
+  **Internal validation only (held-out 2% slice, PGD-10; not an official
+  result, n=1 per arm)**, from the run-bundle summaries:
+  | run | best epoch | best clean / PGD | last clean / PGD |
+  |---|---:|---|---|
+  | `r18_baseline-s0` (`pgd_at`) | 48 | 0.551 / 0.321 | 0.553 / 0.319 |
+  | `r18_adr-s0` (`adr`) | 47 | 0.501 / 0.338 | 0.502 / 0.337 |
+  | `mobilenetv3_baseline-s0` (`pgd_at`) | 46 | 0.459 / 0.253 | 0.460 / 0.252 |
+  | `mobilenetv3_adr-s0` (`adr`) | 3 | 0.423 / 0.219 | 0.321 / 0.208 |
+  On this slice, ResNet-18 `adr` does recover after the LR decay: its best
+  checkpoint is an end-of-schedule epoch (47), unlike MobileNetV3-Small `adr`
+  (epoch 3). Against its own `pgd_at` baseline, ResNet-18 `adr` is -5.0 pp
+  clean and +1.7 pp PGD (best); MobileNetV3-Small `adr` is -3.6 pp clean and
+  -3.4 pp PGD (best), -13.9 pp clean and -4.4 pp PGD (last). The late
+  rectified-target mass is nearly the same in both architectures, so low mass
+  alone does not explain the MobileNetV3-Small shortfall; the small model
+  tolerates it worse. For one seed and a proxy attack, this points in the
+  opposite direction from the plan's hypothesis (a larger `adr` gain at
+  mobile scale). It is not a result under the preregistered rule, which needs
+  AutoAttack on the official test and 3 seeds. Open for the human before
+  stage 2: the AutoAttack evaluation of the four stage-1 checkpoints (best +
+  last; Verification step 4) and this contract's aggregator (step 5); the
+  pending scientific review of the `src/ard/tracking/` collision guard before
+  any new SHA is frozen; and whether MobileNetV3-Small `adr`'s shortfall
+  should change the stage-2 design. No action taken.
