@@ -55,13 +55,22 @@ Heldoutに対しての防御力はしっかりみるべき。100サンプル以�
 
     | run | clean(val 5万枚) | PGD-10(val 5万枚) | AutoAttack(n=500) |
     |---|---:|---:|---:|
-    | `r18_baseline-s0`(pgd_at) | 52.0% | — | 22.8% |
-    | `r18_adr-s0`(adr) | 47.3% | — | 21.2% |
+    | `r18_baseline-s0`(pgd_at) | 52.0% | 29.4% | 22.8% |
+    | `r18_adr-s0`(adr) | 47.3% | 31.0% | 21.2% |
     | `mobilenetv3_baseline-s0`(pgd_at) | 42.8% | 22.7% | 17.4% |
     | `mobilenetv3_adr-s0`(adr) | 38.8% | 19.7% | 13.6% |
 
-    (r18側のPGD-10列は postrun のログ取り込みが本パケット執筆時点で未完了のため空欄。
-    clean/AutoAttackはログから直接確認済み。)
+    (r18側のPGD-10列は2026-09-15のpostrunで`evaluation-results.json`から記入した。)
+
+    - **訂正(postrun、2026-09-15、r18_adr-s0の評価取り込み時)**: 下の「符号自体は両アーキテクチャで
+      揃っており偶然とは考えにくい」は言い過ぎ。AutoAttackは各500枚なので、1本あたりの二項標準誤差は
+      約1.5〜1.9pt。ResNet-18の差-1.6pt(500枚中8枚分)はこの誤差の範囲内で、ResNet-18の
+      AutoAttackの符号は決まっていない。MobileNetV3-Smallの差-3.8ptも、2本の差として見ると誤差の
+      約1.6倍しかない。一方、val 5万枚全体のPGD-10ではResNet-18の`adr`は+1.6ptで、内部検証
+      (+1.7pt)と同じ符号。「PGD-10が勾配マスキングで楽観的だった可能性が高い」も確認されていない。
+      PGD-10→AutoAttackの低下幅は`adr`が-9.8pt、`pgd_at`が-6.6ptで`adr`の方が大きいが、
+      画像集合が違う(5万枚と500枚)ので、これは仮説にとどまる。はっきり言えるのは、両アーキテクチャで
+      `adr`のcleanが4〜5pt低いこと(5万枚、seed 0の1本ずつ)。
 
     **両アーキテクチャで`adr`が`pgd_at`に対しclean・AutoAttackとも一貫して劣る**:
     ResNet-18は-4.7pt clean/-1.6pt AutoAttack、MobileNetV3-Smallは-4.0pt clean/-3.8pt

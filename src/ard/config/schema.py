@@ -61,6 +61,10 @@ class ProtocolConfig(StrictModel):
         # protocol identity from plan 0100's -- not a modification of that
         # plan's own frozen contract.
         "controlled_imagenet_stage01_mobilenetv4_pgd_at_v1",
+        # Plan 0102 Workstream A: TRADES-beta probe on the same
+        # architecture, a separate protocol identity from plan 0101's own
+        # PGD-AT contract.
+        "controlled_imagenet_stage01_mobilenetv4_trades_v1",
     ]
 
 

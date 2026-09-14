@@ -870,3 +870,37 @@ milestone this session.
   The `adr`-vs-`pgd_at` comparison for ResNet-18 needs `r18_adr-s0`; no
   comparison is stated here. No record, report, ledger row or milestone tick;
   no action taken.
+- 2026-09-15 -- **Direction-finding evaluation (decision 0014 option E):
+  `r18_adr-s0` complete; all four option-E evaluations are now done.**
+  `campaign_watch.py --once --include-hand-run` on
+  `r18_adr-s0/train/evaluation-direction-n500/run-bundle/manifest.json`
+  (`eval-a3f13759af0f9e07aa88`): `terminal: true`, `success: true`,
+  `failure_class: null`. Source SHA `c2cada7a691a`, `dirty: false`, evaluation
+  seed 0, world size 1, global batch 128. `evaluation-results.json`,
+  `autoattack-best.json`, `evaluation-lineage.json`, `panel-best.jsonl`,
+  `sample-stats-best.parquet` and `run-bundle/completion.json` on disk. The
+  artifact sha256 values in the manifest could not be recomputed from this
+  session (files are outside the permitted directories). Wall time from
+  manifest `created_at` to `finished_at`: about 13 min on one Hamster 4090.
+  **Nothing imported**, for the same reasons as the other three (option E is
+  not an official test record; no aggregator exists).
+  Numbers (best checkpoint only, ImageNet-1k val `split: val`, `count` 50000,
+  no teacher, training seed 0, Linf eps 4/255; PGD-10 CE, step 8/765, random
+  start; AutoAttack standard v0.1 `a392200`, 500 images drawn with seed 0):
+  | run | checkpoint sha256 | clean (n=50000) | PGD-10 (n=50000) | AutoAttack (n=500) |
+  |---|---|---:|---:|---:|
+  | `r18_baseline-s0` (`pgd_at`) | `64b83423…` | 0.51998 | 0.2936 | 0.228 |
+  | `r18_adr-s0` (`adr`) | `f50f65b7…` | 0.47302 | 0.30964 | 0.212 |
+  Here ResNet-18 `adr` is -4.7 pp clean, +1.6 pp PGD-10 and -1.6 pp AutoAttack
+  against its own `pgd_at` baseline. The clean and PGD-10 signs match the
+  internal validation above (-5.0 pp / +1.7 pp). The AutoAttack gap is 8 of 500
+  images. With n=500, one arm's AutoAttack accuracy has a binomial standard
+  error of about 1.9 pp, so -1.6 pp does not separate the arms; the ResNet-18
+  AutoAttack sign is not established. The drop from PGD-10 to AutoAttack is
+  larger for `adr` (-9.8 pp) than for `pgd_at` (-6.6 pp); this may point to a
+  weaker PGD-10 gradient signal under `adr`, but PGD-10 and AutoAttack here use
+  different image sets (50000 vs 500), so this is a hypothesis only.
+  Decision 0014's result table was filled in with these PGD-10 values, and a
+  note was added that corrects its "unlikely to be chance" wording.
+  No record, report, ledger row or milestone tick. Whether to go to stage 2 is
+  still the human's decision (decision 0014); no action taken.

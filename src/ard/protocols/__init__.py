@@ -517,6 +517,20 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # set the way plan 0100's four configs are.
             metadata=MappingProxyType({"purpose": "imagenet_stage01_mobilenetv4_pgd_at_v1"}),
         ),
+        "controlled_imagenet_stage01_mobilenetv4_trades_v1": ProtocolSpec(
+            id="controlled_imagenet_stage01_mobilenetv4_trades_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0102 Workstream A's first probe: TRADES (Zhang et al.
+            # 2019) at two beta values on MobileNetV4-Conv-Small, to
+            # bracket the clean/robust tradeoff curve before committing a
+            # full run to any one beta. Deliberately a separate protocol
+            # from plan 0101's own pgd_at identity -- same rationale as
+            # that entry (not part of a shared-template multi-config set,
+            # omitted from _validate_protocol_contract's strict CIFAR-
+            # protocol allowlist).
+            metadata=MappingProxyType({"purpose": "imagenet_stage01_mobilenetv4_trades_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,

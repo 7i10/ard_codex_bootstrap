@@ -1,0 +1,29 @@
+# Plan 0102, Workstream A, first probe: TRADES (Zhang et al. 2019) instead
+# of plain PGD-AT's hard-label CE, at a small beta (1.0, favoring clean
+# accuracy over the standard beta=6.0). TRADES's engine path already exists
+# and is exercised by the CIFAR-10 scientific configs
+# (configs/scientific/cifar10_r18_trades.yaml) -- this file only combines
+# that already-reviewed method with the already-registered MobileNetV4
+# architecture and this project's own ImageNet stage-01 dataset/optimizer/
+# schedule convention (matching imagenet_mobilenetv4_pgd_at_no_warmup.yaml
+# exactly outside of method/tracking.group/protocol.id), no attack-layer or
+# trainer code change. No epsilon-warmup here -- this probe isolates the
+# TRADES-beta effect alone; warmup and TRADES are not combined until each
+# is understood on its own. Paired with imagenet_mobilenetv4_trades_beta6.yaml
+# (Zhang et al.'s own default) to bracket the tradeoff curve on this
+# architecture/dataset, per the literature-review recommendation (plan 0102
+# progress log, 2026-09-15) to probe beta in {1, 3, 6} before committing a
+# full 50-epoch run to any one value.
+schema_version: 2
+protocol: {id: controlled_imagenet_stage01_mobilenetv4_trades_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: true, normalization: {profile: imagenet_standard}}
+method: {id: trades, version: 1, trades_beta: 1.0, temperature: 1.0, temperature_squared: true, attack: {loss: kl, kl_target: student_clean, temperature: 1.0, temperature_squared: true, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: sgd, learning_rate: 0.05, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
+scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-trades-beta1-controlled, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

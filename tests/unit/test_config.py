@@ -804,3 +804,39 @@ def test_mobilenetv4_1step_config_is_field_identical_to_the_warmup_config_except
         payload["method"] = {**payload["method"], "attack": {**payload["method"]["attack"], "steps": None}}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert arm_b_3step == arm_c_1step
+
+
+def test_mobilenetv4_trades_beta_configs_are_field_identical_except_beta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0102 Workstream A's first probe (literature-review recommendation,
+    2026-09-15): bracket TRADES's clean/robust tradeoff curve on
+    MobileNetV4-Conv-Small at beta=1 (clean-favoring) and beta=6 (Zhang et
+    al. 2019's own default) before committing a full run to either. The two
+    configs must differ in exactly method.trades_beta and tracking.group --
+    in particular the selection attack and the official evaluation attack
+    (both steps: 10, loss: ce) must be untouched, per CLAUDE.md rule 6."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    beta1 = load_config(config_dir / "imagenet_mobilenetv4_trades_beta1.yaml").model_dump(mode="json")
+    beta6 = load_config(config_dir / "imagenet_mobilenetv4_trades_beta6.yaml").model_dump(mode="json")
+    assert beta1["method"]["trades_beta"] == 1.0
+    assert beta6["method"]["trades_beta"] == 6.0
+    assert beta1["method"]["selection_attack"]["steps"] == 10
+    assert beta6["method"]["selection_attack"]["steps"] == 10
+    assert beta1["evaluation"]["attack"]["steps"] == 10
+    assert beta6["evaluation"]["attack"]["steps"] == 10
+    for payload in (beta1, beta6):
+        payload["method"] = {**payload["method"], "trades_beta": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert beta1 == beta6

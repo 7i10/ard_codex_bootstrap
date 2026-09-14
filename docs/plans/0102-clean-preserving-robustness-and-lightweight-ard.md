@@ -166,3 +166,69 @@ config.
   training launched yet -- waiting on the literature pass before designing
   the first concrete arm, per this plan's own "design from the literature"
   rule above.
+- 2026-09-15 (chat, autonomous, continued): literature agent returned. Key
+  findings (full report not reproduced here; see this entry's summary):
+  - **arXiv:2509.23325 full read**: its schedule is a *trapezoidal*
+    (delay-then-ramp) shape -- flat at eps=0 for the first ~24% of epochs
+    (T1), linear ramp over the middle ~50% (T1→T2), held at target for the
+    rest -- not a pure 0-epoch-start linear ramp like this project's
+    current implementation of Debenedetti. It uses APGD (adaptive internal
+    step size), not fixed-ratio PGD, so it has **no stated position on
+    this project's own step-size-coupling choice** (Option 1) -- that
+    remains this project's own deliberate simplification, not something
+    the paper confirms or contradicts. Its target task is fine-grained
+    transfer datasets (CUB/Cars/Aircraft/etc.) via a robust *pretrained*
+    backbone, not ImageNet-1k itself as the fine-tuning target, and no
+    mobile-scale architecture -- so its exact numbers don't transfer, but
+    its failure-mode framing (fixed-eps fine-tuning from a non-robust
+    backbone can collapse to near-chance) independently corroborates that
+    this project's large clean-accuracy drop is a known, named phenomenon.
+  - **Cheapest, best-evidenced techniques for Workstream A** (full table
+    in the agent's report): SWA/weight-averaging (CIFAR evidence: +5.55pp
+    robust *and* +0.94pp clean simultaneously, near-zero extra compute,
+    but needs per-epoch checkpoint retention this project doesn't do yet);
+    AWP (~8% training overhead, TRADES+AWP is the only CIFAR combo found
+    that improved both axes together); TRADES with tunable beta (same
+    compute as plain PGD-AT, a loss-function swap only, exact beta for
+    this regime unknown -- needs its own probe); MixedNUTS-style post-hoc
+    logit mixing of the existing pretrained + PGD-AT checkpoints (~1
+    GPU-hour, no retraining, diagnostic for how much clean-accuracy loss
+    is recoverable at inference time alone). Bag-of-Tricks' "critical"
+    weight-decay warning was checked against this project's own ImageNet
+    configs (already 1e-4, the standard ImageNet convention, no change
+    needed).
+  - **Workstream B reframe**: no ARD-family method (this project's own
+    EMA self-distillation, the original ARD of Goldblum et al. 2020,
+    RSLAD, AdaAD) has a validated true-ImageNet-1k (not CIFAR/Tiny/
+    ImageNet-100) result in the literature the agent could find -- the
+    absence of a positive result at ImageNet-1k scale is the field-wide
+    norm, not a sign this project's implementation is uniquely broken.
+    ProARD (arXiv:2506.07666, explicitly targets edge/mobile students) is
+    the closest-matching lead but only its abstract was reachable --
+    flagged for a dedicated full-text follow-up, not yet actioned.
+    Separately, arXiv:2605.21999's "Robustly Unlearnable Set" diagnosis
+    (capacity-limited students cannot represent some of a teacher's robust
+    features, forcing memorization of spurious noise on exactly those
+    samples) gives a concrete, testable hypothesis for *why* ADR's EMA
+    target might be hurting rather than helping a small student: an
+    overconfident target on hard examples, not "self-distillation doesn't
+    work here." Cheap first test: temper/soften the EMA target's
+    confidence on high-loss examples, rather than abandoning EMA self-
+    distillation outright.
+  - **First concrete action taken**: Workstream A's TRADES-beta probe was
+    judged cheapest and most directly grounded (TRADES is not new engine
+    surface -- it already exists and is exercised by
+    `configs/scientific/cifar10_r18_trades.yaml`; only a new config
+    combining it with the already-registered MobileNetV4 architecture and
+    this project's own ImageNet stage-01 conventions is needed, no
+    scientific-reviewer pass required by this plan's own process rule,
+    which reserves that gate for attack/engine/schema code changes).
+    Added `configs/scientific/imagenet_mobilenetv4_trades_beta1.yaml` and
+    `_beta6.yaml` (beta=1.0 and beta=6.0, no epsilon-warmup in either --
+    isolating the beta effect alone before combining with warmup),
+    registered a new protocol id
+    `controlled_imagenet_stage01_mobilenetv4_trades_v1`
+    (`src/ard/protocols/__init__.py`, purely additive metadata, same
+    pattern as plan 0101's own protocol entry), and a config-identity test
+    (`tests/unit/test_config.py::test_mobilenetv4_trades_beta_configs_are_field_identical_except_beta`).
+    `scripts/verify.py --changed` run; result recorded in the next entry.
