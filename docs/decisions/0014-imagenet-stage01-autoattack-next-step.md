@@ -51,7 +51,34 @@ Heldoutに対しての防御力はしっかりみるべき。100サンプル以�
   - 決まること: 内部検証(PGD-10、n=1)で見えたmobilenetv3_adrの逆転傾向(§下記)がAutoAttackでも
     同じ符号で出るか。4本同時に見るため、Bのような段階的コスト測定はできないが、Eの時点で
     GPU時間は4本合計でも内部検証よりはるかに小さい(サンプル数1/10未満)。
-  - 結果は本パケットに追記する(実行完了後)。
+  - **結果(4本とも完了、2026-09-15)**:
+
+    | run | clean(val 5万枚) | PGD-10(val 5万枚) | AutoAttack(n=500) |
+    |---|---:|---:|---:|
+    | `r18_baseline-s0`(pgd_at) | 52.0% | — | 22.8% |
+    | `r18_adr-s0`(adr) | 47.3% | — | 21.2% |
+    | `mobilenetv3_baseline-s0`(pgd_at) | 42.8% | 22.7% | 17.4% |
+    | `mobilenetv3_adr-s0`(adr) | 38.8% | 19.7% | 13.6% |
+
+    (r18側のPGD-10列は postrun のログ取り込みが本パケット執筆時点で未完了のため空欄。
+    clean/AutoAttackはログから直接確認済み。)
+
+    **両アーキテクチャで`adr`が`pgd_at`に対しclean・AutoAttackとも一貫して劣る**:
+    ResNet-18は-4.7pt clean/-1.6pt AutoAttack、MobileNetV3-Smallは-4.0pt clean/-3.8pt
+    AutoAttack。**これは内部検証(PGD-10、best epoch)で見えたResNet-18の符号(`adr`が
+    `pgd_at`より+1.7pt高いPGD-10)と矛盾する** — AutoAttackではResNet-18も`adr`が
+    `pgd_at`を下回る(-1.6pt)。PGD-10(訓練で使う10-step攻撃)がAutoAttack(APGD-CE/T,
+    FAB-T, Squareの複合)より弱く、`adr`のself-distillationが勾配マスキング的にPGD-10を
+    実際より楽観的に見せていた可能性が高い。n=500・n=1(seed)なので二項標準誤差は約1.6-1.8pt
+    (500サンプル、比率15-25%近辺)、符号自体は両アーキテクチャで揃っており偶然とは考えにくい。
+
+    **結論**: plan 0100の仮説(小型モデルほど自己蒸留の利得が大きい)は、内部検証・AutoAttack
+    のどちらで見ても支持されない。むしろ**`adr`はこの2アーキテクチャ・このレシピでは
+    `pgd_at`に対しclean・robustの両方で一貫して不利**という、より強い逆方向の兆候。
+    stage 2(seed 1/2、8本、約250 GPU時間)への投資判断はこの逆方向シグナルを踏まえて
+    人間が行うべき — 本パケットはこれ以上の推奨を追加しない(stage 2の可否は本パケットの
+    スコープ外、`chosen: E`は方向性判定の実行方法についての決定であり、stage 2着手の
+    承認ではない)。
 
 ## 何が完了しているか
 
