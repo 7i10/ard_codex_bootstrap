@@ -10,8 +10,48 @@ options:
   C: AutoAttackは保留し、内部検証の符号だけを根拠にstage 2(seed 1/2、8本)へ進む。0 GPU時間(AutoAttack分)。事前登録された判定ルール(AutoAttackが前提)からの逸脱になるため非推奨——公式テストなしでstage 2の判断をすると、後からAutoAttackを回した際に符号が変わるリスクを抱えたまま大きな投資をすることになる。
   D: 何もしない。0 GPU時間。決まること = 何も。
 recommendation: B
-chosen: null
+chosen: E
 ---
+
+## 2026-09-15 追記: 人間の判断でEを実行(BをA/Cから置き換え)
+
+チャットでの人間からの明示的な指示: 「autoattackに関して評価に時間をかけるのは勿体無いが、
+Heldoutに対しての防御力はしっかりみるべき。100サンプル以上の短時間だが有効なサンプル数を
+選んで本番評価ではなく方向性を決めるための評価を行うべきでは？」
+
+これはBの「1本だけ実測してから残りを決める」という段階的コスト測定ではなく、**4本とも
+少サンプルで同時に見る**という異なる設計。新option Eとして記録し、これをchosenとする。
+
+- **E(実行済み)**: 4本すべてのbestチェックポイントに対し、AutoAttackを`autoattack_sample_count=500`
+  (heldout評価セットからseed固定の一様ランダム抽出、`EvaluationConfig.autoattack_sample_count`の
+  既存メカニズムをそのまま使用、prefixではない)で実行。`evaluation.checkpoints=best`のみ(lastは
+  対象外、方向性判定目的でコストを抑える)。使用コマンド:
+  ```
+  PYTHONPATH=src python -m ard.cli.evaluate \
+    --config configs/evaluation/autoattack_saved_checkpoint.yaml \
+    --checkpoint-dir <run>/train --output <run>/train/evaluation-direction-n500 \
+    --weights model --allow-autoattack \
+    evaluation.checkpoints=best evaluation.autoattack_sample_count=500
+  ```
+  実行元: 新規pinned worktree `source-c2cada7a691a`(SHA `c2cada7a691a`、P1-1/P1-2修正
+  commit `1092432`を含む — 旧worktree `source-ae4dd7c82d80`はこの修正より前)。Hamster GPU0/1で
+  2本ずつ実行。
+  - **訂正(postrunの指摘、2026-09-15)**: 「heldout評価セット」と書いたが、実際に使われた
+    `evaluation.dataset`はこのplanの公式評価スプリットである**ImageNet-1k val(5万枚)**で、
+    訓練時のチェックポイント選択に使う2%held-outスライスではない。clean/PGD-10はこのval
+    5万枚全体で計算され、AutoAttackだけがそこから500枚を抽出している(`autoattack_sample_count`
+    は評価対象データセット全体に対する一様ランダム抽出、prefixではない)。
+  - 500というサンプル数の根拠: 人間が示した下限(100以上)を上回りつつ、val全体(5万枚)より
+    AutoAttackのコストを大幅に抑える。方向性(符号関係)を見るための値であり、公式テストの
+    代替ではない。
+  - **これは公式テスト(official test)ではない** — `.claude/rules/results-records.md`の record
+    フォーマットには載せない。plan本文・decision packetのみに記録し、方向性が確認できた場合に
+    初めて、本当に必要な範囲(4本、またはそのうち有望な設定)でフルサンプルのAutoAttackを
+    改めて実行し、それを公式記録とする。
+  - 決まること: 内部検証(PGD-10、n=1)で見えたmobilenetv3_adrの逆転傾向(§下記)がAutoAttackでも
+    同じ符号で出るか。4本同時に見るため、Bのような段階的コスト測定はできないが、Eの時点で
+    GPU時間は4本合計でも内部検証よりはるかに小さい(サンプル数1/10未満)。
+  - 結果は本パケットに追記する(実行完了後)。
 
 ## 何が完了しているか
 
