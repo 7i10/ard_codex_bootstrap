@@ -810,3 +810,38 @@ milestone this session.
   pending scientific review of the `src/ard/tracking/` collision guard before
   any new SHA is frozen; and whether MobileNetV3-Small `adr`'s shortfall
   should change the stage-2 design. No action taken.
+- 2026-09-15 -- **Direction-finding evaluation (decision 0014 option E), both
+  MobileNetV3-Small arms complete; ResNet-18 arms still running.**
+  `campaign_watch.py --once --include-hand-run` on
+  `mobilenetv3_adr-s0/train/evaluation-direction-n500/run-bundle/manifest.json`
+  (`eval-18825f69ad27ed69ea5c`) and `mobilenetv3_baseline-s0/...`
+  (`eval-579a156e59edfb2f5e4e`): `terminal: true`, `success: true`,
+  `failure_class: null`. `r18_baseline-s0` (`eval-bf5723135a97a85892eb`) and
+  `r18_adr-s0` (`eval-a3f13759af0f9e07aa88`) were still `running` at that scan.
+  Source SHA `c2cada7a691a`, `dirty: false`, evaluation seed 0, world size 1,
+  global batch 128. `evaluation-results.json`, `autoattack-best.json`,
+  `evaluation-lineage.json`, `panel-best.jsonl`, `sample-stats-best.parquet`
+  and `run-bundle/completion.json` on disk.
+  **Nothing imported**: option E is by decision not an official test record,
+  and no aggregator for this contract exists (Verification step 5). No record,
+  report, ledger row or milestone tick.
+  **Which split was used**: `dataset_identity.split` is `val`, `count` 50000,
+  so this evaluation used ImageNet-1k val, which is this plan's official
+  evaluation split. It did not use the 2% held-out training slice used for
+  checkpoint selection. Decision 0014's option E text says "heldout評価セット";
+  the human should confirm that this is what was meant. Clean and PGD-10 are
+  over all 50k val images; AutoAttack is over 500 images drawn at random with
+  seed 0.
+  Numbers (best checkpoint only, ImageNet val, `mobilenet_v3_small_imagenet`,
+  no teacher, training seed 0, Linf eps 4/255; PGD-10 CE, step 8/765, random
+  start; AutoAttack standard v0.1 `a392200`):
+  | run | checkpoint sha256 | clean (n=50000) | PGD-10 (n=50000) | AutoAttack (n=500) |
+  |---|---|---:|---:|---:|
+  | `mobilenetv3_baseline-s0` (`pgd_at`) | `7de4437f…` | 0.42802 | 0.2267 | 0.174 |
+  | `mobilenetv3_adr-s0` (`adr`) | `659b9d35…` | 0.388 | 0.19686 | 0.136 |
+  Here MobileNetV3-Small `adr` is -4.0 pp clean, -3.0 pp PGD-10 and
+  -3.8 pp AutoAttack against its own `pgd_at` baseline. This is the same sign as
+  the internal validation above. With n=500, one arm's AutoAttack accuracy has a
+  binomial standard error of about 1.6 pp. One seed gives a direction only,
+  not a result under the preregistered rule. The ResNet-18 pair and the decision
+  0014 addendum are still open; no action taken.
