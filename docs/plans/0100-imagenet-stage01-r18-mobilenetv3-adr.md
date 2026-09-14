@@ -845,3 +845,28 @@ milestone this session.
   binomial standard error of about 1.6 pp. One seed gives a direction only,
   not a result under the preregistered rule. The ResNet-18 pair and the decision
   0014 addendum are still open; no action taken.
+- 2026-09-15 -- **Direction-finding evaluation (decision 0014 option E):
+  `r18_baseline-s0` complete; `r18_adr-s0` still running.**
+  `campaign_watch.py --once --include-hand-run` on
+  `r18_baseline-s0/train/evaluation-direction-n500/run-bundle/manifest.json`
+  (`eval-bf5723135a97a85892eb`): `terminal: true`, `success: true`,
+  `failure_class: null`. `r18_adr-s0` (`eval-a3f13759af0f9e07aa88`) was still
+  `running` (no `completion.json`) at the same scan. Source SHA `c2cada7a691a`,
+  `dirty: false`, evaluation seed 0, world size 1, global batch 128.
+  `evaluation-results.json`, `autoattack-best.json`, `evaluation-lineage.json`,
+  `panel-best.jsonl`, `sample-stats-best.parquet` and
+  `run-bundle/completion.json` on disk. Wall time from manifest
+  `created_at` to `finished_at`: about 14 min on one Hamster 4090 (clean +
+  PGD-10 on 50k val + AutoAttack on 500), shared with a second job on the host.
+  **Nothing imported**, for the same reasons as the MobileNetV3-Small pair
+  (option E is not an official test record; no aggregator exists).
+  Numbers (best checkpoint only, ImageNet-1k val `split: val`, `count` 50000,
+  `resnet18_imagenet`, `pgd_at`, no teacher, training seed 0, Linf eps 4/255;
+  PGD-10 CE, step 8/765, random start; AutoAttack standard v0.1 `a392200`,
+  500 images drawn with seed 0):
+  | run | checkpoint sha256 | clean (n=50000) | PGD-10 (n=50000) | AutoAttack (n=500) |
+  |---|---|---:|---:|---:|
+  | `r18_baseline-s0` (`pgd_at`) | `64b83423…` | 0.51998 | 0.2936 | 0.228 |
+  The `adr`-vs-`pgd_at` comparison for ResNet-18 needs `r18_adr-s0`; no
+  comparison is stated here. No record, report, ledger row or milestone tick;
+  no action taken.
