@@ -514,3 +514,23 @@ eventual source freeze; it is not part of this plan's own scope.
   **Stage C decision, now due**: commit a fuller run (which arm(s), how
   many epochs, whether to extend past 12 to see the LR-decay recovery
   before deciding) is a human call, not made here.
+- 2026-09-15 (chat + Ferret): human chose decision 0015's option C (all
+  three arms, full 50 epochs) via `AskUserQuestion`. Pushed the 6 local
+  commits accumulated since Stage B (plan/decision docs only, no `src/`,
+  `configs/` or `scripts/` changes -- confirmed by diff against Stage B's
+  own source SHA) after explicit approval, then `ferret-prepare`/
+  `ferret-launch` for three fresh run-ids at source SHA `916535a`:
+  `plan0101-stagec-arm-a-no-warmup-v1` (GPU0), `-arm-b-warmup3step-v1`
+  (GPU1), `-arm-c-warmup1step-v1` (GPU2), each `--epochs 50` (matching
+  the frozen configs' own value, not an override away from them). This is
+  a fresh from-scratch 50-epoch run for all three arms, not a resume from
+  Stage B's epoch-12 checkpoints -- resuming would need the continuation
+  job's `--output` to point at Stage B's own output directory while
+  `ferret-prepare` mints a fresh run directory, and `--resume`'s
+  same-output-dir plus config-hash/tracker-run-id equality requirements
+  made that fragile enough that a plain fresh run was judged simpler and
+  lower-risk; decision 0015's GPU-hour estimates were already scoped to
+  full runs, so this doesn't create unplanned cost. All three processes
+  confirmed alive (`ferret-status`: `running`, PID present) immediately
+  after launch; GPU utilization ramp-up (still 0% a few checks in, likely
+  still in dataset/model-load) being confirmed separately.
