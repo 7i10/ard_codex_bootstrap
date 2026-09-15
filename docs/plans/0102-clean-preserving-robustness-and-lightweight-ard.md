@@ -568,3 +568,19 @@ config.
      resume-based continuation on Ferret -- not just a theoretical risk,
      a reproduced mechanical fact. Switched to a fresh from-scratch launch
      under a new run-id, same config, same seed.
+  **AutoAttack result (addresses caveat 2 directly)**: both checks
+  finished. `best.pt` (student-selected, epoch 4): clean 40.28%,
+  AutoAttack(n=500) 14.2%. `best-ema.pt` (EMA-selected, epoch 5): clean
+  45.14%, AutoAttack(n=500) 19.4%. **The EMA weights beat the live
+  weights on both clean (+4.9pp) and real AutoAttack (+5.2pp)** -- this is
+  not a PGD-10-specific artifact; a full APGD-CE/APGD-T/FAB-T/Square attack
+  shows the same direction. At n=500 each arm's binomial standard error is
+  about 1.6-1.8pp, so the 5.2pp AutoAttack gap is roughly 3x the per-arm
+  SE -- more distinguishable than the earlier ResNet-18 adr-vs-pgd_at gap
+  (1.6pp gap against ~1.8pp SE, indistinguishable), though still n=1 seed
+  and not a substitute for a full-sample official test. This is the
+  strongest positive result either workstream has produced so far, and the
+  first result in this plan that survived a real-attack check, not just an
+  internal PGD-10 proxy. Caveats 1, 3 and 4 above are still open (LR-decay
+  survival is what `plan0102-weight-ema-full50-v1` is now checking; decay
+  value and BN-averaging separation are unaddressed; n=1 seed).
