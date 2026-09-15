@@ -414,3 +414,35 @@ config.
        for it once review clears. AWP itself is deferred, not abandoned --
        revisit after weight-EMA's own result is in, since weight-EMA alone
        might already close much of the gap the literature review flagged.
+  5. **Review returned**: 2 blocking (P1), 6 non-blocking (P2) findings, all
+     genuine (not false positives) -- notably the review caught that a bad
+     edit had *deleted* a pre-existing regression guard (rule 6: never
+     weaken a guard to make an edit pass) and that a diagnostic metric
+     (`train_ema_student_agreement`) would have silently logged a false
+     0.0 instead of the true (>0.95) value for every weight-EMA run, which
+     matters because that exact metric has already been read as evidence
+     in plan 0100's own write-up. Fixed all 8 findings in one batched pass
+     (CLAUDE.md rule 2): restored the guard; re-scoped the metric's gate to
+     `adr_config is not None`; added `weight_ema_decay`/`epsilon_warmup_epochs`
+     to `evaluate.py`'s `training_protocol_identity` so the aggregator's
+     mixed-identity guard can see them (no existing record uses either
+     field, so no already-recorded identity changes); documented the
+     config-hash/resume caveat (same class as `epsilon_warmup_epochs`
+     before it -- any pre-`29decde` checkpoint needs its own pinned SHA to
+     resume) and the roughly-doubled per-epoch validation cost; corrected
+     four stale ADR-only comments/help text and added a non-ADR-EMA section
+     to `docs/SCIENTIFIC_INVARIANTS.md`; replaced a one-epoch test that
+     didn't prove "independent selection" with the real independence test.
+     Picked and justified `weight_ema_decay: 0.999` (distinct from ADR's
+     own 0.995, matching the general per-iteration-EMA convention rather
+     than the shorter fixture-test value of 0.9) in a new launch config,
+     `configs/scientific/imagenet_mobilenetv4_pgd_at_no_warmup_weight_ema.yaml`
+     -- field-identical to plan 0101's Arm A except `weight_ema_decay` and
+     `tracking.group`, isolating the weight-EMA effect against Arm A's
+     already-recorded epoch-11 baseline (37.8% clean / 19.4% PGD-10).
+     `scripts/verify.py --changed` green (confirmed twice, including once
+     via explicit exit code after a confusing but benign verify.py
+     cache-timing artifact -- not a real failure). Committed as `29decde`.
+     Pinned worktree `source-29decdedb4c7`, launched a 12-epoch canary on
+     Hamster GPU1 (`plan0102-weight-ema-v1`), GPU0 still running the
+     TRADES-beta3 canary.
