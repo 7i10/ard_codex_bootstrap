@@ -538,3 +538,33 @@ config.
      running statistics are part of the EMA copy and may carry part of the
      effect. Nothing here separates the two.
   4. n=1, seed 0, one GPU, global batch 128.
+- 2026-09-15 (chat, autonomous, continued): both Hamster GPUs freed once the
+  two canaries above finished (human noticed and asked). Given the
+  weight-EMA result's size (well above the CIFAR noise floor) and its two
+  open caveats (does it survive the LR decay; is the PGD-10 gain real
+  robustness or an attack-strength artifact), launched three jobs at once
+  rather than picking one:
+  1. **AutoAttack direction-finding (n=500) on `plan0102-weight-ema-v1`'s
+     own best.pt AND best-ema.pt** (same run, same epoch pool, only the
+     evaluated weights differ -- the cleanest possible apples-to-apples
+     check of caveat 2). `--weights model --allow-autoattack` and
+     `--weights ema --allow-autoattack`, both `evaluation.checkpoints=best
+     evaluation.autoattack_sample_count=500`, both on Hamster GPU0 from the
+     same pinned worktree the training run used
+     (`source-29decdedb4c7`). Not an official test (reduced sample,
+     direction-finding only, same status as decision 0014's option E).
+  2. **A fresh full 50-epoch run of the exact same weight-EMA config**
+     (`plan0102-weight-ema-full50-v1`, Hamster GPU1) to see whether the gap
+     survives the epoch-25/38 LR decay (caveat 1). Attempted a `--resume`
+     of the 12-epoch run first, to avoid re-spending the first 12 epochs:
+     rejected with "checkpoint config hash does not match resolved
+     config" -- `training.epochs` is itself part of the resolved-config
+     hash the checkpoint was saved under (it was launched with `--epochs
+     12`, i.e. `training.epochs=12` forwarded as an override), so
+     resuming under `--epochs 50` is a different identity, not a
+     continuation, by this project's own resume-refuses-drift design.
+     This empirically confirms the same reasoning that led decision
+     0015/plan 0101's Stage C to launch fresh rather than attempt a
+     resume-based continuation on Ferret -- not just a theoretical risk,
+     a reproduced mechanical fact. Switched to a fresh from-scratch launch
+     under a new run-id, same config, same seed.
