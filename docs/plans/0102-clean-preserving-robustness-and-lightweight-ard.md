@@ -629,3 +629,91 @@ config.
   run launched at epochs=12 is never resumable into an epochs=50
   continuation on this project's own design, so the only way to avoid the
   tax is to never create the epochs=12 identity in the first place.
+- 2026-09-16 (`/experiment-postrun`, run-bundle path): `plan0102-adr-sharp-temp-v1`
+  completed at 2026-09-15T18:50Z. Terminal status re-derived with
+  `campaign_watch.py --once --include-hand-run`: `terminal: true`,
+  `success: true`, `failure_class: null`. All 12 of 12 epoch rows are present.
+  `run-bundle/completion.json` (`completed`), `best.pt`, `best-ema.pt`, `last.pt`,
+  `epoch-metrics.parquet`/`.jsonl` and `sample-stats-train.parquet` exist.
+  Source SHA `b9f63c937c85` (clean worktree). World size 1, global batch 128,
+  seed 0, protocol `controlled_imagenet_stage01_mobilenetv4_adr_v1`, resolved
+  `training.epochs: 12`, `adr` with `ema_decay 0.995`, `temperature_high/low
+  1.2/0.8`, `lambda_low/high 0.5/0.9`, `lambda_source: cosine`.
+  **Nothing imported**, for the same reason as the other canaries in this
+  plan: no aggregator exists for this contract, and no AutoAttack has run. No
+  record, report, ledger row or milestone tick. No decision packet either:
+  the governance note above covers the choice of the next arm.
+  **Comparability check.** The config differs from Arm A's
+  `imagenet_mobilenetv4_pgd_at_no_warmup.yaml` only in the header comment,
+  `protocol.id`, `tracking.group` and `method`. Inside `method`, the
+  `selection_attack` is the same (CE, eps 4/255, step 8/765, 10 steps, random
+  start, eval mode), so the validation slice and attack match Arm A. The
+  training objective and the inner attack (KL against the rectified target
+  instead of CE) differ on purpose. Arm A's per-epoch numbers below come from
+  the live weights of `plan0102-weight-ema-v1`. That run has the same config
+  and seed as Arm A, and its epoch-11 numbers matched Arm A (see that entry).
+  **Caveat that changes how to read the diagnostics: the lambda schedule was
+  compressed.** `lambda_i` anneals by cosine over `len(loader) *
+  training.epochs` iterations (`src/ard/cli/train.py:909`). With `--epochs 12`,
+  lambda moves from 0.5 to 0.9 within these 12 epochs. So this run is **not**
+  the first 12 epochs of a 50-epoch `adr` run. By epoch 11 the target is
+  already at `lambda_high`, while the LR is still at its 0.05 peak and has
+  not decayed. That is the same caveat as plan 0100's 3-epoch canary.
+  **Internal validation only (held-out slice, PGD-10; not an official result,
+  n=1, 12 epochs, LR warmup 0.005→0.05 over epochs 0-9, no LR decay)**, from
+  `epoch-metrics.jsonl`. "Student" means the trained weights. "EMA" means
+  ADR's own EMA teacher (decay 0.995), evaluated on the same slice and attack.
+  | epoch | LR | ADR student clean / PGD | ADR EMA clean / PGD | Arm A (PGD-AT) clean / PGD | student − Arm A |
+  |---:|---:|---:|---:|---:|---:|
+  | 0 | 0.005 | 49.2% / 20.8% | 50.0% / 22.1% | 46.8% / 19.2% | +2.4 / +1.6 pp |
+  | 2 | 0.015 | 48.6% / 23.6% | 51.0% / 25.8% | 46.0% / 21.6% | +2.6 / +2.0 pp |
+  | 5 | 0.030 | 45.3% / 23.5% | 48.2% / 26.3% | 42.8% / 21.7% | +2.5 / +1.8 pp |
+  | 8 | 0.045 | 39.6% / 20.4% | 43.1% / 23.9% | 37.2% / 19.6% | +2.4 / +0.8 pp |
+  | 11 (last) | 0.050 | 38.6% / 20.1% | 41.3% / 22.7% | 37.8% / 19.4% | +0.8 / +0.7 pp |
+  Best by PGD: student epoch 4 (46.4% / 24.1%), against Arm A's live best at
+  epoch 4 (43.3% / 21.7%). EMA best: epoch 4 (49.5% / 26.8%). The best
+  checkpoints were chosen on this same slice, so the last-epoch row is the
+  less biased one.
+  ADR diagnostics, per epoch 0→11:
+  `train_rectified_true_class_mass` 0.561, 0.564, 0.552, 0.531, 0.509, 0.486,
+  0.467, 0.455, 0.451, 0.451, 0.456, 0.461.
+  `train_ema_student_agreement` 0.749, 0.763, 0.763, 0.755, 0.744, 0.732,
+  0.721, 0.716, 0.718, 0.724, 0.737, 0.745.
+  Reading, for this single run at this horizon:
+  1. **True-class mass did not collapse.** It levelled off at about 0.45 and
+     rose slightly over epochs 9-11, with lambda already at about 0.9. The
+     closest earlier reference is plan 0100's 3-epoch canary. That run also
+     had a compressed lambda, but used temperature 2.0/1.5 and
+     MobileNetV3-Small. Its mass fell 0.473 → 0.306 → 0.139. Plan 0100's
+     50-epoch `mobilenetv3_adr-s0` ended at 0.105. Agreement stayed at
+     0.72-0.76 here and did not climb toward 0.96. **This part is close to
+     automatic.** A lower temperature makes the teacher's softmax sharper,
+     and that raises true-class mass whenever the teacher is right. So a
+     higher mass is expected from the change itself. It shows that the
+     collapse signature is gone at this horizon. It does not show that the
+     student learns better.
+  2. **Accuracy against PGD-AT.** The student was ahead of Arm A on both
+     clean and PGD at every epoch shown. The gap was about +2.5 pp clean and
+     +1.5-2.0 pp PGD through epoch 5. By epoch 11 it had shrunk to +0.8 pp
+     clean and +0.7 pp PGD, which is inside the 0.16-1.88 pp CIFAR
+     control-vs-control spread. The gap shrank while lambda reached its
+     high end and the LR reached its peak. At the last epoch, sharp-temperature
+     `adr` is therefore level with PGD-AT, not ahead of it. It is also not
+     behind, unlike plan 0100's `adr` at the end of its schedule. That run
+     used a different architecture and a 50-epoch schedule, so the two are
+     not directly comparable.
+  3. **ADR's EMA teacher against plain weight-EMA.** ADR's own EMA copy
+     (decay 0.995) at epoch 11 is 41.3% / 22.7%. That is +2.7 / +2.6 pp over
+     the ADR student, but -3.4 / -3.1 pp below the EMA weights of
+     `plan0102-weight-ema-v1` (decay 0.999, 44.7% / 25.8%). The decays differ.
+     The training objectives differ too. So this comparison does not separate
+     "distilling from the EMA" from "just averaging the weights". It does
+     mean that, at this horizon, `adr` with sharp temperature has not beaten
+     the cheaper weight-EMA arm, on either the student or the EMA weights.
+  4. **What this canary cannot answer**: plan 0100 saw the failure during
+     the recovery after the epoch-25 LR decay. That phase never ran here.
+     Also, the compressed lambda means these 12 epochs do not match any
+     50-epoch trajectory. Only a 50-epoch run can say whether the higher
+     mass carries through the decay. Per this plan's own 2026-09-15 process
+     change, such a run would launch at `--epochs 50` from the start. n=1,
+     seed 0, one GPU, global batch 128.
