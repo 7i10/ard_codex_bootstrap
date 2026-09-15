@@ -809,13 +809,15 @@ def test_mobilenetv4_1step_config_is_field_identical_to_the_warmup_config_except
 def test_mobilenetv4_trades_beta_configs_are_field_identical_except_beta(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Plan 0102 Workstream A's first probe (literature-review recommendation,
-    2026-09-15): bracket TRADES's clean/robust tradeoff curve on
-    MobileNetV4-Conv-Small at beta=1 (clean-favoring) and beta=6 (Zhang et
-    al. 2019's own default) before committing a full run to either. The two
-    configs must differ in exactly method.trades_beta and tracking.group --
-    in particular the selection attack and the official evaluation attack
-    (both steps: 10, loss: ce) must be untouched, per CLAUDE.md rule 6."""
+    """Plan 0102 Workstream A's TRADES-beta probe (literature-review
+    recommendation, 2026-09-15): bracket TRADES's clean/robust tradeoff
+    curve on MobileNetV4-Conv-Small at beta=1 (clean-favoring), beta=3
+    (mid-point, added after beta=1/beta=6 both landed inconclusive at the
+    12-epoch horizon) and beta=6 (Zhang et al. 2019's own default) before
+    committing a full run to any one value. The three configs must differ
+    in exactly method.trades_beta and tracking.group -- in particular the
+    selection attack and the official evaluation attack (both steps: 10,
+    loss: ce) must be untouched, per CLAUDE.md rule 6."""
     values = {
         "ARD_SEED": "7",
         "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
@@ -829,14 +831,14 @@ def test_mobilenetv4_trades_beta_configs_are_field_identical_except_beta(
         monkeypatch.setenv(key, value)
     config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
     beta1 = load_config(config_dir / "imagenet_mobilenetv4_trades_beta1.yaml").model_dump(mode="json")
+    beta3 = load_config(config_dir / "imagenet_mobilenetv4_trades_beta3.yaml").model_dump(mode="json")
     beta6 = load_config(config_dir / "imagenet_mobilenetv4_trades_beta6.yaml").model_dump(mode="json")
     assert beta1["method"]["trades_beta"] == 1.0
+    assert beta3["method"]["trades_beta"] == 3.0
     assert beta6["method"]["trades_beta"] == 6.0
-    assert beta1["method"]["selection_attack"]["steps"] == 10
-    assert beta6["method"]["selection_attack"]["steps"] == 10
-    assert beta1["evaluation"]["attack"]["steps"] == 10
-    assert beta6["evaluation"]["attack"]["steps"] == 10
-    for payload in (beta1, beta6):
+    for payload in (beta1, beta3, beta6):
+        assert payload["method"]["selection_attack"]["steps"] == 10
+        assert payload["evaluation"]["attack"]["steps"] == 10
         payload["method"] = {**payload["method"], "trades_beta": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
-    assert beta1 == beta6
+    assert beta1 == beta3 == beta6

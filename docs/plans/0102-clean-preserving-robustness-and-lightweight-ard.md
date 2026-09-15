@@ -311,3 +311,65 @@ config.
   CIFAR screens. No ImageNet noise floor exists yet, and each arm is one
   run. The safe reading is "TRADES beta=6.0 lands near PGD-AT at epoch 11,
   slightly more clean and slightly less PGD". That is not a ranking.
+- 2026-09-15 (chat, autonomous, continued): both Hamster GPUs went idle
+  once the two TRADES canaries finished (human noticed and asked). Three
+  things launched/run immediately:
+  1. **Third TRADES-beta probe point** (`imagenet_mobilenetv4_trades_beta3.yaml`,
+     beta=3.0, same structure as beta=1/6) added to fill in the curve
+     between the two inconclusive points above, plus a 3-way config-
+     identity test replacing the pairwise one
+     (`test_mobilenetv4_trades_beta_configs_are_field_identical_except_beta`).
+     `scripts/verify.py --changed` run; launch follows once green (recorded
+     in the next entry).
+  2. **MixedNUTS-style post-hoc logit-mixing diagnostic run** (recommendation
+     4, deferred from the previous entry) --
+     `scripts/analysis/plan0102_mixed_nuts_diagnostic.py` (new, throwaway,
+     not a scientific record), a self-contained white-box PGD-10 attack
+     (eps=4/255, step=8/765) against the actual softmax mixture of each
+     plan 0100 `pgd_at` checkpoint (robust) and its own original pretrained
+     backbone (clean), swept over mixing weight lambda in
+     {0, 0.25, 0.5, 0.75, 1}, n=1000 random val images, one Hamster GPU,
+     finished in well under an hour:
+
+     | arch | lambda | clean_acc | robust_acc (white-box PGD-10 vs the mixture) |
+     |---|---:|---:|---:|
+     | resnet18 | 0.00 | 69.5% | 0.0% |
+     | resnet18 | 0.25 | 70.0% | 0.1% |
+     | resnet18 | 0.50 | 69.8% | 3.0% |
+     | resnet18 | 0.75 | 66.6% | 17.1% |
+     | resnet18 | 1.00 | 50.6% | 28.2% |
+     | mobilenetv3 | 0.00 | 66.9% | 0.0% |
+     | mobilenetv3 | 0.25 | 66.7% | 0.2% |
+     | mobilenetv3 | 0.50 | 65.9% | 1.3% |
+     | mobilenetv3 | 0.75 | 62.9% | 9.3% |
+     | mobilenetv3 | 1.00 | 39.2% | 21.3% |
+
+     (lambda=1.0's clean/robust numbers are close to, not identical to,
+     the earlier full-val/AutoAttack numbers -- expected, this is n=1000
+     random images with a different attack (white-box PGD-10 here, not
+     AutoAttack) and a different seed's subset, not a discrepancy.)
+
+     **Reading, honestly**: a plain linear softmax mix is not a free
+     lunch under a white-box attacker who backpropagates through the
+     whole mixture -- robust accuracy stays near zero until lambda is
+     already most of the way to 1 (0.5→3.0%, 0.75→17.1% for resnet18),
+     by which point most of the clean-accuracy gain is already gone
+     (69.8%→66.6% between those same two points). There is no
+     lambda where this simple mixture is both close to the clean
+     model's accuracy and meaningfully more robust than the plain robust
+     model alone. This does not mean MixedNUTS itself doesn't work --
+     the actual paper's mixing function is a *nonlinear*, margin-clipped
+     combination specifically designed to resist exactly this adaptive-
+     attack collapse, which this quick linear approximation does not
+     implement. **Correct conclusion: the naive version of this idea
+     doesn't help here; the paper's actual (more careful) mechanism has
+     not been tested and would need to be implemented properly, not
+     assumed from the linear-mix result.** Filed as a checked-and-mostly-
+     ruled-out item for the naive form; the real MixedNUTS formulation
+     remains a documented, not-yet-tried option if revisited later.
+  3. Given (2)'s negative result, recommendation 4 is deprioritized;
+     Workstream A continues with the TRADES-beta3 canary (1) and, next,
+     starts implementing AWP (recommendation 2) since TRADES alone has not
+     yet beaten PGD-AT on both axes at this horizon and AWP is the only
+     technique from the literature pass with CIFAR evidence of improving
+     both simultaneously (TRADES+AWP combo).
