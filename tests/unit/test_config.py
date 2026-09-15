@@ -860,3 +860,36 @@ def test_mobilenetv4_trades_beta_configs_are_field_identical_except_beta(
         payload["method"] = {**payload["method"], "trades_beta": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert beta1 == beta3 == beta6
+
+
+def test_mobilenetv4_weight_ema_config_is_field_identical_to_arm_a_except_weight_ema_decay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0102 Workstream A's weight-EMA probe: isolate the weight-EMA
+    effect against plan 0101's already-recorded Arm A baseline
+    (imagenet_mobilenetv4_pgd_at_no_warmup.yaml, epoch 11: 37.8% clean /
+    19.4% PGD-10) by differing in exactly training.weight_ema_decay and
+    tracking.group -- no epsilon-warmup, no TRADES, one variable at a
+    time."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
+    weight_ema = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup_weight_ema.yaml").model_dump(
+        mode="json"
+    )
+    assert arm_a["training"]["weight_ema_decay"] is None
+    assert weight_ema["training"]["weight_ema_decay"] == pytest.approx(0.999)
+    for payload in (arm_a, weight_ema):
+        payload["training"] = {**payload["training"], "weight_ema_decay": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert arm_a == weight_ema

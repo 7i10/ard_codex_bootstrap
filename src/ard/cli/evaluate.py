@@ -63,10 +63,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="model",
         help=(
             "Which checkpointed weight set to evaluate: 'model' (default) is the raw trained student, "
-            "matching every non-ADR method and the official ADR code's plain 'ADR' table rows. 'ema' "
-            "evaluates the EMA/weight-averaged shadow model an ADR run also checkpoints, matching the "
-            "official ADR code's '--ema'-flagged 'ADR + WA' rows; only checkpoints from an adr/adr_trades "
-            "run carry it."
+            "matching every non-EMA method and the official ADR code's plain 'ADR' table rows. 'ema' "
+            "evaluates the EMA/weight-averaged shadow model an adr/adr_trades run checkpoints (matching "
+            "the official ADR code's '--ema'-flagged 'ADR + WA' rows) or a plain pgd_at/trades run with "
+            "training.weight_ema_decay set (plan 0102); only a checkpoint from one of those two carries it."
         ),
     )
     parser.add_argument("overrides", nargs="*", help="Dot-path YAML overrides")
@@ -550,6 +550,21 @@ def main(argv: list[str] | None = None) -> int:
                         "validation_fraction": training_config.training.validation_fraction,
                         "scheduler": training_config.scheduler.model_dump(mode="json"),
                         "execution": execution_identity,
+                        # Plan 0102 scientific review, P2 finding 4: these
+                        # two training-level fields (plan 0101's epsilon
+                        # warmup, plan 0102's plain weight EMA) previously
+                        # appeared in neither this identity nor
+                        # method_identity, so summarize_checkpoint_groups's
+                        # "cannot aggregate mixed experiment identities"
+                        # guard could not see the one thing distinguishing
+                        # two otherwise-identical arms and would pool them.
+                        # No aggregator has ever run over a config carrying
+                        # either field (confirmed: no aggregator exists yet
+                        # for the imagenet-stage01 contract), so adding them
+                        # here does not change the identity of any already-
+                        # recorded result.
+                        "epsilon_warmup_epochs": training_config.training.epsilon_warmup_epochs,
+                        "weight_ema_decay": training_config.training.weight_ema_decay,
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

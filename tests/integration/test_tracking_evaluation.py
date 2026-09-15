@@ -623,6 +623,7 @@ def test_evaluation_rejects_ema_weights_for_a_non_adr_checkpoint_before_output_c
                 "ema",
             ]
         )
+    assert not rejected_output.exists()
 
 
 def test_evaluation_accepts_ema_weights_for_a_plain_weight_ema_checkpoint(

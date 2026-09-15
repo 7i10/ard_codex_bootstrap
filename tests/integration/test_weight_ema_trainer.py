@@ -135,7 +135,14 @@ def test_weight_ema_state_round_trips_through_save_and_resume(tmp_path: Path) ->
         assert torch.equal(resumed.ema_model.state_dict()[key], expected_value), key
 
 
-def test_weight_ema_best_ema_checkpoint_is_written_independently_of_best_pt(tmp_path: Path) -> None:
+def test_weight_ema_best_ema_checkpoint_carries_a_valid_selection_record(tmp_path: Path) -> None:
+    """One epoch only proves best-ema.pt exists and matches the live EMA
+    state -- both `improved` and `improved_ema` are trivially true from
+    -inf at epoch 0, so this does NOT prove best.pt/best-ema.pt select
+    independently (see
+    test_weight_ema_best_ema_selection_is_independent_of_student_selection
+    for that, mirroring test_adr_trainer.py's real independence test --
+    scientific review finding 8 caught this test's name overclaiming)."""
     output = tmp_path / "best-ema"
     trainer = _pgd_at_trainer(output, weight_ema_decay=0.9)
     loader, validation_loader, _ = _loaders()
@@ -147,3 +154,55 @@ def test_weight_ema_best_ema_checkpoint_is_written_independently_of_best_pt(tmp_
     assert trainer.ema_model is not None
     for key, value in trainer.ema_model.state_dict().items():
         assert torch.equal(payload["ema"][key], value), key
+
+
+def test_weight_ema_best_ema_selection_is_independent_of_student_selection(tmp_path: Path) -> None:
+    """best.pt and best-ema.pt must be free to disagree on which epoch is
+    best, for a plain weight_ema_decay run exactly as they already do for
+    adr (test_adr_trainer.py::test_best_ema_selection_is_independent_of_student_selection)
+    -- a fixture where the student peaks at epoch 0 and the EMA peaks at
+    epoch 2 would pass even if best-ema.pt were gated on the student's own
+    `improved` flag, unless the two selections are checked separately."""
+    output = tmp_path / "independent-selection"
+    trainer = _pgd_at_trainer(output, weight_ema_decay=0.9)
+    loader, validation_loader, _ = _loaders()
+    student_trajectory = iter(
+        [
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.9},
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.1},
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.2},
+        ]
+    )
+    ema_trajectory = iter(
+        [
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.1},
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.2},
+            {"clean_accuracy": 0.5, "pgd_accuracy": 0.9},
+        ]
+    )
+
+    def fake_validate_epoch(loader, *, model=None):
+        return next(ema_trajectory) if model is trainer.ema_model else next(student_trajectory)
+
+    trainer.validate_epoch = fake_validate_epoch
+    trainer.fit(loader, validation_loader=validation_loader, epochs=3)
+    best = torch.load(output / "best.pt", map_location="cpu", weights_only=False)
+    best_ema = torch.load(output / "best-ema.pt", map_location="cpu", weights_only=False)
+    assert best["selection_metadata"]["selected_epoch"] == 0
+    assert best_ema["selection_metadata"]["selected_epoch"] == 2
+    assert best["best_metric"] == pytest.approx(0.9)
+    assert best_ema["best_metric"] == pytest.approx(0.9)
+
+
+def test_weight_ema_does_not_emit_the_adr_only_student_agreement_metric(tmp_path: Path) -> None:
+    """Scientific review P1 finding 2: train_ema_student_agreement's only
+    data source (_pending_ema_clean_argmax) is populated exclusively by
+    ADR's own _rectified_target path. Before the fix, a plain weight_ema_decay
+    run silently logged a hard 0.0 for this metric (misreadable as "EMA and
+    student agree on 0% of clean images") instead of omitting it -- this
+    metric has been read as evidence in a plan write-up, so a wrong value
+    is not just noise, it is a false scientific claim, not a fixed one."""
+    trainer = _pgd_at_trainer(tmp_path / "no-fake-agreement", weight_ema_decay=0.9)
+    loader, validation_loader, _ = _loaders()
+    epoch_metrics = trainer.fit(loader, validation_loader=validation_loader, epochs=1)[0]
+    assert "train_ema_student_agreement" not in epoch_metrics

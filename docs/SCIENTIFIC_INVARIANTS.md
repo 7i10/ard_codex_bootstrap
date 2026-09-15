@@ -223,3 +223,18 @@ Training" (ICLR 2024, arXiv:2305.12118)。公式実装は `.external/adr`
     選択なので、一般には**epochが異なる**。公式実装と厳密に対応する同一epoch比較
     をしたい場合は、`best-ema.pt`を`--weights=model`と`--weights=ema`の**両方**で
     評価する(同じファイル、同じepoch、重みだけ切り替え)。
+
+## EMAチェックポイント契約はADR専用ではない(plan 0102)
+
+上記の「評価対象の重み」「チェックポイント選択はstudentとEMAで完全に独立」
+「`best-ema.pt`」の契約は、**`method.adr`を使わない、ふつうの`pgd_at`/`trades`
+実行が`training.weight_ema_decay`を設定した場合にも同一のまま適用される**
+(plan 0102 Workstream A: SWA的な、蒸留ターゲットではない、それ自体のための
+weight EMA)。`Trainer.ema_model`・`_update_ema`・`best-ema.pt`書き込み・
+`ard.engine.checkpoint`のsave/load・`ard.cli.evaluate --weights ema`の
+ゲートは、実装上もともと`self.ema_model is not None`だけで判定しており
+`method.id`を見ていなかったため、`adr_config`とは独立な第二の構築経路
+(`weight_ema_decay`)を追加しただけで、上記契約を書き換えずに再利用できた
+(scientific review、2026-09-15)。`training.weight_ema_decay`と`method.adr`
+は**互いに排他**——ADRは既に自分自身のEMAを蒸留ターゲットとして持っているため、
+独立な第二のシャドウモデルは併用できない(schema・Trainer両方で拒否)。

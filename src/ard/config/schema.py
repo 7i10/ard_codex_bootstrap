@@ -689,9 +689,10 @@ class TrainingConfig(StrictModel):
     # evaluation attack, only the training attack (CLAUDE.md rule 6: the
     # evaluated threat model never changes).
     epsilon_warmup_epochs: int | None = Field(default=None, ge=0)
-    # Plan 0102 Workstream A: plain weight-space EMA (Wu, Xia, Wang-style
-    # "SWA for adversarial training" literature review, 2026-09-15), decayed
-    # every training iteration exactly like ADR's own EMA (this reuses
+    # Plan 0102 Workstream A: plain weight-space EMA ("Adversarial Training
+    # with Stochastic Weight Average", arXiv:2009.10526, surfaced by this
+    # session's literature review, 2026-09-15), decayed every training
+    # iteration exactly like ADR's own EMA (this reuses
     # ``Trainer._update_ema`` unchanged -- see there for the exact update
     # rule and why it is method-agnostic already). Independent of, and
     # mutually exclusive with, ``method.adr`` (adr already tracks its own
@@ -699,7 +700,12 @@ class TrainingConfig(StrictModel):
     # run that wants a weight-averaged shadow model purely for its own
     # sake, not as a training-time target). Default None reproduces today's
     # exact behavior -- no EMA model constructed -- for every existing
-    # config that never mentions this field.
+    # config that never mentions this field. 0.0 is a permitted but
+    # degenerate value (the EMA becomes an exact copy of the live model
+    # every step, so best-ema.pt is just a second, differently-selected
+    # copy of the student, not a real average) -- not rejected, since it
+    # is harmless rather than incorrect, but never a value to actually
+    # launch with.
     weight_ema_decay: float | None = Field(default=None, ge=0, lt=1)
 
     @model_validator(mode="after")

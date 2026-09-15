@@ -1,0 +1,30 @@
+# Plan 0102 Workstream A: plain weight-EMA ("Adversarial Training with
+# Stochastic Weight Average", arXiv:2009.10526) on top of plain PGD-AT,
+# identical to plan 0101's Arm A (imagenet_mobilenetv4_pgd_at_no_warmup.yaml)
+# except training.weight_ema_decay and tracking.group -- isolating the
+# weight-EMA effect against the already-recorded Arm A baseline (epoch 11:
+# 37.8% clean / 19.4% PGD-10), the literature review's #1 cost/benefit
+# recommendation (CIFAR-10 evidence: +5.55pp robust AND +0.94pp clean
+# simultaneously, arXiv:2009.10526's own numbers). decay=0.999 matches the
+# general per-iteration EMA convention in the adversarial-training-at-
+# ImageNet-scale literature (Singh/Croce/Hein 2023, arXiv:2303.01870, uses
+# 0.9999 for a much longer 300-epoch schedule; 0.999 is this project's own
+# choice for a 50-epoch schedule, deliberately distinct from ADR's own
+# 0.995 to avoid implying this is the same mechanism) -- an explicit,
+# recorded scientific choice (CLAUDE.md rule 7), not a default left unset.
+# No epsilon-warmup, no TRADES -- one variable (weight EMA) isolated at a
+# time, matching this plan's own "design from the literature, one variable
+# at a time" process rule.
+schema_version: 2
+protocol: {id: controlled_imagenet_stage01_mobilenetv4_pgd_at_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: true, normalization: {profile: imagenet_standard}}
+method: {id: pgd_at, version: 1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: sgd, learning_rate: 0.05, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
+scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, weight_ema_decay: 0.999}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-pgd-at-no-warmup-weight-ema-controlled, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

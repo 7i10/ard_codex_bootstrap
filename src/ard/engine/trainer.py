@@ -1868,11 +1868,19 @@ class Trainer:
             if ema_validation_metrics is not None:
                 epoch_metrics["val_clean_accuracy_ema"] = ema_validation_metrics["clean_accuracy"]
                 epoch_metrics["val_pgd_accuracy_ema"] = ema_validation_metrics["pgd_accuracy"]
-            if self.ema_model is not None:
+            if self.adr_config is not None:
                 # Diagnostic only (plan 0098): a train-only candidate signal,
                 # logged for comparison against the validation-based
                 # raw_gap/severity signal gap-adaptive lambda uses. Gates
-                # nothing.
+                # nothing. Gated on adr_config, not merely `self.ema_model is
+                # not None` (plan 0102 scientific review, P1 finding 2):
+                # this metric's only data source, `_pending_ema_clean_argmax`,
+                # is populated exclusively by `_rectified_target` (ADR's own
+                # rectification path) -- a plain weight-EMA run never reaches
+                # it, so the accumulator would silently divide to a false
+                # 0.0 ("EMA and student agree on 0% of clean images") instead
+                # of the true (typically >0.95) value, with no error to flag
+                # the mismatch.
                 epoch_metrics["train_ema_student_agreement"] = train_metrics["ema_student_agreement"]
             if self.adr_config is not None:
                 # Diagnostic only (plan 0100, scientific review finding

@@ -50,10 +50,12 @@ class TrainingState:
     sample_state: dict[str, Any]
     fork_lineage: dict[str, Any] | None = None
     # Only present when the checkpoint carries an EMA-of-student model
-    # (adr/adr_trades) that has its own, independent best-checkpoint
-    # selection. None on a checkpoint written before this existed -- the
-    # caller restarts EMA-best tracking fresh rather than treating it as
-    # missing required state (unlike "ema" itself, which fails closed).
+    # (adr/adr_trades, or a plain pgd_at/trades run with
+    # training.weight_ema_decay set -- plan 0102) that has its own,
+    # independent best-checkpoint selection. None on a checkpoint written
+    # before this existed -- the caller restarts EMA-best tracking fresh
+    # rather than treating it as missing required state (unlike "ema"
+    # itself, which fails closed).
     best_metric_ema: float | None = None
     selection_metadata_ema: dict[str, Any] | None = None
 
@@ -252,8 +254,9 @@ def load_checkpoint(
         raw_ema = payload.get("ema")
         if raw_ema is None:
             raise ValueError(
-                "this run requires an EMA-of-student model (adr/adr_trades), but the checkpoint being "
-                "resumed carries no 'ema' state -- it was written by a run that did not use one"
+                "this run requires an EMA-of-student model (adr/adr_trades, or a plain pgd_at/trades run "
+                "with training.weight_ema_decay set), but the checkpoint being resumed carries no 'ema' "
+                "state -- it was written by a run that did not use one"
             )
         try:
             unwrap_model(ema_model).load_state_dict(raw_ema, strict=True)

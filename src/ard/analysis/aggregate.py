@@ -8,7 +8,8 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-# best-ema.pt (an ADR/adr_trades run's EMA-selected checkpoint, see
+# best-ema.pt (an ADR/adr_trades run's EMA-selected checkpoint, or a plain
+# pgd_at/trades run's with training.weight_ema_decay set -- plan 0102; see
 # ard.engine.trainer) is a peer of best.pt, not a third checkpoint kind: a
 # given evaluation-results.json set is always uniformly "model" or "ema"
 # weights (ard.cli.evaluate's own --weights flag and checkpoint-dir
