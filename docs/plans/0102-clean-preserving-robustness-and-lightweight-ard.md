@@ -446,3 +446,95 @@ config.
      Pinned worktree `source-29decdedb4c7`, launched a 12-epoch canary on
      Hamster GPU1 (`plan0102-weight-ema-v1`), GPU0 still running the
      TRADES-beta3 canary.
+- 2026-09-15 (`/experiment-postrun`, run-bundle path): `plan0102-trades-beta3-v1`
+  completed at 11:01Z. Terminal status re-derived with `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, `failure_class: null`.
+  All 12 of 12 epoch rows are present. `run-bundle/completion.json`, `best.pt`,
+  `last.pt`, `epoch-metrics.parquet` and `sample-stats-train.parquet` exist.
+  Source SHA `e6cf9edf9f9b` (clean worktree). World size 1, global batch 128,
+  seed 0, protocol `controlled_imagenet_stage01_mobilenetv4_trades_v1`.
+  **Nothing imported**, for the same reason as beta=1.0 and beta=6.0: no
+  aggregator exists for this contract, and no AutoAttack has run. No record,
+  report, ledger row or milestone tick. The config differs from beta=1/6 only
+  in beta. `test_mobilenetv4_trades_beta_configs_are_field_identical_except_beta`
+  enforces this, so the validation slice and selection attack match Arm A, as
+  checked for beta=6.0 above. One caveat: beta=3.0 ran from `e6cf9ed`, while
+  beta=1/6 ran from `3e7224c`. The commits in between change only the plan,
+  this config, its test and a throwaway analysis script. None of them touches
+  `src/ard/`.
+  **Internal validation only (held-out slice, PGD-10; not an official result,
+  n=1 per arm, 12 of 50 epochs, before the LR decay)**, from the run-bundle
+  summaries:
+  | arm | best epoch | best clean / PGD | epoch 11 (last) clean / PGD |
+  |---|---:|---:|---:|
+  | PGD-AT, Arm A (plan 0101) | — | — | 37.8% / 19.4% |
+  | TRADES beta=1.0 | 2 | 53.1% / 10.8% | 45.7% / 10.7% |
+  | TRADES beta=3.0 | 2 | 48.5% / 17.2% | 40.9% / 15.3% |
+  | TRADES beta=6.0 | 2 | 45.4% / 18.7% | 39.5% / 16.7% |
+  Reading, for these single runs at this horizon: beta=3.0 sits between the
+  other two TRADES arms on both axes, at best and at last. The step from 1.0
+  to 3.0 costs 4.8 pp clean and buys 4.6 pp PGD at the last epoch. The step
+  from 3.0 to 6.0 costs 1.4 pp clean and buys 1.4 pp PGD. Both of those last
+  gaps are inside the 0.16-1.88 pp CIFAR control-vs-control spread. Against
+  Arm A at epoch 11, beta=3.0 is +3.1 pp clean and -4.1 pp PGD. That is a
+  point on the same tradeoff, not a gain on both axes. Like the other two arms,
+  beta=3.0 peaked at epoch 2 and then lost ground by epoch 11 (-7.6 pp clean,
+  -1.9 pp PGD) while the LR stayed at 0.05. So the beta curve is filled in and
+  looks smooth: no TRADES beta tested here beats PGD-AT on both clean and PGD
+  accuracy before the LR decay. Whether the post-decay recovery changes this
+  cannot be read from 12-epoch runs.
+- 2026-09-15 (`/experiment-postrun`, run-bundle path): `plan0102-weight-ema-v1`
+  completed at 11:22Z. Terminal status re-derived with `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, `failure_class: null`.
+  All 12 of 12 epoch rows are present. `run-bundle/completion.json`, `best.pt`,
+  `best-ema.pt`, `last.pt`, `epoch-metrics.parquet`/`.jsonl` and
+  `sample-stats-train.parquet` exist. Source SHA `29decdedb4c7` (clean
+  worktree). World size 1, global batch 128, seed 0, protocol
+  `controlled_imagenet_stage01_mobilenetv4_pgd_at_v1`, `weight_ema_decay: 0.999`.
+  **Nothing imported**, for the same reason as the TRADES canaries: no
+  aggregator exists for this contract, and no AutoAttack has run. No record,
+  report, ledger row or milestone tick.
+  **How to read this run.** The EMA is a shadow copy. It never feeds back
+  into training. So the live weights follow plain PGD-AT, and the EMA weights
+  are evaluated on the same held-out slice with the same PGD-10 selection
+  attack, run directly against the EMA model. This makes the live-vs-EMA
+  comparison a within-run control: same data order, same trajectory, same
+  attack. The live weights at epoch 11 (37.82% / 19.43%) agree with plan 0101
+  Arm A (37.8% / 19.4%) to the reported precision, as expected for the
+  same config and seed. Arm A's bundle is on Ferret and was not re-read, so
+  bit-for-bit equality is not confirmed.
+  **Internal validation only (held-out slice, PGD-10; not an official result,
+  n=1, 12 of 50 epochs, LR warmup 0.005→0.05 over epochs 0-9, before the LR
+  decay)**, from `epoch-metrics.jsonl`:
+  | epoch | LR | live clean / PGD | EMA clean / PGD | EMA − live (clean / PGD) |
+  |---:|---:|---:|---:|---:|
+  | 0 | 0.005 | 46.8% / 19.2% | 49.3% / 22.0% | +2.4 / +2.9 pp |
+  | 2 | 0.015 | 46.0% / 21.6% | 50.5% / 26.1% | +4.4 / +4.6 pp |
+  | 5 | 0.030 | 42.8% / 21.7% | 48.7% / 27.1% | +5.9 / +5.4 pp |
+  | 8 | 0.045 | 37.2% / 19.6% | 45.6% / 26.4% | +8.3 / +6.8 pp |
+  | 11 (last) | 0.050 | 37.8% / 19.4% | 44.7% / 25.8% | +6.8 / +6.4 pp |
+  Best by PGD: live epoch 4 (43.3% / 21.7%); EMA epoch 5 (48.7% / 27.1%).
+  Best-checkpoint numbers are selected on this same slice, so the last-epoch
+  row is the less biased one.
+  Reading, for this single run at this horizon: the EMA weights beat the live
+  weights on **both** clean and PGD accuracy at every one of the 12 epochs.
+  At epoch 11 the gap is +6.8 pp clean and +6.4 pp PGD. That is well above the
+  0.16-1.88 pp CIFAR control-vs-control spread. It is the first arm in this
+  plan that is not a point on the clean-vs-robust tradeoff. Against the TRADES
+  arms at epoch 11, EMA is ahead on both axes of beta=3.0 and beta=6.0, and
+  behind only beta=1.0 on clean (by 1.0 pp) while ahead of it by 15.1 pp PGD.
+  Caveats that decide what this is worth:
+  1. The gap grew while the LR ramped up (+2.9 pp PGD at LR 0.005, +6.4 pp at
+     LR 0.05). A plausible reading is that the EMA smooths out high-LR SGD
+     noise. If so, the gap may shrink after the epoch-25/38 LR decay. A
+     12-epoch run cannot say.
+  2. PGD-10 only. Weight averaging could in principle make the loss surface
+     harder for a 10-step attack without real robustness. AutoAttack on the
+     EMA weights (from a saved checkpoint, separate process,
+     `--allow-autoattack`, `--weights=ema`) is the check. Until then, the PGD
+     gain is not a robustness claim.
+  3. The decay 0.999 averages over roughly 1,000 steps, about 0.1 epoch at
+     9,809 steps per epoch. This is a short average. Averaged BatchNorm
+     running statistics are part of the EMA copy and may carry part of the
+     effect. Nothing here separates the two.
+  4. n=1, seed 0, one GPU, global batch 128.
