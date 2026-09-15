@@ -608,3 +608,24 @@ config.
      `train_ema_student_agreement`) looks healthier than plan 0100's own
      record of the same metrics, not whether the actual recovery improves;
      that needs a longer run, decided after this canary's own read.
+- 2026-09-15 (chat): human asked how much GPU time the fresh-restart (vs.
+  resume) decision actually cost. Measured from
+  `plan0102-weight-ema-v1`'s own run-bundle: `created_at` to `finished_at`
+  spans 5h14m (one Hamster 4090) for the 12-epoch canary. Since
+  `plan0102-weight-ema-full50-v1` restarted from scratch rather than
+  resuming, that ~5.2 GPU-hours of the first 12 epochs is recomputed
+  rather than reused -- roughly 24% of the ~22 GPU-hour total the full
+  50-epoch run is projected to take on Hamster (`train_seconds` per epoch
+  ~1430-1440s, consistent across the canary's 12 epochs). **Process change
+  adopted for future canary-then-scale-up arms in this plan**: launch the
+  arm with `--epochs 50` from the start rather than a separate short-epoch
+  canary, and read its intermediate epoch-metrics for the early go/no-go
+  call instead of waiting for completion -- kill the job early if the
+  early read is unpromising (same GPU cost as a dedicated short canary
+  would have been), or simply let it keep running if it looks good (zero
+  restart cost, instead of today's ~24% recomputation tax). This works
+  specifically because `training.epochs` is part of the resolved-config
+  hash (needed so a resume can never silently drift on epoch count): a
+  run launched at epochs=12 is never resumable into an epochs=50
+  continuation on this project's own design, so the only way to avoid the
+  tax is to never create the epochs=12 identity in the first place.
