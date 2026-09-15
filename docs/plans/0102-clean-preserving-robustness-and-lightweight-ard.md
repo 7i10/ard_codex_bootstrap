@@ -584,3 +584,27 @@ config.
   internal PGD-10 proxy. Caveats 1, 3 and 4 above are still open (LR-decay
   survival is what `plan0102-weight-ema-full50-v1` is now checking; decay
   value and BN-averaging separation are unaddressed; n=1 seed).
+  3. **Workstream B's first concrete arm** (GPU0, once it freed):
+     `imagenet_mobilenetv4_adr_sharp_temperature.yaml`, testing plan 0100's
+     own root-cause hypothesis for `adr`'s ImageNet failure -- see that
+     config's header comment for the full chain of reasoning (plan 0100's
+     2026-09-13 diff of `mobilenetv3_adr-s0` against its own `pgd_at`
+     baseline found a self-reinforcing student/EMA-teacher agreement
+     collapse in the rectified target's true-class mass, worst during the
+     epoch-25 LR-decay recovery window, and flagged `temperature_high/low`
+     (2.0/1.5, analogically transferred from the ADR paper's 200-class
+     Tiny-ImageNet setting) as a plausible contributing cause given softmax
+     entropy at fixed temperature scales with class count). New protocol id
+     `controlled_imagenet_stage01_mobilenetv4_adr_v1`, sharpened to 1.2/0.8,
+     every other `adr` hyperparameter (ema_decay, lambda_low/high) held at
+     plan 0100's own values -- one variable at a time. No engine change
+     (adr's engine path already exists and is reviewed); config + protocol-
+     registry addition only, plus a field-identity test. `scripts/verify.py
+     --changed` green, committed as `b9f63c9`. Launched a 12-epoch canary
+     (`plan0102-adr-sharp-temp-v1`) on Hamster GPU0, matching this plan's
+     own canary-first convention -- though the diagnosed failure manifests
+     specifically during/after the epoch-25 decay, so this canary can at
+     best show whether the early trajectory (`train_rectified_true_class_mass`,
+     `train_ema_student_agreement`) looks healthier than plan 0100's own
+     record of the same metrics, not whether the actual recovery improves;
+     that needs a longer run, decided after this canary's own read.
