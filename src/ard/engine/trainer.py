@@ -173,6 +173,7 @@ class Trainer:
         selected_attack_epsilon: float | None = None,
         selected_attack_step_size: float | None = None,
         epsilon_warmup_epochs: int | None = None,
+        weight_ema_decay: float | None = None,
         extra_clean_ce_coefficient: float | None = None,
         adversarial_bce_coefficient: float | None = None,
         adaptive_advkd_gamma: float | None = None,
@@ -357,8 +358,18 @@ class Trainer:
         self.adr_config = adr_config
         if (adr_config is not None) != (total_iterations is not None):
             raise ValueError("adr_config and total_iterations must be supplied together")
+        if adr_config is not None and weight_ema_decay is not None:
+            raise ValueError("weight_ema_decay cannot be combined with adr_config (see schema.py's cross-field check)")
         self.total_iterations = total_iterations
-        if self.adr_config is None:
+        # Plan 0102 Workstream A: ``weight_ema_decay`` gives a plain
+        # pgd_at/trades run the same EMA shadow model ADR already tracks for
+        # itself, purely for its own sake (not as a training-time
+        # distillation target) -- reuses every piece of the existing EMA
+        # machinery below and in ``_update_ema``/checkpoint save-load
+        # unchanged, since that code was already gated on ``self.ema_model
+        # is not None``, never on ``method.id``.
+        self._weight_ema_decay = weight_ema_decay
+        if self.adr_config is None and weight_ema_decay is None:
             self.ema_model = None
         else:
             # A genuinely separate copy, not the frozen static ``anchor_model``
@@ -734,8 +745,8 @@ class Trainer:
         """
         if self.ema_model is None:
             return
-        assert self.adr_config is not None
-        decay = self.adr_config.ema_decay
+        decay = self.adr_config.ema_decay if self.adr_config is not None else self._weight_ema_decay
+        assert decay is not None
         live_state = unwrap_model(self.model).state_dict()
         with torch.no_grad():
             for name, ema_value in self.ema_model.state_dict().items():

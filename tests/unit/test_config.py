@@ -677,6 +677,24 @@ def test_new_adr_protocols_actually_enforce_their_pinned_contract(
         load_config(config_dir / config_name, overrides)
 
 
+def test_weight_ema_decay_rejects_combination_with_adr(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan 0102 Workstream A: training.weight_ema_decay (a plain EMA for
+    pgd_at/trades runs, reusing the same shadow-model machinery ADR already
+    has) must not be combined with method.adr -- adr already tracks its own
+    EMA as a distillation target, so a second independent one would need a
+    second shadow model this project has never built or reviewed."""
+    monkeypatch.setenv("ARD_SEED", "7")
+    monkeypatch.setenv("ARD_CIFAR10_ROOT", str(tmp_path / "cifar10"))
+    monkeypatch.setenv("ARD_NUM_WORKERS", "0")
+    monkeypatch.setenv("ARD_JOB_OUTPUT_DIR", str(tmp_path / "job-output"))
+    monkeypatch.setenv("ARD_RUN_ID", "config-test-run")
+    monkeypatch.setenv("WANDB_ENTITY", "entity")
+    monkeypatch.setenv("WANDB_PROJECT", "project")
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    with pytest.raises(ValueError, match="weight_ema_decay cannot be combined with method.adr"):
+        load_config(config_dir / "cifar10_r18_adr.yaml", ["training.weight_ema_decay=0.9"])
+
+
 def test_the_four_imagenet_stage01_configs_are_field_identical_except_architecture_method_and_group(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

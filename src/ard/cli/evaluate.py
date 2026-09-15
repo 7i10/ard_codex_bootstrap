@@ -280,10 +280,15 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("evaluation requires evaluation.dataset with an official val or test split")
     if config.evaluation.autoattack and not args.allow_autoattack:
         raise ValueError("AutoAttack is opt-in: rerun this separate evaluation process with --allow-autoattack")
-    if args.weights == "ema" and training_config.method.adr is None:
+    if (
+        args.weights == "ema"
+        and training_config.method.adr is None
+        and training_config.training.weight_ema_decay is None
+    ):
         raise ValueError(
-            "--weights=ema requires an adr/adr_trades training run; "
-            f"this checkpoint's method is {training_config.method.id!r}, which carries no EMA state"
+            "--weights=ema requires either an adr/adr_trades training run or training.weight_ema_decay set "
+            f"(plan 0102's plain weight-EMA); this checkpoint's method is {training_config.method.id!r} with "
+            "no weight_ema_decay configured, so it carries no EMA state"
         )
     checkpoints = _checkpoint_paths(
         checkpoint=args.checkpoint,

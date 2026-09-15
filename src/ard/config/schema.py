@@ -689,6 +689,18 @@ class TrainingConfig(StrictModel):
     # evaluation attack, only the training attack (CLAUDE.md rule 6: the
     # evaluated threat model never changes).
     epsilon_warmup_epochs: int | None = Field(default=None, ge=0)
+    # Plan 0102 Workstream A: plain weight-space EMA (Wu, Xia, Wang-style
+    # "SWA for adversarial training" literature review, 2026-09-15), decayed
+    # every training iteration exactly like ADR's own EMA (this reuses
+    # ``Trainer._update_ema`` unchanged -- see there for the exact update
+    # rule and why it is method-agnostic already). Independent of, and
+    # mutually exclusive with, ``method.adr`` (adr already tracks its own
+    # EMA as a distillation target; this field is for a plain pgd_at/trades
+    # run that wants a weight-averaged shadow model purely for its own
+    # sake, not as a training-time target). Default None reproduces today's
+    # exact behavior -- no EMA model constructed -- for every existing
+    # config that never mentions this field.
+    weight_ema_decay: float | None = Field(default=None, ge=0, lt=1)
 
     @model_validator(mode="after")
     def validate_batch_identity(self) -> TrainingConfig:
@@ -1309,6 +1321,11 @@ class ExperimentConfig(StrictModel):
             and not self.dataset.content_sha256
         ):
             raise ValueError("repro/pilot/production ImageNet requires dataset.content_sha256")
+        if self.training.weight_ema_decay is not None and self.method.adr is not None:
+            raise ValueError(
+                "training.weight_ema_decay cannot be combined with method.adr: adr already tracks its own "
+                "EMA as a distillation target; a second, independent weight EMA would need a second shadow model"
+            )
         if self.student.num_classes != self.dataset.num_classes:
             raise ValueError("student and dataset num_classes must match")
         if self.teacher is not None and self.teacher.num_classes != self.dataset.num_classes:

@@ -143,6 +143,36 @@ def adr_offline_run(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return {"output": output, "config": ExperimentConfig.model_validate(raw_config), "temporary": temporary}
 
 
+def _weight_ema_training_config(output: Path) -> dict[str, Any]:
+    """Plan 0102: a plain pgd_at run with training.weight_ema_decay set --
+    exercises the same EMA/checkpoint machinery ADR already carries, without
+    method.adr, so --weights=ema tests can verify it now accepts this case
+    too (see the config-level cross-field rejection test in test_config.py
+    for the case this must still reject: adr + weight_ema_decay together)."""
+    config = _training_config(output)
+    config["training"]["weight_ema_decay"] = 0.9
+    config["tracking"]["run_id"] = "offline-smoke-weight-ema"
+    config["tracking"]["group"] = "fixture-comparison-weight-ema"
+    return config
+
+
+@pytest.fixture(scope="module")
+def weight_ema_offline_run(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    """A trained (but not yet evaluated) plain-pgd_at-plus-weight-EMA
+    checkpoint directory -- separate from `offline_run` for the same reason
+    `adr_offline_run` is: --weights=ema tests need a checkpoint that
+    actually carries an "ema" state."""
+    root = Path(__file__).resolve().parents[2]
+    temporary = tmp_path_factory.mktemp("tracking-evaluation-weight-ema")
+    output = temporary / "train"
+    raw_config = _weight_ema_training_config(output)
+    train_config = temporary / "train.yaml"
+    train_config.write_text(yaml.safe_dump(raw_config), encoding="utf-8")
+    trained = _run(root, "ard.cli.train", "--config", str(train_config))
+    assert trained.returncode == 0, trained.stderr
+    return {"output": output, "config": ExperimentConfig.model_validate(raw_config), "temporary": temporary}
+
+
 @pytest.fixture(scope="module")
 def offline_run(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     root = Path(__file__).resolve().parents[2]
@@ -580,7 +610,7 @@ def test_evaluation_rejects_ema_weights_for_a_non_adr_checkpoint_before_output_c
     config_path = tmp_path / "ema-on-non-adr.yaml"
     config_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
     rejected_output = tmp_path / "ema-rejected"
-    with pytest.raises(ValueError, match="requires an adr/adr_trades training run"):
+    with pytest.raises(ValueError, match="requires either an adr/adr_trades training run"):
         evaluate_cli.main(
             [
                 "--config",
@@ -593,7 +623,31 @@ def test_evaluation_rejects_ema_weights_for_a_non_adr_checkpoint_before_output_c
                 "ema",
             ]
         )
-    assert not rejected_output.exists()
+
+
+def test_evaluation_accepts_ema_weights_for_a_plain_weight_ema_checkpoint(
+    weight_ema_offline_run: dict[str, Any], tmp_path: Path
+) -> None:
+    """Plan 0102: training.weight_ema_decay (no method.adr) is the other
+    case --weights=ema must accept, alongside adr/adr_trades."""
+    training_output: Path = weight_ema_offline_run["output"]
+    raw = _weight_ema_training_config(tmp_path / "unused")
+    config_path = tmp_path / "ema-on-weight-ema.yaml"
+    config_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    accepted_output = tmp_path / "ema-accepted"
+    exit_code = evaluate_cli.main(
+        [
+            "--config",
+            str(config_path),
+            "--checkpoint-dir",
+            str(training_output),
+            "--output",
+            str(accepted_output),
+            "--weights",
+            "ema",
+        ]
+    )
+    assert exit_code == 0
 
 
 def test_evaluation_with_ema_weights_writes_namespaced_outputs_through_the_cli(
