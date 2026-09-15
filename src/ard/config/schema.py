@@ -65,6 +65,10 @@ class ProtocolConfig(StrictModel):
         # architecture, a separate protocol identity from plan 0101's own
         # PGD-AT contract.
         "controlled_imagenet_stage01_mobilenetv4_trades_v1",
+        # Plan 0102 Workstream B: adr on MobileNetV4-Conv-Small, testing
+        # plan 0100's own root-cause hypothesis (temperature mistransferred
+        # from a 200-class setting) for adr's ImageNet failure.
+        "controlled_imagenet_stage01_mobilenetv4_adr_v1",
     ]
 
 

@@ -893,3 +893,38 @@ def test_mobilenetv4_weight_ema_config_is_field_identical_to_arm_a_except_weight
         payload["training"] = {**payload["training"], "weight_ema_decay": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert arm_a == weight_ema
+
+
+def test_mobilenetv4_adr_sharp_temperature_only_changes_temperature(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0102 Workstream B's first probe: test plan 0100's own root-cause
+    hypothesis (adr's temperature_high/low were mistransferred from a
+    200-class setting to this 1000-class one) by sharpening temperature
+    alone. ema_decay/lambda_low/lambda_high must stay at plan 0100's own
+    values (one variable at a time), and the selection/evaluation attacks
+    (steps: 10, ce) must be untouched, per CLAUDE.md rule 6."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    mobilenetv3_adr = load_config(config_dir / "imagenet_mobilenetv3_adr.yaml").model_dump(mode="json")
+    sharp = load_config(config_dir / "imagenet_mobilenetv4_adr_sharp_temperature.yaml").model_dump(mode="json")
+    assert mobilenetv3_adr["method"]["adr"]["temperature_high"] == pytest.approx(2.0)
+    assert mobilenetv3_adr["method"]["adr"]["temperature_low"] == pytest.approx(1.5)
+    assert sharp["method"]["adr"]["temperature_high"] == pytest.approx(1.2)
+    assert sharp["method"]["adr"]["temperature_low"] == pytest.approx(0.8)
+    assert sharp["method"]["adr"]["ema_decay"] == mobilenetv3_adr["method"]["adr"]["ema_decay"]
+    assert sharp["method"]["adr"]["lambda_low"] == mobilenetv3_adr["method"]["adr"]["lambda_low"]
+    assert sharp["method"]["adr"]["lambda_high"] == mobilenetv3_adr["method"]["adr"]["lambda_high"]
+    assert sharp["method"]["selection_attack"]["steps"] == 10
+    assert sharp["method"]["selection_attack"]["loss"] == "ce"
+    assert sharp["evaluation"]["attack"]["steps"] == 10

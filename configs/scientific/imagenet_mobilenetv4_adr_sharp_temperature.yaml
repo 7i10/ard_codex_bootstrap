@@ -1,0 +1,39 @@
+# Plan 0102 Workstream B, first probe: test plan 0100's own root-cause
+# hypothesis for adr's ImageNet failure directly, rather than treat "adr
+# doesn't work at ImageNet" as final (docs/plans/0100, 2026-09-13 entry
+# diffing mobilenetv3_adr-s0 against its own pgd_at baseline). That entry
+# found a self-reinforcing collapse (student/EMA-teacher agreement rises to
+# 0.96 while the rectified target's true-class mass falls to 0.11, worst
+# exactly during the epoch-25 LR-decay recovery window) and flagged two
+# unverified contributing hypotheses, one of which is directly and cheaply
+# testable: temperature_high/low (2.0/1.5) were "analogically transferred
+# from the pinned ADR upstream's 200-class Tiny-ImageNet setting... softmax
+# entropy at a fixed temperature scales with class count" -- i.e. the same
+# temperature makes the EMA teacher's distribution far more diffuse at this
+# plan's 1000-way classification than it was tuned for. This config sharpens
+# temperature_high/low to 1.2/0.8 (a heuristic ~40% reduction, not a formal
+# derivation -- there is no published class-count-scaling formula to invoke)
+# to test directly whether a sharper (less diffuse, more confident) EMA
+# target avoids the true-class-mass collapse. Only method.adr.temperature_*
+# differs from imagenet_mobilenetv3_adr.yaml/imagenet_r18_adr.yaml's own adr
+# hyperparameters (ema_decay, lambda_low/high unchanged -- one variable at a
+# time); architecture is MobileNetV4-Conv-Small (this plan's own choice,
+# not plan 0100's MobileNetV3-Small) so this is also, incidentally, this
+# plan's first adr-family run, not directly a re-run of plan 0100's own
+# mobilenetv3_adr-s0. No engine/schema/attack code change -- adr's engine
+# path already exists and is exercised by plan 0100's own configs; this is
+# a hyperparameter probe only, no scientific-reviewer pass required by this
+# plan's own process rule.
+schema_version: 2
+protocol: {id: controlled_imagenet_stage01_mobilenetv4_adr_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: true, normalization: {profile: imagenet_standard}}
+method: {id: adr, version: 1, adr: {ema_decay: 0.995, temperature_high: 1.2, temperature_low: 0.8, lambda_low: 0.5, lambda_high: 0.9}, attack: {loss: kl, kl_target: rectified, temperature: 1.0, temperature_squared: false, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: sgd, learning_rate: 0.05, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
+scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-adr-sharp-temperature-controlled, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

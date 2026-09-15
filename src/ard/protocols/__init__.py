@@ -531,6 +531,17 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # protocol allowlist).
             metadata=MappingProxyType({"purpose": "imagenet_stage01_mobilenetv4_trades_v1"}),
         ),
+        "controlled_imagenet_stage01_mobilenetv4_adr_v1": ProtocolSpec(
+            id="controlled_imagenet_stage01_mobilenetv4_adr_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0102 Workstream B: adr on MobileNetV4-Conv-Small with a
+            # sharpened temperature (testing plan 0100's own root-cause
+            # hypothesis for adr's ImageNet failure), a separate protocol
+            # identity from plan 0100's own adr contract and from plan
+            # 0102's own TRADES/pgd_at identities.
+            metadata=MappingProxyType({"purpose": "imagenet_stage01_mobilenetv4_adr_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,
