@@ -373,3 +373,44 @@ config.
      yet beaten PGD-AT on both axes at this horizon and AWP is the only
      technique from the literature pass with CIFAR evidence of improving
      both simultaneously (TRADES+AWP combo).
+  4. **Reconsidered before starting AWP**: AWP (a nested weight-perturbation
+     loop) is a materially bigger, riskier trainer change than first
+     estimated. Recommendation 1 (SWA/plain weight-EMA) was rated the
+     single best cost/benefit item in the literature review and, on
+     inspection of `src/ard/engine/trainer.py`, turned out to be nearly
+     free to add: the EMA/checkpoint/best-selection machinery ADR already
+     built (`self.ema_model`, `_update_ema`, `best-ema.pt`,
+     `best_metric_ema`/`selection_metadata_ema`, `ard.engine.checkpoint`'s
+     save/load) was already gated purely on `self.ema_model is not None`,
+     never on `method.id` or `adr_config` -- confirmed by grep before
+     writing any code, not assumed. Implemented first, ahead of AWP:
+     - New `training.weight_ema_decay: float | None` (`src/ard/config/schema.py`),
+       mutually exclusive with `method.adr` (adr already tracks its own EMA
+       as a distillation target; a second one would need a second shadow
+       model this project has never built).
+     - `Trainer.__init__` (`src/ard/engine/trainer.py`) constructs
+       `self.ema_model` when `weight_ema_decay is not None` OR
+       `adr_config is not None` (previously only the latter);
+       `_update_ema` resolves decay from whichever is active.
+     - `src/ard/cli/train.py` threads the new field through;
+       `src/ard/cli/evaluate.py`'s `--weights=ema` preflight gate now also
+       accepts a plain-pgd_at-plus-weight_ema_decay checkpoint, not only
+       adr/adr_trades.
+     - New tests: schema-level mutual-exclusion
+       (`test_weight_ema_decay_rejects_combination_with_adr`), trainer-level
+       construction/divergence/round-trip/independent-selection
+       (`tests/integration/test_weight_ema_trainer.py`, mirroring
+       `test_adr_trainer.py`'s own EMA tests), and a CLI-level
+       `--weights=ema` acceptance test (`tests/integration/test_tracking_evaluation.py`).
+       `scripts/verify.py --changed` green (one own mistake caught and
+       fixed along the way: a stray leftover assertion referencing an
+       undefined variable in the new CLI test, from a bad edit -- not a
+       scientific bug, just sloppy test authoring, fixed before commit).
+       Committed as `bc716cf`.
+     - Per this plan's own process rule (engine/schema changes need
+       scientific-reviewer before a GPU-hour is spent), requested a review
+       of this exact change before launching any training with
+       `weight_ema_decay` set. Not yet launched; GPU1 is free and reserved
+       for it once review clears. AWP itself is deferred, not abandoned --
+       revisit after weight-EMA's own result is in, since weight-EMA alone
+       might already close much of the gap the literature review flagged.
