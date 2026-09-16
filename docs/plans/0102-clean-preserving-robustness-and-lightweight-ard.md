@@ -717,3 +717,62 @@ config.
      mass carries through the decay. Per this plan's own 2026-09-15 process
      change, such a run would launch at `--epochs 50` from the start. n=1,
      seed 0, one GPU, global batch 128.
+- 2026-09-16 (`/experiment-postrun`, run-bundle path): `plan0102-weight-ema-full50-v1`
+  completed at 10:25Z. Terminal status re-derived with `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, `failure_class: null`.
+  All 50 of 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `run-bundle/completion.json` (`completed`), `best.pt`, `best-ema.pt`,
+  `last.pt`, `epoch-049.pt`, `epoch-metrics.parquet`/`.jsonl` and
+  `sample-stats-train.parquet` exist. Source SHA `efac80a717740` (clean
+  worktree). `git diff 29decde efac80a` touches only this plan, so the code is
+  the same as the 12-epoch canary's. World size 1, global batch 128, seed 0,
+  protocol `controlled_imagenet_stage01_mobilenetv4_pgd_at_v1`, resolved
+  `training.epochs: 50`, `weight_ema_decay: 0.999`, warmup_multistep LR
+  (0.005→0.05 over epochs 0-9, ×0.1 at epochs 25 and 38).
+  **Nothing imported**, for the same reason as the other runs in this plan: no
+  aggregator exists for this contract, and no AutoAttack has run on this run's
+  checkpoints. No record, report, ledger row or milestone tick.
+  **Reproducibility check.** Epochs 0-11 match `plan0102-weight-ema-v1` to the
+  reported precision for both live and EMA weights (epoch 11: 37.8% / 19.4%
+  live, 44.7% / 25.8% EMA). The live weights are plain PGD-AT with Arm A's
+  config and seed. So this run's live column is also a Hamster 50-epoch
+  replica of plan 0101 Arm A. It is not bit-for-bit checked against the
+  Ferret Stage C run.
+  **Internal validation only (held-out slice, PGD-10; not an official result,
+  n=1)**, from `epoch-metrics.jsonl`:
+  | epoch | LR | live clean / PGD | EMA clean / PGD | EMA − live (clean / PGD) |
+  |---:|---:|---:|---:|---:|
+  | 0 | 0.005 | 46.8% / 19.2% | 49.3% / 22.0% | +2.4 / +2.9 pp |
+  | 11 | 0.05 | 37.8% / 19.4% | 44.7% / 25.8% | +6.8 / +6.4 pp |
+  | 24 (before 1st decay) | 0.05 | 38.4% / 19.6% | 44.6% / 26.0% | +6.3 / +6.5 pp |
+  | 25 (after 1st decay) | 0.005 | 48.4% / 27.2% | 48.9% / 27.6% | +0.5 / +0.4 pp |
+  | 37 (before 2nd decay) | 0.005 | 50.9% / 27.9% | 52.8% / 30.1% | +1.9 / +2.2 pp |
+  | 38 (after 2nd decay) | 0.0005 | 53.5% / 30.0% | 53.8% / 30.1% | +0.2 / +0.2 pp |
+  | 49 (last) | 0.0005 | 54.6% / 30.6% | 54.7% / 30.8% | +0.1 / +0.2 pp |
+  Best by PGD: live epoch 46 (54.6% / 30.7%); EMA epoch 47 (54.7% / 30.9%).
+  Both were selected on this same slice, so the last-epoch row is the less
+  biased one.
+  Reading, for this single run:
+  1. **Caveat 1 is answered, and the answer is no.** The EMA advantage does
+     not survive the LR decay. It held at about +6.5 pp while the LR stayed at
+     0.05. It fell to +0.4 pp PGD in the first epoch after the epoch-25 decay.
+     It grew back to +2.2 pp at LR 0.005, then fell to +0.2 pp after the
+     epoch-38 decay. At the last epoch the gap is +0.1 pp clean and +0.2 pp
+     PGD. That is at the bottom of the 0.16-1.88 pp CIFAR control-vs-control
+     spread, so it is not distinguishable from zero.
+  2. The pattern fits the reading in caveat 1 of the canary entry: at decay
+     0.999 the EMA averages about 1,000 steps (about 0.1 epoch), which damps
+     SGD noise in roughly the way a lower LR does. Once the LR is already low,
+     there is little noise left to damp. This is a plausible mechanism, not a
+     tested one.
+  3. **What this does to the AutoAttack result.** The +5.2 pp AutoAttack
+     (n=500) gap was measured on the 12-epoch canary's best checkpoints, at a
+     high LR. This run shows the PGD-10 gap behind it shrinks to about +0.2 pp
+     by the end of a full schedule. So that AutoAttack gap is a statement
+     about high-LR checkpoints. It is not evidence of a gain for a finished
+     50-epoch model. No AutoAttack has run on this run's `last.pt` or
+     `best-ema.pt`.
+  4. Still untested: a longer average (for example decay 0.9999, about 1
+     epoch, or an average that spans the decay boundaries, as in SWA), and
+     whether BN statistics carry part of the effect. n=1, seed 0, one GPU,
+     global batch 128. Wall time 21h18m on one Hamster 4090.
