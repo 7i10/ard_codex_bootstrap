@@ -534,3 +534,90 @@ eventual source freeze; it is not part of this plan's own scope.
   confirmed alive (`ferret-status`: `running`, PID present) immediately
   after launch; GPU utilization ramp-up (still 0% a few checks in, likely
   still in dataset/model-load) being confirmed separately.
+- 2026-09-17 (chat, autonomous continuation session): human asked to check
+  Ferret's results. **Stage C is not in `scripts/ardx/status.py`'s output**
+  -- the local `ardx-watch.service` only watches Hamster paths
+  (`<runtime>/runs` on Hamster), so a Ferret hand-run bundle is invisible
+  to it and was never auto-postrun'd. Checked directly:
+  `.agents/skills/run-on-ferret/scripts/ferret-status --run-id <id>` for
+  all three arms reports `status: completed`, `exit_code: 0`,
+  `process_present: false`; each run's `run-bundle/completion.json` says
+  `{"status": "completed"}` and `best.pt`/`last.pt` both exist. **Ferret's
+  three GPUs are now at 97-99% utilization from an unrelated user's job**
+  (`islab` user, `research_ratio_fixdynamic/...` under a separate conda
+  env, confirmed via `ssh Ferret ps aux` -- not this project's), so Stage C
+  itself is done and something else has since claimed the host; no new
+  work should be scheduled on Ferret until it frees again.
+  **All 50 of 50 epochs present for all three arms** (`epoch-metrics.jsonl`,
+  read directly over ssh; `best.pt`'s `selection_metadata.selected_epoch`
+  read the same way). Wall time: Arm A finished 2026-09-16T17:49:59+09:00,
+  Arm B 2026-09-16T16:11:59+09:00, Arm C 2026-09-16T05:55:31+09:00 (all
+  started 2026-09-14T15:56Z) -- Arm C (1-step) finished first, matching
+  Stage B's own throughput note (643 img/s vs 441 img/s).
+
+  | arm | best epoch | best clean / PGD | last (epoch 49) clean / PGD |
+  |---|---:|---|---|
+  | A (no-warmup, 3-step) | 46 | 54.57% / 30.74% | 54.57% / 30.58% |
+  | B (warmup, 3-step) | 46 | 54.56% / 30.65% | 54.76% / 30.56% |
+  | C (warmup, 1-step) | 48 | 60.93% / 24.50% | 60.85% / 24.13% |
+
+  **Internal validation only (held-out slice, PGD-10 selection attack; not
+  an official AutoAttack result; n=1, seed 0)**, same status as every other
+  number in this plan and plan 0100 so far.
+
+  Reading, now that all three arms have gone through both LR decays
+  (epoch 25 and 38):
+
+  1. **This plan's central question is answered, and the answer is yes.**
+     Arm A/B's ~54.6% clean / ~30.6% PGD-10 clears plan 0100's own
+     MobileNetV3-Small `pgd_at` baseline (46.0% / 25.2% last epoch, same
+     recipe, same eps/steps/schedule) by **+8.6pp clean and +5.4pp PGD-10**.
+     A genuinely modern mobile-scale architecture (MobileNetV4-Conv-Small,
+     3.8M params) does lift this project's own adversarially-fine-tuned
+     clean-accuracy floor by a wide margin over the 2019-era MobileNetV3-Small
+     checkpoint, at matched training recipe -- the premise this plan opened
+     on ("a model that cannot reach a reasonable clean accuracy has no
+     chance at a reasonable robust accuracy either").
+  2. **MobileNetV4 (3.8M params) has closed almost all of the gap to
+     ResNet-18 (≈11M params)** on this recipe: plan 0100's `r18_baseline-s0`
+     ended at 55.3% / 31.9% (last), only 0.5-0.7pp clean and 1.3-1.4pp PGD
+     above MobileNetV4 Arm A/B, for roughly 1/3 the parameters. This is the
+     first result in either plan that puts a genuinely mobile-scale student
+     within noise-floor distance of the non-mobile baseline it was compared
+     against, on both clean and robust accuracy.
+  3. **The ε-warmup effect is gone at convergence.** Arm A and Arm B stayed
+     a near-tie the whole way: 12-epoch near-tie (37.8/19.4 vs 38.2/19.2),
+     epoch 24 (pre-decay) near-tie (38.4/19.6 vs 38.5/19.4), and now the
+     final near-tie above (54.57/30.58 vs 54.76/30.56, a 0.19pp clean / 0.02pp
+     PGD gap -- well inside the 0.16-1.88pp CIFAR control-vs-control noise
+     spread). Whatever ε-warmup does during its own 10-epoch window, it
+     does not measurably change where this recipe ends up after 50 epochs,
+     for n=1 at this architecture/dataset. Not a loss either -- Option 1's
+     warmup coupling (this plan's one deliberate deviation from Debenedetti
+     et al.'s exact mechanism) is not shown to help or hurt here.
+  4. **The step-count effect (Arm B vs C) is real, large, and stable across
+     the entire schedule -- this is the strongest, most clearly-answered
+     signal in this plan.** At every checkpoint measured (epoch 11, 24, and
+     now 49), 1-step training PGD trades clean accuracy for PGD-10 robust
+     accuracy against 3-step, and the size of the trade barely moved from
+     epoch 11 to epoch 49: **+6.1 to +6.4pp clean, -6.1 to -6.5pp PGD-10**,
+     consistently, through both LR decays. This directly and stably answers
+     the question the human asked when Arm C was added ("does 1-step differ
+     from 3-step, or do they converge?") -- they do not converge; 1-step
+     FGSM-with-random-start is a materially weaker training attack that
+     lands at a different, stable point on the clean/robust tradeoff curve,
+     not merely a slower path to the same destination.
+  5. **What is still missing before any of this is an official result**: no
+     AutoAttack has run on any Stage C checkpoint. Every number above is
+     the internal PGD-10 held-out-slice proxy, same caveat as plan 0100's
+     own stage-1 numbers before decision 0014's direction-finding pass.
+     Given how large and stable finding 4 is (well above any noise floor
+     seen in this project), and how directly finding 1-2 bear on whether
+     this recipe is worth carrying into a future ADR/robustness-distillation
+     attempt, a same-pattern small-sample (n=500) AutoAttack direction-check
+     on all three arms' best checkpoints is the natural next step -- cheap,
+     and exactly what decision 0014's option E already established as this
+     project's own precedent for this exact situation. Not yet run: Ferret
+     is occupied by another user's job, so this needs either a wait or a
+     checkpoint transfer to Hamster (`ferret-collect`) to run on idle local
+     GPUs instead.

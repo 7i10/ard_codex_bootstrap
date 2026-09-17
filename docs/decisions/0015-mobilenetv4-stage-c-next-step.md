@@ -1,6 +1,6 @@
 ---
 id: 0015
-status: pending
+status: decided
 created: 2026-09-15
 campaign: plan 0101 Stage B（Ferretでのhand-run、3アーム、seed 0、12/50 epoch、全て`completed`）
 question: plan 0101 Stage Bの3アーム(A=no-warmup/3-step、B=warmup/3-step、C=warmup/1-step、いずれもMobileNetV4-Conv-Small)が12epochまで完走した。epoch25のLR減衰にはまだ届いていない。Stage C(50epochフル実行)として、どのアームを何本本launchするか。
@@ -67,3 +67,20 @@ Aは最小コストだが、warmupと1-stepの効果がLR減衰後にどうな�
 - plan 0100: `docs/plans/0100-imagenet-stage01-r18-mobilenetv3-adr.md`(比較対象のmobilenetv3_baseline結果)
 - 関連決定: `docs/decisions/0014-imagenet-stage01-autoattack-next-step.md`(plan 0100側の並行する判断)
 - ソースSHA `3fbf96c3d089ef62847dcd62ea2922e0c0150a25`
+
+## 2026-09-17 追記: Stage C完走、結果、`status: decided`に更新
+
+3アームとも50/50epoch完走(`exit_code: 0`)。詳細はplan本文のProgress logへ。要点のみ:
+
+| arm | best epoch | best clean/PGD | last clean/PGD |
+|---|---:|---|---|
+| A(no-warmup, 3-step) | 46 | 54.57% / 30.74% | 54.57% / 30.58% |
+| B(warmup, 3-step) | 46 | 54.56% / 30.65% | 54.76% / 30.56% |
+| C(warmup, 1-step) | 48 | 60.93% / 24.50% | 60.85% / 24.13% |
+
+- **本パケットの主眼(質問A/B/C共通)への答え**: MobileNetV4はmobilenetv3_baseline(46.0%/25.2%, plan 0100)を大きく上回り(+8.6pt clean/+5.4pt PGD-10)、r18_baseline(55.3%/31.9%, plan 0100)にほぼ並ぶ(-0.5〜0.7pt clean/-1.3〜1.4pt PGD-10、パラメータ数は約1/3)。plan 0101の「モダンなアーキテクチャでclean精度の底上げができるか」という主眼は**達成**。
+- **ε-warmup(A vs B)**: epoch49でも実質同着(0.19pt clean/0.02pt PGD)——CIFAR control-vs-control のノイズ幅(0.16〜1.88pt)の範囲内。warmupの効果は収束後には見えない。
+- **1-step vs 3-step(B vs C)**: epoch11/24/49を通じて一貫して大きい(+6.1〜6.4pt clean、-6.1〜6.5pt PGD-10)。人が最初に立てた問いへの答えは明確に「変わる」——収束はしない。
+- まだ内部検証(PGD-10、n=1)のみ。AutoAttackは未実行(Ferretが他ユーザーのジョブで埋まっているため、Hamsterへcheckpoint転送するか空くのを待つ必要がある)。decision 0014のoption Eと同じ方向性判定パターンを次に実行予定。
+
+`chosen: C`はStage C実行の決定として成立済み。本パケットが問うていた疑問(どのアームを何本launchするか)には答えが出たため`status: decided`とする。AutoAttackをどうするかは新しいdecision packetの対象(必要なら0016)。
