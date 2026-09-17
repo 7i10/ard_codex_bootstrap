@@ -632,3 +632,46 @@ eventual source freeze; it is not part of this plan's own scope.
      pattern as decision 0014's option E, on Hamster (2 arms on GPU0, 1 on
      GPU1, both idle). Not an official test -- same status as every other
      direction-finding pass in this project. Results in the next entry.
+
+  **AutoAttack direction-finding result (n=500, best checkpoint, `--weights model`)**:
+
+  | arm | clean (val 5万枚, best epoch) | AutoAttack (n=500) |
+  |---|---:|---:|
+  | A (no-warmup, 3-step) | 50.94% | 22.8% |
+  | B (warmup, 3-step) | 51.13% | 22.8% |
+  | C (warmup, 1-step) | 57.54% | 17.6% |
+
+  Reading, against both the internal PGD-10 numbers above and plan 0100's
+  own decision-0014 AutoAttack numbers (also n=500, same sample-drawing
+  mechanism, same eps/threat model):
+
+  1. **The step-count tradeoff (finding 4 above) survives a real attack,
+     not just the PGD-10 proxy.** B vs C: +6.4pp clean, -5.2pp AutoAttack.
+     Per-arm binomial SE at n=500 is about 1.8-2.1pp here, so this gap is
+     roughly 2.5-3x a single arm's own SE -- more distinguishable than
+     noise, consistent with the PGD-10 read at every other checkpoint
+     measured through this plan. This is now the second independent attack
+     (PGD-10 and AutoAttack) agreeing on the same direction and a similar
+     magnitude, at the same architecture, across the full 50-epoch
+     schedule -- the most robust single finding in either plan 0100 or
+     plan 0101 so far.
+  2. **The warmup near-tie (finding 3 above) also survives**: A and B are
+     statistically indistinguishable under AutoAttack too (22.8% both,
+     +0.19pp clean) -- not just a PGD-10 coincidence.
+  3. **MobileNetV4 Arm A/B's AutoAttack robust accuracy (22.8%) matches
+     plan 0100's `r18_baseline-s0` (also 22.8% at n=500, decision 0014)
+     almost exactly**, at close clean accuracy too (50.9-51.1% vs 52.0%),
+     for roughly 1/3 the parameters (3.8M vs ResNet-18's ~11.7M). This is
+     the real-attack confirmation of finding 2 above (parity with
+     ResNet-18) -- not just a PGD-10 read.
+  4. **Against `mobilenetv3_baseline-s0`** (42.8% clean / 17.4% AutoAttack,
+     decision 0014, same n=500/eps/method): MobileNetV4 Arm A/B is
+     **+8.1-8.3pp clean and +5.4pp AutoAttack** ahead, at the same recipe.
+     This is the real-attack confirmation of finding 1 (this plan's central
+     hypothesis) -- the modern architecture genuinely raises both the clean
+     *and* the AutoAttack-robust floor for this project's own PGD-AT
+     recipe, not just an artifact of the cheaper PGD-10 proxy.
+  5. Still n=500 (not a full-sample official test) and n=1 seed throughout.
+     A full-sample AutoAttack pass on these same checkpoints (or a second
+     seed) would be needed before this becomes an official, citable result
+     -- flagged here, not yet decided or launched.
