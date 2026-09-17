@@ -965,3 +965,39 @@ def test_mobilenetv4_weight_ema_decay9999_config_is_field_identical_except_decay
         payload["training"] = {**payload["training"], "weight_ema_decay": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert decay999 == decay9999
+
+
+def test_mobilenetv4_trades_beta6_weight_ema_config_is_field_identical_except_weight_ema_decay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0102 Workstream A: combine TRADES beta=6 (landed near PGD-AT
+    alone) with weight-EMA (won on both axes at high LR alone, but the gap
+    collapsed after the LR decay) -- the literature review's own AWP table
+    found TRADES+AWP was the only CIFAR-10 combination to beat plain
+    PGD-AT on both axes when neither alone reliably did, motivating the
+    same-shape test here. Must differ from imagenet_mobilenetv4_trades_beta6.yaml
+    in exactly training.weight_ema_decay and tracking.group -- method.adr
+    stays None (trades never sets it), so this does not trip the
+    weight_ema_decay/adr mutual-exclusion guard."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    beta6 = load_config(config_dir / "imagenet_mobilenetv4_trades_beta6.yaml").model_dump(mode="json")
+    beta6_ema = load_config(config_dir / "imagenet_mobilenetv4_trades_beta6_weight_ema.yaml").model_dump(mode="json")
+    assert beta6["method"]["adr"] is None
+    assert beta6_ema["method"]["adr"] is None
+    assert beta6["training"]["weight_ema_decay"] is None
+    assert beta6_ema["training"]["weight_ema_decay"] == pytest.approx(0.999)
+    for payload in (beta6, beta6_ema):
+        payload["training"] = {**payload["training"], "weight_ema_decay": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert beta6 == beta6_ema
