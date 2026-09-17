@@ -928,3 +928,40 @@ def test_mobilenetv4_adr_sharp_temperature_only_changes_temperature(
     assert sharp["method"]["selection_attack"]["steps"] == 10
     assert sharp["method"]["selection_attack"]["loss"] == "ce"
     assert sharp["evaluation"]["attack"]["steps"] == 10
+
+
+def test_mobilenetv4_weight_ema_decay9999_config_is_field_identical_except_decay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0102 Workstream A follow-up: the decay=0.999 full-50-epoch run
+    found the EMA-vs-live gap collapses to noise once the LR decays,
+    consistent with the EMA mainly damping high-LR SGD noise (window ~0.1
+    epoch) rather than finding a better minimum. decay=0.9999 (~1 epoch
+    window, matching Singh/Croce/Hein 2023's own ImageNet-scale choice)
+    tests whether a longer average behaves differently. Must differ from
+    the decay=0.999 config in exactly training.weight_ema_decay and
+    tracking.group."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    decay999 = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup_weight_ema.yaml").model_dump(
+        mode="json"
+    )
+    decay9999 = load_config(
+        config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup_weight_ema_decay9999.yaml"
+    ).model_dump(mode="json")
+    assert decay999["training"]["weight_ema_decay"] == pytest.approx(0.999)
+    assert decay9999["training"]["weight_ema_decay"] == pytest.approx(0.9999)
+    for payload in (decay999, decay9999):
+        payload["training"] = {**payload["training"], "weight_ema_decay": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert decay999 == decay9999
