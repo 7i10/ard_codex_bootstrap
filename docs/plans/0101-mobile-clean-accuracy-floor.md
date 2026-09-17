@@ -621,3 +621,14 @@ eventual source freeze; it is not part of this plan's own scope.
      is occupied by another user's job, so this needs either a wait or a
      checkpoint transfer to Hamster (`ferret-collect`) to run on idle local
      GPUs instead.
+  6. **Done, same session.** `ferret-collect --run-id <arm> --include-checkpoints`
+     for all three arms, plus a manual `scp` of each `resolved_config.yaml`
+     (the collect skill's own filter list has no `.yaml` pattern -- not
+     edited, since that script is a shared, reviewed tool; worked around by
+     fetching the one needed file directly). Landed under
+     `<runtime>/staging/ferret-results/<arm>/outputs/train/`. Pinned a
+     fresh worktree at HEAD `af0c243`, ran the same n=500,
+     `evaluation.checkpoints=best`, `--weights model --allow-autoattack`
+     pattern as decision 0014's option E, on Hamster (2 arms on GPU0, 1 on
+     GPU1, both idle). Not an official test -- same status as every other
+     direction-finding pass in this project. Results in the next entry.
