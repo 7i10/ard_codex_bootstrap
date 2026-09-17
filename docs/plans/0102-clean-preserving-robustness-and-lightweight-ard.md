@@ -776,3 +776,27 @@ config.
      epoch, or an average that spans the decay boundaries, as in SWA), and
      whether BN statistics carry part of the effect. n=1, seed 0, one GPU,
      global batch 128. Wall time 21h18m on one Hamster 4090.
+- 2026-09-17 (chat, autonomous continuation session, after checking
+  Ferret's Stage C results -- see plan 0101): human asked to continue
+  experiments autonomously. Both Hamster GPUs were free (the Stage C
+  AutoAttack direction-finding checks had finished). Launched two full
+  50-epoch runs at once, both following the 2026-09-15 process change
+  (launch at the target epoch count from the start, not a separate short
+  canary):
+  1. **GPU0: `imagenet_mobilenetv4_adr_sharp_temperature.yaml`, full 50
+     epochs** (`plan0102-adr-sharp-temp-full50-v1`). The 12-epoch canary
+     could not test the actual question (whether sharper temperature
+     prevents the true-class-mass collapse specifically during the
+     epoch-25/38 recovery, since the canary's own compressed lambda
+     schedule never reached a real LR decay) -- this full run does. Same
+     config, same source SHA family (no code change since the canary).
+  2. **GPU1: `imagenet_mobilenetv4_pgd_at_no_warmup_weight_ema_decay9999.yaml`,
+     full 50 epochs** (`plan0102-weight-ema-decay9999-v1`), a new config
+     (decay 0.9999 instead of 0.999, ~1-epoch averaging window instead of
+     ~0.1-epoch) testing whether a longer average survives the LR decay
+     where the shorter one did not. Field-identity test added
+     (`test_mobilenetv4_weight_ema_decay9999_config_is_field_identical_except_decay`),
+     `scripts/verify.py --changed` confirmed green via explicit exit code.
+     No engine change (`weight_ema_decay` already exists and is reviewed).
+  Both processes confirmed launched; GPU utilization ramp-up being
+  confirmed separately.
