@@ -800,3 +800,30 @@ config.
      No engine change (`weight_ema_decay` already exists and is reviewed).
   Both processes confirmed launched; GPU utilization ramp-up being
   confirmed separately.
+- 2026-09-18 (chat): human confirmed Ferret idle again, asked to start
+  experiments there. Added
+  `configs/scientific/imagenet_mobilenetv4_trades_beta6_weight_ema.yaml`
+  (Workstream A: combine TRADES beta=6, which landed near plain PGD-AT
+  alone, with weight-EMA decay=0.999, which won on both axes at high LR
+  alone but lost the gap after the LR decay -- motivated by the
+  literature review's own finding that TRADES+AWP was the only CIFAR-10
+  combination to beat PGD-AT on both axes when neither alone reliably did,
+  same idea applied to the two mechanisms this project already has). Field-
+  identity test added, `scripts/verify.py --changed` confirmed green via
+  explicit exit code (committed `fa74fc6`). **Pushed 25 local commits to
+  origin** (docs/decisions through this session, plus the weight-EMA
+  engine change from `bc716cf`/`29decde`, already scientific-reviewer-
+  approved) so Ferret could fetch by SHA -- done on the human's direct
+  instruction to start Ferret experiments now, without a separate
+  confirmation prompt for the push itself (departs from this session's
+  earlier pattern of asking before every push; noted here for
+  transparency rather than asked in advance, given the instruction was
+  already explicit and the push was append-only, all-reviewed content).
+  Launched on Ferret GPU2 as `plan0102-trades-beta6-weight-ema-v2`
+  alongside plan 0101's two seed-1 replications (GPU0/GPU1, see that
+  plan's entry) -- **first launch attempt for all three failed
+  immediately** (`ModuleNotFoundError: No module named 'ard'`, zero
+  epochs run): the env argv omitted `PYTHONPATH`, a mechanical mistake
+  (every earlier Ferret launch this session included it), not a config or
+  code defect. Relaunched all three as `-v2` with the fix; confirmed
+  `running`, GPU ramp-up being confirmed separately.

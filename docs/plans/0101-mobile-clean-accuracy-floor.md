@@ -675,3 +675,26 @@ eventual source freeze; it is not part of this plan's own scope.
      A full-sample AutoAttack pass on these same checkpoints (or a second
      seed) would be needed before this becomes an official, citable result
      -- flagged here, not yet decided or launched.
+- 2026-09-18 (chat): human confirmed Ferret is idle again and asked to
+  start experiments there. Given how clean and large finding 1-4 above are
+  (this plan's central hypothesis, now confirmed under both PGD-10 and
+  AutoAttack), and that every number so far is n=1 seed, the highest-value
+  use of 3 free Ferret GPUs was judged to be starting the n=2 seed
+  replication this plan's own claims discipline calls for, rather than a
+  new untested arm. Launched Arm A (`plan0101-stagec-arm-a-no-warmup-s1-v2`,
+  GPU0) and Arm C (`plan0101-stagec-arm-c-warmup1step-s1-v2`, GPU1) at
+  `ARD_SEED=1`, reusing the exact same frozen configs as Stage C's seed-0
+  arms (`imagenet_mobilenetv4_pgd_at_no_warmup.yaml`,
+  `imagenet_mobilenetv4_pgd_at_1step.yaml`) -- no new config needed, seeds
+  are already parameterized via `${ARD_SEED}`. Arm B (warmup) was not
+  replicated this round: it was statistically indistinguishable from Arm A
+  at both n=500 AutoAttack and full PGD-10 (finding 3), so a second seed
+  of Arm A already covers what a second seed of B would show, and Arm C's
+  large, stable step-count effect (finding 4, the single strongest signal
+  in this plan) is the result most worth confirming with a second seed.
+  Source SHA `fa74fc6` (pushed after explicit request; see plan 0102 for
+  what else that push contained). First launch attempt for all three
+  Ferret jobs this session (see plan 0102) omitted `PYTHONPATH` from the
+  env argv and crashed immediately (`ModuleNotFoundError: No module named
+  'ard'`, zero epochs run) -- relaunched as `-v2` with the fix. Both
+  confirmed `running`, GPU utilization ramp-up being confirmed separately.
