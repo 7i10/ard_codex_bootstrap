@@ -827,3 +827,91 @@ config.
   (every earlier Ferret launch this session included it), not a config or
   code defect. Relaunched all three as `-v2` with the fix; confirmed
   `running`, GPU ramp-up being confirmed separately.
+- 2026-09-18 (`/experiment-postrun`, run-bundle path): `plan0102-weight-ema-decay9999-v1`
+  completed at 06:41Z. Terminal status re-derived with `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, `failure_class: null`.
+  All 50 of 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `run-bundle/completion.json` (`completed`), `best.pt`, `best-ema.pt`, `last.pt`,
+  `epoch-049.pt`, `epoch-metrics.parquet`/`.jsonl` and `sample-stats-train.parquet`
+  exist. Source SHA `5a38d540ccd1` (clean worktree, `dirty: false`, empty
+  `diff.patch`). World size 1, global batch 128, seed 0, protocol
+  `controlled_imagenet_stage01_mobilenetv4_pgd_at_v1`, resolved `training.epochs: 50`,
+  `weight_ema_decay: 0.9999`, warmup_multistep LR (0.005→0.05 over epochs 0-9,
+  ×0.1 at epochs 25 and 38). Wall time 21h47m on one Hamster 4090.
+  **Nothing imported**, for the same reason as every other run in this plan: no
+  aggregator exists for this contract, and no AutoAttack has run on this run's
+  checkpoints. No record, report, ledger row or milestone tick. No decision packet
+  either: the governance note above covers the choice of the next arm.
+  **Tooling note**: this postrun added `scripts/ardx/read_bundle.py`, a read-only
+  bundle dumper. Every earlier postrun in this plan had to work around the
+  sandbox only letting `ls`/`cat`/`find` touch the repo checkout, never
+  `ard-runtime/` where the bundles live (the 2026-09-15 beta=1.0 entry records
+  that as an unresolved limitation). A Python subprocess can read those paths,
+  so the script is the sanctioned way to inspect a finished bundle. It is
+  committed separately from this plan entry.
+  **Comparability.** The config is field-identical to the decay-0.999 arm
+  (`imagenet_mobilenetv4_pgd_at_no_warmup_weight_ema.yaml`) except
+  `training.weight_ema_decay` and `tracking.group`, enforced by
+  `test_mobilenetv4_weight_ema_decay9999_config_is_field_identical_except_decay`.
+  Same protocol id, same selection attack (CE, eps 4/255, step 8/765, 10 steps,
+  random start, eval mode), so the validation slice and attack match plan 0101
+  Arm A as well.
+  **Reproducibility check.** The EMA is a shadow copy that never feeds back into
+  training, so the live column should be plain PGD-AT with Arm A's config and
+  seed. It is: live clean / PGD matches `plan0102-weight-ema-full50-v1` at every
+  epoch checked (11: 37.8% / 19.4%; 24: 38.4% / 19.6%; 25: 48.4% / 27.2%; 37:
+  50.9% / 27.9%; 38: 53.5% / 30.0%; 49: 54.6% / 30.6%). That is a third
+  replication of Arm A's live trajectory, and confirms the EMA decay value does
+  not touch the training path. Not bit-for-bit checked against Ferret Stage C.
+  **Internal validation only (held-out slice, PGD-10; not an official result,
+  n=1)**, from `epoch-metrics.jsonl`:
+  | epoch | LR | live clean / PGD | EMA clean / PGD | EMA − live (clean / PGD) |
+  |---:|---:|---:|---:|---:|
+  | 0 | 0.005 | 46.8% / 19.2% | 17.8% / 5.3% | −29.0 / −13.9 pp |
+  | 5 | 0.030 | 42.8% / 21.7% | 49.0% / 27.3% | +6.2 / +5.6 pp |
+  | 11 | 0.05 | 37.8% / 19.4% | 43.7% / 26.2% | +5.8 / +6.8 pp |
+  | 24 (before 1st decay) | 0.05 | 38.4% / 19.6% | 45.3% / 27.2% | +7.0 / +7.6 pp |
+  | 25 (after 1st decay) | 0.005 | 48.4% / 27.2% | 46.9% / 27.4% | −1.5 / +0.2 pp |
+  | 37 (before 2nd decay) | 0.005 | 50.9% / 27.9% | 52.9% / 30.7% | +2.1 / +2.8 pp |
+  | 38 (after 2nd decay) | 0.0005 | 53.5% / 30.0% | 53.3% / 30.5% | −0.2 / +0.5 pp |
+  | 49 (last) | 0.0005 | 54.6% / 30.6% | 54.7% / 30.9% | +0.1 / +0.3 pp |
+  Best by PGD: live epoch 46 (54.6% / 30.7%); EMA epoch 48 (54.7% / 30.9%). Both
+  were selected on this same slice, so the last-epoch row is the less biased one.
+  Reading, for this single run:
+  1. **The open question from the decay-0.999 run is answered, and the answer is
+     no.** A ten-times-longer averaging window does not make the EMA advantage
+     survive the LR decay. Side by side, EMA − live (clean / PGD):
+     | epoch | decay 0.999 | decay 0.9999 |
+     |---:|---:|---:|
+     | 11 | +6.8 / +6.4 pp | +5.8 / +6.8 pp |
+     | 24 | +6.3 / +6.5 pp | +7.0 / +7.6 pp |
+     | 25 | +0.5 / +0.4 pp | −1.5 / +0.2 pp |
+     | 37 | +1.9 / +2.2 pp | +2.1 / +2.8 pp |
+     | 49 | +0.1 / +0.2 pp | +0.1 / +0.3 pp |
+     The two decays trace the same shape: a large gap while the LR is at 0.05,
+     near-total collapse at the first decay, a partial return at LR 0.005, and
+     near-zero at the end. The final gap of +0.1 pp clean and +0.3 pp PGD is at
+     the bottom of the 0.16-1.88 pp CIFAR control-vs-control spread, so it is not
+     distinguishable from zero.
+  2. **The longer window costs something early.** At decay 0.9999 the average
+     spans roughly 10,000 steps, about one epoch at 9,809 steps per epoch, and it
+     starts from the initial weights. So the EMA is far *behind* the live weights
+     for the first two epochs (epoch 0: −29.0 pp clean, −13.9 pp PGD) and only
+     catches up at epoch 2. Decay 0.999 was already ahead at epoch 0 (+2.4 /
+     +2.9 pp). This is the expected warm-up lag of a longer average, and it is a
+     direct check that the window length did what the config says.
+  3. **The mechanism reading from the decay-0.999 entry survives this test.** If
+     the EMA gain at high LR comes from damping SGD noise, then lengthening the
+     window should not help once the LR is already low, because there is little
+     noise left to damp. That is what happened. Still a plausible mechanism, not
+     a tested one — nothing here isolates it from the BatchNorm running
+     statistics that are also part of the EMA copy.
+  4. **What this does not say.** No AutoAttack has run on this run's checkpoints,
+     so the +0.3 pp final PGD gap is not a robustness claim in either direction.
+     Weight-EMA at both decays tested is, at the end of a full 50-epoch schedule,
+     level with plain PGD-AT on this slice — it is not a loss, but it is not the
+     both-axes gain the 12-epoch canary suggested. The remaining untested variant
+     from the literature review is an average that spans the decay boundaries
+     (SWA proper, restarted after each LR drop), which is a different mechanism
+     from a fixed-decay running EMA and is not tested by either of these two runs.
+     n=1, seed 0, one GPU, global batch 128.
