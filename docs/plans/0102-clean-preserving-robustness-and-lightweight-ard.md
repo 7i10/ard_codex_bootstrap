@@ -915,3 +915,112 @@ config.
      (SWA proper, restarted after each LR drop), which is a different mechanism
      from a fixed-decay running EMA and is not tested by either of these two runs.
      n=1, seed 0, one GPU, global batch 128.
+- 2026-09-18 (`/experiment-postrun`, run-bundle path): `plan0102-adr-sharp-temp-full50-v1`
+  completed at 07:37Z. Terminal status re-derived with `campaign_watch.py --once
+  --include-hand-run`: `terminal: true`, `success: true`, `failure_class: null`.
+  All 50 of 50 epoch rows are present (`epoch_metrics_complete: true`,
+  `epoch_metrics_source: local_canonical_epoch_rows`). `run-bundle/completion.json`
+  (`completed`), `run-bundle/error-marker.txt` (`no application error recorded`),
+  `best.pt`, `best-ema.pt`, `last.pt`, `epoch-049.pt`, `epoch-metrics.parquet`/`.jsonl`
+  and `sample-stats-train.parquet` all exist. Source SHA `083c2524fe6e` (clean
+  worktree, `dirty: false`, empty `diff.patch`). `git diff b9f63c9 083c252` touches
+  only three docs files, so the code and the config are the same as the 12-epoch
+  canary's. World size 1, per-rank and global batch 128, `batchnorm_mode
+  local_per_rank`, seed 0, protocol `controlled_imagenet_stage01_mobilenetv4_adr_v1`,
+  resolved `training.epochs: 50`, `adr` with `ema_decay 0.995`, `temperature_high/low
+  1.2/0.8`, `lambda_low/high 0.5/0.9`, `lambda_source: cosine`, warmup_multistep LR
+  (0.005→0.05 over epochs 0-9, ×0.1 at epochs 25 and 38). Wall time 22h47m on one
+  Hamster 4090.
+  **Nothing imported**, for the same reason as every other run in this plan: no
+  aggregator exists for this contract, and no AutoAttack has run on this run's
+  checkpoints. No record, report, ledger row or milestone tick. No decision packet
+  either: the governance note above covers the choice of the next arm.
+  **Comparability.** The config differs from Arm A's
+  `imagenet_mobilenetv4_pgd_at_no_warmup.yaml` only in the header comment,
+  `protocol.id`, `tracking.group` and `method`; inside `method`, the
+  `selection_attack` is the same (CE, eps 4/255, step 8/765, 10 steps, random start,
+  both modes eval), and `seeds.split` / `training.validation_fraction` are the same,
+  so the validation slice and the attack match Arm A. The training objective and the
+  inner attack (KL against the rectified target, 3 steps, instead of CE) differ on
+  purpose. The PGD-AT column below is the **live** column of
+  `plan0102-weight-ema-full50-v1`, read from that run's own `epoch-metrics.jsonl`.
+  That run's EMA is a shadow copy that never feeds back into training, and its live
+  trajectory already replicated Arm A twice (see the two entries above), so its live
+  column is a Hamster 50-epoch PGD-AT reference at matching identity. Not
+  bit-for-bit checked against the Ferret Stage C run.
+  **This run also removes the canary's biggest caveat.** The 12-epoch canary had a
+  compressed lambda schedule (lambda anneals over `len(loader) * training.epochs`),
+  so its 12 epochs were not the first 12 epochs of a 50-epoch run. This run is the
+  real schedule: lambda 0.5→0.9 spread over all 50 epochs, both LR decays included.
+  **Internal validation only (held-out 2% slice, PGD-10; not an official result,
+  n=1)**, from `epoch-metrics.jsonl`. "Student" is the trained weights. "EMA" is
+  ADR's own EMA teacher (decay 0.995), evaluated on the same slice and attack.
+  | epoch | LR | ADR student clean / PGD | ADR EMA clean / PGD | PGD-AT clean / PGD | student − PGD-AT |
+  |---:|---:|---:|---:|---:|---:|
+  | 0 | 0.005 | 48.7% / 20.9% | 50.0% / 22.0% | 46.8% / 19.2% | +1.9 / +1.7 pp |
+  | 11 | 0.05 | 40.1% / 22.0% | 44.5% / 25.9% | 37.8% / 19.4% | +2.3 / +2.6 pp |
+  | 24 (before 1st decay) | 0.05 | 41.1% / 21.6% | 44.4% / 25.6% | 38.4% / 19.6% | +2.7 / +2.0 pp |
+  | 25 (after 1st decay) | 0.005 | 49.1% / 27.7% | 49.3% / 28.2% | 48.4% / 27.2% | +0.7 / +0.5 pp |
+  | 37 (before 2nd decay) | 0.005 | 51.0% / 28.1% | 51.7% / 29.1% | 50.9% / 27.9% | +0.1 / +0.2 pp |
+  | 38 (after 2nd decay) | 0.0005 | 52.8% / 29.2% | 53.0% / 29.5% | 53.5% / 30.0% | −0.7 / −0.7 pp |
+  | 49 (last) | 0.0005 | 53.6% / 29.6% | 53.8% / 29.8% | 54.6% / 30.6% | −1.0 / −0.9 pp |
+  Best by PGD: ADR student epoch 47 (53.5% / 29.8%); ADR EMA epoch 47 (53.7% /
+  29.9%); PGD-AT live epoch 46 (54.6% / 30.7%). All three were selected on this
+  same slice, so the last-epoch row is the less biased one. `robust_overfit_gap`
+  0.0018.
+  ADR diagnostics at the same epochs, `train_rectified_true_class_mass` /
+  `train_ema_student_agreement`: epoch 0 0.562 / 0.749; 11 0.535 / 0.665;
+  24 0.470 / 0.699; 25 0.493 / 0.908; 37 0.525 / 0.865; 38 0.535 / 0.956;
+  49 0.557 / 0.953. Minimum mass over the whole run is 0.470, at epoch 24.
+  Reading, for this single run:
+  1. **The hypothesis this run was built to test is confirmed on its own terms:
+     the true-class-mass collapse is gone.** Plan 0100's `mobilenetv3_adr-s0` fell
+     from about 0.30 at epoch 25 to 0.105 at epoch 49 while agreement rose 0.58 →
+     0.96, through the whole post-decay recovery window (`r18_adr-s0` ended at
+     0.110 / 0.957). Here mass bottoms out at 0.470 before the first decay and then
+     **rises** through both recovery windows to 0.557 at epoch 49. So sharpening
+     `temperature_high/low` from 2.0/1.5 to 1.2/0.8 does what it was predicted to
+     do to that diagnostic, and it holds across the decays the canary never reached.
+     Caveat carried forward from the canary entry: a sharper teacher softmax raises
+     true-class mass mechanically whenever the teacher is right, so the direction
+     was close to automatic; what is new here is that it survives the recovery
+     window, which is where plan 0100's collapse was worst.
+  2. **The agreement half of plan 0100's signature reappeared anyway, and it tracks
+     the LR, not the objective.** Agreement jumps at each decay boundary (0.699 →
+     0.908 across epoch 24→25, 0.865 → 0.956 across 37→38) and ends at 0.953,
+     essentially plan 0100's 0.957. But mass rose over exactly those spans instead
+     of falling. So "agreement near 0.95" on its own is not the pathology — a low LR
+     makes the student move slowly, which lets a decay-0.995 EMA track it closely,
+     with or without a collapse. Plan 0100's loop needed both halves; only one half
+     is reproducible here. The 0.96 threshold should not be read as a stop-rule
+     signal by itself.
+  3. **The clean-accuracy non-recovery is also gone.** Plan 0100's actual symptom
+     was that `adr` failed to recover after the epoch-25 decay (32.4% clean at
+     epoch 45, below its own 41-43% pre-dip) while its `pgd_at` baseline did
+     (45.9%). Here the ADR student recovers normally: 41.1% at epoch 24 → 49.1% at
+     epoch 25 → 53.6% at epoch 49, the same shape as the PGD-AT column. Attribution
+     is not clean: this run is MobileNetV4-Conv-Small and plan 0100's was
+     MobileNetV3-Small, so architecture and temperature both changed between them.
+  4. **None of that made a better model.** Against PGD-AT at matching identity, the
+     ADR student is ahead on both axes while the LR is at 0.05 (+2.7 clean / +2.0 pp
+     PGD at epoch 24), level right after the first decay, and **behind on both axes
+     at the end** (−1.0 clean / −0.9 pp PGD at epoch 49; −0.7 / −0.7 pp at epoch 38).
+     The final gap is about half a pp outside the 0.16-1.88 pp CIFAR
+     control-vs-control spread on clean and inside it on PGD, so "slightly behind"
+     is the honest reading, not "clearly worse". ADR's own EMA teacher ends at
+     53.8% / 29.8%, also behind PGD-AT, and behind both weight-EMA arms' EMA weights
+     (54.7% / 30.8-30.9%).
+  5. **This is the same shape the two weight-EMA arms traced, from a different
+     mechanism.** Every arm in this plan that softens or averages the training
+     target has led plain PGD-AT by several pp while the LR sat at 0.05 and then
+     given the lead back at the decays. Weight-EMA ended level; sharp-temperature
+     ADR ends about 1 pp behind. That is now three full-50 runs agreeing that a
+     high-LR advantage on this slice does not predict the finished model, which is
+     a reason to stop reading 12-epoch canaries as rankings in this plan.
+  6. **What this does not say.** No AutoAttack has run on this run's checkpoints,
+     so nothing here is a robustness claim in either direction; the ±1 pp PGD-10
+     differences are internal validation only. The sharp temperature was one
+     heuristic point (1.2/0.8), not a sweep, and `ema_decay`, `lambda_low/high` and
+     `lambda_source` were held at plan 0100's values on purpose, so this does not
+     rule out that some other `adr` setting clears PGD-AT. n=1, seed 0, one GPU,
+     global batch 128.
