@@ -698,3 +698,26 @@ eventual source freeze; it is not part of this plan's own scope.
   env argv and crashed immediately (`ModuleNotFoundError: No module named
   'ard'`, zero epochs run) -- relaunched as `-v2` with the fix. Both
   confirmed `running`, GPU utilization ramp-up being confirmed separately.
+- 2026-09-21 (chat, autonomous continuation): the seed=1 replication of
+  Stage C's Arm A and Arm C both completed (`exit_code: 0`, all 50 of 50
+  epochs). Internal validation only (held-out slice, PGD-10; not an
+  official result), from `epoch-metrics.jsonl`:
+
+  | arm | seed | last (epoch 49) clean / PGD |
+  |---|---:|---:|
+  | A (no-warmup, 3-step) | 0 | 54.57% / 30.58% |
+  | A (no-warmup, 3-step) | 1 | 54.33% / 30.59% |
+  | C (warmup, 1-step) | 0 | 60.85% / 24.13% |
+  | C (warmup, 1-step) | 1 | 60.82% / 24.25% |
+
+  **Both arms replicate almost exactly across seeds** -- Arm A differs by
+  0.24pp clean / 0.01pp PGD between seeds, Arm C by 0.03pp clean / 0.12pp
+  PGD. Both gaps are well inside the 0.16-1.88pp CIFAR control-vs-control
+  noise spread, and far smaller than the seed-0 Arm A vs Arm C gap itself
+  (+6.3pp clean / -6.1pp PGD). This gives n=2 confidence (still not a
+  full-sample official test, and still only 2 seeds) that plan 0101's two
+  central findings -- MobileNetV4 clears MobileNetV3-Small's floor, and
+  the 1-step/3-step tradeoff is real and stable -- are not single-seed
+  flukes. Arm B (warmup) was not replicated this round (see plan 0102's
+  own entry for why); AutoAttack has not been re-run on either seed-1
+  checkpoint.
