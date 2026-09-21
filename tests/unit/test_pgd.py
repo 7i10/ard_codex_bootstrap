@@ -228,3 +228,46 @@ def test_pgd_at_objective_is_unreduced() -> None:
     assert torch.equal(terms.kd, torch.zeros(2))
     terms.total.mean().backward()
     assert logits.grad is not None
+
+
+def test_pgd_at_objective_label_smoothing_matches_cross_entropy_directly() -> None:
+    """Plan 0102 Workstream A: label_smoothing=0.0 (the default) must
+    reproduce today's exact plain-CE behavior for every existing caller;
+    a nonzero value must match torch's own label_smoothing semantics
+    exactly, not an approximation of it."""
+    torch.manual_seed(0)
+    logits = torch.randn(4, 3, requires_grad=True)
+    labels = torch.tensor([0, 1, 2, 0])
+    plain = PGDATObjective()(student_logits=logits, labels=labels)
+    expected_plain = torch.nn.functional.cross_entropy(logits, labels, reduction="none")
+    assert torch.allclose(plain.hard, expected_plain)
+
+    smoothed = PGDATObjective(label_smoothing=0.1)(student_logits=logits, labels=labels)
+    expected_smoothed = torch.nn.functional.cross_entropy(logits, labels, reduction="none", label_smoothing=0.1)
+    assert torch.allclose(smoothed.hard, expected_smoothed)
+    assert not torch.allclose(smoothed.hard, plain.hard)
+
+
+def test_pgd_at_objective_rejects_invalid_label_smoothing() -> None:
+    with pytest.raises(ValueError, match="label_smoothing must lie in"):
+        PGDATObjective(label_smoothing=1.0)
+    with pytest.raises(ValueError, match="label_smoothing must lie in"):
+        PGDATObjective(label_smoothing=-0.1)
+
+
+def test_pgd_at_objective_uses_soft_target_when_adversarial_target_probabilities_given() -> None:
+    """The soft-target path (CutMix/MixUp's own mixed label, or any other
+    caller of adversarial_target_probabilities) must ignore `labels` and
+    `label_smoothing` entirely -- matching revisiting-at's own
+    SoftTargetCrossEntropy, which replaces (not stacks with) label
+    smoothing once a soft target is active."""
+    torch.manual_seed(1)
+    logits = torch.randn(4, 3, requires_grad=True)
+    labels = torch.tensor([0, 1, 2, 0])
+    soft_target = torch.softmax(torch.randn(4, 3), dim=1)
+    terms = PGDATObjective(label_smoothing=0.1)(
+        student_logits=logits, labels=labels, adversarial_target_probabilities=soft_target
+    )
+    log_probabilities = torch.nn.functional.log_softmax(logits, dim=1)
+    expected = -(soft_target * log_probabilities).sum(dim=1)
+    assert torch.allclose(terms.hard, expected)

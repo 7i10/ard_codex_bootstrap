@@ -433,8 +433,20 @@ def _validate_allowed_delta(*, parent: ExperimentConfig, child: ExperimentConfig
         raise ScheduleControlForkError("child changes fields outside output/tracking/protocol/scheduler whitelist")
     if not isinstance(parent_scheduler, Mapping) or not isinstance(child_scheduler, Mapping):
         raise ScheduleControlForkError("parent and child scheduler mappings are required")
-    expected_parent = {"id": "multistep", "milestones": list(PARENT_MILESTONES), "gamma": 0.1, "step_at": "epoch_end"}
-    expected_child = {"id": "multistep", "milestones": list(CHILD_MILESTONES), "gamma": 0.1, "step_at": "epoch_end"}
+    expected_parent = {
+        "id": "multistep",
+        "milestones": list(PARENT_MILESTONES),
+        "gamma": 0.1,
+        "step_at": "epoch_end",
+        "warmup_epochs": None,
+    }
+    expected_child = {
+        "id": "multistep",
+        "milestones": list(CHILD_MILESTONES),
+        "gamma": 0.1,
+        "step_at": "epoch_end",
+        "warmup_epochs": None,
+    }
     if dict(parent_scheduler) != expected_parent or dict(child_scheduler) != expected_child:
         raise ScheduleControlForkError("schedule-control may change only [100,150] to [120,170] at epoch end")
 

@@ -1001,3 +1001,52 @@ def test_mobilenetv4_trades_beta6_weight_ema_config_is_field_identical_except_we
         payload["training"] = {**payload["training"], "weight_ema_decay": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert beta6 == beta6_ema
+
+
+def test_mobilenetv4_revisiting_at_recipe_config_changes_only_recipe_mechanics_not_the_threat_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0102 Workstream A: Singh/Croce/Hein 2023's own pretrained-init
+    recipe (AdamW, cosine decay, label smoothing, heavy augmentation,
+    weight EMA) transplanted onto MobileNetV4-Conv-Small, to test whether
+    this project's own SGD peak LR (0.05, a from-scratch-training-style
+    value) rather than epsilon accumulation drives the clean-accuracy
+    collapse. Must differ from Arm A
+    (imagenet_mobilenetv4_pgd_at_no_warmup.yaml) in exactly optimizer,
+    scheduler, method.label_smoothing, dataset.imagenet_heavy_augmentation,
+    training.weight_ema_decay and tracking.group -- epsilon, steps, step
+    size, random start and the rest of the attack identity (both training
+    and evaluation) must be byte-identical, per CLAUDE.md rule 6."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
+    recipe = load_config(config_dir / "imagenet_mobilenetv4_revisiting_at_recipe.yaml").model_dump(mode="json")
+    # The attack identity (train and eval) is exactly preserved.
+    assert arm_a["method"]["attack"] == recipe["method"]["attack"]
+    assert arm_a["method"]["selection_attack"] == recipe["method"]["selection_attack"]
+    assert arm_a["evaluation"]["attack"] == recipe["evaluation"]["attack"]
+    assert recipe["optimizer"]["id"] == "adamw"
+    assert recipe["optimizer"]["learning_rate"] == pytest.approx(0.001)
+    assert recipe["scheduler"]["id"] == "warmup_cosine"
+    assert recipe["method"]["label_smoothing"] == pytest.approx(0.1)
+    assert recipe["dataset"]["imagenet_heavy_augmentation"] is True
+    assert recipe["training"]["weight_ema_decay"] == pytest.approx(0.999)
+    for payload in (arm_a, recipe):
+        payload["protocol"] = None
+        payload["optimizer"] = None
+        payload["scheduler"] = None
+        payload["method"] = {**payload["method"], "label_smoothing": None}
+        payload["dataset"] = {**payload["dataset"], "imagenet_heavy_augmentation": None}
+        payload["training"] = {**payload["training"], "weight_ema_decay": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert arm_a == recipe

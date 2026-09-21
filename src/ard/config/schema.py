@@ -69,6 +69,12 @@ class ProtocolConfig(StrictModel):
         # plan 0100's own root-cause hypothesis (temperature mistransferred
         # from a 200-class setting) for adr's ImageNet failure.
         "controlled_imagenet_stage01_mobilenetv4_adr_v1",
+        # Plan 0102 Workstream A: Singh/Croce/Hein 2023's own pretrained-init
+        # ImageNet recipe (AdamW, cosine decay, label smoothing, heavy
+        # augmentation, weight EMA), transplanted onto MobileNetV4-Conv-Small
+        # -- a separate protocol identity from this plan's own pgd_at/trades
+        # identities.
+        "controlled_imagenet_stage01_mobilenetv4_revisiting_at_recipe_v1",
     ]
 
 
@@ -85,25 +91,57 @@ class SeedsConfig(StrictModel):
 
 
 class OptimizerConfig(StrictModel):
-    """Optimizer identity frozen for the M1 protocol implementation."""
+    """Optimizer identity. ``sgd`` is the original M1 protocol implementation.
 
-    id: Literal["sgd"]
+    Plan 0102 Workstream A: ``adamw`` reproduces Singh/Croce/Hein 2023's own
+    pretrained-init ImageNet recipe (arXiv:2303.01870, Appendix A.1; fetched
+    from the paper this session, not paraphrased) -- AdamW, beta1/beta2
+    configurable (paper uses 0.9/0.95, not PyTorch's 0.9/0.999 default, so
+    both are explicit config fields rather than library defaults). The two
+    optimizer identities use disjoint field sets (sgd: momentum/nesterov;
+    adamw: beta1/beta2) enforced below, rather than one flat "works for
+    either" set someone could half-fill in.
+    """
+
+    id: Literal["sgd", "adamw"]
     learning_rate: float = Field(gt=0)
-    momentum: float = Field(ge=0, lt=1)
     weight_decay: float = Field(ge=0)
-    nesterov: bool
+    momentum: float | None = Field(default=None, ge=0, lt=1)
+    nesterov: bool | None = None
+    beta1: float | None = Field(default=None, gt=0, lt=1)
+    beta2: float | None = Field(default=None, gt=0, lt=1)
 
     @model_validator(mode="after")
-    def validate_nesterov(self) -> OptimizerConfig:
-        if self.nesterov and self.momentum <= 0:
-            raise ValueError("nesterov SGD requires positive momentum")
+    def validate_by_id(self) -> OptimizerConfig:
+        if self.id == "sgd":
+            if self.momentum is None or self.nesterov is None:
+                raise ValueError("sgd requires momentum and nesterov")
+            if self.beta1 is not None or self.beta2 is not None:
+                raise ValueError("sgd does not use beta1/beta2")
+            if self.nesterov and self.momentum <= 0:
+                raise ValueError("nesterov SGD requires positive momentum")
+        else:
+            if self.beta1 is None or self.beta2 is None:
+                raise ValueError("adamw requires beta1 and beta2")
+            if self.momentum is not None or self.nesterov is not None:
+                raise ValueError("adamw does not use momentum/nesterov")
         return self
 
 
 class SchedulerConfig(StrictModel):
-    """Scheduler identity frozen before M1 supplies concrete schedules."""
+    """Scheduler identity frozen before M1 supplies concrete schedules.
 
-    id: Literal["identity", "multistep", "warmup_multistep"]
+    Plan 0102 Workstream A: ``warmup_cosine`` reproduces Singh/Croce/Hein
+    2023's own pretrained-init ImageNet recipe (arXiv:2303.01870, Appendix
+    A.1) -- linear warmup (same shape ``warmup_multistep`` already has, and
+    for the same reason: "peak LR attained at epoch 10" of a 50-epoch run)
+    followed by cosine decay to 0 at the final epoch, instead of multistep
+    decay. ``milestones``/``gamma`` are meaningless for a cosine decay (there
+    is no discrete drop), so this id requires the same no-op values
+    "identity" does, rather than silently ignoring whatever is supplied.
+    """
+
+    id: Literal["identity", "multistep", "warmup_multistep", "warmup_cosine"]
     milestones: tuple[int, ...]
     gamma: float = Field(gt=0)
     step_at: Literal["epoch_end"]
@@ -122,19 +160,24 @@ class SchedulerConfig(StrictModel):
             if self.milestones or self.gamma != 1.0:
                 raise ValueError("identity scheduler requires milestones=[] and gamma=1.0")
             if self.warmup_epochs is not None:
-                raise ValueError("warmup_epochs is only defined for warmup_multistep")
+                raise ValueError("warmup_epochs is only defined for warmup_multistep/warmup_cosine")
         elif self.id == "multistep":
             if not self.milestones or tuple(sorted(set(self.milestones))) != self.milestones or self.milestones[0] < 0:
                 raise ValueError("multistep scheduler requires strictly increasing non-negative milestones")
             if self.warmup_epochs is not None:
-                raise ValueError("warmup_epochs is only defined for warmup_multistep")
-        else:
+                raise ValueError("warmup_epochs is only defined for warmup_multistep/warmup_cosine")
+        elif self.id == "warmup_multistep":
             if not self.milestones or tuple(sorted(set(self.milestones))) != self.milestones or self.milestones[0] < 0:
                 raise ValueError("warmup_multistep scheduler requires strictly increasing non-negative milestones")
             if self.warmup_epochs is None:
                 raise ValueError("warmup_multistep requires warmup_epochs")
             if self.milestones[0] < self.warmup_epochs:
                 raise ValueError("warmup_multistep's first decay milestone must not occur during warmup")
+        else:
+            if self.milestones or self.gamma != 1.0:
+                raise ValueError("warmup_cosine scheduler requires milestones=[] and gamma=1.0 (no discrete decay)")
+            if self.warmup_epochs is None:
+                raise ValueError("warmup_cosine requires warmup_epochs")
         return self
 
 
@@ -374,6 +417,20 @@ class DatasetConfig(StrictModel):
     # checked against these three fields before any image is transformed.
     stagewise_late_mask_selected_ids_sha256: str | None = None
     stagewise_late_mask_selected_count: int | None = Field(default=None, ge=1)
+    # Plan 0102 Workstream A: Singh/Croce/Hein 2023's own pretrained-init
+    # ImageNet recipe (arXiv:2303.01870, Appendix A.2) uses RandAugment(2
+    # layers, magnitude 9) + RandomErasing(p=0.25) on top of the existing
+    # RandomResizedCrop+flip. Deliberately NOT built against this project's
+    # own local-``torch.Generator`` determinism discipline (human decision,
+    # chat, 2026-09-21): torchvision's own ``RandAugment``/``RandomErasing``
+    # draw from the *global* RNG, so unlike ``EpochImageNetTransform``'s
+    # crop+flip, a resumed epoch is not guaranteed to reproduce the exact
+    # same augmented view per source ID when this is enabled. Accepted for
+    # this exploratory recipe-matching experiment; revisit for full
+    # determinism if this becomes a lasting part of the recipe rather than
+    # a one-off comparison. Default False reproduces today's exact
+    # behavior for every existing config.
+    imagenet_heavy_augmentation: bool = False
 
     @model_validator(mode="after")
     def validate_dataset(self) -> DatasetConfig:
@@ -394,6 +451,8 @@ class DatasetConfig(StrictModel):
             raise ValueError("imagenet requires an explicit root")
         if self.augmentation_policy != "canonical" and self.name not in {"cifar10", "cifar100"}:
             raise ValueError("non-canonical augmentation policies are currently defined only for CIFAR datasets")
+        if self.imagenet_heavy_augmentation and self.name != "imagenet":
+            raise ValueError("imagenet_heavy_augmentation is only defined for the imagenet dataset")
         if self.augmentation_policy == "stagewise":
             if self.stagewise_switch_epoch is None or self.stagewise_late_policy is None:
                 raise ValueError("stagewise augmentation requires a switch epoch and late policy")
@@ -533,6 +592,12 @@ class MethodConfig(StrictModel):
     temperature_squared: bool = True
     trades_beta: float = Field(default=6.0, ge=0)
     entropy_gamma: float = Field(default=1.0, gt=0)
+    # Plan 0102 Workstream A: pgd_at's own label smoothing (Singh/Croce/Hein
+    # 2023, arXiv:2303.01870, Appendix A.1: "label smoothing coefficient of
+    # 0.1"). Default 0.0 reproduces today's exact plain hard-label CE for
+    # every existing pgd_at config. Only wired for pgd_at so far -- not a
+    # statement that other methods couldn't use it, just not yet asked for.
+    label_smoothing: float = Field(default=0.0, ge=0, lt=1)
     student_ema_decay: float = Field(default=0.9, ge=0, lt=1)
     student_policy_warmup_epochs: int = Field(default=1, ge=1)
     target_policy: TargetPolicyConfig | None = None

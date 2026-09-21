@@ -1020,7 +1020,7 @@ def run_stage_a_arm(
         weight_decay=config.optimizer.weight_decay,
         nesterov=config.optimizer.nesterov,
     )
-    scheduler = build_scheduler(optimizer, config.scheduler)
+    scheduler = build_scheduler(optimizer, config.scheduler, total_epochs=config.training.epochs)
     sample_store = SampleStateStore(ema_decay=config.method.student_ema_decay)
     mask = None
     teacher_reliability_mask = None

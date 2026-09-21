@@ -128,7 +128,7 @@ def _inputs(
     torch.manual_seed(31)
     model = nn.Linear(2, 2)
     optimizer = SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-    scheduler = build_scheduler(optimizer, parent.scheduler)
+    scheduler = build_scheduler(optimizer, parent.scheduler, total_epochs=parent.training.epochs)
     _advance(optimizer, scheduler, 80)
     assert scheduler.state_dict()["last_epoch"] == 80
     state = _sample_state()
@@ -322,7 +322,7 @@ def test_epoch79_schedule_control_preserves_state_replaces_only_future_milestone
         model = nn.Linear(2, 2)
         optimizer = SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
         config = child_config.scheduler
-        return model, optimizer, build_scheduler(optimizer, config), EpochShuffleSampler(45_000, seed=2)
+        return model, optimizer, build_scheduler(optimizer, config, total_epochs=child_config.training.epochs), EpochShuffleSampler(45_000, seed=2)
 
     uninterrupted_model, uninterrupted_optimizer, uninterrupted_scheduler, _ = components()
     _advance(uninterrupted_optimizer, uninterrupted_scheduler, 80)

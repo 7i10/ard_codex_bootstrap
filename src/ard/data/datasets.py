@@ -640,13 +640,21 @@ class EpochImageNetTransform:
     _LOG_RATIO = (math.log(3.0 / 4.0), math.log(4.0 / 3.0))
     _ATTEMPTS = 10
 
-    def __init__(self, *, augmentation_seed: int, image_size: int) -> None:
+    def __init__(self, *, augmentation_seed: int, image_size: int, heavy_augmentation: bool = False) -> None:
         if image_size < 1:
             raise ValueError("ImageNet augmentation image_size must be a positive integer")
         self.augmentation_seed = augmentation_seed
         self.image_size = image_size
         self.epoch = 0
         self.source_id_keyed = True
+        # Plan 0102 Workstream A: Singh/Croce/Hein 2023's own RandAugment(2
+        # layers, magnitude 9) + RandomErasing(p=0.25) (arXiv:2303.01870,
+        # Appendix A.2). Deliberately global-RNG-based, not keyed by this
+        # class's own local generator -- see DatasetConfig.imagenet_heavy_augmentation's
+        # docstring for why (human decision, chat, 2026-09-21).
+        self.heavy_augmentation = heavy_augmentation
+        self._rand_augment = transforms.RandAugment(num_ops=2, magnitude=9) if heavy_augmentation else None
+        self._random_erasing = transforms.RandomErasing(p=0.25) if heavy_augmentation else None
 
     def set_epoch(self, epoch: int) -> None:
         if epoch < 0:
@@ -692,7 +700,15 @@ class EpochImageNetTransform:
         )
         if bool(torch.randint(0, 2, (), generator=generator).item()):
             cropped = transform_functional.hflip(cropped)
-        return _to_tensor(cropped)
+        if self._rand_augment is not None:
+            # Global RNG from here on -- see __init__'s heavy_augmentation
+            # comment; the deterministic local generator above still governs
+            # the crop and flip.
+            cropped = self._rand_augment(cropped)
+        tensor = _to_tensor(cropped)
+        if self._random_erasing is not None:
+            tensor = self._random_erasing(tensor)
+        return tensor
 
 
 def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
@@ -867,7 +883,11 @@ def build_train_validation_views(
         else:  # pragma: no cover - DatasetConfig rejects unknown literals
             raise ValueError(f"unsupported CIFAR augmentation policy: {config.augmentation_policy}")
     elif config.name == "imagenet":
-        train_transform = EpochImageNetTransform(augmentation_seed=augmentation_seed, image_size=config.image_size)
+        train_transform = EpochImageNetTransform(
+            augmentation_seed=augmentation_seed,
+            image_size=config.image_size,
+            heavy_augmentation=config.imagenet_heavy_augmentation,
+        )
     else:
         train_transform = _to_tensor
     validation_transform: IndexedTransform = (

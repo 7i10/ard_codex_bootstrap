@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import torch
 from PIL import Image
+from pydantic import ValidationError
 from torch.utils.data import DataLoader
 
 from ard.config.schema import DatasetConfig
@@ -492,6 +493,45 @@ def test_imagenet_validation_view_is_not_augmented_and_matches_the_eval_transfor
     assert torch.equal(image_epoch_0, image_epoch_1)
     expected = ImageNetEvalTransform(image_size=32)(train_view.dataset.dataset[validation_view.indices[0]][0])
     assert torch.equal(image_epoch_0, expected)
+
+
+def test_epoch_image_net_transform_default_output_is_unchanged_by_the_heavy_augmentation_addition() -> None:
+    """Plan 0102 Workstream A: heavy_augmentation defaults to False, so
+    every existing caller (and every existing config, which never
+    mentions imagenet_heavy_augmentation) must see byte-identical output
+    to before RandAugment/RandomErasing existed."""
+    image = Image.new("RGB", (64, 64))
+    plain = EpochImageNetTransform(augmentation_seed=3, image_size=16)
+    explicit_off = EpochImageNetTransform(augmentation_seed=3, image_size=16, heavy_augmentation=False)
+    assert torch.equal(plain(image, source_id=5), explicit_off(image, source_id=5))
+
+
+def test_epoch_image_net_transform_heavy_augmentation_runs_and_returns_the_right_shape() -> None:
+    """Not a determinism guarantee (RandAugment/RandomErasing use the
+    global RNG, by design -- see DatasetConfig.imagenet_heavy_augmentation's
+    docstring) -- just confirms the path executes and produces a valid
+    tensor, since torchvision's transforms accept PIL images generically
+    and a shape mismatch would only surface at training time otherwise."""
+    torch.manual_seed(0)
+    image = Image.new("RGB", (64, 64))
+    transform = EpochImageNetTransform(augmentation_seed=3, image_size=16, heavy_augmentation=True)
+    tensor = transform(image, source_id=5)
+    assert tensor.shape == (3, 16, 16)
+    assert tensor.dtype == torch.float32
+
+
+def test_imagenet_heavy_augmentation_config_flag_reaches_the_training_view(tmp_path: Path) -> None:
+    _imagenet_layout(tmp_path, split="train", size=64)
+    config = DatasetConfig(
+        name="imagenet", root=tmp_path, split="train", num_classes=3, image_size=32, imagenet_heavy_augmentation=True
+    )
+    train_view, _ = build_train_validation_views(config, validation_fraction=0.34, split_seed=1, augmentation_seed=7)
+    assert train_view.dataset.transform.heavy_augmentation is True
+
+
+def test_imagenet_heavy_augmentation_is_rejected_for_non_imagenet_datasets() -> None:
+    with pytest.raises(ValidationError, match="imagenet_heavy_augmentation is only defined for the imagenet dataset"):
+        DatasetConfig(name="cifar10", imagenet_heavy_augmentation=True)
 
 
 def test_epoch_image_net_transform_falls_back_to_a_centered_square_crop_when_nothing_fits(tmp_path: Path) -> None:

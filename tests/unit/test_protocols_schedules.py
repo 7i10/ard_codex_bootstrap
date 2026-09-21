@@ -13,7 +13,7 @@ from torch.optim import SGD
 from ard.cli import train as train_cli
 from ard.config.schema import ExperimentConfig, MethodConfig, SchedulerConfig
 from ard.protocols import ensure_local_trainable, get_protocol
-from ard.schedules import build_scheduler, warmup_multistep_multiplier
+from ard.schedules import build_scheduler, warmup_cosine_multiplier, warmup_multistep_multiplier
 
 pytestmark = pytest.mark.t1
 
@@ -337,7 +337,9 @@ def _lr_after_completed_epochs(completed: int) -> tuple[float, dict[str, object]
     parameter = nn.Parameter(torch.ones(()))
     optimizer = SGD([parameter], lr=0.1)
     scheduler = build_scheduler(
-        optimizer, SchedulerConfig(id="multistep", milestones=(100, 150), gamma=0.1, step_at="epoch_end")
+        optimizer,
+        SchedulerConfig(id="multistep", milestones=(100, 150), gamma=0.1, step_at="epoch_end"),
+        total_epochs=200,
     )
     for _ in range(completed):
         optimizer.step()
@@ -352,7 +354,9 @@ def test_epoch_end_multistep_boundaries_and_state_dict_resume_are_exact() -> Non
         resumed_parameter = nn.Parameter(torch.ones(()))
         resumed_optimizer = SGD([resumed_parameter], lr=0.1)
         resumed = build_scheduler(
-            resumed_optimizer, SchedulerConfig(id="multistep", milestones=(100, 150), gamma=0.1, step_at="epoch_end")
+            resumed_optimizer,
+            SchedulerConfig(id="multistep", milestones=(100, 150), gamma=0.1, step_at="epoch_end"),
+            total_epochs=200,
         )
         _, state = _lr_after_completed_epochs(boundary)
         resumed_optimizer.param_groups[0]["lr"] = observed[boundary]
@@ -391,6 +395,7 @@ def _lr_after_completed_warmup_epochs(completed: int) -> tuple[float, dict[str, 
     scheduler = build_scheduler(
         optimizer,
         SchedulerConfig(id="warmup_multistep", milestones=(25, 38), gamma=0.1, step_at="epoch_end", warmup_epochs=10),
+        total_epochs=50,
     )
     for _ in range(completed):
         optimizer.step()
@@ -414,6 +419,7 @@ def test_warmup_multistep_scheduler_boundaries_and_resume_are_exact() -> None:
             SchedulerConfig(
                 id="warmup_multistep", milestones=(25, 38), gamma=0.1, step_at="epoch_end", warmup_epochs=10
             ),
+            total_epochs=50,
         )
         lr_at_boundary, state = _lr_after_completed_warmup_epochs(boundary)
         resumed_optimizer.param_groups[0]["lr"] = lr_at_boundary
@@ -423,6 +429,82 @@ def test_warmup_multistep_scheduler_boundaries_and_resume_are_exact() -> None:
         resumed.step()
         assert resumed_optimizer.param_groups[0]["lr"] == pytest.approx(uninterrupted_lr)
         assert resumed.state_dict()["last_epoch"] == uninterrupted_state["last_epoch"]
+
+
+def test_warmup_cosine_multiplier_matches_a_hand_computed_sequence() -> None:
+    """Plan 0102 Workstream A: linear warmup (same shape as
+    warmup_multistep_multiplier), then cosine decay to exactly 0 at the
+    last epoch of the run -- Singh/Croce/Hein 2023's own pretrained-init
+    recipe (arXiv:2303.01870, Appendix A.1)."""
+    import math
+
+    kwargs = {"warmup_epochs": 10, "total_epochs": 50}
+    observed = {epoch: warmup_cosine_multiplier(epoch, **kwargs) for epoch in (0, 1, 9, 10, 29, 49)}
+    assert observed[0] == pytest.approx(0.1)  # (0+1)/10
+    assert observed[1] == pytest.approx(0.2)  # (1+1)/10
+    assert observed[9] == pytest.approx(1.0)  # warmup complete
+    assert observed[10] == pytest.approx(1.0)  # cosine progress 0 -> multiplier 1.0
+    # Midpoint of the post-warmup span (epoch 10..49, span=39): epoch 29 is
+    # not exactly the midpoint (29.5 would be), so hand-compute via the cosine
+    # formula directly rather than assume 0.5.
+    expected_29 = 0.5 * (1.0 + math.cos(math.pi * (29 - 10) / (49 - 10)))
+    assert observed[29] == pytest.approx(expected_29)
+    assert observed[49] == pytest.approx(0.0, abs=1e-12)  # last epoch -> multiplier 0
+
+
+def test_warmup_cosine_multiplier_rejects_warmup_at_or_past_total_epochs() -> None:
+    with pytest.raises(ValueError, match="warmup_epochs < total_epochs"):
+        warmup_cosine_multiplier(0, warmup_epochs=50, total_epochs=50)
+
+
+def _lr_after_completed_cosine_epochs(completed: int) -> tuple[float, dict[str, object]]:
+    parameter = nn.Parameter(torch.ones(()))
+    optimizer = SGD([parameter], lr=0.1)
+    scheduler = build_scheduler(
+        optimizer,
+        SchedulerConfig(id="warmup_cosine", milestones=(), gamma=1.0, step_at="epoch_end", warmup_epochs=10),
+        total_epochs=50,
+    )
+    for _ in range(completed):
+        optimizer.step()
+        scheduler.step()
+    return optimizer.param_groups[0]["lr"], scheduler.state_dict()
+
+
+def test_warmup_cosine_scheduler_boundaries_and_resume_are_exact() -> None:
+    observed = {epoch: _lr_after_completed_cosine_epochs(epoch)[0] for epoch in (0, 9, 10, 49)}
+    assert observed[0] == pytest.approx(0.01)
+    assert observed[9] == pytest.approx(0.1)
+    assert observed[10] == pytest.approx(0.1)
+    assert observed[49] == pytest.approx(0.0, abs=1e-12)
+    for boundary in (9, 10, 29):
+        resumed_parameter = nn.Parameter(torch.ones(()))
+        resumed_optimizer = SGD([resumed_parameter], lr=0.1)
+        resumed = build_scheduler(
+            resumed_optimizer,
+            SchedulerConfig(id="warmup_cosine", milestones=(), gamma=1.0, step_at="epoch_end", warmup_epochs=10),
+            total_epochs=50,
+        )
+        lr_at_boundary, state = _lr_after_completed_cosine_epochs(boundary)
+        resumed_optimizer.param_groups[0]["lr"] = lr_at_boundary
+        resumed.load_state_dict(state)
+        uninterrupted_lr, uninterrupted_state = _lr_after_completed_cosine_epochs(boundary + 1)
+        resumed_optimizer.step()
+        resumed.step()
+        assert resumed_optimizer.param_groups[0]["lr"] == pytest.approx(uninterrupted_lr)
+        assert resumed.state_dict()["last_epoch"] == uninterrupted_state["last_epoch"]
+
+
+def test_warmup_cosine_requires_warmup_epochs() -> None:
+    with pytest.raises(ValidationError, match="warmup_cosine requires warmup_epochs"):
+        SchedulerConfig(id="warmup_cosine", milestones=(), gamma=1.0, step_at="epoch_end")
+
+
+def test_warmup_cosine_rejects_nonempty_milestones_or_nondefault_gamma() -> None:
+    with pytest.raises(ValidationError, match="requires milestones=\\[\\] and gamma=1.0"):
+        SchedulerConfig(id="warmup_cosine", milestones=(25,), gamma=1.0, step_at="epoch_end", warmup_epochs=10)
+    with pytest.raises(ValidationError, match="requires milestones=\\[\\] and gamma=1.0"):
+        SchedulerConfig(id="warmup_cosine", milestones=(), gamma=0.1, step_at="epoch_end", warmup_epochs=10)
 
 
 def test_warmup_multistep_requires_warmup_epochs() -> None:

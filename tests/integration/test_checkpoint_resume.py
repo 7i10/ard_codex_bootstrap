@@ -883,7 +883,7 @@ def test_multistep_optimizer_scheduler_checkpoint_roundtrip_matches_uninterrupte
         torch.manual_seed(71)
         model = nn.Linear(2, 2)
         optimizer = SGD(model.parameters(), lr=0.1, momentum=0.9)
-        return model, optimizer, build_scheduler(optimizer, schedule), EpochShuffleSampler(2, seed=3)
+        return model, optimizer, build_scheduler(optimizer, schedule, total_epochs=200), EpochShuffleSampler(2, seed=3)
 
     uninterrupted_model, uninterrupted_optimizer, uninterrupted_scheduler, _ = components()
     _advance_optimizer_and_schedule(

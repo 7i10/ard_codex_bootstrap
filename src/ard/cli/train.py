@@ -12,7 +12,7 @@ from typing import cast
 
 import torch
 from torch import nn
-from torch.optim import SGD
+from torch.optim import SGD, AdamW
 from torch.utils.data import DataLoader
 
 from ard.analysis import write_sample_parquet
@@ -429,7 +429,7 @@ def _build_method(
     """Compose the M2 outer objective and optional policy without branching a loop."""
     method = config.method
     if method.id == "pgd_at":
-        return PGDATObjective(), None, None, None
+        return PGDATObjective(label_smoothing=method.label_smoothing), None, None, None
     if method.id == "trades":
         return (
             TRADESObjective(
@@ -839,14 +839,24 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("prescriptive v3 anchor is not the exact epoch-79 end-boundary checkpoint")
             anchor_model = build_student(config.student, tier=config.tier)
             anchor_model.load_state_dict(anchor_payload["model"], strict=True)
-        optimizer = SGD(
-            student.parameters(),
-            lr=config.optimizer.learning_rate,
-            momentum=config.optimizer.momentum,
-            weight_decay=config.optimizer.weight_decay,
-            nesterov=config.optimizer.nesterov,
-        )
-        scheduler = build_scheduler(optimizer, config.scheduler)
+        if config.optimizer.id == "sgd":
+            assert config.optimizer.momentum is not None and config.optimizer.nesterov is not None
+            optimizer: SGD | AdamW = SGD(
+                student.parameters(),
+                lr=config.optimizer.learning_rate,
+                momentum=config.optimizer.momentum,
+                weight_decay=config.optimizer.weight_decay,
+                nesterov=config.optimizer.nesterov,
+            )
+        else:
+            assert config.optimizer.beta1 is not None and config.optimizer.beta2 is not None
+            optimizer = AdamW(
+                student.parameters(),
+                lr=config.optimizer.learning_rate,
+                betas=(config.optimizer.beta1, config.optimizer.beta2),
+                weight_decay=config.optimizer.weight_decay,
+            )
+        scheduler = build_scheduler(optimizer, config.scheduler, total_epochs=config.training.epochs)
         selection_attack_config = config.method.selection_attack
         assert selection_attack_config is not None  # resolved by MethodConfig validation
         objective, policy, sample_store, target_policy = _build_method(config)
