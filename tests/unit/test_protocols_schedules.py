@@ -433,9 +433,12 @@ def test_warmup_multistep_scheduler_boundaries_and_resume_are_exact() -> None:
 
 def test_warmup_cosine_multiplier_matches_a_hand_computed_sequence() -> None:
     """Plan 0102 Workstream A: linear warmup (same shape as
-    warmup_multistep_multiplier), then cosine decay to exactly 0 at the
-    last epoch of the run -- Singh/Croce/Hein 2023's own pretrained-init
-    recipe (arXiv:2303.01870, Appendix A.1)."""
+    warmup_multistep_multiplier), then cosine decay towards (never exactly
+    reaching) 0 at the last epoch of the run -- Singh/Croce/Hein 2023's own
+    pretrained-init recipe (arXiv:2303.01870, Appendix A.1), using the same
+    never-quite-reached-endpoint convention as
+    ard.schedules.cosine_value.cosine_anneal (scientific review, 2026-09-21,
+    P1 finding 2: consistency, and no exact-zero final-epoch no-op step)."""
     import math
 
     kwargs = {"warmup_epochs": 10, "total_epochs": 50}
@@ -444,17 +447,30 @@ def test_warmup_cosine_multiplier_matches_a_hand_computed_sequence() -> None:
     assert observed[1] == pytest.approx(0.2)  # (1+1)/10
     assert observed[9] == pytest.approx(1.0)  # warmup complete
     assert observed[10] == pytest.approx(1.0)  # cosine progress 0 -> multiplier 1.0
-    # Midpoint of the post-warmup span (epoch 10..49, span=39): epoch 29 is
-    # not exactly the midpoint (29.5 would be), so hand-compute via the cosine
-    # formula directly rather than assume 0.5.
-    expected_29 = 0.5 * (1.0 + math.cos(math.pi * (29 - 10) / (49 - 10)))
+    # Post-warmup span is total_epochs - warmup_epochs = 40 (the denominator
+    # in the cosine_anneal-matching convention), not 39.
+    expected_29 = 0.5 * (1.0 + math.cos(math.pi * (29 - 10) / 40))
     assert observed[29] == pytest.approx(expected_29)
-    assert observed[49] == pytest.approx(0.0, abs=1e-12)  # last epoch -> multiplier 0
+    expected_49 = 0.5 * (1.0 + math.cos(math.pi * (49 - 10) / 40))
+    assert observed[49] == pytest.approx(expected_49)
+    assert 0.0 < observed[49] < 0.01  # small and positive, never exactly 0
 
 
 def test_warmup_cosine_multiplier_rejects_warmup_at_or_past_total_epochs() -> None:
     with pytest.raises(ValueError, match="warmup_epochs < total_epochs"):
         warmup_cosine_multiplier(0, warmup_epochs=50, total_epochs=50)
+
+
+def test_warmup_cosine_multiplier_is_not_degenerate_at_a_short_canary_horizon() -> None:
+    """Scientific review (2026-09-21, P1 finding 2): before the denominator
+    fix, a 12-epoch canary with a 10-epoch warmup (this plan's own
+    established canary horizon) silently returned multiplier 0.0 for both
+    of its post-warmup epochs -- no error, just a training attack/LR that
+    never moved past the warmup ramp. Confirm neither post-warmup epoch is
+    zero at this exact horizon."""
+    kwargs = {"warmup_epochs": 10, "total_epochs": 12}
+    assert warmup_cosine_multiplier(10, **kwargs) == pytest.approx(1.0)
+    assert 0.0 < warmup_cosine_multiplier(11, **kwargs) < 1.0
 
 
 def _lr_after_completed_cosine_epochs(completed: int) -> tuple[float, dict[str, object]]:
@@ -476,7 +492,7 @@ def test_warmup_cosine_scheduler_boundaries_and_resume_are_exact() -> None:
     assert observed[0] == pytest.approx(0.01)
     assert observed[9] == pytest.approx(0.1)
     assert observed[10] == pytest.approx(0.1)
-    assert observed[49] == pytest.approx(0.0, abs=1e-12)
+    assert 0.0 < observed[49] < 0.01  # small and positive, never exactly 0 (see multiplier test above)
     for boundary in (9, 10, 29):
         resumed_parameter = nn.Parameter(torch.ones(()))
         resumed_optimizer = SGD([resumed_parameter], lr=0.1)
@@ -493,6 +509,30 @@ def test_warmup_cosine_scheduler_boundaries_and_resume_are_exact() -> None:
         resumed.step()
         assert resumed_optimizer.param_groups[0]["lr"] == pytest.approx(uninterrupted_lr)
         assert resumed.state_dict()["last_epoch"] == uninterrupted_state["last_epoch"]
+
+
+def test_adamw_parameter_groups_exclude_norm_and_bias_from_weight_decay() -> None:
+    """Scientific review (2026-09-21, P1 finding 1): BatchNorm affine
+    parameters and biases (ndim <= 1) must land in a zero-weight-decay
+    group; every other (ndim > 1) parameter must land in the decayed
+    group at exactly the configured weight_decay -- and every parameter
+    in the model must appear in exactly one group (no parameter silently
+    dropped from optimization)."""
+    model = nn.Sequential(nn.Conv2d(3, 4, 3), nn.BatchNorm2d(4), nn.Linear(4, 2))
+    groups = train_cli._adamw_parameter_groups(model, weight_decay=0.05)
+    assert len(groups) == 2
+    decay_group, no_decay_group = groups
+    assert decay_group["weight_decay"] == pytest.approx(0.05)
+    assert no_decay_group["weight_decay"] == pytest.approx(0.0)
+    assert all(parameter.ndim > 1 for parameter in decay_group["params"])
+    assert all(parameter.ndim <= 1 for parameter in no_decay_group["params"])
+    all_model_parameters = {id(parameter) for parameter in model.parameters()}
+    all_grouped_parameters = {id(parameter) for group in groups for parameter in group["params"]}
+    assert all_grouped_parameters == all_model_parameters
+    # Conv2d(3,4,3) weight is 4-D, BatchNorm2d(4) weight/bias and Conv2d's
+    # own bias are 1-D, Linear(4,2) weight is 2-D and its bias is 1-D.
+    assert len(decay_group["params"]) == 2  # conv weight, linear weight
+    assert len(no_decay_group["params"]) == 4  # conv bias, BN weight, BN bias, linear bias
 
 
 def test_warmup_cosine_requires_warmup_epochs() -> None:

@@ -1013,6 +1013,10 @@ def run_stage_a_arm(
     for parameter in teacher.parameters():
         parameter.requires_grad_(False)
         parameter.grad = None
+    # Stage A runtime is SGD-only (never adamw); the two fields are still
+    # typed float | None / bool | None since plan 0102 gave OptimizerConfig
+    # a second, disjoint adamw field set (scientific review, 2026-09-21).
+    assert config.optimizer.momentum is not None and config.optimizer.nesterov is not None
     optimizer = SGD(
         student.parameters(),
         lr=config.optimizer.learning_rate,

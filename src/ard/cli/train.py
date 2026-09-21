@@ -136,6 +136,32 @@ def _seed_everything(seed: int) -> None:
         pass
 
 
+def _adamw_parameter_groups(model: nn.Module, *, weight_decay: float) -> list[dict[str, object]]:
+    """Split parameters into decay / no-decay groups before constructing AdamW.
+
+    Plan 0102 scientific review (2026-09-21, P1 finding 1): a single flat
+    parameter group applies ``weight_decay`` to every parameter, including
+    BatchNorm affine (``gamma``/``beta``) and every bias -- at AdamW's
+    decoupled decay, a nonzero weight_decay pulls an otherwise-undamped 1-D
+    parameter toward zero by a fixed fraction *every step*, unrelated to
+    its gradient. Upstream (Singh/Croce/Hein 2023's own code,
+    github.com/nmndeep/revisiting-at) builds its optimizer through timm's
+    ``create_optimizer``, whose default (``filter_bias_and_bn=True``)
+    excludes exactly these parameters from decay -- this reproduces that
+    split (``ndim <= 1`` covers both BatchNorm/LayerNorm affine parameters
+    and every bias in one check, matching timm's own
+    ``param_groups_weight_decay`` heuristic) rather than silently decaying
+    them and confounding "does the recipe stop the collapse" with "did
+    weight decay crush the normalization layers".
+    """
+    decay = [parameter for parameter in model.parameters() if parameter.requires_grad and parameter.ndim > 1]
+    no_decay = [parameter for parameter in model.parameters() if parameter.requires_grad and parameter.ndim <= 1]
+    return [
+        {"params": decay, "weight_decay": weight_decay},
+        {"params": no_decay, "weight_decay": 0.0},
+    ]
+
+
 def _guard_output(output_dir: Path, *, resume: Path | None, config_hash: str) -> None:
     """Reject collisions before the resolved config or checkpoint can be written."""
     if resume is None:
@@ -851,10 +877,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             assert config.optimizer.beta1 is not None and config.optimizer.beta2 is not None
             optimizer = AdamW(
-                student.parameters(),
+                _adamw_parameter_groups(student, weight_decay=config.optimizer.weight_decay),
                 lr=config.optimizer.learning_rate,
                 betas=(config.optimizer.beta1, config.optimizer.beta2),
-                weight_decay=config.optimizer.weight_decay,
             )
         scheduler = build_scheduler(optimizer, config.scheduler, total_epochs=config.training.epochs)
         selection_attack_config = config.method.selection_attack

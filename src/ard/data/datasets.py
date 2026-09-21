@@ -634,6 +634,16 @@ class EpochImageNetTransform:
     shorter side if no attempt fits) is reimplemented here against a local
     ``torch.Generator``, matching torchvision's own algorithm
     (``torchvision.transforms.RandomResizedCrop``) parameter-for-parameter.
+
+    **Exception (scientific review, 2026-09-21, P2 finding 5)**: when
+    ``heavy_augmentation=True`` (``DatasetConfig.imagenet_heavy_augmentation``),
+    the reproduce-per-source-ID guarantee above no longer holds.
+    ``torchvision.transforms.RandAugment``/``RandomErasing`` consume the
+    *global* PyTorch RNG, not this class's local generator, by deliberate
+    human decision (chat, 2026-09-21) rather than reimplementing
+    RandAugment's ~14 operations against a local generator. A resumed
+    epoch still reproduces the same crop and flip, but not the same
+    RandAugment/RandomErasing draw.
     """
 
     _SCALE = (0.08, 1.0)

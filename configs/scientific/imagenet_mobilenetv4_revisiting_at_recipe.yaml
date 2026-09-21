@@ -35,6 +35,28 @@
 # a weakening) is real, if small, new surface in src/ard/attacks/ and
 # needs its own scientific-reviewer pass before being added -- deferred
 # to a follow-up rather than rushed into this config's first launch.
+#
+# RandAugment/RandomErasing fidelity note (scientific review, 2026-09-21,
+# P2-6): this config uses torchvision's RandAugment/RandomErasing
+# (EpochImageNetTransform(heavy_augmentation=True), human decision, chat
+# 2026-09-21: "torchvisionの実装をそのまま使う"), not timm's, which is what
+# Singh/Croce/Hein's own code actually calls. Known deltas: torchvision's
+# RandAugment omits a handful of timm-only ops (e.g. Cutout is dropped
+# entirely, "Identity" bookkeeping differs) and its magnitude-to-pixel
+# mapping is not guaranteed bit-identical to timm's for every op; the
+# transforms are not expected to be a pixel-exact reproduction of the
+# paper's augmentation, only the same class of heavy augmentation at the
+# same layers(2)/magnitude(9)/erasing-probability(0.25) settings.
+#
+# Config-hash-rotation caution (scientific review, 2026-09-21, P2-9): if
+# this run needs to be paused and resumed, resume it only from the exact
+# pinned worktree/source SHA it was launched from. Checkpoint resume
+# refuses on config-hash drift (docs/SCIENTIFIC_INVARIANTS.md), so
+# resuming after a later, unrelated schema/engine change lands on this
+# same YAML text would either refuse to resume (safe) or, if the schema
+# change is additive-default-preserving and happens not to change this
+# config's resolved hash, silently pick up unintended behavior -- always
+# resume from the original pinned worktree, never a freshly re-pinned one.
 schema_version: 2
 protocol: {id: controlled_imagenet_stage01_mobilenetv4_revisiting_at_recipe_v1}
 tier: production

@@ -126,7 +126,7 @@ def main() -> int:
         weight_decay=config.optimizer.weight_decay,
         nesterov=config.optimizer.nesterov,
     )
-    scheduler = build_scheduler(optimizer, config.scheduler)
+    scheduler = build_scheduler(optimizer, config.scheduler, total_epochs=config.training.epochs)
     objective, policy, sample_store, target_policy = _build_method(config)
     if config.observation.records_student_history and sample_store is None:
         sample_store = SampleStateStore(ema_decay=config.method.student_ema_decay)

@@ -1085,6 +1085,17 @@ config.
     real, if small, new surface in `src/ard/attacks/` and needs its own
     scientific-reviewer pass, deferred to a follow-up rather than rushed
     into this launch.
+  - **Attribution scope (scientific review, 2026-09-21, P2-7)**: this arm
+    tests Singh/Croce/Hein's *whole recipe* (optimizer identity, LR
+    magnitude and shape, weight decay, label smoothing, heavy augmentation,
+    weight-EMA) transplanted together onto MobileNetV4-Conv-Small -- not
+    an isolated SGD-vs-AdamW or LR-magnitude probe. If clean accuracy
+    improves, that result supports "this recipe as a whole beats this
+    project's own SGD recipe" and does not, by itself, isolate which
+    ingredient (LR magnitude, schedule shape, optimizer, augmentation, or
+    their interaction) is doing the work. Do not later cite this run as
+    having shown "the LR was the problem" specifically -- that would need
+    a follow-up single-variable ablation, not yet run.
   - `scripts/verify.py --changed` confirmed green via explicit exit code.
     Scientific review requested (touches `src/ard/config/schema.py`,
     `src/ard/engine`-adjacent `src/ard/cli/train.py`, `src/ard/schedules/`,

@@ -24,6 +24,7 @@ import yaml
 
 from ard.config import ExperimentConfig, load_config, save_resolved_config
 from ard.config.loader import resolved_config_dict
+from ard.config.schema import SchedulerConfig
 from ard.engine.checkpoint import REQUIRED_KEYS, config_digest
 from ard.state import SampleStateStore
 from ard.tracking import stable_run_id
@@ -433,20 +434,19 @@ def _validate_allowed_delta(*, parent: ExperimentConfig, child: ExperimentConfig
         raise ScheduleControlForkError("child changes fields outside output/tracking/protocol/scheduler whitelist")
     if not isinstance(parent_scheduler, Mapping) or not isinstance(child_scheduler, Mapping):
         raise ScheduleControlForkError("parent and child scheduler mappings are required")
-    expected_parent = {
-        "id": "multistep",
-        "milestones": list(PARENT_MILESTONES),
-        "gamma": 0.1,
-        "step_at": "epoch_end",
-        "warmup_epochs": None,
-    }
-    expected_child = {
-        "id": "multistep",
-        "milestones": list(CHILD_MILESTONES),
-        "gamma": 0.1,
-        "step_at": "epoch_end",
-        "warmup_epochs": None,
-    }
+    # Built from the real schema rather than a hand-maintained literal
+    # dict, so a future SchedulerConfig field does not silently reintroduce
+    # the bug this fix repairs (scientific review, 2026-09-21, P2 finding
+    # 8): these two dicts drifted out of sync with SchedulerConfig once
+    # before (plan 0100 added warmup_epochs and this comparison was never
+    # updated), which is exactly the class of bug a schema-derived
+    # comparison cannot have.
+    expected_parent = SchedulerConfig(
+        id="multistep", milestones=PARENT_MILESTONES, gamma=0.1, step_at="epoch_end"
+    ).model_dump(mode="json")
+    expected_child = SchedulerConfig(
+        id="multistep", milestones=CHILD_MILESTONES, gamma=0.1, step_at="epoch_end"
+    ).model_dump(mode="json")
     if dict(parent_scheduler) != expected_parent or dict(child_scheduler) != expected_child:
         raise ScheduleControlForkError("schedule-control may change only [100,150] to [120,170] at epoch end")
 

@@ -8,6 +8,7 @@
 - dataset adapterからattackへ渡す画像はfloat pixel-space `[0,1]`。
 - CIFAR normalizationはstudent/teacher model adapterが所有し、attack前後に二重適用しない。
 - CIFAR-10 SAAD studentはnamed `cifar10_raw_identity` profile（student adapter所有）を要求する。train augmentationはsource-keyed、validation/testはdeterministicである。
+  - **例外(plan 0102, scientific review 2026-09-21)**: `DatasetConfig.imagenet_heavy_augmentation`を有効にしたImageNet訓練では、RandAugment/RandomErasing部分はtorchvisionのグローバル乱数を使うため、source ID単位の再現性(resumeで同じ拡張結果になること)は保証されない(crop/flip部分は引き続きsource-keyedで再現性あり)。人間の明示的判断(chat, 2026-09-21)による、この一実験に限った既知の逸脱。
 - PGD projectionはpixel-spaceで行い、`Linf` ballへprojectした後`[0,1]`へclampする。
 - rational値は文字列`8/255`, `2/255`としてresolved configへ保持し、数値値と照合する。
 

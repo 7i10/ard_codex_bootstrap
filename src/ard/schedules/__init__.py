@@ -33,21 +33,37 @@ def warmup_multistep_multiplier(
 
 def warmup_cosine_multiplier(epoch: int, *, warmup_epochs: int, total_epochs: int) -> float:
     """Pure function: linear warmup (same shape as ``warmup_multistep_multiplier``),
-    then cosine decay from 1.0 at ``epoch == warmup_epochs`` to 0.0 at
-    ``epoch == total_epochs - 1`` (the last epoch that runs), matching
-    Singh/Croce/Hein 2023's own pretrained-init recipe (arXiv:2303.01870,
-    Appendix A.1: linear warmup then cosine decay). ``total_epochs`` must be
-    the same value as ``TrainingConfig.epochs`` for this run -- the decay
-    curve is defined relative to the run's own length, not an absolute
-    epoch count, so a different ``total_epochs`` changes the whole curve,
-    not just its tail.
+    then cosine decay from 1.0 at ``epoch == warmup_epochs`` towards (but
+    never exactly reaching) 0.0, matching Singh/Croce/Hein 2023's own
+    pretrained-init recipe (arXiv:2303.01870, Appendix A.1: linear warmup
+    then cosine decay). ``total_epochs`` must be the same value as
+    ``TrainingConfig.epochs`` for this run -- the decay curve is defined
+    relative to the run's own length, not an absolute epoch count, so a
+    different ``total_epochs`` changes the whole curve, not just its tail.
+
+    Plan 0102 scientific review (2026-09-21, P1 finding 2): the post-warmup
+    span is ``total_epochs - warmup_epochs`` (the denominator), not
+    ``total_epochs - 1 - warmup_epochs`` -- matching
+    ``ard.schedules.cosine_value.cosine_anneal``'s own convention
+    (``iteration / total_iterations``, endpoint approached but never
+    reached) instead of introducing a second, inconsistent convention for
+    the same "cosine towards a target" family. This has two effects, both
+    intentional: (1) since ``warmup_epochs < total_epochs`` is already
+    required below, the post-warmup span is always at least 1 -- there is
+    no longer a silent all-zero degenerate case at a short horizon (e.g. a
+    12-epoch canary with a 10-epoch warmup no longer collapses to
+    multiplier 0.0 for its only two post-warmup epochs); (2) the very last
+    epoch of a full run never receives an exact multiplier of 0.0 (a literal
+    no-op training step, since AdamW's decoupled weight decay is also
+    scaled by the LR) -- it receives a small positive value instead, the
+    same way ``cosine_anneal`` never exactly reaches its own endpoint.
     """
     if warmup_epochs >= total_epochs:
         raise ValueError("warmup_cosine requires warmup_epochs < total_epochs")
     if epoch < warmup_epochs:
         return (epoch + 1) / warmup_epochs
-    span = total_epochs - 1 - warmup_epochs
-    progress = 1.0 if span <= 0 else min((epoch - warmup_epochs) / span, 1.0)
+    span = total_epochs - warmup_epochs
+    progress = (epoch - warmup_epochs) / span
     return 0.5 * (1.0 + math.cos(math.pi * progress))
 
 
