@@ -1024,3 +1024,69 @@ config.
      `lambda_source` were held at plan 0100's values on purpose, so this does not
      rule out that some other `adr` setting clears PGD-AT. n=1, seed 0, one GPU,
      global batch 128.
+- 2026-09-21 (chat, autonomous continuation): human asked whether the
+  epoch-1 clean-accuracy shock is normal for pretrained-init adversarial
+  fine-tuning, whether the LR-decay recovery could be overfitting, and
+  what LR Singh/Croce/Hein 2023 actually use, then directed a full
+  transplant of that paper's own recipe rather than an isolated SGD-LR
+  probe.
+  - **Overfitting check** (existing data, `plan0102-weight-ema-full50-v1`'s
+    live column): train and val clean/robust accuracy both jump at the
+    same epoch-25 decay (train_clean 38.84%→41.60%, val_clean
+    38.38%→48.40%; train_robust 17.24%→22.35%, val_pgd 19.58%→27.19%).
+    Both move together, so this is not overfitting (train already fitting
+    well while only val improves) -- consistent with SGD-noise settling
+    plus BatchNorm running-statistic stabilization at lower LR, not a
+    generalization-gap artifact.
+  - **Singh/Croce/Hein 2023's actual recipe** (fetched from arXiv:2303.01870
+    Appendix A.1/A.2 via ar5iv, and from their official code,
+    github.com/nmndeep/revisiting-at, not paraphrased): AdamW
+    (beta1/beta2=0.9/0.95), peak LR **1e-3**, linear warmup to epoch 10 of
+    a 50-100 epoch run then **cosine** decay (this project's own
+    `warmup_multistep` schedule shape already borrowed the warmup timing
+    from this exact paper, per its own code comment -- confirmed, not
+    coincidental -- but not the cosine decay or the optimizer/LR
+    magnitude), weight_decay 5e-2, label_smoothing 0.1, weight EMA decay
+    0.999 (matches this plan's own already-implemented mechanism exactly),
+    RandAugment(2 layers, magnitude 9) + RandomErasing(p=0.25) on top of
+    RandomResizedCrop+flip. They also initialize from a pretrained clean
+    backbone (same as this project) and explicitly justify heavy
+    augmentation by that choice ("initializing with a well-trained
+    standard classifier makes it possible to use heavy augmentation").
+    Confirmed via their own training loop (`main.py`): Mixup/CutMix is
+    applied once per batch, before the attack, and the resulting
+    soft/mixed label feeds both the inner APGD loss and the outer
+    SoftTargetCrossEntropy (replacing, not stacking with, label
+    smoothing when active).
+  - **Implemented** (commit `2339a3d`): AdamW optimizer, warmup_cosine
+    scheduler (`ard.schedules.warmup_cosine_multiplier`, same warmup
+    shape as `warmup_multistep_multiplier`, cosine decay to exactly 0 at
+    the final epoch), `PGDATObjective.label_smoothing` (plus a soft-target
+    branch prepared for CutMix/MixUp, confirmed safe for every existing
+    pgd_at config since it requires a teacher no pgd_at config has),
+    `DatasetConfig.imagenet_heavy_augmentation` (RandAugment+RandomErasing
+    via torchvision directly -- deliberately not built to this project's
+    own per-source-ID determinism discipline, human decision, given the
+    size of reimplementing ~14 RandAugment operations against a local
+    generator versus this experiment's exploratory scope). New config
+    `imagenet_mobilenetv4_revisiting_at_recipe.yaml` combines all of the
+    above on MobileNetV4-Conv-Small, with a field-identity test proving
+    the full attack identity (train, selection, and evaluation) stays
+    byte-identical to Arm A -- only recipe mechanics changed, not the
+    threat model. Also fixed an unrelated pre-existing bug (confirmed via
+    `git stash` against a clean prior commit) in
+    `schedule_control_fork.py`'s comparison dicts, which never accounted
+    for `warmup_epochs` after plan 0100 added that field.
+  - **Deliberately not included yet: CutMix/MixUp.** Their own code feeds
+    the mixed soft label to the inner attack loss, but this project's
+    `pgd_at` attack (`loss: ce`) is hard-wired to `LinfPGD._loss`'s
+    hard-label branch (`F.cross_entropy(logits, labels)` against the
+    batch's own integer labels) -- extending it to accept a soft target is
+    real, if small, new surface in `src/ard/attacks/` and needs its own
+    scientific-reviewer pass, deferred to a follow-up rather than rushed
+    into this launch.
+  - `scripts/verify.py --changed` confirmed green via explicit exit code.
+    Scientific review requested (touches `src/ard/config/schema.py`,
+    `src/ard/engine`-adjacent `src/ard/cli/train.py`, `src/ard/schedules/`,
+    and `src/ard/objectives/pgd_at.py`) before any GPU-hour is spent;
+    not yet launched.
