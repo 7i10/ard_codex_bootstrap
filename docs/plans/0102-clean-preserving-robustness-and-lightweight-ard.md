@@ -1090,3 +1090,30 @@ config.
     `src/ard/engine`-adjacent `src/ard/cli/train.py`, `src/ard/schedules/`,
     and `src/ard/objectives/pgd_at.py`) before any GPU-hour is spent;
     not yet launched.
+- 2026-09-21 (chat, continued): `plan0102-trades-beta6-weight-ema-v2`
+  (Ferret) also completed (`exit_code: 0`, 50/50 epochs). Internal
+  validation only (held-out slice, PGD-10; not an official result, n=1,
+  seed 0), from `epoch-metrics.jsonl`:
+
+  | epoch | LR | live clean/PGD (TRADES β=6) | EMA clean/PGD (decay 0.999) |
+  |---:|---:|---:|---:|
+  | 24 (pre-decay) | 0.05 | 39.38% / 17.21% | 47.03% / 23.26% |
+  | 25 (post-decay) | 0.005 | 49.87% / 23.31% | 50.22% / 24.15% |
+  | 49 (last) | 0.0005 | 54.30% / 26.27% | 54.70% / 26.46% |
+
+  Reading: the EMA-vs-live gap collapses to +0.40pp clean / +0.19pp PGD by
+  the last epoch -- the same pattern as both plain weight-EMA arms (decay
+  0.999 and 0.9999), not a stronger, decay-surviving effect from combining
+  it with TRADES. **More importantly, TRADES β=6's own live trajectory
+  ends close to plain PGD-AT on clean (54.3% vs. Arm A's 54.3-54.6%) but
+  clearly behind on PGD-10 (26.27% vs. ~30.6%)** -- a ~4.3pp robust-accuracy
+  cost that weight-EMA does not recover (the EMA weights' own PGD, 26.46%,
+  is still ~4pp below plain PGD-AT). So after a full 50-epoch schedule,
+  **none of the three Workstream A arms tried so far (weight-EMA alone at
+  two decays, TRADES+weight-EMA combined) beats plain PGD-AT on both
+  clean and robust accuracy** -- every one of them is either a point on
+  the same tradeoff curve or landed level-to-behind on both axes once the
+  LR fully decays. This is the reason this plan pivoted (human direction,
+  2026-09-19/21) from probing more combinations of these same mechanisms
+  toward diagnosing the recipe's own LR/optimizer/augmentation choices
+  instead (see the entry above).
