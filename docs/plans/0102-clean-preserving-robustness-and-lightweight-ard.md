@@ -1128,3 +1128,51 @@ config.
   2026-09-19/21) from probing more combinations of these same mechanisms
   toward diagnosing the recipe's own LR/optimizer/augmentation choices
   instead (see the entry above).
+- 2026-09-21 (chat, continued): scientific review of commit `2339a3d`
+  (the revisiting_at recipe transplant) returned 2 P1 and 5 P2 findings,
+  all fixed in commit `ebad235`: (P1-1) AdamW was applying weight_decay to
+  every parameter including BatchNorm/bias; fixed with
+  `_adamw_parameter_groups` (decay/no-decay split). (P1-2)
+  `warmup_cosine_multiplier`'s span convention caused a degenerate
+  zero-multiplier at short horizons and an exact-zero no-op update on the
+  schedule's own final epoch; fixed by matching `cosine_value.py`'s
+  existing "approach but never reach the endpoint" convention. (P2, all
+  addressed) two analysis scripts had missed the `build_scheduler`
+  `total_epochs=` signature change; `ert_stage_a_runtime.py`'s SGD branch
+  now asserts `momentum`/`nesterov` are set; `schedule_control_fork.py`'s
+  hardcoded comparison dicts (already caught one real staleness bug this
+  session, confirmed pre-existing via `git stash`) are now built from
+  `SchedulerConfig(...).model_dump(mode="json")`; documented the lost
+  per-source-ID reproducibility guarantee for
+  `imagenet_heavy_augmentation` runs (`EpochImageNetTransform` docstring +
+  `docs/SCIENTIFIC_INVARIANTS.md`); documented torchvision-vs-timm
+  RandAugment/RandomErasing fidelity deltas and a config-hash-rotation
+  resume caution directly in the recipe config's header comment; added
+  the attribution-scope note above (whole-recipe test, not an isolated
+  LR probe). `scripts/verify.py --changed` confirmed green (the one
+  failing test outside its scope, `test_prescriptive_v3.py`'s epoch79
+  fork test, was confirmed via `git stash` to pre-exist on a clean
+  checkout, unrelated to this batch).
+
+  Pinned a fresh worktree at `ebad23561172cc9fe4efe8d3c17efd17b3a5c46e`
+  and launched `imagenet_mobilenetv4_revisiting_at_recipe.yaml` as a
+  local hand-run on Hamster GPU0, run_id
+  `plan0102-revisiting-at-recipe-full50-v1`, seed 0, full 50 epochs from
+  the start (this plan's own established policy, adopted 2026-09-15: read
+  intermediate epoch-metrics for an early go/no-go call instead of a
+  separate short canary). Confirmed alive and healthy after epoch 0
+  (`epoch-metrics.jsonl`): train_clean 29.39% / train_robust 11.08%,
+  val_clean 45.83% (EMA 47.38%), val_pgd 20.52% (EMA 21.79%),
+  train_seconds 1408s -- throughput matches this plan's prior ~1430-1440s/
+  epoch estimate for a 50-epoch MobileNetV4 ImageNet run on one Hamster
+  4090. Epoch 0's val_clean (45.8%) is not yet distinguishable from Arm
+  A's own epoch-0-ish collapse floor (~42-47%, plan 0100/0101 canary
+  precedent) -- this recipe's 10-epoch linear LR warmup to a peak of only
+  1e-3 (vs. Arm A's much higher effective SGD LR reached much earlier)
+  means the two recipes are not expected to diverge visibly until later
+  epochs (peak LR at epoch 10, and specifically past Arm A's own epoch-25
+  decay point, where the SGD recipe's sharp step-decay recovery happens
+  and this recipe's smooth cosine decay does not). Next check: read
+  epoch-metrics again once several more epochs land, focused on whether
+  clean accuracy avoids Arm A's ~37-40% mid-training floor during the
+  high-LR (pre-decay-equivalent) phase.
