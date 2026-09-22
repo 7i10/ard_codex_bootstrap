@@ -397,6 +397,11 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
         "train_loss",
         "train_clean_accuracy",
         "train_robust_accuracy",
+        # Decision 0016, option A: mode-matched to train_clean_accuracy
+        # (both eval-mode, post-step) so a BatchNorm-mode gap can be told
+        # apart from genuine catastrophic overfitting without re-training.
+        "train_robust_accuracy_eval_mode",
+        "train_robust_overtakes_clean",
         "train_valid_examples",
         "train_seconds",
         "train_images_per_second",
@@ -427,6 +432,9 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
     assert history[0]["train_cuda_peak_reserved_bytes"] == 0.0
     assert history[0]["learning_rate"] == pytest.approx(0.03)
     assert history[0]["next_learning_rate"] == pytest.approx(0.024)
+    for row in history:
+        assert 0.0 <= row["train_robust_accuracy_eval_mode"] <= 1.0
+        assert row["train_robust_overtakes_clean"] == (row["train_robust_accuracy"] > row["train_clean_accuracy"])
     assert history[1]["learning_rate"] == pytest.approx(0.024)
     assert history[1]["next_learning_rate"] == pytest.approx(0.0192)
     assert callback_metrics == history

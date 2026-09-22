@@ -1,6 +1,6 @@
 ---
 id: 0016
-status: pending
+status: decided
 created: 2026-09-22
 campaign: plan0102-revisiting-at-recipe-full50-v1（Hamster GPU0のhand-run、seed 0、50/50 epoch完走、source SHA ebad235）
 question: revisiting_atレシピ移植は50 epoch完走したが崩壊した（最終 clean 28.6% / PGD-10 0.05%、Arm Aは54.6% / 30.6%）。原因は「壊滅的過学習（catastrophic overfitting）とラベルリーク」で、移植コミットにバグは見つからなかった。ここから、崩壊の原因を切り分けるのか、切り分けるならどの単一変数を、それとも移植を打ち切ってplain PGD-ATに戻るのか。
@@ -10,7 +10,7 @@ options:
   C: 訓練時の攻撃ステップ数を3から上げた新しいcontractを立てて1本走らせる。GPU約40〜50時間
   D: 移植を打ち切る。plain PGD-AT（Arm A）を現時点の最良レシピとして確定し、GPUはWorkstream Bに回す。GPU約0時間
 recommendation: A
-chosen: null
+chosen: A
 ---
 
 # 0016 revisiting_atレシピ崩壊のあと、次に何をするか

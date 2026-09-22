@@ -107,8 +107,8 @@ def _reduce_epoch_observability(
     local_cuda_peak_reserved_bytes: int,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     """Apply the epoch SUM/MAX contract and derive globally valid throughput."""
-    if local_totals.shape != (8,):
-        raise ValueError("epoch totals must contain eight scalar accumulators")
+    if local_totals.shape != (9,):
+        raise ValueError("epoch totals must contain nine scalar accumulators")
     global_totals = reduce_sums(local_totals)
     rank_max = reduce_max(
         torch.tensor(
@@ -135,6 +135,15 @@ def _reduce_epoch_observability(
         # see _rectified_target's caching note for what a near-chance-level
         # value would indicate.
         "rectified_true_class_mass": (float(global_totals[7].item()) / valid_examples) if valid_examples > 0 else 0.0,
+        # Decision 0016, option A: robust accuracy under the SAME eval-mode,
+        # post-step forward as clean_accuracy above (BatchNorm running
+        # statistics, no dropout), unlike the pre-step, train-mode
+        # `robust_accuracy` this project has always reported (BatchNorm
+        # batch statistics). This never replaces or changes
+        # `robust_accuracy`'s own value; it exists so a mode-driven gap
+        # between the two can be told apart from genuine catastrophic
+        # overfitting/label leaking without re-running training.
+        "robust_accuracy_eval_mode": (float(global_totals[8].item()) / valid_examples) if valid_examples > 0 else 0.0,
     }
 
 
@@ -1023,7 +1032,14 @@ class Trainer:
         # Loss sum, clean-correct, robust-correct, valid examples, and actual
         # detached clean/adv teacher forwards.  One final SUM makes the
         # count telemetry global without adding a hot-loop collective.
-        totals = torch.zeros(8, dtype=torch.float64, device=self.device)
+        # Index 8 (decision 0016, option A): robust-correct under the SAME
+        # eval-mode/no-grad forward the post-step clean accuracy already
+        # uses, so "train_robust_accuracy_eval_mode" is mode-matched to
+        # "train_clean_accuracy" -- unlike the pre-step, train-mode
+        # "train_robust_accuracy" this project has always reported.
+        # Observability only; does not change train_robust_accuracy's own
+        # definition or value.
+        totals = torch.zeros(9, dtype=torch.float64, device=self.device)
         # Plan 0101 (scientific review P2-1): the realized training-attack
         # budget, computed once per epoch (constant across its batches) so
         # a warmup-ramped epoch's train_robust_accuracy is not silently
@@ -1604,6 +1620,13 @@ class Trainer:
             self._update_ema()
             with _evaluation_mode(self.model), torch.no_grad():
                 clean_logits = self.model(batch.images)
+                # Decision 0016, option A: the same eval-mode/no-grad forward
+                # as clean_logits above, on the same post-step weights, but
+                # fed the already-generated `adversarial` batch instead of
+                # `batch.images`. Mode-matched to train_clean_accuracy, unlike
+                # `logits` (line ~1225: train-mode, pre-step) which
+                # train_robust_accuracy has always used.
+                adversarial_logits_eval_mode = self.model(adversarial)
             ema_student_agreement_sum = (
                 0.0
                 if self._pending_ema_clean_argmax is None
@@ -1626,6 +1649,7 @@ class Trainer:
                     self._teacher_adversarial_forward_calls,
                     ema_student_agreement_sum,
                     rectified_true_class_mass_sum,
+                    float(((adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
                 ],
                 dtype=torch.float64,
                 device=self.device,
@@ -1848,6 +1872,18 @@ class Trainer:
                 "train_loss": train_metrics["loss"],
                 "train_clean_accuracy": train_metrics["clean_accuracy"],
                 "train_robust_accuracy": train_metrics["robust_accuracy"],
+                # Decision 0016, option A: mode-matched to train_clean_accuracy
+                # above (both eval-mode, post-step), unlike train_robust_accuracy
+                # (train-mode, pre-step). Observability only -- does not change
+                # train_robust_accuracy's own definition, value, or any
+                # downstream consumer (e.g. gap_adaptive_step) that reads it.
+                "train_robust_accuracy_eval_mode": train_metrics.get("robust_accuracy_eval_mode", 0.0),
+                # Recorded, not acted on: a true-value here is exactly the
+                # signature decision 0016 diagnosed as catastrophic
+                # overfitting/label leaking (plan0102-revisiting-at-recipe-full50-v1,
+                # epoch 21 onward). Never gates a checkpoint, schedule or
+                # attack decision.
+                "train_robust_overtakes_clean": train_metrics["robust_accuracy"] > train_metrics["clean_accuracy"],
                 "train_valid_examples": train_metrics.get("valid_examples", 0.0),
                 "train_seconds": train_metrics.get("seconds", 0.0),
                 "train_images_per_second": train_metrics.get("images_per_second", 0.0),
