@@ -1283,3 +1283,57 @@ config.
   **Next**: decision packet `docs/decisions/0016-*` — the human chooses whether
   to diagnose this collapse (and with which single-variable probe) or abandon the
   transplant. No new arm launched from this postrun.
+- 2026-09-22 (chat): human chose decision 0016 option A. Executed both parts.
+
+  **Part 1 (commit `0a96e1c`)**: added `train_robust_accuracy_eval_mode`
+  (same post-step, eval-mode forward `train_clean_accuracy` already uses,
+  applied to the already-generated adversarial batch instead of clean
+  images) and a recorded-only `train_robust_overtakes_clean` flag, in
+  `src/ard/engine/trainer.py`. Neither changes `train_robust_accuracy`'s own
+  definition, value, or any downstream consumer (`gap_adaptive_step`,
+  checkpoint selection). `scripts/verify.py --changed` confirmed green via
+  explicit exit code.
+
+  **Part 2 — forward-only forensic check** (no training; `last.pt`, one
+  fresh batch of 128 from the run's own training-dataset config, run from
+  the pinned worktree `source-ebad23561172`, one Hamster GPU, throwaway
+  script not committed):
+  | | clean | after 3-step train attack | after 10-step selection attack |
+  |---|---:|---:|---:|
+  | eval mode | 28.12% | **0.00%** | 0.00% |
+  | train mode | 33.59% | 77.34% | 68.75% |
+
+  **Decision 0016's preregistered rule fired its first branch**: (c) eval-mode
+  post-attack accuracy (0.00%) is 77.34pt below (d) train-mode post-attack
+  accuracy (77.34%) — far past the 20pt threshold. Per the rule, this means
+  **the headline `train_robust_accuracy=70.9%` at epoch 49 was mostly a
+  BatchNorm train/eval-mode artifact, not evidence of hidden real
+  robustness**: under the eval-mode forward that matches the official
+  evaluation protocol (and matches this run's own recorded
+  `val_pgd_accuracy=0.05%` almost exactly), the model has **zero**
+  measured robustness on this batch, at both 3 and 10 attack steps.
+  `train_robust_accuracy` alone must not be read as a robustness or
+  collapse-detection signal going forward — exactly what part 1's new
+  `train_robust_accuracy_eval_mode` field now makes checkable without a
+  forward-only script.
+
+  **What this does and does not change about the collapse's diagnosis.**
+  It confirms the collapse is real and total (eval-mode robustness is
+  genuinely ~0%, not masked by a monitoring artifact) — consistent with,
+  not a revision of, the postrun's headline numbers. It does **not** move
+  the packet's probability toward option C: the rule's other branch
+  (`(c) ≈ (d)` and a 10-step attack near-zero → "step-count-driven
+  catastrophic overfitting, raise C's prior") did not fire, because (c)
+  and (d) are nowhere close. It also means the panel evidence cited in the
+  postrun commit (10 of 15 clean-wrong samples flipping to correct under
+  attack) was read from the same train-mode, pre-step forward as
+  `train_robust_accuracy` (`trainer.py:1541-1542`) — not re-verified here
+  under eval mode — so "catastrophic overfitting with label leaking" as
+  the *specific* mechanism should be held slightly less firmly than the
+  postrun commit stated; "the model is not robust at all, in a way that
+  is real and not a measurement artifact" is what this check actually
+  established.
+
+  **Next**: decision packet `docs/decisions/0017-*` — B vs. C vs. abandoning
+  the transplant, informed by this finding. No new GPU-hour spent choosing
+  between them yet.
