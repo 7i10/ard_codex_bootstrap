@@ -75,6 +75,15 @@ class ProtocolConfig(StrictModel):
         # -- a separate protocol identity from this plan's own pgd_at/trades
         # identities.
         "controlled_imagenet_stage01_mobilenetv4_revisiting_at_recipe_v1",
+        # Decision 0017, option E: the identical revisiting_at recipe
+        # (same attack identity, optimizer, scheduler, augmentation,
+        # weight-EMA) on resnet18_imagenet instead of MobileNetV4-Conv-Small
+        # -- an architecture-swap control, human's own proposal (chat,
+        # 2026-09-22), testing whether this recipe's catastrophic-collapse
+        # failure mode is specific to the extra-lightweight architecture. A
+        # separate protocol identity from the MobileNetV4 arm's, matching
+        # this project's own precedent of one id per architecture pairing.
+        "controlled_imagenet_stage01_r18_revisiting_at_recipe_v1",
     ]
 
 

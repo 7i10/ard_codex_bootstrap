@@ -1,0 +1,44 @@
+# Decision 0017, option E: an architecture-swap control for
+# imagenet_mobilenetv4_revisiting_at_recipe.yaml (which collapsed -- plan
+# 0102 Progress log, 2026-09-22; catastrophic-overfitting signature at
+# epoch 20-21, eval-mode robust accuracy confirmed genuinely ~0%). Human's
+# own proposal (chat, 2026-09-22): run the identical recipe on a
+# standard-capacity architecture (resnet18_imagenet, 11.2M params, ~3x
+# MobileNetV4-Conv-Small's 3.8M) to test whether this collapse is specific
+# to the extra-lightweight architecture, or whether the recipe itself
+# (3-step training attack, AdamW at weight_decay 5e-2, heavy augmentation)
+# collapses regardless of capacity.
+#
+# The ONLY difference from imagenet_mobilenetv4_revisiting_at_recipe.yaml
+# is student.architecture and tracking.group. Every recipe ingredient
+# (optimizer, scheduler, label_smoothing, imagenet_heavy_augmentation,
+# weight_ema_decay) and the full attack identity (epsilon, steps, step
+# size, random start) are held fixed. resnet18_imagenet already supports
+# pretrained=True with zero registry changes (added plan 0100, same
+# pretrained-non-robust-init convention this project uses throughout).
+# A separate protocol id from the MobileNetV4 arm's (this project's own
+# precedent: one protocol id per architecture pairing within a plan) --
+# see src/ard/config/schema.py's ProtocolConfig.id and
+# src/ard/protocols/__init__.py's registration.
+#
+# Not a literal reproduction of Singh/Croce/Hein 2023's own training
+# procedure: their released code uses APGD (not this project's LinfPGD) as
+# the inner training attack, which would be new attack-layer surface
+# needing its own scientific-reviewer pass, and would confound
+# "architecture" with "attack algorithm" -- defeating this arm's purpose
+# of isolating architecture as the single variable. This arm instead keeps
+# this project's own already-implemented, already-reviewed recipe fixed
+# and swaps only the architecture.
+schema_version: 2
+protocol: {id: controlled_imagenet_stage01_r18_revisiting_at_recipe_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358, imagenet_heavy_augmentation: true}
+student: {architecture: resnet18_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: true, normalization: {profile: imagenet_standard}}
+method: {id: pgd_at, version: 1, label_smoothing: 0.1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: adamw, learning_rate: 0.001, beta1: 0.9, beta2: 0.95, weight_decay: 0.05}
+scheduler: {id: warmup_cosine, milestones: [], gamma: 1.0, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, weight_ema_decay: 0.999}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-r18-revisiting-at-recipe-controlled, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

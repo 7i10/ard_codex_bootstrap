@@ -553,6 +553,17 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # this plan's own pgd_at/trades/adr identities.
             metadata=MappingProxyType({"purpose": "imagenet_stage01_mobilenetv4_revisiting_at_recipe_v1"}),
         ),
+        "controlled_imagenet_stage01_r18_revisiting_at_recipe_v1": ProtocolSpec(
+            id="controlled_imagenet_stage01_r18_revisiting_at_recipe_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Decision 0017, option E: the identical revisiting_at recipe on
+            # resnet18_imagenet instead of MobileNetV4-Conv-Small -- an
+            # architecture-swap control isolating whether the recipe's
+            # catastrophic collapse is specific to the extra-lightweight
+            # architecture. A separate protocol from the MobileNetV4 arm's.
+            metadata=MappingProxyType({"purpose": "imagenet_stage01_r18_revisiting_at_recipe_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,

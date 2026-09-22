@@ -1094,3 +1094,46 @@ def test_revisiting_at_recipe_no_heavy_aug_config_changes_only_the_augmentation_
         payload["dataset"] = {**payload["dataset"], "imagenet_heavy_augmentation": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert collapsed == ablation
+
+
+def test_r18_revisiting_at_recipe_config_changes_only_the_architecture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Decision 0017, option E: an architecture-swap control for the
+    collapsed imagenet_mobilenetv4_revisiting_at_recipe.yaml (plan 0102
+    Progress log, 2026-09-22). Must differ from it in exactly
+    student.architecture, protocol.id and tracking.group -- the full
+    attack identity, optimizer, scheduler, label_smoothing,
+    imagenet_heavy_augmentation and weight_ema_decay must be
+    byte-identical, per CLAUDE.md rule 6 (only the architecture is the
+    scientific variable here)."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    mobilenetv4 = load_config(config_dir / "imagenet_mobilenetv4_revisiting_at_recipe.yaml").model_dump(mode="json")
+    r18 = load_config(config_dir / "imagenet_r18_revisiting_at_recipe.yaml").model_dump(mode="json")
+    assert mobilenetv4["method"]["attack"] == r18["method"]["attack"]
+    assert mobilenetv4["method"]["selection_attack"] == r18["method"]["selection_attack"]
+    assert mobilenetv4["evaluation"]["attack"] == r18["evaluation"]["attack"]
+    assert mobilenetv4["optimizer"] == r18["optimizer"]
+    assert mobilenetv4["scheduler"] == r18["scheduler"]
+    assert mobilenetv4["method"]["label_smoothing"] == r18["method"]["label_smoothing"]
+    assert mobilenetv4["dataset"]["imagenet_heavy_augmentation"] == r18["dataset"]["imagenet_heavy_augmentation"]
+    assert mobilenetv4["training"]["weight_ema_decay"] == r18["training"]["weight_ema_decay"]
+    assert mobilenetv4["training"]["epochs"] == r18["training"]["epochs"] == 50
+    assert mobilenetv4["student"]["architecture"] == "mobilenetv4_conv_small_imagenet"
+    assert r18["student"]["architecture"] == "resnet18_imagenet"
+    for payload in (mobilenetv4, r18):
+        payload["protocol"] = None
+        payload["student"] = {**payload["student"], "architecture": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert mobilenetv4 == r18
