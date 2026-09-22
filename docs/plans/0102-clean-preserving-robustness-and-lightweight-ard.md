@@ -1337,3 +1337,46 @@ config.
   **Next**: decision packet `docs/decisions/0017-*` — B vs. C vs. abandoning
   the transplant, informed by this finding. No new GPU-hour spent choosing
   between them yet.
+- 2026-09-22 (chat, continued): human chose decision 0017 option B, and
+  separately proposed a new option E — an architecture-swap control on the
+  second idle Hamster GPU, to test whether the collapse is specific to the
+  extra-lightweight architecture, while still pursuing B/C to find which
+  recipe ingredient is at fault. Corrected in chat: a literal reproduction
+  of Singh/Croce/Hein 2023's own procedure uses APGD (not this project's
+  `LinfPGD`) as the inner training attack — confounding "architecture"
+  with "attack algorithm" and needing new reviewed attack-layer surface.
+  Instead, option E keeps this project's own already-implemented,
+  already-reviewed recipe fixed and swaps only `student.architecture`.
+  Asked the human to choose between ResNet-18 (11.2M params, ~3x
+  MobileNetV4; already `pretrained=True`-capable with zero registry
+  changes; real per-epoch timing from plan 0100's `r18_baseline-s0`:
+  2503s/epoch, ~34.8 GPU-hours for 50 epochs) and ResNet-50 (25.6M, ~6.7x;
+  needs a small `pretrained=True` registry addition; ~80 GPU-hours,
+  FLOPs-ratio estimate, no empirical anchor) — chose **ResNet-18**.
+
+  **Option B implemented** (commit `94a5267`): new config
+  `imagenet_mobilenetv4_revisiting_at_recipe_no_heavy_aug.yaml`, identical
+  to the collapsed config except `dataset.imagenet_heavy_augmentation:
+  false`. Deliberately kept `training.epochs: 50` (not a compressed 25) so
+  `warmup_cosine`'s decay shape isn't confounded with the ablation — reads
+  an early go/no-go at epoch 25 per decision 0017's preregistered rule,
+  killing early if collapse recurs. Same protocol id as the collapsed run
+  (same scientific contract, one ingredient toggled). Config-identity test
+  added (`test_revisiting_at_recipe_no_heavy_aug_config_changes_only_the_augmentation_flag`).
+  Launched from a fresh worktree at `94a5267` as
+  `plan0102-revisiting-at-recipe-no-heavy-aug-full50-v1` on Hamster GPU0;
+  confirmed alive and GPU-utilized shortly after launch.
+
+  **Option E implemented** (commit `a35fc21`): new config
+  `imagenet_r18_revisiting_at_recipe.yaml` and new protocol id
+  `controlled_imagenet_stage01_r18_revisiting_at_recipe_v1`
+  (`src/ard/protocols/__init__.py`), identical to the collapsed config
+  except `student.architecture: resnet18_imagenet` and `tracking.group`.
+  Config-identity test added
+  (`test_r18_revisiting_at_recipe_config_changes_only_the_architecture`).
+  Launched from a fresh worktree at `a35fc21` as
+  `plan0102-r18-revisiting-at-recipe-full50-v1` on Hamster GPU1 (`nvidia-smi`
+  confirmed both GPUs were idle before launch). Both arms run at the full
+  50-epoch horizon per this plan's own established policy, in parallel,
+  from two independently pinned worktrees. `scripts/verify.py --changed`
+  confirmed green (explicit exit code) for both commits.
