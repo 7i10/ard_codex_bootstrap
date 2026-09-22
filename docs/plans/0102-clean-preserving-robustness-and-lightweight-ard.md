@@ -1176,3 +1176,110 @@ config.
   epoch-metrics again once several more epochs land, focused on whether
   clean accuracy avoids Arm A's ~37-40% mid-training floor during the
   high-LR (pre-decay-equivalent) phase.
+- 2026-09-22 (`/experiment-postrun`, run-bundle path):
+  `plan0102-revisiting-at-recipe-full50-v1` completed at 06:57Z. Terminal status
+  re-derived with `campaign_watch.py --once --emit-existing --include-hand-run`:
+  `terminal: true`, `success: true`, `failure_class: null`, and
+  `run-bundle/completion.json` says `completed` with
+  `error-marker.txt` = "no application error recorded". All 50 of 50 epoch rows
+  are present (`epoch_metrics_complete: true`). `best.pt`, `best-ema.pt`,
+  `epoch-metrics.parquet`/`.jsonl`, `sample-stats-train.parquet` and the panel
+  JSONL/PNG set exist. Source SHA `ebad23561172` (clean worktree, empty
+  `diff_sha256`). World size 1, global batch 128, seed 0, protocol
+  `controlled_imagenet_stage01_mobilenetv4_revisiting_at_recipe_v1`, resolved
+  `training.epochs: 50`, AdamW (lr 1e-3, wd 5e-2, betas 0.9/0.95),
+  `warmup_cosine` (10 warmup epochs), `method.label_smoothing: 0.1`,
+  `dataset.imagenet_heavy_augmentation: true`, `training.weight_ema_decay: 0.999`.
+  **Nothing imported**, for the same reason as every other hand-run in this plan:
+  no aggregator exists for this contract, and no AutoAttack has run. No record,
+  report, ledger row or milestone tick. The process exited cleanly; the science
+  did not survive.
+  **Comparability.** Every attack-identity field is unchanged from Arm A
+  (`imagenet_mobilenetv4_pgd_at_no_warmup.yaml`): training attack CE, eps 4/255,
+  step 8/765, 3 steps, random start, `student_mode: eval`; selection and
+  evaluation attack the same at 10 steps. So the validation slice and the
+  selection attack match Arm A, and the collapse below cannot be attributed to a
+  changed threat model. Only recipe mechanics differ (optimizer, LR magnitude and
+  shape, weight decay, label smoothing, heavy augmentation, weight-EMA).
+  **Internal validation only (held-out slice, PGD-10; not an official result,
+  n=1, seed 0)**, from `epoch-metrics.jsonl`. "train robust" is the training-time
+  3-step attack; read the caveat below before comparing it to anything:
+  | epoch | LR | val clean / PGD | EMA clean / PGD | train clean / train robust |
+  |---:|---:|---:|---:|---:|
+  | 0 | 0.0001 | 45.83% / 20.52% | 47.38% / 21.79% | 29.39% / 11.08% |
+  | 9 (peak LR) | 0.001 | 29.91% / 13.59% | 34.30% / 18.49% | 20.92% / 10.88% |
+  | 19 | 0.00088 | 28.64% / 8.99% | 35.00% / 13.74% | 22.06% / 14.88% |
+  | 20 | 0.00085 | 27.38% / 7.01% | 34.00% / 12.54% | 21.33% / 16.31% |
+  | 21 | 0.00082 | 16.98% / 2.74% | 29.65% / 8.49% | 18.69% / 19.22% |
+  | 30 | 0.0005 | 14.70% / 0.66% | 19.42% / 2.19% | 13.30% / 31.46% |
+  | 40 | 0.00015 | 44.66% / 1.51% | 37.65% / 2.86% | 22.33% / 39.30% |
+  | 49 (last) | 0.0000015 | 28.56% / **0.05%** | 32.58% / **0.07%** | 22.24% / **70.93%** |
+  Best by PGD: epoch 1 (42.14% clean / 21.05% PGD) — i.e. the best checkpoint is
+  from before the recipe had done any real work. Both `best.pt` and `best-ema.pt`
+  are kept.
+  Reading, for this single run:
+  1. **The arm failed on both axes, badly.** Against Arm A's own full-50 endpoint
+     (54.6% clean / 30.6% PGD-10, replicated three times in this plan), this
+     recipe ends 26.0 pp behind on clean and at essentially zero robust accuracy.
+     0.05% is *below* the 0.1% chance rate for 1000 classes. This is not a point
+     on the clean-vs-robust tradeoff; it is a collapse.
+  2. **The collapse has a sharp onset at epoch 20-21, and it is not a schedule
+     artifact.** The realized LR is exactly as designed (linear warmup 1e-4→1e-3
+     over epochs 0-9, then cosine to 1.54e-6 at epoch 49, `next_learning_rate`
+     0.0). Epoch 21's LR is 8.2e-4, mid-cosine — no discontinuity. At that same
+     epoch three things break together: `train_robust_accuracy` crosses *above*
+     `train_clean_accuracy`, `train_loss` begins a monotone fall (5.09 → 2.44 by
+     epoch 49), and `val_pgd_accuracy` starts its slide to zero.
+  3. **`train_robust_accuracy` ending at 70.9% against `train_clean_accuracy` at
+     22.2% is catastrophic overfitting with label leaking — not a code defect.**
+     A read-only `bug-investigator` pass over the transplant commits (`2339a3d`,
+     `ebad235`) cleared every candidate defect with code evidence: label
+     smoothing does not reach the inner attack (`src/ard/attacks/pgd.py:170-171`
+     calls `F.cross_entropy(logits, labels)` with the default smoothing 0.0);
+     the soft-target branch in `pgd_at.py` is provably inert here (it requires
+     `target_policy` or `iad_inspired`, and the run logs
+     `train_teacher_*_forward_calls: 0.0` every epoch); `warmup_cosine_multiplier`
+     reproduces the logged LR series exactly; `_adamw_parameter_groups` covers
+     every `requires_grad` parameter with nothing dropped; and heavy augmentation
+     is applied to the clean image in pixel `[0,1]` *before* the attack, with the
+     epsilon ball centred correctly and project-then-clamp intact. The decisive
+     evidence is per-sample and was already saved: in
+     `run-bundle/panels/panel-epoch-49.jsonl`, of the 15 panel samples the model
+     gets **wrong** on the clean image, **10 are predicted exactly right under
+     attack** (true 198 → clean 490 → adv 198; 461 → 854 → 461; 315 → 40 → 315;
+     910 → 587 → 910; 943 → 939 → 943), while only 2 of the 9 clean-correct
+     samples are broken by the attack. A perturbation built by ascending CE on
+     the true label has become a true-label stamp the network learned to decode,
+     and the outer objective minimizes by decoding it instead of learning robust
+     features.
+  4. **Caveat that changes how `train_robust_accuracy` may be read anywhere in
+     this project.** The two training metrics are not mode-matched:
+     `train_clean_accuracy` is computed in **eval mode, after** the optimizer
+     step (`trainer.py:1605-1606`, inside `_evaluation_mode` + `no_grad`), while
+     `train_robust_accuracy` is computed in **train mode, before** it
+     (`trainer.py:1225`, BatchNorm batch statistics). This asymmetry predates
+     this plan (it dates to the bootstrap commit `3e309dd`) and is normally
+     benign — the control run `plan0102-weight-ema-full50-v1` ends at train clean
+     49.56% / train robust 27.92% with the ordering intact, and its train robust
+     sits below its own val PGD (30.58%). So the asymmetry inflates the headline
+     number once the collapse has happened; it does not cause it. But it does
+     mean `train_robust_accuracy` alone cannot be used to detect catastrophic
+     overfitting, and it is a silently mode-mixed input to `gap_adaptive_step`
+     (`trainer.py:1797-1799`) for ADR runs.
+  5. **What this does and does not establish.** Per this arm's own
+     pre-registered attribution scope (2026-09-21, review finding P2-7), this
+     tested Singh/Croce/Hein's *whole recipe* transplanted together. The
+     honest conclusion is therefore "this recipe as a whole, at these settings,
+     collapses on MobileNetV4-Conv-Small at ImageNet-1k stage-01" — it does
+     **not** isolate which ingredient did it, and it must not later be cited as
+     having shown anything about the LR hypothesis specifically. Three
+     ingredients are jointly suspicious and untested apart: the 3-step inner
+     attack (a near-"fast-AT" regime with known catastrophic-overfitting risk,
+     inherited unchanged from Arm A, where it was safe under SGD), AdamW at
+     wd 5e-2 with BatchNorm affine now correctly undecayed on a 3.77M-param
+     BN-based student, and heavy augmentation whose statistics the BN running
+     estimates must track. No AutoAttack has run, so nothing here is a
+     robustness claim in either direction. n=1, seed 0, one GPU, global batch 128.
+  **Next**: decision packet `docs/decisions/0016-*` — the human chooses whether
+  to diagnose this collapse (and with which single-variable probe) or abandon the
+  transplant. No new arm launched from this postrun.
