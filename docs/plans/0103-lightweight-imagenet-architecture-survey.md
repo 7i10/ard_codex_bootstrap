@@ -346,4 +346,11 @@ history behind this pivot.)
     (all streams) instead of `torch.random.fork_rng`.
   - Config-hash note: the new TrainingConfig field changes every resolved
     config hash; any earlier run must be resumed only from its own worktree.
+- 2026-09-24 (chat): **Phase 0 2x2, both 100-epoch cells launched together**
+  from pinned worktree `source-b0cfc9e4e2d2` (SHA `b0cfc9e`), seed 0, W&B
+  project `lightweight-imagenet-at`, train probe 2000 (2 per class):
+  `plan0103-mobilenetv4-pretrained-100ep-v2` (Hamster GPU0) and
+  `plan0103-mobilenetv4-random-init-100ep-v1` (Hamster GPU1). Arm A
+  (pretrained, 50 epochs, n=2) fills the third cell; the random-init/50 cell
+  is deferred until these two land (human, 2026-09-24).
 
