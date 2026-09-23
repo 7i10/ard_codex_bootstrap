@@ -1334,10 +1334,13 @@ def test_architecture_survey_configs_change_only_the_architecture(
     assert candidate["student"]["architecture"] == architecture
     assert candidate["student"]["normalization"]["profile"] == profile
     assert candidate["protocol"]["id"] == "controlled_imagenet_stage02_lightweight_architecture_survey_v1"
+    candidate_probe = candidate["training"]["train_probe_size"]
     for payload in (arm_a, candidate):
         payload["protocol"] = None
         payload["student"] = {**payload["student"], "architecture": None, "normalization": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
+        payload["training"] = {**payload["training"], "train_probe_size": None}
+    assert candidate_probe == 2000
     assert arm_a == candidate
 
 
