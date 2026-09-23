@@ -191,3 +191,48 @@ before any GPU-hour is spent, per this project's standing discipline.
 
 (Continued from plan 0102's 2026-09-23 entries; see that plan for the full
 history behind this pivot.)
+
+- 2026-09-24 (chat): **identical-condition generalization-gap check**
+  (forward-only, no training). Motivation: the "val > train" reading behind
+  the underfitting claim compares logged metrics that are not comparable --
+  train_* uses random-resized-crop inputs, train-mode BatchNorm, the 3-step
+  attack, and is averaged over a moving model. Here every number uses the
+  same eval transform (resize + center crop), eval mode, and the same PGD-10
+  selection attack (eps 4/255, step 8/765), on N=2000 images the model
+  trained on ("seen", training partition) vs N=2000 from the held-out 2%
+  slice of the same split ("unseen"). `last.pt`, seed 0, n=1 per model;
+  throwaway script from pinned worktree `source-dd6effad5384`, not committed.
+  Binomial SE of each gap is about 1.4-1.5pt.
+
+  | model (all plain-SGD PGD-AT, same recipe) | params / MACs | seen clean / PGD-10 | unseen clean / PGD-10 | gap clean / PGD |
+  |---|---:|---:|---:|---:|
+  | MobileNetV3-Small (plan 0100) | 2.5M / 0.06G | 45.80 / 25.50 | 45.15 / 24.55 | +0.65 / +0.95 |
+  | MobileNetV4-Conv-Small (`plan0102-weight-ema-full50-v1` live weights = Arm A recipe) | 3.8M / 0.19G | 58.50 / 32.60 | 54.40 / 30.10 | +4.10 / +2.50 |
+  | ResNet-18 (plan 0100) | 11.7M / 1.81G | 57.20 / 33.30 | 53.75 / 30.70 | +3.45 / +2.60 |
+  | MobileNetV4, collapsed AdamW recipe (reference) | 3.8M | 27.25 / 0.00 | 27.40 / 0.15 | -0.15 / -0.15 |
+
+  Reading:
+  1. **The logged "val > train" was a measurement artifact.** Under
+     identical conditions, seen >= unseen for every healthy model -- there
+     is a small, real generalization gap (about 2.5pt robust for
+     MobileNetV4-S and ResNet-18; within noise for MobileNetV3-S). The
+     adversarial review's "pure underfitting" wording is too strong.
+  2. **But the regime is still bias-dominated.** Seen-set PGD-10 accuracy is
+     only 25-33%: the models cannot fit their own training images
+     adversarially. The gap between seen robust accuracy and a perfect fit
+     (~67-75pt) dwarfs the seen-unseen gap (~1-2.6pt). A regularizer can at
+     most recover the latter; reducing training error has far more headroom.
+     This is the quantitative form of "why regularizers didn't help".
+  3. **Against the human's hypothesis** (small models underfit, normal-size
+     ones overfit): directionally consistent at the small end (MobileNetV3-S,
+     0.06G MACs, shows no detectable gap), but MobileNetV4-S and ResNet-18
+     have nearly the same gap despite 3x params and ~10x MACs, and both are
+     still far from memorizing. Within <=12M on ImageNet at 50 epochs,
+     every model tested is bias-dominated; the overfitting regime where
+     heavy augmentation pays off (Singh/Croce/Hein, >=28M) is not reached
+     here. Three models, n=1 each -- a hint, not a scaling law.
+  4. **The collapse is not memorization.** The collapsed run's robust
+     accuracy is 0 on seen and unseen alike (no gap). Its catastrophic
+     overfitting is an attack/model interaction, not overfitting to the
+     training set in the usual sense.
+

@@ -1599,6 +1599,21 @@ config.
   Hamster; will copy the checkpoint over and run this on Hamster once a
   GPU is free with nothing higher-priority waiting, or on Ferret directly
   if it frees first.
-
-
+- 2026-09-24 (chat): interim verdicts on the two remaining arms (internal
+  validation only, held-out slice, PGD-10, n=1, seed 0).
+  - **Option E (ResNet-18, identical recipe that collapsed MobileNetV4)**:
+    passed its epoch 19-21 window with no collapse signature. At epoch 27:
+    val clean 41.05% / val PGD 22.58%, still rising;
+    `train_robust_overtakes_clean` False throughout. Confounded (capacity,
+    conv style, checkpoint provenance all differ), so this says "this
+    combination survives", not "architecture is the lever".
+  - **Option F (MobileNetV4, same recipe with weight_decay 0.0)**: passed
+    epoch 21 with no collapse. At epoch 22: val PGD 15.21% vs the epoch-9
+    reference 15.45% (rule threshold 7.73%), minimum since epoch 9 14.18%,
+    no overtake. The eval-mode gap is widening slowly (5.98pt at epoch 17
+    -> 7.34pt at epoch 22) and val PGD drifts down, so this is "not
+    collapsing", not "healthy". Formal epoch-25 rule not yet applicable.
+    Current evidence: weight_decay 0.05 looks necessary for the collapse
+    (n=1). Hypothesis, untested: with BatchNorm, strong weight decay raises
+    the effective learning rate, which could destabilize a small model.
 
