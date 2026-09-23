@@ -402,3 +402,39 @@ history behind this pivot.)
   trained with standard normalization and can be re-evaluated (PGD-10 /
   AutoAttack) under this project's protocol as an external anchor.
 
+- 2026-09-24 (chat): **Compute hosts.** Ferret is fully occupied by another
+  user's jobs (13 EEG processes, all 3 GPUs at 99%). Crocodile (1x 2080 Ti,
+  driver 520 = CUDA 11.8 max) is dropped: a driver upgrade needs lab consent and
+  a reboot, and another student actively uses it. **Anteater** (4x RTX 2080 Ti
+  11GB, driver 550; we may use GPUs 2,3 only) is set up with the same
+  `~/workspace-local/...` layout as Hamster/Ferret. Its lab-shared ImageNet
+  copy reproduces both manifest hashes exactly (train `ae033613...`, val
+  `abc0ee80...`). Its env mirrors Hamster's pip freeze (torch 2.11+cu128). Its
+  repo is a bundle clone of master at `1285358` (GitHub is 34 commits behind,
+  not pushed), with a pinned worktree `source-1285358c1b73`. A `gpu-guard`
+  wrapper refuses any `CUDA_VISIBLE_DEVICES` outside {2,3} and sets
+  `CUDA_DEVICE_ORDER=PCI_BUS_ID`.
+- 2026-09-24 (chat): **2080 Ti step throughput** (throwaway microbenchmark:
+  one PGD-AT step = 3-step PGD + CE + SGD, batch 128, 224px, fp32, synthetic
+  pixels, no data loading; an upper bound on training img/s):
+  MobileNetV4-S 665 img/s (5.3 GiB), MobileNetV4-M 227 (6.8 GiB), ConvNeXt-Atto
+  283 (5.4 GiB), DeiT-Tiny 210 (4.1 GiB). **EfficientNet-B0 and MobileViT-S run
+  out of memory at batch 128 on 11 GB.** Batch size is part of the recipe (and
+  BN statistics), so these two run on 4090s only. Precision caveat: the
+  trainer leaves PyTorch defaults, so convolutions use TF32 on the 4090s but
+  full fp32 on the 2080 Ti. Keep each comparison set on one GPU type, or
+  record the GPU type as a covariate.
+- 2026-09-24 (chat): **Step 1c canaries on Anteater** (3 epochs, seed 0, dev
+  W&B project, pinned worktree `source-1285358c1b73`, hand-run bundle):
+  `plan0103-canary-convnext-atto-anteater-v1` (GPU2) and
+  `plan0103-canary-deit-tiny-anteater-v1` (GPU3).
+- 2026-09-24 (chat): **Both Anteater canaries stopped after a few minutes.
+  Anteater cannot train on ImageNet.** Its ImageNet copy sits on a 5400 rpm
+  HDD (`sda`, WD Red 2 TB). Random JPEG reads measured 121 reads/s at 4 MB/s,
+  about 40 images/s for both jobs together, against the 200-280 img/s each
+  job needs. The 144 GB train set cannot fit in the 92 GB page cache. The only
+  SSD is the root disk, which is full. The 50k-image val set (~6.4 GB) and the
+  2000-image probe do fit in cache, so **Anteater is an evaluation host**
+  (full-val clean/PGD-10 and AutoAttack from saved checkpoints), not a
+  training host. The two canary bundles are incomplete by design; they are
+  not results.
