@@ -1379,8 +1379,44 @@ def test_mobilenetv4_pretrained_100ep_config_changes_only_the_budget(
     assert long["protocol"]["id"] == "controlled_imagenet_stage02_budget_init_v1"
     for payload in (arm_a, long):
         payload["protocol"] = None
-        payload["training"] = {**payload["training"], "epochs": None}
+        payload["training"] = {**payload["training"], "epochs": None, "train_probe_size": None}
         payload["scheduler"] = {**payload["scheduler"], "milestones": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert arm_a == long
+
+
+def test_train_probe_size_defaults_off_and_rejects_nonpositive() -> None:
+    from ard.config.schema import TrainingConfig
+
+    assert TrainingConfig(per_rank_batch_size=2, global_batch_size=2).train_probe_size is None
+    assert TrainingConfig(per_rank_batch_size=2, global_batch_size=2, train_probe_size=2000).train_probe_size == 2000
+    with pytest.raises(ValidationError):
+        TrainingConfig(per_rank_batch_size=2, global_batch_size=2, train_probe_size=0)
+
+
+def test_mobilenetv4_budget_init_100ep_cells_differ_only_in_init(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0103 Phase 0 2x2: the two 100-epoch cells differ only in
+    student.pretrained; both enable the observability-only train probe."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    pretrained = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_pretrained_100ep.yaml").model_dump(mode="json")
+    random_init = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_random_init_100ep.yaml").model_dump(
+        mode="json"
+    )
+    assert pretrained["student"]["pretrained"] is True and random_init["student"]["pretrained"] is False
+    assert pretrained["training"]["train_probe_size"] == random_init["training"]["train_probe_size"] == 2000
+    pretrained["student"]["pretrained"] = random_init["student"]["pretrained"] = None
+    assert pretrained == random_init
 

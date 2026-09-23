@@ -27,6 +27,7 @@ from ard.data import (
     EpochShuffleSampler,
     HistoryBalancedSampler,
     IndexedBatch,
+    build_train_probe_view,
     build_train_validation_views,
     collate_indexed,
     data_loader_generator,
@@ -954,6 +955,29 @@ def main(argv: list[str] | None = None) -> int:
                 worker_init_fn=seed_data_loader_worker,
             ),
         )
+        probe_loader: DataLoader[IndexedBatch] | None = None
+        if config.training.train_probe_size is not None:
+            probe_view = build_train_probe_view(
+                train_dataset, validation_dataset, size=config.training.train_probe_size, seed=config.seeds.split
+            )
+            probe_loader = cast(
+                DataLoader[IndexedBatch],
+                DataLoader(
+                    probe_view,
+                    batch_size=config.training.per_rank_batch_size,
+                    sampler=EpochShuffleSampler(
+                        len(probe_view),
+                        seed=config.seeds.data_order,
+                        rank=get_rank(),
+                        world_size=get_world_size(),
+                        shuffle=False,
+                    ),
+                    num_workers=config.training.num_workers,
+                    collate_fn=collate_indexed,
+                    generator=data_loader_generator(config.seeds.data_order + 2),
+                    worker_init_fn=seed_data_loader_worker,
+                ),
+            )
         diagnostics = (
             None
             if config.tracking.diagnostics_mode == "off"
@@ -1141,6 +1165,7 @@ def main(argv: list[str] | None = None) -> int:
         history = trainer.fit(
             loader,
             validation_loader=validation_loader,
+            probe_loader=probe_loader,
             epochs=config.training.epochs,
             start_epoch=start_epoch,
             on_epoch_end=_record_epoch,

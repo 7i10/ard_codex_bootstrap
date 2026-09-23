@@ -41,6 +41,10 @@ def write_sample_parquet(rows: Iterable[Mapping[str, Any]], path: Path) -> Path:
         ) from exc
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    pq.write_table(pa.Table.from_pylist(materialized), temporary)
+    # Union of keys in first-seen order: from_pylist takes its schema from the
+    # first row, which would silently drop columns first appearing later
+    # (e.g. a run resumed across a version that added a metric).
+    columns = list(dict.fromkeys(key for row in materialized for key in row))
+    pq.write_table(pa.Table.from_pylist([{key: row.get(key) for key in columns} for row in materialized]), temporary)
     temporary.replace(path)
     return path

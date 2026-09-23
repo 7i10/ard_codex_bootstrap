@@ -804,6 +804,14 @@ class TrainingConfig(StrictModel):
     # is harmless rather than incorrect, but never a value to actually
     # launch with.
     weight_ema_decay: float | None = Field(default=None, ge=0, lt=1)
+    # Observability only (plan 0103): after each epoch, measure clean and
+    # selection-attack accuracy on this many fixed training-partition images
+    # under the validation transform and eval mode -- identical conditions to
+    # the validation slice, so seen-vs-unseen is a real generalization gap
+    # and seen-set robust accuracy is the training error. Logged train_*
+    # metrics cannot serve (augmented crops, train-mode BatchNorm, 3-step
+    # attack). Never used for checkpoint selection. None (default) disables it.
+    train_probe_size: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def validate_batch_identity(self) -> TrainingConfig:

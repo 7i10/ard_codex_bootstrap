@@ -42,7 +42,7 @@ from ard.state import SampleStateStore
 from ard.targets import AnchoredTeacherTargetPolicy, TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 
-from .checkpoint import TrainingState, load_checkpoint, save_checkpoint
+from .checkpoint import TrainingState, capture_rng_state, load_checkpoint, restore_rng_state, save_checkpoint
 from .distributed import (
     gather_objects,
     get_rank,
@@ -1736,6 +1736,7 @@ class Trainer:
         start_epoch: int = 0,
         on_epoch_end: Callable[[Mapping[str, float], bool], None] | None = None,
         on_batch_start: Callable[[int, int, IndexedBatch], None] | None = None,
+        probe_loader: DataLoader[IndexedBatch] | None = None,
     ) -> list[dict[str, float]]:
         history = []
         for epoch in range(start_epoch, epochs):
@@ -1786,6 +1787,15 @@ class Trainer:
             if self.diagnostics is not None:
                 self.diagnostics.flush()
             validation_metrics = self.validate_epoch(validation_loader)
+            # Same eval-mode pass on fixed training-partition images; never
+            # feeds selection, the scheduler or any training state. fork_rng
+            # (capture/restore of every RNG stream) keeps a probe loader built
+            # without its own generator still cannot shift the training stream.
+            probe_metrics = None
+            if probe_loader is not None:
+                rng_state = capture_rng_state()
+                probe_metrics = self.validate_epoch(probe_loader)
+                restore_rng_state(rng_state)
             self.selection_metadata["last_epoch"] = epoch
             self.selection_metadata["last_clean_accuracy"] = validation_metrics["clean_accuracy"]
             self.selection_metadata["last_pgd_accuracy"] = validation_metrics["pgd_accuracy"]
@@ -1874,15 +1884,20 @@ class Trainer:
                 "train_robust_accuracy": train_metrics["robust_accuracy"],
                 # Decision 0016, option A: mode-matched to train_clean_accuracy
                 # above (both eval-mode, post-step), unlike train_robust_accuracy
-                # (train-mode, pre-step). Observability only -- does not change
+                # (train-mode, pre-step). Also post-step on perturbations crafted
+                # against the pre-step weights (stale), which biases it upward:
+                # its gap to train_robust_accuracy is a lower bound on the pure
+                # BatchNorm-mode gap. train_probe_* (fresh eval-mode attack) is
+                # the clean seen-set measurement. Observability only -- does not change
                 # train_robust_accuracy's own definition, value, or any
                 # downstream consumer (e.g. gap_adaptive_step) that reads it.
                 "train_robust_accuracy_eval_mode": train_metrics.get("robust_accuracy_eval_mode", 0.0),
-                # Recorded, not acted on: a true-value here is exactly the
-                # signature decision 0016 diagnosed as catastrophic
-                # overfitting/label leaking (plan0102-revisiting-at-recipe-full50-v1,
-                # epoch 21 onward). Never gates a checkpoint, schedule or
-                # attack decision.
+                # Recorded, not acted on. Compares train-mode pre-step robust
+                # accuracy with eval-mode post-step clean accuracy, so a true
+                # value marks the train/eval BatchNorm-mode divergence that
+                # accompanied the collapse diagnosed in decision 0016 -- not
+                # catastrophic overfitting as such. Kept unchanged for series
+                # continuity. Never gates a checkpoint, schedule or attack.
                 "train_robust_overtakes_clean": train_metrics["robust_accuracy"] > train_metrics["clean_accuracy"],
                 "train_valid_examples": train_metrics.get("valid_examples", 0.0),
                 "train_seconds": train_metrics.get("seconds", 0.0),
@@ -1901,6 +1916,9 @@ class Trainer:
                 "learning_rate": epoch_learning_rate,
                 "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
             }
+            if probe_metrics is not None:
+                epoch_metrics["train_probe_clean_accuracy"] = probe_metrics["clean_accuracy"]
+                epoch_metrics["train_probe_pgd_accuracy"] = probe_metrics["pgd_accuracy"]
             if ema_validation_metrics is not None:
                 epoch_metrics["val_clean_accuracy_ema"] = ema_validation_metrics["clean_accuracy"]
                 epoch_metrics["val_pgd_accuracy_ema"] = ema_validation_metrics["pgd_accuracy"]

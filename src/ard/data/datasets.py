@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, overload
 
@@ -909,6 +909,44 @@ def build_train_validation_views(
         SourceIndexedSubset(train_view, list(split_train.indices)),
         SourceIndexedSubset(validation_view, list(split_validation.indices)),
     )
+
+
+def train_probe_ids(indices: Sequence[int], targets: Sequence[int], *, size: int, seed: int) -> list[int]:
+    """Fixed, sorted, class-stratified sample of training-partition source IDs
+    for the per-epoch train probe (``size // n_classes`` per class, remainder
+    filled at random). Depends only on the partition, labels and seed."""
+    if not 1 <= size <= len(indices):
+        raise ValueError(f"train probe size must be in [1, {len(indices)}], got {size}")
+    generator = torch.Generator().manual_seed(seed)
+    by_label: dict[int, list[int]] = defaultdict(list)
+    for source_id in indices:
+        by_label[int(targets[source_id])].append(int(source_id))
+    per_class = size // len(by_label)
+    chosen: list[int] = []
+    leftover: list[int] = []
+    for label in sorted(by_label):
+        members = by_label[label]
+        order = torch.randperm(len(members), generator=generator).tolist()
+        take = min(per_class, len(members))
+        chosen.extend(members[position] for position in order[:take])
+        leftover.extend(members[position] for position in order[take:])
+    remainder = size - len(chosen)
+    if remainder:
+        fill = torch.randperm(len(leftover), generator=generator).tolist()[:remainder]
+        chosen.extend(leftover[position] for position in fill)
+    return sorted(chosen)
+
+
+def build_train_probe_view(
+    train_dataset: SourceIndexedSubset, validation_dataset: SourceIndexedSubset, *, size: int, seed: int
+) -> SourceIndexedSubset:
+    """Training-partition probe IDs viewed through the validation transform,
+    so seen-vs-unseen accuracy is measured under identical conditions."""
+    targets = getattr(validation_dataset.dataset.dataset, "targets", None)
+    if not isinstance(targets, (list, tuple)):
+        raise TypeError("train probe requires a label-only targets sequence on the raw dataset")
+    probe_ids = train_probe_ids(train_dataset.indices, targets, size=size, seed=seed)
+    return SourceIndexedSubset(validation_dataset.dataset, probe_ids)
 
 
 def stratified_train_validation_split(

@@ -1,23 +1,16 @@
-# Plan 0103 Phase 0: training-budget x initialization 2x2. This cell is
-# "pretrained init, 100 epochs". Identical to Arm A
-# (imagenet_mobilenetv4_pgd_at_no_warmup.yaml, pretrained, 50 epochs) except
-# training.epochs 50 -> 100 and the LR step-decay milestones scaled in
-# proportion, [25, 38] -> [50, 76]. The 10-epoch LR warmup is kept in absolute
-# epochs (it stabilizes the start of fine-tuning, not a fraction of the run).
-# The full attack identity, optimizer and init are byte-identical to Arm A.
-# Separate protocol id because the schedule (a protected field, CLAUDE.md
-# rule 6) differs. Question: does 50 epochs under-train (budget-limited
-# underfitting)? Paired with a random-init 100-epoch cell to ask whether the
-# pretrained advantage is a head start or lasting. train_probe_size 2000
-# (observability only) logs seen-set clean/PGD-10 each epoch under the
-# validation transform and eval mode, i.e. training error and the
-# seen-vs-unseen gap.
+# Plan 0103 Phase 0: training-budget x initialization 2x2, cell "random
+# init, 100 epochs". Identical to imagenet_mobilenetv4_pgd_at_pretrained_100ep.yaml
+# except student.pretrained: false. 100 epochs matches the from-scratch
+# ImageNet AT budgets in the literature (Salman 2020: 90; SAT, RobustART: 100).
+# Paired with the pretrained 100-epoch cell: does the pretrained advantage
+# persist at a longer budget (useful knowledge) or shrink (only a head start)?
+# train_probe_size 2000 is observability only (seen-set training error).
 schema_version: 2
 protocol: {id: controlled_imagenet_stage02_budget_init_v1}
 tier: production
 seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
 dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
-student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: true, normalization: {profile: imagenet_standard}}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: false, normalization: {profile: imagenet_standard}}
 method: {id: pgd_at, version: 1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
 optimizer: {id: sgd, learning_rate: 0.05, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
 scheduler: {id: warmup_multistep, milestones: [50, 76], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}

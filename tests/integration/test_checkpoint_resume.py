@@ -81,6 +81,127 @@ def test_training_diagnostics_are_observational_for_full_checkpoint_state(tmp_pa
             assert equal(first[key], second[key]), key
 
 
+def test_train_probe_is_observational_and_logs_seen_set_metrics(tmp_path: Path) -> None:
+    """Plan 0103: the per-epoch train probe (eval-mode clean/selection-attack
+    accuracy on fixed training-partition images) must not change any
+    training outcome -- checkpoints, RNG state and every non-probe epoch
+    metric stay bit-identical to a run without it -- and must add exactly
+    the two probe columns."""
+    import random
+
+    import numpy as np
+
+    def equal(left: object, right: object) -> bool:
+        if isinstance(left, torch.Tensor) and isinstance(right, torch.Tensor):
+            return torch.equal(left, right)
+        if isinstance(left, np.ndarray) and isinstance(right, np.ndarray):
+            return np.array_equal(left, right)
+        if isinstance(left, dict) and isinstance(right, dict):
+            return left.keys() == right.keys() and all(equal(left[key], right[key]) for key in left)
+        if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+            return len(left) == len(right) and all(equal(a, b) for a, b in zip(left, right))
+        return left == right
+
+    plain = make_trainer(tmp_path / "plain-probe")
+    probed = make_trainer(tmp_path / "probed")
+    loader_a, validation_a, _ = make_loaders()
+    loader_b, validation_b, _ = make_loaders()
+    _, probe_loader, _ = make_loaders()
+    torch.manual_seed(991)
+    np.random.seed(991)
+    random.seed(991)
+    plain_history = plain.fit(loader_a, validation_loader=validation_a, epochs=2)
+    torch.manual_seed(991)
+    np.random.seed(991)
+    random.seed(991)
+    probed_history = probed.fit(loader_b, validation_loader=validation_b, epochs=2, probe_loader=probe_loader)
+    probe_keys = {"train_probe_clean_accuracy", "train_probe_pgd_accuracy"}
+    wall_clock = {"train_seconds", "train_images_per_second"}
+    for plain_row, probed_row in zip(plain_history, probed_history, strict=True):
+        assert set(probed_row) - set(plain_row) == probe_keys
+        assert all(0.0 <= probed_row[key] <= 1.0 for key in probe_keys)
+        assert {key: value for key, value in probed_row.items() if key not in probe_keys | wall_clock} == {
+            key: value for key, value in plain_row.items() if key not in wall_clock
+        }
+    for name in ("best.pt", "last.pt"):
+        first = torch.load(tmp_path / "plain-probe" / name, map_location="cpu", weights_only=False)
+        second = torch.load(tmp_path / "probed" / name, map_location="cpu", weights_only=False)
+        for key in REQUIRED_KEYS:
+            assert equal(first[key], second[key]), key
+
+
+def test_train_probe_is_observational_with_batchnorm_and_dropout(tmp_path: Path) -> None:
+    """Same as above on a BatchNorm + Dropout student: Dropout draws from the
+    global RNG and BatchNorm keeps running stats, so a leaked RNG draw, a
+    train-mode probe forward or a missed mode restore would all break
+    bit-identity. Also pins that no extra train-mode forward happens per step
+    (num_batches_tracked == optimizer steps), which covers the eval-mode
+    robust-accuracy forward added in decision 0016 too."""
+    import random
+
+    import numpy as np
+
+    def make(output: Path) -> Trainer:
+        torch.manual_seed(123)
+        model = nn.Sequential(
+            nn.Conv2d(3, 8, 3, padding=1),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Flatten(),
+            nn.Linear(8 * 4 * 4, 3),
+        )
+        optimizer = SGD(model.parameters(), lr=0.03, momentum=0.9)
+        attack = AttackConfig(epsilon="1/255", step_size="1/255", steps=1, random_start=True)
+        selection = AttackConfig(
+            epsilon="1/255", step_size="1/255", steps=1, random_start=True, student_mode="eval", teacher_mode="eval"
+        )
+        return Trainer(
+            model=model,
+            optimizer=optimizer,
+            scheduler=StepLR(optimizer, step_size=1, gamma=0.8),
+            scaler=None,
+            attack=LinfPGD(attack),
+            selection_attack=LinfPGD(selection),
+            objective=PGDATObjective(),
+            device=torch.device("cpu"),
+            output_dir=output,
+            config_hash="b" * 64,
+            seed=4,
+            tracker_run_id="offline-fixture",
+        )
+
+    plain, probed = make(tmp_path / "plain-bn"), make(tmp_path / "probed-bn")
+    loader_a, validation_a, _ = make_loaders()
+    loader_b, validation_b, _ = make_loaders()
+    _, probe_loader, _ = make_loaders()
+    torch.manual_seed(991)
+    np.random.seed(991)
+    random.seed(991)
+    plain_history = plain.fit(loader_a, validation_loader=validation_a, epochs=2)
+    torch.manual_seed(991)
+    np.random.seed(991)
+    random.seed(991)
+    probed_history = probed.fit(loader_b, validation_loader=validation_b, epochs=2, probe_loader=probe_loader)
+    wall_clock = {"train_seconds", "train_images_per_second"}
+    probe_keys = {"train_probe_clean_accuracy", "train_probe_pgd_accuracy"}
+    for plain_row, probed_row in zip(plain_history, probed_history, strict=True):
+        assert {k: v for k, v in probed_row.items() if k not in probe_keys | wall_clock} == {
+            k: v for k, v in plain_row.items() if k not in wall_clock
+        }
+    assert plain.model.training == probed.model.training
+    for (name, left), (_, right) in zip(plain.model.state_dict().items(), probed.model.state_dict().items(), strict=True):
+        assert torch.equal(left, right), name
+    steps = 2 * len(loader_a)
+    assert int(plain.model[1].num_batches_tracked) == steps
+    assert int(probed.model[1].num_batches_tracked) == steps
+    for name in ("best.pt", "last.pt"):
+        first = torch.load(tmp_path / "plain-bn" / name, map_location="cpu", weights_only=False)
+        second = torch.load(tmp_path / "probed-bn" / name, map_location="cpu", weights_only=False)
+        for key in ("model", "optimizer", "rng"):
+            assert repr(first[key]) == repr(second[key]), key
+
+
 def test_teacher_response_observation_is_exact_for_optimization_rng_and_checkpoint_state(tmp_path: Path) -> None:
     import random
 

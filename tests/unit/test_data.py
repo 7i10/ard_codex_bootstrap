@@ -614,3 +614,43 @@ def test_imagenet_content_manifest_is_stable_and_detects_membership_and_size_cha
 
     with pytest.raises(ValueError, match="does not match adapter-visible manifest"):
         build_dataset(config.model_copy(update={"content_sha256": "0" * 64}))
+
+
+def test_train_probe_ids_are_a_fixed_stratified_subset_of_the_training_partition() -> None:
+    from ard.data import train_probe_ids
+
+    targets = tuple(index % 10 for index in range(2000))
+    partition = list(range(500, 1500))
+    first = train_probe_ids(partition, targets, size=50, seed=20260911)
+    assert first == train_probe_ids(partition, targets, size=50, seed=20260911)
+    assert first == sorted(first) and len(set(first)) == 50 and set(first) <= set(partition)
+    assert sorted(sum(1 for source_id in first if targets[source_id] == label) for label in range(10)) == [5] * 10
+    assert first != train_probe_ids(partition, targets, size=50, seed=1)
+    assert len(train_probe_ids(partition, targets, size=57, seed=1)) == 57
+    with pytest.raises(ValueError, match="train probe size"):
+        train_probe_ids(partition, targets, size=0, seed=1)
+    with pytest.raises(ValueError, match="train probe size"):
+        train_probe_ids(partition, targets, size=1001, seed=1)
+
+
+def test_train_probe_view_uses_training_ids_through_the_validation_view() -> None:
+    from ard.data import (
+        IndexedDataset,
+        SyntheticCIFAR,
+        build_train_probe_view,
+        stratified_train_validation_split,
+    )
+    from ard.data.datasets import SourceIndexedSubset
+
+    raw = SyntheticCIFAR(size=200, num_classes=10, image_size=4, seed=3)
+    split_train, split_validation = stratified_train_validation_split(
+        IndexedDataset(raw), validation_fraction=0.2, seed=5
+    )
+    validation_view = IndexedDataset(raw)
+    train = SourceIndexedSubset(IndexedDataset(raw), list(split_train.indices))
+    validation = SourceIndexedSubset(validation_view, list(split_validation.indices))
+    probe = build_train_probe_view(train, validation, size=40, seed=9)
+    assert probe.dataset is validation.dataset
+    assert set(probe.indices) <= set(train.indices)
+    assert not set(probe.indices) & set(validation.indices)
+    assert len(probe) == 40

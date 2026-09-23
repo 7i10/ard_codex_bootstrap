@@ -298,4 +298,52 @@ history behind this pivot.)
   not a random-init/50 cell is also run), so it was launched on the freed
   Hamster GPU0 without waiting for that choice. A 100-epoch run's epoch-49
   checkpoint is *not* a substitute for a 50-epoch run (different LR schedule).
+- 2026-09-24 (chat): human stopped option E (answered: no collapse through
+  epoch 28; still behind the SGD R18 run at matched epochs, but E differs from
+  it in six recipe elements -- optimizer, LR size/shape, weight decay, label
+  smoothing, heavy augmentation, weight-EMA -- plus LR-schedule phase, so the
+  gap is not attributable to augmentation alone). The first
+  pretrained/100-epoch launch (`plan0103-mobilenetv4-pretrained-100ep-v1`,
+  single-teacher-ard W&B project, epoch 0 done) was also stopped so both
+  100-epoch cells start together from the same code with the train probe and
+  in the new W&B project (`configs/tracking/lightweight.env`: production
+  `lightweight-imagenet-at`, exploration `lightweight-imagenet-at-dev`).
+  EasyRobust EfficientNet-B0 (61.83 / 35.06 AutoAttack): README gives only the
+  numbers and "Adversarial Training (Madry)"; its AT example script defaults
+  are from scratch, 90 epochs, SGD step decay, PGD-3 eps 4/255 step 2/3 eps
+  (no random start); the checkpoint is a bare state_dict with no args, so the
+  actual recipe is unverifiable. (The "100 epochs from scratch" figure is
+  SAT's EfficientNet-B0, not EasyRobust's.) Plan: re-evaluate that checkpoint
+  under this project's own protocol in Phase 1b.
+- 2026-09-24 (chat): **train probe** (`training.train_probe_size`, per-epoch
+  eval-mode clean/PGD-10 on fixed class-stratified training-partition images
+  through the validation transform; `train_probe_*` columns) added, plus
+  scientific review of it and of decision 0016's eval-mode robust metric
+  (which had been used in options B/E/F *without* the review decision 0016
+  itself required -- disclosed). Review verdict: neither change alters
+  training. Addressed before launch:
+  - P1 (probe added to a running cell): moot -- that run had already been
+    stopped; both cells restart from one SHA.
+  - P2-2 tests: added a BatchNorm+Dropout bit-identity test (Dropout uses the
+    global RNG, BN keeps running stats) and a BN `num_batches_tracked == steps`
+    check (no extra train-mode forward, covering change 1 too); the CLI wiring
+    moved into a tested helper (`build_train_probe_view`: training IDs only,
+    disjoint from validation IDs, same view object as validation).
+  - P2-3: `train_robust_accuracy_eval_mode` is post-step on perturbations
+    crafted against pre-step weights, so it is biased upward; its gap to
+    `train_robust_accuracy` is only a *lower bound* on the pure BatchNorm-mode
+    gap. Documented in code. Decision 0018's verdict (12.8 vs 36.1) cannot
+    flip. The probe is now the clean seen-set measurement.
+  - P2-4: `train_robust_overtakes_clean` compares train-mode pre-step robust
+    with eval-mode post-step clean, so it marks the BN-mode divergence, not
+    catastrophic overfitting as such; comment corrected, definition kept for
+    series continuity.
+  - P2-5: parquet writer took its schema from the first row and would drop
+    columns first appearing on a resumed run; now writes the union of keys
+    (test added). No run in this plan was resumed across that boundary.
+  - P2-6: probe sample stratified per class (2000 -> 2 per class).
+  - P2-7: probe wrapped in the repo's `capture_rng_state`/`restore_rng_state`
+    (all streams) instead of `torch.random.fork_rng`.
+  - Config-hash note: the new TrainingConfig field changes every resolved
+    config hash; any earlier run must be resumed only from its own worktree.
 
