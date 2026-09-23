@@ -1,0 +1,39 @@
+# New research direction (chat, 2026-09-23): before designing a
+# lightweight-specific adversarial training method, first settle whether
+# pretrained (non-robust) clean-classification initialization is actually
+# beneficial for adversarial fine-tuning at this architecture scale, or
+# whether it is itself a contributing risk factor. Motivation: this
+# plan's own diagnosis (decision 0016) found that a collapsed run's
+# catastrophic overfitting traced to a BatchNorm train/eval-mode
+# divergence -- and BatchNorm running statistics tuned for a clean-only
+# training distribution (i.e. exactly what pretrained init gives you) are
+# a plausible contributing factor, not just a free efficiency win.
+# Singh/Croce/Hein 2023's own claim ("initializing with a well-trained
+# standard classifier makes it possible to use heavy augmentation") is
+# argued at their own scale (ResNet-50 and up); it has not been verified
+# for a genuinely lightweight (<5M param) BatchNorm-heavy CNN.
+#
+# The ONLY difference from imagenet_mobilenetv4_pgd_at_no_warmup.yaml
+# (Arm A, this project's own working, 3x-replicated baseline: 54.6% clean
+# / 30.6% PGD-10 at epoch 49) is student.pretrained: false (random init)
+# and tracking.group. Everything else -- optimizer (SGD), scheduler
+# (warmup_multistep), the full attack identity, epoch count -- is held
+# fixed, so this isolates pretrained-vs-random initialization as the
+# single variable. Same protocol id as Arm A: this tests the same
+# scientific contract (this project's own working PGD-AT recipe), one
+# further variable (initialization) probed. No registry or schema change
+# needed -- build_architecture/ModelConfig only guard pretrained=True,
+# never pretrained=False.
+schema_version: 2
+protocol: {id: controlled_imagenet_stage01_mobilenetv4_pgd_at_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: false, normalization: {profile: imagenet_standard}}
+method: {id: pgd_at, version: 1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: sgd, learning_rate: 0.05, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
+scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-pgd-at-random-init-controlled, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

@@ -1185,3 +1185,44 @@ def test_revisiting_at_recipe_no_weight_decay_config_changes_only_weight_decay(
         payload["optimizer"] = {**payload["optimizer"], "weight_decay": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert collapsed == ablation
+
+
+def test_mobilenetv4_random_init_config_changes_only_pretrained_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """New research direction (chat, 2026-09-23): a random-init control for
+    Arm A (imagenet_mobilenetv4_pgd_at_no_warmup.yaml, this project's own
+    working, 3x-replicated PGD-AT baseline), isolating whether pretrained
+    (non-robust) initialization is a necessary condition for Arm A's own
+    result or a contributing risk factor. Must differ from Arm A in
+    exactly student.pretrained and tracking.group -- the full attack
+    identity, optimizer, scheduler and epoch count must be byte-identical,
+    and both configs share the same protocol id (same scientific
+    contract, one further variable probed)."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
+    random_init = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_random_init.yaml").model_dump(mode="json")
+    assert arm_a["protocol"] == random_init["protocol"]
+    assert arm_a["method"]["attack"] == random_init["method"]["attack"]
+    assert arm_a["method"]["selection_attack"] == random_init["method"]["selection_attack"]
+    assert arm_a["evaluation"]["attack"] == random_init["evaluation"]["attack"]
+    assert arm_a["optimizer"] == random_init["optimizer"]
+    assert arm_a["scheduler"] == random_init["scheduler"]
+    assert arm_a["training"]["epochs"] == random_init["training"]["epochs"] == 50
+    assert arm_a["student"]["pretrained"] is True
+    assert random_init["student"]["pretrained"] is False
+    for payload in (arm_a, random_init):
+        payload["student"] = {**payload["student"], "pretrained": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert arm_a == random_init
