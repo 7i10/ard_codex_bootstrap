@@ -236,3 +236,45 @@ history behind this pivot.)
      overfitting is an attack/model interaction, not overfitting to the
      training set in the usual sense.
 
+- 2026-09-24 (background literature verification, read from paper PDFs and
+  the RobustART repo, no RobustBench): **the literature-gap claim in this
+  plan's Context section is false as worded and is superseded here.**
+  Adversarial training of <12M-parameter ImageNet-1k models exists, but only
+  as isolated data points:
+  - RobustART (arXiv:2109.05211, App. F.2): ShuffleNetV2-x2.0 and
+    MobileNetV3-x1.4 (~7.5M), PGD-l_inf at eps=16/255 (20 steps), 100 epochs
+    from scratch; results only as bar charts, no tables. Its "lightweight
+    models don't improve with size" claim is about standard-trained models.
+  - Salman et al. 2020 (arXiv:2007.08489): MobileNetV2 / ShuffleNet / MNASNet
+    at l2 eps=3 from scratch, clean accuracy only; ResNet-18 at l_inf 4/255
+    clean 52.49.
+  - Smooth Adversarial Training (arXiv:2006.14536): EfficientNet-B0 at
+    eps=4/255, PGD-1 training, 100 epochs from scratch: **65.1% clean /
+    37.6% PGD-200** (no AutoAttack).
+  - EasyRobust model zoo (arXiv:2503.16975): EfficientNet-B0 **61.83% clean /
+    35.06% AutoAttack** (eps 4/255 inferred from checkpoint name; recipe not
+    verified).
+  - Heuillet et al. 2025 (arXiv:2508.14079): robust fine-tuning of pretrained
+    5-10M models (RegNetX-004, EfficientNet-B0, EdgeNeXt-S, DeiT-Tiny,
+    CoaT-Tiny, MobileViT-S) at eps=4/255 with AutoAttack -- but on six small
+    downstream datasets, not ImageNet. Must be cited and distinguished.
+  Re-scoped claim: no work *systematically* studies **modern** lightweight
+  architectures (MobileNetV4, ConvNeXt-Atto, MobileViT, DeiT-Ti) on ImageNet-1k
+  under l_inf 4/255 with AutoAttack, using **fine-tuning from clean pretrained
+  checkpoints**, with a controlled comparison and an analysis of the
+  low-capacity regime (capacity, stem, activation, training method incl.
+  distillation). Anchor to beat or explain: EfficientNet-B0 at ~35% AutoAttack
+  vs this project's MobileNetV4-S 22.8% (n=500) -- the gap is itself
+  informative (smooth activation + SE + 2x MACs, and/or our 50-epoch budget).
+
+  Also verified: Singh/Croce/Hein give **no mechanistic explanation** for
+  ConvStem (they call it an open question and point to Xiao et al.'s
+  trainability argument). Their ConvStem l_inf gain is large for ViT-S
+  (+4.1 to +5.2pt AutoAttack) but marginal for ConvNeXt-T (+0.9); the big
+  ConvNeXt effect is on unseen l1/l2 threats. Their Table 1 also shows
+  pretrained vs random init at ViT-S scale: 39.1 vs 31.8 l_inf AutoAttack
+  (+7.3pt) -- a prior for this plan's own pretrained-vs-random-init test.
+  CIFAR anchor for distillation: RSLAD gives MobileNetV2 +3.9pt AutoAttack
+  over plain AT (arXiv:2108.07969, Table 3), though AdaAD's reproduction of
+  RSLAD lands ~3.4pt lower -- a reproducibility warning.
+
