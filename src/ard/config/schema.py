@@ -90,6 +90,9 @@ class ProtocolConfig(StrictModel):
         # across every candidate architecture, since architecture is the
         # single studied variable.
         "controlled_imagenet_stage02_lightweight_architecture_survey_v1",
+        # Plan 0103 Phase 0: training-budget x initialization 2x2 on
+        # MobileNetV4-Conv-Small (100-epoch cells; schedule differs from Arm A).
+        "controlled_imagenet_stage02_budget_init_v1",
     ]
 
 

@@ -277,4 +277,25 @@ history behind this pivot.)
   CIFAR anchor for distillation: RSLAD gives MobileNetV2 +3.9pt AutoAttack
   over plain AT (arXiv:2108.07969, Table 3), though AdaAD's reproduction of
   RSLAD lands ~3.4pt lower -- a reproducibility warning.
+- 2026-09-24 (chat): **decision 0018 option F verdict, epoch 25**
+  (`plan0102-revisiting-at-recipe-no-weight-decay-full50-v1`, internal
+  validation only, n=1): val clean 46.39% / val PGD 15.63% vs the epoch-9
+  reference 15.45% (rule threshold 7.73%; minimum since epoch 9 14.18%);
+  `train_robust_overtakes_clean` False through epoch 25;
+  `train_robust_accuracy_eval_mode` 12.76% < `train_clean_accuracy` 36.10%.
+  Both preregistered conditions hold, so per decision 0018's rule
+  **weight_decay 0.05 was a necessary condition for the revisiting_at
+  recipe's collapse** on MobileNetV4-S (n=1). Not a healthy run either --
+  val PGD drifted from ~17.6% (epoch 17) to ~15.5% and the train/eval-mode
+  robust gap widened from 6.0 to 9.5pt. Ended via SIGTERM at epoch 25 per the
+  human's prior approval; checkpoints and epoch metrics preserved.
+- 2026-09-24 (chat): **Phase 0 budget x init 2x2, first new cell launched**:
+  `imagenet_mobilenetv4_pgd_at_pretrained_100ep.yaml` (new protocol
+  `controlled_imagenet_stage02_budget_init_v1`): Arm A with epochs 50 -> 100
+  and LR milestones scaled [25, 38] -> [50, 76]; 10-epoch warmup kept in
+  absolute epochs. Existing Arm A fills the pretrained/50 cell (n=2). This
+  cell is common to every variant of the 2x2 under discussion (whether or
+  not a random-init/50 cell is also run), so it was launched on the freed
+  Hamster GPU0 without waiting for that choice. A 100-epoch run's epoch-49
+  checkpoint is *not* a substitute for a 50-epoch run (different LR schedule).
 

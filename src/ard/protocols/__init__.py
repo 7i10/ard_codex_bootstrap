@@ -575,6 +575,15 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # whole survey -- architecture is the single studied variable.
             metadata=MappingProxyType({"purpose": "imagenet_stage02_lightweight_architecture_survey_v1"}),
         ),
+        "controlled_imagenet_stage02_budget_init_v1": ProtocolSpec(
+            id="controlled_imagenet_stage02_budget_init_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0103 Phase 0: training-budget x initialization 2x2 on
+            # MobileNetV4-Conv-Small with Arm A's recipe; 100-epoch cells
+            # (milestones scaled [25,38] -> [50,76]).
+            metadata=MappingProxyType({"purpose": "imagenet_stage02_budget_init_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,
