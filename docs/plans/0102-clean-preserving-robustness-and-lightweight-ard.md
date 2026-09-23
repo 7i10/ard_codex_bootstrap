@@ -1380,3 +1380,42 @@ config.
   50-epoch horizon per this plan's own established policy, in parallel,
   from two independently pinned worktrees. `scripts/verify.py --changed`
   confirmed green (explicit exit code) for both commits.
+- 2026-09-23 (chat, continued): **decision 0017's rule broke at epoch 21 --
+  option B's ablation collapsed too.** Read epoch-by-epoch from
+  `plan0102-revisiting-at-recipe-no-heavy-aug-full50-v1`'s own
+  `epoch-metrics.jsonl`, epoch 19-21:
+
+  | epoch | train_clean | train_robust | eval-mode gap | val_clean | val_pgd | overtake |
+  |---:|---:|---:|---:|---:|---:|---|
+  | 19 | 28.28% | 22.03% | 12.68pt | 30.90% | 10.91% | False |
+  | 20 | 27.03% | 23.36% | 15.11pt | 29.45% | 4.79% | False |
+  | 21 | 24.17% | **25.87%** | 19.65pt | 29.33% | 4.43% | **True** |
+
+  Both of decision 0017's preregistered conditions broke at epoch 21:
+  `train_robust_overtakes_clean` became `True` (the same signature as the
+  original collapse), and `val_pgd_accuracy` (4.79%, 4.43%) stayed below
+  half of epoch 9's value (7.46%) for two consecutive epochs -- unlike the
+  one-epoch dips at epochs 11 and 13 (7.66%, 7.64%) that both recovered the
+  following epoch. Onset epoch (20-21) is essentially identical to the
+  original collapsed run's own onset. **Verdict: heavy data augmentation
+  was not a necessary condition for this collapse.** Removing it did not
+  prevent or meaningfully delay the failure. Per decision 0017's own
+  reasoning, this rules out augmentation as the (sole) cause and narrows
+  suspicion to the two remaining ingredients: the 3-step training attack
+  (inherited unchanged from Arm A, a known fast-AT catastrophic-overfitting
+  risk) and/or AdamW at weight_decay 5e-2. Both arms left running to
+  completion (sunk-cost GPU time already committed; the full-50-epoch
+  floor and Option E's eventual read remain informative) rather than
+  killed early, since nothing else is queued for these GPUs.
+
+  **Option E (ResNet-18) shows no comparable pattern through epoch 11**
+  (val_pgd 19.20% to 20.33%, eval-mode gap oscillating narrowly around
+  -0.6 to -0.9pt, no trend) -- at the same LR-schedule position (epoch 11,
+  still in warmup) where option B was still healthy and well before its
+  own epoch 19-21 turn. Too early to call a verdict on the architecture
+  hypothesis; the informative window for this arm is its own epoch 19-21,
+  still many hours away given ResNet-18's slower per-epoch cost.
+
+  **Next**: a follow-up decision packet is needed to choose between the
+  two remaining candidates (3-step attack vs. AdamW/weight-decay) --
+  not yet written.
