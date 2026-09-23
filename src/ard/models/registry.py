@@ -136,6 +136,9 @@ def build_architecture(architecture: str, num_classes: int, *, pretrained: bool 
         "resnet18_imagenet",
         "mobilenet_v3_small_imagenet",
         "mobilenetv4_conv_small_imagenet",
+        "convnextv2_atto_imagenet",
+        "xcit_nano_imagenet",
+        "ghostnetv2_imagenet",
     }:
         raise ValueError(f"pretrained=True is not supported for architecture: {architecture}")
     if architecture == "saad_resnet18_cifar_v1":
@@ -199,6 +202,48 @@ def build_architecture(architecture: str, num_classes: int, *, pretrained: bool 
         return timm.create_model(
             "mobilenetv4_conv_small.e1200_r224_in1k", pretrained=pretrained, num_classes=num_classes
         )
+    if architecture == "convnextv2_atto_imagenet":
+        # Plan 0103: ConvNeXt V2-Atto (Woo et al./Meta-KAIST, arXiv:2301.00808,
+        # 2023), 3.71M params -- a LayerNorm-based lightweight architecture,
+        # a genuine miniaturization of the same ConvNeXt family
+        # Singh/Croce/Hein 2023 validated at ConvNeXt-T scale (~28M), added
+        # to test whether their architecture-family findings scale down.
+        # timm ships only the FCMAE-pretrained-then-ImageNet-1k-finetuned
+        # checkpoint at this scale (no pure supervised-from-scratch
+        # checkpoint exists in timm for Atto) -- disclosed in plan 0103,
+        # judged acceptable since this project uses the checkpoint as an
+        # off-the-shelf non-robust classifier init, not as a training-recipe
+        # claim. Same lazy-import, no-head-replacement pattern as
+        # mobilenetv4_conv_small_imagenet above.
+        import timm
+
+        return timm.create_model("convnextv2_atto.fcmae_ft_in1k", pretrained=pretrained, num_classes=num_classes)
+    if architecture == "xcit_nano_imagenet":
+        # Plan 0103: XCiT-Nano-12/p16 (El-Nouby et al./Meta, arXiv:2106.09681,
+        # NeurIPS 2021), 3.05M params -- a LayerNorm-based linear
+        # (cross-covariance) attention architecture, still widely cited as a
+        # baseline in 2023-2025 hybrid-attention papers, and the same
+        # architecture family Debenedetti et al. 2022 used for their own
+        # small-ViT ImageNet-100 ablations (this project targets full
+        # ImageNet-1k instead). Uses the non-distilled checkpoint
+        # (`.fb_in1k`, not `.fb_dist_in1k`) to avoid a knowledge-distillation
+        # confound in the pretrained init. Same lazy-import,
+        # no-head-replacement pattern as mobilenetv4_conv_small_imagenet.
+        import timm
+
+        return timm.create_model("xcit_nano_12_p16_224.fb_in1k", pretrained=pretrained, num_classes=num_classes)
+    if architecture == "ghostnetv2_imagenet":
+        # Plan 0103: GhostNetV2 1.0x (Tang et al./Huawei Noah's Ark Lab,
+        # arXiv:2211.12905, NeurIPS 2022), 6.16M params -- a BatchNorm-based
+        # architecture whose "cheap operation" (Ghost module) design is
+        # architecturally distinct from the depthwise-separable-conv family
+        # (MobileNet/EfficientNet lineage) already represented in this
+        # project's cohort, diversifying the BatchNorm-CNN comparison point
+        # rather than duplicating it. Same lazy-import, no-head-replacement
+        # pattern as mobilenetv4_conv_small_imagenet.
+        import timm
+
+        return timm.create_model("ghostnetv2_100.in1k", pretrained=pretrained, num_classes=num_classes)
     if architecture == "convnext_tiny_imagenet":
         # NOT torchvision.models.convnext_tiny. Registered to validate this
         # project's AutoAttack evaluation pipeline at ImageNet scale against

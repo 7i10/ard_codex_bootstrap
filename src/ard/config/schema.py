@@ -84,6 +84,12 @@ class ProtocolConfig(StrictModel):
         # separate protocol identity from the MobileNetV4 arm's, matching
         # this project's own precedent of one id per architecture pairing.
         "controlled_imagenet_stage01_r18_revisiting_at_recipe_v1",
+        # Plan 0103: lightweight-architecture survey, all candidates trained
+        # with Arm A's own pinned, working, plain-SGD PGD-AT recipe (never
+        # the collapsed AdamW recipe) -- one scientific contract shared
+        # across every candidate architecture, since architecture is the
+        # single studied variable.
+        "controlled_imagenet_stage02_lightweight_architecture_survey_v1",
     ]
 
 
@@ -501,6 +507,13 @@ class ModelConfig(StrictModel):
         # pipeline as a pipeline-correctness check, not to select an
         # architecture for any ImageNet training campaign.
         "convnext_tiny_imagenet",
+        # Plan 0103: lightweight-architecture-survey candidates, all
+        # trained with Arm A's own pinned plain-SGD PGD-AT recipe -- see
+        # registry.py's build_architecture and
+        # docs/plans/0103-lightweight-imagenet-architecture-survey.md.
+        "convnextv2_atto_imagenet",
+        "xcit_nano_imagenet",
+        "ghostnetv2_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
@@ -521,6 +534,9 @@ class ModelConfig(StrictModel):
             "resnet18_imagenet",
             "mobilenet_v3_small_imagenet",
             "mobilenetv4_conv_small_imagenet",
+            "convnextv2_atto_imagenet",
+            "xcit_nano_imagenet",
+            "ghostnetv2_imagenet",
         }:
             raise ValueError(f"pretrained=True is not supported for architecture: {self.architecture}")
         return self

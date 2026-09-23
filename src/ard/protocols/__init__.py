@@ -564,6 +564,17 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # architecture. A separate protocol from the MobileNetV4 arm's.
             metadata=MappingProxyType({"purpose": "imagenet_stage01_r18_revisiting_at_recipe_v1"}),
         ),
+        "controlled_imagenet_stage02_lightweight_architecture_survey_v1": ProtocolSpec(
+            id="controlled_imagenet_stage02_lightweight_architecture_survey_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0103: lightweight-architecture survey (ConvNeXt V2-Atto,
+            # XCiT-Nano, GhostNetV2, alongside MobileNetV4-Conv-Small),
+            # every candidate trained with Arm A's own pinned, working,
+            # plain-SGD PGD-AT recipe. One protocol id shared across the
+            # whole survey -- architecture is the single studied variable.
+            metadata=MappingProxyType({"purpose": "imagenet_stage02_lightweight_architecture_survey_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,
