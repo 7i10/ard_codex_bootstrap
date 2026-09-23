@@ -1137,3 +1137,51 @@ def test_r18_revisiting_at_recipe_config_changes_only_the_architecture(
         payload["student"] = {**payload["student"], "architecture": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert mobilenetv4 == r18
+
+
+def test_revisiting_at_recipe_no_weight_decay_config_changes_only_weight_decay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Decision 0018, option F: a single-variable ablation of the collapsed
+    imagenet_mobilenetv4_revisiting_at_recipe.yaml (plan 0102 Progress log,
+    2026-09-22). Must differ from it in exactly optimizer.weight_decay and
+    tracking.group -- everything else, including the full attack identity,
+    optimizer id/learning_rate/betas, scheduler, label_smoothing,
+    imagenet_heavy_augmentation and weight_ema_decay, must be
+    byte-identical, and both configs share the same protocol id (same
+    scientific contract, one further ingredient toggled)."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    collapsed = load_config(config_dir / "imagenet_mobilenetv4_revisiting_at_recipe.yaml").model_dump(mode="json")
+    ablation = load_config(
+        config_dir / "imagenet_mobilenetv4_revisiting_at_recipe_no_weight_decay.yaml"
+    ).model_dump(mode="json")
+    assert collapsed["protocol"] == ablation["protocol"]
+    assert collapsed["method"]["attack"] == ablation["method"]["attack"]
+    assert collapsed["method"]["selection_attack"] == ablation["method"]["selection_attack"]
+    assert collapsed["evaluation"]["attack"] == ablation["evaluation"]["attack"]
+    assert collapsed["optimizer"]["id"] == ablation["optimizer"]["id"] == "adamw"
+    assert collapsed["optimizer"]["learning_rate"] == ablation["optimizer"]["learning_rate"]
+    assert collapsed["optimizer"]["beta1"] == ablation["optimizer"]["beta1"]
+    assert collapsed["optimizer"]["beta2"] == ablation["optimizer"]["beta2"]
+    assert collapsed["scheduler"] == ablation["scheduler"]
+    assert collapsed["method"]["label_smoothing"] == ablation["method"]["label_smoothing"]
+    assert collapsed["dataset"]["imagenet_heavy_augmentation"] == ablation["dataset"]["imagenet_heavy_augmentation"]
+    assert collapsed["training"]["weight_ema_decay"] == ablation["training"]["weight_ema_decay"]
+    assert collapsed["training"]["epochs"] == ablation["training"]["epochs"] == 50
+    assert collapsed["optimizer"]["weight_decay"] == pytest.approx(0.05)
+    assert ablation["optimizer"]["weight_decay"] == pytest.approx(0.0)
+    for payload in (collapsed, ablation):
+        payload["optimizer"] = {**payload["optimizer"], "weight_decay": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert collapsed == ablation

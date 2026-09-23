@@ -1,0 +1,41 @@
+# Decision 0018, option F: single-variable ablation of
+# imagenet_mobilenetv4_revisiting_at_recipe.yaml (which collapsed at
+# epoch 21 -- plan 0102 Progress log, 2026-09-22) and of its
+# heavy-augmentation ablation sibling (which ALSO collapsed at epoch 21,
+# ruling out heavy augmentation -- plan 0102 Progress log, 2026-09-23,
+# decision 0017). The ONLY difference from the original collapsed config
+# is optimizer.weight_decay: 0.0 (was 0.05). Every other suspected
+# ingredient (the 3-step training attack inherited unchanged from Arm A,
+# heavy augmentation, weight-EMA, label smoothing) is held fixed. Attack
+# identity (epsilon, steps, step size, random start, normalization) is
+# byte-identical to the collapsed run and to Arm A -- this is a recipe-
+# ingredient ablation, not a threat-model change (CLAUDE.md rule 6). Same
+# protocol id as the collapsed run: this tests the same scientific
+# contract (does this recipe collapse), one further ingredient toggled.
+#
+# weight_decay chosen as 0.0 rather than a smaller nonzero value (e.g.
+# AdamW's common default 1e-2): a clean, maximally-informative ablation
+# that fully removes the suspected ingredient, matching how option B
+# ablated imagenet_heavy_augmentation to its off value rather than a
+# partial setting.
+#
+# Deliberately still training.epochs: 50, not a compressed horizon --
+# warmup_cosine's decay shape depends on total_epochs; see option B's own
+# config for the identical reasoning. Launched at the full epoch count per
+# this plan's own established policy: read intermediate epoch-metrics for
+# an early go/no-go read against decision 0018's preregistered epoch-25
+# rule, and kill early if collapse recurs; let it run to completion if it
+# looks healthy.
+schema_version: 2
+protocol: {id: controlled_imagenet_stage01_mobilenetv4_revisiting_at_recipe_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358, imagenet_heavy_augmentation: true}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: true, normalization: {profile: imagenet_standard}}
+method: {id: pgd_at, version: 1, label_smoothing: 0.1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: adamw, learning_rate: 0.001, beta1: 0.9, beta2: 0.95, weight_decay: 0.0}
+scheduler: {id: warmup_cosine, milestones: [], gamma: 1.0, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, weight_ema_decay: 0.999}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-revisiting-at-recipe-no-weight-decay, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

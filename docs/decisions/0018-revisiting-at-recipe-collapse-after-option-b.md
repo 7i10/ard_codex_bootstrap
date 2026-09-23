@@ -1,6 +1,6 @@
 ---
 id: 0018
-status: pending
+status: decided
 created: 2026-09-23
 campaign: plan0102-revisiting-at-recipe-no-heavy-aug-full50-v1（decision 0017オプションB実行後のフォローアップ。plan0102-r18-revisiting-at-recipe-full50-v1(オプションE)は継続監視中、まだ判定不能）
 question: decision 0017のオプションBを実行した結果、重いデータ拡張を外しても崩壊はepoch 21で再発した（元の崩壊と同じepoch、同じ兆候：train_robust_accuracyがtrain_clean_accuracyを追い越し、val_pgd_accuracyがepoch9の半分を2epoch連続で下回った）。重いデータ拡張は原因ではないと判定された。残る容疑者は2つ：3-stepの弱い内側攻撃と、AdamWのweight_decay=5e-2。次にどちらを切り分けるか、あるいは両方並行するか。
@@ -10,7 +10,7 @@ options:
   G: 両方を並行して走らせる（GPU0でF、GPU1の空きを待つか Bを早期終了してF、Eの結果を待ってからC）
   D: ここで打ち切り、plain PGD-AT（Arm A）を最良レシピとして確定する
 recommendation: F
-chosen: null
+chosen: F
 ---
 
 # 0018 revisiting_atレシピ崩壊、decision 0017オプションB実行後の続き
