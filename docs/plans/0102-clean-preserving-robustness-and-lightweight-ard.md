@@ -1489,4 +1489,100 @@ config.
   entry): `imagenet_mobilenetv4_pgd_at_random_init.yaml`, a random-init
   control for Arm A's own working PGD-AT baseline. Queued to launch on
   whichever Hamster GPU frees first (option E's, expected soonest).
+- 2026-09-23 (autonomous, subagent review): an independent adversarial
+  review (Opus, background agent) of the "data augmentation -> architecture
+  -> loss function" priority order returned. Its central, verified-correct
+  points, adopted here:
+  1. **The three-category taxonomy is missing a category the evidence
+     actually implicates**: optimizer/LR/schedule/weight-decay/init/
+     attack-budget. Every collapse this plan diagnosed (decisions
+     0016-0018) traces to that missing category (AdamW wd=0.05 and/or the
+     3-step attack), not to augmentation or loss. Re-ordering three
+     categories while the implicated fourth is absent doesn't address the
+     actual mechanism.
+  2. **Findings about avoiding a broken recipe don't transfer to ranking
+     novel tricks on a working one.** Ruling out heavy augmentation as a
+     necessary condition for one collapse says nothing about whether
+     augmentation can add robust accuracy to a healthy baseline -- using
+     it to demote augmentation was a category error on my part.
+  3. **The single most important point, independently verified against
+     this plan's own numbers**: at the plan0102-weight-ema-full50-v1
+     epoch-25 decay, `train_clean 41.60% < val_clean 48.40%` and
+     `train_robust 22.35% < val_pgd 27.19%` -- validation *above* train on
+     both axes (confirmed by re-reading this doc's own 2026-09-21 entry).
+     Separately, the ADR-vs-PGD-AT comparison table's `robust_overfit_gap`
+     is 0.0018 (confirmed by re-reading that entry too) -- best-epoch and
+     last-epoch checkpoints are within 0.1pp of each other. **This is an
+     underfitting signature, not overfitting.** It mechanistically explains
+     why every regularizer-shaped mechanism tried so far (heavy
+     augmentation, weight-EMA, TRADES, self-distillation) underperformed
+     plain PGD-AT: they all suppress overfitting, and there is none to
+     suppress here. This demotes augmentation *and* loss tricks **jointly**,
+     by mechanism, rather than ranking them against each other -- and
+     points the productive levers at capacity/architecture, longer
+     schedules, inner-attack strength, and initialization quality instead.
+  4. **Decision 0017's option E (ResNet-18 architecture control) is
+     confounded**, correctly flagged: it changes architecture, capacity
+     (~3x), conv style, *and* pretrained-checkpoint provenance/recipe
+     quality simultaneously. If it stays healthy through its own epoch
+     19-21, that supports "this specific combination survives," not
+     cleanly "architecture is the lever" over "capacity" or "init quality"
+     specifically -- worth remembering when option E's result lands.
+  5. Recommended structure: Phase 0 (cheap, hours) -- firm up the
+     reference baseline and a real noise floor; Phase 1 (the likely paper
+     contribution) -- the already-planned architecture-selection screen,
+     run at the pinned, known-good plain-SGD PGD-AT recipe (matching what
+     was already independently decided); Phase 2 (residual budget only)
+     -- one or two arms chosen by *mechanism* (underfitting -> capacity/
+     attack-budget; overfitting, if any architecture shows it -> that
+     architecture's own augmentation/loss tricks), not by a fixed category
+     order.
+
+  **Two of the review's specific factual claims were checked against this
+  project's own history and do not hold as stated** -- corrected here so
+  the revised plan isn't built on them:
+  - It claimed Arm A's 54.6%/30.6% reference "has never been AutoAttacked"
+    and may reflect gradient masking from the 3-step training attack. This
+    is incorrect: decision 0014 already ran a real AutoAttack
+    (`autoattack_sample_count=500`, full ImageNet-1k val 50k for
+    clean/PGD-10, 500-sample random subset for AutoAttack) on Arm A/B,
+    getting **22.8% AutoAttack robust accuracy at 50.94-51.13% clean**
+    (`docs/plans/0101-mobile-clean-accuracy-floor.md`, its "against both
+    the internal PGD-10 numbers... and plan 0100's own decision-0014
+    AutoAttack numbers" entry). This number is internally consistent
+    across architectures and seeds in the expected direction (matches
+    ResNet-18's own 22.8% at n=500 almost exactly at ~1/3 the parameters;
+    beats MobileNetV3-Small's 17.4% by the same margin PGD-10 predicted) --
+    evidence against pure gradient masking, not for it. What's genuinely
+    still missing: a full-sample (not n=500 direction-finding) AutoAttack
+    pass, and AutoAttack on the seed-1 replication -- both explicitly
+    flagged as not-yet-done in plan 0101 itself, not a fresh finding.
+  - It claimed "no ImageNet noise floor exists" (only the CIFAR
+    control-vs-control 0.16-1.88pp reference). This is also incorrect:
+    plan 0101's own Stage C seed-0-vs-seed-1 replication of Arm A gives an
+    explicit two-seed ImageNet-scale spread of **0.24pp clean / 0.01pp
+    PGD-10** (54.57/30.58 vs 54.33/30.59) -- tighter than the CIFAR
+    reference, though still only n=2.
+  - One genuinely new, unverified point from the review worth recording
+    but not chasing further (the revisiting_at-recipe root-cause
+    investigation is being wound down per this session's own
+    reprioritization, not continued): Singh/Croce/Hein 2023's peak LR 1e-3
+    may have been tuned for a larger global batch size than this project's
+    128; if so, transplanting the LR value unchanged at batch 128 would
+    itself be an unexamined recipe mistransfer, on top of everything else
+    already identified. Flagged for the record, not investigated further,
+    since Workstream A's specific recipe-collapse chase is not the current
+    priority.
+
+  **Net effect on this plan's stated priorities**: retire the
+  "augmentation -> architecture -> loss" ordering as originally framed.
+  Architecture *selection* (not modification) is confirmed as the
+  immediate next study, at the pinned Arm A recipe -- consistent with
+  what was already independently decided, now with an explicit mechanism
+  (probe whether the underfitting signature is architecture/capacity-
+  dependent) rather than a bare "try architectures next" heuristic. This
+  revision is presented for the human's confirmation, not yet treated as
+  final -- proceeding with Phase 0/1 preparation in the meantime since
+  none of it forecloses the human's own judgment call.
+
 
