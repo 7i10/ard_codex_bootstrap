@@ -1418,4 +1418,30 @@ config.
 
   **Next**: a follow-up decision packet is needed to choose between the
   two remaining candidates (3-step attack vs. AdamW/weight-decay) --
-  not yet written.
+  written as `docs/decisions/0018-*`.
+- 2026-09-23 (chat, continued): human chose decision 0018 option F (chat:
+  "OK, Fに進もう。それでもわからなかったりCに進もう" -- proceed to F,
+  fall back to C if F doesn't resolve it either). Ended
+  `plan0102-revisiting-at-recipe-no-heavy-aug-full50-v1` (option B) early
+  via SIGTERM at epoch 26 -- its decisive result (collapse at epoch 21)
+  was already captured; the remaining ~23 epochs would only have shown
+  the eventual floor. Process and its 8 dataloader workers exited cleanly;
+  `best.pt`/`last.pt`/`epoch-metrics.jsonl` through epoch 26 are preserved
+  on disk. Freed Hamster GPU0.
+
+  **Option F implemented** (commit `dd6effa`): new config
+  `imagenet_mobilenetv4_revisiting_at_recipe_no_weight_decay.yaml`,
+  identical to the collapsed config except `optimizer.weight_decay: 0.0`
+  (was 0.05) -- chosen as a clean full removal rather than a smaller
+  nonzero value, matching how option B ablated
+  `imagenet_heavy_augmentation` to fully off. Same protocol id (same
+  scientific contract, one further ingredient toggled). Config-identity
+  test added
+  (`test_revisiting_at_recipe_no_weight_decay_config_changes_only_weight_decay`).
+  `scripts/verify.py --changed` confirmed green. Launched from a fresh
+  worktree at `dd6effa` as
+  `plan0102-revisiting-at-recipe-no-weight-decay-full50-v1` on Hamster
+  GPU0; confirmed alive shortly after launch. `imagenet_r18_revisiting_at_recipe`
+  (option E) continues unattended on GPU1, still healthy through epoch 13
+  with no sign of the collapse pattern (its own decisive window, epoch
+  19-21, is still ahead).
