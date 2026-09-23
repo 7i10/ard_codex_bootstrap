@@ -379,4 +379,26 @@ history behind this pivot.)
   1b before any training. MobileNetV3-Small and ResNet-18 stay as existing
   single-seed reference points only. Configs:
   `imagenet_{efficientnet_b0,mobilenetv4_conv_medium,convnext_atto,deit_tiny,mobilevit_s}_pgd_at.yaml`.
+- 2026-09-24 (chat): **Phase 1b, pretrained clean top-1 on this project's own
+  ImageNet-val pipeline** (full 50k val, 224px, resize 256 + center crop,
+  bilinear; forward-only, pinned worktree `source-23f6bf0a3a79`, throwaway
+  script not committed):
+
+  | model | ours @224 | published | diff |
+  |---|---:|---:|---:|
+  | MobileNetV4-Conv-Small | 73.41 | 73.45 | -0.04 |
+  | EfficientNet-B0 (ra_in1k) | 77.67 | 77.70 | -0.03 |
+  | MobileNetV4-Conv-Medium | 79.09 | 79.09 | -0.00 |
+  | ConvNeXt-Atto V1 | 75.62 | 75.67 | -0.05 |
+  | DeiT-Tiny | 72.02 | 72.19 | -0.17 |
+  | MobileViT-S | 77.03 | 78.30 (@256) | -1.27 |
+
+  Every checkpoint reproduces its published number within 0.2pt (bilinear vs
+  bicubic resize does not matter); MobileViT-S pays 1.3pt for running at 224
+  instead of its native 256 -- accepted for a uniform input size and recorded
+  as a covariate. EasyRobust's adversarially trained EfficientNet-B0: clean
+  61.08% on a 10k val subset under imagenet_standard (published 61.83; subset
+  SE ~0.5pt), 32.4% under mean/std 0.5, 1.3% under raw pixels -- so it was
+  trained with standard normalization and can be re-evaluated (PGD-10 /
+  AutoAttack) under this project's protocol as an external anchor.
 
