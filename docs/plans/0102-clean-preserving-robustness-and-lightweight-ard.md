@@ -1445,3 +1445,48 @@ config.
   (option E) continues unattended on GPU1, still healthy through epoch 13
   with no sign of the collapse pattern (its own decisive window, epoch
   19-21, is still ahead).
+- 2026-09-23 (chat, continued): human reframed the research direction more
+  fundamentally, and delegated ~8 hours of autonomous investigation/
+  experimentation (no human availability during that window).
+
+  **Standing corrections/decisions from this message**:
+  1. Never cite RobustBench as a literature source for this line of work
+     (stated repeatedly by the human; saved as a standing feedback memory).
+  2. Survey BOTH BatchNorm-based and LayerNorm-based (ConvNeXt/ViT-hybrid)
+     architectures for the eventual model comparison -- not CNNs only.
+     For ViT-side candidates, weigh FLOPs alongside parameter count.
+  3. **Decision 0018's option C (raise attack steps 3->10) is
+     deprioritized**, for two reasons the human gave: it is GPU-expensive
+     (~40-50h), and even a positive result (10 steps prevents the
+     revisiting_at recipe's collapse) would be hard to act on going
+     forward. This **supersedes the earlier autonomous authorization** to
+     launch option C the moment option F showed a collapse signature by
+     epoch 20-25 -- that authorization is now withdrawn. Whatever F shows
+     should be recorded as this sub-investigation's final data point;
+     no new arm should be launched from it.
+  4. Model selection for the new architecture-comparison study must come
+     from an actual survey of recent (2023-2026) standard-classification
+     and robust-classification literature, identifying prominent,
+     well-established, high-accuracy architectures in the ~1-10M
+     parameter/FLOPs band -- not an ad hoc pick from a single benchmark
+     table. Comparing several such architectures' standard-training clean
+     accuracy against their post-AT clean and robust accuracy, and
+     analyzing the gap, is itself framed as having real paper value even
+     before any novel method is proposed.
+  5. The standing priority order for novel lightweight-specific tricks
+     ("data augmentation -> architecture -> loss function", stated
+     earlier in this plan) was explicitly flagged by the human as
+     something to critically re-derive, not accept at face value --
+     including via an independent/adversarial review pass, given this
+     session's own evidence: heavy augmentation was ruled out as the
+     revisiting_at recipe's cause (decision 0017), while architecture
+     (option E, ResNet-18) has so far stayed healthy where MobileNetV4
+     did not, and every loss-based mechanism tried in Workstream A
+     (weight-EMA, TRADES+weight-EMA, sharp-temperature ADR) has
+     underperformed plain PGD-AT. See the next entry for that review.
+
+  **First concrete step already prepared** (commit `89baddb`, prior
+  entry): `imagenet_mobilenetv4_pgd_at_random_init.yaml`, a random-init
+  control for Arm A's own working PGD-AT baseline. Queued to launch on
+  whichever Hamster GPU frees first (option E's, expected soonest).
+
