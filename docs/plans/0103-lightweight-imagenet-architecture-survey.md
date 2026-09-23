@@ -456,3 +456,25 @@ history behind this pivot.)
   HDD copy to `/home/shunsukenaito/datasets-ssd/imagenet`, with a manifest-hash
   check after the copy. Both splits go on the SSD because the dataset adapter
   rejects paths that resolve outside its root. About 56 GB stays free.
+- 2026-09-24 (chat): **Anteater now trains from its SSD.** HDD-to-SSD copy
+  on Anteater ran at ~6.6 MB/s (seek-bound), so it was stopped. ImageNet was
+  rsynced from Hamster's NVMe instead: 150 GB in 21 min at ~112 MB/s,
+  `--size-only` on top of the partial copy. Manifest hashes match on both
+  splits (train `ae033613...`, val `abc0ee80...`). `~/workspace-local/datasets/imagenet`
+  now points at `/home/shunsukenaito/datasets-ssd/imagenet`; 55 GB of the root
+  SSD stays free. Hamster's pretrained-100 run was back at 843-845 img/s
+  (epochs 7-8) once the co-located canary was stopped.
+- 2026-09-24 (chat): **Step 1c canaries, attempt 2 on Anteater** (3 epochs,
+  seed 0, dev W&B project, pinned worktree `source-1285358c1b73`, 7 loader
+  workers each): `plan0103-canary-convnext-atto-anteater-v2` (GPU2) and
+  `plan0103-canary-deit-tiny-anteater-v2` (GPU3). Both GPUs sit at 93-97%
+  util with iowait under 1%. Measured training speed, estimated from bytes
+  read by the loaders over the first ~1.8 h, is about 120 img/s for
+  ConvNeXt-Atto and 157 for DeiT-Tiny, far below the step microbenchmark's 283
+  and 210. The microbenchmark let cuDNN pick fast non-deterministic kernels
+  (`cudnn.benchmark=True`). The real recipe has `training.deterministic: true`
+  (`torch.use_deterministic_algorithms(True)` in `ard.cli.train`), so it
+  overstated throughput. The 4090 numbers (e.g. 857 img/s for MobileNetV4-S)
+  come from the same deterministic setting and remain the right reference.
+  Implied cost on a 2080 Ti: ~2.9 h/epoch for ConvNeXt-Atto, ~2.2 h/epoch for
+  DeiT-Tiny.
