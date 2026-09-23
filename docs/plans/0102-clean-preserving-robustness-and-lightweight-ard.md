@@ -1585,4 +1585,20 @@ config.
   final -- proceeding with Phase 0/1 preparation in the meantime since
   none of it forecloses the human's own judgment call.
 
+  **Phase 0 backlog item, not yet launched**: a larger-sample (or
+  full-sample) AutoAttack pass on Arm A's own checkpoint, to firm up the
+  n=500 direction-finding number (22.8%) into something closer to
+  citable, per the review's still-valid point that n=500 remains a
+  direction-finding sample, not an official test. Arm A's seed-0
+  checkpoints (`best.pt`/`last.pt`) confirmed present on Ferret at
+  `runs/plan0101-stagec-arm-a-no-warmup-v1/outputs/train/`. Not launched
+  now because Ferret's three GPUs are currently saturated by an unrelated
+  user's job (confirmed via `ssh Ferret nvidia-smi`, matching plan 0101's
+  own earlier note about this same host-sharing situation) -- queued
+  behind the higher-priority random-init and architecture-survey arms on
+  Hamster; will copy the checkpoint over and run this on Hamster once a
+  GPU is free with nothing higher-priority waiting, or on Ferret directly
+  if it frees first.
+
+
 
