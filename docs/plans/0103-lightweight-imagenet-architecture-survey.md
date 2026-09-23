@@ -438,3 +438,21 @@ history behind this pivot.)
   (full-val clean/PGD-10 and AutoAttack from saved checkpoints), not a
   training host. The two canary bundles are incomplete by design; they are
   not results.
+- 2026-09-24 (chat): **Co-location verdict: two jobs on one 4090 lose total
+  throughput. Stopped.** `plan0103-mobilenetv4-pretrained-100ep-v2`'s epoch 3
+  was the first epoch fully shared with the EfficientNet-B0 canary on Hamster
+  GPU0 and nothing else (the Crocodile rsync had already been stopped). It ran
+  at 376 img/s, against 857 alone (epoch 0); the co-located rows are epoch 1:
+  791 (partial overlap) and epoch 2: 494 (co-location plus the rsync). The canary
+  `plan0103-canary-efficientnet-b0-colocated-v1` had not finished epoch 0 after
+  2 h 13 min, i.e. under 157 img/s. So the pair made fewer than 533 img/s
+  together, less than one job alone. The canary was stopped; its bundle is
+  incomplete and is not a result. One job per GPU from here on. EfficientNet-B0
+  still needs its Step 1c canary, on a free 4090.
+- 2026-09-24 (chat): **Anteater SSD.** The lab freed ~200 GB on Anteater's
+  root SATA SSD (Micron 5200 960 GB). Steps: removed an unused miniforge3,
+  cleared pip/uv/wandb caches, ran `conda clean`, and moved `~/.cache` to the
+  HDD behind a symlink. ImageNet (train+val, 144 GB) is being copied from the
+  HDD copy to `/home/shunsukenaito/datasets-ssd/imagenet`, with a manifest-hash
+  check after the copy. Both splits go on the SSD because the dataset adapter
+  rejects paths that resolve outside its root. About 56 GB stays free.
