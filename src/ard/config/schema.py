@@ -273,6 +273,7 @@ class NormalizationConfig(StrictModel):
         "cifar100_standard",
         "tiny_imagenet_standard",
         "imagenet_standard",
+        "imagenet_raw_identity",
         "custom",
     ] = "fixture_unit"
     mean: tuple[float, float, float] | None = None
@@ -308,6 +309,11 @@ class NormalizationConfig(StrictModel):
                 (0.485, 0.456, 0.406),
                 (0.229, 0.224, 0.225),
                 "Standard ILSVRC-2012 mean/std convention (torchvision.models default preprocessing)",
+            ),
+            "imagenet_raw_identity": (
+                (0.0, 0.0, 0.0),
+                (1.0, 1.0, 1.0),
+                "ImageNet checkpoints trained on raw [0,1] pixels without mean/std (e.g. timm mobilevit_*.cvnets_in1k)",
             ),
         }
         if self.profile == "custom":
@@ -514,9 +520,11 @@ class ModelConfig(StrictModel):
         # trained with Arm A's own pinned plain-SGD PGD-AT recipe -- see
         # registry.py's build_architecture and
         # docs/plans/0103-lightweight-imagenet-architecture-survey.md.
-        "convnextv2_atto_imagenet",
-        "xcit_nano_imagenet",
-        "ghostnetv2_imagenet",
+        "efficientnet_b0_imagenet",
+        "mobilenetv4_conv_medium_imagenet",
+        "convnext_atto_imagenet",
+        "deit_tiny_imagenet",
+        "mobilevit_s_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
@@ -537,9 +545,11 @@ class ModelConfig(StrictModel):
             "resnet18_imagenet",
             "mobilenet_v3_small_imagenet",
             "mobilenetv4_conv_small_imagenet",
-            "convnextv2_atto_imagenet",
-            "xcit_nano_imagenet",
-            "ghostnetv2_imagenet",
+            "efficientnet_b0_imagenet",
+            "mobilenetv4_conv_medium_imagenet",
+            "convnext_atto_imagenet",
+            "deit_tiny_imagenet",
+            "mobilevit_s_imagenet",
         }:
             raise ValueError(f"pretrained=True is not supported for architecture: {self.architecture}")
         return self
@@ -1494,6 +1504,10 @@ class ExperimentConfig(StrictModel):
         }[self.dataset.name]
         if self.student.architecture == "saad_resnet18_cifar_v1" and self.dataset.name == "cifar10":
             expected_profile = "cifar10_raw_identity"
+        # Plan 0103: timm's mobilevit_s.cvnets_in1k checkpoint was trained on
+        # raw [0,1] pixels; pin it to that profile (and no other architecture).
+        if self.student.architecture == "mobilevit_s_imagenet" and self.dataset.name == "imagenet":
+            expected_profile = "imagenet_raw_identity"
         if self.student.normalization.profile != expected_profile:
             raise ValueError(f"dataset {self.dataset.name} requires student normalization profile {expected_profile}")
         self._validate_protocol_contract()

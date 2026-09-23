@@ -1228,126 +1228,6 @@ def test_mobilenetv4_random_init_config_changes_only_pretrained_flag(
     assert arm_a == random_init
 
 
-def test_convnextv2_atto_config_changes_only_the_architecture(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Plan 0103: a lightweight-architecture-survey candidate, trained with
-    Arm A's own pinned, working, plain-SGD PGD-AT recipe. Must differ from
-    Arm A (imagenet_mobilenetv4_pgd_at_no_warmup.yaml) in exactly
-    student.architecture, protocol.id and tracking.group -- the full
-    attack identity, optimizer, scheduler and epoch count must be
-    byte-identical, per CLAUDE.md rule 6 (architecture is the only
-    scientific variable in this survey)."""
-    values = {
-        "ARD_SEED": "7",
-        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
-        "ARD_NUM_WORKERS": "0",
-        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
-        "ARD_RUN_ID": "config-test-run",
-        "WANDB_ENTITY": "entity",
-        "WANDB_PROJECT": "project",
-    }
-    for key, value in values.items():
-        monkeypatch.setenv(key, value)
-    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
-    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
-    candidate = load_config(config_dir / "imagenet_convnextv2_atto_pgd_at.yaml").model_dump(mode="json")
-    assert arm_a["method"]["attack"] == candidate["method"]["attack"]
-    assert arm_a["method"]["selection_attack"] == candidate["method"]["selection_attack"]
-    assert arm_a["evaluation"]["attack"] == candidate["evaluation"]["attack"]
-    assert arm_a["optimizer"] == candidate["optimizer"]
-    assert arm_a["scheduler"] == candidate["scheduler"]
-    assert arm_a["training"]["epochs"] == candidate["training"]["epochs"] == 50
-    assert arm_a["student"]["architecture"] == "mobilenetv4_conv_small_imagenet"
-    assert candidate["student"]["architecture"] == "convnextv2_atto_imagenet"
-    assert candidate["protocol"]["id"] == "controlled_imagenet_stage02_lightweight_architecture_survey_v1"
-    for payload in (arm_a, candidate):
-        payload["protocol"] = None
-        payload["student"] = {**payload["student"], "architecture": None}
-        payload["tracking"] = {**payload["tracking"], "group": None}
-    assert arm_a == candidate
-
-
-def test_xcit_nano_config_changes_only_the_architecture(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Plan 0103: a lightweight-architecture-survey candidate, trained with
-    Arm A's own pinned, working, plain-SGD PGD-AT recipe. Must differ from
-    Arm A (imagenet_mobilenetv4_pgd_at_no_warmup.yaml) in exactly
-    student.architecture, protocol.id and tracking.group -- the full
-    attack identity, optimizer, scheduler and epoch count must be
-    byte-identical, per CLAUDE.md rule 6 (architecture is the only
-    scientific variable in this survey)."""
-    values = {
-        "ARD_SEED": "7",
-        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
-        "ARD_NUM_WORKERS": "0",
-        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
-        "ARD_RUN_ID": "config-test-run",
-        "WANDB_ENTITY": "entity",
-        "WANDB_PROJECT": "project",
-    }
-    for key, value in values.items():
-        monkeypatch.setenv(key, value)
-    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
-    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
-    candidate = load_config(config_dir / "imagenet_xcit_nano_pgd_at.yaml").model_dump(mode="json")
-    assert arm_a["method"]["attack"] == candidate["method"]["attack"]
-    assert arm_a["method"]["selection_attack"] == candidate["method"]["selection_attack"]
-    assert arm_a["evaluation"]["attack"] == candidate["evaluation"]["attack"]
-    assert arm_a["optimizer"] == candidate["optimizer"]
-    assert arm_a["scheduler"] == candidate["scheduler"]
-    assert arm_a["training"]["epochs"] == candidate["training"]["epochs"] == 50
-    assert arm_a["student"]["architecture"] == "mobilenetv4_conv_small_imagenet"
-    assert candidate["student"]["architecture"] == "xcit_nano_imagenet"
-    assert candidate["protocol"]["id"] == "controlled_imagenet_stage02_lightweight_architecture_survey_v1"
-    for payload in (arm_a, candidate):
-        payload["protocol"] = None
-        payload["student"] = {**payload["student"], "architecture": None}
-        payload["tracking"] = {**payload["tracking"], "group": None}
-    assert arm_a == candidate
-
-
-def test_ghostnetv2_config_changes_only_the_architecture(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Plan 0103: a lightweight-architecture-survey candidate, trained with
-    Arm A's own pinned, working, plain-SGD PGD-AT recipe. Must differ from
-    Arm A (imagenet_mobilenetv4_pgd_at_no_warmup.yaml) in exactly
-    student.architecture, protocol.id and tracking.group -- the full
-    attack identity, optimizer, scheduler and epoch count must be
-    byte-identical, per CLAUDE.md rule 6 (architecture is the only
-    scientific variable in this survey)."""
-    values = {
-        "ARD_SEED": "7",
-        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
-        "ARD_NUM_WORKERS": "0",
-        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
-        "ARD_RUN_ID": "config-test-run",
-        "WANDB_ENTITY": "entity",
-        "WANDB_PROJECT": "project",
-    }
-    for key, value in values.items():
-        monkeypatch.setenv(key, value)
-    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
-    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
-    candidate = load_config(config_dir / "imagenet_ghostnetv2_pgd_at.yaml").model_dump(mode="json")
-    assert arm_a["method"]["attack"] == candidate["method"]["attack"]
-    assert arm_a["method"]["selection_attack"] == candidate["method"]["selection_attack"]
-    assert arm_a["evaluation"]["attack"] == candidate["evaluation"]["attack"]
-    assert arm_a["optimizer"] == candidate["optimizer"]
-    assert arm_a["scheduler"] == candidate["scheduler"]
-    assert arm_a["training"]["epochs"] == candidate["training"]["epochs"] == 50
-    assert arm_a["student"]["architecture"] == "mobilenetv4_conv_small_imagenet"
-    assert candidate["student"]["architecture"] == "ghostnetv2_imagenet"
-    assert candidate["protocol"]["id"] == "controlled_imagenet_stage02_lightweight_architecture_survey_v1"
-    for payload in (arm_a, candidate):
-        payload["protocol"] = None
-        payload["student"] = {**payload["student"], "architecture": None}
-        payload["tracking"] = {**payload["tracking"], "group": None}
-    assert arm_a == candidate
-
-
 def test_mobilenetv4_pretrained_100ep_config_changes_only_the_budget(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1419,4 +1299,67 @@ def test_mobilenetv4_budget_init_100ep_cells_differ_only_in_init(
     assert pretrained["training"]["train_probe_size"] == random_init["training"]["train_probe_size"] == 2000
     pretrained["student"]["pretrained"] = random_init["student"]["pretrained"] = None
     assert pretrained == random_init
+
+
+@pytest.mark.parametrize(
+    ("config_file", "architecture", "profile"),
+    [
+        ("imagenet_efficientnet_b0_pgd_at.yaml", "efficientnet_b0_imagenet", "imagenet_standard"),
+        ("imagenet_mobilenetv4_conv_medium_pgd_at.yaml", "mobilenetv4_conv_medium_imagenet", "imagenet_standard"),
+        ("imagenet_convnext_atto_pgd_at.yaml", "convnext_atto_imagenet", "imagenet_standard"),
+        ("imagenet_deit_tiny_pgd_at.yaml", "deit_tiny_imagenet", "imagenet_standard"),
+        ("imagenet_mobilevit_s_pgd_at.yaml", "mobilevit_s_imagenet", "imagenet_raw_identity"),
+    ],
+)
+def test_architecture_survey_configs_change_only_the_architecture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_file: str, architecture: str, profile: str
+) -> None:
+    """Plan 0103: every survey candidate uses Arm A's pinned plain-SGD PGD-AT
+    recipe. Only student.architecture, the checkpoint's own normalization
+    profile, protocol.id and tracking.group may differ from Arm A."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
+    candidate = load_config(config_dir / config_file).model_dump(mode="json")
+    assert candidate["student"]["architecture"] == architecture
+    assert candidate["student"]["normalization"]["profile"] == profile
+    assert candidate["protocol"]["id"] == "controlled_imagenet_stage02_lightweight_architecture_survey_v1"
+    for payload in (arm_a, candidate):
+        payload["protocol"] = None
+        payload["student"] = {**payload["student"], "architecture": None, "normalization": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert arm_a == candidate
+
+
+def test_imagenet_normalization_profile_is_pinned_per_architecture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """MobileViT-S must use imagenet_raw_identity; every other ImageNet student
+    must keep imagenet_standard. Swapping either fails validation."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    with pytest.raises(ValidationError, match="requires student normalization profile imagenet_raw_identity"):
+        load_config(config_dir / "imagenet_mobilevit_s_pgd_at.yaml", ["student.normalization.profile=imagenet_standard"])
+    with pytest.raises(ValidationError, match="requires student normalization profile imagenet_standard"):
+        load_config(
+            config_dir / "imagenet_deit_tiny_pgd_at.yaml", ["student.normalization.profile=imagenet_raw_identity"]
+        )
 

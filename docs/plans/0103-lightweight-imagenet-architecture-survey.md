@@ -353,4 +353,30 @@ history behind this pivot.)
   `plan0103-mobilenetv4-random-init-100ep-v1` (Hamster GPU1). Arm A
   (pretrained, 50 epochs, n=2) fills the third cell; the random-init/50 cell
   is deferred until these two land (human, 2026-09-24).
+- 2026-09-24 (chat): **final architecture set (human-approved, supersedes the
+  earlier shortlist table)**. Replaced the never-launched ConvNeXt V2-Atto,
+  XCiT-Nano and GhostNetV2 entries (V2's GRN + FCMAE pretraining are two
+  confounds; XCiT-Nano's supervised checkpoint is only 70.0%; GhostNetV2 is
+  not prominent enough). All measured locally at 224px (params / GMACs /
+  published top-1):
+
+  | family | model | params / GMACs | top-1 | checkpoint | normalization |
+  |---|---|---:|---:|---|---|
+  | BN CNN | MobileNetV4-Conv-Small (Arm A) | 3.77M / 0.19 | 73.5 | e1200_r224_in1k | imagenet_standard |
+  | BN CNN (+SE, SiLU) | EfficientNet-B0 | 5.29M / 0.39 | 77.7 | ra_in1k | imagenet_standard |
+  | BN CNN, larger | MobileNetV4-Conv-Medium | 9.72M / 0.83 | 79.1 | e500_r224_in1k | imagenet_standard |
+  | LN CNN (patchify) | ConvNeXt-Atto (V1) | 3.70M / 0.55 | 75.7 | d2_in1k | imagenet_standard |
+  | ViT (LN) | DeiT-Tiny | 5.72M / 1.07 | 72.2 | fb_in1k (non-distilled) | imagenet_standard |
+  | hybrid (BN conv + LN attn) | MobileViT-S | 5.58M / 1.42 | 78.3 @256 | cvnets_in1k | imagenet_raw_identity |
+
+  EfficientNet-B0 uses `ra_in1k` rather than the stronger `ra4_e3600` (78.6%,
+  mean/std 0.5) to keep the standard profile. MobileViT-S's checkpoint was
+  trained at 256px on raw [0,1] pixels: added a pinned `imagenet_raw_identity`
+  profile (schema validator requires it for mobilevit_s_imagenet and forbids
+  it elsewhere, with a regression test), and use 224px like every other model
+  (uniform input size); the resulting clean-accuracy cost, plus the bicubic
+  (timm) vs bilinear (this pipeline) resize difference, is measured in Phase
+  1b before any training. MobileNetV3-Small and ResNet-18 stay as existing
+  single-seed reference points only. Configs:
+  `imagenet_{efficientnet_b0,mobilenetv4_conv_medium,convnext_atto,deit_tiny,mobilevit_s}_pgd_at.yaml`.
 
