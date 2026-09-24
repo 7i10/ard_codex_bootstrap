@@ -506,3 +506,27 @@ history behind this pivot.)
   project's protocol (full-val clean/PGD-10, AutoAttack n=500 direction
   setting) as an external anchor. How to stage an external checkpoint for
   `ard.cli.evaluate` is being worked out, and no guard will be weakened to do it.
+- 2026-09-24 (chat): **Step 1c canary: ConvNeXt-Atto completed** on Anteater
+  GPU2 (`completion.json` completed). Epochs 0-2, all inside the LR warmup:
+  10883/10906/10874 s at 115 img/s. val clean/PGD-10 53.28/26.64,
+  50.76/26.55, 48.65/26.67. Probe 54.70/27.05, 52.95/27.90, 50.85/27.80. No
+  collapse, and the probe is logged. Both Anteater canaries show clean
+  accuracy dipping a little each epoch while PGD-10 holds, as expected when
+  the LR warms up from a clean-pretrained init.
+- 2026-09-24 (chat): **Anteater's ImageNet copy is byte-identical to
+  Hamster's.** `rsync -rnc` found 0 differing files in train and val (full
+  checksums, not just the size manifest).
+- 2026-09-24 (chat): **External anchor code** (commit `f201ac2`).
+  `scripts/evaluate_external_checkpoint.py --dataset imagenet` measures
+  foreign weights with every setting taken from our own scientific config,
+  through the same loop and loader as `ard.cli.evaluate`. It writes a
+  FOREIGN-lineage record with git/GPU/TF32 provenance. Scientific review found
+  no P1, and all P2/P3 findings were fixed in the same commit. The full
+  `verify --changed` set passes except the known pre-existing
+  `test_prescriptive_v3::test_v3_generates_four_strict_arms_and_atomically_forks_exact_epoch79_state`.
+  **EfficientNet-B0 evaluation does not fit an 11 GB 2080 Ti at batch 128**:
+  one PGD-10 batch in eval mode ran out of memory at ~10 GiB. Evaluation PGD
+  random starts are drawn per batch, so a smaller batch would change the
+  measurement. The EasyRobust anchor therefore waits for a free 4090 (after the
+  2x2 cells). Checkpoint on Anteater: `advtrain_efficientnet_b0_ep4.pth`,
+  sha256 `d90ccd52...` (from EasyRobust's adversarial-training model zoo).
