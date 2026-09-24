@@ -497,3 +497,12 @@ history behind this pivot.)
   worktree, 3 epochs, dev project). ConvNeXt-Atto (GPU2) finished epochs 0-1:
   115 img/s, val 53.28/26.64 then 50.76/26.55, probe 54.70/27.05 then
   52.95/27.90.
+- 2026-09-24 (human, chat): **Host policy decided.** The Phase 1 survey runs
+  entirely on RTX 4090s, so GPU type (TF32 on Ada vs full fp32 on Turing) is
+  not mixed into the architecture comparison. Anteater's 2080 Tis take
+  self-contained work only: saved-checkpoint evaluation, extra seeds, and
+  comparisons run wholly on that GPU type. **Approved:** re-evaluate
+  EasyRobust's adversarially trained EfficientNet-B0 on Anteater under this
+  project's protocol (full-val clean/PGD-10, AutoAttack n=500 direction
+  setting) as an external anchor. How to stage an external checkpoint for
+  `ard.cli.evaluate` is being worked out, and no guard will be weakened to do it.
