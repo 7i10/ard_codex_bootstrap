@@ -478,3 +478,22 @@ history behind this pivot.)
   come from the same deterministic setting and remain the right reference.
   Implied cost on a 2080 Ti: ~2.9 h/epoch for ConvNeXt-Atto, ~2.2 h/epoch for
   DeiT-Tiny.
+- 2026-09-24 (chat): **Step 1c canary: DeiT-Tiny completed** on Anteater GPU3.
+  The run ended with `completion.json` status `completed`; its
+  `error-marker.txt` reads "No application error recorded". Its
+  `environment.json` records RTX 2080 Ti, torch 2.11.0+cu128, cuDNN 91900. The
+  run is 3 epochs, all inside the 10-epoch LR warmup, so these are pipeline and
+  stability checks, not results:
+
+  | epoch | s / img/s | val clean / PGD-10 | probe clean / PGD-10 | train clean / robust |
+  |---|---|---|---|---|
+  | 0 | 8332 / 151 | 49.44 / 23.09 | 50.75 / 23.30 | 42.62 / 16.27 |
+  | 1 | 8346 / 150 | 48.17 / 23.71 | 50.10 / 25.75 | 44.56 / 18.01 |
+  | 2 | 8364 / 150 | 46.63 / 22.82 | 49.15 / 23.40 | 44.44 / 18.12 |
+
+  No collapse, and the probe is logged. Seen and unseen accuracy are close
+  (probe 1-3 pt above val), as expected this early. Peak memory was 4.5 GB.
+  GPU3 then started `plan0103-canary-mobilenetv4-medium-anteater-v1` (same
+  worktree, 3 epochs, dev project). ConvNeXt-Atto (GPU2) finished epochs 0-1:
+  115 img/s, val 53.28/26.64 then 50.76/26.55, probe 54.70/27.05 then
+  52.95/27.90.
