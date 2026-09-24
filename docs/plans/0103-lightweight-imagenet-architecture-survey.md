@@ -530,3 +530,25 @@ history behind this pivot.)
   measurement. The EasyRobust anchor therefore waits for a free 4090 (after the
   2x2 cells). Checkpoint on Anteater: `advtrain_efficientnet_b0_ep4.pth`,
   sha256 `d90ccd52...` (from EasyRobust's adversarial-training model zoo).
+- 2026-09-24 (chat): **Where the time goes, on a 2080 Ti** (throwaway probe,
+  one trainer-shaped PGD-AT step: eval-mode 3-step PGD then a train-mode CE+SGD
+  step, batch 128, 224 px, fp32, synthetic pixels; img/s):
+
+  | model | det (current recipe) | non-det | non-det + cudnn.benchmark | det + channels_last | det + torch.compile |
+  |---|---:|---:|---:|---:|---:|
+  | MobileNetV4-S | 514 | 654 | 657 | 433 | 356 |
+  | ConvNeXt-Atto | 141 | 196 | 282 | 141 | 69 |
+  | DeiT-Tiny | 191 | 209 | 209 | 188 | 176 |
+
+  `training.deterministic: true` costs 1.1-2.0x, and all of that comes from
+  the deterministic-algorithm restriction and the lack of cuDNN autotuning.
+  On Turing fp32, channels_last and torch.compile are neutral or harmful. Real
+  canary throughput (ConvNeXt 115, DeiT 150) is ~20% below the `det` column
+  because of data loading and per-epoch validation/probe. **This is not yet
+  evidence for the 4090s:** Ada has TF32 tensor cores and is fast enough for
+  launch overhead to dominate, so channels_last and compile may behave
+  differently there. Next: repeat this probe on a Hamster 4090 once the 2x2
+  cells end, before implementing compile/channels_last flags and before
+  proposing any change to `deterministic`. That change is a human decision;
+  it would apply uniformly to every survey run, and Arm A and the 2x2 cells
+  stay deterministic.
