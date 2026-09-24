@@ -194,6 +194,26 @@ def _dataset_identity(dataset: Any, *, observed: dict[str, object] | None = None
     return identity
 
 
+def evaluation_loader(dataset: Any, *, seed: int, batch_size: int, num_workers: int) -> DataLoader[IndexedBatch]:
+    """The clean/PGD evaluation loader: every sample once, in dataset order.
+
+    Shared with ``scripts/evaluate_external_checkpoint.py`` so a foreign model's
+    PGD random starts (drawn per batch from one seeded generator) come from the
+    same batches, in the same order, as this project's own checkpoints get.
+    """
+    sampler = EpochShuffleSampler(len(dataset), seed=seed, shuffle=False)
+    return cast(
+        DataLoader[IndexedBatch],
+        DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=sampler,
+            num_workers=num_workers,
+            collate_fn=collate_indexed,
+        ),
+    )
+
+
 def _autoattack_loader(
     dataset: Any, *, sample_count: int | None, seed: int, batch_size: int, num_workers: int
 ) -> DataLoader[IndexedBatch]:
@@ -429,16 +449,11 @@ def main(argv: list[str] | None = None) -> int:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         dataset = build_dataset(config.evaluation.dataset)
         evaluation_dataset_identity = _dataset_identity(config.evaluation.dataset, observed=dataset.content_identity)
-        sampler = EpochShuffleSampler(len(dataset), seed=config.evaluation.seed, shuffle=False)
-        loader = cast(
-            DataLoader[IndexedBatch],
-            DataLoader(
-                dataset,
-                batch_size=training_config.training.per_rank_batch_size,
-                sampler=sampler,
-                num_workers=training_config.training.num_workers,
-                collate_fn=collate_indexed,
-            ),
+        loader = evaluation_loader(
+            dataset,
+            seed=config.evaluation.seed,
+            batch_size=training_config.training.per_rank_batch_size,
+            num_workers=training_config.training.num_workers,
         )
         attack_config = evaluation_attack
         threat_model = attack_config.identity()

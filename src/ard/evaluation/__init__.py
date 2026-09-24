@@ -3,6 +3,7 @@
 from .autoattack import AutoAttackUnavailable, run_autoattack
 from .saved_checkpoint import (
     EvaluationResult,
+    evaluate_loaded_model,
     evaluate_saved_checkpoint,
     load_saved_student_checkpoint,
     validate_checkpoint_lineage,
@@ -11,6 +12,7 @@ from .saved_checkpoint import (
 __all__ = [
     "AutoAttackUnavailable",
     "EvaluationResult",
+    "evaluate_loaded_model",
     "evaluate_saved_checkpoint",
     "load_saved_student_checkpoint",
     "run_autoattack",

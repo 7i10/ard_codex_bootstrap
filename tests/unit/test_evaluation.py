@@ -983,3 +983,88 @@ def test_autoattack_loader_sample_count_larger_than_the_dataset_attacks_everythi
     loader = _autoattack_loader(dataset, sample_count=1000, seed=0, batch_size=8, num_workers=0)
     total = sum(batch.images.shape[0] for batch in loader)
     assert total == 12
+
+
+def test_evaluate_loaded_model_is_the_measurement_half_of_evaluate_saved_checkpoint(tmp_path: Path) -> None:
+    """Plan 0103: foreign ImageNet weights go through ``evaluate_loaded_model``.
+    That is only a fair measurement if it is the very loop our own checkpoints
+    get: identical clean/PGD numbers, identical panel and sample-stats rows, and
+    unchanged artifact filenames for ``evaluate_saved_checkpoint``."""
+    import json
+
+    import pyarrow.parquet as pq
+    import torch
+    from torch import nn
+    from torch.utils.data import DataLoader
+
+    from ard.attacks import LinfPGD
+    from ard.config.schema import AttackConfig
+    from ard.data import EpochShuffleSampler, collate_indexed
+    from ard.evaluation import evaluate_loaded_model, evaluate_saved_checkpoint
+
+    def build() -> nn.Module:
+        torch.manual_seed(3)
+        return nn.Sequential(
+            nn.Conv2d(3, 4, 3, padding=1), nn.BatchNorm2d(4), nn.ReLU(), nn.Flatten(), nn.Linear(4 * 4 * 4, 5)
+        )
+
+    reference = build()
+    with torch.no_grad():
+        reference[1].running_mean.uniform_(-0.1, 0.1)
+    checkpoint_path = tmp_path / "best.pt"
+    torch.save({"model": reference.state_dict()}, checkpoint_path)
+
+    dataset = IndexedDataset(SyntheticCIFAR(size=37, num_classes=5, image_size=4, seed=1))
+
+    def loader() -> DataLoader:
+        return DataLoader(
+            dataset,
+            batch_size=8,
+            sampler=EpochShuffleSampler(len(dataset), seed=0, shuffle=False),
+            collate_fn=collate_indexed,
+        )
+
+    attack = LinfPGD(AttackConfig(loss="ce", epsilon="8/255", step_size="2/255", steps=3, random_start=True))
+    device = torch.device("cpu")
+    saved_dir, loaded_dir = tmp_path / "saved", tmp_path / "loaded"
+    saved = evaluate_saved_checkpoint(
+        checkpoint=checkpoint_path,
+        model=build(),
+        loader=loader(),
+        attack=attack,
+        device=device,
+        seed=0,
+        output_dir=saved_dir,
+        panel_size=6,
+        write_sample_stats=True,
+    )
+    foreign = build()
+    foreign.load_state_dict(reference.state_dict(), strict=True)
+    loaded = evaluate_loaded_model(
+        model=foreign,
+        result_name="best.pt",
+        artifact_stem="best",
+        loader=loader(),
+        attack=attack,
+        device=device,
+        seed=0,
+        output_dir=loaded_dir,
+        panel_size=6,
+        write_sample_stats=True,
+    )
+
+    assert saved.checkpoint == loaded.checkpoint == "best.pt"
+    assert (saved.clean_accuracy, saved.pgd_accuracy, saved.count) == (
+        loaded.clean_accuracy,
+        loaded.pgd_accuracy,
+        loaded.count,
+    )
+    assert saved.count == 37
+    # The saved-checkpoint path keeps its pre-refactor artifact names.
+    assert saved.panel == saved_dir / "panel-best.jsonl"
+    assert saved.sample_stats == saved_dir / "sample-stats-best.parquet"
+    assert [json.loads(line) for line in saved.panel.read_text().splitlines()] == [
+        json.loads(line) for line in loaded.panel.read_text().splitlines()
+    ]
+    assert saved.sample_stats is not None and loaded.sample_stats is not None
+    assert pq.read_table(saved.sample_stats).to_pylist() == pq.read_table(loaded.sample_stats).to_pylist()

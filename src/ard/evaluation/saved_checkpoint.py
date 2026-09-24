@@ -110,6 +110,45 @@ def evaluate_saved_checkpoint(
     same output directory never collides.
     """
     load_saved_student_checkpoint(checkpoint, model, weights_key=weights_key)
+    # "model" keeps the pre-existing filename exactly (no evaluation ever
+    # requested anything else before EMA support existed); any other weight
+    # set gets an explicit suffix so it never collides with the student's.
+    name_suffix = "" if weights_key == "model" else f"-{weights_key}"
+    return evaluate_loaded_model(
+        model=model,
+        result_name=checkpoint.name,
+        artifact_stem=f"{checkpoint.stem}{name_suffix}",
+        loader=loader,
+        attack=attack,
+        device=device,
+        seed=seed,
+        output_dir=output_dir,
+        panel_size=panel_size,
+        write_sample_stats=write_sample_stats,
+    )
+
+
+def evaluate_loaded_model(
+    *,
+    model: nn.Module,
+    result_name: str,
+    artifact_stem: str,
+    loader: DataLoader[IndexedBatch],
+    attack: AttackGenerator,
+    device: torch.device,
+    seed: int,
+    output_dir: Path,
+    panel_size: int,
+    write_sample_stats: bool = False,
+) -> EvaluationResult:
+    """Clean and PGD accuracy of weights the caller has already loaded.
+
+    This is the measurement half of ``evaluate_saved_checkpoint``, split out so
+    ``scripts/evaluate_external_checkpoint.py`` can put foreign weights (which
+    have no lineage here and so cannot pass ``load_saved_student_checkpoint``)
+    through exactly the same loop, generator seeding and batch order as this
+    project's own checkpoints. It never loads weights itself.
+    """
     model.to(device)
     totals = torch.zeros(3, dtype=torch.float64, device=device)
     rows: list[dict[str, object]] = []
@@ -178,22 +217,16 @@ def evaluate_saved_checkpoint(
             raise TypeError("evaluation sample ID must be an integer")
         sample_ids.append(sample_id)
     selected = set(fixed_panel_ids(sample_ids, seed=seed, size=panel_size))
-    # "model" keeps the pre-existing filename exactly (no evaluation ever
-    # requested anything else before EMA support existed); any other weight
-    # set gets an explicit suffix so it never collides with the student's.
-    name_suffix = "" if weights_key == "model" else f"-{weights_key}"
-    panel = output_dir / f"panel-{checkpoint.stem}{name_suffix}.jsonl"
+    panel = output_dir / f"panel-{artifact_stem}.jsonl"
     panel.write_text(
         "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows if row["sample_id"] in selected),
         encoding="utf-8",
     )
     sample_stats = (
-        write_sample_parquet(rows, output_dir / f"sample-stats-{checkpoint.stem}{name_suffix}.parquet")
-        if write_sample_stats
-        else None
+        write_sample_parquet(rows, output_dir / f"sample-stats-{artifact_stem}.parquet") if write_sample_stats else None
     )
     return EvaluationResult(
-        checkpoint=checkpoint.name,
+        checkpoint=result_name,
         clean_accuracy=float(totals[0].item()) / count,
         pgd_accuracy=float(totals[1].item()) / count,
         count=count,
