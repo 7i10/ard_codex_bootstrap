@@ -22,8 +22,21 @@ class PixelNormalization(nn.Module):
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         if not images.is_floating_point():
             raise TypeError("model inputs must be floating-point pixels")
-        if images.numel() and (images.detach().amin() < -1e-6 or images.detach().amax() > 1 + 1e-6):
-            raise ValueError("model adapter expects pixels in [0, 1]")
+        if images.numel():
+            # Same condition and tolerance as before, checked on every forward,
+            # but as a tensor-side assertion instead of a Python branch on
+            # ``.amin()/.amax()``: the old ``bool(tensor)`` forced a GPU->CPU
+            # sync per forward and broke torch.compile graphs. ``_assert_async``
+            # is traceable (it stays inside the compiled graph for every
+            # backend) and fails closed: on CPU it raises ``RuntimeError`` with
+            # this message immediately; on CUDA it triggers a device-side
+            # assert that surfaces as a ``RuntimeError`` at the next
+            # synchronization and leaves the CUDA context unusable, i.e. the
+            # process dies. NaN pixels pass, exactly as before (both
+            # comparisons are false for NaN).
+            detached = images.detach()
+            out_of_range = (detached.amin() < -1e-6) | (detached.amax() > 1 + 1e-6)
+            torch._assert_async(torch.logical_not(out_of_range), "model adapter expects pixels in [0, 1]")
         return (images - self.mean.to(images)) / self.std.to(images)
 
 

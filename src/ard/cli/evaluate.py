@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader, Subset
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, save_resolved_config
 from ard.config.loader import load_evaluation_config, load_resolved_config_for_evaluation, resolved_config_dict
-from ard.config.schema import training_execution_identity
+from ard.config.schema import TrainingConfig, training_execution_identity
 from ard.data import EpochShuffleSampler, IndexedBatch, build_dataset, collate_indexed
 from ard.engine import config_digest
 from ard.evaluation import (
@@ -281,6 +281,25 @@ def _evaluation_tracker_config(
 def _evaluation_preflight_config(config: ExperimentConfig, training_config: ExperimentConfig) -> ExperimentConfig:
     """Use portable local paths without changing canonical training lineage."""
     return training_config.model_copy(update={"teacher": config.teacher})
+
+
+def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
+    """Identity entries for the throughput options, present only when enabled.
+
+    ``cudnn_benchmark`` and ``compile`` change kernel selection and fusion, so
+    numerics differ from an eager, deterministic run and the two must never be
+    pooled silently. They are emitted only when true: every run that predates
+    them (or leaves them at their false defaults) keeps a byte-identical
+    training_protocol_identity, so re-evaluating an old checkpoint still
+    aggregates with its already-recorded rows, while an enabled run's identity
+    differs and the aggregator's mixed-identity guard refuses to pool it.
+    """
+    identity: dict[str, bool] = {}
+    if training.cudnn_benchmark:
+        identity["cudnn_benchmark"] = True
+    if training.compile:
+        identity["compile"] = True
+    return identity
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -580,6 +599,7 @@ def main(argv: list[str] | None = None) -> int:
                         # recorded result.
                         "epsilon_warmup_epochs": training_config.training.epsilon_warmup_epochs,
                         "weight_ema_decay": training_config.training.weight_ema_decay,
+                        **_throughput_protocol_identity(training_config.training),
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

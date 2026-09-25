@@ -695,6 +695,11 @@ def main(argv: list[str] | None = None) -> int:
             global_batch_size=config.training.global_batch_size,
             world_size=get_world_size(),
         )
+        if config.training.compile and initialized_distributed:
+            raise ValueError(
+                "training.compile is only validated for single-process training; torch.compile with DDP "
+                "(buffer-broadcast suspension, bucketed gradient sync) is untested here"
+            )
         config_hash = config_digest(resolved_config_dict(config))
 
         def _validate_output_guard() -> None:
@@ -754,6 +759,9 @@ def main(argv: list[str] | None = None) -> int:
         _seed_everything(config.seeds.model_init + get_rank())
         if config.training.deterministic:
             torch.use_deterministic_algorithms(True)
+        # Schema validation guarantees cudnn_benchmark implies not deterministic.
+        # Set unconditionally so the default (false) is explicit, not inherited.
+        torch.backends.cudnn.benchmark = config.training.cudnn_benchmark
         late_mask = load_stagewise_late_mask(args.stagewise_late_mask) if args.stagewise_late_mask else None
         train_dataset, validation_dataset = build_train_validation_views(
             config.dataset,
@@ -847,6 +855,12 @@ def main(argv: list[str] | None = None) -> int:
         student: nn.Module = build_student(config.student, tier=config.tier).to(device)
         if initialized_distributed:
             student = wrap_ddp(student, device)
+        if config.training.compile:
+            # Only the Trainer's forward passes (training, attacks, in-training
+            # validation) go through the compiled wrapper. Checkpoints, EMA
+            # copies and resume use ``unwrap_model``, which strips it, so saved
+            # state_dict keys never gain an ``_orig_mod.`` prefix.
+            student = cast(nn.Module, torch.compile(student))
         teacher = None if config.teacher is None else build_teacher(config.teacher, tier=config.tier)
         anchor_model: nn.Module | None = None
         if config.prescriptive_v3 is not None and config.prescriptive_v3.arm.startswith("PF_"):

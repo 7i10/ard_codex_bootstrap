@@ -74,6 +74,58 @@ def test_explicit_cifar_model_registry_and_normalization() -> None:
     assert mobile.model.features[0][0].stride == (1, 1)
 
 
+def _identity_adapter() -> PixelModel:
+    normalization = NormalizationConfig(
+        profile="custom", mean=(0.0, 0.0, 0.0), std=(1.0, 1.0, 1.0), provenance="unit-test"
+    )
+    return PixelModel(nn.Identity(), normalization)
+
+
+PIXEL_GUARD_CASES = (
+    (1.0 + 2e-6, "above"),
+    (-2e-6, "below"),
+    (1.5, "far above"),
+    (-0.5, "far below"),
+)
+
+
+@pytest.mark.parametrize(("value", "_label"), PIXEL_GUARD_CASES)
+def test_pixel_guard_rejects_out_of_range_inputs_on_every_forward(value: float, _label: str) -> None:
+    adapter = _identity_adapter()
+    pixels = torch.rand(2, 3, 4, 4)
+    pixels[1, 2, 3, 3] = value
+    # CPU raises immediately; on CUDA the same assertion is a device-side
+    # assert that kills the process at the next synchronization.
+    with pytest.raises(RuntimeError, match=r"model adapter expects pixels in \[0, 1\]"):
+        adapter(pixels)
+    with pytest.raises(RuntimeError, match=r"model adapter expects pixels in \[0, 1\]"):
+        adapter(pixels.requires_grad_(True))
+
+
+def test_pixel_guard_keeps_its_exact_tolerance_and_type_check() -> None:
+    adapter = _identity_adapter()
+    for edge in (0.0, 1.0, -1e-7, 1.0 + 1e-7, -1e-6, 1.0 + 1e-6):
+        pixels = torch.full((1, 3, 2, 2), 0.5, dtype=torch.float64)
+        pixels[0, 0, 0, 0] = edge
+        assert torch.equal(adapter(pixels), pixels), edge
+    assert adapter(torch.empty(0, 3, 2, 2)).shape == (0, 3, 2, 2)
+    with pytest.raises(TypeError, match="floating-point pixels"):
+        adapter(torch.zeros(1, 3, 2, 2, dtype=torch.uint8))
+
+
+@pytest.mark.parametrize("backend", ["eager", "aot_eager"])
+def test_pixel_guard_is_traceable_without_a_graph_break_and_still_fires_compiled(backend: str) -> None:
+    torch._dynamo.reset()
+    compiled = torch.compile(_identity_adapter(), backend=backend, fullgraph=True)
+    pixels = torch.rand(2, 3, 4, 4)
+    assert torch.equal(compiled(pixels), pixels)
+    for value, _label in PIXEL_GUARD_CASES:
+        bad = pixels.clone()
+        bad[0, 1, 2, 2] = value
+        with pytest.raises(RuntimeError, match=r"model adapter expects pixels in \[0, 1\]"):
+            compiled(bad)
+
+
 def test_clean_room_saad_resnet18_cifar_contract_is_exact_and_has_no_external_dependency() -> None:
     model = build_architecture("saad_resnet18_cifar_v1", 10)
     assert model(torch.rand(2, 3, 32, 32)).shape == (2, 10)

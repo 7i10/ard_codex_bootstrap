@@ -784,6 +784,19 @@ class TrainingConfig(StrictModel):
     # existing "auto" device-resolution pattern elsewhere in this config.
     amp: bool = False
     deterministic: bool = True
+    # Throughput options (human-approved 2026-09-25). Both default false,
+    # which reproduces today's exact behavior for every existing config that
+    # never mentions them: cuDNN autotuning off (PyTorch's own default) and
+    # the student run eagerly. cudnn_benchmark lets cuDNN time and pick
+    # convolution algorithms per input shape; that choice is not
+    # reproducible, so it requires deterministic=false. compile wraps only
+    # the student's training-time forward in torch.compile (default mode);
+    # checkpoints, EMA copies and state_dict I/O always use the original
+    # module, so saved keys are unchanged. Both are recorded in the
+    # evaluation record's training_protocol_identity so arms that differ in
+    # them are never pooled silently.
+    cudnn_benchmark: bool = False
+    compile: bool = False
     validation_fraction: float = Field(default=0.25, gt=0, lt=1)
     # This is a protocol identity, not a performance option. Ordinary DDP
     # computes BatchNorm statistics independently on each rank.
@@ -835,6 +848,11 @@ class TrainingConfig(StrictModel):
             raise ValueError("checkpoint_epochs must be strictly increasing positive epoch numbers")
         if self.epsilon_warmup_epochs is not None and self.epsilon_warmup_epochs > self.epochs:
             raise ValueError("epsilon_warmup_epochs must not exceed the total number of training epochs")
+        if self.cudnn_benchmark and self.deterministic:
+            raise ValueError(
+                "training.cudnn_benchmark=true requires training.deterministic=false: cuDNN autotuning "
+                "selects convolution algorithms nondeterministically"
+            )
         return self
 
 

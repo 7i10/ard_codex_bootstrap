@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any, TypeVar, cast
@@ -100,8 +101,33 @@ def suspend_ddp_buffer_broadcasts(model: torch.nn.Module) -> Iterator[None]:
         model.require_forward_param_sync = require_forward_param_sync
 
 
+def _compiled_module_type() -> type[torch.nn.Module] | None:
+    """Return torch.compile's wrapper class if dynamo has been imported.
+
+    A model can only be an ``OptimizedModule`` after ``torch.compile`` ran,
+    which imports ``torch._dynamo``; looking it up lazily keeps the ~1 s dynamo
+    import off every process that never compiles.
+    """
+    eval_frame = sys.modules.get("torch._dynamo.eval_frame")
+    return None if eval_frame is None else cast(type[torch.nn.Module], eval_frame.OptimizedModule)
+
+
 def unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
-    return model.module if isinstance(model, DistributedDataParallel) else model
+    """Return the original module under any DDP and ``torch.compile`` wrappers.
+
+    ``training.compile`` wraps the student in ``torch.compile``; the wrapper's
+    own state_dict keys carry an ``_orig_mod.`` prefix. Checkpoint save/load,
+    EMA copies and every other state_dict consumer go through this function,
+    so they always see the original module and its unprefixed keys.
+    """
+    compiled_type = _compiled_module_type()
+    while True:
+        if isinstance(model, DistributedDataParallel):
+            model = model.module
+        elif compiled_type is not None and isinstance(model, compiled_type):
+            model = cast(torch.nn.Module, model._orig_mod)
+        else:
+            return model
 
 
 def run_rank_zero_phase(operation: Callable[[], None], *, phase: str) -> None:

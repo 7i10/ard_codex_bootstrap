@@ -1438,3 +1438,22 @@ def test_imagenet_normalization_profile_is_pinned_per_architecture(tmp_path: Pat
             config_dir / "imagenet_deit_tiny_pgd_at.yaml", ["student.normalization.profile=imagenet_raw_identity"]
         )
 
+
+def test_throughput_options_default_off_and_cudnn_benchmark_requires_nondeterminism() -> None:
+    """cudnn_benchmark/compile default to today's behavior; autotuning cannot claim determinism."""
+    from ard.cli.evaluate import _throughput_protocol_identity
+    from ard.config.schema import TrainingConfig
+
+    default = TrainingConfig(per_rank_batch_size=4, global_batch_size=4)
+    assert (default.deterministic, default.cudnn_benchmark, default.compile) == (True, False, False)
+    # Defaults add nothing to the evaluation record's training_protocol_identity,
+    # so re-evaluating a pre-existing run keeps its recorded identity byte-for-byte.
+    assert _throughput_protocol_identity(default) == {}
+    with pytest.raises(ValidationError, match="cudnn_benchmark=true requires training.deterministic=false"):
+        TrainingConfig(per_rank_batch_size=4, global_batch_size=4, cudnn_benchmark=True)
+    fast = TrainingConfig(
+        per_rank_batch_size=4, global_batch_size=4, deterministic=False, cudnn_benchmark=True, compile=True
+    )
+    assert _throughput_protocol_identity(fast) == {"cudnn_benchmark": True, "compile": True}
+    compiled_only = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, compile=True)
+    assert _throughput_protocol_identity(compiled_only) == {"compile": True}
