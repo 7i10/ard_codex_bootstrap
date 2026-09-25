@@ -680,3 +680,23 @@ history behind this pivot.)
      GPU->CPU sync on every forward, in eager mode too. It is a candidate for
      an equally strict but sync-free form (e.g. an async assert). That change
      needs its own review because it touches a guard.
+- 2026-09-25 (human, chat): **Standing design principles for the pretraining
+  question.**
+  (1) If pretraining turns out unnecessary, Phase 1's main line is random
+  init.
+  (2) To state that *other* models do not need pretraining, every model gets
+  both inits, not only the suspected ViT.
+  (3) If random init is enough, whether it needs 50 or 100 epochs must also be
+  tested.
+  (4) No experiment is designed to steer toward the preferred answer
+  ("pretraining unnecessary"). Judge fairly.
+  (5) A pretraining comparison is only fair when each init uses a recipe
+  suited to it: fine-tuning hyperparameters for pretrained, from-scratch
+  hyperparameters for random init. The same Arm A recipe for both is not
+  enough.
+  Approved: `training.deterministic: false` plus cuDNN autotuning for Phase 1,
+  a sync-free form of the pixel-range guard (same strictness), and per-model
+  torch.compile where it helps. Implementation is in progress, with a
+  scientific review before use. The robust-teacher choice for Phase 2
+  distillation is delegated to the assistant (no ImageNet counterpart of the
+  CIFAR "ERT" teacher exists).
