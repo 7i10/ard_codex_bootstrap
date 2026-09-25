@@ -627,3 +627,30 @@ history behind this pivot.)
   result. Step 1c is now done for ConvNeXt-Atto, DeiT-Tiny and
   MobileNetV4-M; EfficientNet-B0 and MobileViT-S need a 4090 (they do not fit
   11 GB at batch 128).
+- 2026-09-25 (human, chat): **Decision 0019: B plus an FT-schedule plan.**
+  (1) The fourth 2x2 cell, random init / 50 epochs
+  (`imagenet_mobilenetv4_pgd_at_random_init_50ep.yaml`), is launched on Hamster
+  GPU0 from pinned worktree `source-987dfb534512` as
+  `plan0103-mobilenetv4-random-init-50ep-v1` (seed 0, W&B
+  `lightweight-imagenet-at`). The human's stated reason is to learn whether
+  pretraining is needed at all; not needing it would be preferred. The
+  preregistered rule is unchanged (decision 0019 B). (2) A fine-tuning-shaped
+  schedule (Arm A with peak lr 0.005) runs on GPU1 under its own
+  contract, plan 0104 (`docs/plans/0104-finetune-lr-schedule.md`).
+- 2026-09-25 (chat): **Budget-limited or capacity-limited?** Each LR stage of
+  both 100-epoch runs saturates within ~12 epochs. Over the second half of
+  each stage, adversarial train loss moves by at most 0.4% relative, and
+  seen-set (probe) and val PGD-10 stay flat (lr 0.0005, ep 88-99, pretrained:
+  loss 3.659 -> 3.643, probe PGD 35.1 -> 34.9, val PGD 30.81 -> 30.70).
+  Doubling the time at every LR (50 -> 100 epochs) moved nothing beyond noise,
+  and the model still fits only ~35% of its own training images under PGD-10.
+  So under this recipe the limit is what the model can fit (capacity, or
+  capacity under this regularization and objective), not epochs. Two caveats
+  remain. First, duration is entangled with the LR schedule: a lower final
+  LR or a different shape could still reduce training error, which is an
+  optimization question; plan 0104's run happens to add a 5e-5 stage.
+  Second, this holds for MobileNetV4-S only. Phase 1 must check per
+  architecture with the same stage-saturation diagnostic. Supporting
+  evidence: the MobileNetV4-M canary reaches probe PGD-10 32% within 3
+  warmup epochs, against 21% for MobileNetV4-S at the end of its lr-0.05
+  phase.
