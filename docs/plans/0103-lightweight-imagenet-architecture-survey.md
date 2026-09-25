@@ -552,3 +552,68 @@ history behind this pivot.)
   proposing any change to `deterministic`. That change is a human decision;
   it would apply uniformly to every survey run, and Arm A and the 2x2 cells
   stay deterministic.
+- 2026-09-25 (postrun): **Phase 0 2x2: both 100-epoch cells completed.**
+  `plan0103-mobilenetv4-pretrained-100ep-v2` (Hamster GPU0) and
+  `plan0103-mobilenetv4-random-init-100ep-v1` (Hamster GPU1) both ran 100/100
+  epochs. Each has `completion.json` `completed`, manifest status `completed`,
+  and `error-marker.txt` "no application error recorded". The watcher
+  re-derived both as terminal and successful. Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract, as for every
+  other hand-run in plans 0102/0103.
+
+  Fixed identity for every number below: ImageNet-1k,
+  MobileNetV4-Conv-Small, plain PGD-AT (SGD lr 0.05, Nesterov, wd 1e-4,
+  10-epoch LR warmup, x0.1 at epochs 50 and 76), no teacher, training and
+  evaluation seed 0. Training attack: l_inf 4/255, 3 steps, step 8/765, random
+  start. Selection attack: PGD-10, same eps and step, random start, eval mode.
+  World size 1, global batch 128, RTX 4090 (TF32), deterministic. Source SHA
+  `b0cfc9e` (worktree `source-b0cfc9e4e2d2`), protocol
+  `controlled_imagenet_stage02_budget_init_v1`. "val" is **internal
+  validation**: the held-out 2% slice of the training split (25,620 images),
+  not the official ImageNet val set. "probe" is 2,000 training images (2 per
+  class) under the same transform, eval mode and PGD-10. No AutoAttack has run.
+
+  | cell | run | last (ep 99) val clean / PGD-10 | best (by val PGD) | last probe clean / PGD-10 |
+  |---|---|---:|---:|---:|
+  | pretrained, 100 ep | `plan0103-mobilenetv4-pretrained-100ep-v2` | 55.21 / 30.70 | ep 91: 54.88 / 31.03 | 59.55 / 34.90 |
+  | random init, 100 ep | `plan0103-mobilenetv4-random-init-100ep-v1` | 54.56 / 30.58 | ep 97: 54.44 / 30.68 | 60.75 / 35.00 |
+  | pretrained, 50 ep (Arm A, plan 0101, seed 0) | | 54.57 / 30.58 (ep 49) | ep 46: 54.57 / 30.74 | not logged |
+  | pretrained, 50 ep (Arm A, plan 0101, seed 1) | | 54.33 / 30.59 (ep 49) | | not logged |
+  | random init, 50 ep | not run (deferred, human 2026-09-24) | | | |
+
+  Trajectory (val clean / PGD-10), pretrained vs random init: epoch 0
+  46.81/19.20 vs 1.36/0.98; epoch 24 38.38/19.58 vs 37.12/19.51; epoch 49
+  (end of the lr-0.05 phase) 37.85/20.13 vs 38.02/20.19; epoch 75 (end of the
+  lr-0.005 phase) 50.45/27.74 vs 50.09/27.81.
+
+  Reading (n=1 per cell, internal validation, PGD-10 only):
+  1. **The pretrained head start is gone by the end of the high-LR phase.**
+     Pretrained starts 45pt clean ahead, but the lr-0.05 phase pulls it down
+     to where random init climbs to. At every checked epoch from 24 on (24,
+     49, 50, 75, 76, 99), the two runs are within 1.3pt clean and 0.3pt
+     PGD-10. At the end, pretrained leads by 0.65pt clean
+     and 0.12pt PGD-10 (last), or 0.44 / 0.35pt (best).
+  2. **Doubling the epochs barely moves robustness.** Pretrained 100 vs 50
+     epochs (seed 0 vs seed 0): +0.64pt clean, +0.12pt PGD-10 (last). Random
+     init at 100 epochs ties pretrained at 50 epochs (54.56/30.58 vs
+     54.57/30.58).
+  3. **The 40 epochs at lr 0.05 are a plateau.** Pretrained val clean stays in
+     37.4-39.1% and PGD-10 in 18.9-20.5% from epoch 9 to 49. Most of the
+     gain arrives right at the two LR decays (epoch 49 to 50: +6.7pt PGD-10;
+     epoch 75 to 76: +2.6pt).
+  4. **Seen-unseen gap at the end** (probe minus val, same conditions):
+     pretrained +4.3 clean / +4.2 PGD-10, random init +6.2 / +4.4. The probe's
+     binomial SE is about 1.1pt. Seen-set PGD-10 accuracy is still only ~35%, so
+     the regime stays bias-dominated at 100 epochs.
+
+  Caveats: one seed per 100-epoch cell, so no noise floor for this pair. Arm
+  A's two seeds differ by 0.24pt clean / 0.01pt PGD-10, but two runs do not
+  estimate a spread; the CIFAR control-vs-control floor was 0.16-1.88pt.
+  Differences of 0.1-0.4pt PGD-10 here are inside any credible floor. Arm A
+  ran from a different source SHA (plan 0101); the train-probe change in
+  between was tested to leave training bit-identical. Pretrained epochs 1-4
+  shared GPU0 with a canary (throughput only; the run is deterministic).
+  Checkpoints (sha256): pretrained `best.pt` `d05be221...`, `last.pt`
+  `8f9a0401...`; random init `best.pt` `a26f426f...`, `last.pt` `be64fcaa...`.
+  W&B project `lightweight-imagenet-at`, runs under the same ids. Next step:
+  decision packet 0019.
