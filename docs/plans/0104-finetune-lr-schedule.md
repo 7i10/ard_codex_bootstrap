@@ -60,3 +60,6 @@ All comparisons use internal-val PGD-10 (the held-out 2% of the training split),
 ## Progress log
 
 - 2026-09-25: plan created; config, protocol id and config-identity test added.
+- 2026-09-25: launched `plan0104-mobilenetv4-ft-lr0005-v1` on Hamster GPU1 from pinned worktree `source-be9fdfeccb93`
+  (seed 0, W&B `lightweight-imagenet-at`), hand-run bundle. The auto-launch waiter's `pgrep -f` matched its own command
+  line, so the GPU sat idle ~40 min before a manual launch.

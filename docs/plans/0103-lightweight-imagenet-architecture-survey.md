@@ -654,3 +654,29 @@ history behind this pivot.)
   evidence: the MobileNetV4-M canary reaches probe PGD-10 32% within 3
   warmup epochs, against 21% for MobileNetV4-S at the end of its lr-0.05
   phase.
+- 2026-09-25 (chat): **Throughput on a Hamster 4090** (the same throwaway
+  trainer-shaped step probe, run on GPU1 while it waited for plan 0104; img/s,
+  and in brackets the ratio to the current deterministic recipe; all 42
+  settings completed without error):
+
+  | model | det | non-det | +cudnn.benchmark | det+channels_last | det+compile | non-det+bench+cl | non-det+bench+compile |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | MobileNetV4-S | 1358 | 1733 (1.28) | 1739 (1.28) | 1211 (0.89) | 1235 (0.91) | 1457 (1.07) | 1504 (1.11) |
+  | EfficientNet-B0 | 320 | 383 (1.19) | 383 (1.19) | 308 (0.96) | 434 (1.35) | 361 (1.13) | 460 (1.44) |
+  | MobileNetV4-M | 491 | 588 (1.20) | 593 (1.21) | 469 (0.96) | 527 (1.07) | 558 (1.14) | 572 (1.17) |
+  | ConvNeXt-Atto | 698 | 718 (1.03) | 869 (1.25) | 710 (1.02) | 385 (0.55) | 884 (1.27) | 602 (0.86) |
+  | DeiT-Tiny | 610 | 630 (1.03) | 631 (1.03) | 613 (1.01) | 572 (0.94) | 635 (1.04) | 579 (0.95) |
+  | MobileViT-S | 189 | 213 (1.13) | 213 (1.13) | 177 (0.94) | 219 (1.16) | 204 (1.08) | 235 (1.24) |
+
+  Non-deterministic mode plus cudnn.benchmark gives 1.03-1.28x.
+  channels_last never helps. torch.compile helps only EfficientNet-B0 and
+  MobileViT-S, and halves ConvNeXt-Atto. A `TORCH_LOGS=recompiles,graph_breaks`
+  check on Anteater gave two findings:
+  1. Only two expected recompiles occur, one per input `requires_grad`
+     variant (attack vs train step).
+  2. `PixelNormalization.forward`'s [0,1] range check
+     (`if images.amin() < ... or images.amax() > ...`) is a data-dependent
+     branch. It breaks the compiled graph at the model entry and forces a
+     GPU->CPU sync on every forward, in eager mode too. It is a candidate for
+     an equally strict but sync-free form (e.g. an async assert). That change
+     needs its own review because it touches a guard.
