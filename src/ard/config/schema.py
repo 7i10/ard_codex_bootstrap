@@ -93,6 +93,9 @@ class ProtocolConfig(StrictModel):
         # Plan 0103 Phase 0: training-budget x initialization 2x2 on
         # MobileNetV4-Conv-Small (100-epoch cells; schedule differs from Arm A).
         "controlled_imagenet_stage02_budget_init_v1",
+        # Plan 0104: fine-tuning-shaped schedule on MobileNetV4-Conv-Small --
+        # Arm A with peak learning rate 0.05 -> 0.005 (decision 0019).
+        "controlled_imagenet_stage02_finetune_lr_v1",
     ]
 
 

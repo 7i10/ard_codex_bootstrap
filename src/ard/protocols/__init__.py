@@ -584,6 +584,15 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # (milestones scaled [25,38] -> [50,76]).
             metadata=MappingProxyType({"purpose": "imagenet_stage02_budget_init_v1"}),
         ),
+        "controlled_imagenet_stage02_finetune_lr_v1": ProtocolSpec(
+            id="controlled_imagenet_stage02_finetune_lr_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0104: Arm A (pretrained MobileNetV4-Conv-Small, 50 epochs)
+            # with only optimizer.learning_rate 0.05 -> 0.005, so adversarial
+            # fine-tuning keeps the clean-pretrained features (decision 0019).
+            metadata=MappingProxyType({"purpose": "imagenet_stage02_finetune_lr_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,

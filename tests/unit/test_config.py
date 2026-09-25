@@ -1342,6 +1342,37 @@ def test_mobilenetv4_budget_init_random_init_50ep_is_arm_a_without_pretraining(
     assert long == cell
 
 
+def test_mobilenetv4_finetune_lr_config_changes_only_the_peak_learning_rate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0104: Arm A with optimizer.learning_rate 0.05 -> 0.005 and nothing
+    else scientific -- same init, attack, schedule shape, epochs and data."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
+    ft = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_ft_lr0005.yaml").model_dump(mode="json")
+    assert arm_a["optimizer"]["learning_rate"] == 0.05 and ft["optimizer"]["learning_rate"] == 0.005
+    assert ft["protocol"]["id"] == "controlled_imagenet_stage02_finetune_lr_v1"
+    assert ft["student"]["pretrained"] is True
+    assert ft["training"]["train_probe_size"] == 2000
+    for payload in (arm_a, ft):
+        payload["optimizer"] = {**payload["optimizer"], "learning_rate": None}
+        payload["protocol"] = None
+        payload["training"] = {**payload["training"], "train_probe_size": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert arm_a == ft
+
+
 @pytest.mark.parametrize(
     ("config_file", "architecture", "profile"),
     [
