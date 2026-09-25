@@ -700,3 +700,19 @@ history behind this pivot.)
   scientific review before use. The robust-teacher choice for Phase 2
   distillation is delegated to the assistant (no ImageNet counterpart of the
   CIFAR "ERT" teacher exists).
+- 2026-09-26 (chat): **Throughput options merged** (`c4af44c`, `2e0e9dd`). All
+  are off by default and behavior-preserving; scientific review found no P1,
+  and every P2/P3 finding is fixed.
+  - Options: `training.cudnn_benchmark` (requires `deterministic: false`) and
+    `training.compile` (requires `deterministic: false`, no DDP, and
+    inductor's assert-preserving debug flag; recompile-limit fallback to
+    eager is turned into an error).
+  - The pixel guard is now sync-free: a `torch._assert_async` with the same
+    condition and tolerance.
+  - The guard was verified to fire on an RTX 4090 in eager and in inductor,
+    in forward, backward and input-grad graphs. On CUDA it is a fatal
+    device-side assert that keeps its message.
+  - Default `training_protocol_identity` stays byte-identical; enabled runs
+    get a distinct identity and are never pooled with eager rows.
+  - Every `config_hash` changes, so a run can only resume from its own
+    pinned worktree (as with earlier field additions).
