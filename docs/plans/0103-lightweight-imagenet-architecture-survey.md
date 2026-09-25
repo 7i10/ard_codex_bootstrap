@@ -716,3 +716,9 @@ history behind this pivot.)
     get a distinct identity and are never pooled with eager rows.
   - Every `config_hash` changes, so a run can only resume from its own
     pinned worktree (as with earlier field additions).
+- 2026-09-26 (human, chat): **Phase 1 scope approved: every architecture with both
+  inits** (pretrained and random), one seed each, and a second seed only for the
+  2-3 finalists. AutoAttack runs at n=500 (direction setting). Estimated cost
+  is ~440 GPU-h, about 9 days on two 4090s. Each init's recipe (learning rate)
+  comes from the MobileNetV4-S per-init LR comparison, which is still awaiting
+  approval.
