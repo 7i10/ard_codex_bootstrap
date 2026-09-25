@@ -617,3 +617,13 @@ history behind this pivot.)
   `8f9a0401...`; random init `best.pt` `a26f426f...`, `last.pt` `be64fcaa...`.
   W&B project `lightweight-imagenet-at`, runs under the same ids. Next step:
   decision packet 0019.
+- 2026-09-25 (chat): **Step 1c canary: MobileNetV4-Conv-Medium completed**
+  on Anteater GPU3 (`completion.json` completed). Epochs 0-2 inside the LR
+  warmup: 8637/8583/8586 s at 145-146 img/s, peak 7.45 GB. val clean/PGD-10
+  54.66/25.93, 54.25/28.16, 54.24/28.67. Probe 57.30/27.25, 56.35/30.50,
+  57.65/32.05. No collapse. Its PGD-10 after 3 warmup epochs (28.7) is already
+  close to MobileNetV4-S's end-of-training value (30.7, 100 epochs), consistent
+  with capacity-limited underfitting at the small end. This is a canary, not a
+  result. Step 1c is now done for ConvNeXt-Atto, DeiT-Tiny and
+  MobileNetV4-M; EfficientNet-B0 and MobileViT-S need a 4090 (they do not fit
+  11 GB at batch 128).
