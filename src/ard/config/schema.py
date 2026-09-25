@@ -789,7 +789,9 @@ class TrainingConfig(StrictModel):
     # never mentions them: cuDNN autotuning off (PyTorch's own default) and
     # the student run eagerly. cudnn_benchmark lets cuDNN time and pick
     # convolution algorithms per input shape; that choice is not
-    # reproducible, so it requires deterministic=false. compile wraps only
+    # reproducible, so it requires deterministic=false. compile also
+    # requires deterministic=false: bitwise reproducibility of inductor's
+    # generated kernels is unproven here. compile wraps only
     # the student's training-time forward in torch.compile (default mode);
     # checkpoints, EMA copies and state_dict I/O always use the original
     # module, so saved keys are unchanged. Both are recorded in the
@@ -853,7 +855,28 @@ class TrainingConfig(StrictModel):
                 "training.cudnn_benchmark=true requires training.deterministic=false: cuDNN autotuning "
                 "selects convolution algorithms nondeterministically"
             )
+        if self.compile and self.deterministic:
+            raise ValueError(
+                "training.compile=true requires training.deterministic=false: bitwise reproducibility of "
+                "torch.compile/inductor kernels is not established"
+            )
         return self
+
+
+def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None:
+    """Refuse a config whose throughput options a runtime does not implement.
+
+    Only ``ard.cli.train`` applies ``training.compile`` and
+    ``training.cudnn_benchmark``. Every other Trainer builder would silently
+    run eagerly without autotuning while the config says otherwise, so it
+    must call this first.
+    """
+    enabled = [name for name in ("compile", "cudnn_benchmark") if getattr(training, name)]
+    if enabled:
+        raise ValueError(
+            f"{runtime} does not implement training.{'/'.join(enabled)}; run it with these options false "
+            "(only ard.cli.train applies them)"
+        )
 
 
 def validate_global_batch_size(*, per_rank_batch_size: int, global_batch_size: int, world_size: int) -> int:

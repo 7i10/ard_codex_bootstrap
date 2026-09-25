@@ -676,6 +676,34 @@ def _attach_prescriptive_v3_input_artifacts(
     coordinator(tracker, phase="prescriptive v3 input artifacts", action=record)
 
 
+def _configure_compile(*, initialized_distributed: bool) -> None:
+    """Fail closed before any write unless a compiled run keeps its guarantees.
+
+    - DDP + torch.compile (buffer-broadcast suspension, bucketed gradient
+      sync) is untested here.
+    - Inductor emits Triton ``device_assert`` -- and with it the
+      ``torch._assert_async`` [0, 1] pixel guard in ``PixelNormalization`` --
+      only while ``torch._inductor.config.assert_indirect_indexing`` is true;
+      otherwise the guard would be compiled out on CUDA.
+    - A run labelled ``compile`` must never silently fall back to eager when
+      dynamo hits its recompile limit, so that becomes a hard error.
+    """
+    if initialized_distributed:
+        raise ValueError(
+            "training.compile is only validated for single-process training; torch.compile with DDP "
+            "(buffer-broadcast suspension, bucketed gradient sync) is untested here"
+        )
+    import torch._dynamo.config as dynamo_config
+    import torch._inductor.config as inductor_config
+
+    if inductor_config.assert_indirect_indexing is not True:
+        raise ValueError(
+            "training.compile requires torch._inductor.config.assert_indirect_indexing=True; without it "
+            "inductor drops device asserts and the [0, 1] pixel guard would not run on CUDA"
+        )
+    dynamo_config.fail_on_recompile_limit_hit = True
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config = load_config(args.config, args.overrides)
@@ -695,11 +723,8 @@ def main(argv: list[str] | None = None) -> int:
             global_batch_size=config.training.global_batch_size,
             world_size=get_world_size(),
         )
-        if config.training.compile and initialized_distributed:
-            raise ValueError(
-                "training.compile is only validated for single-process training; torch.compile with DDP "
-                "(buffer-broadcast suspension, bucketed gradient sync) is untested here"
-            )
+        if config.training.compile:
+            _configure_compile(initialized_distributed=initialized_distributed)
         config_hash = config_digest(resolved_config_dict(config))
 
         def _validate_output_guard() -> None:

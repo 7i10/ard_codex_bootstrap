@@ -1455,5 +1455,20 @@ def test_throughput_options_default_off_and_cudnn_benchmark_requires_nondetermin
         per_rank_batch_size=4, global_batch_size=4, deterministic=False, cudnn_benchmark=True, compile=True
     )
     assert _throughput_protocol_identity(fast) == {"cudnn_benchmark": True, "compile": True}
-    compiled_only = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, compile=True)
+    with pytest.raises(ValidationError, match="compile=true requires training.deterministic=false"):
+        TrainingConfig(per_rank_batch_size=4, global_batch_size=4, compile=True)
+    compiled_only = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, deterministic=False, compile=True)
     assert _throughput_protocol_identity(compiled_only) == {"compile": True}
+
+
+def test_runtimes_that_ignore_throughput_options_refuse_them() -> None:
+    from ard.config.schema import TrainingConfig, reject_throughput_options
+
+    reject_throughput_options(TrainingConfig(per_rank_batch_size=4, global_batch_size=4), runtime="fixture")
+    reject_throughput_options(
+        TrainingConfig(per_rank_batch_size=4, global_batch_size=4, deterministic=False), runtime="fixture"
+    )
+    for enabled in ({"compile": True}, {"cudnn_benchmark": True}):
+        training = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, deterministic=False, **enabled)
+        with pytest.raises(ValueError, match=f"fixture does not implement training.{next(iter(enabled))}"):
+            reject_throughput_options(training, runtime="fixture")

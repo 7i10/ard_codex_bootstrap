@@ -16,6 +16,7 @@ from ard.attacks import LinfPGD
 from ard.cli.train import _build_method, _seed_everything
 from ard.config import load_config
 from ard.config.loader import resolved_config_dict
+from ard.config.schema import reject_throughput_options
 from ard.data import (
     EpochCropReTransform,
     EpochCropshiftTransform,
@@ -59,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     config = load_config(args.config)
+    reject_throughput_options(config.training, runtime="stagewise_augmentation_canary")
     if config.dataset.stagewise_switch_epoch != args.switch or config.dataset.stagewise_late_policy != args.late_policy:
         raise ValueError("canary policy does not match config")
     payload = torch.load(args.checkpoint, map_location="cpu", weights_only=False)

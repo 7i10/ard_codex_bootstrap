@@ -26,7 +26,7 @@ Find the smallest evidence-backed root cause without repeatedly running expensiv
 
 Consult `references/ard_failure_modes.md`. At minimum inspect:
 
-- pixel vs normalized space
+- pixel vs normalized space (a CUDA "device-side assert triggered" from `_assert_async_cuda_kernel` in `TensorCompare.cu` (or, under `training.compile`, from a `/tmp/torchinductor_*` Triton kernel with the message `model adapter expects pixels in [0, 1]`) means the `PixelNormalization` [0, 1] pixel guard fired — inputs out of range — not a label-index bug)
 - epsilon and step-size units
 - projection and clamp order
 - attack loss sign and gradient source

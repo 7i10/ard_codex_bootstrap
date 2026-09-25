@@ -15,6 +15,7 @@ from torch.optim import SGD
 
 from ard.attacks import AttackRequest, LinfPGD
 from ard.config import load_config
+from ard.config.schema import reject_throughput_options
 from ard.models import build_student, build_teacher
 from ard.objectives import RSLADObjective
 
@@ -107,6 +108,7 @@ def main() -> int:
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA is unavailable")
     config = load_config(args.config)
+    reject_throughput_options(config.training, runtime="ert_rslad_runtime_parity")
     if config.training.deterministic:
         torch.use_deterministic_algorithms(True)
     _seed(args.seed)
