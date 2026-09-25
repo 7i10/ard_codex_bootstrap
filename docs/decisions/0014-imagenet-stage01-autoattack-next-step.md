@@ -1,6 +1,6 @@
 ---
 id: 0014
-status: pending
+status: decided
 created: 2026-09-15
 campaign: imagenet-stage01-r18-mobilenetv3-adr-v2（4本とも訓練完了、内訳はorchestrator 3本＋hand-run 1本）
 question: plan 0100 stage 1の4本(r18_baseline/r18_adr/mobilenetv3_baseline/mobilenetv3_adr、いずれもseed 0)の訓練が完了した。内部検証(held-out 2%スライス、PGD-10、n=1、公式テストではない)では、ResNet-18のadrはLR減衰後に回復する(best epoch 47)がMobileNetV3-Smallのadrは回復しない(best epoch 3、degenerate)——plan本文の仮説(小型モデルほど自己蒸留が効く)と逆方向の兆候。事前登録された判定ルールはAutoAttack・公式テストを前提にしている。stage 2(seed 1/2、8本、約250 GPU時間)に進む前に、AutoAttackをどう・どこまで実行するか。
@@ -114,3 +114,7 @@ Cは事前登録された判定ルールから外れるため、内部検証の�
 
 - plan: `docs/plans/0100-imagenet-stage01-r18-mobilenetv3-adr.md`(Progress log、2026-09-14の3エントリ)
 - ソースSHA `ae4dd7c82d80`、pinned worktree `source-ae4dd7c82d80`
+
+## 2026-09-25 追記：状態の整理
+
+判断と実施は上の追記のとおり完了していたため、人間の了承（チャット、2026-09-25）を得て status を decided に更新した。

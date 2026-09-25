@@ -1,6 +1,6 @@
 ---
 id: 0013
-status: pending
+status: decided
 created: 2026-09-13
 campaign: imagenet-stage01-r18-mobilenetv3-adr-v2（plan 0100 stage 1、job `r18_adr-s0`）
 question: stage 1 の `r18_adr-s0` が起動 5 秒で落ちた。原因は、中止した v1 attempt2 が同じ W&B run ID
@@ -11,7 +11,7 @@ options:
   C: A（または B）の再起動の前に、決定 0004 で選ばれたまま未実装の preflight 門を入れる（`tracking.mode: online` で run ID が明示され、ローカルに先行 manifest が無いのに W&B に同 ID の run がある場合、GPU を使う前に失敗させる）。作業半日程度 + 回帰テスト、GPU は A と同じ。決まること = stage 2（seed 1/2 の 8 本、うち `r18_adr-s1` は同じ衝突を必ず起こす）を安全に出せるか。事前規則 = 回帰テストが修正前に落ち修正後に通ること。
   D: 何も変えずに同じ job を再投入する。GPU 0 時間で必ず同じ 5 秒で落ちる。推奨しない。
 recommendation: A を今すぐ、C の門は別プランで stage 2 の起動前までに
-chosen: null
+chosen: A/B とは別に hand-run で解決（2026-09-13 追記を参照）
 ---
 
 ## 何が起きたか
@@ -156,3 +156,7 @@ scratchpadに書いたため、そこが基準になった）。**恒久対策�
 - gate: `ard-runtime/ard_codex_bootstrap/runs/imagenet-stage01-r18-mobilenetv3-adr-v2-attempt3/launch-gate/`（resolved manifest SHA `99465e2c…`）
 - ソース SHA `ae4dd7c82d80`、worktree `source-ae4dd7c82d80`
 - 関連決定: `docs/decisions/0004-alloc-p1-safe-fork-run-id-collision.md`、`docs/decisions/0003-trades-fix-v1-failure-not-diagnosable.md`
+
+## 2026-09-25 追記：状態の整理
+
+判断と実施は上の追記のとおり完了していたため、人間の了承（チャット、2026-09-25）を得て status を decided に更新した。
