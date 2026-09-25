@@ -1301,6 +1301,47 @@ def test_mobilenetv4_budget_init_100ep_cells_differ_only_in_init(
     assert pretrained == random_init
 
 
+def test_mobilenetv4_budget_init_random_init_50ep_is_arm_a_without_pretraining(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0103 2x2, fourth cell (decision 0019 B). Differs from Arm A only in
+    student.pretrained, protocol.id, tracking.group and the observability-only
+    train probe; from the random-init 100-epoch cell only in epochs and the
+    scaled LR milestones."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
+    cell = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_random_init_50ep.yaml").model_dump(mode="json")
+    long = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_random_init_100ep.yaml").model_dump(mode="json")
+    assert cell["student"]["pretrained"] is False and arm_a["student"]["pretrained"] is True
+    assert cell["protocol"]["id"] == long["protocol"]["id"] == "controlled_imagenet_stage02_budget_init_v1"
+    assert cell["training"]["train_probe_size"] == 2000 and arm_a["training"]["train_probe_size"] is None
+    assert cell["tracking"]["group"] == long["tracking"]["group"]
+    assert cell["scheduler"] == arm_a["scheduler"]
+    assert cell["training"]["epochs"] == 50
+    for payload in (arm_a, cell):
+        payload["student"] = {**payload["student"], "pretrained": None}
+        payload["protocol"] = None
+        payload["training"] = {**payload["training"], "train_probe_size": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert arm_a == cell
+    cell = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_random_init_50ep.yaml").model_dump(mode="json")
+    for payload in (long, cell):
+        payload["training"] = {**payload["training"], "epochs": None}
+        payload["scheduler"] = {**payload["scheduler"], "milestones": None}
+    assert long == cell
+
+
 @pytest.mark.parametrize(
     ("config_file", "architecture", "profile"),
     [
