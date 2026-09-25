@@ -93,3 +93,9 @@ Stop rule: same as stage 1. No further learning rates, schedules or seeds withou
   (seed 0, W&B `lightweight-imagenet-at`), hand-run bundle. The auto-launch waiter's `pgrep -f` matched its own command
   line, so the GPU sat idle ~40 min before a manual launch.
 - 2026-09-26: stage 2 (per-init LR comparison) approved by the human; three configs, protocol id and config test added.
+- 2026-09-26: stage 2 queued from pinned worktree `source-76280eb86100` by a detached queue script
+  (`ard-runtime/.../queues/plan0104_stage2_queue.sh`, logs `queues/gpu{0,1}.log`). Each run starts only after the previous
+  process exits and its run bundle records `completed`; otherwise the queue stops. GPU0: after
+  `plan0103-mobilenetv4-random-init-50ep-v1`, `plan0104-mobilenetv4-random-init-lr01-v1`, then
+  `plan0104-mobilenetv4-pretrained-lr0015-v1`. GPU1: after `plan0104-mobilenetv4-ft-lr0005-v1`,
+  `plan0104-mobilenetv4-random-init-lr0025-v1`.
