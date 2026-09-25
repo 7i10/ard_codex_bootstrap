@@ -593,6 +593,15 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # fine-tuning keeps the clean-pretrained features (decision 0019).
             metadata=MappingProxyType({"purpose": "imagenet_stage02_finetune_lr_v1"}),
         ),
+        "controlled_imagenet_stage02_init_lr_grid_v1": ProtocolSpec(
+            id="controlled_imagenet_stage02_init_lr_grid_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0104 stage 2: each init tried at three peak learning rates
+            # (Arm A recipe otherwise) so pretrained vs random init is compared
+            # best-vs-best with equal tuning effort.
+            metadata=MappingProxyType({"purpose": "imagenet_stage02_init_lr_grid_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,

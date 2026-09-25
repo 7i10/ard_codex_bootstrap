@@ -96,6 +96,9 @@ class ProtocolConfig(StrictModel):
         # Plan 0104: fine-tuning-shaped schedule on MobileNetV4-Conv-Small --
         # Arm A with peak learning rate 0.05 -> 0.005 (decision 0019).
         "controlled_imagenet_stage02_finetune_lr_v1",
+        # Plan 0104 stage 2: per-init learning-rate comparison on
+        # MobileNetV4-Conv-Small (pretrained 0.015; random init 0.025 / 0.1).
+        "controlled_imagenet_stage02_init_lr_grid_v1",
     ]
 
 

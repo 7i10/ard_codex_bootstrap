@@ -1374,6 +1374,47 @@ def test_mobilenetv4_finetune_lr_config_changes_only_the_peak_learning_rate(
 
 
 @pytest.mark.parametrize(
+    ("config_file", "learning_rate", "pretrained"),
+    [
+        ("imagenet_mobilenetv4_pgd_at_pretrained_lr0015.yaml", 0.015, True),
+        ("imagenet_mobilenetv4_pgd_at_random_init_lr0025.yaml", 0.025, False),
+        ("imagenet_mobilenetv4_pgd_at_random_init_lr01.yaml", 0.1, False),
+    ],
+)
+def test_mobilenetv4_init_lr_grid_configs_change_only_lr_and_init(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_file: str, learning_rate: float, pretrained: bool
+) -> None:
+    """Plan 0104 stage 2: every grid cell is Arm A with only the peak learning
+    rate (and, for random-init cells, student.pretrained) changed, plus
+    protocol.id, tracking.group and the observability-only train probe."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    arm_a = load_config(config_dir / "imagenet_mobilenetv4_pgd_at_no_warmup.yaml").model_dump(mode="json")
+    cell = load_config(config_dir / config_file).model_dump(mode="json")
+    assert cell["optimizer"]["learning_rate"] == learning_rate
+    assert cell["student"]["pretrained"] is pretrained
+    assert cell["protocol"]["id"] == "controlled_imagenet_stage02_init_lr_grid_v1"
+    assert cell["training"]["train_probe_size"] == 2000 and cell["training"]["deterministic"] is True
+    for payload in (arm_a, cell):
+        payload["optimizer"] = {**payload["optimizer"], "learning_rate": None}
+        payload["student"] = {**payload["student"], "pretrained": None}
+        payload["protocol"] = None
+        payload["training"] = {**payload["training"], "train_probe_size": None}
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert arm_a == cell
+
+
+@pytest.mark.parametrize(
     ("config_file", "architecture", "profile"),
     [
         ("imagenet_efficientnet_b0_pgd_at.yaml", "efficientnet_b0_imagenet", "imagenet_standard"),

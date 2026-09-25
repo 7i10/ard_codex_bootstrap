@@ -57,9 +57,39 @@ All comparisons use internal-val PGD-10 (the held-out 2% of the training split),
   accuracy under 5% for 2 consecutive epochs after the warmup.
 - No extension, restart with changed settings, or second seed without a new human decision.
 
+## Stage 2: per-init learning-rate comparison (human-approved 2026-09-26)
+
+Why: a pretraining comparison is only fair when each init uses a recipe suited to it (human, 2026-09-25), and when both inits
+get the same number of tries. Before this stage, pretrained had two tries (0.05, 0.005) and random init had one (0.05).
+
+Frozen contract: Arm A's recipe, 50 epochs, seed 0, deterministic, train probe 2000, on Hamster RTX 4090s from pinned worktrees.
+Only `optimizer.learning_rate` (and `student.pretrained`) varies. New runs use protocol id
+`controlled_imagenet_stage02_init_lr_grid_v1`.
+
+| init | peak lr | run |
+|---|---|---|
+| pretrained | 0.005 | `plan0104-mobilenetv4-ft-lr0005-v1` (stage 1 above) |
+| pretrained | 0.015 | `plan0104-mobilenetv4-pretrained-lr0015-v1` (`imagenet_mobilenetv4_pgd_at_pretrained_lr0015.yaml`) |
+| pretrained | 0.05 | Arm A seed 0 (plan 0101; 54.57 / 30.58) |
+| random | 0.025 | `plan0104-mobilenetv4-random-init-lr0025-v1` (`imagenet_mobilenetv4_pgd_at_random_init_lr0025.yaml`) |
+| random | 0.05 | `plan0103-mobilenetv4-random-init-50ep-v1` (decision 0019 B) |
+| random | 0.1 | `plan0104-mobilenetv4-random-init-lr01-v1` (`imagenet_mobilenetv4_pgd_at_random_init_lr01.yaml`) |
+
+Preregistered rule (internal-val PGD-10 at the last epoch, seed 0, n=1 per cell):
+- For each init, best = the maximum over its three learning rates. D = best(pretrained) - best(random).
+- D >= +1pt: "pretraining helps MobileNetV4-S". D <= -1pt: "random init is better". Otherwise: "no effect above 1pt; pretraining
+  is not needed for MobileNetV4-S".
+- The argmax learning rate of each init becomes that init's Phase 1 recipe. Clean accuracy is reported next to every number.
+- Caveats that will be stated: both sides take the maximum of three noisy runs, which biases both upward by about the same amount.
+  The optimum for MobileNetV4-S may not transfer to other architectures, and Phase 1 will check this per model through the
+  stage-saturation diagnostic.
+
+Stop rule: same as stage 1. No further learning rates, schedules or seeds without a new human decision.
+
 ## Progress log
 
 - 2026-09-25: plan created; config, protocol id and config-identity test added.
 - 2026-09-25: launched `plan0104-mobilenetv4-ft-lr0005-v1` on Hamster GPU1 from pinned worktree `source-be9fdfeccb93`
   (seed 0, W&B `lightweight-imagenet-at`), hand-run bundle. The auto-launch waiter's `pgrep -f` matched its own command
   line, so the GPU sat idle ~40 min before a manual launch.
+- 2026-09-26: stage 2 (per-init LR comparison) approved by the human; three configs, protocol id and config test added.
