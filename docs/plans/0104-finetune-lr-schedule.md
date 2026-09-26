@@ -158,3 +158,12 @@ The secondary threshold 30.58% is Arm A's rounded value. Wall clock 21.9 h (2026
 ~836 img/s). Checkpoints `best.pt`, `last.pt`, `epoch-049.pt` are on disk; their sha256 was not computed in this postrun.
 `epoch-metrics.parquet` sha256 `98b4cd86...`, `sample-stats-train.parquet` sha256 `8035516b...` (from the run-bundle
 manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-09-26: **stage 1 result, `plan0104-mobilenetv4-ft-lr0005-v1`** (50/50 epochs, completed; internal val, seed 0, n=1).
+  - Last epoch: 57.81 / 31.26 (clean / PGD-10). Best: epoch 39, 31.39. Probe: 62.80 / 36.45.
+  - Primary rule (last PGD-10 >= 31.59%): **not met**. The result is +0.68pt over Arm A's 30.58, inside the noise floor.
+  - Secondary rule (val PGD-10 >= 30.58% by epoch 25): **not met**. It is first reached at epoch 26.
+  - Not preregistered, reported as an observation only: clean is 57.81 vs Arm A's 54.57 (+3.24pt) at the same robustness.
+    With the low peak LR, the pretrained clean accuracy is largely kept (epoch 9: 51.80, against ~37 under Arm A). This
+    observation does not change the verdict. It is an input for the human's decision after stage 2.
+  - Stage 2 was auto-launched by the queue: `plan0104-mobilenetv4-random-init-lr01-v1` on GPU0 at 10:50Z and
+    `plan0104-mobilenetv4-random-init-lr0025-v1` on GPU1 at 11:34Z.

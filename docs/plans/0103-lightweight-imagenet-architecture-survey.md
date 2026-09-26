@@ -838,3 +838,17 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `1930be95...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id. Next step: decision
   packet 0020.
+- 2026-09-26 (chat): **Decision 0019 B completed:
+  `plan0103-mobilenetv4-random-init-50ep-v1`** (Hamster GPU0, source
+  `987dfb5`, 50/50 epochs, `completion.json` completed; internal val, seed 0,
+  n=1).
+  - Last epoch: 53.36 / 30.05 (clean / PGD-10). Best: epoch 48, 30.17. Probe
+    at the last epoch: 58.85 / 34.25.
+  - Preregistered rule: last PGD-10 <= 29.58% would mean "pretraining helps
+    at 50 epochs". 30.05 > 29.58, so **no effect above 1pt is visible at 50
+    epochs either** (Arm A seed 0 gives 54.57 / 30.58, a difference of
+    -1.21 clean / -0.53 PGD-10).
+  - Random init at 100 epochs gave 54.56 / 30.58. Doubling the budget moved
+    random init by +1.2 clean / +0.5 PGD-10, inside the noise floor.
+  - This is Arm A's recipe for both inits. The fair best-vs-best comparison
+    is plan 0104 stage 2, which is running now.
