@@ -890,3 +890,19 @@ history behind this pivot.)
   ~868 img/s on a Ferret 4090 against ~1739 on Hamster. BF16 adds ~1%. This
   fits a CPU-launch-bound small model on a host with slower cores; to be
   confirmed.
+- 2026-09-27 (chat): **Ferret is launch-bound per process; co-location
+  doubles throughput there.** Throwaway probe on Ferret GPU1, MobileNetV4-S,
+  nondeterministic plus cudnn autotuning, synthetic pixels:
+  - one process: 876 img/s unpinned, 740 img/s pinned to the GPU's NUMA
+    node 0;
+  - two processes on the same GPU, pinned: 740 + 739 = ~1480 img/s, with no
+    per-process slowdown.
+  Single-job GPU utilization on Ferret is only 30-67%. Hamster has the same
+  CPU model (Xeon Gold 6230R, but single-socket) and reaches ~1739 img/s for
+  one process. The cause of the per-process gap is still open: NUMA pinning
+  did not help, and CPU contention from other jobs on node 0 may be involved.
+  This does not contradict the Hamster co-location loss: there one job
+  already kept the GPU at ~80%, and the partner was EfficientNet-B0. A
+  per-model single / two-concurrent / BF16 probe is running on Ferret GPU1.
+  The BF16 probe so far: MobileNetV4-S +1%, so BF16 does not help a
+  launch-bound model.
