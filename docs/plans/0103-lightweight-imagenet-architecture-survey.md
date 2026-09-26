@@ -774,3 +774,67 @@ history behind this pivot.)
     needs its own reviewed change.
   - Operational note: pinned host memory is ~2 GB per process at 8
     workers. Check host RSS in the first Phase 1 run.
+- 2026-09-26 (postrun): **Phase 0 2x2, fourth cell completed (decision 0019
+  B).** `plan0103-mobilenetv4-random-init-50ep-v1` (Hamster, 4090) ran 50/50
+  epochs. `completion.json` reads `completed`, the manifest status is
+  `completed`, and `error-marker.txt` reads "no application error recorded".
+  The watcher re-derived it as terminal and successful. All 50 epoch rows are
+  present. Nothing is imported into `docs/experiments/`: no aggregator exists
+  for this contract (same as the other three cells).
+
+  Fixed identity: as in the 2026-09-25 postrun entry above (ImageNet-1k,
+  MobileNetV4-Conv-Small, plain PGD-AT, no teacher, seed 0, training attack
+  l_inf 4/255 3 steps, selection PGD-10, world size 1, global batch 128, RTX
+  4090, deterministic, protocol `controlled_imagenet_stage02_budget_init_v1`),
+  except `pretrained: false`, 50 epochs, LR x0.1 at epochs 25 and 38, 10-epoch
+  warmup. Source SHA `987dfb5` (worktree `source-987dfb534512`, clean). "val"
+  is internal validation (held-out 2% of the training split), not the
+  official ImageNet val. No AutoAttack has run.
+
+  | cell | last (ep 49 / 99) val clean / PGD-10 | best (by val PGD) | last probe clean / PGD-10 |
+  |---|---:|---:|---:|
+  | random init, 50 ep (this run) | 53.36 / 30.05 | ep 48: 53.42 / 30.17 | 58.85 / 34.25 |
+  | pretrained, 50 ep (Arm A, seed 0) | 54.57 / 30.58 | ep 46: 54.57 / 30.74 | not logged |
+  | pretrained, 50 ep (Arm A, seed 1) | 54.33 / 30.59 | | not logged |
+  | random init, 100 ep | 54.56 / 30.58 | ep 97: 54.44 / 30.68 | 60.75 / 35.00 |
+  | pretrained, 100 ep | 55.21 / 30.70 | ep 91: 54.88 / 31.03 | 59.55 / 34.90 |
+
+  **Preregistered rule (decision 0019 B):** "pretraining helps at 50 epochs"
+  only if last PGD-10 <= 29.58% (Arm A's lower seed, 30.58, minus 1pt).
+  30.05% > 29.58%, so the verdict is **no PGD-10 difference above 1pt at 50
+  epochs either (n=1)**.
+
+  Reading (n=1 per cell, internal validation, PGD-10 only):
+  1. Against pretrained/50, random init is behind by 0.53-0.54pt PGD-10 and
+     0.97-1.21pt clean (last), and 0.57 / 1.15pt (best vs Arm A seed 0).
+     Unlike the 100-epoch pair, all four differences point the same way,
+     and the clean gap is at the 1pt scale. The rule is about PGD-10 only;
+     the clean gap is reported, not judged.
+  2. Random init gains +0.53pt PGD-10 and +1.20pt clean from 50 to 100
+     epochs. Pretrained gains +0.12 / +0.64 (seed 0). So the 100-epoch budget
+     closes most of random init's shortfall.
+  3. Epochs 0-24 are identical to the random-init/100 run to every printed
+     digit (epoch 0: 1.36 / 0.98; epoch 24: 37.12 / 19.51). This is expected:
+     same seed, deterministic, same warmup and LR up to epoch 24, and it
+     shows the `b0cfc9e` -> `987dfb5` changes left training unchanged.
+  4. The lr-0.05 phase was cut from 40 to 15 epochs. At its end (epoch 24)
+     val was 37.12 / 19.51, vs 38.02 / 20.19 at the end of the 100-epoch
+     run's lr-0.05 phase (epoch 49). The lr-0.005 phase ended (epoch 37) at
+     49.87 / 27.65, vs 50.09 / 27.81 (epoch 75). The shortfall appears in the
+     final lr-0.0005 stage: 30.05 vs 30.58 PGD-10.
+  5. The final stage saturated. Over epochs 44-49 the train loss moved
+     3.749 -> 3.736 (0.35% relative) and val PGD-10 29.98 -> 30.05.
+  6. Seen-unseen gap at the end (probe minus val): +5.5 clean / +4.2 PGD-10.
+     The probe fits only ~34% of its own images under PGD-10, so the regime
+     stays bias-dominated.
+
+  Caveats: one seed. The CIFAR control-vs-control floor was 0.16-1.88pt, and
+  Arm A's two seeds do not estimate a spread. The 0.5pt PGD-10 gap is inside
+  that floor, and the ~1.2pt clean gap sits at its lower edge. Arm A ran from
+  a different source SHA (plan 0101). Wall clock 21.7 h (2026-09-25 13:08 to
+  09-26 10:49 UTC, ~843 img/s), i.e. about 0.43 GPU-h per epoch. Checkpoints
+  `best.pt`, `last.pt`, `epoch-049.pt` are on disk; their sha256 was not
+  computed in this postrun (the session cannot hash files outside the repo).
+  `epoch-metrics.parquet` sha256 `1930be95...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id. Next step: decision
+  packet 0020.
