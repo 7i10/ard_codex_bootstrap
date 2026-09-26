@@ -906,3 +906,35 @@ history behind this pivot.)
   per-model single / two-concurrent / BF16 probe is running on Ferret GPU1.
   The BF16 probe so far: MobileNetV4-S +1%, so BF16 does not help a
   launch-bound model.
+- 2026-09-27 (chat): **Literature on epoch budgets (option B, subagent,
+  checked against the paper texts).**
+  - **Budgets.** ImageNet adversarial training of CNNs with basic
+    augmentation uses 90-110 epochs: Salman 2020 (90), Xie 2020 (110),
+    EasyRobust (90, RRC+flip, eps 4/255), ARES ResNets (95), RobustART (100).
+    300 epochs appears only with heavy augmentation (ViT/ConvNeXt).
+  - **Studies that vary the budget.**
+    - Wong 2020: FGSM for 15 epochs vs Free-AT for 92 is ~1pp at 4/255.
+    - SAT sec 3.2: ResNet-50 at 100 -> 200 epochs is +2.6 clean but -1.8
+      robust.
+    - Singh/Croce/Hein 2023: 50 -> 300 epochs helps only with heavy
+      augmentation and >=22M-parameter models.
+    - No paper varies the budget for ImageNet adversarial training below
+      10M parameters. That is an open gap.
+  - **Capacity.**
+    - Madry 2018 sec 4: capacity is crucial.
+    - Xie 2020 sec 5: even ResNet-152 underfits the adversarial
+      distribution.
+    - SAT: robustness rises from EfficientNet-B0 to B7.
+    - Debenedetti 2022: adversarial training needs much more capacity, and
+      heavy augmentation costs capacity.
+  - **Clean lightweight recipes.** They are long because of heavy
+    augmentation or distillation. The official MobileNetV4-Conv-S recipe is
+    9600 epochs with RandAug, Mixup, CutMix and EMA (Qin 2024, App. C,
+    Table 10). Beyer 2022 shows patient function matching keeps improving.
+  - **Reference points.** EasyRobust EfficientNet-B0 (90 epochs): 61.83
+    clean / 35.06 AutoAttack. SAT EfficientNet-B0 (PGD-1): 65.1 / 37.6
+    PGD-200.
+  - **Bottom line.** ~50-epoch saturation is consistent with the literature.
+    The mechanism is capacity-limited underfitting of the robust objective.
+    Robust overfitting is a large-model phenomenon. The clean-training
+    control (option A) tests this directly for MobileNetV4-S.
