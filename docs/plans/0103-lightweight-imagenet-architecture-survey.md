@@ -722,3 +722,38 @@ history behind this pivot.)
   is ~440 GPU-h, about 9 days on two 4090s. Each init's recipe (learning rate)
   comes from the MobileNetV4-S per-init LR comparison, which is still awaiting
   approval.
+- 2026-09-26 (chat): **Speed-up review against a generic list the human
+  supplied** (data loader, BF16, channels_last, compile, larger batch,
+  progressive resizing, eval frequency, cached distillation, subset tuning,
+  profiling).
+  - Measured: Hamster's CPU-side train loader (exact training loader, while
+    both 4090 jobs ran) gives 1715 / 2293 / 2693 img/s at 8 / 12 / 16
+    workers. That is not the limit today (real training 857 img/s,
+    deterministic). It would be at 8 workers once non-deterministic
+    MobileNetV4-S reaches ~1740 img/s, so Phase 1 uses 16 workers.
+    `EpochImageNetTransform` keys crop/flip on (seed, epoch, source id),
+    so the worker count cannot change the data.
+  - The training step also runs two eval-mode diagnostic forwards
+    (train clean acc, eval-mode robust acc; ~+17% compute) and several
+    per-step GPU->CPU syncs (`float()` metric accumulation,
+    `if not isfinite(loss)`).
+  - Adopting now as engineering-only changes: sync-free step accounting,
+    a sync-free non-finite-loss check of equal strictness, and pinned-memory
+    non-blocking copies, with bit-identity tests; plus 16 loader workers.
+  - Needs a human decision plus one MobileNetV4-S validation run each:
+    BF16 autocast for training (evaluation stays fp32), progressive
+    resizing, and trimming the per-step diagnostic forwards.
+  - Not adopted:
+    - larger batch (human decision; changes the recipe);
+    - channels_last (measured no gain in fp32);
+    - DALI/FFCV (the loader is not the limit; changes decode/resize);
+    - pre-resized dataset (changes training pixels; Hamster's 251 GB RAM
+      already caches the full set);
+    - persistent_workers (set_epoch would not reach persistent workers,
+      silently repeating augmentation);
+    - evaluating less often (changes best-checkpoint selection);
+    - FixRes-style higher evaluation resolution (changes the protocol).
+  - For Phase 2: cache robust-teacher outputs once, FKD-style, and reuse
+    them across runs. Sample-keyed augmentation makes this exact.
+  - ImageNet-100 screening on Anteater is a candidate use of the idle
+    2080 Tis.
