@@ -99,6 +99,12 @@ class ProtocolConfig(StrictModel):
         # Plan 0104 stage 2: per-init learning-rate comparison on
         # MobileNetV4-Conv-Small (pretrained 0.015; random init 0.025 / 0.1).
         "controlled_imagenet_stage02_init_lr_grid_v1",
+        # Plan 0103 option A (human-approved 2026-09-27): clean-training
+        # control for the random-init budget cells -- Arm A's recipe with
+        # method ``standard`` (no training attack) at 50 and 100 epochs:
+        # is PGD-AT's 50-epoch saturation specific to the robust objective
+        # or a property of the recipe?
+        "controlled_imagenet_stage02_clean_budget_v1",
     ]
 
 
@@ -617,6 +623,11 @@ class TeacherConfig(StrictModel):
 
 class MethodConfig(StrictModel):
     id: Literal[
+        # Plan 0103 option A: standard (non-adversarial) training -- the same
+        # hard-label CE as pgd_at, on the clean training batch, with no
+        # training attack at all. method.selection_attack is still required,
+        # so validation keeps reporting clean AND PGD accuracy.
+        "standard",
         "pgd_at",
         "trades",
         "rslad",
@@ -630,7 +641,9 @@ class MethodConfig(StrictModel):
         "adr_trades",
     ]
     version: Literal[1]
-    attack: AttackConfig = Field(default_factory=AttackConfig)
+    # None only for ``standard`` (no training attack); every other method
+    # requires one -- see ``resolve_training_attack``.
+    attack: AttackConfig | None = Field(default_factory=AttackConfig)
     selection_attack: AttackConfig | None = None
     temperature: float = Field(default=1.0, gt=0)
     temperature_squared: bool = True
@@ -639,8 +652,9 @@ class MethodConfig(StrictModel):
     # Plan 0102 Workstream A: pgd_at's own label smoothing (Singh/Croce/Hein
     # 2023, arXiv:2303.01870, Appendix A.1: "label smoothing coefficient of
     # 0.1"). Default 0.0 reproduces today's exact plain hard-label CE for
-    # every existing pgd_at config. Only wired for pgd_at so far -- not a
-    # statement that other methods couldn't use it, just not yet asked for.
+    # every existing pgd_at config. Wired for pgd_at and standard (the same
+    # CE objective) -- not a statement that other methods couldn't use it,
+    # just not yet asked for.
     label_smoothing: float = Field(default=0.0, ge=0, lt=1)
     student_ema_decay: float = Field(default=0.9, ge=0, lt=1)
     student_policy_warmup_epochs: int = Field(default=1, ge=1)
@@ -655,8 +669,35 @@ class MethodConfig(StrictModel):
         """Runtime compatibility only; resolved configuration serializes ``id``."""
         return self.id
 
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_training_attack(cls, value: Any) -> Any:
+        """``standard`` has no training attack; every other method has one.
+
+        A ``standard`` config may omit ``attack`` or give it as ``null`` (its
+        resolved config serializes ``null``); an attack mapping there would be
+        silently ignored, so it is refused. Any other method given
+        ``attack: null`` is refused rather than silently defaulted.
+        """
+        if not isinstance(value, dict):
+            return value
+        if value.get("id") == "standard":
+            if value.get("attack") is not None:
+                raise ValueError(
+                    "method standard trains on clean inputs and has no training attack; remove method.attack "
+                    "(checkpoint selection uses method.selection_attack)"
+                )
+            return {**value, "attack": None}
+        if "attack" in value and value["attack"] is None:
+            raise ValueError(f"method {value.get('id')!r} requires a training attack; method.attack must not be null")
+        return value
+
     @model_validator(mode="after")
     def resolve_selection_attack(self) -> MethodConfig:
+        if self.id == "standard":
+            return self._resolve_standard()
+        if self.attack is None:
+            raise ValueError(f"method {self.id} requires a training attack")
         expected_loss = "ce" if self.id == "pgd_at" else "kl"
         expected_target = {
             "trades": "student_clean",
@@ -768,6 +809,51 @@ class MethodConfig(StrictModel):
             or any(character not in "0123456789abcdef" for character in self.frozen_oracle_manifest_sha256)
         ):
             raise ValueError("frozen_oracle_manifest_sha256 must be a lowercase 64-character digest")
+        return self
+
+    def _resolve_standard(self) -> MethodConfig:
+        """Validate ``standard``: clean CE training plus an explicit selection attack.
+
+        There is no training threat model to derive the selection attack from,
+        so it must be given explicitly, under the same rules as every other
+        method (hard-label CE, eval modes). Fields no ``standard`` code path
+        reads must keep their defaults; a non-default value would be silently
+        ignored. ``label_smoothing`` is honored (the same CE as pgd_at).
+        """
+        if self.attack is not None:
+            raise ValueError("method standard has no training attack")
+        selection = self.selection_attack
+        if selection is None:
+            raise ValueError(
+                "method standard requires an explicit method.selection_attack (there is no training attack "
+                "to derive it from)"
+            )
+        if selection.loss != "ce":
+            raise ValueError("checkpoint selection attack must use hard-label CE")
+        if selection.student_mode != "eval" or selection.teacher_mode != "eval":
+            raise ValueError("checkpoint selection attack must keep student and teacher in eval mode")
+        ignored = [
+            name
+            for name in (
+                "temperature",
+                "temperature_squared",
+                "trades_beta",
+                "entropy_gamma",
+                "student_ema_decay",
+                "student_policy_warmup_epochs",
+            )
+            if getattr(self, name) != type(self).model_fields[name].default
+        ]
+        if ignored:
+            raise ValueError("method standard does not use " + ", ".join(f"method.{name}" for name in ignored))
+        if self.target_policy is not None:
+            raise ValueError("target_policy is not defined for method standard")
+        if self.adr is not None:
+            raise ValueError("adr configuration is not defined for method standard")
+        if self.oracle_mask:
+            raise ValueError("oracle_mask is only defined for rslad_hard_fallback")
+        if self.frozen_oracle_manifest is not None or self.frozen_oracle_manifest_sha256 is not None:
+            raise ValueError("frozen_oracle_manifest fields are only defined for rslad_frozen_oracle_softening")
         return self
 
 
@@ -1531,6 +1617,16 @@ class ExperimentConfig(StrictModel):
         }
         if self.method.id in rslad_methods and self.teacher is None:
             raise ValueError(f"{self.method.id} requires a frozen teacher")
+        if self.method.id == "standard":
+            # Plan 0103 option A: nothing in standard training reads a
+            # teacher or a training-attack budget, so either would be
+            # silently ignored.
+            if self.teacher is not None:
+                raise ValueError("method standard trains without a teacher; remove teacher")
+            if self.training.epsilon_warmup_epochs is not None:
+                raise ValueError("method standard has no training attack; training.epsilon_warmup_epochs is undefined")
+        if self.protocol.id == "controlled_imagenet_stage02_clean_budget_v1" and self.method.id != "standard":
+            raise ValueError("controlled_imagenet_stage02_clean_budget_v1 requires method standard")
         if self.method.oracle_mask and self.tier != "dev":
             raise ValueError("oracle_mask is scientific/dev-only and is forbidden for smoke, repro, and production")
         if self.method.id == "rslad_frozen_oracle_softening" and self.tier not in {"dev", "production"}:
@@ -1671,6 +1767,8 @@ class ExperimentConfig(StrictModel):
         for field, expected in schedule.items():
             if getattr(self.scheduler, field) != expected:
                 errors.append(f"scheduler.{field} must be {expected!r}")
+        if self.method.attack is None:
+            raise ValueError(f"{self.protocol.id} contract defines no method without a training attack")
         attack_family = self.method.id if self.method.id in {"pgd_at", "trades", "adr", "adr_trades"} else "rslad"
         train_attacks = metadata["train_attacks"]
         assert isinstance(train_attacks, Mapping)

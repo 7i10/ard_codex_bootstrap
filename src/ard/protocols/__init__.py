@@ -602,6 +602,18 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # best-vs-best with equal tuning effort.
             metadata=MappingProxyType({"purpose": "imagenet_stage02_init_lr_grid_v1"}),
         ),
+        "controlled_imagenet_stage02_clean_budget_v1": ProtocolSpec(
+            id="controlled_imagenet_stage02_clean_budget_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0103 option A (human-approved 2026-09-27): clean-training
+            # control for the random-init budget cells -- the identical Arm A
+            # recipe (random init, 50 and 100 epochs) with method standard
+            # (clean CE, no training attack). Selection/evaluation attacks
+            # unchanged, so the clean model's PGD-10 accuracy is still
+            # measured. Schema restricts this protocol to method standard.
+            metadata=MappingProxyType({"purpose": "imagenet_stage02_clean_budget_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,

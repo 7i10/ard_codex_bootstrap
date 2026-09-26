@@ -619,6 +619,7 @@ def test_top_level_configs_resolve_under_controlled_environment(
         if path.parent.name == "scientific":
             assert config.tier == "production"
             assert config.method.id in {
+                "standard",
                 "pgd_at",
                 "trades",
                 "rslad",

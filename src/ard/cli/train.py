@@ -455,7 +455,10 @@ def _build_method(
 ) -> tuple[DistillationObjective, WeightPolicy | None, SampleStateStore | None, TeacherTargetPolicy | None]:
     """Compose the M2 outer objective and optional policy without branching a loop."""
     method = config.method
-    if method.id == "pgd_at":
+    if method.id in {"pgd_at", "standard"}:
+        # standard (plan 0103 option A) is the same hard-label CE objective;
+        # it differs from pgd_at only in the Trainer receiving no training
+        # attack, so the objective sees clean-batch logits.
         return PGDATObjective(label_smoothing=method.label_smoothing), None, None, None
     if method.id == "trades":
         return (
@@ -814,6 +817,7 @@ def main(argv: list[str] | None = None) -> int:
             assert config.method.frozen_oracle_manifest_sha256 is not None
             assert config.teacher is not None
             assert config.teacher.checkpoint_sha256 is not None
+            assert config.method.attack is not None
             raw_targets = getattr(train_dataset.dataset.dataset, "targets", None)
             if not isinstance(raw_targets, (list, tuple)):
                 raise ValueError("frozen oracle training requires immutable source training labels")
@@ -1048,7 +1052,9 @@ def main(argv: list[str] | None = None) -> int:
             optimizer=optimizer,
             scheduler=scheduler,
             scaler=_build_grad_scaler(amp=config.training.amp, device=device),
-            attack=LinfPGD(config.method.attack),
+            # None only for method standard: the Trainer then trains on the
+            # clean batch and never generates a training attack.
+            attack=None if config.method.attack is None else LinfPGD(config.method.attack),
             selection_attack=LinfPGD(selection_attack_config),
             objective=objective,
             policy=policy,

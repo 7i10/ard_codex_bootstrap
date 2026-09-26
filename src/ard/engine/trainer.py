@@ -61,6 +61,14 @@ if TYPE_CHECKING:
 # train_epoch metrics measured only by the post-step eval-mode student
 # forwards that ``step_diagnostics=False`` skips.
 _STEP_DIAGNOSTIC_TRAIN_METRICS = ("clean_accuracy", "robust_accuracy_eval_mode", "ema_student_agreement")
+# Objective input requirements a Trainer without a training attack (method
+# ``standard``) does not provide.
+_ATTACK_FREE_UNSUPPORTED_OBJECTIVE_FLAGS = (
+    "requires_clean_student_logits",
+    "requires_teacher_clean_logits",
+    "requires_rectified_target_probabilities",
+    "rectifies_attack_target",
+)
 
 
 @contextmanager
@@ -202,7 +210,7 @@ class Trainer:
         optimizer: Optimizer,
         scheduler: Any,
         scaler: Any,
-        attack: AttackGenerator,
+        attack: AttackGenerator | None,
         selection_attack: AttackGenerator,
         objective: DistillationObjective,
         device: torch.device,
@@ -261,6 +269,51 @@ class Trainer:
                 parameter.grad = None
         self.optimizer, self.scheduler, self.scaler = optimizer, scheduler, scaler
         self.attack, self.selection_attack, self.objective = attack, selection_attack, objective
+        if attack is None:
+            # Plan 0103 option A (method ``standard``): train on the clean
+            # batch with no training attack. Everything that reads or
+            # perturbs the training attack, a teacher, or adversarial
+            # per-sample state would be silently meaningless, so refuse it.
+            attack_dependent = {
+                "teacher": teacher,
+                "policy": policy,
+                "sample_store": sample_store,
+                "target_policy": target_policy,
+                "intervention_mask": intervention_mask,
+                "anchor_model": anchor_model,
+                "adr_config": adr_config,
+                "prescriptive_v3_route": prescriptive_v3_route,
+                "adversarial_kd_multiplier": adversarial_kd_multiplier,
+                "adversarial_ce_coefficient": adversarial_ce_coefficient,
+                "clean_ce_coefficient": clean_ce_coefficient,
+                "clean_wrong_mode": clean_wrong_mode,
+                "selected_attack_epsilon": selected_attack_epsilon,
+                "selected_attack_step_size": selected_attack_step_size,
+                "epsilon_warmup_epochs": epsilon_warmup_epochs,
+                "extra_clean_ce_coefficient": extra_clean_ce_coefficient,
+                "adversarial_bce_coefficient": adversarial_bce_coefficient,
+                "adaptive_advkd_gamma": adaptive_advkd_gamma,
+                "margin_coefficient": margin_coefficient,
+                "margin_target_mode": margin_target_mode,
+                "teacher_clean_reliability_mask": teacher_clean_reliability_mask,
+                "boundary_intervention": boundary_intervention,
+                "dynamic_s3_router": dynamic_s3_router,
+                "online_state_s2_router": online_state_s2_router,
+                "frozen_risk_lookup": frozen_risk_lookup,
+            }
+            supplied = sorted(name for name, value in attack_dependent.items() if value is not None)
+            if clean_wrong_attack_skip:
+                supplied.append("clean_wrong_attack_skip")
+            if iad_inspired:
+                supplied.append("iad_inspired")
+            if oracle_mask:
+                supplied.append("oracle_mask")
+            if observation_profile != "off":
+                supplied.append("observation_profile")
+            if any(getattr(objective, flag, False) for flag in _ATTACK_FREE_UNSUPPORTED_OBJECTIVE_FLAGS):
+                supplied.append("objective (requires clean/teacher/rectified inputs)")
+            if supplied:
+                raise ValueError("training without an attack (method standard) cannot use: " + ", ".join(supplied))
         self.device, self.output_dir, self.config_hash, self.seed = device, output_dir, config_hash, seed
         self.evaluation_attack_seed = seed if evaluation_attack_seed is None else evaluation_attack_seed
         self.tracker_run_id = tracker_run_id
@@ -1225,7 +1278,13 @@ class Trainer:
             )
             if requires_rectified_target and skip_selected:
                 raise ValueError("adr/adr_trades cannot be combined with clean-wrong attack skipping")
-            if skip_selected:
+            if self.attack is None:
+                # Method standard (plan 0103 option A): the training input is
+                # the clean batch itself. No attack call and no attack
+                # generator is constructed, so no training-attack RNG exists.
+                adversarial = batch.images
+                attack_result = None
+            elif skip_selected:
                 if treatment_risk is None:
                     raise RuntimeError("clean-wrong attack skip lost its intervention mask")
                 attack_indices = torch.nonzero(treatment_risk <= 0, as_tuple=False).flatten()
@@ -1615,16 +1674,27 @@ class Trainer:
                     if self.diagnostics.mode == "panel"
                     else []
                 )
-                panel_media: dict[int, tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = {}
+                panel_media: dict[int, tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]] = {}
+                # Method standard (no training attack): there is no
+                # adversarial image, perturbation or adversarial prediction;
+                # those panel fields are None rather than the clean batch
+                # relabelled as adversarial.
+                attacked = self.attack is not None
                 if panel_positions:
                     positions = torch.tensor(panel_positions, device=self.device)
                     clean_images = batch.images.index_select(0, positions).detach().cpu()
-                    adversarial_images = adversarial.index_select(0, positions).detach().cpu()
-                    perturbations = (adversarial_images - clean_images).detach()
-                    panel_media = {
-                        position: (clean_images[index], adversarial_images[index], perturbations[index])
-                        for index, position in enumerate(panel_positions)
-                    }
+                    if attacked:
+                        adversarial_images = adversarial.index_select(0, positions).detach().cpu()
+                        perturbations = (adversarial_images - clean_images).detach()
+                        panel_media = {
+                            position: (clean_images[index], adversarial_images[index], perturbations[index])
+                            for index, position in enumerate(panel_positions)
+                        }
+                    else:
+                        panel_media = {
+                            position: (clean_images[index], None, None)
+                            for index, position in enumerate(panel_positions)
+                        }
                 for position, sample_id in enumerate(sample_ids):
                     media = panel_media.get(position)
                     has_prior = (
@@ -1645,7 +1715,7 @@ class Trainer:
                         perturbation_visualization=None if media is None else media[2],
                         true_label=labels[position],
                         student_clean_prediction=clean_predictions[position],
-                        student_adv_prediction=adversarial_predictions[position],
+                        student_adv_prediction=adversarial_predictions[position] if attacked else None,
                         teacher_prediction=None if teacher_predictions is None else teacher_predictions[position],
                         teacher_entropy=None if teacher_entropies is None else teacher_entropies[position],
                         student_robust_margin_ema=prior_value,
@@ -1653,7 +1723,7 @@ class Trainer:
                         joint_risk=None if joint_risks is None else joint_risks[position],
                         kd_weight=0.0 if kd_weights is None else kd_weights[position],
                         clean_correct=clean_predictions[position] == labels[position],
-                        robust_correct=adversarial_predictions[position] == labels[position],
+                        robust_correct=(adversarial_predictions[position] == labels[position]) if attacked else None,
                     )
                 self._teacher_adversarial_logits = None
             # DDP averages gradients across ranks.  Scale each local masked
@@ -1685,8 +1755,10 @@ class Trainer:
                     # fed the already-generated `adversarial` batch instead of
                     # `batch.images`. Mode-matched to train_clean_accuracy, unlike
                     # `logits` (line ~1225: train-mode, pre-step) which
-                    # train_robust_accuracy has always used.
-                    adversarial_logits_eval_mode = self.model(adversarial)
+                    # train_robust_accuracy has always used. Skipped without a
+                    # training attack (method standard): it would only repeat
+                    # the clean forward above.
+                    adversarial_logits_eval_mode = None if self.attack is None else self.model(adversarial)
                 # Every entry stays on the device (no per-step host sync); see
                 # _float64_totals for why the epoch totals are bit-identical.
                 if self._pending_ema_clean_argmax is not None:
@@ -1694,9 +1766,10 @@ class Trainer:
                         (self._pending_ema_clean_argmax == clean_logits.argmax(1)).to(mask.dtype) * mask
                     ).sum()
                 clean_correct_sum = ((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()
-                robust_eval_mode_correct_sum = (
-                    (adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype) * mask
-                ).sum()
+                if adversarial_logits_eval_mode is not None:
+                    robust_eval_mode_correct_sum = (
+                        (adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype) * mask
+                    ).sum()
             # With step_diagnostics=False the three slots above stay 0.0 and
             # their epoch metrics are dropped below. Under DDP the skipped
             # no-grad forward would have been the one to broadcast rank 0's
@@ -1756,6 +1829,15 @@ class Trainer:
             # Never measured this epoch: absent, not a fake 0.0.
             for key in _STEP_DIAGNOSTIC_TRAIN_METRICS:
                 del metrics[key]
+        if self.attack is None:
+            # Method standard (plan 0103 option A): the training forward saw
+            # the clean batch, so slot 2 is the train-mode, pre-step accuracy
+            # on clean training inputs -- reported under that honest name,
+            # never as a "robust" accuracy. There is no adversarial batch, so
+            # robust_accuracy_eval_mode was never measured and is absent.
+            # attack_epsilon/attack_step_size stay the true realized 0.0.
+            metrics["clean_accuracy_train_mode"] = metrics.pop("robust_accuracy")
+            metrics.pop("robust_accuracy_eval_mode", None)
         return metrics
 
     def validate_epoch(self, loader: DataLoader[IndexedBatch], *, model: nn.Module | None = None) -> dict[str, float]:
@@ -1960,8 +2042,16 @@ class Trainer:
             epoch_metrics: dict[str, Any] = {"train_loss": train_metrics["loss"]}
             if self.step_diagnostics:
                 epoch_metrics["train_clean_accuracy"] = train_metrics["clean_accuracy"]
-            epoch_metrics["train_robust_accuracy"] = train_metrics["robust_accuracy"]
-            if self.step_diagnostics:
+            if self.attack is None:
+                # Method standard: see train_epoch -- the same train-mode,
+                # pre-step slot, on clean inputs, named for what it measures.
+                # train_robust_accuracy_eval_mode and
+                # train_robust_overtakes_clean have no adversarial batch to
+                # measure and are absent.
+                epoch_metrics["train_clean_accuracy_train_mode"] = train_metrics["clean_accuracy_train_mode"]
+            else:
+                epoch_metrics["train_robust_accuracy"] = train_metrics["robust_accuracy"]
+            if self.step_diagnostics and self.attack is not None:
                 # Decision 0016, option A: mode-matched to train_clean_accuracy
                 # above (both eval-mode, post-step), unlike train_robust_accuracy
                 # (train-mode, pre-step). Also post-step on perturbations crafted
