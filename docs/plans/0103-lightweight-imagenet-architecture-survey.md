@@ -938,3 +938,13 @@ history behind this pivot.)
     The mechanism is capacity-limited underfitting of the robust objective.
     Robust overfitting is a large-model phenomenon. The clean-training
     control (option A) tests this directly for MobileNetV4-S.
+- 2026-09-27 (chat): **Ferret probe numbers are contaminated.** From ~15:50Z,
+  another user's EEG jobs (~36 processes) ran on all three Ferret GPUs. The
+  per-model single / two-concurrent / BF16 numbers measured after that time
+  are void, and the probe was stopped. Earlier, uncontaminated readings on
+  Ferret were MobileNetV4-S single 868-876 img/s and two-concurrent 740+739.
+  Why a lone Ferret process runs at ~half of Hamster is still unexplained:
+  the GPUs showed no power or clock throttling, so the cause must be
+  elsewhere. The plan-0104 lr-0.015 run and the EfficientNet-B0 canary keep
+  running on Ferret; they are slower but their numerics are unaffected.
+  BF16 and co-location decisions wait for a clean measurement on Hamster.
