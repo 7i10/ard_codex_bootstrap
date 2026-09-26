@@ -27,6 +27,7 @@ Find the smallest evidence-backed root cause without repeatedly running expensiv
 Consult `references/ard_failure_modes.md`. At minimum inspect:
 
 - pixel vs normalized space (a CUDA "device-side assert triggered" from `_assert_async_cuda_kernel` in `TensorCompare.cu` (or, under `training.compile`, from a `/tmp/torchinductor_*` Triton kernel with the message `model adapter expects pixels in [0, 1]`) means the `PixelNormalization` [0, 1] pixel guard fired — inputs out of range — not a label-index bug)
+- training divergence (a CUDA "device-side assert triggered" whose stderr says `non-finite training loss` is the trainer's non-finite training-loss guard, formerly a `FloatingPointError`; it surfaces at a later synchronization — typically the next step's attack or the epoch-end sync — not at the step that diverged. On CPU it is still `FloatingPointError`)
 - epsilon and step-size units
 - projection and clamp order
 - attack loss sign and gradient source
