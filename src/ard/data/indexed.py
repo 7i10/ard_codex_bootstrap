@@ -22,13 +22,28 @@ class IndexedBatch:
     state_update_mask: torch.Tensor | None = None
     multiplicity: torch.Tensor | None = None
 
-    def to(self, device: torch.device | str) -> IndexedBatch:
+    def to(self, device: torch.device | str, *, non_blocking: bool = False) -> IndexedBatch:
+        # ``non_blocking`` only overlaps a host->device copy whose source is
+        # pinned (DataLoader ``pin_memory=True``); the copy stays on the
+        # current stream, so every consumer is still ordered after it.  For a
+        # pageable source it degrades to an ordinary copy.
         return IndexedBatch(
-            self.images.to(device),
-            self.labels.to(device),
-            self.sample_ids.to(device),
-            None if self.state_update_mask is None else self.state_update_mask.to(device),
-            None if self.multiplicity is None else self.multiplicity.to(device),
+            self.images.to(device, non_blocking=non_blocking),
+            self.labels.to(device, non_blocking=non_blocking),
+            self.sample_ids.to(device, non_blocking=non_blocking),
+            None if self.state_update_mask is None else self.state_update_mask.to(device, non_blocking=non_blocking),
+            None if self.multiplicity is None else self.multiplicity.to(device, non_blocking=non_blocking),
+        )
+
+    def pin_memory(self) -> IndexedBatch:
+        """Called by DataLoader's pin-memory thread; a dataclass without this
+        method would be passed through unpinned."""
+        return IndexedBatch(
+            self.images.pin_memory(),
+            self.labels.pin_memory(),
+            self.sample_ids.pin_memory(),
+            None if self.state_update_mask is None else self.state_update_mask.pin_memory(),
+            None if self.multiplicity is None else self.multiplicity.pin_memory(),
         )
 
 

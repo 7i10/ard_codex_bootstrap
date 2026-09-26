@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import math
 import time
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -66,6 +66,48 @@ def _evaluation_mode(model: nn.Module) -> Iterator[None]:
         yield
     finally:
         model.train(mode)
+
+
+def _float64_totals(values: Sequence[torch.Tensor | float], *, device: torch.device) -> torch.Tensor:
+    """Device-side twin of ``torch.tensor([float(v) for v in values], dtype=float64)``.
+
+    ``float(tensor)`` forces a GPU->CPU synchronization per value.  Widening a
+    floating-point tensor to float64 on the device is exact (as is Python's
+    float32/16->double conversion), and a Python float becomes the same double
+    through ``torch.full``, so the stacked vector -- and every epoch total the
+    caller adds it into, in the same order -- is bit-identical, with no sync.
+    """
+    return torch.stack(
+        [
+            value.detach().to(device=device, dtype=torch.float64)
+            if isinstance(value, torch.Tensor)
+            else torch.full((), float(value), dtype=torch.float64, device=device)
+            for value in values
+        ]
+    )
+
+
+def _assert_finite_training_loss(loss: torch.Tensor) -> None:
+    """Fail closed on a non-finite scalar training loss before ``backward``.
+
+    Same predicate as the former ``if not torch.isfinite(loss)`` host check,
+    without its per-step GPU->CPU synchronization. On CPU (no sync to save)
+    it still raises ``FloatingPointError`` immediately. On an accelerator it
+    is a ``torch._assert_async`` device-side assert ordered on the stream
+    before the backward/optimizer kernels: a non-finite loss traps the kernel,
+    the CUDA context becomes unusable, every later kernel (backward, optimizer
+    step, EMA) fails, and the process dies with ``RuntimeError: CUDA error:
+    device-side assert triggered`` at the next synchronization -- at the
+    latest the epoch-end ``torch.cuda.synchronize`` that precedes every
+    checkpoint write -- so the poisoned update can never be persisted. Same
+    mechanism as the pixel guard in ``ard.models.registry.PixelNormalization``.
+    """
+    finite = torch.isfinite(loss.detach())
+    if finite.device.type == "cpu":
+        if not bool(finite):
+            raise FloatingPointError("non-finite training loss")
+        return
+    torch._assert_async(finite, "non-finite training loss")
 
 
 def _jensen_shannon_response(clean_logits: torch.Tensor, adversarial_logits: torch.Tensor) -> torch.Tensor:
@@ -1074,7 +1116,7 @@ class Trainer:
                 raise TypeError("trainer requires IndexedBatch batches")
             if on_batch_start is not None:
                 on_batch_start(batch_index, batch)
-            batch = batch.to(self.device)
+            batch = batch.to(self.device, non_blocking=True)
             self._teacher_adversarial_logits = None
             self._teacher_adversarial_forward_calls = 0.0
             mask = self._mask(batch)
@@ -1604,8 +1646,7 @@ class Trainer:
             # dilute the update (including the size < world_size case).
             global_count = reduce_sums(mask.detach().sum().to(dtype=torch.float64)).clamp_min(1.0)
             loss = (terms.total * mask).sum() * (get_world_size() / global_count.to(dtype=terms.total.dtype))
-            if not torch.isfinite(loss):
-                raise FloatingPointError("non-finite training loss")
+            _assert_finite_training_loss(loss)
             if self.scaler is None:
                 loss.backward()
             else:
@@ -1627,31 +1668,32 @@ class Trainer:
                 # `logits` (line ~1225: train-mode, pre-step) which
                 # train_robust_accuracy has always used.
                 adversarial_logits_eval_mode = self.model(adversarial)
-            ema_student_agreement_sum = (
+            # Every entry stays on the device (no per-step host sync); see
+            # _float64_totals for why the epoch totals are bit-identical.
+            ema_student_agreement_sum: torch.Tensor | float = (
                 0.0
                 if self._pending_ema_clean_argmax is None
-                else float(((self._pending_ema_clean_argmax == clean_logits.argmax(1)).to(mask.dtype) * mask).sum())
+                else ((self._pending_ema_clean_argmax == clean_logits.argmax(1)).to(mask.dtype) * mask).sum()
             )
             self._pending_ema_clean_argmax = None
-            rectified_true_class_mass_sum = (
+            rectified_true_class_mass_sum: torch.Tensor | float = (
                 0.0
                 if self._pending_rectified_true_class_mass is None
-                else float((self._pending_rectified_true_class_mass * mask).sum())
+                else (self._pending_rectified_true_class_mass * mask).sum()
             )
             self._pending_rectified_true_class_mass = None
-            totals += torch.tensor(
+            totals += _float64_totals(
                 [
-                    float((terms.total.detach() * mask).sum()),
-                    float(((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
-                    float(((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
-                    float(mask.sum()),
+                    (terms.total.detach() * mask).sum(),
+                    ((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
+                    ((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
+                    mask.sum(),
                     teacher_clean_forward_calls,
                     self._teacher_adversarial_forward_calls,
                     ema_student_agreement_sum,
                     rectified_true_class_mass_sum,
-                    float(((adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
+                    ((adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
                 ],
-                dtype=torch.float64,
                 device=self.device,
             )
             self.global_step += 1
@@ -1699,7 +1741,7 @@ class Trainer:
             for batch in loader:
                 if not isinstance(batch, IndexedBatch):
                     raise TypeError("trainer requires IndexedBatch batches")
-                batch = batch.to(self.device)
+                batch = batch.to(self.device, non_blocking=True)
                 mask = self._mask(batch)
                 with torch.no_grad():
                     clean_logits = target_model(batch.images)
@@ -1714,13 +1756,12 @@ class Trainer:
                 )
                 with torch.no_grad():
                     adversarial_logits = target_model(attack_result.adversarial)
-                totals += torch.tensor(
+                totals += _float64_totals(
                     [
-                        float(((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
-                        float(((adversarial_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()),
-                        float(mask.sum()),
+                        ((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
+                        ((adversarial_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
+                        mask.sum(),
                     ],
-                    dtype=torch.float64,
                     device=self.device,
                 )
         totals = reduce_sums(totals)

@@ -676,6 +676,18 @@ def _attach_prescriptive_v3_input_artifacts(
     coordinator(tracker, phase="prescriptive v3 input artifacts", action=record)
 
 
+def _loader_pin_memory(device: torch.device) -> bool:
+    """Pin host batches only when they are copied to a CUDA device.
+
+    Pure transfer engineering: pinned pages let ``IndexedBatch.to(...,
+    non_blocking=True)`` overlap the host->device copy on the default stream;
+    batch contents, order, RNG and numerics are unchanged.  Workers are
+    deliberately NOT persistent: ``dataset.set_epoch()`` runs in the main
+    process each epoch and would never reach persistent workers.
+    """
+    return device.type == "cuda"
+
+
 def _configure_compile(*, initialized_distributed: bool) -> None:
     """Fail closed before any write unless a compiled run keeps its guarantees.
 
@@ -964,6 +976,7 @@ def main(argv: list[str] | None = None) -> int:
             world_size=get_world_size(),
             shuffle=False,
         )
+        pin_memory = _loader_pin_memory(device)
         loader = cast(
             DataLoader[IndexedBatch],
             DataLoader(
@@ -971,6 +984,7 @@ def main(argv: list[str] | None = None) -> int:
                 batch_size=config.training.per_rank_batch_size,
                 sampler=sampler,
                 num_workers=config.training.num_workers,
+                pin_memory=pin_memory,
                 collate_fn=collate_indexed,
                 generator=data_loader_generator(config.seeds.data_order),
                 worker_init_fn=seed_data_loader_worker,
@@ -989,6 +1003,7 @@ def main(argv: list[str] | None = None) -> int:
                 batch_size=config.training.per_rank_batch_size,
                 sampler=validation_sampler,
                 num_workers=config.training.num_workers,
+                pin_memory=pin_memory,
                 collate_fn=collate_indexed,
                 generator=data_loader_generator(config.seeds.data_order + 1),
                 worker_init_fn=seed_data_loader_worker,
@@ -1012,6 +1027,7 @@ def main(argv: list[str] | None = None) -> int:
                         shuffle=False,
                     ),
                     num_workers=config.training.num_workers,
+                    pin_memory=pin_memory,
                     collate_fn=collate_indexed,
                     generator=data_loader_generator(config.seeds.data_order + 2),
                     worker_init_fn=seed_data_loader_worker,
