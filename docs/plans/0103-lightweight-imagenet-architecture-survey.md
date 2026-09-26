@@ -757,3 +757,20 @@ history behind this pivot.)
     them across runs. Sample-keyed augmentation makes this exact.
   - ImageNet-100 screening on Anteater is a candidate use of the idle
     2080 Tis.
+- 2026-09-26 (chat): **Sync-free training step and pinned loaders merged.**
+  Scientific review found no P1, and all P2/P3 findings are fixed.
+  - Per-step metric accumulation stays on the device, the non-finite-loss
+    check is a sync-free `_assert_async` (still a `FloatingPointError` on
+    CPU), and the train/val/probe loaders pin memory with non-blocking copies
+    on CUDA.
+  - A same-process old-vs-new differential test gives bit-identical epoch
+    rows and checkpoint state (weights, optimizer, EMA, RNG, sampler,
+    sample state, selection metadata) for PGD-AT, RSLAD and ADR. This holds
+    on CPU and on CUDA with pinned loaders, the CUDA case run on an Anteater
+    2080 Ti.
+  - Remaining per-step syncs are in the attack's guards
+    (`src/ard/attacks/pgd.py`: pixel range, step <= eps, random-start
+    check, `max_abs_delta`). Removing them would touch attack guards, so it
+    needs its own reviewed change.
+  - Operational note: pinned host memory is ~2 GB per process at 8
+    workers. Check host RSS in the first Phase 1 run.
