@@ -852,3 +852,19 @@ history behind this pivot.)
     random init by +1.2 clean / +0.5 PGD-10, inside the noise floor.
   - This is Arm A's recipe for both inits. The fair best-vs-best comparison
     is plan 0104 stage 2, which is running now.
+- 2026-09-26 (human-approved, chat): **`training.step_diagnostics` merged.**
+  - Default `true` is bit-identical to before, and the field is serialized only
+    when false, so config hashes are unchanged.
+  - `false` skips the two per-step diagnostic eval-mode forwards (~17%
+    compute). The epoch rows then drop train_clean_accuracy,
+    train_robust_accuracy_eval_mode, train_robust_overtakes_clean and
+    train_ema_student_agreement.
+  - Training state is proven identical under `false`: checkpoints, RNG,
+    sampler and selection match on CPU for PGD-AT, RSLAD and ADR, and in a
+    2-rank DDP test. Under DDP, BN buffers resync at the next DDP forward
+    instead of at `train_epoch` return.
+  - The field is observability-only and not part of the evaluation pooling
+    identity, like `train_probe_size`.
+  - Scientific review found no P1, and all findings are fixed.
+  - Phase 1 configs set `step_diagnostics: false` and keep
+    `train_probe_size: 2000`, the remaining eval-mode seen-set signal.
