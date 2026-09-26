@@ -948,3 +948,22 @@ history behind this pivot.)
   elsewhere. The plan-0104 lr-0.015 run and the EfficientNet-B0 canary keep
   running on Ferret; they are slower but their numerics are unaffected.
   BF16 and co-location decisions wait for a clean measurement on Hamster.
+- 2026-09-27 (chat): **Option A preregistered rule, written before launch.**
+  - **Runs.** `imagenet_mobilenetv4_standard_50ep.yaml` and `..._100ep.yaml`
+    (method `standard`: clean CE, no training attack; random init; Arm A's
+    recipe; deterministic; seed 0; train probe 2000). They run on Anteater
+    GPU2/GPU3 in parallel, a comparison made entirely on the 2080 Ti.
+  - **Reference.** Adversarial training with the same recipe and random init
+    moved from 50 to 100 epochs by +1.20 clean / +0.53 PGD-10 (53.36/30.05
+    -> 54.56/30.58, Hamster 4090).
+  - **Metric.** Last-epoch internal-val clean accuracy. `best.pt` is chosen by
+    val PGD-10, which is ~0 for a clean model, so it is not used.
+  - **Rule.** Let G = clean(100) - clean(50) for the standard runs.
+    - G >= 2pt: "the 50-epoch saturation is specific to the robust
+      objective".
+    - G < 1pt: "the recipe itself saturates by 50 epochs; the saturation is
+      not specific to adversarial training".
+    - Otherwise inconclusive.
+  - **Also reported.** Seen-set probe clean accuracy of the standard runs, a
+    fit check to compare with ~35% seen-set PGD-10 under adversarial
+    training, and the stage-saturation pattern per LR stage. n=1 per cell.
