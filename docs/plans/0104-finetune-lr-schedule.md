@@ -99,3 +99,62 @@ Stop rule: same as stage 1. No further learning rates, schedules or seeds withou
   `plan0103-mobilenetv4-random-init-50ep-v1`, `plan0104-mobilenetv4-random-init-lr01-v1`, then
   `plan0104-mobilenetv4-pretrained-lr0015-v1`. GPU1: after `plan0104-mobilenetv4-ft-lr0005-v1`,
   `plan0104-mobilenetv4-random-init-lr0025-v1`.
+- 2026-09-26 (postrun): stage 1 run `plan0104-mobilenetv4-ft-lr0005-v1` completed 50/50 epochs. Results and verdict in
+  "Stage 1 completion report" below. The GPU1 queue launched `plan0104-mobilenetv4-random-init-lr0025-v1` at 11:34:57 UTC.
+
+## Stage 1 completion report
+
+Status: stage 1 is closed. Stage 2 is still running; this run is also its pretrained / lr 0.005 cell.
+
+Run: `plan0104-mobilenetv4-ft-lr0005-v1`, Hamster RTX 4090 (GPU1), hand-run bundle. `completion.json` reads `completed`,
+the manifest status is `completed`, and `error-marker.txt` reads "no application error recorded". The watcher re-derived it
+as terminal and successful. All 50 epoch rows are present (`epoch_metrics_complete: true`). `train.log` has no traceback,
+NaN or error line. Nothing is imported into `docs/experiments/`: no aggregator exists for this contract, as for the plan 0103
+cells. The numbers below are read from `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest summary.
+
+Fixed identity: ImageNet-1k, MobileNetV4-Conv-Small, clean-pretrained init (timm `mobilenetv4_conv_small.e1200_r224_in1k`),
+plain PGD-AT, no teacher. Training and evaluation-attack seed 0 (split seed 20260911). Training attack: CE PGD-3, l_inf
+eps 4/255, step 8/765, random start, eval mode. Selection and validation attack: PGD-10, same eps. Peak LR 0.005,
+warmup_multistep (10-epoch warmup, x0.1 at epochs 25 and 38), 50 epochs. World size 1, global batch 128, local BatchNorm,
+deterministic. Protocol `controlled_imagenet_stage02_finetune_lr_v1`. Source SHA `be9fdfeccb93ad6c2f7a430dafbe81047bdcd449`
+(worktree `source-be9fdfeccb93`, clean). "val" is internal validation (the held-out 2% of the training split), not the
+official ImageNet val. No AutoAttack has run.
+
+| run | last (ep 49) val clean / PGD-10 | best (by val PGD-10) | last probe clean / PGD-10 |
+|---|---:|---:|---:|
+| pretrained, lr 0.005 (this run) | 57.81 / 31.26 | ep 39: 57.70 / 31.39 | 62.80 / 36.45 |
+| pretrained, lr 0.05 (Arm A, seed 0) | 54.57 / 30.58 | ep 46: 54.57 / 30.74 | not logged |
+| pretrained, lr 0.05 (Arm A, seed 1) | 54.33 / 30.59 | | not logged |
+| random init, lr 0.05 (plan 0103, 50 ep) | 53.36 / 30.05 | ep 48: 53.42 / 30.17 | 58.85 / 34.25 |
+
+**Preregistered rules:**
+- Primary: a Phase 1 recipe candidate only if last PGD-10 >= 31.59%. 31.26% is 0.33pt short, so **Arm A stays**.
+- Secondary (budget): a half-budget candidate only if val PGD-10 first reaches >= 30.58% at or before epoch 25. It first
+  reaches it at epoch 26 (30.60%; epoch 25 is 30.44%), so **not a half-budget candidate**, by one epoch.
+- Interpretation table: random-init/50 vs Arm A is -0.53pt (within 1pt), and this run vs Arm A is +0.68pt (within 1pt).
+  The preregistered reading is **"pretraining is not needed"** (n=1).
+
+Reading (n=1, internal validation, PGD-10 only):
+1. PGD-10 gain over Arm A: +0.68pt (seed 0) and +0.67pt (seed 1) at the last epoch, +0.65pt at best. This is below the 1pt
+   threshold and inside the noise floor.
+2. Clean gain over Arm A: +3.24pt (seed 0) and +3.48pt (seed 1) at the last epoch. This is the largest difference in the
+   plan 0103 / 0104 series so far, and it is above the upper edge of the CIFAR control-vs-control floor (1.88pt). The rules
+   judge PGD-10 only, so this is reported, not judged.
+3. The pretrained head start is kept. Val clean starts at 49.46% (epoch 0) and never falls below it. It is 51.8-53.2% during
+   the lr-0.005 phase, whereas Arm A falls to ~37-38% during its lr-0.05 phase.
+4. The lr-0.005 phase (epochs 9-24) is not a flat plateau like Arm A's. PGD-10 rises from 24.58% to 27.60%, but it is nearly
+   flat over the last five epochs (26.99-27.68%). The first decay (epoch 25) gives +2.8pt PGD-10 in one epoch. The lr-0.0005
+   stage ends (epoch 37) at 57.39 / 30.96, and the last stage adds ~0.3-0.4pt.
+5. The final stage saturated. Over epochs 38-49 the train loss moved 3.588 -> 3.574, and val PGD-10 stayed in 31.22-31.39%.
+6. Seen-unseen gap at the end (probe minus val): +5.0 clean / +5.2 PGD-10, similar to random-init/50 (+5.5 / +4.2).
+
+Decision: by the preregistered rule, Arm A remains the recipe, and this run is not a half-budget candidate. The stage 2
+grid (already approved) takes this run as its pretrained / lr 0.005 cell. The pretrained-vs-random verdict and each init's
+Phase 1 LR come from the stage 2 rule, not from this stage.
+
+Caveats: one seed. The CIFAR control-vs-control floor was 0.16-1.88pt, and Arm A's two seeds do not estimate a spread.
+The runs compared here come from different source SHAs (Arm A: plan 0101; random-init/50: `987dfb5`; this run: `be9fdfe`).
+The secondary threshold 30.58% is Arm A's rounded value. Wall clock 21.9 h (2026-09-25 13:41 to 09-26 11:34 UTC,
+~836 img/s). Checkpoints `best.pt`, `last.pt`, `epoch-049.pt` are on disk; their sha256 was not computed in this postrun.
+`epoch-metrics.parquet` sha256 `98b4cd86...`, `sample-stats-train.parquet` sha256 `8035516b...` (from the run-bundle
+manifest). W&B `lightweight-imagenet-at`, same run id.
