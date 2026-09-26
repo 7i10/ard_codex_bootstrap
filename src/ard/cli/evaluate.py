@@ -299,6 +299,11 @@ def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
         identity["cudnn_benchmark"] = True
     if training.compile:
         identity["compile"] = True
+    # Skipping the diagnostic-only forwards does not change the trained
+    # model, but it is a distinct execution protocol; like the options above
+    # it appears only when non-default so existing identities stay identical.
+    if not training.step_diagnostics:
+        identity["step_diagnostics"] = False
     return identity
 
 

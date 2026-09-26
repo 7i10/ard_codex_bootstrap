@@ -1102,6 +1102,7 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics=diagnostics,
             observation_profile=config.observation.profile,
             checkpoint_epochs=config.training.checkpoint_epochs,
+            step_diagnostics=config.training.step_diagnostics,
         )
         start_epoch = 0
         if args.resume is not None:

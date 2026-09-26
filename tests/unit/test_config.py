@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -1502,6 +1503,43 @@ def test_throughput_options_default_off_and_cudnn_benchmark_requires_nondetermin
     assert _throughput_protocol_identity(compiled_only) == {"compile": True}
 
 
+def test_step_diagnostics_defaults_on_and_is_serialized_only_when_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Default configs keep a byte-identical resolved config, config hash and evaluation identity."""
+    from ard.cli.evaluate import _throughput_protocol_identity
+    from ard.config.loader import resolved_config_dict
+    from ard.config.schema import TrainingConfig
+
+    default = TrainingConfig(per_rank_batch_size=4, global_batch_size=4)
+    assert default.step_diagnostics is True
+    assert "step_diagnostics" not in default.model_dump()
+    assert "step_diagnostics" not in json.loads(default.model_dump_json())
+    assert _throughput_protocol_identity(default) == {}
+    # Independent of determinism: skipping forwards changes no kernel choice.
+    for deterministic in (True, False):
+        off = TrainingConfig(
+            per_rank_batch_size=4, global_batch_size=4, deterministic=deterministic, step_diagnostics=False
+        )
+        assert off.model_dump()["step_diagnostics"] is False
+        assert TrainingConfig.model_validate_json(off.model_dump_json()).step_diagnostics is False
+        assert _throughput_protocol_identity(off) == {"step_diagnostics": False}
+
+    _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
+    path = Path("configs/production/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml")
+    config = load_config(path)
+    explicit = load_config(path, ["training.step_diagnostics=true"])
+    disabled = load_config(path, ["training.step_diagnostics=false"])
+    assert "step_diagnostics" not in resolved_config_dict(config)["training"]
+    assert resolved_config_dict(explicit) == resolved_config_dict(config)
+    assert config_digest(resolved_config_dict(explicit)) == config_digest(resolved_config_dict(config))
+    assert resolved_config_dict(disabled)["training"]["step_diagnostics"] is False
+    assert config_digest(resolved_config_dict(disabled)) != config_digest(resolved_config_dict(config))
+    # A saved resolved config reloads to the same setting.
+    assert ExperimentConfig.model_validate(resolved_config_dict(disabled)).training.step_diagnostics is False
+    assert ExperimentConfig.model_validate(resolved_config_dict(config)).training.step_diagnostics is True
+
+
 def test_runtimes_that_ignore_throughput_options_refuse_them() -> None:
     from ard.config.schema import TrainingConfig, reject_throughput_options
 
@@ -1513,3 +1551,6 @@ def test_runtimes_that_ignore_throughput_options_refuse_them() -> None:
         training = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, deterministic=False, **enabled)
         with pytest.raises(ValueError, match=f"fixture does not implement training.{next(iter(enabled))}"):
             reject_throughput_options(training, runtime="fixture")
+    no_diagnostics = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, step_diagnostics=False)
+    with pytest.raises(ValueError, match="fixture does not implement training.step_diagnostics=false"):
+        reject_throughput_options(no_diagnostics, runtime="fixture")

@@ -58,6 +58,11 @@ if TYPE_CHECKING:
     from ard.analysis.frozen_oracle import FrozenRiskLookup
 
 
+# train_epoch metrics measured only by the post-step eval-mode student
+# forwards that ``step_diagnostics=False`` skips.
+_STEP_DIAGNOSTIC_TRAIN_METRICS = ("clean_accuracy", "robust_accuracy_eval_mode", "ema_student_agreement")
+
+
 @contextmanager
 def _evaluation_mode(model: nn.Module) -> Iterator[None]:
     mode = model.training
@@ -246,6 +251,7 @@ class Trainer:
         diagnostics: TrainingDiagnostics | None = None,
         observation_profile: str = "off",
         checkpoint_epochs: tuple[int, ...] = (),
+        step_diagnostics: bool = True,
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -452,6 +458,15 @@ class Trainer:
         self._pending_ema_clean_argmax: torch.Tensor | None = None
         # Diagnostic only (plan 0100): see _rectified_target's caching note.
         self._pending_rectified_true_class_mass: torch.Tensor | None = None
+        # Throughput option (human-approved 2026-09-26): False skips the two
+        # post-step eval-mode student forwards that exist only to measure
+        # clean_accuracy, robust_accuracy_eval_mode and ema_student_agreement.
+        # Those forwards consume no RNG, run under no_grad in eval mode (no
+        # BatchNorm running-stat update) and feed nothing but logged metrics,
+        # so skipping them leaves every training update, validation, probe,
+        # selection and checkpoint unchanged; the three metrics are then
+        # absent rather than reported as a fake value.
+        self.step_diagnostics = step_diagnostics
         self.adversarial_kd_multiplier = adversarial_kd_multiplier
         self.adversarial_ce_coefficient = adversarial_ce_coefficient
         self.clean_ce_coefficient = clean_ce_coefficient
@@ -1659,22 +1674,35 @@ class Trainer:
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
             self._update_ema()
-            with _evaluation_mode(self.model), torch.no_grad():
-                clean_logits = self.model(batch.images)
-                # Decision 0016, option A: the same eval-mode/no-grad forward
-                # as clean_logits above, on the same post-step weights, but
-                # fed the already-generated `adversarial` batch instead of
-                # `batch.images`. Mode-matched to train_clean_accuracy, unlike
-                # `logits` (line ~1225: train-mode, pre-step) which
-                # train_robust_accuracy has always used.
-                adversarial_logits_eval_mode = self.model(adversarial)
-            # Every entry stays on the device (no per-step host sync); see
-            # _float64_totals for why the epoch totals are bit-identical.
-            ema_student_agreement_sum: torch.Tensor | float = (
-                0.0
-                if self._pending_ema_clean_argmax is None
-                else ((self._pending_ema_clean_argmax == clean_logits.argmax(1)).to(mask.dtype) * mask).sum()
-            )
+            ema_student_agreement_sum: torch.Tensor | float = 0.0
+            clean_correct_sum: torch.Tensor | float = 0.0
+            robust_eval_mode_correct_sum: torch.Tensor | float = 0.0
+            if self.step_diagnostics:
+                with _evaluation_mode(self.model), torch.no_grad():
+                    clean_logits = self.model(batch.images)
+                    # Decision 0016, option A: the same eval-mode/no-grad forward
+                    # as clean_logits above, on the same post-step weights, but
+                    # fed the already-generated `adversarial` batch instead of
+                    # `batch.images`. Mode-matched to train_clean_accuracy, unlike
+                    # `logits` (line ~1225: train-mode, pre-step) which
+                    # train_robust_accuracy has always used.
+                    adversarial_logits_eval_mode = self.model(adversarial)
+                # Every entry stays on the device (no per-step host sync); see
+                # _float64_totals for why the epoch totals are bit-identical.
+                if self._pending_ema_clean_argmax is not None:
+                    ema_student_agreement_sum = (
+                        (self._pending_ema_clean_argmax == clean_logits.argmax(1)).to(mask.dtype) * mask
+                    ).sum()
+                clean_correct_sum = ((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()
+                robust_eval_mode_correct_sum = (
+                    (adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype) * mask
+                ).sum()
+            # With step_diagnostics=False the three slots above stay 0.0 and
+            # their epoch metrics are dropped below. Under DDP the skipped
+            # no-grad forward would have been the one to broadcast rank 0's
+            # BatchNorm buffers; the next DDP forward (the next attack, or
+            # validation) broadcasts the same, unmodified rank-0 values before
+            # anything reads them, so no rank's computation changes.
             self._pending_ema_clean_argmax = None
             rectified_true_class_mass_sum: torch.Tensor | float = (
                 0.0
@@ -1685,14 +1713,14 @@ class Trainer:
             totals += _float64_totals(
                 [
                     (terms.total.detach() * mask).sum(),
-                    ((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
+                    clean_correct_sum,
                     ((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
                     mask.sum(),
                     teacher_clean_forward_calls,
                     self._teacher_adversarial_forward_calls,
                     ema_student_agreement_sum,
                     rectified_true_class_mass_sum,
-                    ((adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
+                    robust_eval_mode_correct_sum,
                 ],
                 device=self.device,
             )
@@ -1711,7 +1739,7 @@ class Trainer:
             local_cuda_peak_reserved_bytes=peak_reserved_bytes,
         )
         count = max(observability["valid_examples"], 1.0)
-        return {
+        metrics = {
             "loss": float(totals[0].item()) / count,
             "clean_accuracy": float(totals[1].item()) / count,
             "robust_accuracy": float(totals[2].item()) / count,
@@ -1724,6 +1752,11 @@ class Trainer:
             **observability,
             **self._boundary_epoch_stats,
         }
+        if not self.step_diagnostics:
+            # Never measured this epoch: absent, not a fake 0.0.
+            for key in _STEP_DIAGNOSTIC_TRAIN_METRICS:
+                del metrics[key]
+        return metrics
 
     def validate_epoch(self, loader: DataLoader[IndexedBatch], *, model: nn.Module | None = None) -> dict[str, float]:
         """Evaluate post-update clean and PGD accuracy without mutating model state.
@@ -1919,9 +1952,10 @@ class Trainer:
                         "selection_metadata": self.selection_metadata_ema,
                     },
                 )
+            clean_accuracy = train_metrics.get("clean_accuracy")
             epoch_metrics = {
                 "train_loss": train_metrics["loss"],
-                "train_clean_accuracy": train_metrics["clean_accuracy"],
+                "train_clean_accuracy": clean_accuracy,
                 "train_robust_accuracy": train_metrics["robust_accuracy"],
                 # Decision 0016, option A: mode-matched to train_clean_accuracy
                 # above (both eval-mode, post-step), unlike train_robust_accuracy
@@ -1939,7 +1973,9 @@ class Trainer:
                 # accompanied the collapse diagnosed in decision 0016 -- not
                 # catastrophic overfitting as such. Kept unchanged for series
                 # continuity. Never gates a checkpoint, schedule or attack.
-                "train_robust_overtakes_clean": train_metrics["robust_accuracy"] > train_metrics["clean_accuracy"],
+                "train_robust_overtakes_clean": (
+                    clean_accuracy is not None and train_metrics["robust_accuracy"] > clean_accuracy
+                ),
                 "train_valid_examples": train_metrics.get("valid_examples", 0.0),
                 "train_seconds": train_metrics.get("seconds", 0.0),
                 "train_images_per_second": train_metrics.get("images_per_second", 0.0),
@@ -1957,6 +1993,11 @@ class Trainer:
                 "learning_rate": epoch_learning_rate,
                 "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
             }
+            if clean_accuracy is None:
+                # step_diagnostics=False: the post-step eval-mode forwards
+                # these three metrics are derived from never ran.
+                for key in ("train_clean_accuracy", "train_robust_accuracy_eval_mode", "train_robust_overtakes_clean"):
+                    del epoch_metrics[key]
             if probe_metrics is not None:
                 epoch_metrics["train_probe_clean_accuracy"] = probe_metrics["clean_accuracy"]
                 epoch_metrics["train_probe_pgd_accuracy"] = probe_metrics["pgd_accuracy"]
@@ -1976,7 +2017,8 @@ class Trainer:
                 # 0.0 ("EMA and student agree on 0% of clean images") instead
                 # of the true (typically >0.95) value, with no error to flag
                 # the mismatch.
-                epoch_metrics["train_ema_student_agreement"] = train_metrics["ema_student_agreement"]
+                if "ema_student_agreement" in train_metrics:
+                    epoch_metrics["train_ema_student_agreement"] = train_metrics["ema_student_agreement"]
             if self.adr_config is not None:
                 # Diagnostic only (plan 0100, scientific review finding
                 # P0-1): the rectified target's mean true-class probability

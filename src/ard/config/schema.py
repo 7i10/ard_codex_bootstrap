@@ -802,6 +802,20 @@ class TrainingConfig(StrictModel):
     # them are never pooled silently.
     cudnn_benchmark: bool = False
     compile: bool = False
+    # Throughput option (human-approved 2026-09-26). True (default) keeps
+    # today's two post-optimizer-step eval-mode/no-grad student forwards
+    # (clean batch and the already-crafted adversarial batch) that exist only
+    # for logged diagnostics: train_clean_accuracy,
+    # train_robust_accuracy_eval_mode, train_robust_overtakes_clean and
+    # ADR's train_ema_student_agreement. False skips them (~17% of step
+    # compute); those metrics are then absent from the epoch rows. No
+    # training decision reads them (gap-adaptive ADR reads the train-mode
+    # train_robust_accuracy; online S2 reads boundary_* only), so the model,
+    # optimizer, EMA, RNG streams and checkpoints are unchanged. Serialized
+    # only when false, so every existing config keeps a byte-identical
+    # resolved config and config hash; recorded in the evaluation
+    # training_protocol_identity only when false as well.
+    step_diagnostics: bool = Field(default=True, exclude_if=lambda value: value is True)
     validation_fraction: float = Field(default=0.25, gt=0, lt=1)
     # This is a protocol identity, not a performance option. Ordinary DDP
     # computes BatchNorm statistics independently on each rank.
@@ -869,12 +883,15 @@ class TrainingConfig(StrictModel):
 def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None:
     """Refuse a config whose throughput options a runtime does not implement.
 
-    Only ``ard.cli.train`` applies ``training.compile`` and
-    ``training.cudnn_benchmark``. Every other Trainer builder would silently
-    run eagerly without autotuning while the config says otherwise, so it
-    must call this first.
+    Only ``ard.cli.train`` applies ``training.compile``,
+    ``training.cudnn_benchmark`` and ``training.step_diagnostics=false``.
+    Every other Trainer builder would silently run eagerly without
+    autotuning, with the diagnostic forwards, while the config says
+    otherwise, so it must call this first.
     """
     enabled = [name for name in ("compile", "cudnn_benchmark") if getattr(training, name)]
+    if not training.step_diagnostics:
+        enabled.append("step_diagnostics=false")
     if enabled:
         raise ValueError(
             f"{runtime} does not implement training.{'/'.join(enabled)}; run it with these options false "
