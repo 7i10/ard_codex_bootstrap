@@ -1952,11 +1952,16 @@ class Trainer:
                         "selection_metadata": self.selection_metadata_ema,
                     },
                 )
-            clean_accuracy = train_metrics.get("clean_accuracy")
-            epoch_metrics = {
-                "train_loss": train_metrics["loss"],
-                "train_clean_accuracy": clean_accuracy,
-                "train_robust_accuracy": train_metrics["robust_accuracy"],
+            # step_diagnostics=False: the post-step eval-mode forwards that
+            # train_clean_accuracy, train_robust_accuracy_eval_mode and
+            # train_robust_overtakes_clean are derived from never ran, so the
+            # keys are absent. With the default, insertion order and lookups
+            # are exactly as before (a missing clean_accuracy still raises).
+            epoch_metrics: dict[str, Any] = {"train_loss": train_metrics["loss"]}
+            if self.step_diagnostics:
+                epoch_metrics["train_clean_accuracy"] = train_metrics["clean_accuracy"]
+            epoch_metrics["train_robust_accuracy"] = train_metrics["robust_accuracy"]
+            if self.step_diagnostics:
                 # Decision 0016, option A: mode-matched to train_clean_accuracy
                 # above (both eval-mode, post-step), unlike train_robust_accuracy
                 # (train-mode, pre-step). Also post-step on perturbations crafted
@@ -1966,38 +1971,38 @@ class Trainer:
                 # the clean seen-set measurement. Observability only -- does not change
                 # train_robust_accuracy's own definition, value, or any
                 # downstream consumer (e.g. gap_adaptive_step) that reads it.
-                "train_robust_accuracy_eval_mode": train_metrics.get("robust_accuracy_eval_mode", 0.0),
+                epoch_metrics["train_robust_accuracy_eval_mode"] = train_metrics.get("robust_accuracy_eval_mode", 0.0)
                 # Recorded, not acted on. Compares train-mode pre-step robust
                 # accuracy with eval-mode post-step clean accuracy, so a true
                 # value marks the train/eval BatchNorm-mode divergence that
                 # accompanied the collapse diagnosed in decision 0016 -- not
                 # catastrophic overfitting as such. Kept unchanged for series
                 # continuity. Never gates a checkpoint, schedule or attack.
-                "train_robust_overtakes_clean": (
-                    clean_accuracy is not None and train_metrics["robust_accuracy"] > clean_accuracy
-                ),
-                "train_valid_examples": train_metrics.get("valid_examples", 0.0),
-                "train_seconds": train_metrics.get("seconds", 0.0),
-                "train_images_per_second": train_metrics.get("images_per_second", 0.0),
-                "train_cuda_peak_allocated_bytes": train_metrics.get("cuda_peak_allocated_bytes", 0.0),
-                "train_cuda_peak_reserved_bytes": train_metrics.get("cuda_peak_reserved_bytes", 0.0),
-                "train_teacher_clean_forward_calls": train_metrics.get("teacher_clean_forward_calls", 0.0),
-                "train_teacher_adversarial_forward_calls": train_metrics.get("teacher_adversarial_forward_calls", 0.0),
-                # Plan 0101 (scientific review P2-1): the realized training
-                # attack budget this epoch, self-describing regardless of
-                # whether epsilon_warmup_epochs is configured.
-                "train_attack_epsilon": train_metrics.get("attack_epsilon", 0.0),
-                "train_attack_step_size": train_metrics.get("attack_step_size", 0.0),
-                "val_clean_accuracy": validation_metrics["clean_accuracy"],
-                "val_pgd_accuracy": validation_metrics["pgd_accuracy"],
-                "learning_rate": epoch_learning_rate,
-                "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
-            }
-            if clean_accuracy is None:
-                # step_diagnostics=False: the post-step eval-mode forwards
-                # these three metrics are derived from never ran.
-                for key in ("train_clean_accuracy", "train_robust_accuracy_eval_mode", "train_robust_overtakes_clean"):
-                    del epoch_metrics[key]
+                epoch_metrics["train_robust_overtakes_clean"] = (
+                    train_metrics["robust_accuracy"] > train_metrics["clean_accuracy"]
+                )
+            epoch_metrics.update(
+                {
+                    "train_valid_examples": train_metrics.get("valid_examples", 0.0),
+                    "train_seconds": train_metrics.get("seconds", 0.0),
+                    "train_images_per_second": train_metrics.get("images_per_second", 0.0),
+                    "train_cuda_peak_allocated_bytes": train_metrics.get("cuda_peak_allocated_bytes", 0.0),
+                    "train_cuda_peak_reserved_bytes": train_metrics.get("cuda_peak_reserved_bytes", 0.0),
+                    "train_teacher_clean_forward_calls": train_metrics.get("teacher_clean_forward_calls", 0.0),
+                    "train_teacher_adversarial_forward_calls": train_metrics.get(
+                        "teacher_adversarial_forward_calls", 0.0
+                    ),
+                    # Plan 0101 (scientific review P2-1): the realized training
+                    # attack budget this epoch, self-describing regardless of
+                    # whether epsilon_warmup_epochs is configured.
+                    "train_attack_epsilon": train_metrics.get("attack_epsilon", 0.0),
+                    "train_attack_step_size": train_metrics.get("attack_step_size", 0.0),
+                    "val_clean_accuracy": validation_metrics["clean_accuracy"],
+                    "val_pgd_accuracy": validation_metrics["pgd_accuracy"],
+                    "learning_rate": epoch_learning_rate,
+                    "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
+                }
+            )
             if probe_metrics is not None:
                 epoch_metrics["train_probe_clean_accuracy"] = probe_metrics["clean_accuracy"]
                 epoch_metrics["train_probe_pgd_accuracy"] = probe_metrics["pgd_accuracy"]
@@ -2017,7 +2022,7 @@ class Trainer:
                 # 0.0 ("EMA and student agree on 0% of clean images") instead
                 # of the true (typically >0.95) value, with no error to flag
                 # the mismatch.
-                if "ema_student_agreement" in train_metrics:
+                if self.step_diagnostics:
                     epoch_metrics["train_ema_student_agreement"] = train_metrics["ema_student_agreement"]
             if self.adr_config is not None:
                 # Diagnostic only (plan 0100, scientific review finding

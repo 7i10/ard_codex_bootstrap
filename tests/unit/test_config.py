@@ -1523,7 +1523,8 @@ def test_step_diagnostics_defaults_on_and_is_serialized_only_when_off(
         )
         assert off.model_dump()["step_diagnostics"] is False
         assert TrainingConfig.model_validate_json(off.model_dump_json()).step_diagnostics is False
-        assert _throughput_protocol_identity(off) == {"step_diagnostics": False}
+        # Training-neutral, so never part of the pooling identity.
+        assert _throughput_protocol_identity(off) == {}
 
     _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
     path = Path("configs/production/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml")
@@ -1552,5 +1553,25 @@ def test_runtimes_that_ignore_throughput_options_refuse_them() -> None:
         with pytest.raises(ValueError, match=f"fixture does not implement training.{next(iter(enabled))}"):
             reject_throughput_options(training, runtime="fixture")
     no_diagnostics = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, step_diagnostics=False)
-    with pytest.raises(ValueError, match="fixture does not implement training.step_diagnostics=false"):
+    with pytest.raises(ValueError) as refused:
         reject_throughput_options(no_diagnostics, runtime="fixture")
+    # The remediation names the value each option must be run with.
+    assert str(refused.value) == (
+        "fixture does not implement training.step_diagnostics=false; run it with "
+        "training.step_diagnostics=true (only ard.cli.train applies these options)"
+    )
+    everything = TrainingConfig(
+        per_rank_batch_size=4,
+        global_batch_size=4,
+        deterministic=False,
+        compile=True,
+        cudnn_benchmark=True,
+        step_diagnostics=False,
+    )
+    with pytest.raises(ValueError) as refused:
+        reject_throughput_options(everything, runtime="fixture")
+    assert str(refused.value) == (
+        "fixture does not implement training.compile=true, training.cudnn_benchmark=true, "
+        "training.step_diagnostics=false; run it with training.compile=false, training.cudnn_benchmark=false, "
+        "training.step_diagnostics=true (only ard.cli.train applies these options)"
+    )

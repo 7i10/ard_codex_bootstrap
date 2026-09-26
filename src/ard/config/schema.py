@@ -813,8 +813,10 @@ class TrainingConfig(StrictModel):
     # train_robust_accuracy; online S2 reads boundary_* only), so the model,
     # optimizer, EMA, RNG streams and checkpoints are unchanged. Serialized
     # only when false, so every existing config keeps a byte-identical
-    # resolved config and config hash; recorded in the evaluation
-    # training_protocol_identity only when false as well.
+    # resolved config and config hash. Deliberately NOT part of the
+    # evaluation training_protocol_identity (training-neutral, like
+    # train_probe_size), so True and False seeds of one arm pool.
+    # pydantic>=2.12 is required for Field(exclude_if=...).
     step_diagnostics: bool = Field(default=True, exclude_if=lambda value: value is True)
     validation_fraction: float = Field(default=0.25, gt=0, lt=1)
     # This is a protocol identity, not a performance option. Ordinary DDP
@@ -889,13 +891,16 @@ def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None
     autotuning, with the diagnostic forwards, while the config says
     otherwise, so it must call this first.
     """
-    enabled = [name for name in ("compile", "cudnn_benchmark") if getattr(training, name)]
+    # (field, value this runtime would ignore, value it must be run with)
+    unsupported = [(name, "true", "false") for name in ("compile", "cudnn_benchmark") if getattr(training, name)]
     if not training.step_diagnostics:
-        enabled.append("step_diagnostics=false")
-    if enabled:
+        unsupported.append(("step_diagnostics", "false", "true"))
+    if unsupported:
+        requested = ", ".join(f"training.{name}={value}" for name, value, _ in unsupported)
+        remediation = ", ".join(f"training.{name}={value}" for name, _, value in unsupported)
         raise ValueError(
-            f"{runtime} does not implement training.{'/'.join(enabled)}; run it with these options false "
-            "(only ard.cli.train applies them)"
+            f"{runtime} does not implement {requested}; run it with {remediation} "
+            "(only ard.cli.train applies these options)"
         )
 
 

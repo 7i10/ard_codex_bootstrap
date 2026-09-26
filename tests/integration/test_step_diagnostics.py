@@ -30,6 +30,8 @@ import yaml
 from torch import nn
 
 import tests.integration.test_step_sync_free_parity as parity
+from ard.analysis import summarize_checkpoint_groups
+from ard.cli import evaluate as evaluate_cli
 from ard.cli import train as train_cli
 from tests.integration.test_compile_trainer import _cli_config, _write_config
 
@@ -49,16 +51,30 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _pre_change_trainer_module() -> ModuleType:
+    """Load the Trainer as it was at ``PRE_CHANGE_COMMIT``.
+
+    One-time proof that introducing the option left the default path
+    bit-identical. It depends on git history (absent in an export, a shallow
+    clone, or once shared ``ard`` modules drift far enough that the old file no
+    longer imports); the lasting guard is
+    ``test_disabling_step_diagnostics_changes_no_training_state``, which needs
+    no history.
+    """
     try:
-        source = subprocess.run(
+        completed = subprocess.run(
             ["git", "show", f"{PRE_CHANGE_COMMIT}:src/ard/engine/trainer.py"],
             cwd=_REPO_ROOT,
-            check=True,
             capture_output=True,
             text=True,
-        ).stdout
-    except (OSError, subprocess.CalledProcessError) as exc:  # pragma: no cover - no git history available
-        pytest.skip(f"pre-change trainer source unavailable: {exc}")
+        )
+    except OSError as exc:  # pragma: no cover - git not installed
+        pytest.skip(f"git unavailable, cannot load the pre-change trainer from {PRE_CHANGE_COMMIT}: {exc}")
+    if completed.returncode != 0:  # pragma: no cover - commit absent (export or shallow clone)
+        pytest.skip(
+            f"commit {PRE_CHANGE_COMMIT} (pre-step_diagnostics trainer) is not in this checkout's history: "
+            f"{completed.stderr.strip()}"
+        )
+    source = completed.stdout
     assert "step_diagnostics" not in source
     name = "ard.engine._trainer_pre_step_diagnostics"
     spec = importlib.util.spec_from_loader(name, loader=None)
@@ -182,6 +198,22 @@ def test_disabling_step_diagnostics_changes_no_training_state(
     assert _exact(rows_off) == _exact(kept)
 
 
+def test_default_still_requires_the_diagnostic_metrics(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """With the default, a train_epoch result lacking clean_accuracy is an error, never a silent drop."""
+    trainer = parity._trainer(tmp_path / "missing", "pgd_at")
+    real_train_epoch = trainer.train_epoch
+
+    def without_clean_accuracy(*args: Any, **kwargs: Any) -> dict[str, float]:
+        metrics = real_train_epoch(*args, **kwargs)
+        del metrics["clean_accuracy"]
+        return metrics
+
+    monkeypatch.setattr(trainer, "train_epoch", without_clean_accuracy)
+    loader, validation_loader = parity._loaders()
+    with pytest.raises(KeyError, match="clean_accuracy"):
+        trainer.fit(loader, validation_loader=validation_loader, epochs=1)
+
+
 def test_train_cli_threads_step_diagnostics_into_rows_and_resolved_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -214,3 +246,45 @@ def test_train_cli_threads_step_diagnostics_into_rows_and_resolved_config(
         assert not (DROPPED_ROW_KEYS & set(row_off))
         assert row_off["train_robust_accuracy"] == row_on["train_robust_accuracy"]
         assert row_off["val_pgd_accuracy"] == row_on["val_pgd_accuracy"]
+
+
+def test_step_diagnostics_never_splits_the_evaluation_pooling_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Training-neutral, so an arm's True and False seeds must pool (unlike compile)."""
+    monkeypatch.chdir(tmp_path)
+    deterministic = torch.are_deterministic_algorithms_enabled()
+    rows: dict[bool, list[dict[str, Any]]] = {}
+    try:
+        for model_init, enabled in ((8, True), (9, False)):
+            name = f"pool-{enabled}"
+            output = tmp_path / name
+            data = _cli_config(output)
+            data["seeds"]["model_init"] = model_init
+            data["tracker_run_id"] = f"smoke-local-{name}"
+            if not enabled:
+                data["training"]["step_diagnostics"] = False
+            config_path = _write_config(tmp_path, name, data)
+            assert train_cli.main(["--config", str(config_path)]) == 0
+            evaluation_output = tmp_path / f"{name}-evaluation"
+            arguments = [
+                "--config",
+                str(config_path),
+                "--checkpoint-dir",
+                str(output),
+                "--output",
+                str(evaluation_output),
+            ]
+            assert evaluate_cli.main(arguments) == 0
+            rows[enabled] = json.loads((evaluation_output / "evaluation-results.json").read_text(encoding="utf-8"))
+    finally:
+        torch.use_deterministic_algorithms(deterministic)
+    identities = {
+        enabled: {json.dumps(row["training_protocol_identity"], sort_keys=True) for row in result}
+        for enabled, result in rows.items()
+    }
+    assert len(identities[True]) == 1
+    assert identities[True] == identities[False]
+    assert all("step_diagnostics" not in row["training_protocol_identity"] for row in rows[True] + rows[False])
+    pooled = summarize_checkpoint_groups(rows[True] + rows[False], metric="pgd_accuracy")
+    assert {alias: summary["count"] for alias, summary in pooled.items()} == {"best": 2, "last": 2}

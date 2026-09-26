@@ -52,3 +52,27 @@ def test_two_rank_local_batchnorm_allows_two_forwards_before_backward() -> None:
         timeout=30,
     )
     assert completed.returncode == 0, completed.stderr
+
+
+def test_two_rank_step_diagnostics_off_changes_no_ddp_training_state(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[2]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(root / "src")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "torch.distributed.run",
+            "--standalone",
+            "--nproc_per_node=2",
+            str(root / "tests" / "regression" / "torchrun_step_diagnostics.py"),
+            str(tmp_path),
+        ],
+        cwd=root,
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=180,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "STEP_DIAGNOSTICS_DDP_OK" in completed.stdout
