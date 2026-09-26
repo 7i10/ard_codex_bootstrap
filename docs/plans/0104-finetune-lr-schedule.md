@@ -167,3 +167,8 @@ manifest). W&B `lightweight-imagenet-at`, same run id.
     observation does not change the verdict. It is an input for the human's decision after stage 2.
   - Stage 2 was auto-launched by the queue: `plan0104-mobilenetv4-random-init-lr01-v1` on GPU0 at 10:50Z and
     `plan0104-mobilenetv4-random-init-lr0025-v1` on GPU1 at 11:34Z.
+- 2026-09-27: Ferret (3x RTX 4090) became free. Its env matches Hamster's pip freeze, and its ImageNet copy matches both manifest
+  hashes. `plan0104-mobilenetv4-pretrained-lr0015-v1` moved from Hamster GPU0's queue, whose queue script was stopped
+  by the operator with the running lr-0.1 job untouched, to Ferret GPU0. It launched from Ferret's pinned worktree
+  `source-76280eb86100`, the same SHA as the other stage-2 runs. Same GPU type, recipe and deterministic mode; the host is
+  recorded in the run bundle.

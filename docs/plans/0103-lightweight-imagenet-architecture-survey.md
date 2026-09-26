@@ -868,3 +868,25 @@ history behind this pivot.)
   - Scientific review found no P1, and all findings are fixed.
   - Phase 1 configs set `step_diagnostics: false` and keep
     `train_probe_size: 2000`, the remaining eval-mode seen-set signal.
+- 2026-09-27 (human, chat): **Budget question refined.** Lightweight models
+  normally do not train with heavy augmentation; the value of long schedules
+  there comes from distillation, which gives new information every epoch.
+  Squeezing the last 1-2% with a long cosine tail is not a goal, and 300
+  epochs is the upper bound worth considering. Hypothesis: the ~50-epoch
+  saturation reflects the difficulty of robust versus standard
+  classification. Approved:
+  - (A) a clean-training control: a new `standard` method (no training
+    attack), same recipe, random init, MobileNetV4-S, 50 and 100 epochs, on
+    Anteater's 2080 Tis (a comparison run entirely on that GPU type).
+    Implementation is in progress.
+  - (B) a literature survey on adversarial-training epoch budgets and
+    capacity limits for small models.
+  Ferret (3x 4090) is free and takes 4090-only work: plan 0104's last
+  stage-2 run, and on GPU1 a BF16 / channels_last / compile throughput probe
+  with all six models. On GPU2, 3-epoch Phase-1-settings canaries for
+  EfficientNet-B0 and MobileViT-S (deterministic off, cudnn autotuning,
+  compile, step_diagnostics off, 16 workers; dev W&B project; worktree
+  `source-bf37707ee8de`). Early probe reading: MobileNetV4-S reaches only
+  ~868 img/s on a Ferret 4090 against ~1739 on Hamster. BF16 adds ~1%. This
+  fits a CPU-launch-bound small model on a host with slower cores; to be
+  confirmed.
