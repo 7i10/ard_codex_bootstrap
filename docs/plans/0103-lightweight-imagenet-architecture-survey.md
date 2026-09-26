@@ -967,3 +967,16 @@ history behind this pivot.)
   - **Also reported.** Seen-set probe clean accuracy of the standard runs, a
     fit check to compare with ~35% seen-set PGD-10 under adversarial
     training, and the stage-saturation pattern per LR stage. n=1 per cell.
+- 2026-09-27 (chat): **Option A launched.** Method `standard` merged as
+  `2762b89`. Scientific review found no P0/P1/P2; the P3 follow-ups are in
+  progress, none blocking.
+  - Anteater GPU2 runs `plan0103-mobilenetv4-standard-50ep-v1` and GPU3
+    runs `plan0103-mobilenetv4-standard-100ep-v1`, from pinned worktree
+    `source-2762b89ead95` (seed 0, 7 loader workers each, W&B
+    `lightweight-imagenet-at`).
+  - The review confirmed the standard path shares data order, augmentation,
+    optimizer, scheduler, RNG streams and BN update pattern with the PGD-AT
+    cells; only the training attack is removed.
+  - `best.pt` / W&B best_* for these runs are meaningless (selection by val
+    PGD-10 ~0). The analysis reads last-epoch clean, per the preregistered
+    rule.
