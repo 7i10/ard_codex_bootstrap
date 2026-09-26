@@ -208,7 +208,7 @@ def replay_robust_correctness(
         or source_config.teacher is None
     ):
         raise FrozenOracleError("frozen-oracle replay requires a baseline RSLAD source and frozen teacher")
-    attack_config = source_config.method.attack
+    attack_config = source_config.method.require_training_attack()
     expected_attack = AttackConfig(loss="kl", kl_target="teacher_clean")
     if attack_config.identity() != expected_attack.identity():
         raise FrozenOracleError("frozen-oracle replay requires the complete controlled KL PGD-10 attack identity")
@@ -387,7 +387,7 @@ def build_frozen_oracle_manifests(
     if source_config.teacher.checkpoint_sha256 is None:
         raise FrozenOracleError("frozen oracle source teacher must have an exact checkpoint SHA")
     expected_attack = AttackConfig(loss="kl", kl_target="teacher_clean")
-    if source_config.method.attack.identity() != expected_attack.identity():
+    if source_config.method.require_training_attack().identity() != expected_attack.identity():
         raise FrozenOracleError("frozen oracle source attack must match the complete controlled KL PGD-10 identity")
     valid_control_seeds = len(control_seeds) == 3 and len(set(control_seeds)) == 3
     if not valid_control_seeds or any(not isinstance(seed, int) for seed in control_seeds):
@@ -420,7 +420,7 @@ def build_frozen_oracle_manifests(
         maximum = replay.get("max_abs_delta")
         if not isinstance(maximum, (int, float)) or maximum < 0:
             raise FrozenOracleError(f"{name} replay max Linf delta is invalid")
-        epsilon = source_config.method.attack.epsilon_value
+        epsilon = source_config.method.require_training_attack().epsilon_value
         assert epsilon is not None
         if maximum > epsilon + 1e-7:
             raise FrozenOracleError(f"{name} replay exceeds the configured pixel-space Linf bound")
@@ -474,7 +474,7 @@ def build_frozen_oracle_manifests(
             **lineage,
             "config_sha256": source_config_hash,
             "teacher_checkpoint_sha256": source_config.teacher.checkpoint_sha256,
-            "attack_identity": source_config.method.attack.identity(),
+            "attack_identity": source_config.method.require_training_attack().identity(),
             "replay_source_files": replay_source_hashes(),
             "builder_git": {"sha": builder_sha, "dirty": False},
             "wandb_checkpoint_inventory": dict(wandb_checkpoint_inventory),

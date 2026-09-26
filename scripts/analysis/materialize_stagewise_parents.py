@@ -211,7 +211,7 @@ def main() -> int:
         optimizer=optimizer,
         scheduler=scheduler,
         scaler=None,
-        attack=LinfPGD(config.method.attack),
+        attack=LinfPGD(config.method.require_training_attack()),
         selection_attack=LinfPGD(selection_attack_config),
         objective=objective,
         policy=policy,

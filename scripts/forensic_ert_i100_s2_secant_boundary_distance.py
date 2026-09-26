@@ -285,7 +285,9 @@ def main() -> int:
     if sha256(args.checkpoint) != args.expected_checkpoint_sha256:
         raise ValueError("e99 parent checkpoint SHA mismatch")
     config = load_config(args.config)
-    attack_config = config.method.attack.model_copy(update={"random_start_keying": "sample_keyed_v1"})
+    attack_config = config.method.require_training_attack().model_copy(
+        update={"random_start_keying": "sample_keyed_v1"}
+    )
     if attack_config.loss != "kl" or attack_config.steps != 10 or attack_config.kl_target != "teacher_clean":
         raise ValueError("forensic requires registered sample-keyed KL-PGD10")
     payload = torch.load(args.checkpoint, map_location="cpu", weights_only=False)

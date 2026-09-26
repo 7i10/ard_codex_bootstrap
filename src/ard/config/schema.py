@@ -669,6 +669,16 @@ class MethodConfig(StrictModel):
         """Runtime compatibility only; resolved configuration serializes ``id``."""
         return self.id
 
+    def require_training_attack(self) -> AttackConfig:
+        """Return ``attack`` itself (the same object), or refuse ``standard``.
+
+        For callers that only make sense for a method with a training attack;
+        typed non-optional so they need no per-site ``None`` handling.
+        """
+        if self.attack is None:
+            raise ValueError(f"method {self.id} has no training attack")
+        return self.attack
+
     @model_validator(mode="before")
     @classmethod
     def resolve_training_attack(cls, value: Any) -> Any:
@@ -1625,6 +1635,17 @@ class ExperimentConfig(StrictModel):
                 raise ValueError("method standard trains without a teacher; remove teacher")
             if self.training.epsilon_warmup_epochs is not None:
                 raise ValueError("method standard has no training attack; training.epsilon_warmup_epochs is undefined")
+            # Mirrors the Trainer's attack-free refusals that a config can
+            # express, so they fail here, before any tracker run exists.
+            # (intervention/prescriptive_v3 already require method rslad;
+            # target_policy/adr/oracle_mask/frozen oracle are refused on
+            # MethodConfig.)
+            if self.observation.profile != "off":
+                raise ValueError(
+                    "method standard records no adversarial per-sample state; observation.profile must be off"
+                )
+            if self.protocol.id != "controlled_imagenet_stage02_clean_budget_v1":
+                raise ValueError("method standard is defined only under controlled_imagenet_stage02_clean_budget_v1")
         if self.protocol.id == "controlled_imagenet_stage02_clean_budget_v1" and self.method.id != "standard":
             raise ValueError("controlled_imagenet_stage02_clean_budget_v1 requires method standard")
         if self.method.oracle_mask and self.tier != "dev":

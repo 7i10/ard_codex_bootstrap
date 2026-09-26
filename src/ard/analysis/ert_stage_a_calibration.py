@@ -207,11 +207,18 @@ def _load_parent(
     *, config_path: Path, checkpoint_path: Path, device: torch.device
 ) -> tuple[Any, nn.Module, nn.Module, dict[str, Any]]:
     config = load_config(config_path)
-    if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
+    if (
+        config.method.id != "rslad"
+        or config.method.require_training_attack().loss != "kl"
+        or config.method.require_training_attack().steps != 10
+    ):
         raise StageACalibrationError("calibration parent is not the exact observed RSLAD KL-PGD10 run")
-    if config.method.attack.kl_target != "teacher_clean":
+    if config.method.require_training_attack().kl_target != "teacher_clean":
         raise StageACalibrationError("calibration parent must use teacher-clean KL target")
-    if config.method.attack.temperature != 1.0 or not config.method.attack.temperature_squared:
+    if (
+        config.method.require_training_attack().temperature != 1.0
+        or not config.method.require_training_attack().temperature_squared
+    ):
         raise StageACalibrationError("calibration parent temperature contract drifted")
     payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     if not isinstance(payload, Mapping) or payload.get("epoch") != 79 or payload.get("epoch_boundary") != "end":
@@ -261,7 +268,7 @@ def calibrate(*, config_path: Path, output: Path, device: str = "cuda") -> dict[
             raise StageACalibrationError("parent dataset does not expose immutable train labels")
         labels = {int(sample_id): int(raw_targets[sample_id]) for sample_id in train_dataset.indices}
         masks = _state_masks(mask_path)
-        attack = LinfPGD(config.method.attack)
+        attack = LinfPGD(config.method.require_training_attack())
         objective = RSLADObjective(
             temperature=config.method.temperature,
             temperature_squared=config.method.temperature_squared,

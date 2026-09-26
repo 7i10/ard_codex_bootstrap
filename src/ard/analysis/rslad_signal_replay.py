@@ -346,7 +346,7 @@ def inventory_feature_trajectory(
 
 def validate_rslad_replay_attack(config: ExperimentConfig) -> None:
     """Require the immutable RSLAD KL teacher-clean PGD-10 threat model."""
-    attack = config.method.attack
+    attack = config.method.require_training_attack()
     expected = {
         "norm": "linf",
         "input_domain": "pixel_0_1",
@@ -449,7 +449,7 @@ def checkpoint_cache_identity(
             "sha256": checkpoint.sha256,
             "config_hash": checkpoint.config_hash,
         },
-        "attack_identity": training_config.method.attack.identity(),
+        "attack_identity": training_config.method.require_training_attack().identity(),
         "expected_count": expected_count,
         "saved_resolved_config_mapping_sha256": saved_resolved_config_mapping_sha256,
         "saved_resolved_config_file_sha256": saved_resolved_config_file_sha256,
@@ -642,7 +642,7 @@ def replay_checkpoint_rows(
     )
     teacher.eval()
     student.eval()
-    attack = LinfPGD(training_config.method.attack)
+    attack = LinfPGD(training_config.method.require_training_attack())
     margin_signal = RobustMarginSignal()
     rows: list[dict[str, Any]] = []
     max_abs_delta = 0.0
@@ -767,7 +767,7 @@ def replay_checkpoint_rows(
         student.zero_grad(set_to_none=True)
     if len({row["sample_id"] for row in rows}) != len(rows):
         raise RSLADSignalReplayError("replayed checkpoint contains duplicate stable source sample IDs")
-    epsilon = training_config.method.attack.epsilon_value
+    epsilon = training_config.method.require_training_attack().epsilon_value
     assert epsilon is not None
     if max_abs_delta > epsilon + 1e-7:
         raise RSLADSignalReplayError("common-trajectory replay violated pixel-space Linf projection")
@@ -1289,7 +1289,7 @@ def replay_lineage(
                 training=training_config.training, world_size=panel.world_size
             ),
         },
-        "attack_identity": training_config.method.attack.identity(),
+        "attack_identity": training_config.method.require_training_attack().identity(),
         "train_expected_count": expected_count,
         "teacher": dict(teacher_metadata),
         "dataset_identity": dict(dataset_identity),
@@ -1416,7 +1416,7 @@ def feature_replay_lineage(
                 training=training_config.training, world_size=panel.world_size
             ),
         },
-        "attack_identity": training_config.method.attack.identity(),
+        "attack_identity": training_config.method.require_training_attack().identity(),
         "train_expected_count": expected_count,
         "teacher": dict(teacher_metadata),
         "dataset_identity": dict(dataset_identity),
@@ -1477,7 +1477,7 @@ def outcome_replay_lineage(
                 training=training_config.training, world_size=panel.world_size
             ),
         },
-        "attack_identity": training_config.method.attack.identity(),
+        "attack_identity": training_config.method.require_training_attack().identity(),
         "train_expected_count": expected_count,
         "teacher": dict(teacher_metadata),
         "dataset_identity": dict(dataset_identity),

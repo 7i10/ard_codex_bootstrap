@@ -259,9 +259,11 @@ def replay_envelope(
     if audit_config.get("dataset_fingerprint") != expected_fingerprint:
         raise TeacherRiskReplayError("analysis dataset fingerprint does not match strict resolved training config")
     declared_attack = audit_config.get("threat_identity", audit_config.get("attack_identity"))
-    if canonical_json(declared_attack) != canonical_json(training_config.method.attack.model_dump(mode="json")):
+    if canonical_json(declared_attack) != canonical_json(
+        training_config.method.require_training_attack().model_dump(mode="json")
+    ):
         raise TeacherRiskReplayError("analysis attack identity does not match the strict resolved training method")
-    if training_config.method.attack.steps != 10:
+    if training_config.method.require_training_attack().steps != 10:
         raise TeacherRiskReplayError("teacher-risk replay requires a training method with exact PGD-10")
     repository_identity = git_identity(root=repository_root)
     if repository_identity["dirty"]:
@@ -273,7 +275,7 @@ def replay_envelope(
         student=student,
         teacher=teacher,
         loader=loader,
-        attack=LinfPGD(training_config.method.attack),
+        attack=LinfPGD(training_config.method.require_training_attack()),
         device=device,
         attack_seed_base=training_config.seeds.train_attack + 1_000_003 * int(checkpoint_payload["global_step"]),
     )
@@ -303,7 +305,7 @@ def replay_envelope(
         "teacher_checkpoint_sha256": teacher.metadata.checkpoint_sha256,
         "dataset_fingerprint": expected_fingerprint,
         "dataset_identity": dataset_identity,
-        "attack_identity": training_config.method.attack.model_dump(mode="json"),
+        "attack_identity": training_config.method.require_training_attack().model_dump(mode="json"),
         "replay_protocol": protocol,
         "rows": list(replay.rows),
         "replay_output_sha256": _sha256_mapping(replay.rows),

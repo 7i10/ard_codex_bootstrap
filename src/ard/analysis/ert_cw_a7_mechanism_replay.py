@@ -123,7 +123,7 @@ def replay_checkpoint(
 ) -> dict[str, Any]:
     """Replay one checkpoint with the exact KL-PGD10 attack, without updates."""
     config = _runtime_config(config_path)
-    attack_config = config.method.attack
+    attack_config = config.method.require_training_attack()
     if (
         attack_config.loss != "kl"
         or attack_config.kl_target != "teacher_clean"

@@ -150,7 +150,7 @@ def _contracts(seed: str) -> tuple[Path, Path, dict[str, object], dict[str, obje
     teacher_path = Path(str(config.teacher.checkpoint)) if config.teacher is not None else None
     if teacher_path is None or not teacher_path.is_file() or _sha256(teacher_path) != TEACHER_SHA256:
         raise SystemExit(f"frozen Teacher SHA mismatch for {seed}")
-    keyed_attack = config.method.attack.model_copy(update={"random_start_keying": "sample_keyed_v1"})
+    keyed_attack = config.method.require_training_attack().model_copy(update={"random_start_keying": "sample_keyed_v1"})
     training = keyed_attack.identity()
     endpoint = None if config.method.selection_attack is None else config.method.selection_attack.identity()
     if keyed_attack.identity_sha256() != SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256:

@@ -96,7 +96,7 @@ def probe_checkpoint(
         num_workers=config.training.num_workers,
         collate_fn=collate_indexed,
     )
-    attack_config = config.method.attack
+    attack_config = config.method.require_training_attack()
     attack = LinfPGD(attack_config)
     global_step = payload.get("global_step")
     if not isinstance(global_step, int):

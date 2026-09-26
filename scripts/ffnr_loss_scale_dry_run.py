@@ -100,7 +100,7 @@ def run(*, config_path: Path, parent: Path, masks: list[Path], device: str, batc
         parameter.requires_grad_(False)
     with torch.no_grad():
         teacher_clean = teacher(images).detach().float()
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     generator = torch.Generator(device=target_device).manual_seed(config.seeds.train_attack + 79_000_003)
     adversarial = attack.generate(
         AttackRequest(

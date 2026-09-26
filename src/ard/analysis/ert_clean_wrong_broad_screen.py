@@ -134,7 +134,11 @@ def calibrate_bce_beta(
 ) -> dict[str, Any]:
     """Freeze C12 beta from no-update AdvKD/BCE gradient ratios."""
     config = load_config(config_path)
-    if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
+    if (
+        config.method.id != "rslad"
+        or config.method.require_training_attack().loss != "kl"
+        or config.method.require_training_attack().steps != 10
+    ):
         raise CleanWrongScreenError("C12 calibration requires the canonical RSLAD KL-PGD10 parent")
     payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     if not isinstance(payload, Mapping) or payload.get("epoch") != 79 or payload.get("epoch_boundary") != "end":
@@ -170,7 +174,7 @@ def calibrate_bce_beta(
         shuffle=False,
         collate_fn=collate_indexed,
     )
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     objective = RSLADObjective(
         temperature=config.method.temperature,
         temperature_squared=config.method.temperature_squared,

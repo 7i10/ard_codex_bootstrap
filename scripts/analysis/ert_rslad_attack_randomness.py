@@ -124,9 +124,9 @@ def fixed_model_replay(
     )
     if config.seeds.model_init != seed or config.seeds.data_order != seed or config.seeds.augmentation != seed:
         raise ValueError("fixed replay config does not match parent streams")
-    if config.method.attack.random_start_keying != "sample_keyed_v1":
+    if config.method.require_training_attack().random_start_keying != "sample_keyed_v1":
         raise ValueError("fixed replay requires sample_keyed_v1")
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     teacher = build_teacher(config.teacher, tier=config.tier).eval() if config.teacher is not None else None
     if teacher is None:
         raise ValueError("RSLAD fixed replay requires the frozen Teacher")

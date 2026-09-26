@@ -544,7 +544,10 @@ def run_dynamic_s3_arm(
     training_contract = payload.get("training_attack")
     endpoint_contract = payload.get("endpoint_attack")
     parent_config = load_config(Path(run["parent_config"]))
-    if not isinstance(training_contract, dict) or training_contract != parent_config.method.attack.identity():
+    if (
+        not isinstance(training_contract, dict)
+        or training_contract != parent_config.method.require_training_attack().identity()
+    ):
         raise DynamicS3RoutingError("dynamic S3 training attack contract does not exactly match the parent")
     if (
         not isinstance(endpoint_contract, dict)

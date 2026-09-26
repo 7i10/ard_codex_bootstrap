@@ -217,7 +217,7 @@ def main() -> int:
     teacher.eval()
     model, compile_seconds = _compile_model(student, args.candidate)
     model.train()
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     objective = RSLADObjective(
         temperature=config.method.temperature,
         temperature_squared=config.method.temperature_squared,

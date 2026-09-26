@@ -211,7 +211,7 @@ def main() -> int:
 
     torch.manual_seed(arguments.init_seed)
     config = load_config(arguments.config)
-    attack_config = config.method.attack
+    attack_config = config.method.require_training_attack()
     epsilon = float(attack_config.epsilon_value)
     step_size = float(attack_config.step_size_value)
     steps = int(attack_config.steps)

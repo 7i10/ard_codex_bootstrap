@@ -134,7 +134,7 @@ def _run(
     if sha256(checkpoint) != PARENT_SHA[run]:
         raise ValueError(f"{run}: parent SHA mismatch")
     config = load_config(config_path)
-    keyed = config.method.attack.model_copy(update={"random_start_keying": "sample_keyed_v1"})
+    keyed = config.method.require_training_attack().model_copy(update={"random_start_keying": "sample_keyed_v1"})
     if keyed.identity_sha256() != TRAIN_ATTACK_ID:
         raise ValueError(f"{run}: training attack identity mismatch")
     config = config.model_copy(update={"method": config.method.model_copy(update={"attack": keyed})})

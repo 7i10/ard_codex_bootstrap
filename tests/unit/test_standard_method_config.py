@@ -42,7 +42,7 @@ def _standard(**extra: Any) -> dict[str, Any]:
 def _experiment(method: dict[str, Any], **extra: Any) -> dict[str, Any]:
     return {
         "schema_version": 2,
-        "protocol": {"id": "synthetic_smoke_v2"},
+        "protocol": {"id": "controlled_imagenet_stage02_clean_budget_v1"},
         "tier": "dev",
         "seeds": dict.fromkeys(
             (
@@ -129,19 +129,38 @@ def test_standard_refuses_a_teacher_and_epsilon_warmup() -> None:
         ExperimentConfig.model_validate(data)
 
 
+@pytest.mark.parametrize("profile", ["student_history", "teacher_response"])
+def test_standard_refuses_a_non_off_observation_profile(profile: str) -> None:
+    """Refused in the schema, before a tracker run exists (the Trainer would
+    refuse it too, but only after W&B run creation)."""
+    with pytest.raises(ValidationError, match="observation.profile must be off"):
+        ExperimentConfig.model_validate(_experiment(_standard(), observation={"profile": profile}))
+
+
 def test_clean_budget_protocol_is_registered_and_restricted_to_standard() -> None:
     assert ensure_local_trainable("controlled_imagenet_stage02_clean_budget_v1").runnable_locally
-    data = _experiment(_standard(), protocol={"id": "controlled_imagenet_stage02_clean_budget_v1"})
+    data = _experiment(_standard())
     assert ExperimentConfig.model_validate(data).method.id == "standard"
     data["method"] = {"id": "pgd_at", "version": 1}
     with pytest.raises(ValidationError, match="requires method standard"):
         ExperimentConfig.model_validate(data)
 
 
-def test_standard_fails_closed_under_a_controlled_cifar_contract() -> None:
-    data = _experiment(_standard(), protocol={"id": "controlled_cifar10_r18_v1"})
-    with pytest.raises(ValidationError, match="defines no method without a training attack"):
+@pytest.mark.parametrize(
+    "protocol",
+    ["synthetic_smoke_v2", "controlled_cifar10_r18_v1", "controlled_imagenet_stage02_budget_init_v1"],
+)
+def test_standard_is_refused_under_every_other_protocol(protocol: str) -> None:
+    data = _experiment(_standard(), protocol={"id": protocol})
+    with pytest.raises(ValidationError, match="defined only under controlled_imagenet_stage02_clean_budget_v1"):
         ExperimentConfig.model_validate(data)
+
+
+def test_require_training_attack_returns_the_same_object_or_refuses_standard() -> None:
+    pgd_at = MethodConfig.model_validate({"id": "pgd_at", "version": 1})
+    assert pgd_at.require_training_attack() is pgd_at.attack
+    with pytest.raises(ValueError, match="method standard has no training attack"):
+        MethodConfig.model_validate(_standard()).require_training_attack()
 
 
 def _env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

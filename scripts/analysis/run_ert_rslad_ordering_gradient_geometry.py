@@ -131,7 +131,7 @@ def run_seed(*, seed: int, parent_path: Path, config_path: Path, output: Path, d
     for parameter in teacher.parameters():
         parameter.requires_grad_(False)
         parameter.grad = None
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     objective = RSLADObjective(
         temperature=config.method.temperature,
         temperature_squared=config.method.temperature_squared,

@@ -37,7 +37,7 @@ def _run(
 ) -> dict[str, Any]:
     images = batch.images.to(device)
     labels = batch.labels.to(device)
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     objective = RSLADObjective(
         temperature=config.method.temperature,
         temperature_squared=config.method.temperature_squared,

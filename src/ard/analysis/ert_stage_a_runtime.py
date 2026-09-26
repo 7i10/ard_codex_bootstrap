@@ -663,7 +663,9 @@ def run_stage_a_arm(
         # contract.  Keep the checkpoint/config hash as the parent identity,
         # but explicitly bind this continuation's actual attack to the
         # registered sample-keyed KL-PGD10 identity.
-        keyed_attack = config.method.attack.model_copy(update={"random_start_keying": "sample_keyed_v1"})
+        keyed_attack = config.method.require_training_attack().model_copy(
+            update={"random_start_keying": "sample_keyed_v1"}
+        )
         config = config.model_copy(update={"method": config.method.model_copy(update={"attack": keyed_attack})})
         if keyed_attack.identity_sha256() != SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256:
             raise StageARuntimeError("forced training attack does not match the registered sample-keyed KL10 identity")
@@ -678,9 +680,13 @@ def run_stage_a_arm(
         torch.backends.cudnn.deterministic = True
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
-    if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
+    if (
+        config.method.id != "rslad"
+        or config.method.require_training_attack().loss != "kl"
+        or config.method.require_training_attack().steps != 10
+    ):
         raise StageARuntimeError("Stage A parent is not the observed RSLAD KL-PGD10 run")
-    if config.method.attack.kl_target != "teacher_clean":
+    if config.method.require_training_attack().kl_target != "teacher_clean":
         raise StageARuntimeError("Stage A parent attack target is not teacher_clean")
     if (
         config.method.selection_attack is None
@@ -837,7 +843,9 @@ def run_stage_a_arm(
     if dynamic_s3_arm is not None:
         if config.method.selection_attack is None:
             raise StageARuntimeError("dynamic S3 requires a saved CE-PGD20 endpoint attack")
-        _require_attack_identity(config.method.attack.identity(), dynamic_s3_attack_contract, label="training")
+        _require_attack_identity(
+            config.method.require_training_attack().identity(), dynamic_s3_attack_contract, label="training"
+        )
         _require_attack_identity(
             config.method.selection_attack.identity(), dynamic_s3_endpoint_contract, label="endpoint"
         )
@@ -853,7 +861,9 @@ def run_stage_a_arm(
         assert online_state_s2 is not None and online_original_parent_sha256 is not None
         expected_training = online_state_s2.get("training_attack")
         expected_endpoint = online_state_s2.get("endpoint_attack")
-        _require_attack_identity(config.method.attack.identity(), expected_training, label="training")
+        _require_attack_identity(
+            config.method.require_training_attack().identity(), expected_training, label="training"
+        )
         if config.method.selection_attack is None:
             raise StageARuntimeError("online S2 routing requires the frozen CE-PGD20 endpoint attack")
         _require_attack_identity(config.method.selection_attack.identity(), expected_endpoint, label="endpoint")
@@ -1112,7 +1122,7 @@ def run_stage_a_arm(
             experiment_parent_sha256=online_original_parent_sha256,
             prefix_epoch=online_prefix_epoch,
             expected_source_git_sha=source_sha,
-            expected_training_attack_identity_sha256=config.method.attack.identity_sha256(),
+            expected_training_attack_identity_sha256=config.method.require_training_attack().identity_sha256(),
         )
         prefix_router_state = prefix_lineage.get("online_state_s2_state")
         if not isinstance(prefix_router_state, dict):
@@ -1128,7 +1138,7 @@ def run_stage_a_arm(
             materialized_state_path=materialized_state_path,
             prefix_checkpoint_sha256=actual_parent_checkpoint_sha256,
             source_git_sha=source_sha,
-            training_attack_identity_sha256=config.method.attack.identity_sha256(),
+            training_attack_identity_sha256=config.method.require_training_attack().identity_sha256(),
         )
         online_prefix_state = {
             "path": str(parent_checkpoint.resolve()),
@@ -1166,7 +1176,7 @@ def run_stage_a_arm(
         optimizer=optimizer,
         scheduler=scheduler,
         scaler=None,
-        attack=LinfPGD(config.method.attack),
+        attack=LinfPGD(config.method.require_training_attack()),
         selection_attack=LinfPGD(config.method.selection_attack),
         objective=objective,
         policy=RSLADBaselinePolicy(),
@@ -1269,8 +1279,8 @@ def run_stage_a_arm(
         ),
         "child_config_hash": arm_hash,
         "calibration_sha256": calibration.get("artifact_sha256"),
-        "training_attack_identity_sha256": config.method.attack.identity_sha256(),
-        "training_attack_random_start_keying": config.method.attack.random_start_keying,
+        "training_attack_identity_sha256": config.method.require_training_attack().identity_sha256(),
+        "training_attack_random_start_keying": config.method.require_training_attack().random_start_keying,
         "source_git_sha": source_sha,
         "rng_source_seeds": None if rng_source_seeds is None else rng_source_seeds.as_dict(),
         "shuffle_augmentation_seeds": (
@@ -1293,7 +1303,7 @@ def run_stage_a_arm(
                 "shared_prefix": shared_prefix,
                 "treatment": treatment.__dict__,
                 "calibration": calibration,
-                "training_attack_identity_sha256": config.method.attack.identity_sha256(),
+                "training_attack_identity_sha256": config.method.require_training_attack().identity_sha256(),
                 "child_config_hash": arm_hash,
                 "run_namespace": run_namespace,
                 "continuation_seed": continuation_seed,

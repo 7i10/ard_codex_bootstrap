@@ -101,7 +101,7 @@ def checkpoint_path(block: str, arm: str, epoch: int) -> Path:
 
 
 def _assert_attack(config: Any) -> None:
-    attack = config.method.attack
+    attack = config.method.require_training_attack()
     if not (
         attack.loss == "kl"
         and attack.kl_target == "teacher_clean"
@@ -182,7 +182,7 @@ def replay_one(*, block: str, arm: str, epoch: int, device: str, output_root: Pa
     for parameter in teacher.parameters():
         parameter.requires_grad_(False)
         parameter.grad = None
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     floor = float(treatment.get("margin_floor") or FLOOR)
     cap = float(treatment.get("margin_cap") or CAP)
     rows: list[dict[str, Any]] = []
@@ -257,7 +257,7 @@ def replay_one(*, block: str, arm: str, epoch: int, device: str, output_root: Pa
             )
     if {int(row["sample_id"]) for row in rows} != probe_set or len(rows) != len(probe_set):
         raise RuntimeError(f"fixed probe did not recover exact IDs: {block}/{arm}/epoch-{epoch}")
-    if max_abs_delta > float(config.method.attack.epsilon_value) + 1e-7:
+    if max_abs_delta > float(config.method.require_training_attack().epsilon_value) + 1e-7:
         raise RuntimeError("fixed replay exceeded pixel-space Linf bound")
     out_dir.mkdir(parents=True, exist_ok=False)
     write_sample_parquet(rows, rows_path)
@@ -282,8 +282,8 @@ def replay_one(*, block: str, arm: str, epoch: int, device: str, output_root: Pa
         "probe_selection": "first 256 sorted IDs from fixed epoch-79 Clean-Wrong mask",
         "rows_path": str(rows_path.resolve()),
         "rows_sha256": sha256(rows_path),
-        "attack": config.method.attack.identity(),
-        "attack_identity_sha256": config.method.attack.identity_sha256(),
+        "attack": config.method.require_training_attack().identity(),
+        "attack_identity_sha256": config.method.require_training_attack().identity_sha256(),
         "fixed_probe_seed_protocol": "910000 + teacher_code*100000 + 101*epoch + full-train-batch-index; shared by R1/R2",
         "initial_delta_sha256_by_batch": initial_delta_hashes,
         "max_abs_delta": max_abs_delta,
@@ -541,7 +541,7 @@ def _gradient_one(*, block: str, arm: str, epoch: int, checkpoint: Path, probe_r
     for parameter in teacher.parameters():
         parameter.requires_grad_(False)
         parameter.grad = None
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     objective = RSLADObjective(temperature=config.method.temperature, temperature_squared=config.method.temperature_squared)
     parameters = tuple(student.parameters())
     total_n = 0

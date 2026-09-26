@@ -532,7 +532,8 @@ def test_exact_rslad_threat_accepts_temperature_squared_canonical_config() -> No
 def test_exact_rslad_threat_rejects_each_canonical_identity_field_drift(field: str, value: object) -> None:
     config = load_config(Path(__file__).parents[2] / "configs" / "experiments" / "synthetic_rslad.yaml")
     attack = config.method.attack.model_copy(update={field: value})
-    drifted = SimpleNamespace(method=SimpleNamespace(id="rslad", attack=attack))
+    # model_copy skips validation, so the drifted attack survives as-is.
+    drifted = SimpleNamespace(method=config.method.model_copy(update={"attack": attack}))
     with pytest.raises(RSLADSignalReplayError, match="exact RSLAD"):
         validate_rslad_replay_attack(drifted)
 

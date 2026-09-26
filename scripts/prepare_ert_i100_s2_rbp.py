@@ -229,9 +229,13 @@ def _calibrate_run(
     if sha256(checkpoint) != PARENT_SHA[run]:
         raise ValueError(f"{run} parent SHA mismatch")
     config = load_config(config_path)
-    if config.method.id != "rslad" or config.method.attack.loss != "kl" or config.method.attack.steps != 10:
+    if (
+        config.method.id != "rslad"
+        or config.method.require_training_attack().loss != "kl"
+        or config.method.require_training_attack().steps != 10
+    ):
         raise ValueError("calibration requires I100 KL-PGD10")
-    keyed_attack = config.method.attack.model_copy(update={"random_start_keying": "sample_keyed_v1"})
+    keyed_attack = config.method.require_training_attack().model_copy(update={"random_start_keying": "sample_keyed_v1"})
     if keyed_attack.identity_sha256() != SAMPLE_KEYED_KL10_ATTACK_IDENTITY:
         raise ValueError("calibration attack does not match the registered sample-keyed KL10 identity")
     config = config.model_copy(update={"method": config.method.model_copy(update={"attack": keyed_attack})})
@@ -261,7 +265,7 @@ def _calibrate_run(
         raise ValueError(f"{run} calibration IDs are outside the train split")
     subset = Subset(train_dataset, [positions[sid] for sid in sample_ids])
     loader = DataLoader(subset, batch_size=64, shuffle=False, num_workers=0, collate_fn=collate_indexed)
-    attack = LinfPGD(config.method.attack)
+    attack = LinfPGD(config.method.require_training_attack())
     objective = RSLADObjective(
         temperature=config.method.temperature,
         temperature_squared=config.method.temperature_squared,

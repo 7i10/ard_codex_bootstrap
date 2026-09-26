@@ -60,7 +60,7 @@ def replay(
     feature_epoch: int = 79,
 ) -> dict[str, Any]:
     config = load_config(config_path)
-    attack_config = config.method.selection_attack if attack_kind == "CE20" else config.method.attack
+    attack_config = config.method.selection_attack if attack_kind == "CE20" else config.method.require_training_attack()
     if attack_kind == "CE20":
         expected = {"loss": "ce", "steps": 20, "epsilon": "8/255", "step_size": "2/255", "kl_target": None}
     else:

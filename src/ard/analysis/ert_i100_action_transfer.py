@@ -128,7 +128,7 @@ def _primitives(logits: torch.Tensor, labels: torch.Tensor) -> dict[str, torch.T
 
 
 def _attack_config(config: Any, name: str):
-    source = config.method.selection_attack if name == "ce20" else config.method.attack
+    source = config.method.selection_attack if name == "ce20" else config.method.require_training_attack()
     if source is None:
         raise TransferReplayError(f"missing {name} attack")
     if name == "ce20" and (source.loss != "ce" or source.steps != 20):

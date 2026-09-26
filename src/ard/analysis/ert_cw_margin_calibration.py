@@ -139,7 +139,7 @@ def calibrate(*, config_path: Path, output: Path, device: str = "cuda") -> dict[
             num_workers=0,
             collate_fn=collate_indexed,
         )
-        attack = LinfPGD(config.method.attack)
+        attack = LinfPGD(config.method.require_training_attack())
         objective = RSLADObjective(
             temperature=config.method.temperature,
             temperature_squared=config.method.temperature_squared,

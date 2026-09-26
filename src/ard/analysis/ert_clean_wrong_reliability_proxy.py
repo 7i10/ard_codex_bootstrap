@@ -63,7 +63,7 @@ def _pearson_spearman(x: list[float], y: list[float]) -> dict[str, float | None]
 
 
 def _validate_kl_config(config: Any) -> Any:
-    attack = config.method.attack
+    attack = config.method.require_training_attack()
     if (
         attack.loss != "kl"
         or attack.kl_target != "teacher_clean"

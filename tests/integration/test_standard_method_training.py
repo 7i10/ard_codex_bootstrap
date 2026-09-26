@@ -6,7 +6,10 @@
 * Per-step metrics that assume an adversarial batch are absent or honestly
   renamed; validation still reports clean and PGD accuracy.
 * A small end-to-end ``ard.cli.train`` + ``ard.cli.evaluate`` run.
-* Existing methods are bit-identical to the pre-change Trainer (commit
+* ``standard`` shares data order and saved RNG/sampler state with the real
+  LinfPGD PGD-AT trainer.
+* One-off merge check (skipped unless ARD_RUN_HISTORY_DIFFERENTIALS=1):
+  existing methods are bit-identical to the pre-change Trainer (commit
   bf37707, loaded from git into this process), using the same-process
   ``_fingerprint`` differential of ``test_step_sync_free_parity``.
 """
@@ -31,6 +34,7 @@ import ard.engine.trainer as trainer_module
 import tests.integration.test_step_sync_free_parity as parity
 from ard.attacks import AttackGenerator, AttackRequest, AttackResult, LinfPGD
 from ard.config import load_config
+from ard.config.schema import AttackConfig
 from ard.engine.trainer import Trainer
 from ard.models import build_student
 from ard.objectives import PGDATObjective
@@ -164,6 +168,46 @@ def test_standard_equals_pgd_at_whose_training_attack_returns_the_clean_batch(tm
             assert standard_row[key] == zero_row[key], key
 
 
+def _pgd_at_trainer(output: Path) -> Trainer:
+    trainer = _standard_trainer(output)
+    trainer.attack = LinfPGD(AttackConfig(epsilon="2/255", step_size="1/255", steps=2, random_start=True))
+    return trainer
+
+
+def _fit_recording_sample_ids(trainer: Trainer) -> list[tuple[int, int, list[int]]]:
+    loader, validation_loader = parity._loaders()
+    steps: list[tuple[int, int, list[int]]] = []
+    trainer.fit(
+        loader,
+        validation_loader=validation_loader,
+        epochs=2,
+        on_batch_start=lambda epoch, index, batch: steps.append((epoch, index, batch.sample_ids.tolist())),
+    )
+    return steps
+
+
+def test_standard_shares_data_order_and_rng_streams_with_the_real_pgd_at_trainer(tmp_path: Path) -> None:
+    """Against the real 2-epoch LinfPGD PGD-AT trainer (same seeds, loaders,
+    selection attack): identical per-step sample IDs and identical saved
+    global RNG and sampler state -- the training attack draws only from its
+    own per-step generator, so removing it shifts no shared stream."""
+    deterministic = torch.are_deterministic_algorithms_enabled()
+    torch.use_deterministic_algorithms(True)
+    try:
+        standard_steps = _fit_recording_sample_ids(_standard_trainer(tmp_path / "standard"))
+        pgd_at_steps = _fit_recording_sample_ids(_pgd_at_trainer(tmp_path / "pgd_at"))
+    finally:
+        torch.use_deterministic_algorithms(deterministic)
+    assert standard_steps and standard_steps == pgd_at_steps
+    left = torch.load(tmp_path / "standard" / "last.pt", map_location="cpu", weights_only=False)
+    right = torch.load(tmp_path / "pgd_at" / "last.pt", map_location="cpu", weights_only=False)
+    for key in ("rng", "sampler_epoch", "sampler_state", "global_step"):
+        assert key in left and key in right, key
+        assert _digest(left[key]) == _digest(right[key]), key
+    # The trained weights must differ: PGD-AT really did train on perturbed inputs.
+    assert _digest(left["model"]) != _digest(right["model"])
+
+
 def test_standard_step_diagnostics_off_drops_only_the_post_step_metrics(tmp_path: Path) -> None:
     trainer = _standard_trainer(tmp_path / "run", step_diagnostics=False)
     loader, validation_loader = parity._loaders()
@@ -202,7 +246,9 @@ def _run(module: str, *args: str) -> subprocess.CompletedProcess[str]:
 def _cli_config(output: Path) -> dict[str, Any]:
     return {
         "schema_version": 2,
-        "protocol": {"id": "synthetic_smoke_v2"},
+        # method standard is defined only under this protocol; it carries no
+        # dataset/student contract, so a smoke-tier synthetic run is valid.
+        "protocol": {"id": "controlled_imagenet_stage02_clean_budget_v1"},
         "tier": "smoke",
         "seeds": dict.fromkeys(
             (
@@ -297,6 +343,16 @@ def test_standard_cli_trains_and_evaluates_end_to_end(tmp_path: Path) -> None:
     evaluation_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
     evaluated = _run("ard.cli.evaluate", "--config", str(evaluation_path), "--checkpoint-dir", str(output))
     assert evaluated.returncode == 0, evaluated.stderr
+    results = json.loads((output / "evaluation" / "evaluation-results.json").read_text(encoding="utf-8"))
+    assert sorted(item["checkpoint_alias"] for item in results) == ["best", "last"]
+    assert resolved.method.selection_attack is not None
+    selection_hash = resolved.method.selection_attack.identity_sha256()
+    for item in results:
+        assert item["runtime_method"] == "standard"
+        assert item["method_identity"]["id"] == "standard"
+        assert item["method_identity"]["attack"] is None
+        # Evaluation defaults to the saved selection attack's exact identity.
+        assert item["threat_hash"] == selection_hash
 
 
 def test_standard_cli_refuses_a_training_attack_override(tmp_path: Path) -> None:
@@ -306,6 +362,17 @@ def test_standard_cli_refuses_a_training_attack_override(tmp_path: Path) -> None
     assert refused.returncode != 0
     assert "no training attack" in refused.stderr
     assert not (tmp_path / "train").exists()
+
+
+# One-off merge check (plan 0103 option A, commit ab1b624): the Trainer with
+# `standard` against the pre-`standard` Trainer at bf37707, loaded from git.
+# It passed when `standard` merged (2762b89). Any later, intended change to
+# trainer.py numerics would legitimately break it, and telling such a change
+# apart from a `standard` regression is not automatable, so it is retired by
+# default: it runs only with ARD_RUN_HISTORY_DIFFERENTIALS=1 (e.g. to re-check
+# the merge from that commit). The standing, non-historical guards are the
+# same-process tests above (identity-attack and real-LinfPGD comparisons).
+_RUN_HISTORY_DIFFERENTIALS = os.environ.get("ARD_RUN_HISTORY_DIFFERENTIALS") == "1"
 
 
 def _pre_change_trainer_class() -> type:
@@ -332,6 +399,10 @@ def _pre_change_trainer_class() -> type:
     return module.Trainer
 
 
+@pytest.mark.skipif(
+    not _RUN_HISTORY_DIFFERENTIALS,
+    reason="one-off merge check against the bf37707 Trainer; set ARD_RUN_HISTORY_DIFFERENTIALS=1 to run",
+)
 @pytest.mark.parametrize("method", parity.METHODS)
 def test_existing_methods_are_bit_identical_to_the_pre_standard_trainer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str

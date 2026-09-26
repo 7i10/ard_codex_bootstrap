@@ -1341,6 +1341,88 @@ def test_offline_sync_uses_offline_wandb_mode_and_public_artifact_api(tmp_path: 
     assert fake.created_artifacts[-1].directories == [str(directory)]
 
 
+def test_mock_wandb_panel_table_accepts_standard_method_rows_without_adversarial_fields(tmp_path: Path) -> None:
+    """Plan 0103 option A: a method-standard panel row has a clean image but
+    None adversarial image/perturbation/prediction/correctness; a row may also
+    have every image column None. Both must reach the W&B table as None."""
+
+    class Run:
+        url = "mock://run"
+
+        def __init__(self, run_dir: Path) -> None:
+            self.dir = str(run_dir)
+            self.summary: dict = {}
+            self.logged: list[dict] = []
+
+        def log(self, values: dict, step: int | None = None) -> None:
+            del step
+            self.logged.append(values)
+
+        def finish(self, *, exit_code: int) -> None:
+            assert exit_code == 0
+
+    class Wandb:
+        def __init__(self, run_dir: Path) -> None:
+            self.run = Run(run_dir)
+            self.images: list[str] = []
+            self.tables: list[dict[str, object]] = []
+
+        def init(self, **kwargs: object) -> Run:
+            del kwargs
+            return self.run
+
+        def Image(self, path: str) -> tuple[str, str]:
+            self.images.append(path)
+            return ("image", path)
+
+        def Table(self, **kwargs: object) -> dict[str, object]:
+            self.tables.append(dict(kwargs))
+            return dict(kwargs)
+
+    output = tmp_path / "run"
+    output.mkdir()
+    wandb_parent = tmp_path / "offline-run-stable-run"
+    wandb_files = wandb_parent / "files"
+    wandb_files.mkdir(parents=True)
+    (wandb_parent / "run-stable-run.wandb").write_bytes(b"offline segment")
+    fake = Wandb(wandb_files)
+    cfg = config(output).model_copy(
+        update={"tracking": config(output).tracking.model_copy(update={"mode": "offline_sync"})}
+    )
+    tracker = create_tracker(config=cfg, output_dir=output, config_hash="abc", root=Path.cwd(), wandb_module=fake)
+    assert isinstance(tracker, LocalTracker)
+    standard_row = {column: None for column in QUALITATIVE_COLUMNS}
+    standard_row.update(
+        {
+            "sample_id": 2,
+            "epoch": 0,
+            "clean_image": torch.zeros(3, 4, 4),
+            "true_label": 1,
+            "student_clean_prediction": 1,
+            "kd_weight": 0.0,
+            "clean_correct": True,
+        }
+    )
+    all_none_row = {column: None for column in QUALITATIVE_COLUMNS}
+    all_none_row.update({"sample_id": 3, "epoch": 0})
+    tracker.log_table("panel-epoch-0", [standard_row, all_none_row])
+    assert len(fake.images) == 1  # only the one clean image
+    table = fake.tables[0]
+    data = table["data"]
+    assert isinstance(data, list) and len(data) == 2
+    columns = list(QUALITATIVE_COLUMNS)
+    for name in ("adversarial_image", "perturbation_visualization", "student_adv_prediction", "robust_correct"):
+        assert data[0][columns.index(name)] is None and data[1][columns.index(name)] is None
+    assert data[0][columns.index("clean_image")] == ("image", fake.images[0])
+    assert all(data[1][columns.index(name)] is None for name in ("clean_image",))
+    local_rows = [
+        json.loads(line)
+        for line in (output / "run-bundle" / "panels" / "panel-epoch-0.jsonl").read_text().splitlines()
+    ]
+    assert local_rows[0]["adversarial_image"] is None and local_rows[0]["robust_correct"] is None
+    assert fake.run.logged and "panel-epoch-0" in fake.run.logged[-1]
+
+
 def test_wandb_artifact_failure_rolls_back_local_manifest_entry(tmp_path: Path) -> None:
     class Artifact:
         def __init__(self, name: str, type: str) -> None:
