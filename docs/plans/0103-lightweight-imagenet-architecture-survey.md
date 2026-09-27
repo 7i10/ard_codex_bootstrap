@@ -1060,3 +1060,20 @@ history behind this pivot.)
     reproducibility).
   - Order: ConvNeXt-Atto (Hamster GPU0) and DeiT-Tiny (Hamster GPU1) first,
     then MobileNetV4-M, EfficientNet-B0 and MobileViT-S.
+- 2026-09-27 (human, chat): **BF16 is not adopted.** All Phase 1 runs stay
+  fp32 (TF32 convolutions under PyTorch defaults on the 4090s).
+- 2026-09-27 (chat): **Official evaluations of the 2x2 and the FT run**
+  (Ferret 4090, full ImageNet val 50k, PGD-10, AutoAttack n=500 seeded
+  subset, source `b004d51`, last / best):
+  - pretrained 100ep: 51.72 / 27.81 / 23.6 (last); 51.53 / 28.23 / 23.8
+    (best).
+  - random 100ep: 51.15 / 27.85 / 22.0 (last); 51.25 / 27.99 / 23.6 (best).
+  - random 50ep: 50.18 / 27.40 / 22.8 (last); 50.07 / 27.37 / 23.2 (best).
+  - FT lr 0.005: 54.17 / 28.49 / 24.2 (last); 54.06 / 28.44 / 23.2 (best).
+  - Arm A (pretrained 50ep, plan 0101, best only): clean 50.94,
+    AutoAttack 22.8.
+  - The AutoAttack SE at n=500 is ~1.9pt, so the 22.0-24.2 spread is not
+    resolvable. FT's +2.5-4pt clean advantage reproduces on the official
+    split. The EasyRobust anchor's first attempt failed (missing ARD_SEED
+    env; the wrapper's `rc=$?` read `date`'s status, now fixed) and is
+    rerunning on Ferret GPU2.
