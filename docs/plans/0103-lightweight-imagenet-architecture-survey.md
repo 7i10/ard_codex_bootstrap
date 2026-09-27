@@ -1004,3 +1004,20 @@ history behind this pivot.)
     lr 0.025 runs end (~08:30Z today), so Phase 1 random-init runs start
     then, beginning with ConvNeXt-Atto and DeiT-Tiny. The pretrained side
     waits for lr 0.015.
+- 2026-09-27 (human, chat): **Finalist selection (the 2-3 models that get a
+  second seed) is decided by the human after Phase 1, from several
+  criteria rather than robustness alone.** To avoid post-hoc choice of
+  criteria, the dimensions are fixed now and weighted later. Every model
+  will be shown on all of them:
+  1. robustness: AutoAttack n=500 and full-val PGD-10;
+  2. clean accuracy and the clean cost of robustness;
+  3. efficiency: robustness per parameter and per MAC, and whether the
+     model is Pareto-optimal;
+  4. pretraining dependence: pretrained minus random-init, both inits for
+     every model;
+  5. training state: seen-vs-unseen gap (under- vs overfitting) and
+     per-LR-stage saturation;
+  6. training cost: GPU-hours per run;
+  7. architectural coverage (BN CNN, LN CNN, ViT, hybrid) as rows of the
+     Phase 2 method table.
+  Finalist selection only allocates second seeds; it makes no claim.
