@@ -172,3 +172,59 @@ manifest). W&B `lightweight-imagenet-at`, same run id.
   by the operator with the running lr-0.1 job untouched, to Ferret GPU0. It launched from Ferret's pinned worktree
   `source-76280eb86100`, the same SHA as the other stage-2 runs. Same GPU type, recipe and deterministic mode; the host is
   recorded in the run bundle.
+- 2026-09-27 (postrun): stage 2 cell random init / lr 0.1, `plan0104-mobilenetv4-random-init-lr01-v1`, completed 50/50
+  epochs. Results are in "Stage 2 cell report: random init, lr 0.1" below. Stage 2 is still open: random init / lr 0.025
+  (Hamster GPU1, epoch 46 at this postrun) and pretrained / lr 0.015 (Ferret GPU0) are running.
+
+## Stage 2 cell report: random init, lr 0.1
+
+Status: one of six cells. The stage 2 rule needs all six, so this report gives no verdict.
+
+Run: `plan0104-mobilenetv4-random-init-lr01-v1`, Hamster RTX 4090 (GPU0), hand-run bundle launched by the stage 2 queue.
+`completion.json` reads `completed`, the manifest status is `completed`, and `error-marker.txt` reads "no application
+error recorded". The watcher re-derived it as terminal and successful. All 50 epoch rows are present
+(`epoch_metrics_complete: true`). `train.log` has no traceback, NaN or error line. `best.pt`, `last.pt` and
+`epoch-049.pt` are on disk. Nothing is imported into `docs/experiments/`: no aggregator exists for this contract, as for
+stage 1. The numbers below are read from `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest summary.
+
+Fixed identity: ImageNet-1k, MobileNetV4-Conv-Small, random init (`student.pretrained: false`), plain PGD-AT, no teacher.
+Training and evaluation-attack seed 0 (split seed 20260911). Training attack: CE PGD-3, l_inf eps 4/255, step 8/765,
+random start, eval mode. Selection and validation attack: PGD-10, same eps. Peak LR 0.1, warmup_multistep (10-epoch
+warmup, x0.1 at epochs 25 and 38), 50 epochs. World size 1, global batch 128, local BatchNorm, deterministic. Protocol
+`controlled_imagenet_stage02_init_lr_grid_v1`. Source SHA `76280eb86100d6d27a04b62edcc8fe700643deed` (worktree
+`source-76280eb86100`, clean). "val" is internal validation (the held-out 2% of the training split), not the official
+ImageNet val. No AutoAttack has run.
+
+| random init, peak lr | ep 24 (end of peak-LR stage) val clean / PGD-10 | ep 37 (end of 2nd stage) | last (ep 49) | best (by val PGD-10) | last probe clean / PGD-10 |
+|---|---:|---:|---:|---:|---:|
+| 0.1 (this run) | 31.04 / 15.94 | 46.39 / 25.07 | 51.73 / 29.18 | ep 49 (= last) | 56.25 / 32.75 |
+| 0.05 (plan 0103, `987dfb5`) | 37.12 / 19.51 | 49.87 / 27.65 | 53.36 / 30.05 | ep 48: 53.42 / 30.17 | 58.85 / 34.25 |
+
+Stage 2 grid so far (last-epoch val PGD-10, clean in brackets):
+
+| init | lr | result |
+|---|---|---|
+| pretrained | 0.005 | 31.26 (57.81) |
+| pretrained | 0.015 | running (Ferret) |
+| pretrained | 0.05 | 30.58 (54.57), Arm A seed 0 |
+| random | 0.025 | running (Hamster GPU1) |
+| random | 0.05 | 30.05 (53.36) |
+| random | 0.1 | 29.18 (51.73) |
+
+Reading (n=1, internal validation, PGD-10 only):
+1. Against random init / lr 0.05, lr 0.1 is -0.87pt PGD-10 and -1.63pt clean at the last epoch. The PGD-10 difference is
+   under the 1pt threshold. So lr 0.1 is lower but not a finding on its own.
+2. The peak-LR stage (epochs 9-24) is a plateau at a lower level than lr 0.05: val PGD-10 14.7-16.3% and clean 28.9-31.4%,
+   against 17.0-19.8% PGD-10 and 32.7-37.6% clean for lr 0.05. The gap closes after each decay: -3.57pt PGD-10 at epoch 24,
+   -2.58pt at epoch 37, -0.87pt at epoch 49.
+3. Each decay gives a one-epoch jump (+8.3pt PGD-10 at epoch 25, +3.1pt at epoch 38). The last stage is almost flat:
+   val PGD-10 29.04-29.18% over epochs 45-49, train loss 3.839 -> 3.825.
+4. No collapse: val clean is under 5% only at epoch 0, inside the warmup.
+5. Seen-unseen gap at the end (probe minus val): +4.5 clean / +3.6 PGD-10.
+6. For the stage 2 rule, lr 0.1 can be the random-init argmax only if lr 0.025 ends below 29.18%.
+
+Caveats: one seed per cell. The CIFAR control-vs-control floor was 0.16-1.88pt. The lr-0.05 comparison run comes from a
+different source SHA (`987dfb5`, plan 0103). Wall clock 21.2 h (2026-09-26 10:51 to 09-27 08:01 UTC, ~866 img/s).
+Checkpoint sha256 was not computed in this postrun. `epoch-metrics.parquet` sha256 `88408419...`,
+`sample-stats-train.parquet` sha256 `0254cfb1...` (from the run-bundle manifest). W&B `lightweight-imagenet-at`, same
+run id.
