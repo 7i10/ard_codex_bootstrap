@@ -175,6 +175,70 @@ manifest). W&B `lightweight-imagenet-at`, same run id.
 - 2026-09-27 (postrun): stage 2 cell random init / lr 0.1, `plan0104-mobilenetv4-random-init-lr01-v1`, completed 50/50
   epochs. Results are in "Stage 2 cell report: random init, lr 0.1" below. Stage 2 is still open: random init / lr 0.025
   (Hamster GPU1, epoch 46 at this postrun) and pretrained / lr 0.015 (Ferret GPU0) are running.
+- 2026-09-27 (postrun): stage 2 cell random init / lr 0.025, `plan0104-mobilenetv4-random-init-lr0025-v1`, completed 50/50
+  epochs. Results are in "Stage 2 cell report: random init, lr 0.025" below. The random-init side of the grid is now
+  complete. Stage 2 is still open: pretrained / lr 0.015 (Ferret GPU0) is running. Both Hamster GPUs are idle.
+
+## Stage 2 cell report: random init, lr 0.025
+
+Status: five of six cells are done. The stage 2 rule needs all six, so this report gives no verdict.
+
+Run: `plan0104-mobilenetv4-random-init-lr0025-v1`, Hamster RTX 4090 (GPU1), hand-run bundle launched by the stage 2 queue.
+`completion.json` reads `completed`, the manifest status is `completed`, and `error-marker.txt` reads "no application
+error recorded". The watcher re-derived it as terminal and successful. All 50 epoch rows are present
+(`epoch_metrics_complete: true`). `train.log` has no traceback, NaN or error line. `best.pt`, `last.pt` and
+`epoch-049.pt` are on disk. Nothing is imported into `docs/experiments/`: no aggregator exists for this contract, as for
+stage 1. The numbers below are read from `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest summary.
+
+Fixed identity: ImageNet-1k, MobileNetV4-Conv-Small, random init (`student.pretrained: false`), plain PGD-AT, no teacher.
+Training and evaluation-attack seed 0 (split seed 20260911). Training attack: CE PGD-3, l_inf eps 4/255, step 8/765,
+random start, eval mode. Selection and validation attack: PGD-10, same eps. Peak LR 0.025, warmup_multistep (10-epoch
+warmup, x0.1 at epochs 25 and 38), 50 epochs. World size 1, global batch 128, local BatchNorm, deterministic. Protocol
+`controlled_imagenet_stage02_init_lr_grid_v1`. Source SHA `76280eb86100d6d27a04b62edcc8fe700643deed` (worktree
+`source-76280eb86100`, clean). "val" is internal validation (the held-out 2% of the training split), not the official
+ImageNet val. No AutoAttack has run.
+
+| random init, peak lr | ep 24 (end of peak-LR stage) val clean / PGD-10 | ep 37 (end of 2nd stage) | last (ep 49) | best (by val PGD-10) | last probe clean / PGD-10 |
+|---|---:|---:|---:|---:|---:|
+| 0.025 (this run) | 41.59 / 22.29 | 52.19 / 29.38 | 53.85 / 30.71 | ep 49 (= last) | 59.80 / 34.40 |
+| 0.05 (plan 0103, `987dfb5`) | 37.12 / 19.51 | 49.87 / 27.65 | 53.36 / 30.05 | ep 48: 53.42 / 30.17 | 58.85 / 34.25 |
+| 0.1 (`76280eb`) | 31.04 / 15.94 | 46.39 / 25.07 | 51.73 / 29.18 | ep 49 (= last) | 56.25 / 32.75 |
+
+Stage 2 grid so far (last-epoch val PGD-10, clean in brackets):
+
+| init | lr | result |
+|---|---|---|
+| pretrained | 0.005 | 31.26 (57.81) |
+| pretrained | 0.015 | running (Ferret GPU0) |
+| pretrained | 0.05 | 30.58 (54.57), Arm A seed 0 |
+| random | 0.025 | 30.71 (53.85) |
+| random | 0.05 | 30.05 (53.36) |
+| random | 0.1 | 29.18 (51.73) |
+
+Reading (n=1, internal validation, PGD-10 only):
+1. Against random init / lr 0.05, lr 0.025 is +0.66pt PGD-10 and +0.49pt clean at the last epoch. The PGD-10 difference is
+   under the 1pt threshold. Against lr 0.1 it is +1.53pt PGD-10 and +2.12pt clean.
+2. Over the three random-init runs, a lower peak LR ends higher: 29.18 (0.1) < 30.05 (0.05) < 30.71 (0.025). Only the
+   0.025-vs-0.1 gap is above 1pt.
+3. The peak-LR stage (epochs 9-24) is not a flat plateau here. Val PGD-10 rises from 16.45% to 22.29-22.41%, and clean
+   from 31.59% to 41.59-41.99%. It is nearly flat over the last five epochs of the stage (21.62-22.41% PGD-10).
+   The lead over lr 0.05 shrinks after each decay: +2.78pt PGD-10 at epoch 24, +1.73pt at epoch 37, +0.66pt at epoch 49.
+4. The first decay gives +5.66pt PGD-10 in one epoch (epoch 25), the second +0.82pt (epoch 38). The last stage is almost
+   flat: val PGD-10 30.61-30.71% over epochs 45-49, train loss 3.705 -> 3.697.
+5. No collapse: val clean is under 5% only at epochs 0 and 1, inside the warmup.
+6. Seen-unseen gap at the end (probe minus val): +5.9 clean / +3.7 PGD-10.
+7. For the stage 2 rule, the random-init argmax is lr 0.025 (30.71%). This is the lowest LR in the random-init grid, so
+   the random-init optimum may lie below it; the grid does not test this. The pretrained argmax so far (0.005) is also
+   the lowest LR on its side.
+8. With the pretrained side at 31.26% so far, D = best(pretrained) - best(random) is at least +0.55pt. The verdict
+   "pretraining helps MobileNetV4-S" (D >= +1pt) needs pretrained / lr 0.015 to end at >= 31.71%. Otherwise the verdict
+   is "no effect above 1pt". Random init cannot come out ahead by 1pt, since the pretrained side is already above 30.71.
+
+Caveats: one seed per cell. The CIFAR control-vs-control floor was 0.16-1.88pt. The lr-0.05 comparison run comes from a
+different source SHA (`987dfb5`, plan 0103). Wall clock 21.3 h (2026-09-26 11:35 to 09-27 08:52 UTC, ~860 img/s).
+Checkpoint sha256 was not computed in this postrun. `epoch-metrics.parquet` sha256 `0463f61b...`,
+`sample-stats-train.parquet` sha256 `a1e5167b...` (from the run-bundle manifest). W&B `lightweight-imagenet-at`, same
+run id.
 
 ## Stage 2 cell report: random init, lr 0.1
 
