@@ -1046,3 +1046,17 @@ history behind this pivot.)
     finished (rc=0) at 07:01Z, before the overlap. The remaining
     evaluations and the plan-0104 lr 0.015 run continue; they are slower but
     their numerics are unaffected.
+- 2026-09-27 (chat): **Phase 1 random-init side starts.** Configs are
+  `imagenet_{efficientnet_b0, mobilenetv4_conv_medium, convnext_atto,
+  deit_tiny, mobilevit_s}_pgd_at_phase1_random.yaml`. Each is its survey
+  config with random init, lr 0.025 (plan 0104 stage-2 random argmax) and the
+  approved throughput options: nondeterministic plus cudnn autotuning,
+  step_diagnostics off, and compile only for EfficientNet-B0 and
+  MobileViT-S. BF16 is not used. The config test pins that nothing else
+  differs.
+  - MobileNetV4-S's random-init Phase 1 cell is the stage-2 lr 0.025 run
+    itself (deterministic; its step_diagnostics and determinism differ from
+    the other rows only in non-training observability and in
+    reproducibility).
+  - Order: ConvNeXt-Atto (Hamster GPU0) and DeiT-Tiny (Hamster GPU1) first,
+    then MobileNetV4-M, EfficientNet-B0 and MobileViT-S.

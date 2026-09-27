@@ -292,3 +292,12 @@ different source SHA (`987dfb5`, plan 0103). Wall clock 21.2 h (2026-09-26 10:51
 Checkpoint sha256 was not computed in this postrun. `epoch-metrics.parquet` sha256 `88408419...`,
 `sample-stats-train.parquet` sha256 `0254cfb1...` (from the run-bundle manifest). W&B `lightweight-imagenet-at`, same
 run id.
+- 2026-09-27: **stage 2, random-init side complete** (all completed, seed 0, internal val, last epoch clean / PGD-10).
+  - lr 0.025: 53.85 / 30.71 (`plan0104-mobilenetv4-random-init-lr0025-v1`).
+  - lr 0.05: 53.36 / 30.05 (`plan0103-mobilenetv4-random-init-50ep-v1`).
+  - lr 0.1: 51.73 / 29.18 (`plan0104-mobilenetv4-random-init-lr01-v1`).
+  - best(random) = 30.71 at lr 0.025, which becomes the random-init Phase 1 learning rate under the preregistered rule.
+  - Caveats: the argmax sits at the grid edge and robustness rises as LR falls, so a lower LR may be better still. 0.025 beats
+    0.05 by only 0.66pt, inside the noise floor.
+  - The pretrained side (lr 0.015 on Ferret) is still running, so D = best(pretrained) - best(random) is not decided yet.
+    Pretrained so far: 0.005 gives 57.81 / 31.26 and 0.05 (Arm A) gives 54.57 / 30.58.

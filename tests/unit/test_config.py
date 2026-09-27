@@ -1376,6 +1376,57 @@ def test_mobilenetv4_finetune_lr_config_changes_only_the_peak_learning_rate(
 
 
 @pytest.mark.parametrize(
+    ("stem", "compile_"),
+    [
+        ("efficientnet_b0", True),
+        ("mobilenetv4_conv_medium", False),
+        ("convnext_atto", False),
+        ("deit_tiny", False),
+        ("mobilevit_s", True),
+    ],
+)
+def test_phase1_random_init_configs_change_only_init_lr_and_throughput_options(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stem: str, compile_: bool
+) -> None:
+    """Plan 0103 Phase 1 random-init cells: the survey config with random init,
+    the random-init argmax learning rate from plan 0104 stage 2 (0.025) and the
+    approved throughput options; attack, data, schedule, epochs and probe unchanged."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    survey = load_config(config_dir / f"imagenet_{stem}_pgd_at.yaml").model_dump(mode="json")
+    cell = load_config(config_dir / f"imagenet_{stem}_pgd_at_phase1_random.yaml").model_dump(mode="json")
+    assert cell["student"]["pretrained"] is False and survey["student"]["pretrained"] is True
+    assert cell["optimizer"]["learning_rate"] == 0.025
+    training = cell["training"]
+    assert training["deterministic"] is False and training["cudnn_benchmark"] is True
+    assert training["step_diagnostics"] is False and training["compile"] is compile_
+    assert training["train_probe_size"] == 2000
+    assert cell["tracking"]["group"] == survey["tracking"]["group"] + "-phase1-random"
+    for payload in (survey, cell):
+        payload["student"] = {**payload["student"], "pretrained": None}
+        payload["optimizer"] = {**payload["optimizer"], "learning_rate": None}
+        payload["training"] = {
+            **payload["training"],
+            "deterministic": None,
+            "cudnn_benchmark": None,
+            "step_diagnostics": None,
+            "compile": None,
+        }
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert survey == cell
+
+
+@pytest.mark.parametrize(
     ("config_file", "learning_rate", "pretrained"),
     [
         ("imagenet_mobilenetv4_pgd_at_pretrained_lr0015.yaml", 0.015, True),
