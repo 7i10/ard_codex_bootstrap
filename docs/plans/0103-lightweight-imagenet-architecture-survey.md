@@ -1021,3 +1021,28 @@ history behind this pivot.)
   7. architectural coverage (BN CNN, LN CNN, ViT, hybrid) as rows of the
      Phase 2 method table.
   Finalist selection only allocates second seeds; it makes no claim.
+- 2026-09-27 (chat): **Ferret throughput probe rerun on an idle host**
+  (06:48Z onward, synthetic trainer-shaped step, non-deterministic plus
+  cudnn autotuning). Another user's EEG jobs started on all three GPUs at
+  07:01Z. The probe log has no timestamps, so the last rows (MobileNetV4-S)
+  may overlap them.
+  - **Single process, img/s (Hamster in parentheses).** EfficientNet-B0 386
+    (383), MobileNetV4-M 540 (593), ConvNeXt-Atto 850 (869), DeiT-Tiny 650
+    (631), MobileViT-S 218 (213). An idle Ferret matches Hamster, so the
+    earlier "half speed" readings came from contention.
+  - **Two processes on one GPU, total img/s.**
+    - Lower than one process for MobileNetV4-M (504), ConvNeXt-Atto (708)
+      and DeiT-Tiny (591).
+    - EfficientNet-B0 and MobileViT-S run out of memory.
+    - Only MobileNetV4-S gains, at ~1.8x (781 + 825), and that may be
+      contaminated.
+    - Co-location is therefore not used in Phase 1, except possibly for
+      MobileNetV4-S.
+  - **BF16 autocast gain.** +0-6% for most models, +18% DeiT-Tiny, +14%
+    MobileViT-S. Not worth the risk of weaker low-precision attack
+    gradients, so BF16 is not recommended for Phase 1 (pending human
+    confirmation).
+  - The official evaluation of `plan0103-mobilenetv4-pretrained-100ep-v2`
+    finished (rc=0) at 07:01Z, before the overlap. The remaining
+    evaluations and the plan-0104 lr 0.015 run continue; they are slower but
+    their numerics are unaffected.
