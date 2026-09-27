@@ -980,3 +980,27 @@ history behind this pivot.)
   - `best.pt` / W&B best_* for these runs are meaningless (selection by val
     PGD-10 ~0). The analysis reads last-epoch clean, per the preregistered
     rule.
+- 2026-09-27 (chat): **Ferret free again; 4090 work resumed.**
+  - Step 1c canaries on Ferret GPU2 with Phase-1 options (nondet, cudnn
+    autotuning, compile, step_diagnostics off, 16 workers; source
+    `bf37707`) both completed rc=0. EfficientNet-B0 at epoch 2: 58.77 /
+    30.77, 355 img/s. MobileViT-S at epoch 2: 57.19 / 27.03, 180 img/s.
+    Both overlapped partly with another user's jobs, so the throughput is
+    indicative only. Step 1c is now complete for all six models.
+  - Ferret GPU1 reruns the per-model single / two-concurrent / BF16 probe
+    with the host otherwise idle.
+  - Ferret GPU2 runs the official evaluation (full ImageNet val clean +
+    PGD-10, AutoAttack n=500, best and last, `ard.cli.evaluate`, source
+    `b004d51`) of `plan0103-mobilenetv4-{pretrained-100ep-v2,
+    random-init-100ep-v1, random-init-50ep-v1}` and
+    `plan0104-mobilenetv4-ft-lr0005-v1`. Checkpoints were copied from
+    Hamster, with sha256 verified identical. This is followed by the
+    EasyRobust EfficientNet-B0 external anchor (published 61.83 clean /
+    35.06 AutoAttack).
+  - The Ferret stage-2 run (pretrained lr 0.015) was slowed by the
+    overlap: epoch 18/50, about 25 h left.
+  - Per plan 0104 stage 2's rule, each init's Phase 1 learning rate is its
+    own argmax. The random-init side is complete once Hamster's lr 0.1 and
+    lr 0.025 runs end (~08:30Z today), so Phase 1 random-init runs start
+    then, beginning with ConvNeXt-Atto and DeiT-Tiny. The pretrained side
+    waits for lr 0.015.
