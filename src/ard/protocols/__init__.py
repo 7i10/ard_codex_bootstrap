@@ -602,6 +602,18 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # best-vs-best with equal tuning effort.
             metadata=MappingProxyType({"purpose": "imagenet_stage02_init_lr_grid_v1"}),
         ),
+        "controlled_imagenet100_proxy_lr_v1": ProtocolSpec(
+            id="controlled_imagenet100_proxy_lr_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0104 stage 3 (human-approved 2026-09-28): the six
+            # MobileNetV4-Conv-Small stage-1/2 cells (pretrained lr 0.005 /
+            # 0.015 / 0.05, random init 0.025 / 0.05 / 0.1) rerun on
+            # ImageNet-100 (every 10th ImageNet-1k wnid) with a 100-way head
+            # and everything else identical. Valid for LR selection only if
+            # each init's argmax LR matches ImageNet-1k's.
+            metadata=MappingProxyType({"purpose": "imagenet100_proxy_lr_v1"}),
+        ),
         "controlled_imagenet_stage02_clean_budget_v1": ProtocolSpec(
             id="controlled_imagenet_stage02_clean_budget_v1",
             runnable_locally=True,

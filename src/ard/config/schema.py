@@ -99,6 +99,12 @@ class ProtocolConfig(StrictModel):
         # Plan 0104 stage 2: per-init learning-rate comparison on
         # MobileNetV4-Conv-Small (pretrained 0.015; random init 0.025 / 0.1).
         "controlled_imagenet_stage02_init_lr_grid_v1",
+        # Plan 0104 stage 3: ImageNet-100 proxy validation -- the six
+        # MobileNetV4-Conv-Small stage-1/2 cells rerun on ImageNet-100
+        # (``imagenet`` adapter, 100-class root, pinned manifest hashes, a
+        # 100-way head) with everything else identical, to test whether the
+        # proxy's learning-rate ranking matches ImageNet-1k's.
+        "controlled_imagenet100_proxy_lr_v1",
         # Plan 0103 option A (human-approved 2026-09-27): clean-training
         # control for the random-init budget cells -- Arm A's recipe with
         # method ``standard`` (no training attack) at 50 and 100 epochs:

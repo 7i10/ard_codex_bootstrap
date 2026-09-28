@@ -270,6 +270,42 @@ def test_pretrained_false_at_a_non_1000_class_count_does_not_consume_extra_rng_o
     assert torch.equal(baseline_head.bias, current_head.bias)
 
 
+def test_mobilenetv4_pretrained_100_class_head_keeps_the_pretrained_backbone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan 0104 stage 3 (ImageNet-100 proxy): pretrained=True with
+    num_classes=100 loads every ImageNet-1k backbone tensor unchanged and
+    replaces only the classifier with a freshly initialised 100-way head,
+    drawn from the global torch RNG (so train.py's seeds.model_init seeding,
+    applied before build_student, fixes it). Uses the real cached timm
+    weights; skipped when they are not in the local Hugging Face cache, and
+    never reaches the network."""
+    import huggingface_hub
+    from huggingface_hub import constants as hf_constants
+
+    cached = huggingface_hub.try_to_load_from_cache("timm/mobilenetv4_conv_small.e1200_r224_in1k", "model.safetensors")
+    if not isinstance(cached, str):
+        pytest.skip("timm mobilenetv4_conv_small.e1200_r224_in1k weights are not cached offline")
+    monkeypatch.setattr(hf_constants, "HF_HUB_OFFLINE", True)
+
+    torch.manual_seed(0)
+    proxy = build_architecture("mobilenetv4_conv_small_imagenet", num_classes=100, pretrained=True)
+    reference = build_architecture("mobilenetv4_conv_small_imagenet", num_classes=1000, pretrained=True)
+    proxy_state, reference_state = proxy.state_dict(), reference.state_dict()
+    assert set(proxy_state) == set(reference_state)
+    head = {"classifier.weight", "classifier.bias"}
+    for key in set(proxy_state) - head:
+        assert torch.equal(proxy_state[key], reference_state[key]), key
+    assert torch.equal(proxy_state["conv_stem.weight"], reference_state["conv_stem.weight"])
+    assert proxy_state["classifier.weight"].shape == (100, 1280)
+    assert proxy_state["classifier.bias"].shape == (100,)
+
+    torch.manual_seed(0)
+    same_seed = build_architecture("mobilenetv4_conv_small_imagenet", num_classes=100, pretrained=True)
+    torch.manual_seed(1)
+    other_seed = build_architecture("mobilenetv4_conv_small_imagenet", num_classes=100, pretrained=True)
+    assert torch.equal(same_seed.state_dict()["classifier.weight"], proxy_state["classifier.weight"])
+    assert not torch.equal(other_seed.state_dict()["classifier.weight"], proxy_state["classifier.weight"])
+
+
 @pytest.mark.parametrize("architecture", ["resnet50_imagenet", "mobilenet_v2_imagenet", "convnext_tiny_imagenet"])
 def test_pretrained_true_is_rejected_for_unsupported_architectures(architecture: str) -> None:
     with pytest.raises(ValueError, match="pretrained=True is not supported"):

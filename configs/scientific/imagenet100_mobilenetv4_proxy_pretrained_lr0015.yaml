@@ -1,0 +1,20 @@
+# Plan 0104 stage 3 (ImageNet-100 proxy validation, human-approved 2026-09-28): pretrained, peak lr 0.015.
+# ImageNet-1k counterpart: imagenet_mobilenetv4_pgd_at_pretrained_lr0015.yaml. Identical to it except
+# dataset/evaluation.dataset (root ${ARD_IMAGENET100_ROOT}, num_classes 100, ImageNet-100
+# train/val manifest hashes), student.num_classes 1000 -> 100, protocol.id and tracking.group.
+# The 100-way head is re-initialised by timm (seeded by seeds.model_init); the backbone
+# keeps the ImageNet-1k pretrained weights.
+# Preregistered rule: docs/plans/0104-finetune-lr-schedule.md ("Stage 3").
+schema_version: 2
+protocol: {id: controlled_imagenet100_proxy_lr_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET100_ROOT}", split: train, download: false, num_classes: 100, image_size: 224, content_sha256: b7cd65936683eb043f34f151a558d42ad27bdfb2d12750268572f9ded82ca251}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 100, preprocessing_owner: student_adapter, pretrained: true, normalization: {profile: imagenet_standard}}
+method: {id: pgd_at, version: 1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: sgd, learning_rate: 0.015, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
+scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet100-mobilenetv4-proxy-lr, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET100_ROOT}", split: val, download: false, num_classes: 100, image_size: 224, content_sha256: 8921c1d5d168ef77a4714c2230a5dd8c2cb47609e87dc74f6492691a13961167}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

@@ -580,6 +580,7 @@ def test_top_level_configs_resolve_under_controlled_environment(
         "ARD_SEED": "7",
         "ARD_CIFAR10_ROOT": str(tmp_path / "cifar10"),
         "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_IMAGENET100_ROOT": str(tmp_path / "imagenet100"),
         "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT": str(teacher_checkpoint),
         "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256": "a" * 64,
         "ARD_TEACHER_BARTOLDSON2024_ADVERSARIAL_WRN94_16_CHECKPOINT": str(teacher_checkpoint),
@@ -1465,6 +1466,97 @@ def test_mobilenetv4_init_lr_grid_configs_change_only_lr_and_init(
         payload["training"] = {**payload["training"], "train_probe_size": None}
         payload["tracking"] = {**payload["tracking"], "group": None}
     assert arm_a == cell
+
+
+_IMAGENET100_TRAIN_SHA256 = "b7cd65936683eb043f34f151a558d42ad27bdfb2d12750268572f9ded82ca251"
+_IMAGENET100_VAL_SHA256 = "8921c1d5d168ef77a4714c2230a5dd8c2cb47609e87dc74f6492691a13961167"
+
+
+@pytest.mark.parametrize(
+    ("proxy_stem", "counterpart_file", "adds_probe"),
+    [
+        ("pretrained_lr0005", "imagenet_mobilenetv4_pgd_at_ft_lr0005.yaml", False),
+        ("pretrained_lr0015", "imagenet_mobilenetv4_pgd_at_pretrained_lr0015.yaml", False),
+        ("pretrained_lr005", "imagenet_mobilenetv4_pgd_at_no_warmup.yaml", True),
+        ("random_lr0025", "imagenet_mobilenetv4_pgd_at_random_init_lr0025.yaml", False),
+        ("random_lr005", "imagenet_mobilenetv4_pgd_at_random_init_50ep.yaml", False),
+        ("random_lr01", "imagenet_mobilenetv4_pgd_at_random_init_lr01.yaml", False),
+    ],
+)
+def test_imagenet100_proxy_configs_change_only_the_dataset_and_head(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, proxy_stem: str, counterpart_file: str, adds_probe: bool
+) -> None:
+    """Plan 0104 stage 3: each ImageNet-100 proxy cell is its ImageNet-1k
+    counterpart with only the dataset (100-class root, pinned manifest
+    hashes), the 100-way head, protocol.id and tracking.group changed --
+    plus, for the Arm A counterpart only, the observability-only train probe
+    so all six proxy runs log it."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_IMAGENET100_ROOT": str(tmp_path / "imagenet100"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    counterpart = load_config(config_dir / counterpart_file).model_dump(mode="json")
+    proxy = load_config(config_dir / f"imagenet100_mobilenetv4_proxy_{proxy_stem}.yaml").model_dump(mode="json")
+    assert proxy["protocol"]["id"] == "controlled_imagenet100_proxy_lr_v1"
+    assert proxy["tracking"]["group"] == "imagenet100-mobilenetv4-proxy-lr"
+    assert proxy["tier"] == "production"
+    assert proxy["student"]["num_classes"] == 100
+    for dataset, split, digest in (
+        (proxy["dataset"], "train", _IMAGENET100_TRAIN_SHA256),
+        (proxy["evaluation"]["dataset"], "val", _IMAGENET100_VAL_SHA256),
+    ):
+        assert dataset["name"] == "imagenet" and dataset["split"] == split
+        assert dataset["root"] == str(tmp_path / "imagenet100")
+        assert dataset["num_classes"] == 100 and dataset["image_size"] == 224
+        assert dataset["content_sha256"] == digest
+    assert proxy["training"]["train_probe_size"] == 2000 and proxy["training"]["deterministic"] is True
+    assert counterpart["training"]["train_probe_size"] == (None if adds_probe else 2000)
+    for payload in (counterpart, proxy):
+        payload["protocol"] = None
+        payload["tracking"] = {**payload["tracking"], "group": None}
+        payload["student"] = {**payload["student"], "num_classes": None}
+        payload["dataset"] = None
+        payload["evaluation"] = {**payload["evaluation"], "dataset": None}
+        payload["training"] = {**payload["training"], "train_probe_size": None}
+    assert counterpart == proxy
+
+
+def test_imagenet100_proxy_protocol_is_registered_and_requires_the_manifest_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 0104 stage 3: the proxy protocol is a runnable local identity,
+    and a production ImageNet-100 config without the manifest pin fails."""
+    from ard.protocols import ensure_local_trainable
+
+    spec = ensure_local_trainable("controlled_imagenet100_proxy_lr_v1")
+    assert spec.id == "controlled_imagenet100_proxy_lr_v1" and spec.runnable_locally
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    path = config_dir / "imagenet100_mobilenetv4_proxy_random_lr005.yaml"
+    for key, value in {
+        "ARD_SEED": "0",
+        "ARD_IMAGENET100_ROOT": str(tmp_path / "imagenet100"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }.items():
+        monkeypatch.setenv(key, value)
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["dataset"]["content_sha256"] = None
+    unpinned = tmp_path / "unpinned.yaml"
+    unpinned.write_text(yaml.safe_dump(data), encoding="utf-8")
+    with pytest.raises(ValidationError, match="requires dataset.content_sha256"):
+        load_config(unpinned)
 
 
 @pytest.mark.parametrize(
