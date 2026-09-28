@@ -1138,3 +1138,89 @@ history behind this pivot.)
       clean-training control hints at recipe saturation.
     - Every remedy must beat simply spending the same compute on a larger
       model, so the frontier includes scaled-up baselines.
+- 2026-09-28 (postrun): **Phase 1 random init, ConvNeXt-Atto completed.**
+  `plan0103-phase1-convnext-atto-random-v1` (Hamster GPU0, RTX 4090) ran
+  50/50 epochs. `completion.json` reads `completed`, the manifest status is
+  `completed`, and `error-marker.txt` reads "no application error recorded".
+  The watcher re-derived it as terminal and successful. All 50 epoch rows are
+  present (`epoch_metrics_complete: true`). `train.log` has no traceback, NaN
+  or error line. `best.pt`, `last.pt` and `epoch-049.pt` are on disk. Nothing
+  is imported into `docs/experiments/`: no aggregator exists for this
+  contract, as for every other hand-run in plans 0103/0104. The numbers below
+  are read from `outputs/train/epoch-metrics.jsonl` and the run-bundle
+  manifest summary.
+
+  Fixed identity: ImageNet-1k, ConvNeXt-Atto (V1, `convnext_atto_imagenet`,
+  3.70M params / 0.55 GMACs), random init (`student.pretrained: false`), plain
+  PGD-AT, no teacher. Training and evaluation-attack seed 0 (split seed
+  20260911). Training attack: CE PGD-3, l_inf eps 4/255, step 8/765, random
+  start. Selection and validation attack: PGD-10, same eps, eval mode. SGD
+  Nesterov, peak LR 0.025, wd 1e-4, warmup_multistep (10-epoch warmup, x0.1 at
+  epochs 25 and 38), 50 epochs. World size 1, global batch 128, local
+  BatchNorm. Non-deterministic with cuDNN autotuning, no compile,
+  step_diagnostics off, fp32 (TF32 convolutions). Protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`, config
+  `imagenet_convnext_atto_pgd_at_phase1_random.yaml`, config hash
+  `cf6de143...`. Source SHA `086072bcde9243a4b85a31f009f26249d7bc386f`
+  (worktree `source-086072bcde92`, clean). "val" is internal validation (the
+  held-out 2% of the training split, 25,620 images), not the official
+  ImageNet val. "probe" is 2,000 training images (2 per class), same
+  transform, eval mode and PGD-10. No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 0.56 / 0.50 | 0.35 / 0.25 | 6.813 |
+  | 9 | end of warmup | 8.86 / 4.86 | 8.80 / 5.00 | 6.038 |
+  | 24 | end of lr 0.025 | 21.95 / 12.17 | 22.55 / 12.45 | 5.282 |
+  | 25 | first epoch at lr 0.0025 | 26.98 / 14.48 | 26.80 / 14.20 | 5.065 |
+  | 37 | end of lr 0.0025 | 28.91 / 15.25 | 29.40 / 15.20 | 4.955 |
+  | 38 | first epoch at lr 0.00025 | 29.86 / 16.19 | 30.35 / 16.30 | 4.883 |
+  | 45 | best (by val PGD-10) | 30.82 / 16.59 | 31.10 / 16.80 | 4.858 |
+  | 49 | last | 30.68 / 16.53 | 31.45 / 15.60 | 4.853 |
+
+  For comparison, the MobileNetV4-Conv-Small random-init cell with the same
+  LR, epochs and attack (plan 0104 stage 2, `76280eb`, deterministic) ended
+  at 53.85 / 30.71 (last = best).
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **ConvNeXt-Atto trains far worse than MobileNetV4-S under this recipe.**
+     At almost the same parameter count (3.70M vs 3.77M) and ~3x the MACs, it
+     ends 23.2pt lower in clean and 14.2pt lower in PGD-10. This is far
+     outside any noise floor. It confirms the ~30% clean reading behind A2 /
+     B1 (recipe mismatch suspected) with the finished run.
+  2. **Learning is slow from the start.** By the end of the 10-epoch warmup,
+     val clean is only 8.86%. Train loss is 6.81 at epoch 0 (chance is
+     ln 1000 = 6.91) and 4.85 at the end. At the same LR, MobileNetV4-S
+     random init was at 41.59 / 22.29 by epoch 24; ConvNeXt-Atto is at
+     21.95 / 12.17.
+  3. **The peak-LR stage did not saturate.** Val PGD-10 rose from 4.86% to
+     12.17% over epochs 9-24, and still by about 0.3pt per epoch over the
+     last five (10.95 -> 12.17). The first decay then gave +2.31pt PGD-10 and
+     +5.03pt clean in one epoch. So the run was cut while it was still
+     improving at the peak LR. The later stages do flatten: +0.77pt PGD-10
+     over epochs 25-37, and 16.34-16.59% over epochs 44-49 (train loss
+     4.859 -> 4.853).
+  4. **No seen-unseen gap.** At the last epoch, probe minus val is +0.77
+     clean and -0.93 PGD-10, inside the probe's binomial SE (about 1.0 /
+     0.8pt). The model fits its own training images as badly as unseen ones.
+     This is the underfitting signature, stronger than for MobileNetV4-S
+     (+5.9 / +3.7).
+  5. No collapse and no instability. `robust_overfit_gap` (best minus last
+     PGD-10) is 0.05pt.
+  6. What this run does not tell: whether the cause is the LR, the optimizer
+     (SGD vs the AdamW that ConvNeXt normally uses, B2), the warmup length,
+     the 50-epoch budget, or the random init itself. The Anteater
+     pretrained-init canary (2080 Ti, deterministic, lr 0.05, 3 warmup epochs)
+     was already at 48.65 / 26.67 at epoch 2, but it differs in init, LR,
+     GPU type and determinism, so it is context, not a comparison.
+
+  Caveats: one seed. Non-deterministic mode, so a rerun would not be
+  bit-identical. The MobileNetV4-S reference ran deterministic from a
+  different SHA; the gap here is far larger than either difference could
+  explain. Cost: wall clock 25.4 h (2026-09-27 08:59 to 09-28 10:26 UTC),
+  718-723 img/s (the idle-Hamster probe gave 869 for this setting), peak
+  allocated memory 5.7 GB. Checkpoint sha256 was not computed in this
+  postrun. `epoch-metrics.parquet` sha256 `d73a1df7...`,
+  `sample-stats-train.parquet` sha256 `9f1c006b...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id. Hamster GPU0 is now
+  idle; DeiT-Tiny random init still runs on GPU1.
