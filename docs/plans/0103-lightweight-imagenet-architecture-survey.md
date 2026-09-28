@@ -1093,3 +1093,13 @@ history behind this pivot.)
   launched from Ferret's pinned worktree `source-086072bcde92`, the same SHA
   as the Hamster Phase 1 runs, with 16 workers. If foreign jobs return, the
   runs slow down but their numerics are unaffected.
+- 2026-09-28 (chat): **Co-location on Ferret, guided by measured headroom.**
+  Real-training GPU utilization: GPU1 EfficientNet-B0 78-100% (10.5 GB),
+  GPU2 MobileNetV4-M 54-90% (9.7 GB), GPU0 MobileNetV4-S deterministic lr
+  0.015 23-53% (4 GB, launch-bound). The idle-Ferret probe showed that two
+  jobs per GPU lower total throughput for MobileNetV4-M and run
+  EfficientNet-B0 out of memory, so GPU1/GPU2 stay single. On GPU0, the
+  longest Phase 1 cell, `plan0103-phase1-mobilevit-s-random-v1` (~4 days),
+  was co-located with the plan-0104 lr 0.015 run (a few hours left). It takes
+  the GPU alone once that run ends. Numerics are unaffected; only speed
+  changes.
