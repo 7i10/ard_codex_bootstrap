@@ -301,3 +301,13 @@ run id.
     0.05 by only 0.66pt, inside the noise floor.
   - The pretrained side (lr 0.015 on Ferret) is still running, so D = best(pretrained) - best(random) is not decided yet.
     Pretrained so far: 0.005 gives 57.81 / 31.26 and 0.05 (Arm A) gives 54.57 / 30.58.
+- 2026-09-28: **stage 2 complete; preregistered verdict.** `plan0104-mobilenetv4-pretrained-lr0015-v1` (Ferret GPU0, completed):
+  last 57.27 / 31.92, best epoch 47 at 32.14, probe 62.70 / 36.65, first epoch >= 30.58 is 27.
+  - best(pretrained) = 31.92 at lr 0.015 (0.005: 31.26; 0.05: 30.58).
+  - best(random) = 30.71 at lr 0.025.
+  - D = +1.21pt >= 1pt, so the rule reads **"pretraining helps MobileNetV4-S" (n=1)**. Clean: 57.27 vs 53.85 (+3.42).
+  - Caveats: D barely clears the threshold, inside the project's 1-2pt noise floor. Both sides take a max over three noisy
+    runs. The random-init argmax sits at the grid edge (0.025), so a lower LR could narrow D.
+  - Phase 1 recipes under the rule: pretrained lr 0.015, random init lr 0.025.
+  - The human's 2026-09-28 fairness principle (equal tuning budget per model, best-vs-best) means a per-architecture
+    re-tune may supersede this MobileNetV4-S-derived transfer for other models (plan 0103, B1/B2).
