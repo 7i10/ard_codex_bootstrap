@@ -1077,3 +1077,19 @@ history behind this pivot.)
     split. The EasyRobust anchor's first attempt failed (missing ARD_SEED
     env; the wrapper's `rc=$?` read `date`'s status, now fixed) and is
     rerunning on Ferret GPU2.
+- 2026-09-28 (chat): **EasyRobust external anchor reproduced** (Ferret 4090,
+  `scripts/evaluate_external_checkpoint.py --dataset imagenet`, protocol
+  config `imagenet_efficientnet_b0_pgd_at.yaml`, source `b004d51` clean,
+  FOREIGN lineage, not an official test of ours). Full val 50k: clean 61.05
+  (published 61.83, -0.78pp), PGD-10 37.59. AutoAttack n=500: 35.0
+  (published 35.06, -0.06pp; SE ~2.1pt). So our evaluation stack
+  (preprocessing, PGD, pinned AutoAttack) agrees with the field's.
+  EfficientNet-B0 trained by EasyRobust (90 epochs from scratch) reaches
+  ~35% AutoAttack, against ~23% for our MobileNetV4-S runs.
+- 2026-09-28 (human, chat): **Ferret may be used again** (the human watched it
+  for 15 min with no new foreign processes). Phase 1 random-init
+  `plan0103-phase1-efficientnet-b0-random-v1` (Ferret GPU1) and
+  `plan0103-phase1-mobilenetv4-conv-medium-random-v1` (Ferret GPU2)
+  launched from Ferret's pinned worktree `source-086072bcde92`, the same SHA
+  as the Hamster Phase 1 runs, with 16 workers. If foreign jobs return, the
+  runs slow down but their numerics are unaffected.
