@@ -1256,3 +1256,9 @@ history behind this pivot.)
   - **Implication.** The current SGD Phase 1 random-init runs for
     ConvNeXt-Atto, DeiT-Tiny and MobileViT-S are "fixed-recipe" reference
     runs, not the family-appropriate baseline. Decision pending (B1/B2).
+- 2026-09-28 (chat): **Clean-training control, official val.**
+  `plan0103-mobilenetv4-standard-50ep-v1`, last checkpoint, full ImageNet val:
+  clean 67.47%. Internal val was 70.86% and the seen-set probe 77.70%. Our own
+  pipeline gives 73.41% for the public MobileNetV4-S e1200 weights. So 50
+  epochs with basic augmentation lands ~6pt below the long heavy-augmentation
+  recipe; it does not reproduce it.

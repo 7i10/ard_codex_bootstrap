@@ -331,3 +331,9 @@ learning-rate tuning. The proxy is only useful if its ranking matches full Image
   - Spearman rho over the six runs is reported. With n=6 it is descriptive only.
   - If LR selection fails, the proxy is not used for per-model tuning. Options then go back to the human: a short-schedule proxy
     on ImageNet-1k, or direct tuning.
+- 2026-09-28: stage 3 configs merged (`616d081`, protocol `controlled_imagenet100_proxy_lr_v1`). For pretrained init, every
+  tensor except the classifier matches the 1000-class weights bit-for-bit, and the 100-way head is seeded by `seeds.model_init`.
+  The runs are queued on Anteater from pinned worktree `source-616d081a952b` (dev W&B project, 7 workers). Each launches only
+  after its predecessor's bundle records `completed`.
+  - GPU2: pretrained lr 0.005, then 0.015, then 0.05.
+  - GPU3: after `plan0103-mobilenetv4-standard-100ep-v1` ends, random lr 0.025, then 0.05, then 0.1.
