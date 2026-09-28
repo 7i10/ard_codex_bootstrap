@@ -1262,3 +1262,23 @@ history behind this pivot.)
   pipeline gives 73.41% for the public MobileNetV4-S e1200 weights. So 50
   epochs with basic augmentation lands ~6pt below the long heavy-augmentation
   recipe; it does not reproduce it.
+- 2026-09-28 (human, chat): **B1/B2 decided: per-family baseline recipe.**
+  - BN CNNs (MobileNetV4-S/M, EfficientNet-B0): SGD, wd 1e-4.
+  - ConvNeXt-Atto and DeiT-Tiny: AdamW, wd 0.05, no stochastic depth.
+  - MobileViT-S: AdamW, wd 0.01.
+  - Common to all: 50 epochs, 10-epoch warmup, warmup_multistep, basic
+    augmentation.
+  - Peak LR is tuned with 3 points per model and init, equal budget,
+    best-vs-best. The exact grids are still to be approved.
+  - The SGD transfer runs are the "fixed-recipe" reference:
+    - `plan0103-phase1-convnext-atto-random-v1` completed. Last 30.68 /
+      16.53, probe 31.45 / 15.60: fails to fit even the seen set.
+    - `plan0103-phase1-deit-tiny-random-v1` was stopped by the human's
+      decision at epoch 38 (DataLoader-worker SIGTERM; bundle
+      incomplete).
+    - `plan0103-phase1-mobilevit-s-random-v1` was stopped by the human's
+      decision early in training (bundle incomplete).
+    - Stopped runs are not results.
+  - EfficientNet-B0 and MobileNetV4-M random-init SGD lr 0.025 keep running
+    on Ferret as the SGD-family reference (their per-model LR tuning is
+    still to come).
