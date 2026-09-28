@@ -1299,3 +1299,78 @@ history behind this pivot.)
     protocol and group differ from the survey config.
   - Expected wall time is ~1.5 days on three 4090s; MobileViT-S dominates
     at ~10 h per run.
+- 2026-09-29 (postrun): **ImageNet-100 LR tuning, MobileViT-S AdamW random
+  init / lr 1.25e-4 completed.** `plan0103-in100-tune-mobilevit-s-adamw-random-lr1p25em4-v1`
+  (Hamster, RTX 4090) ran 50/50 epochs. `completion.json` reads `completed`,
+  the manifest status is `completed`, and `error-marker.txt` reads "no
+  application error recorded". The watcher re-derived it as terminal and
+  successful. All 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `train.log` has no traceback, NaN or error line (only the wandb git-root and
+  inductor TF32 warnings). `best.pt`, `last.pt` and `epoch-049.pt` are on
+  disk. Nothing is imported into `docs/experiments/`: no aggregator exists for
+  this contract, as for the other plan 0103/0104 hand-runs. The numbers below
+  are read from `outputs/train/epoch-metrics.jsonl` and the run-bundle
+  manifest summary.
+
+  Fixed identity: ImageNet-100 proxy (100 classes, pinned train/val hashes),
+  MobileViT-S (`mobilevit_s_imagenet`, `imagenet_raw_identity` profile),
+  random init, plain PGD-AT, no teacher. Training and evaluation-attack seed 0
+  (split seed 20260911). Training attack: CE PGD-3, l_inf eps 4/255, step
+  8/765, random start. Selection and validation attack: PGD-10, same eps, eval
+  mode. AdamW (betas 0.9/0.999), peak LR 1.25e-4, wd 0.01, warmup_multistep
+  (10-epoch warmup, x0.1 at epochs 25 and 38), 50 epochs. World size 1,
+  global batch 128, local BatchNorm. Non-deterministic with cuDNN autotuning,
+  `torch.compile`, step_diagnostics off, fp32. Protocol
+  `controlled_imagenet100_proxy_lr_v1`, config
+  `imagenet100_mobilevit_s_adamw_random_lr1p25em4.yaml`, config hash
+  `b80c0d42...`. Source SHA `5a5dcbaabf0fed62a0c97dc239f11c1365352b6d`
+  (worktree `source-5a5dcbaabf0f`, clean). "val" is internal validation (the
+  held-out 2% of the ImageNet-100 training split, 2,564 images), not the
+  ImageNet-100 val split. "probe" is 2,000 training images, same transform,
+  eval mode and PGD-10. No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 2.03 / 1.56 | 1.90 / 1.15 | 4.690 |
+  | 9 | end of warmup | 15.72 / 10.65 | 17.50 / 12.35 | 4.120 |
+  | 24 | end of lr 1.25e-4 | 49.69 / 32.22 | 54.25 / 36.05 | 2.970 |
+  | 25 | first epoch at lr 1.25e-5 | 52.77 / 35.37 | 57.35 / 37.95 | 2.877 |
+  | 37 | end of lr 1.25e-5 | 54.60 / 35.45 | 59.00 / 39.10 | 2.790 |
+  | 38 | first epoch at lr 1.25e-6 | 55.54 / 36.66 | 59.05 / 40.15 | 2.782 |
+  | 48 | best (by val PGD-10) | 56.28 / 37.13 | 59.45 / 39.95 | 2.772 |
+  | 49 | last | 55.93 / 36.27 | 59.90 / 40.15 | 2.764 |
+
+  Reading (n=1, one of three random-init LR cells, internal validation,
+  PGD-10 only):
+  1. **The run trains normally.** No collapse, no instability. Val clean ends
+     at 55.9% on 100 classes (chance 1%).
+  2. **The warmup start is slow.** Over epochs 1-6 (LR 2.5e-5 to 8.75e-5)
+     val clean stays at 2.5-5.9%. It takes off only at epochs 7-9, when the
+     LR reaches 1.0e-4 to 1.25e-4.
+  3. **The peak-LR stage did not saturate.** Val PGD-10 rose by 3.2pt over
+     the last five peak-LR epochs (28.98% at ep 19 to 32.22% at ep 24), about
+     0.65pt per epoch; clean rose 1.3pt per epoch. The first decay then gave
+     +3.2pt PGD-10 and +3.1pt clean in one epoch.
+  4. **The two low-LR stages are nearly flat.** Val PGD-10 stays within
+     34.91-36.35% over epochs 25-37 and 35.69-37.13% over epochs 38-49. The
+     val SE is about 1.0pt (2,564 images), so these moves are at noise level.
+  5. **Best and last are within noise.** Best minus last is 0.86pt PGD-10
+     (`robust_overfit_gap`), under one val SE. Best selection likely picked a
+     noise peak.
+  6. **Small seen-unseen gap.** At the last epoch, probe minus val is +4.0
+     clean and +3.9 PGD-10, about 2.7x the SE of the difference (~1.5pt).
+  7. Points 2 and 3 are consistent with 1.25e-4 being below the best peak LR
+     for this cell, but only the 2.5e-4 and 5e-4 cells can say that. No
+     verdict on the grid until all three random-init cells are done.
+
+  Caveats: one seed. Non-deterministic mode with `torch.compile`, so a rerun
+  would not be bit-identical. ImageNet-100 numbers are not comparable to the
+  ImageNet-1k Phase 1 runs; the stopped SGD MobileViT-S run is not a result.
+  Cost: wall clock 8.9 h (2026-09-28 12:16 to 21:12 UTC), 216-217 img/s
+  after epoch 0 (141 img/s at epoch 0, compile warm-up), peak allocated
+  memory 18.6 GB at epoch 0 and 14.5 GB at the last epoch. Checkpoint sha256
+  was not computed in this postrun. `epoch-metrics.parquet` sha256
+  `a6463bd7...`, `sample-stats-train.parquet` sha256 `60fad178...` (from the
+  run-bundle manifest). W&B `lightweight-imagenet-at-dev`, same run id. The
+  MobileViT-S random / 2.5e-4 and pretrained / 6.25e-5 cells have run
+  directories on Hamster.
