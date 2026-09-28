@@ -311,3 +311,23 @@ run id.
   - Phase 1 recipes under the rule: pretrained lr 0.015, random init lr 0.025.
   - The human's 2026-09-28 fairness principle (equal tuning budget per model, best-vs-best) means a per-architecture
     re-tune may supersede this MobileNetV4-S-derived transfer for other models (plan 0103, B1/B2).
+
+## Stage 3: ImageNet-100 proxy validation (human-approved 2026-09-28)
+
+Why: the human's fairness principle (equal tuning budget per model, best-vs-best; plan 0103 A2) needs a cheap proxy for per-model
+learning-rate tuning. The proxy is only useful if its ranking matches full ImageNet-1k training.
+
+- **Dataset.** ImageNet-100 = every 10th wnid (`classes[::10]`) of the sorted ImageNet-1k classes, built on Anteater's SSD as
+  hardlinks to the verified ImageNet-1k copy. Manifest hashes: train `b7cd6593...` (128,135 images), val `8921c1d5...` (5,000
+  images). Class list in `CLASSES.txt` next to the data.
+- **Runs.** The six MobileNetV4-S stage-1/2 cells rerun on ImageNet-100 with everything else identical (50 epochs, same schedule,
+  seed 0, deterministic, probe 2000): pretrained lr 0.005 / 0.015 / 0.05 and random init 0.025 / 0.05 / 0.1. The only other
+  change is a 100-class head; for pretrained init the head is re-initialised. Host: Anteater 2080 Tis. The proxy is compared
+  only on its own ranking, so the GPU type does not matter.
+- **Preregistered rule** (last-epoch internal-val PGD-10 on each dataset):
+  - The proxy is **valid for LR selection** if, for both inits, the argmax learning rate on ImageNet-100 equals the ImageNet-1k
+    argmax (pretrained 0.015, random 0.025).
+  - It is **valid for init comparison** if D_100 = best(pretrained) - best(random) has the same sign as D_1k (+1.21).
+  - Spearman rho over the six runs is reported. With n=6 it is descriptive only.
+  - If LR selection fails, the proxy is not used for per-model tuning. Options then go back to the human: a short-schedule proxy
+    on ImageNet-1k, or direct tuning.
