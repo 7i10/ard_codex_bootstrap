@@ -99,3 +99,4 @@
 | 2026-09-28 | D3 | 補足：clean 学習の約78% は、学習に使った画像（train probe）での精度。学習に使っていない画像（内部検証）では 70.86%（50 epoch）。比べる相手は MobileNetV4-S の公式の重み（手元の評価手順で 73.41%）。公式 val での値を測って確かめる（Anteater で評価中）。 |
 | 2026-09-28 | B1/B2 | 文献調査の結果、提案：最適化手法を正規化の種類で決める（BN を使う CNN は SGD、LN を使う ConvNeXt・DeiT・MobileViT は AdamW）。データ拡張は全モデル弱いまま。50 epoch とスケジュールは共通。weight decay は系統ごとに固定。学習率はモデル×初期化ごとに3点試す。人間の判断待ち。 |
 | 2026-09-28 | B1/B2 | 決定（人間）：モデルの系統ごとの基準レシピ（BN を使う CNN は SGD、ConvNeXt・DeiT・MobileViT は AdamW。weight decay は系統ごとに固定。学習率はモデル×初期化ごとに3点）。SGD で学習率を流用した run は参考値とする。DeiT-Tiny と MobileViT-S の SGD の run は、人間の判断で途中停止した（結果としては扱わない）。 |
+| 2026-09-28 | B3 | 決定（人間）：学習率の候補。SGD の random-init は {0.0125, 0.025, 0.05}、pretrained は {0.005, 0.015, 0.05}。AdamW の random-init は {1.25e-4, 2.5e-4, 5e-4}、pretrained は {6.25e-5, 1.25e-4, 2.5e-4}。代理学習が使えるかの判定を待たずに、ImageNet-100 での調整を始めてよい（案 a）。 |

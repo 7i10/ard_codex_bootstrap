@@ -1427,6 +1427,72 @@ def test_phase1_random_init_configs_change_only_init_lr_and_throughput_options(
     assert survey == cell
 
 
+_ADAMW_TUNE_CASES = [
+    (stem, init, lr, wd, compile_)
+    for stem, wd, compile_ in (("convnext_atto", 0.05, False), ("deit_tiny", 0.05, False), ("mobilevit_s", 0.01, True))
+    for init, lrs in (("random", ("1.25e-4", "2.5e-4", "5e-4")), ("pretrained", ("6.25e-5", "1.25e-4", "2.5e-4")))
+    for lr in lrs
+]
+
+
+@pytest.mark.parametrize(("stem", "init", "lr", "wd", "compile_"), _ADAMW_TUNE_CASES)
+def test_imagenet100_adamw_tune_configs_change_only_the_approved_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stem: str, init: str, lr: str, wd: float, compile_: bool
+) -> None:
+    """Plan 0103 per-family LR tuning on the ImageNet-100 proxy: the survey config
+    with only dataset (ImageNet-100, pinned), head size, init, AdamW (approved wd,
+    peak lr), Phase 1 throughput options, protocol and group changed."""
+    values = {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_IMAGENET100_ROOT": str(tmp_path / "imagenet100"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    config_dir = Path(__file__).resolve().parents[2] / "configs" / "scientific"
+    tag = lr.replace(".", "p").replace("-", "m")
+    survey = load_config(config_dir / f"imagenet_{stem}_pgd_at.yaml").model_dump(mode="json")
+    cell = load_config(config_dir / f"imagenet100_{stem}_adamw_{init}_lr{tag}.yaml").model_dump(mode="json")
+    assert cell["optimizer"] == {
+        "id": "adamw",
+        "learning_rate": float(lr),
+        "weight_decay": wd,
+        "momentum": None,
+        "nesterov": None,
+        "beta1": 0.9,
+        "beta2": 0.999,
+    }
+    assert cell["student"]["pretrained"] is (init == "pretrained")
+    assert cell["student"]["num_classes"] == 100
+    for key in ("dataset",):
+        assert cell[key]["num_classes"] == 100 and cell[key]["content_sha256"].startswith("b7cd6593")
+    assert cell["evaluation"]["dataset"]["content_sha256"].startswith("8921c1d5")
+    training = cell["training"]
+    assert training["deterministic"] is False and training["cudnn_benchmark"] is True
+    assert training["step_diagnostics"] is False and training["compile"] is compile_
+    assert cell["protocol"]["id"] == "controlled_imagenet100_proxy_lr_v1"
+    for payload in (survey, cell):
+        payload["dataset"] = None
+        payload["evaluation"] = {**payload["evaluation"], "dataset": None}
+        payload["student"] = {**payload["student"], "num_classes": None, "pretrained": None}
+        payload["optimizer"] = None
+        payload["training"] = {
+            **payload["training"],
+            "deterministic": None,
+            "cudnn_benchmark": None,
+            "step_diagnostics": None,
+            "compile": None,
+        }
+        payload["protocol"] = None
+        payload["tracking"] = {**payload["tracking"], "group": None}
+    assert survey == cell
+
+
 @pytest.mark.parametrize(
     ("config_file", "learning_rate", "pretrained"),
     [

@@ -1282,3 +1282,20 @@ history behind this pivot.)
   - EfficientNet-B0 and MobileNetV4-M random-init SGD lr 0.025 keep running
     on Ferret as the SGD-family reference (their per-model LR tuning is
     still to come).
+- 2026-09-28 (human, chat): **LR grids approved; option a (start the
+  ImageNet-100 tuning before the proxy verdict) approved.**
+  - Grids, 3 points per model x init:
+    - SGD random {0.0125, 0.025, 0.05}; SGD pretrained {0.005, 0.015,
+      0.05}.
+    - AdamW random {1.25e-4, 2.5e-4, 5e-4}; AdamW pretrained {6.25e-5,
+      1.25e-4, 2.5e-4}.
+    - AdamW betas 0.9/0.999, as in the official ConvNeXt/DeiT/MobileViT
+      recipes.
+  - ImageNet-100 was built on Hamster and Ferret as well, with identical
+    manifest hashes on all three hosts.
+  - The 18 AdamW configs are `imagenet100_{convnext_atto,deit_tiny,
+    mobilevit_s}_adamw_{random,pretrained}_lr*.yaml`. A config test pins that
+    only the dataset, head size, init, optimizer, throughput options,
+    protocol and group differ from the survey config.
+  - Expected wall time is ~1.5 days on three 4090s; MobileViT-S dominates
+    at ~10 h per run.
