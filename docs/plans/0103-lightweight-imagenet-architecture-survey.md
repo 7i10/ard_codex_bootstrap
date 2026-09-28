@@ -1103,3 +1103,38 @@ history behind this pivot.)
   was co-located with the plan-0104 lr 0.015 run (a few hours left). It takes
   the GPU alone once that run ends. Numerics are unaffected; only speed
   changes.
+- 2026-09-28 (human, chat): **Paper framing (A1-A5 of the open-issues list).**
+  - **A1, the claim.** For each lightweight model: robustness per parameter
+    and per MAC, and the training approach that suits it (including whether
+    pretraining is needed). Where the model underfits, why, and which remedy
+    fixes it. As research questions:
+    - RQ1 efficiency: the robustness Pareto frontier.
+    - RQ2 prescription: per-model init, recipe and method.
+    - RQ3 mechanism: why underfitting happens, and which remedies work and
+      why.
+  - **A2, fairness.** The human noted that no shared recipe is neutral:
+    what works for MobileNet need not work for EfficientNet. Adopted
+    principle: "same conditions" means an **equal tuning budget per model,
+    compared best-vs-best**, not identical hyperparameters. This is the
+    same principle as plan 0104's per-init LR comparison.
+    - Fixed-recipe results are kept as a sensitivity reference.
+    - Tuning on a cheap proxy (short schedule / ImageNet-100 /
+      successive halving) needs a rank-correlation check against the full
+      run.
+    - Consequence: the current Phase 1 (MobileNetV4-S LR transferred to
+      every model) is the biased variant. ConvNeXt-Atto and DeiT-Tiny random
+      init reach only ~30% clean, likely a recipe mismatch. Phase 1's design
+      is to be revisited (B1/B2).
+  - **A3, audience.** Robustness researchers. Since mobile is the premise,
+    speed is reported properly at the end: params, MACs, and real-device
+    latency (possibly int8). No venue targeting; best effort.
+  - **A4, threat models.** l_inf 4/255 now. l2 later, first as evaluation of
+    l_inf-trained models, then training if needed.
+  - **A5, framing.** "Remedies in the capacity-limited regime", examined
+    critically.
+    - Deployment-readiness is not claimed: ~51% clean and 23-35%
+      AutoAttack.
+    - "Capacity" is a hypothesis to test, not an assumption; the
+      clean-training control hints at recipe saturation.
+    - Every remedy must beat simply spending the same compute on a larger
+      model, so the frontier includes scaled-up baselines.
