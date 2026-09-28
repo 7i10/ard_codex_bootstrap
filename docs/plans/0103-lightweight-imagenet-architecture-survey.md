@@ -1224,3 +1224,35 @@ history behind this pivot.)
   `sample-stats-train.parquet` sha256 `9f1c006b...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id. Hamster GPU0 is now
   idle; DeiT-Tiny random init still runs on GPU1.
+- 2026-09-28 (chat): **Literature: official clean recipes vs adversarial-training
+  recipes per family** (A2 item 1, subagent, checked against the paper texts;
+  items not checked are flagged unverified in the chat record).
+  - **Official clean recipes** are co-tuned with heavy augmentation, large
+    batches and 300-9600 epochs (MNv4-S: AdamW, 9600 ep). They are not a
+    sound adversarial-training baseline wholesale.
+  - **Heavy augmentation from random init makes adversarial training of
+    ConvNeXt/DeiT fail** (Singh 2023 sec 4.2; Debenedetti 2022 Tab. IV; Bai
+    2021 sec 4.1). Keep basic augmentation for all models.
+  - **The optimizer follows the normalization type.**
+    - LN/attention models (ConvNeXt, DeiT, and MobileViT per its own
+      recipe) use AdamW in every ImageNet adversarial-training paper.
+      RobustART: "SGD would cause the failure of training". DeiT Tab. 8:
+      SGD -7 pts even clean.
+    - BN CNNs use SGD everywhere, and AdamW on a BN ResNet collapsed under
+      adversarial training (Bai 2021), consistent with our plan-0102
+      MobileNetV4 collapse.
+    - Our ~30% clean for ConvNeXt-Atto and DeiT-Tiny random init under SGD
+      matches this known failure mode.
+  - **LR at batch 128.** AdamW ~1.25e-4 (linear rule) to ~2.5e-4-7e-4
+    (square-root rule); SGD 0.025-0.05.
+  - **Weight decay.** The evidence conflicts: Debenedetti 0.5 helps, Singh
+    0.05 best, ARES larger hurts.
+  - **Recommended per-family baseline.** 50 ep, 10-ep warmup and the same
+    multistep schedule for all:
+    - BN CNNs (MNv4-S/M, EfficientNet-B0): SGD, wd 1e-4.
+    - ConvNeXt-Atto and DeiT-Tiny: AdamW, wd 0.05, no stochastic depth.
+    - MobileViT-S: AdamW, wd 0.01.
+    - Tune peak LR (3 points) per model and init.
+  - **Implication.** The current SGD Phase 1 random-init runs for
+    ConvNeXt-Atto, DeiT-Tiny and MobileViT-S are "fixed-recipe" reference
+    runs, not the family-appropriate baseline. Decision pending (B1/B2).
