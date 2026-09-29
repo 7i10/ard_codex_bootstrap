@@ -95,9 +95,7 @@ _JOB: dict[str, object] = {}
 
 
 def _init_worker(source_train: str, out_train: str, short_side: int, quality: int, resume: bool) -> None:
-    _JOB.update(
-        source=Path(source_train), out=Path(out_train), short_side=short_side, quality=quality, resume=resume
-    )
+    _JOB.update(source=Path(source_train), out=Path(out_train), short_side=short_side, quality=quality, resume=resume)
 
 
 def _process(relative: str) -> tuple[str, str, str, int]:

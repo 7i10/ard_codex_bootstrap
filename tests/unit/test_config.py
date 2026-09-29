@@ -580,6 +580,7 @@ def test_top_level_configs_resolve_under_controlled_environment(
         "ARD_SEED": "7",
         "ARD_CIFAR10_ROOT": str(tmp_path / "cifar10"),
         "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_IMAGENET_TRAIN_ROOT": str(tmp_path / "imagenet_train_derived"),
         "ARD_IMAGENET100_ROOT": str(tmp_path / "imagenet100"),
         "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT": str(teacher_checkpoint),
         "ARD_TEACHER_CHEN2021_LTD_WRN34_10_CHECKPOINT_SHA256": "a" * 64,

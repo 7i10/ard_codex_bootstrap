@@ -62,6 +62,10 @@ STAGE_CONFIGS = {
     "imagenet_mobilenetv4_twostage_stage1_112_pgd1.yaml",
     "imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft.yaml",
 }
+# Configs added after this module's pre-change commit that use later schema
+# fields (loader speedup C's dataset.derived_from); their own byte-identity
+# test is tests/unit/test_imagenet_loader_speedups.py.
+LATER_CONFIGS = {"imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized.yaml"}
 
 
 def _pre_change_module(relative: str, name: str, package: str) -> types.ModuleType:
@@ -106,6 +110,7 @@ def _env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "ARD_FROZEN_ORACLE_MANIFEST_SHA256": "c" * 64,
         "ARD_SEED": "7",
         "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_IMAGENET_TRAIN_ROOT": str(tmp_path / "imagenet_train_derived"),
         "ARD_IMAGENET100_ROOT": str(tmp_path / "imagenet100"),
         "ARD_CIFAR10_ROOT": str(tmp_path / "cifar10"),
         "ARD_NUM_WORKERS": "0",
@@ -141,7 +146,7 @@ def test_existing_configs_serialize_exactly_as_under_the_pre_change_schema(
         path
         for directory in ("experiments", "pilot", "production", "scientific")
         for path in sorted((ROOT / "configs" / directory).glob("*.yaml"))
-        if path.name not in STAGE_CONFIGS
+        if path.name not in STAGE_CONFIGS | LATER_CONFIGS
     ]
     assert len(paths) > 20
     for path in paths:
