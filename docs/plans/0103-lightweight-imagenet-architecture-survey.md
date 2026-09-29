@@ -1615,3 +1615,11 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `7e67c0b4...`, `sample-stats-train.parquet`
   sha256 `07dc187d...` (from the run-bundle manifest). W&B
   `lightweight-imagenet-at-dev`, same run id.
+- 2026-09-29 (chat): **Option A verdict (preregistered): G = 70.95 - 70.86 =
+  +0.09pt < 1pt.** The recipe itself saturates by 50 epochs; the saturation
+  is not specific to adversarial training.
+  - `plan0103-mobilenetv4-standard-100ep-v1` completed.
+  - Clean training shows the same per-LR-stage plateau pattern.
+  - The robust fit level still differs sharply: seen-set clean ~78% under
+    clean training versus seen-set PGD-10 ~35% under adversarial training.
+    The capacity account concerns the level of fit, not when it saturates.

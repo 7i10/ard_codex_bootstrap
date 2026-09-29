@@ -337,3 +337,12 @@ learning-rate tuning. The proxy is only useful if its ranking matches full Image
   after its predecessor's bundle records `completed`.
   - GPU2: pretrained lr 0.005, then 0.015, then 0.05.
   - GPU3: after `plan0103-mobilenetv4-standard-100ep-v1` ends, random lr 0.025, then 0.05, then 0.1.
+- 2026-09-29: **stage 3 verdict: the ImageNet-100 proxy FAILS for LR selection and PASSES for init comparison**
+  (all six completed on Anteater; last-epoch internal-val PGD-10, ImageNet-100 vs ImageNet-1k):
+  - Pretrained lr 0.005 / 0.015 / 0.05: 49.77 / 51.29 / **53.67** (1k: 31.26 / **31.92** / 30.58).
+  - Random lr 0.025 / 0.05 / 0.1: 37.40 / 44.62 / **49.06** (1k: **30.71** / 30.05 / 29.18).
+  - The argmax differs for both inits and the within-init order is reversed: the proxy prefers the highest LR. D_100 = +4.61
+    has the same sign as D_1k = +1.21. Spearman rho over the six runs is 0.31 (descriptive, n=6).
+  - Likely mechanism: at equal epochs ImageNet-100 gives 10x fewer optimizer steps, which favours larger learning rates.
+  - Under the rule, the proxy is **not** used for per-model LR selection. The ImageNet-100 AdamW tuning runs keep value only for
+    the init comparison (sign) and as descriptive LR sensitivity. The options go back to the human.
