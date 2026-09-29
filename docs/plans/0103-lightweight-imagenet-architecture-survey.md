@@ -2012,3 +2012,26 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `d7ffc681...`, `sample-stats-train.parquet`
   sha256 `3a8090ad...` (from the run-bundle manifest). W&B
   `lightweight-imagenet-at-dev`, same run id.
+- 2026-09-30 — Throughput diagnosis for stage 1 (112 px, batch 128),
+  measured with throwaway scripts.
+  - Loader alone (training view, img/s):
+    - Hamster, original data: 4348 / 5406 / 5703 at 16 / 32 / 48 workers.
+    - Hamster, S=256: 8722 / 10489 / 11515 at the same worker counts.
+    - Ferret, original data: 3099-4180 at 16-64 workers.
+    - Ferret, S=256: 6141-8755 at 16-64 workers. Ferret is not faster,
+      because it shares the host with other training jobs.
+  - GPU-only synthetic step (deterministic, img/s): 3860 at bs128 and
+    6669 at bs256; 4994 at bs128 non-deterministic. For reference,
+    224 px PGD-3 at bs128 runs at 1319.
+  - So at 112 px and bs128 the step is kernel-launch bound (the
+    CPU-thread limit), not GPU-compute bound.
+  - Human decision:
+    - Run stage 1 with S=256 and `training.step_diagnostics: false`,
+      which removes per-step host syncs without changing the math
+      (sync-free parity-tested). Config changed in 8333698.
+    - Batch 256, non-deterministic mode and compile are not used for
+      this comparison.
+    - Explore CUDA Graphs separately, on Ferret.
+  - Launched `plan0103-mnv4s-twostage-stage1-112-pgd1-s256-s0-v1`:
+    Hamster GPU1, pinned worktree source-8333698a3de1, 16 workers,
+    seed 0.
