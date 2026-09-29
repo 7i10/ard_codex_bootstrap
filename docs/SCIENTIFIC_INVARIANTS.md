@@ -27,6 +27,16 @@ checkpoint selectionはhard-label CEです。evaluation attackはsaved training 
 defaultとし、lossを含む全identity fieldのexact equalityを要求します。training attackとのbudget driftと、
 saved selection attackからのevaluation driftはschema/CLIで拒否します。
 
+**記録済みの例外（1件、人間承認 2026-09-30）**：`method.selection_step_size_independent: true`。
+training attackとselection attackのstep size一致チェックだけを外すフラグです。範囲は次の3条件をすべて
+満たす場合に限ります。(1) protocolが`controlled_imagenet_stage02_two_stage_lowres_v1`、(2)
+`training.train_image_size`が設定されている（2段階学習のstage 1）、(3) selection attackが参照のidentity
+（CE、Linf eps 4/255、step 8/765、10 steps、random start、student/teacherともeval）と完全に一致する。
+norm、input domain、epsilon、random startの一致チェックは残ります。理由：1-step PGD（PGD-1）で学習するには
+step = eps（4/255）が必要です。一方でselectionとevaluationは参照のPGD-10 step 8/765のままなので、
+報告する数値のthreat identityは変わりません。schemaがこの範囲を強制し、テストで確認しています
+（`tests/unit/test_two_stage_lowres.py`）。
+
 attack identityとthreat hashは`AttackConfig`の全14 field、すなわち`norm`、`input_domain`、`epsilon`、
 `epsilon_value`、`step_size`、`step_size_value`、`steps`、`random_start`、`loss`、`kl_target`、
 `temperature`、`temperature_squared`、`student_mode`、`teacher_mode`から作ります。comparisonはこのcomplete

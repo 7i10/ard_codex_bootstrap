@@ -19,6 +19,8 @@ import yaml
 from torch import nn
 from torch.optim import Optimizer
 
+from ard.config.schema import ExperimentConfig
+
 from .distributed import gather_objects, get_rank, get_world_size, run_rank_zero_phase, unwrap_model
 
 REQUIRED_KEYS = {
@@ -237,7 +239,34 @@ def _reject_ema_selected_resume(payload: Mapping[str, Any]) -> None:
 INIT_CHECKPOINT_LINEAGE_KIND = "student_init_checkpoint_v1"
 
 
-def read_init_checkpoint(path: Path, *, expected_sha256: str) -> tuple[dict[str, torch.Tensor], dict[str, Any]]:
+TWO_STAGE_PROTOCOL_ID = "controlled_imagenet_stage02_two_stage_lowres_v1"
+
+
+def _source_compatibility_errors(source: ExperimentConfig, target: ExperimentConfig) -> list[str]:
+    """Fields a stage-2 run must share with the stage-1 run it starts from."""
+    errors: list[str] = []
+    if source.protocol.id != TWO_STAGE_PROTOCOL_ID or target.protocol.id != TWO_STAGE_PROTOCOL_ID:
+        errors.append(f"both runs must use protocol {TWO_STAGE_PROTOCOL_ID}")
+    if source.training.train_image_size is None:
+        errors.append("the source run must be a reduced-resolution stage 1 (training.train_image_size set)")
+    for field in ("name", "content_sha256", "num_classes", "image_size"):
+        if getattr(source.dataset, field) != getattr(target.dataset, field):
+            errors.append(f"dataset.{field}")
+    if source.seeds.split != target.seeds.split:
+        errors.append("seeds.split")
+    if source.training.validation_fraction != target.training.validation_fraction:
+        errors.append("training.validation_fraction")
+    for field in ("architecture", "num_classes", "normalization"):
+        if getattr(source.student, field) != getattr(target.student, field):
+            errors.append(f"student.{field}")
+    if source.student.pretrained or target.student.pretrained:
+        errors.append("student.pretrained must be false in both runs")
+    return errors
+
+
+def read_init_checkpoint(
+    path: Path, *, expected_sha256: str, target: ExperimentConfig
+) -> tuple[dict[str, torch.Tensor], dict[str, Any]]:
     """Verify one of this project's own final checkpoints and return its
     student weights plus an init-lineage record (plan 0103, two-stage stage 2).
 
@@ -247,7 +276,12 @@ def read_init_checkpoint(path: Path, *, expected_sha256: str) -> tuple[dict[str,
     not EMA-selected; and the sibling ``resolved_config.yaml`` of the run
     that wrote it digests to the checkpoint's ``config_hash`` and declares
     ``training.epochs == epoch + 1`` (so it is that run's *final* student,
-    not an interrupted run's latest). Only ``payload["model"]`` is returned;
+    not an interrupted run's latest). That sibling config must also validate
+    as a full ``ExperimentConfig`` and agree with the stage-2 ``target`` on
+    the two-stage protocol (source has ``train_image_size``), the dataset
+    identity, ``seeds.split`` and ``validation_fraction`` (same train /
+    validation partition), and the student architecture, head and
+    normalization (neither run pretrained). Only ``payload["model"]`` is returned;
     optimizer, scheduler, scaler, RNG, sampler, sample and selection state
     are never read. This is not resume: see ``load_checkpoint``.
     """
@@ -288,7 +322,13 @@ def read_init_checkpoint(path: Path, *, expected_sha256: str) -> tuple[dict[str,
         raise ValueError(
             f"init checkpoint is not its run's final epoch: epoch index {epoch!r}, run epochs {source_epochs!r}"
         )
-    source_protocol = source_config.get("protocol")
+    try:
+        source = ExperimentConfig.model_validate(source_config)
+    except ValueError as exc:
+        raise ValueError(f"init checkpoint's sibling resolved_config.yaml is not a valid config: {exc}") from exc
+    errors = _source_compatibility_errors(source, target)
+    if errors:
+        raise ValueError("init checkpoint's run is incompatible with this stage-2 run: " + "; ".join(errors))
     lineage: dict[str, Any] = {
         "kind": INIT_CHECKPOINT_LINEAGE_KIND,
         "path": str(path),
@@ -298,21 +338,21 @@ def read_init_checkpoint(path: Path, *, expected_sha256: str) -> tuple[dict[str,
         "source_tracker_run_id": payload["tracker_run_id"],
         "source_config_hash": payload["config_hash"],
         "source_resolved_config_sha256": hashlib.sha256(source_config_bytes).hexdigest(),
-        "source_protocol_id": source_protocol.get("id") if isinstance(source_protocol, dict) else None,
+        "source_protocol_id": source.protocol.id,
         "source_epoch": epoch,
         "source_epochs": source_epochs,
         "source_world_size": payload["world_size"],
-        "source_train_image_size": (
-            source_training.get("train_image_size") if isinstance(source_training, dict) else None
-        ),
+        "source_train_image_size": source.training.train_image_size,
     }
     return payload["model"], lineage
 
 
-def load_init_student_weights(model: nn.Module, path: Path, *, expected_sha256: str) -> dict[str, Any]:
+def load_init_student_weights(
+    model: nn.Module, path: Path, *, expected_sha256: str, target: ExperimentConfig
+) -> dict[str, Any]:
     """Load a verified ``last.pt``'s student weights (``strict=True``) into
     ``model`` and return the init lineage; see ``read_init_checkpoint``."""
-    state, lineage = read_init_checkpoint(path, expected_sha256=expected_sha256)
+    state, lineage = read_init_checkpoint(path, expected_sha256=expected_sha256, target=target)
     unwrap_model(model).load_state_dict(state, strict=True)
     return lineage
 

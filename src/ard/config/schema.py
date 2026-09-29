@@ -684,7 +684,9 @@ class MethodConfig(StrictModel):
     # are measured under the same threat identity as every other ImageNet
     # arm. True exempts *only* the step-size equality below; norm, input
     # domain, epsilon and random start must still match, selection must be
-    # given explicitly, and ExperimentConfig restricts the flag to
+    # given explicitly and equal the reference PGD-10 identity exactly
+    # (docs/SCIENTIFIC_INVARIANTS.md records this exception, human-approved
+    # 2026-09-30), and ExperimentConfig restricts the flag to
     # controlled_imagenet_stage02_two_stage_lowres_v1 with
     # training.train_image_size set. Serialized only when true, so every
     # existing config keeps a byte-identical resolved config.
@@ -796,6 +798,23 @@ class MethodConfig(StrictModel):
             raise ValueError(
                 "checkpoint selection attack must match the training threat model: " + ", ".join(mismatched)
             )
+        if self.selection_step_size_independent:
+            # The exemption is only safe because selection (and so the
+            # default evaluation attack) is pinned to the reference identity.
+            pinned = AttackConfig(
+                loss="ce",
+                epsilon="4/255",
+                step_size="8/765",
+                steps=10,
+                random_start=True,
+                student_mode="eval",
+                teacher_mode="eval",
+            )
+            if selection.identity() != pinned.identity():
+                raise ValueError(
+                    "method.selection_step_size_independent requires the reference selection attack exactly "
+                    "(CE, Linf eps 4/255, step 8/765, 10 steps, random start, eval/eval)"
+                )
         if self.id == "rslad_entropy" and self.entropy_gamma != 1.0:
             raise ValueError("rslad_entropy currently implements Shannon entropy only (entropy_gamma=1)")
         risk_methods = {
@@ -1694,6 +1713,13 @@ class ExperimentConfig(StrictModel):
             raise ValueError(
                 "training.init_checkpoint cannot be combined with student.pretrained=true: the student would "
                 "have two initializations"
+            )
+        if (
+            self.training.init_checkpoint is not None
+            and self.protocol.id != "controlled_imagenet_stage02_two_stage_lowres_v1"
+        ):
+            raise ValueError(
+                "training.init_checkpoint is defined only for controlled_imagenet_stage02_two_stage_lowres_v1"
             )
         if self.method.selection_step_size_independent and (
             self.protocol.id != "controlled_imagenet_stage02_two_stage_lowres_v1"

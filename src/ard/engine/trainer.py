@@ -260,6 +260,7 @@ class Trainer:
         observation_profile: str = "off",
         checkpoint_epochs: tuple[int, ...] = (),
         step_diagnostics: bool = True,
+        validation_image_size: int | None = None,
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -580,6 +581,13 @@ class Trainer:
             "seed_protocol": "seed+1000003*global_step+10007*rank+590017; one advancing generator per pass",
             "selected_epoch": None,
         }
+        # Plan 0103 two-stage stage 1: validation (and so selection) runs at
+        # training.train_image_size, not the evaluation resolution; say so in
+        # every checkpoint's selection record. Absent (default) means the
+        # dataset's own image_size, so existing checkpoints are unchanged.
+        if validation_image_size is not None:
+            self.selection_metadata["validation_image_size"] = validation_image_size
+            self.selection_metadata_ema["validation_image_size"] = validation_image_size
         if prescriptive_v3_route is not None:
             self.selection_metadata["prescriptive_v3"] = {
                 "route": prescriptive_v3_route,

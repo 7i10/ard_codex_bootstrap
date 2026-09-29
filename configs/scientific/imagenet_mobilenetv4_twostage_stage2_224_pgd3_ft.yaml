@@ -17,6 +17,10 @@
 # random start), identical to the reference, rather than AdvXL's own PGD-3 step 4/255, so stage 2's
 # attack matches the single-stage run exactly. student.pretrained stays false (refused together
 # with init_checkpoint).
+# Disclosed, accepted (review 2026-09-30): stage 2 shares stage 1's seeds and restarts the epoch
+# counter at 0, so it replays stage 1's epochs 0-19 batch order and crop boxes (now output at 224px).
+# Stage 1 keeps the reference's 10-epoch warmup in absolute epochs (not scaled to 195), as the
+# 100-epoch budget x init 2x2 did.
 schema_version: 2
 protocol: {id: controlled_imagenet_stage02_two_stage_lowres_v1}
 tier: production

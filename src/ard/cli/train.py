@@ -35,7 +35,7 @@ from ard.data import (
     seed_data_loader_worker,
 )
 from ard.engine import Trainer, config_digest, get_rank, get_world_size
-from ard.engine.checkpoint import load_init_student_weights, read_init_checkpoint, validate_resume_checkpoint
+from ard.engine.checkpoint import load_init_student_weights, validate_resume_checkpoint
 from ard.engine.distributed import (
     barrier,
     initialize_from_env,
@@ -749,9 +749,16 @@ def main(argv: list[str] | None = None) -> int:
             _validate_required_fork_resume(args.resume, config, config_hash=config_hash)
             init_checkpoint = config.training.init_checkpoint
             if init_checkpoint is not None and args.resume is None:
-                # Fail before any output is written (dry-run included); the
-                # load below re-verifies the exact bytes it deserializes.
-                read_init_checkpoint(init_checkpoint.path, expected_sha256=init_checkpoint.sha256)
+                # Fail before any output or tracker run exists (dry-run
+                # included): verify the file and its source run, and
+                # strict-load it into a throwaway student. The load below
+                # re-verifies the exact bytes it deserializes.
+                load_init_student_weights(
+                    build_student(config.student, tier=config.tier),
+                    init_checkpoint.path,
+                    expected_sha256=init_checkpoint.sha256,
+                    target=config,
+                )
 
         run_rank_zero_phase(_validate_output_guard, phase="output guard")
         terminal_resume = run_rank_zero_value(
@@ -908,7 +915,7 @@ def main(argv: list[str] | None = None) -> int:
             # the manifest must already carry the lineage of the fresh start.
             if args.resume is None:
                 init_lineage = load_init_student_weights(
-                    student, init_checkpoint.path, expected_sha256=init_checkpoint.sha256
+                    student, init_checkpoint.path, expected_sha256=init_checkpoint.sha256, target=config
                 )
 
                 def _record_init_lineage(active_tracker: ExperimentTracker) -> None:
@@ -1142,6 +1149,7 @@ def main(argv: list[str] | None = None) -> int:
             observation_profile=config.observation.profile,
             checkpoint_epochs=config.training.checkpoint_epochs,
             step_diagnostics=config.training.step_diagnostics,
+            validation_image_size=config.training.train_image_size,
         )
         start_epoch = 0
         if args.resume is not None:
@@ -1194,6 +1202,10 @@ def main(argv: list[str] | None = None) -> int:
                 values = dict(metrics)
                 values["epoch"] = trainer.current_epoch
                 values["global_step"] = trainer.global_step
+                if config.training.train_image_size is not None:
+                    # In-training validation/probe ran at this size, not at
+                    # the evaluation resolution (plan 0103 stage 1).
+                    values["validation_image_size"] = config.training.train_image_size
                 if ordering_telemetry is not None and ordering_telemetry.last_descriptor is not None:
                     values.update(
                         {
@@ -1368,6 +1380,11 @@ def main(argv: list[str] | None = None) -> int:
                     "last_clean_accuracy": last_clean,
                     "last_pgd_accuracy": last_pgd,
                     "robust_overfit_gap": selected_pgd - last_pgd,
+                    **(
+                        {"validation_image_size": config.training.train_image_size}
+                        if config.training.train_image_size is not None
+                        else {}
+                    ),
                     **epoch_trajectory_summary(epoch_rows, expected_epochs=config.training.epochs),
                 }
             )

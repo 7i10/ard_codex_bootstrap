@@ -22,14 +22,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pyarrow.parquet as pq
 import pytest
 import torch
 import yaml
 from PIL import Image
 
 from ard.config import load_config
-from ard.config.schema import DatasetConfig
+from ard.config.schema import DatasetConfig, ModelConfig
 from ard.data import build_dataset
+from ard.models import build_student
 
 pytestmark = pytest.mark.t3
 
@@ -164,6 +166,13 @@ def test_two_stage_cli_trains_stage1_small_then_fine_tunes_stage2_from_its_last_
     assert resolved1.training.train_image_size == 16 and resolved1.dataset.image_size == 32
     assert resolved1.method.attack is not None and resolved1.method.attack.steps == 1
     manifest1 = json.loads((out1 / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    # 16px selection numbers are labelled as such everywhere they are recorded.
+    assert manifest1["summary"]["validation_image_size"] == 16
+    for name in ("best.pt", "last.pt"):
+        metadata = torch.load(out1 / name, map_location="cpu", weights_only=False)["selection_metadata"]
+        assert metadata["validation_image_size"] == 16
+    rows1 = pq.read_table(out1 / "epoch-metrics.parquet").to_pylist()
+    assert [row["validation_image_size"] for row in rows1] == [16, 16]
     assert "init_lineage" not in manifest1
     last1 = out1 / "last.pt"
     stage1_weights = torch.load(last1, map_location="cpu", weights_only=False)["model"]
@@ -194,6 +203,24 @@ def test_two_stage_cli_trains_stage1_small_then_fine_tunes_stage2_from_its_last_
     assert refused.returncode != 0 and "SHA-256 mismatch" in refused.stderr
     assert not out2.exists()
 
+    # ---- stage 2: a wrong-architecture last.pt (valid digest, compatible
+    # source config) fails the dry-run's strict load before any output exists
+    forged = tmp_path / "forged-stage1"
+    forged.mkdir()
+    (forged / "resolved_config.yaml").write_bytes((out1 / "resolved_config.yaml").read_bytes())
+    forged_payload = torch.load(last1, map_location="cpu", weights_only=False)
+    forged_payload["model"] = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3)).state_dict()
+    torch.save(forged_payload, forged / "last.pt")
+    mismatched = _environment(
+        {
+            "ARD_STAGE1_CHECKPOINT": str(forged / "last.pt"),
+            "ARD_STAGE1_CHECKPOINT_SHA256": hashlib.sha256((forged / "last.pt").read_bytes()).hexdigest(),
+        }
+    )
+    refused = _run(["-m", "ard.cli.train", "--config", str(config2), "--dry-run"], mismatched)
+    assert refused.returncode != 0 and "size mismatch" in refused.stderr
+    assert not out2.exists()
+
     # ---- stage 2: exact stage-1 weights, fresh optimizer/scheduler/step
     right = _environment({"ARD_STAGE1_CHECKPOINT": str(last1), "ARD_STAGE1_CHECKPOINT_SHA256": digest})
     snapshot2 = tmp_path / "stage2-start.pt"
@@ -205,6 +232,8 @@ def test_two_stage_cli_trains_stage1_small_then_fine_tunes_stage2_from_its_last_
         assert torch.equal(start["model"][key], value), key
     assert start["image_shapes"] == dict.fromkeys(("train", "validation", "probe"), (3, 32, 32))
     assert start["optimizer_state_entries"] == 0
+    stage2_last = torch.load(out2 / "last.pt", map_location="cpu", weights_only=False)
+    assert "validation_image_size" not in stage2_last["selection_metadata"]
     assert start["global_step"] == 0 and start["start_epoch"] == 0 and start["scheduler_last_epoch"] == 0
     # warmup_multistep, 1 warmup epoch: epoch 0 runs at the configured peak 0.0025.
     assert start["learning_rates"] == [pytest.approx(0.0025)]

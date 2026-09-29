@@ -35,7 +35,7 @@ from ard.attacks import AttackRequest, LinfPGD
 from ard.cli.evaluate import _two_stage_protocol_identity
 from ard.cli.train import _build_method
 from ard.config import load_config
-from ard.config.loader import _expand_environment, resolved_config_dict
+from ard.config.loader import _expand_environment, resolved_config_dict, save_resolved_config
 from ard.config.schema import (
     AttackConfig,
     DatasetConfig,
@@ -346,6 +346,13 @@ def test_selection_step_guard_still_fires_without_the_explicit_stage1_flag(
     stage2 = CONFIG_DIR / "imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft.yaml"
     with pytest.raises(ValidationError, match="only for the reduced-resolution stage 1"):
         load_config(stage2, ["method.selection_step_size_independent=true"])
+    # Under the flag, the selection attack is pinned to the reference identity.
+    for override in (
+        "method.selection_attack.step_size=1/255",
+        "method.selection_attack.steps=20",
+    ):
+        with pytest.raises(ValidationError, match="requires the reference selection attack exactly"):
+            load_config(STAGE1, [override])
     method = load_config(STAGE1).method
     assert method.attack is not None and method.selection_attack is not None
     assert (method.attack.step_size, method.selection_attack.step_size) == ("4/255", "8/765")
@@ -408,24 +415,64 @@ def test_pgd1_with_step_equal_to_epsilon_passes_the_unweakened_step_guard() -> N
 # --------------------------------------------------------------------------- init_checkpoint
 
 
-def _source_run(tmp_path: Path, *, epochs: int = 3, epoch: int = 2, **payload_extra: Any) -> tuple[Path, Any]:
+def _deep_update(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_update(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def _two_stage_config(tmp_path: Path, *, stage: int, **overrides: Any) -> ExperimentConfig:
+    """A tiny, valid config of either stage (fixture student, 32px ImageNet)."""
+    stage_field: dict[str, Any] = (
+        {"train_image_size": 16}
+        if stage == 1
+        else {"init_checkpoint": {"path": str(tmp_path / "stage1" / "last.pt"), "sha256": "d" * 64}}
+    )
+    raw: dict[str, Any] = {
+        "schema_version": 2,
+        "protocol": {"id": PROTOCOL},
+        "tier": "dev",
+        "seeds": dict.fromkeys(
+            (
+                "split",
+                "model_init",
+                "data_order",
+                "augmentation",
+                "train_attack",
+                "evaluation_attack",
+                "qualitative_panel",
+            ),
+            1,
+        ),
+        "dataset": {"name": "imagenet", "root": str(tmp_path / "imagenet"), "num_classes": 2, "image_size": 32},
+        "student": {"architecture": "fixture_cnn", "num_classes": 2, "normalization": {"profile": "imagenet_standard"}},
+        "method": {"id": "pgd_at", "version": 1},
+        "optimizer": {"id": "sgd", "learning_rate": 0.01, "momentum": 0.9, "weight_decay": 0.0, "nesterov": False},
+        "scheduler": {"id": "identity", "milestones": [], "gamma": 1.0, "step_at": "epoch_end"},
+        "training": {"epochs": 3, "per_rank_batch_size": 2, "global_batch_size": 2, **stage_field},
+    }
+    return ExperimentConfig.model_validate(_deep_update(raw, overrides))
+
+
+def _source_run(
+    tmp_path: Path, *, epoch: int = 2, source: dict[str, Any] | None = None, **payload_extra: Any
+) -> tuple[Path, Any]:
+    """A stage-1 run directory: a full resolved config next to its last.pt."""
     run = tmp_path / "stage1"
     run.mkdir(parents=True, exist_ok=True)
-    resolved = {
-        "protocol": {"id": PROTOCOL},
-        "training": {"epochs": epochs, "train_image_size": 16},
-        "tracking": {"artifact_retention": "metrics_only"},
-    }
-    (run / "resolved_config.yaml").write_text(yaml.safe_dump(resolved, sort_keys=False), encoding="utf-8")
+    save_resolved_config(_two_stage_config(tmp_path, stage=1, **(source or {})), run / "resolved_config.yaml")
     torch.manual_seed(5)
-    source = build_student(ModelConfig(architecture="fixture_cnn", num_classes=2), tier="dev")
+    model = build_student(ModelConfig(architecture="fixture_cnn", num_classes=2), tier="dev")
     payload: dict[str, Any] = dict.fromkeys(REQUIRED_KEYS)
     payload.update(
         {
             "format_version": 1,
             "epoch": epoch,
             "epoch_boundary": "end",
-            "model": source.state_dict(),
+            "model": model.state_dict(),
             "optimizer": {"state": {"sentinel": 1}, "param_groups": []},
             "selection_metadata": {},
             "tracker_run_id": "stage1-run",
@@ -435,11 +482,19 @@ def _source_run(tmp_path: Path, *, epochs: int = 3, epoch: int = 2, **payload_ex
         }
     )
     torch.save(payload, run / "last.pt")
-    return run / "last.pt", source
+    return run / "last.pt", model
 
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _read(tmp_path: Path, path: Path, *, expected_sha256: str | None = None) -> Any:
+    return read_init_checkpoint(
+        path,
+        expected_sha256=_sha(path) if expected_sha256 is None else expected_sha256,
+        target=_two_stage_config(tmp_path, stage=2),
+    )
 
 
 def test_init_checkpoint_loads_exactly_the_saved_student_weights_and_records_lineage(tmp_path: Path) -> None:
@@ -447,7 +502,9 @@ def test_init_checkpoint_loads_exactly_the_saved_student_weights_and_records_lin
     torch.manual_seed(99)
     target = build_student(ModelConfig(architecture="fixture_cnn", num_classes=2), tier="dev")
     assert any(not torch.equal(a, b) for a, b in zip(target.state_dict().values(), source.state_dict().values()))
-    lineage = load_init_student_weights(target, path, expected_sha256=_sha(path))
+    lineage = load_init_student_weights(
+        target, path, expected_sha256=_sha(path), target=_two_stage_config(tmp_path, stage=2)
+    )
     loaded = target.state_dict()
     assert loaded.keys() == source.state_dict().keys()
     for key, value in source.state_dict().items():
@@ -472,13 +529,13 @@ def test_init_checkpoint_loads_exactly_the_saved_student_weights_and_records_lin
 def test_init_checkpoint_refuses_a_missing_file_or_a_mismatched_digest(tmp_path: Path) -> None:
     path, _ = _source_run(tmp_path)
     with pytest.raises(FileNotFoundError, match="does not exist"):
-        read_init_checkpoint(tmp_path / "nowhere" / "last.pt", expected_sha256=_sha(path))
+        _read(tmp_path, tmp_path / "nowhere" / "last.pt", expected_sha256=_sha(path))
     with pytest.raises(ValueError, match="SHA-256 mismatch"):
-        read_init_checkpoint(path, expected_sha256="0" * 64)
+        _read(tmp_path, path, expected_sha256="0" * 64)
     renamed = path.with_name("best.pt")
     renamed.write_bytes(path.read_bytes())
     with pytest.raises(ValueError, match="must be a run's last.pt"):
-        read_init_checkpoint(renamed, expected_sha256=_sha(renamed))
+        _read(tmp_path, renamed)
 
 
 @pytest.mark.parametrize(
@@ -495,24 +552,76 @@ def test_init_checkpoint_refuses_a_non_final_foreign_or_ema_checkpoint(
 ) -> None:
     path, _ = _source_run(tmp_path, **variant)
     with pytest.raises(ValueError, match=message):
-        read_init_checkpoint(path, expected_sha256=_sha(path))
+        _read(tmp_path, path)
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        ({"seeds": {"split": 2}}, "seeds.split"),
+        ({"training": {"validation_fraction": 0.5}}, "training.validation_fraction"),
+        ({"dataset": {"num_classes": 3}, "student": {"num_classes": 3}}, "dataset.num_classes"),
+        ({"dataset": {"image_size": 64}}, "dataset.image_size"),
+        ({"dataset": {"content_sha256": "a" * 64}}, "dataset.content_sha256"),
+        # A single-stage run (no train_image_size) under another protocol.
+        (
+            {"protocol": {"id": "controlled_imagenet_stage02_init_lr_grid_v1"}, "training": {"train_image_size": None}},
+            "must be a reduced-resolution stage 1",
+        ),
+        ({"protocol": {"id": "controlled_imagenet_stage02_init_lr_grid_v1"}}, "both runs must use protocol"),
+        (
+            {
+                "student": {
+                    "architecture": "mobilevit_s_imagenet",
+                    "normalization": {"profile": "imagenet_raw_identity"},
+                }
+            },
+            "student.normalization",
+        ),
+    ],
+)
+def test_init_checkpoint_refuses_a_source_run_incompatible_with_stage2(
+    tmp_path: Path, source: dict[str, Any], message: str
+) -> None:
+    path, _ = _source_run(tmp_path, source=source)
+    with pytest.raises(ValueError, match="incompatible with this stage-2 run") as refused:
+        _read(tmp_path, path)
+    assert message in str(refused.value)
+
+
+def test_init_checkpoint_refuses_a_source_config_that_is_not_a_valid_experiment(tmp_path: Path) -> None:
+    path, _ = _source_run(tmp_path)
+    config_path = path.parent / "resolved_config.yaml"
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    raw["training"]["surprise"] = 1
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    payload = torch.load(path, weights_only=False)
+    payload["config_hash"] = config_digest(raw)
+    torch.save(payload, path)
+    with pytest.raises(ValueError, match="not a valid config"):
+        _read(tmp_path, path)
 
 
 def test_init_checkpoint_refuses_a_missing_sibling_config_and_an_incomplete_payload(tmp_path: Path) -> None:
     path, _ = _source_run(tmp_path)
     (path.parent / "resolved_config.yaml").unlink()
     with pytest.raises(FileNotFoundError, match="sibling resolved_config.yaml"):
-        read_init_checkpoint(path, expected_sha256=_sha(path))
+        _read(tmp_path, path)
     torch.save({"model": {}}, path)
     with pytest.raises(ValueError, match="incomplete"):
-        read_init_checkpoint(path, expected_sha256=_sha(path))
+        _read(tmp_path, path)
 
 
 def test_init_checkpoint_load_is_strict(tmp_path: Path) -> None:
     path, _ = _source_run(tmp_path)
     wider = build_student(ModelConfig(architecture="fixture_cnn", num_classes=3), tier="dev")
     with pytest.raises(RuntimeError, match="size mismatch"):
-        load_init_student_weights(wider, path, expected_sha256=_sha(path))
+        load_init_student_weights(wider, path, expected_sha256=_sha(path), target=_two_stage_config(tmp_path, stage=2))
+
+
+def test_schema_restricts_init_checkpoint_to_the_two_stage_protocol(tmp_path: Path) -> None:
+    with pytest.raises(ValidationError, match="init_checkpoint is defined only for"):
+        _two_stage_config(tmp_path, stage=2, protocol={"id": "controlled_imagenet_stage02_init_lr_grid_v1"})
 
 
 # --------------------------------------------------------------------------- configs
