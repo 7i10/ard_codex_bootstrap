@@ -830,10 +830,27 @@ def build_train_validation_views(
     split_seed: int,
     augmentation_seed: int,
     stagewise_late_mask: frozenset[int] | None = None,
+    train_image_size: int | None = None,
 ) -> tuple[SourceIndexedSubset, SourceIndexedSubset]:
-    """Create independently transformed train/validation views over one raw set."""
+    """Create independently transformed train/validation views over one raw set.
+
+    ``train_image_size`` (``TrainingConfig.train_image_size``, plan 0103's
+    two-stage stage 1) replaces ``config.image_size`` as the output size of
+    both training-partition views built here -- the RandomResizedCrop
+    training crop and the ImageNetEvalTransform validation view (and so the
+    train probe, which reuses the validation view). Nothing else reads it:
+    the official evaluation dataset is built from ``evaluation.dataset``
+    elsewhere and stays at its own ``image_size``. ``None`` (default) is
+    today's exact behavior. Both transforms resize PIL images with PIL's
+    bilinear filter, whose support widens with the downscale factor, i.e.
+    the resize is anti-aliased (torchvision's ``antialias`` flag only
+    affects tensor inputs; for PIL it is always on).
+    """
     if config.split != "train":
         raise ValueError("train/validation views require the official train split")
+    if train_image_size is not None and config.name != "imagenet":
+        raise ValueError("train_image_size is only defined for the imagenet dataset")
+    view_image_size = config.image_size if train_image_size is None else train_image_size
     raw = build_raw_dataset(config)
     split_view = IndexedDataset(raw, _to_tensor)
     split_train, split_validation = stratified_train_validation_split(
@@ -895,13 +912,13 @@ def build_train_validation_views(
     elif config.name == "imagenet":
         train_transform = EpochImageNetTransform(
             augmentation_seed=augmentation_seed,
-            image_size=config.image_size,
+            image_size=view_image_size,
             heavy_augmentation=config.imagenet_heavy_augmentation,
         )
     else:
         train_transform = _to_tensor
     validation_transform: IndexedTransform = (
-        ImageNetEvalTransform(image_size=config.image_size) if config.name == "imagenet" else _to_tensor
+        ImageNetEvalTransform(image_size=view_image_size) if config.name == "imagenet" else _to_tensor
     )
     train_view = IndexedDataset(raw, train_transform)
     validation_view = IndexedDataset(raw, validation_transform)

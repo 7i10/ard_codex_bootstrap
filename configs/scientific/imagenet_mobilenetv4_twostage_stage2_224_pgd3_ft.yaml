@@ -1,0 +1,32 @@
+# Plan 0103, two-stage low-resolution PGD-AT, STAGE 2 (human-approved 2026-09-30).
+# Full-resolution fine-tune of stage 1 (imagenet_mobilenetv4_twostage_stage1_112_pgd1.yaml; see its
+# header for the AdvXL rationale and the FLOPs matching: 195 stage-1 epochs = 30 single-stage
+# epochs, plus these 20 = the reference's 50).
+# Reference: imagenet_mobilenetv4_pgd_at_random_init_lr0025.yaml. Differences from it, and nothing else:
+#   protocol.id, tracking.group,
+#   training.init_checkpoint: stage 1's last.pt (final student weights only, strict load, after its
+#     SHA-256 is verified; the file must sit next to stage 1's resolved_config.yaml and be that
+#     run's final epoch). Fresh optimizer, scheduler and RNG -- this is not a resume. The path and
+#     digest are known only after stage 1 finishes, hence ${ARD_STAGE1_CHECKPOINT} and
+#     ${ARD_STAGE1_CHECKPOINT_SHA256}; lineage (path, digest, stage-1 run ID and config hash) is
+#     recorded in run-bundle/manifest.json "init_lineage", and the digest in the evaluation record's
+#     training_protocol_identity.
+#   training.epochs 50 -> 20, optimizer.learning_rate 0.025 -> 0.0025 (peak),
+#   scheduler.warmup_epochs 10 -> 2, scheduler.milestones [25, 38] -> [10, 15].
+# Training attack: deliberately OUR established 224px PGD-3 (eps 4/255, step 8/765 = 2.67/255,
+# random start), identical to the reference, rather than AdvXL's own PGD-3 step 4/255, so stage 2's
+# attack matches the single-stage run exactly. student.pretrained stays false (refused together
+# with init_checkpoint).
+schema_version: 2
+protocol: {id: controlled_imagenet_stage02_two_stage_lowres_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: false, normalization: {profile: imagenet_standard}}
+method: {id: pgd_at, version: 1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: sgd, learning_rate: 0.0025, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
+scheduler: {id: warmup_multistep, milestones: [10, 15], gamma: 0.1, step_at: epoch_end, warmup_epochs: 2}
+training: {epochs: 20, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000, init_checkpoint: {path: "${ARD_STAGE1_CHECKPOINT}", sha256: "${ARD_STAGE1_CHECKPOINT_SHA256}"}}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-twostage-lowres-stage2, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

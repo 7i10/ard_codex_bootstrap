@@ -35,7 +35,7 @@ from ard.data import (
     seed_data_loader_worker,
 )
 from ard.engine import Trainer, config_digest, get_rank, get_world_size
-from ard.engine.checkpoint import validate_resume_checkpoint
+from ard.engine.checkpoint import load_init_student_weights, read_init_checkpoint, validate_resume_checkpoint
 from ard.engine.distributed import (
     barrier,
     initialize_from_env,
@@ -747,6 +747,11 @@ def main(argv: list[str] | None = None) -> int:
             _guard_output(output_dir, resume=args.resume, config_hash=config_hash)
             _validate_intervention_resume(args.resume, config, config_hash=config_hash)
             _validate_required_fork_resume(args.resume, config, config_hash=config_hash)
+            init_checkpoint = config.training.init_checkpoint
+            if init_checkpoint is not None and args.resume is None:
+                # Fail before any output is written (dry-run included); the
+                # load below re-verifies the exact bytes it deserializes.
+                read_init_checkpoint(init_checkpoint.path, expected_sha256=init_checkpoint.sha256)
 
         run_rank_zero_phase(_validate_output_guard, phase="output guard")
         terminal_resume = run_rank_zero_value(
@@ -809,6 +814,7 @@ def main(argv: list[str] | None = None) -> int:
             split_seed=config.seeds.split,
             augmentation_seed=config.seeds.augmentation,
             stagewise_late_mask=late_mask,
+            train_image_size=config.training.train_image_size,
         )
         frozen_risk_lookup: FrozenRiskLookup | None = None
         intervention_mask: FixedInterventionMask | None = None
@@ -893,7 +899,34 @@ def main(argv: list[str] | None = None) -> int:
                 if not bundle_path.is_file() or hashlib.sha256(bundle_path.read_bytes()).hexdigest() != bundle_sha:
                     raise ValueError("history-routing v2 selector bundle bytes do not match the registered SHA-256")
                 _attach_history_routing_v2_input_artifacts(tracker=active_tracker, config=config, resume=args.resume)
-        student: nn.Module = build_student(config.student, tier=config.tier).to(device)
+        student: nn.Module = build_student(config.student, tier=config.tier)
+        init_checkpoint = config.training.init_checkpoint
+        if init_checkpoint is not None:
+            # Plan 0103 two-stage stage 2: student weights only; optimizer,
+            # scheduler, RNG and epoch start fresh (unlike --resume). On an
+            # epoch-boundary resume the resumed checkpoint's weights win and
+            # the manifest must already carry the lineage of the fresh start.
+            if args.resume is None:
+                init_lineage = load_init_student_weights(
+                    student, init_checkpoint.path, expected_sha256=init_checkpoint.sha256
+                )
+
+                def _record_init_lineage(active_tracker: ExperimentTracker) -> None:
+                    if isinstance(active_tracker, LocalTracker):
+                        active_tracker.attach_init_lineage(init_lineage)
+
+                coordinated_tracker_action(active_tracker, phase="init lineage", action=_record_init_lineage)
+            else:
+
+                def _check_init_lineage(active_tracker: ExperimentTracker) -> None:
+                    if not isinstance(active_tracker, LocalTracker):
+                        return
+                    recorded = active_tracker.manifest.get("init_lineage")
+                    if not isinstance(recorded, Mapping) or recorded.get("sha256") != init_checkpoint.sha256:
+                        raise TrackingError("resumed run manifest lacks the configured init checkpoint lineage")
+
+                coordinated_tracker_action(active_tracker, phase="init lineage check", action=_check_init_lineage)
+        student = student.to(device)
         if initialized_distributed:
             student = wrap_ddp(student, device)
         if config.training.compile:

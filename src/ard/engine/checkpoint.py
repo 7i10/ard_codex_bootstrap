@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import random
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
+import yaml
 from torch import nn
 from torch.optim import Optimizer
 
@@ -230,6 +232,89 @@ def _reject_ema_selected_resume(payload: Mapping[str, Any]) -> None:
             "best_metric/selection_metadata describe the EMA's own selection, not the student's -- "
             "resume from last.pt instead"
         )
+
+
+INIT_CHECKPOINT_LINEAGE_KIND = "student_init_checkpoint_v1"
+
+
+def read_init_checkpoint(path: Path, *, expected_sha256: str) -> tuple[dict[str, torch.Tensor], dict[str, Any]]:
+    """Verify one of this project's own final checkpoints and return its
+    student weights plus an init-lineage record (plan 0103, two-stage stage 2).
+
+    Fail closed unless: the file is named ``last.pt``; its bytes hash to
+    ``expected_sha256`` (the bytes hashed are the bytes deserialized -- no
+    re-read); it is a complete epoch-boundary training checkpoint that is
+    not EMA-selected; and the sibling ``resolved_config.yaml`` of the run
+    that wrote it digests to the checkpoint's ``config_hash`` and declares
+    ``training.epochs == epoch + 1`` (so it is that run's *final* student,
+    not an interrupted run's latest). Only ``payload["model"]`` is returned;
+    optimizer, scheduler, scaler, RNG, sampler, sample and selection state
+    are never read. This is not resume: see ``load_checkpoint``.
+    """
+    if not path.is_file():
+        raise FileNotFoundError(f"init checkpoint does not exist: {path}")
+    if path.name != "last.pt":
+        raise ValueError(f"init checkpoint must be a run's last.pt, got {path.name}")
+    data = path.read_bytes()
+    observed_sha256 = hashlib.sha256(data).hexdigest()
+    if observed_sha256 != expected_sha256:
+        raise ValueError(
+            f"init checkpoint SHA-256 mismatch: expected {expected_sha256}, observed {observed_sha256} ({path})"
+        )
+    payload = torch.load(io.BytesIO(data), map_location="cpu", weights_only=False)
+    if not isinstance(payload, dict):
+        raise ValueError("init checkpoint must be a mapping")
+    missing = REQUIRED_KEYS.difference(payload)
+    if missing:
+        raise ValueError("init checkpoint is incomplete; missing: " + ", ".join(sorted(missing)))
+    if payload["epoch_boundary"] != "end":
+        raise ValueError("init checkpoint must be an epoch-boundary checkpoint")
+    selection_metadata = payload.get("selection_metadata")
+    if isinstance(selection_metadata, Mapping) and selection_metadata.get("selection_source") == "ema":
+        raise ValueError("init checkpoint is EMA-selected; the student init must be a run's last.pt")
+    source_config_path = path.parent / "resolved_config.yaml"
+    if not source_config_path.is_file():
+        raise FileNotFoundError(f"init checkpoint's run has no sibling resolved_config.yaml: {source_config_path}")
+    source_config_bytes = source_config_path.read_bytes()
+    source_config = yaml.safe_load(source_config_bytes)
+    if not isinstance(source_config, dict):
+        raise ValueError("init checkpoint's sibling resolved_config.yaml must be a mapping")
+    if config_digest(source_config) != payload["config_hash"]:
+        raise ValueError("init checkpoint config_hash does not match its sibling resolved_config.yaml")
+    source_training = source_config.get("training")
+    source_epochs = source_training.get("epochs") if isinstance(source_training, dict) else None
+    epoch = payload["epoch"]
+    if isinstance(epoch, bool) or not isinstance(epoch, int) or source_epochs != epoch + 1:
+        raise ValueError(
+            f"init checkpoint is not its run's final epoch: epoch index {epoch!r}, run epochs {source_epochs!r}"
+        )
+    source_protocol = source_config.get("protocol")
+    lineage: dict[str, Any] = {
+        "kind": INIT_CHECKPOINT_LINEAGE_KIND,
+        "path": str(path),
+        "sha256": observed_sha256,
+        "loaded_entry": "model",
+        "strict": True,
+        "source_tracker_run_id": payload["tracker_run_id"],
+        "source_config_hash": payload["config_hash"],
+        "source_resolved_config_sha256": hashlib.sha256(source_config_bytes).hexdigest(),
+        "source_protocol_id": source_protocol.get("id") if isinstance(source_protocol, dict) else None,
+        "source_epoch": epoch,
+        "source_epochs": source_epochs,
+        "source_world_size": payload["world_size"],
+        "source_train_image_size": (
+            source_training.get("train_image_size") if isinstance(source_training, dict) else None
+        ),
+    }
+    return payload["model"], lineage
+
+
+def load_init_student_weights(model: nn.Module, path: Path, *, expected_sha256: str) -> dict[str, Any]:
+    """Load a verified ``last.pt``'s student weights (``strict=True``) into
+    ``model`` and return the init lineage; see ``read_init_checkpoint``."""
+    state, lineage = read_init_checkpoint(path, expected_sha256=expected_sha256)
+    unwrap_model(model).load_state_dict(state, strict=True)
+    return lineage
 
 
 def load_checkpoint(

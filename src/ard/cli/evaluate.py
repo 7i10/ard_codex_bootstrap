@@ -306,6 +306,20 @@ def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
     return identity
 
 
+def _two_stage_protocol_identity(training: TrainingConfig) -> dict[str, object]:
+    """Plan 0103 two-stage fields, present only when set (same byte-identity
+    argument as ``_throughput_protocol_identity``): a stage-1 run trained at a
+    reduced resolution, and a stage-2 run initialized from a specific stage-1
+    checkpoint (identified by its SHA-256, never its host-specific path), must
+    never pool with a single-stage run or with each other."""
+    identity: dict[str, object] = {}
+    if training.train_image_size is not None:
+        identity["train_image_size"] = training.train_image_size
+    if training.init_checkpoint is not None:
+        identity["init_checkpoint_sha256"] = training.init_checkpoint.sha256
+    return identity
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.checkpoint_dir is not None:
@@ -604,6 +618,7 @@ def main(argv: list[str] | None = None) -> int:
                         "epsilon_warmup_epochs": training_config.training.epsilon_warmup_epochs,
                         "weight_ema_decay": training_config.training.weight_ema_decay,
                         **_throughput_protocol_identity(training_config.training),
+                        **_two_stage_protocol_identity(training_config.training),
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

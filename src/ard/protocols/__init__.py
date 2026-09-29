@@ -626,6 +626,19 @@ PROTOCOLS: Mapping[str, ProtocolSpec] = MappingProxyType(
             # measured. Schema restricts this protocol to method standard.
             metadata=MappingProxyType({"purpose": "imagenet_stage02_clean_budget_v1"}),
         ),
+        "controlled_imagenet_stage02_two_stage_lowres_v1": ProtocolSpec(
+            id="controlled_imagenet_stage02_two_stage_lowres_v1",
+            runnable_locally=True,
+            local_train_reason=None,
+            # Plan 0103 (human-approved 2026-09-30): AdvXL-inspired (Wang et
+            # al., CVPR 2024, arXiv 2401.04727) two-stage PGD-AT of
+            # MobileNetV4-Conv-Small from random init, FLOPs-matched to the
+            # single-stage 50-epoch lr-0.025 run: stage 1 trains at 112px
+            # with PGD-1 (step 4/255) for 195 epochs; stage 2 fine-tunes at
+            # 224px with the reference PGD-3 (step 8/765) for 20 epochs from
+            # stage 1's last.pt. Official evaluation stays 224px PGD-10.
+            metadata=MappingProxyType({"purpose": "imagenet_stage02_two_stage_lowres_v1"}),
+        ),
         "saad_paper_reproduction_v1": ProtocolSpec(
             id="saad_paper_reproduction_v1",
             runnable_locally=False,

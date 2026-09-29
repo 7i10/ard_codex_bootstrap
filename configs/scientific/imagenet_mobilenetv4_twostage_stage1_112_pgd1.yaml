@@ -1,0 +1,36 @@
+# Plan 0103, two-stage low-resolution PGD-AT, STAGE 1 (human-approved 2026-09-30).
+# AdvXL-inspired (Wang et al., CVPR 2024, arXiv 2401.04727): most of the budget is spent at low
+# resolution with a cheap attack, then a short full-resolution fine-tune (stage 2,
+# imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft.yaml) closes the resolution gap.
+# Reference: imagenet_mobilenetv4_pgd_at_random_init_lr0025.yaml (random init, lr 0.025,
+# 50 epochs, 224px, PGD-3 step 8/765). Differences from it, and nothing else:
+#   protocol.id, tracking.group,
+#   training.train_image_size 112 (training crop AND in-training validation/probe views; the
+#     official evaluation dataset stays 224px; PIL bilinear resize, anti-aliased),
+#   method.attack steps 3 -> 1 and step_size 8/765 -> 4/255 (= eps; PGD-1 at the full budget,
+#     random start; the selection attack stays PGD-10 step 8/765),
+#   method.selection_step_size_independent true (the schema otherwise requires the selection
+#     attack's step size to equal the training attack's; this flag exempts that one field, only
+#     under this protocol's stage 1, so selection and the default evaluation attack keep the
+#     reference's exact threat identity),
+#   training.epochs 50 -> 195, scheduler.milestones [25, 38] -> [98, 148] (50% / 76%, as 25/50, 38/50).
+# Compute matching (FLOPs per training image, F = one 224px forward):
+#   an attack step (forward + input-gradient backward) = 2F, the training update (forward + full
+#   backward) = 3F. 224px PGD-3 step = 3 x 2F + 3F = 9F. 112px PGD-1 step = (2F + 3F) x 0.277
+#   (MobileNetV4-Conv-Small FLOPs at 112px / at 224px) = 1.385F. Ratio 1.385 / 9 = 0.154.
+#   Stage 1's 195 epochs = 30 single-stage-equivalent epochs (30 / 0.154); stage 2's 20 epochs at
+#   224px PGD-3 bring the total to the single-stage run's 50 epochs. Per-epoch in-training
+#   validation (PGD-10, at 112px here) is not counted in the match.
+schema_version: 2
+protocol: {id: controlled_imagenet_stage02_two_stage_lowres_v1}
+tier: production
+seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", augmentation: "${ARD_SEED}", train_attack: "${ARD_SEED}", evaluation_attack: 0, qualitative_panel: "${ARD_SEED}"}
+dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
+student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: false, normalization: {profile: imagenet_standard}}
+method: {id: pgd_at, version: 1, selection_step_size_independent: true, attack: {loss: ce, epsilon: "4/255", step_size: "4/255", steps: 1, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
+optimizer: {id: sgd, learning_rate: 0.025, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
+scheduler: {id: warmup_multistep, milestones: [98, 148], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
+training: {epochs: 195, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000, train_image_size: 112}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-twostage-lowres-stage1, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
+output_dir: "${ARD_JOB_OUTPUT_DIR}"

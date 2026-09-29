@@ -555,6 +555,7 @@ class LocalTracker:
                 "external",
                 "teacher",
                 "latest_progress",
+                "init_lineage",
             ):
                 if key in prior:
                     self.manifest[key] = prior[key]
@@ -604,6 +605,17 @@ class LocalTracker:
         if not path.is_file():
             raise TrackingError(f"resolved config is missing: {path}")
         shutil.copy2(path, self.bundle_dir / "resolved_config.yaml")
+
+    def attach_init_lineage(self, lineage: Mapping[str, Any]) -> None:
+        """Persist the verified student-init checkpoint lineage (plan 0103,
+        two-stage stage 2) in the manifest. Written once on the fresh start;
+        an epoch-boundary resume carries it over from the prior manifest."""
+        if self._terminal_resume:
+            return
+        if "init_lineage" in self.manifest and self.manifest["init_lineage"] != dict(lineage):
+            raise TrackingError("manifest already records a different init lineage")
+        self.manifest["init_lineage"] = dict(lineage)
+        _write_json(self.manifest_path, self.manifest)
 
     def attach_fork_lineage(self, lineage: Mapping[str, Any]) -> None:
         """Persist immutable common-state parent evidence in the child manifest."""

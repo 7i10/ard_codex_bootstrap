@@ -601,6 +601,8 @@ def test_top_level_configs_resolve_under_controlled_environment(
         "WANDB_GROUP_BARTOLDSON_ORACLE": "bartoldson-oracle-group",
         "ARD_FROZEN_ORACLE_MANIFEST": str(tmp_path / "frozen-oracle.json"),
         "ARD_FROZEN_ORACLE_MANIFEST_SHA256": "c" * 64,
+        "ARD_STAGE1_CHECKPOINT": str(tmp_path / "stage1" / "last.pt"),
+        "ARD_STAGE1_CHECKPOINT_SHA256": "d" * 64,
     }
     for key, value in values.items():
         monkeypatch.setenv(key, value)

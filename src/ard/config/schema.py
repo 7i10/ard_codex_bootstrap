@@ -111,6 +111,14 @@ class ProtocolConfig(StrictModel):
         # is PGD-AT's 50-epoch saturation specific to the robust objective
         # or a property of the recipe?
         "controlled_imagenet_stage02_clean_budget_v1",
+        # Plan 0103 (human-approved 2026-09-30): AdvXL-inspired two-stage
+        # adversarial training of MobileNetV4-Conv-Small from random init,
+        # FLOPs-matched to the single-stage 50-epoch run -- stage 1 at a
+        # 112px training resolution with PGD-1, stage 2 a 224px PGD-3
+        # fine-tune initialized from stage 1's last.pt. Each config sets
+        # exactly one of training.train_image_size (stage 1) or
+        # training.init_checkpoint (stage 2).
+        "controlled_imagenet_stage02_two_stage_lowres_v1",
     ]
 
 
@@ -669,6 +677,18 @@ class MethodConfig(StrictModel):
     frozen_oracle_manifest: Path | None = None
     frozen_oracle_manifest_sha256: str | None = None
     adr: AdrConfig | None = None
+    # Plan 0103 two-stage run, stage 1 only (human-approved 2026-09-30):
+    # the training attack is PGD-1 with step 4/255 (= epsilon) while
+    # checkpoint selection -- and therefore the default evaluation attack --
+    # stays the reference's PGD-10 with step 8/765, so stage-1 checkpoints
+    # are measured under the same threat identity as every other ImageNet
+    # arm. True exempts *only* the step-size equality below; norm, input
+    # domain, epsilon and random start must still match, selection must be
+    # given explicitly, and ExperimentConfig restricts the flag to
+    # controlled_imagenet_stage02_two_stage_lowres_v1 with
+    # training.train_image_size set. Serialized only when true, so every
+    # existing config keeps a byte-identical resolved config.
+    selection_step_size_independent: bool = Field(default=False, exclude_if=lambda value: value is False)
 
     @property
     def name(self) -> str:
@@ -739,6 +759,8 @@ class MethodConfig(StrictModel):
         if self.attack.kl_target != expected_target:
             raise ValueError(f"{self.id} requires attack.kl_target={expected_target!r}")
         selection = self.selection_attack
+        if selection is None and self.selection_step_size_independent:
+            raise ValueError("method.selection_step_size_independent requires an explicit method.selection_attack")
         if selection is None:
             selection = self.attack.model_copy(
                 update={
@@ -766,7 +788,9 @@ class MethodConfig(StrictModel):
         assert selection.step_size_value is not None and self.attack.step_size_value is not None
         if not math.isclose(selection.epsilon_value, self.attack.epsilon_value, rel_tol=0, abs_tol=1e-15):
             mismatched.append("epsilon")
-        if not math.isclose(selection.step_size_value, self.attack.step_size_value, rel_tol=0, abs_tol=1e-15):
+        if not self.selection_step_size_independent and not math.isclose(
+            selection.step_size_value, self.attack.step_size_value, rel_tol=0, abs_tol=1e-15
+        ):
             mismatched.append("step_size")
         if mismatched:
             raise ValueError(
@@ -873,6 +897,30 @@ class MethodConfig(StrictModel):
         return self
 
 
+class InitCheckpointConfig(StrictModel):
+    """Student initialization from one of this project's own saved checkpoints.
+
+    Plan 0103's two-stage run: stage 2 starts from stage 1's final student
+    weights. Only the ``model`` entry of a ``last.pt`` payload is loaded
+    (``strict=True``) after the file's SHA-256 matches ``sha256``; optimizer,
+    scheduler, scaler, RNG, sampler, sample state, epoch and best-selection
+    state all start fresh. This is *not* resume, which continues one run's
+    own trajectory (see ``ard.engine.checkpoint.load_init_student_weights``).
+    The path is provenance, the digest is the identity; the file itself is
+    read only by ``ard.cli.train`` (never at config validation or evaluation
+    time, since the evaluation host need not hold it).
+    """
+
+    path: Path
+    sha256: str
+
+    @model_validator(mode="after")
+    def validate_digest(self) -> InitCheckpointConfig:
+        if len(self.sha256) != 64 or any(character not in "0123456789abcdef" for character in self.sha256):
+            raise ValueError("training.init_checkpoint.sha256 must be a lowercase 64-character SHA-256 hex digest")
+        return self
+
+
 class TrainingConfig(StrictModel):
     epochs: int = Field(default=1, ge=1)
     checkpoint_epochs: tuple[int, ...] = (49, 99, 149, 199)
@@ -961,6 +1009,20 @@ class TrainingConfig(StrictModel):
     # metrics cannot serve (augmented crops, train-mode BatchNorm, 3-step
     # attack). Never used for checkpoint selection. None (default) disables it.
     train_probe_size: int | None = Field(default=None, ge=1)
+    # Plan 0103 two-stage run (stage 1). The square output size of the
+    # *training-partition* views only: the RandomResizedCrop training crop
+    # and the in-training validation / train-probe views (ImageNetEvalTransform
+    # at this size: shorter side to round(size*256/224), centre crop), so
+    # per-epoch selection is measured at the resolution the model trains at.
+    # dataset.image_size and evaluation.dataset (the official evaluation)
+    # are untouched. Resizing is PIL bilinear on PIL images, which is
+    # anti-aliased on downscale. ImageNet only. Serialized only when set, so
+    # every existing config keeps a byte-identical resolved config and
+    # config hash.
+    train_image_size: int | None = Field(default=None, ge=1, exclude_if=lambda value: value is None)
+    # Plan 0103 two-stage run (stage 2); see InitCheckpointConfig. Serialized
+    # only when set, like train_image_size.
+    init_checkpoint: InitCheckpointConfig | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def validate_batch_identity(self) -> TrainingConfig:
@@ -997,6 +1059,11 @@ def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None
     unsupported = [(name, "true", "false") for name in ("compile", "cudnn_benchmark") if getattr(training, name)]
     if not training.step_diagnostics:
         unsupported.append(("step_diagnostics", "false", "true"))
+    # Plan 0103 two-stage fields: equally applied only by ard.cli.train.
+    if training.train_image_size is not None:
+        unsupported.append(("train_image_size", str(training.train_image_size), "null"))
+    if training.init_checkpoint is not None:
+        unsupported.append(("init_checkpoint", "<set>", "null"))
     if unsupported:
         requested = ", ".join(f"training.{name}={value}" for name, value, _ in unsupported)
         remediation = ", ".join(f"training.{name}={value}" for name, _, value in unsupported)
@@ -1617,6 +1684,31 @@ class ExperimentConfig(StrictModel):
             raise ValueError(
                 "training.weight_ema_decay cannot be combined with method.adr: adr already tracks its own "
                 "EMA as a distillation target; a second, independent weight EMA would need a second shadow model"
+            )
+        if self.training.train_image_size is not None:
+            if self.dataset.name != "imagenet":
+                raise ValueError("training.train_image_size is only defined for the imagenet dataset")
+            if self.training.train_image_size == self.dataset.image_size:
+                raise ValueError("training.train_image_size equals dataset.image_size; omit it")
+        if self.training.init_checkpoint is not None and self.student.pretrained:
+            raise ValueError(
+                "training.init_checkpoint cannot be combined with student.pretrained=true: the student would "
+                "have two initializations"
+            )
+        if self.method.selection_step_size_independent and (
+            self.protocol.id != "controlled_imagenet_stage02_two_stage_lowres_v1"
+            or self.training.train_image_size is None
+        ):
+            raise ValueError(
+                "method.selection_step_size_independent is defined only for the reduced-resolution stage 1 of "
+                "controlled_imagenet_stage02_two_stage_lowres_v1"
+            )
+        if self.protocol.id == "controlled_imagenet_stage02_two_stage_lowres_v1" and (
+            (self.training.train_image_size is None) == (self.training.init_checkpoint is None)
+        ):
+            raise ValueError(
+                "controlled_imagenet_stage02_two_stage_lowres_v1 requires exactly one of "
+                "training.train_image_size (stage 1) or training.init_checkpoint (stage 2)"
             )
         if self.student.num_classes != self.dataset.num_classes:
             raise ValueError("student and dataset num_classes must match")
