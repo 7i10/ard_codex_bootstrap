@@ -1829,3 +1829,38 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `73187e0e...`, `sample-stats-train.parquet`
   sha256 `a7796fa2...` (from the run-bundle manifest). W&B
   `lightweight-imagenet-at-dev`, same run id.
+- 2026-09-30 (human, chat): **AdvXL-inspired two-stage pilot on MobileNetV4-S,
+  compute-matched to the single-stage 50-epoch run.**
+  - **AdvXL facts.** Title "Revisiting Adversarial Training at Scale",
+    CVPR 2024. The paper has no appendix or hyperparameter table, and the
+    repo is evaluation-only.
+    - Stated: stage 1 at 112px (anti-aliased bilinear), PGD-1 step 4/255,
+      200 ep, AdamW, warmup + cosine, RandAug + MixUp + CutMix; stage 2 at
+      224px, PGD-3 step 4/255, 20 ep.
+    - ViT-B results: 73.0 / 52.5 at 0.25x compute versus 75.5 / 54.5
+      single-stage at 224. Stage 1 alone gives 68.5 / 39.3.
+    - Only >=86M-parameter LayerNorm models are covered. Nothing is said
+      about catastrophic overfitting.
+  - **Compute matching.** Forward FLOPs were measured; torch
+    FlopCounterMode overcounts depthwise-conv backward by ~groups x, so
+    backward is taken as 2x forward. A 224/PGD-3 step is 9F; a 112/PGD-1
+    step is 5 x 0.277F. The ratio is 0.154, so stage 1 gets
+    (50 - 20) / 0.154 = 195 epochs.
+  - **Design** (the cosine-vs-multistep schedule is deferred as a later
+    search candidate).
+    - Stage 1: 112px, PGD-1 (eps 4/255, step 4/255, random start), SGD lr
+      0.025, warmup_multistep [98, 148], basic augmentation.
+    - Stage 2: 224px, PGD-3 with OUR step 8/765 (so it matches the
+      reference attack; AdvXL uses 4/255), 20 ep from stage-1 last.pt, lr
+      0.0025, 2-ep warmup, [10, 15].
+    - Both stages random init, deterministic, seed 0.
+  - **Preregistered rule.** Compare last-epoch internal-val PGD-10 after
+    stage 2 with the single-stage random-init reference, 30.71 (lr 0.025).
+    >= +1pt: two-stage better at equal compute. Within +-1pt: equivalent;
+    choose by wall-clock and simplicity. <= -1pt: worse. Clean is reported
+    alongside.
+  - **Catastrophic-overfitting guard.** Stop and report if stage-1
+    val PGD-10 falls below half of its running maximum.
+  - Implementation is in progress (train resolution separate from
+    evaluation; init from our own checkpoint with sha256 lineage), with
+    review before use.
