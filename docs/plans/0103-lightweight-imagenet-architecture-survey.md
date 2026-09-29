@@ -1901,3 +1901,29 @@ history behind this pivot.)
     1.25e-4, 2.5e-4) were moved to Hamster GPU0. They run from the same
     worktree source-5a5dcbaabf0f, keep the same run ids, and go to W&B
     project `lightweight-imagenet-at-dev`.
+- 2026-09-30 — Loader speedups B and C merged: bad0dfa, c0a1431, and
+  9ad9d31 (scientific-review fixes).
+  - Single-process benchmark: decode + 112 training view, img/s,
+    2000 images.
+
+    | root     | img/s, draft off | img/s, draft on | crops upsampled to 112 |
+    |----------|------------------|-----------------|------------------------|
+    | original | 303              | 381             | 5.9%                   |
+    | S=256    | 650              | 666             | 16.0%                  |
+    | S=160    | 920              | 905             | 51.5%                  |
+
+  - RandomResizedCrop Monte Carlo on a 500x375 image; share of crops
+    upsampled in at least one dimension / in both dimensions:
+    original 0.2%/0.0%, S=256 12.5%/6.5%, S=160 49.8%/34.6%.
+  - Draft decode changes pixels by a mean absolute 0.74 (0-255 scale) on
+    original data.
+  - Derived roots (built with Q=95 and LANCZOS):
+    - `imagenet_train_s160`: content f52345d8…, manifest 2bf01d09….
+    - `imagenet_train_s256`: content 65f729c7…, manifest 1b878f7a….
+  - Configs: `..._stage1_112_pgd1_resized_s256.yaml` and
+    `..._resized_s160.yaml`, each with its own W&B group.
+  - Stage 2 refuses to run on derived data.
+  - Recommendation: use S=256 with draft off. Awaiting the human's choice
+    of S.
+  - The S=256 copy is being transferred to Ferret. Ferret worktree
+    source-9ad9d318deee is pinned.
