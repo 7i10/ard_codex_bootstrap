@@ -245,23 +245,23 @@ TWO_STAGE_PROTOCOL_ID = "controlled_imagenet_stage02_two_stage_lowres_v1"
 def _same_or_declared_derivative(source: DatasetConfig, target: DatasetConfig) -> bool:
     """Stage 1 trained on stage 2's own dataset, or on a declared derivative of it.
 
-    Identical dataset identity (same ``content_sha256`` and same
-    ``derived_from``, usually both absent), or: stage 1's root is a declared
-    derivative (``dataset.derived_from``, loader speedup C) whose *source*
-    digest is stage 2's own ``content_sha256``, and stage 2 itself is not
-    derived. The derivative keeps the source's relative paths and labels, so
-    the seeded train/validation partition is the same set of source IDs.
-    Anything else -- a derivative of some other dataset, stage 2 on a
-    derivative stage 1 did not use, two different derivatives -- is refused.
+    Stage 2 always runs on original data (``target.derived_from`` is None;
+    ``_source_compatibility_errors`` refuses a derived stage 2 outright). Then
+    stage 1 either used the same dataset (same ``content_sha256``, not
+    derived), or its root is a declared derivative (``dataset.derived_from``,
+    loader speedup C) whose *source* digest is stage 2's own
+    ``content_sha256``. The derivative keeps the source's relative paths and
+    labels, so the seeded train/validation partition is the same set of
+    source IDs. Anything else -- a derivative of some other dataset, a plain
+    digest mismatch -- is refused.
     """
-    if source.content_sha256 == target.content_sha256 and source.derived_from == target.derived_from:
-        return True
-    return (
-        source.derived_from is not None
-        and target.derived_from is None
-        and target.content_sha256 is not None
-        and source.derived_from.content_sha256 == target.content_sha256
-    )
+    if target.derived_from is not None or target.content_sha256 is None:
+        return source.derived_from is None and target.derived_from is None and (
+            source.content_sha256 == target.content_sha256
+        )
+    if source.derived_from is None:
+        return source.content_sha256 == target.content_sha256
+    return source.derived_from.content_sha256 == target.content_sha256
 
 
 def _source_compatibility_errors(source: ExperimentConfig, target: ExperimentConfig) -> list[str]:
@@ -274,7 +274,9 @@ def _source_compatibility_errors(source: ExperimentConfig, target: ExperimentCon
     for field in ("name", "split", "num_classes", "image_size"):
         if getattr(source.dataset, field) != getattr(target.dataset, field):
             errors.append(f"dataset.{field}")
-    if not _same_or_declared_derivative(source.dataset, target.dataset):
+    if target.dataset.derived_from is not None:
+        errors.append("dataset.derived_from: stage 2 must run on the original (non-derived) dataset")
+    elif not _same_or_declared_derivative(source.dataset, target.dataset):
         errors.append("dataset.content_sha256")
     if source.seeds.split != target.seeds.split:
         errors.append("seeds.split")
@@ -369,6 +371,10 @@ def read_init_checkpoint(
         "source_world_size": payload["world_size"],
         "source_train_image_size": source.training.train_image_size,
     }
+    # Loader speedups (B, C) the source was trained with; present only when
+    # either was used, so a plain source's lineage is unchanged.
+    if source.dataset.derived_from is not None or source.training.jpeg_draft_decode:
+        lineage["source_jpeg_draft_decode"] = source.training.jpeg_draft_decode
     if source.dataset.derived_from is not None:
         lineage["source_dataset_content_sha256"] = source.dataset.content_sha256
         lineage["source_dataset_derived_from"] = source.dataset.derived_from.model_dump(mode="json")

@@ -85,6 +85,23 @@ def encode_resized(source: Path, short_side: int, quality: int) -> bytes | None:
     return buffer.getvalue()
 
 
+BUILD_PARAMETERS = "build_parameters.json"
+
+
+def _build_parameters(source_content_sha256: str, short_side: int, quality: int) -> dict[str, object]:
+    return {
+        "source_content_sha256": source_content_sha256,
+        "transform": TRANSFORM,
+        "short_side": short_side,
+        "jpeg_quality": quality,
+        "resample": RESAMPLE,
+        "jpeg_subsampling": JPEG_SUBSAMPLING,
+        "pil_version": PIL.__version__,
+        "libjpeg_version": features.version("jpg"),
+        "libjpeg_turbo_version": features.version("libjpeg_turbo"),
+    }
+
+
 def _write_atomic(path: Path, data: bytes) -> None:
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
     temporary.write_bytes(data)
@@ -151,6 +168,22 @@ def build(
     out_train = out / "train"
     if out_train.exists() and any(out_train.iterdir()) and not resume:
         raise FileExistsError(f"output train/ already populated (pass --resume to reuse it): {out_train}")
+    # Parameter sentinel: a resume must continue the same build, never mix files
+    # encoded under different parameters or library versions.
+    parameters = _build_parameters(observed_source, short_side, quality)
+    sentinel = out / BUILD_PARAMETERS
+    if resume and out_train.exists() and any(out_train.iterdir()):
+        if not sentinel.is_file():
+            raise ValueError(f"cannot resume: no {BUILD_PARAMETERS} records how {out} was started")
+        recorded = json.loads(sentinel.read_text(encoding="utf-8"))
+        if recorded != parameters:
+            changed = sorted(
+                key for key in parameters.keys() | recorded.keys() if recorded.get(key) != parameters.get(key)
+            )
+            raise ValueError(f"cannot resume {out} with different build parameters: {', '.join(changed)}")
+    else:
+        out.mkdir(parents=True, exist_ok=True)
+        sentinel.write_text(json.dumps(parameters, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if resume and out_train.exists():
         for stale in out_train.glob("*/.*.tmp-*"):
             stale.unlink()
@@ -198,6 +231,9 @@ def build(
         "pil_version": PIL.__version__,
         "libjpeg_version": features.version("jpg"),
         "libjpeg_turbo": bool(features.check_feature("libjpeg_turbo")),
+        # Added after the S=160 / S=256 builds of 2026-09-30, whose manifests
+        # lack it; the load-time verifier does not read provenance keys.
+        "libjpeg_turbo_version": features.version("libjpeg_turbo"),
         "content_manifest_algorithm": "imagenet-manifest-v1",
         "source_content_sha256": observed_source,
         "derived_content_sha256": derived_dataset.content_identity["observed_sha256"],

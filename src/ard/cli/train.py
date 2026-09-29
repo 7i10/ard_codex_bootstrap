@@ -719,6 +719,24 @@ def _configure_compile(*, initialized_distributed: bool) -> None:
     dynamo_config.fail_on_recompile_limit_hit = True
 
 
+def _validation_dataset_derivation(config: ExperimentConfig) -> dict[str, object] | None:
+    """Loader speedup C: the derived root the in-training validation / probe
+    views (and so checkpoint selection) read; None for an original root."""
+    derived = config.dataset.derived_from
+    if derived is None:
+        return None
+    return {"short_side": derived.short_side, "content_sha256": config.dataset.content_sha256}
+
+
+def _validation_derivation_fields(config: ExperimentConfig) -> dict[str, object]:
+    """Flat epoch-row / run-summary form of ``_validation_dataset_derivation``
+    (scalar columns for parquet and W&B); empty for an original root."""
+    derivation = _validation_dataset_derivation(config)
+    if derivation is None:
+        return {}
+    return {f"validation_dataset_derived_{key}": value for key, value in derivation.items()}
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config = load_config(args.config, args.overrides)
@@ -1151,6 +1169,7 @@ def main(argv: list[str] | None = None) -> int:
             checkpoint_epochs=config.training.checkpoint_epochs,
             step_diagnostics=config.training.step_diagnostics,
             validation_image_size=config.training.train_image_size,
+            validation_dataset_derivation=_validation_dataset_derivation(config),
         )
         start_epoch = 0
         if args.resume is not None:
@@ -1207,6 +1226,7 @@ def main(argv: list[str] | None = None) -> int:
                     # In-training validation/probe ran at this size, not at
                     # the evaluation resolution (plan 0103 stage 1).
                     values["validation_image_size"] = config.training.train_image_size
+                values.update(_validation_derivation_fields(config))
                 if ordering_telemetry is not None and ordering_telemetry.last_descriptor is not None:
                     values.update(
                         {
@@ -1386,6 +1406,7 @@ def main(argv: list[str] | None = None) -> int:
                         if config.training.train_image_size is not None
                         else {}
                     ),
+                    **_validation_derivation_fields(config),
                     **epoch_trajectory_summary(epoch_rows, expected_epochs=config.training.epochs),
                 }
             )

@@ -261,6 +261,7 @@ class Trainer:
         checkpoint_epochs: tuple[int, ...] = (),
         step_diagnostics: bool = True,
         validation_image_size: int | None = None,
+        validation_dataset_derivation: Mapping[str, Any] | None = None,
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -588,6 +589,12 @@ class Trainer:
         if validation_image_size is not None:
             self.selection_metadata["validation_image_size"] = validation_image_size
             self.selection_metadata_ema["validation_image_size"] = validation_image_size
+        # Loader speedup C: validation (and so selection) read a pre-resized
+        # derivative of the training root, not the original images; say so in
+        # the same record. Absent (default) for an original root.
+        if validation_dataset_derivation is not None:
+            self.selection_metadata["validation_dataset_derivation"] = dict(validation_dataset_derivation)
+            self.selection_metadata_ema["validation_dataset_derivation"] = dict(validation_dataset_derivation)
         if prescriptive_v3_route is not None:
             self.selection_metadata["prescriptive_v3"] = {
                 "route": prescriptive_v3_route,

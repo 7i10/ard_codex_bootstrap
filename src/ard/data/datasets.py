@@ -852,6 +852,13 @@ def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
             }
         return base
     if config.name == "imagenet":
+        if config.derived_from is None and (config.root / DERIVED_DATASET_MANIFEST).exists():
+            # A derived root read as if it were original data would train on
+            # altered pixels under an identity that does not say so.
+            raise ValueError(
+                f"{config.root} is a derived dataset root ({DERIVED_DATASET_MANIFEST} present); "
+                "declare it with dataset.derived_from"
+            )
         imagenet_base = ImageNetDataset(config.root, config.split, image_size=config.image_size)
         if len(imagenet_base.class_to_index) != config.num_classes:
             raise ValueError(

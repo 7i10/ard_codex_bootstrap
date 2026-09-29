@@ -1,20 +1,26 @@
-# Plan 0103, two-stage low-resolution PGD-AT, STAGE 1 on a PRE-RESIZED training copy (loader speedup C,
-# human-approved 2026-09-30). Identical to imagenet_mobilenetv4_twostage_stage1_112_pgd1.yaml except
-# `dataset` (root, content_sha256, derived_from) -- see that file for the scientific design.
+# Plan 0103, two-stage low-resolution PGD-AT, STAGE 1 on a PRE-RESIZED training copy, short side 160
+# (loader speedup C, human-approved 2026-09-30). Identical to
+# imagenet_mobilenetv4_twostage_stage1_112_pgd1.yaml except `dataset` (root, content_sha256, derived_from)
+# and tracking.group (imagenet-mobilenetv4-twostage-lowres-stage1-s160); see that file for the design.
 # PREPROCESSING CHANGE (disclosed): the training root is a declared derivative of the original ImageNet
 # train set (dataset.derived_from.content_sha256 = the original's pinned digest), built by
 # scripts/build_resized_imagenet.py: every image whose shorter side exceeds 160 px was resized to a
-# 160 px shorter side (PIL LANCZOS, aspect ratio kept), converted to RGB and re-encoded as baseline
-# JPEG quality 95 (4:2:0); smaller images are byte-identical copies. Relative paths are identical, so
-# class indices, source IDs and the seeded train/validation split are the original's. Consequences:
-# RandomResizedCrop samples its box on the 160-px image (same scale/ratio law, relative to the smaller
-# image), so small crops are upsampled to 112 more often than on the original (quantified in plan 0103);
-# the in-training validation and train-probe views (ImageNetEvalTransform at 112: short side 128, centre
-# crop) also read the 160-px copy. The official evaluation (evaluation.dataset) is the ORIGINAL val root
-# at 224 px, unchanged. The root comes from ${ARD_IMAGENET_TRAIN_ROOT} (evaluation keeps
-# ${ARD_IMAGENET_ROOT}); load-time checks verify the root's manifest digest and its build manifest
-# (derived_manifest.json, pinned by manifest_sha256). Stage 2 (original data, 224 px) accepts this run's
-# last.pt as a declared derivative of its own dataset (ard.engine.checkpoint._same_or_declared_derivative).
+# 160 px shorter side (PIL LANCZOS, aspect ratio kept), converted to RGB and re-encoded as baseline JPEG
+# quality 95 (4:2:0); smaller images are byte-identical copies. Relative paths are identical, so class
+# indices, source IDs and the seeded train/validation split are the original's.
+# Blur cost: RandomResizedCrop samples its box on the smaller image (same scale/ratio law), so more crops
+# are smaller than 112 px and get UPSAMPLED to 112. Fraction of sampled crops smaller than 112 px:
+#   Monte Carlo (reviewer), a 500x375 image, in at least one dim / in both dims:
+#     original 0.2% / 0.0%, S=256 12.5% / 6.5%, S=160 49.8% / 34.6%;
+#   measured on 2000 random real train images (at least one dim):
+#     original 5.9%, S=256 16.0%, S=160 51.5%.
+# The in-training validation and train-probe views (ImageNetEvalTransform at 112: short side 128, centre
+# crop) also read this derived copy, so per-epoch selection numbers are on derived images; they are
+# labelled with validation_dataset_derivation in best.pt / epoch rows / the run summary. The official
+# evaluation (evaluation.dataset) is the ORIGINAL val root at 224 px, unchanged. The training root comes
+# from ${ARD_IMAGENET_TRAIN_ROOT} (evaluation keeps ${ARD_IMAGENET_ROOT}); load-time checks verify the
+# root's manifest digest and its build manifest (derived_manifest.json, pinned by manifest_sha256).
+# Stage 2 (original data, 224 px) accepts this run's last.pt as a declared derivative of its own dataset.
 schema_version: 2
 protocol: {id: controlled_imagenet_stage02_two_stage_lowres_v1}
 tier: production
@@ -25,6 +31,6 @@ method: {id: pgd_at, version: 1, selection_step_size_independent: true, attack: 
 optimizer: {id: sgd, learning_rate: 0.025, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
 scheduler: {id: warmup_multistep, milestones: [98, 148], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
 training: {epochs: 195, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000, train_image_size: 112}
-tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-twostage-lowres-stage1, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
+tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-twostage-lowres-stage1-s160, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
 evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
 output_dir: "${ARD_JOB_OUTPUT_DIR}"

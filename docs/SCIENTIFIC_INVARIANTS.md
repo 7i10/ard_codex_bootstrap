@@ -9,6 +9,14 @@
 - CIFAR normalizationはstudent/teacher model adapterが所有し、attack前後に二重適用しない。
 - CIFAR-10 SAAD studentはnamed `cifar10_raw_identity` profile（student adapter所有）を要求する。train augmentationはsource-keyed、validation/testはdeterministicである。
   - **例外(plan 0102, scientific review 2026-09-21)**: `DatasetConfig.imagenet_heavy_augmentation`を有効にしたImageNet訓練では、RandAugment/RandomErasing部分はtorchvisionのグローバル乱数を使うため、source ID単位の再現性(resumeで同じ拡張結果になること)は保証されない(crop/flip部分は引き続きsource-keyedで再現性あり)。人間の明示的判断(chat, 2026-09-21)による、この一実験に限った既知の逸脱。
+  - **Exception (plan 0103 loader speedups, human-approved 2026-09-30), ImageNet only, both default off.**
+    `training.jpeg_draft_decode: true` decodes the RandomResizedCrop training view at a reduced JPEG scale
+    (1/2, 1/4 or 1/8) whenever the crop stays at least the output size, so the resize is still a downscale.
+    Crop boxes, flips and random draws are unchanged; training pixels differ slightly. Validation, probe and
+    evaluation views are unchanged. `dataset.derived_from` declares a pre-resized copy of the training set
+    (`scripts/build_resized_imagenet.py`); training AND in-training validation/probe read the smaller images, so
+    more crops are upsampled. The official evaluation always reads the original val set. Stage 2 of the two-stage
+    protocol must run on original data.
 - PGD projectionはpixel-spaceで行い、`Linf` ballへprojectした後`[0,1]`へclampする。
 - rational値は文字列`8/255`, `2/255`としてresolved configへ保持し、数値値と照合する。
 
@@ -156,6 +164,10 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
 - evaluation config、lineage、results、panel、任意Parquet、run bundleをartifactへ保存する。
 - portable dataset identityはname/split/classes/image size/version/content fingerprintで構成し、machine-specific
   rootはprovenanceへ分離する。
+- Dataset identity also includes `dataset.derived_from` (source digest, short side, JPEG quality, filter, build
+  manifest digest) when set; the derived root's own digest is its `content_sha256`, and a derived root cannot be
+  loaded without declaring it. `training.jpeg_draft_decode` is in the config hash and in
+  `training_protocol_identity`. Both are recorded only when used, so runs with and without them never pool.
 - Tiny-ImageNetのobserved split digestは、expected digestなしなら`computed`、configのexpected digestと一致したら
   `computed-and-matched`。training configだけから作るidentityの`expected-unverified`は観測済みという意味ではない。
 - 集計ではevaluation/training dataset、student、method、training protocol、evaluation protocol、complete threat、

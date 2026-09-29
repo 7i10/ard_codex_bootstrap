@@ -65,7 +65,10 @@ STAGE_CONFIGS = {
 # Configs added after this module's pre-change commit that use later schema
 # fields (loader speedup C's dataset.derived_from); their own byte-identity
 # test is tests/unit/test_imagenet_loader_speedups.py.
-LATER_CONFIGS = {"imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized.yaml"}
+LATER_CONFIGS = {
+    "imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized_s160.yaml",
+    "imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized_s256.yaml",
+}
 
 
 def _pre_change_module(relative: str, name: str, package: str) -> types.ModuleType:

@@ -54,7 +54,10 @@ CONFIG_DIR = ROOT / "configs" / "scientific"
 PROTOCOL = "controlled_imagenet_stage02_two_stage_lowres_v1"
 # The commit this change is based on: the pre-change schema and data views.
 PRE_CHANGE_COMMIT = "29caab2"
-NEW_CONFIGS = {"imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized.yaml"}
+NEW_CONFIGS = {
+    "imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized_s160.yaml",
+    "imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized_s256.yaml",
+}
 REAL_IMAGENET_TRAIN = Path.home() / "workspace-local" / "datasets" / "imagenet" / "train"
 
 
@@ -448,9 +451,19 @@ def test_builder_mirrors_layout_labels_and_split_and_is_deterministic(tmp_path: 
                 copied += 1
                 assert derived.read_bytes() == original.read_bytes()
     assert (resized, copied) == (result["resized_count"], result["copied_count"]) and resized and copied
+    assert json.loads(manifest_a)["libjpeg_turbo_version"] == builder.features.version("libjpeg_turbo")
     # Same seeded train/validation partition over the same source IDs.
     source_config = DatasetConfig(name="imagenet", root=source, num_classes=2, image_size=32)
-    derived_config = DatasetConfig(name="imagenet", root=tmp_path / "a", num_classes=2, image_size=32)
+    derived_config = DatasetConfig.model_validate(
+        {
+            "name": "imagenet",
+            "root": tmp_path / "a",
+            "num_classes": 2,
+            "image_size": 32,
+            "content_sha256": result["derived_content_sha256"],
+            "derived_from": _derived_from(result),
+        }
+    )
     source_views = _views(sys.modules["ard.data.datasets"], source_config)
     derived_views = _views(sys.modules["ard.data.datasets"], derived_config)
     assert [view.indices for view in source_views] == [view.indices for view in derived_views]
@@ -466,6 +479,14 @@ def test_builder_refuses_a_wrong_source_digest_or_a_populated_output(tmp_path: P
         _build(source, tmp_path / "out")
     resumed = _build(source, tmp_path / "out", resume=True)
     assert resumed["derived_content_sha256"] == _manifest_sha(tmp_path / "out")
+    # A resume must continue the same build: other parameters are refused.
+    with pytest.raises(ValueError, match="different build parameters: jpeg_quality"):
+        _build(source, tmp_path / "out", resume=True, quality=90)
+    with pytest.raises(ValueError, match="different build parameters: short_side"):
+        _build(source, tmp_path / "out", resume=True, short_side=100)
+    (tmp_path / "out" / builder.BUILD_PARAMETERS).unlink()
+    with pytest.raises(ValueError, match="cannot resume: no build_parameters.json"):
+        _build(source, tmp_path / "out", resume=True)
 
 
 # =========================================================================== C: identity + load-time checks
@@ -521,6 +542,20 @@ def test_derived_root_is_verified_against_its_own_digest_and_manifest(tmp_path: 
     # The views (training runtime path) go through the same verification.
     with pytest.raises(FileNotFoundError, match="derived dataset manifest missing"):
         _views(sys.modules["ard.data.datasets"], config())
+
+
+def test_a_derived_root_cannot_be_loaded_as_original_data(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    _imagenet_layout(source, [(300, 200), (60, 50)])
+    result = _build(source, tmp_path / "derived")
+    for digest in (result["derived_content_sha256"], None):
+        undeclared = DatasetConfig(
+            name="imagenet", root=tmp_path / "derived", num_classes=2, image_size=32, content_sha256=digest
+        )
+        with pytest.raises(ValueError, match="is a derived dataset root .* declare it with dataset.derived_from"):
+            build_raw_dataset(undeclared)
+        with pytest.raises(ValueError, match="declare it with dataset.derived_from"):
+            _views(sys.modules["ard.data.datasets"], undeclared)
 
 
 @pytest.mark.parametrize(
@@ -657,6 +692,21 @@ def test_stage2_accepts_a_stage1_trained_on_a_declared_derivative_of_its_dataset
     _, lineage = read_init_checkpoint(path, expected_sha256=_sha(path), target=target)
     assert lineage["source_dataset_content_sha256"] == DERIVED
     assert lineage["source_dataset_derived_from"] == DERIVATION
+    assert lineage["source_jpeg_draft_decode"] is False
+
+
+def test_stage2_lineage_records_the_source_draft_decode(tmp_path: Path) -> None:
+    run = tmp_path / "stage1"
+    path = _source_run(tmp_path, {"content_sha256": ORIGINAL})
+    raw = yaml.safe_load((run / "resolved_config.yaml").read_text(encoding="utf-8"))
+    raw["training"]["jpeg_draft_decode"] = True
+    (run / "resolved_config.yaml").write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    payload = torch.load(path, weights_only=False)
+    payload["config_hash"] = config_digest(raw)
+    torch.save(payload, path)
+    target = _stage(tmp_path, stage=2, dataset={"content_sha256": ORIGINAL})
+    _, lineage = read_init_checkpoint(path, expected_sha256=_sha(path), target=target)
+    assert lineage["source_jpeg_draft_decode"] is True and "source_dataset_derived_from" not in lineage
 
 
 def test_stage2_on_the_same_dataset_records_no_derivation(tmp_path: Path) -> None:
@@ -664,6 +714,7 @@ def test_stage2_on_the_same_dataset_records_no_derivation(tmp_path: Path) -> Non
     target = _stage(tmp_path, stage=2, dataset={"content_sha256": ORIGINAL})
     _, lineage = read_init_checkpoint(path, expected_sha256=_sha(path), target=target)
     assert "source_dataset_derived_from" not in lineage and "source_dataset_content_sha256" not in lineage
+    assert "source_jpeg_draft_decode" not in lineage
 
 
 @pytest.mark.parametrize(
@@ -679,13 +730,19 @@ def test_stage2_on_the_same_dataset_records_no_derivation(tmp_path: Path) -> Non
         (
             {"content_sha256": ORIGINAL},
             {"content_sha256": DERIVED, "derived_from": DERIVATION},
-            "dataset.content_sha256",
+            "stage 2 must run on the original (non-derived) dataset",
         ),
         # Two different derivatives of the same original.
         (
             {"content_sha256": DERIVED, "derived_from": DERIVATION},
             {"content_sha256": "f" * 64, "derived_from": {**DERIVATION, "short_side": 256}},
-            "dataset.content_sha256",
+            "stage 2 must run on the original (non-derived) dataset",
+        ),
+        # Stage 2 on the very same derived root as stage 1: still not original data.
+        (
+            {"content_sha256": DERIVED, "derived_from": DERIVATION},
+            {"content_sha256": DERIVED, "derived_from": DERIVATION},
+            "stage 2 must run on the original (non-derived) dataset",
         ),
         # Plain digest mismatch, no derivation declared (unchanged behaviour).
         ({"content_sha256": DERIVED}, {"content_sha256": ORIGINAL}, "dataset.content_sha256"),
@@ -709,14 +766,31 @@ def test_stage2_refuses_any_other_dataset_relation(
 # =========================================================================== config
 
 
+BUILT_DERIVATIVES = {
+    160: (
+        "f52345d89aa982871cb6bd3e642aed1b18a33778f1488ea0578c33c63058d8ba",
+        "2bf01d09ed717eda0722a012fb86ad2b9fb22783c46d47355aac76f3db11c92a",
+    ),
+    256: (
+        "65f729c7a34047a9063f95d2ac08e3701a8464203a7074e7216ea11321095ba0",
+        "1b878f7a12c9def7bef00d9ebdd34d4136134c9e8c8772a05afdfce11bd07b0c",
+    ),
+}
+
+
+@pytest.mark.parametrize("short_side", sorted(BUILT_DERIVATIVES))
 def test_resized_stage1_config_is_stage1_except_the_declared_derived_dataset(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, short_side: int
 ) -> None:
     _env(monkeypatch, tmp_path)
     stage1 = load_config(CONFIG_DIR / "imagenet_mobilenetv4_twostage_stage1_112_pgd1.yaml").model_dump(mode="json")
-    resized_config = load_config(CONFIG_DIR / "imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized.yaml")
+    name = f"imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized_s{short_side}.yaml"
+    resized_config = load_config(CONFIG_DIR / name)
     resized = resized_config.model_dump(mode="json")
     derived = resized["dataset"]["derived_from"]
+    assert derived["short_side"] == short_side and derived["jpeg_quality"] == 95
+    assert (resized["dataset"]["content_sha256"], derived["manifest_sha256"]) == BUILT_DERIVATIVES[short_side]
+    assert resized["tracking"]["group"] == f"imagenet-mobilenetv4-twostage-lowres-stage1-s{short_side}"
     assert resized["dataset"]["root"] == str(tmp_path / "imagenet_train_derived")
     assert derived["content_sha256"] == stage1["dataset"]["content_sha256"]
     assert resized["dataset"]["content_sha256"] != stage1["dataset"]["content_sha256"]
@@ -727,6 +801,7 @@ def test_resized_stage1_config_is_stage1_except_the_declared_derived_dataset(
     for payload in (stage1, resized):
         payload["dataset"] = {**payload["dataset"], "root": None, "content_sha256": None}
         payload["dataset"].pop("derived_from", None)
+        payload["tracking"] = {**payload["tracking"], "group": None}
     assert stage1 == resized
     objective, _, _, _ = _build_method(resized_config)
     assert objective is not None
@@ -735,3 +810,31 @@ def test_resized_stage1_config_is_stage1_except_the_declared_derived_dataset(
     from ard.engine.checkpoint import _source_compatibility_errors
 
     assert _source_compatibility_errors(resized_config, stage2) == []
+
+
+def _crop_upsample_fraction(
+    width: int, height: int, *, output: int = 112, samples: int = 20_000
+) -> tuple[float, float]:
+    """Fraction of RandomResizedCrop boxes smaller than ``output`` px in at least
+    one / in both dimensions (so upsampled to ``output``), for one image size."""
+    transform = EpochImageNetTransform(augmentation_seed=0, image_size=output)
+    generator = torch.Generator().manual_seed(0)
+    either = both = 0
+    for _ in range(samples):
+        _, _, crop_height, crop_width = transform._crop_box_for_size(width, height, generator)
+        either += crop_width < output or crop_height < output
+        both += crop_width < output and crop_height < output
+    return either / samples, both / samples
+
+
+@pytest.mark.parametrize(
+    ("short_side", "either", "both"),
+    [(None, 0.002, 0.000), (256, 0.125, 0.065), (160, 0.498, 0.346)],
+)
+def test_crop_upsample_fraction_per_short_side(short_side: int | None, either: float, both: float) -> None:
+    """The blur cost quoted in the resized configs' headers: a 500x375 image,
+    as stored at the original size or by the builder at each short side."""
+    size = (500, 375) if short_side is None else builder.resized_dimensions(500, 375, short_side)
+    observed = _crop_upsample_fraction(*size)
+    # Monte Carlo standard error at 20k draws is <= 0.0036; 0.01 is ~3 SE.
+    assert observed == pytest.approx((either, both), abs=0.01)

@@ -171,8 +171,12 @@ def test_two_stage_cli_trains_stage1_small_then_fine_tunes_stage2_from_its_last_
     for name in ("best.pt", "last.pt"):
         metadata = torch.load(out1 / name, map_location="cpu", weights_only=False)["selection_metadata"]
         assert metadata["validation_image_size"] == 16
+        # An original (non-derived) root carries no derivation marker.
+        assert "validation_dataset_derivation" not in metadata
     rows1 = pq.read_table(out1 / "epoch-metrics.parquet").to_pylist()
     assert [row["validation_image_size"] for row in rows1] == [16, 16]
+    assert not any(key.startswith("validation_dataset_derived") for row in rows1 for key in row)
+    assert not any(key.startswith("validation_dataset_derived") for key in manifest1["summary"])
     assert "init_lineage" not in manifest1
     last1 = out1 / "last.pt"
     stage1_weights = torch.load(last1, map_location="cpu", weights_only=False)["model"]
@@ -276,3 +280,70 @@ def test_two_stage_cli_trains_stage1_small_then_fine_tunes_stage2_from_its_last_
         assert "train_image_size" not in item["training_protocol_identity"]
         # Both stages are selected/evaluated under the same threat identity.
         assert item["threat_hash"] == results1[0]["threat_hash"]
+
+
+def _load_builder() -> Any:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "build_resized_imagenet", ROOT / "scripts" / "build_resized_imagenet.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_stage1_on_a_derived_root_labels_its_selection_numbers_as_derived(tmp_path: Path) -> None:
+    """Loader speedup C: in-training validation / probe (and so checkpoint
+    selection) read the derived copy, and every place the selection numbers are
+    recorded says so: best.pt / last.pt selection metadata, epoch rows and the
+    run summary."""
+    data_root = tmp_path / "imagenet"
+    _imagenet_fixture(data_root)
+    builder = _load_builder()
+    source_digest = build_dataset(
+        DatasetConfig(name="imagenet", root=data_root, split="train", num_classes=2, image_size=32)
+    ).content_identity
+    assert source_digest is not None
+    derived_root = tmp_path / "imagenet_s32"
+    built = builder.build(
+        source=data_root,
+        out=derived_root,
+        short_side=32,
+        quality=95,
+        source_content_sha256=source_digest["observed_sha256"],
+        workers=1,
+        log=False,
+    )
+    assert built["resized_count"] == 12
+    out = tmp_path / "stage1-derived"
+    raw = _tiny(STAGE1, data_root=data_root, output=out, run_id="offline-stage1-derived")
+    raw["dataset"].update(
+        root=str(derived_root),
+        content_sha256=built["derived_content_sha256"],
+        derived_from={
+            "content_sha256": built["source_content_sha256"],
+            "transform": "resize_short_side",
+            "short_side": 32,
+            "jpeg_quality": 95,
+            "resample": "lanczos",
+            "manifest_sha256": built["manifest_sha256"],
+        },
+    )
+    config = _write(tmp_path / "stage1-derived.yaml", raw)
+    trained = _run(["-m", "ard.cli.train", "--config", str(config)], _environment({}))
+    assert trained.returncode == 0, trained.stderr
+    marker = {"short_side": 32, "content_sha256": built["derived_content_sha256"]}
+    for name in ("best.pt", "last.pt"):
+        metadata = torch.load(out / name, map_location="cpu", weights_only=False)["selection_metadata"]
+        assert metadata["validation_dataset_derivation"] == marker
+        assert metadata["validation_image_size"] == 16
+    rows = pq.read_table(out / "epoch-metrics.parquet").to_pylist()
+    assert [
+        (row["validation_dataset_derived_short_side"], row["validation_dataset_derived_content_sha256"]) for row in rows
+    ] == [(32, built["derived_content_sha256"])] * 2
+    summary = json.loads((out / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))["summary"]
+    assert summary["validation_dataset_derived_short_side"] == 32
+    assert summary["validation_dataset_derived_content_sha256"] == built["derived_content_sha256"]
