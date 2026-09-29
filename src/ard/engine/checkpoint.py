@@ -19,7 +19,7 @@ import yaml
 from torch import nn
 from torch.optim import Optimizer
 
-from ard.config.schema import ExperimentConfig
+from ard.config.schema import DatasetConfig, ExperimentConfig
 
 from .distributed import gather_objects, get_rank, get_world_size, run_rank_zero_phase, unwrap_model
 
@@ -242,6 +242,28 @@ INIT_CHECKPOINT_LINEAGE_KIND = "student_init_checkpoint_v1"
 TWO_STAGE_PROTOCOL_ID = "controlled_imagenet_stage02_two_stage_lowres_v1"
 
 
+def _same_or_declared_derivative(source: DatasetConfig, target: DatasetConfig) -> bool:
+    """Stage 1 trained on stage 2's own dataset, or on a declared derivative of it.
+
+    Identical dataset identity (same ``content_sha256`` and same
+    ``derived_from``, usually both absent), or: stage 1's root is a declared
+    derivative (``dataset.derived_from``, loader speedup C) whose *source*
+    digest is stage 2's own ``content_sha256``, and stage 2 itself is not
+    derived. The derivative keeps the source's relative paths and labels, so
+    the seeded train/validation partition is the same set of source IDs.
+    Anything else -- a derivative of some other dataset, stage 2 on a
+    derivative stage 1 did not use, two different derivatives -- is refused.
+    """
+    if source.content_sha256 == target.content_sha256 and source.derived_from == target.derived_from:
+        return True
+    return (
+        source.derived_from is not None
+        and target.derived_from is None
+        and target.content_sha256 is not None
+        and source.derived_from.content_sha256 == target.content_sha256
+    )
+
+
 def _source_compatibility_errors(source: ExperimentConfig, target: ExperimentConfig) -> list[str]:
     """Fields a stage-2 run must share with the stage-1 run it starts from."""
     errors: list[str] = []
@@ -249,9 +271,11 @@ def _source_compatibility_errors(source: ExperimentConfig, target: ExperimentCon
         errors.append(f"both runs must use protocol {TWO_STAGE_PROTOCOL_ID}")
     if source.training.train_image_size is None:
         errors.append("the source run must be a reduced-resolution stage 1 (training.train_image_size set)")
-    for field in ("name", "content_sha256", "num_classes", "image_size"):
+    for field in ("name", "split", "num_classes", "image_size"):
         if getattr(source.dataset, field) != getattr(target.dataset, field):
             errors.append(f"dataset.{field}")
+    if not _same_or_declared_derivative(source.dataset, target.dataset):
+        errors.append("dataset.content_sha256")
     if source.seeds.split != target.seeds.split:
         errors.append("seeds.split")
     if source.training.validation_fraction != target.training.validation_fraction:
@@ -279,7 +303,8 @@ def read_init_checkpoint(
     not an interrupted run's latest). That sibling config must also validate
     as a full ``ExperimentConfig`` and agree with the stage-2 ``target`` on
     the two-stage protocol (source has ``train_image_size``), the dataset
-    identity, ``seeds.split`` and ``validation_fraction`` (same train /
+    identity (equal, or the source's dataset is a declared derivative of the
+    target's -- see ``_same_or_declared_derivative``), ``seeds.split`` and ``validation_fraction`` (same train /
     validation partition), and the student architecture, head and
     normalization (neither run pretrained). Only ``payload["model"]`` is returned;
     optimizer, scheduler, scaler, RNG, sampler, sample and selection state
@@ -344,6 +369,9 @@ def read_init_checkpoint(
         "source_world_size": payload["world_size"],
         "source_train_image_size": source.training.train_image_size,
     }
+    if source.dataset.derived_from is not None:
+        lineage["source_dataset_content_sha256"] = source.dataset.content_sha256
+        lineage["source_dataset_derived_from"] = source.dataset.derived_from.model_dump(mode="json")
     return payload["model"], lineage
 
 

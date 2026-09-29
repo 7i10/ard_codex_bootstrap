@@ -650,11 +650,23 @@ class EpochImageNetTransform:
     _LOG_RATIO = (math.log(3.0 / 4.0), math.log(4.0 / 3.0))
     _ATTEMPTS = 10
 
-    def __init__(self, *, augmentation_seed: int, image_size: int, heavy_augmentation: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        augmentation_seed: int,
+        image_size: int,
+        heavy_augmentation: bool = False,
+        jpeg_draft_decode: bool = False,
+    ) -> None:
         if image_size < 1:
             raise ValueError("ImageNet augmentation image_size must be a positive integer")
         self.augmentation_seed = augmentation_seed
         self.image_size = image_size
+        # TrainingConfig.jpeg_draft_decode: this transform then receives the
+        # image *path* (see ImageNetPathView) and decodes it itself, at a
+        # reduced JPEG DCT scale when that keeps the final resize a downscale.
+        # False (default) is today's exact behavior.
+        self.jpeg_draft_decode = jpeg_draft_decode
         self.epoch = 0
         self.source_id_keyed = True
         # Plan 0102 Workstream A: Singh/Croce/Hein 2023's own RandAugment(2
@@ -678,6 +690,9 @@ class EpochImageNetTransform:
 
     def _crop_box(self, image: Any, generator: torch.Generator) -> tuple[int, int, int, int]:
         width, height = transform_functional.get_image_size(image)
+        return self._crop_box_for_size(width, height, generator)
+
+    def _crop_box_for_size(self, width: int, height: int, generator: torch.Generator) -> tuple[int, int, int, int]:
         area = width * height
         for _ in range(self._ATTEMPTS):
             target_area = area * (
@@ -698,16 +713,88 @@ class EpochImageNetTransform:
         left = (width - side) // 2
         return top, left, side, side
 
+    @staticmethod
+    def draft_scale(crop_width: int, crop_height: int, output_size: int) -> int:
+        """Largest JPEG DCT reduction (8, 4, 2 or 1) keeping the crop at least
+        ``output_size`` pixels in both dimensions at the reduced scale, so the
+        final resize stays a (never an upscaling) downscale."""
+        for scale in (8, 4, 2):
+            if crop_width >= output_size * scale and crop_height >= output_size * scale:
+                return scale
+        return 1
+
+    def draft_plan(self, width: int, height: int, generator: torch.Generator) -> tuple[tuple[int, int, int, int], int]:
+        """The crop box (top, left, height, width, in *original* full-resolution
+        pixels, drawn exactly as the non-draft path draws it) and the requested
+        JPEG reduction scale. Consumes ``generator`` exactly like ``_crop_box``."""
+        box = self._crop_box_for_size(width, height, generator)
+        return box, self.draft_scale(box[3], box[2], self.image_size)
+
+    def _draft_resized_crop(self, path: Path, generator: torch.Generator) -> Image.Image:
+        """``TrainingConfig.jpeg_draft_decode``: the same crop box as the
+        non-draft path, decoded at a reduced JPEG DCT scale where possible.
+
+        The crop is sampled on the original header size, so RNG consumption
+        and the sampled box are identical to the non-draft path. When a
+        reduction of 1/2, 1/4 or 1/8 still leaves the box >= ``image_size`` in
+        both dimensions, PIL's ``draft`` makes libjpeg decode at that scale;
+        the box is mapped into reduced coordinates with the scale PIL reports
+        (``draft`` returns the original image's extent in reduced pixels,
+        ``W/s x H/s``: libjpeg's reduced pixel ``i`` covers original pixels
+        ``[i*s, (i+1)*s)``), and cropped + resized in one float-box PIL
+        bilinear resize (anti-aliased on downscale, the same filter as
+        ``resized_crop``). With no reduction (scale 1, non-JPEG files, or a
+        crop too small to reduce) the output is bit-identical to the non-draft
+        path. If PIL ever delivers a scale that would make the resize an
+        upscale, the image is re-decoded at full resolution instead.
+        """
+        with Image.open(path) as image:
+            width, height = image.size
+            (top, left, crop_height, crop_width), scale = self.draft_plan(width, height, generator)
+            if scale > 1:
+                drafted = image.draft("RGB", (width // scale, height // scale))
+                if drafted is None:
+                    # Not a single-tile JPEG: draft is a no-op, decode as today.
+                    rgb = image.convert("RGB")
+                else:
+                    _, extent = drafted
+                    ratio_x, ratio_y = extent[2] / width, extent[3] / height
+                    if crop_width * ratio_x >= self.image_size and crop_height * ratio_y >= self.image_size:
+                        rgb = image.convert("RGB")
+                        return rgb.resize(
+                            (self.image_size, self.image_size),
+                            Image.Resampling.BILINEAR,
+                            box=(
+                                left * ratio_x,
+                                top * ratio_y,
+                                (left + crop_width) * ratio_x,
+                                (top + crop_height) * ratio_y,
+                            ),
+                        )
+                    # Unexpected scale: fall back to a fresh full-resolution decode.
+                    with Image.open(path) as full:
+                        rgb = full.convert("RGB")
+            else:
+                rgb = image.convert("RGB")
+        return transform_functional.resized_crop(
+            rgb, top, left, crop_height, crop_width, [self.image_size, self.image_size]
+        )
+
     def __call__(self, image: Any, *, source_id: int) -> torch.Tensor:
         # Independent of worker order, sampler order, rank, and process RNG
         # state -- see EpochSourceTransform's identical rationale above.
         generator = torch.Generator().manual_seed(
             self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
         )
-        top, left, height, width = self._crop_box(image, generator)
-        cropped = transform_functional.resized_crop(
-            image, top, left, height, width, [self.image_size, self.image_size]
-        )
+        if self.jpeg_draft_decode:
+            if not isinstance(image, (str, Path)):
+                raise TypeError("jpeg_draft_decode requires the ImageNet train view to supply image paths")
+            cropped = self._draft_resized_crop(Path(image), generator)
+        else:
+            top, left, height, width = self._crop_box(image, generator)
+            cropped = transform_functional.resized_crop(
+                image, top, left, height, width, [self.image_size, self.image_size]
+            )
         if bool(torch.randint(0, 2, (), generator=generator).item()):
             cropped = transform_functional.hflip(cropped)
         if self._rand_augment is not None:
@@ -719,6 +806,23 @@ class EpochImageNetTransform:
         if self._random_erasing is not None:
             tensor = self._random_erasing(tensor)
         return tensor
+
+
+class ImageNetPathView(Dataset[tuple[Path, int]]):
+    """The same samples as an ``ImageNetDataset``, yielding each image's path
+    instead of its decoded pixels (``TrainingConfig.jpeg_draft_decode``: the
+    training transform decodes, so it can decode at a reduced scale). Labels,
+    ``targets`` and indices are the wrapped dataset's own."""
+
+    def __init__(self, dataset: ImageNetDataset) -> None:
+        self.dataset = dataset
+        self.targets = dataset.targets
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, index: int) -> tuple[Path, int]:
+        return self.dataset.samples[index]
 
 
 def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
@@ -757,6 +861,11 @@ def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
         observed = imagenet_base.content_identity["observed_sha256"]
         if config.content_sha256 is not None and config.content_sha256 != observed:
             raise ValueError("ImageNet content_sha256 does not match adapter-visible manifest")
+        if config.derived_from is not None:
+            imagenet_base.content_identity = {
+                **imagenet_base.content_identity,
+                "derived_from": verify_derived_dataset_manifest(config),
+            }
         if config.content_sha256 is not None:
             imagenet_base.content_identity = {
                 **imagenet_base.content_identity,
@@ -765,6 +874,45 @@ def build_raw_dataset(config: DatasetConfig) -> Dataset[Any]:
             }
         return imagenet_base
     raise ValueError(f"unknown dataset: {config.name}")
+
+
+DERIVED_DATASET_MANIFEST = "derived_manifest.json"
+
+
+def verify_derived_dataset_manifest(config: DatasetConfig) -> dict[str, object]:
+    """Check a derived dataset root's build manifest against ``dataset.derived_from``.
+
+    The root's own manifest digest has already been checked against
+    ``dataset.content_sha256`` by the caller; this ties that root to its
+    source dataset and build parameters (``scripts/build_resized_imagenet.py``).
+    Returns the verified ``derived_from`` record for ``content_identity``.
+    """
+    derived = config.derived_from
+    if derived is None or config.root is None:
+        raise ValueError("derived dataset verification requires dataset.derived_from and dataset.root")
+    path = config.root / DERIVED_DATASET_MANIFEST
+    if not path.is_file():
+        raise FileNotFoundError(f"derived dataset manifest missing: {path}")
+    data = path.read_bytes()
+    observed = hashlib.sha256(data).hexdigest()
+    if observed != derived.manifest_sha256:
+        raise ValueError(
+            f"derived dataset manifest SHA-256 mismatch: expected {derived.manifest_sha256}, observed {observed}"
+        )
+    manifest = json.loads(data)
+    expected = {
+        "source_content_sha256": derived.content_sha256,
+        "derived_content_sha256": config.content_sha256,
+        "transform": derived.transform,
+        "short_side": derived.short_side,
+        "jpeg_quality": derived.jpeg_quality,
+        "resample": derived.resample,
+        "split": config.split,
+    }
+    mismatched = sorted(key for key, value in expected.items() if manifest.get(key) != value)
+    if mismatched:
+        raise ValueError("derived dataset manifest disagrees with dataset.derived_from: " + ", ".join(mismatched))
+    return {**derived.model_dump(mode="json"), "verification": "manifest-matched"}
 
 
 def load_stagewise_late_mask(path: Path) -> frozenset[int]:
@@ -831,6 +979,7 @@ def build_train_validation_views(
     augmentation_seed: int,
     stagewise_late_mask: frozenset[int] | None = None,
     train_image_size: int | None = None,
+    jpeg_draft_decode: bool = False,
 ) -> tuple[SourceIndexedSubset, SourceIndexedSubset]:
     """Create independently transformed train/validation views over one raw set.
 
@@ -845,11 +994,20 @@ def build_train_validation_views(
     bilinear filter, whose support widens with the downscale factor, i.e.
     the resize is anti-aliased (torchvision's ``antialias`` flag only
     affects tensor inputs; for PIL it is always on).
+
+    ``jpeg_draft_decode`` (``TrainingConfig.jpeg_draft_decode``) makes the
+    RandomResizedCrop training view decode each JPEG at a reduced DCT scale
+    where that keeps the resize a downscale (see
+    ``EpochImageNetTransform._draft_resized_crop``). Same crop boxes and flips;
+    different (slightly) training pixels. The validation / probe views are
+    unchanged. ``False`` (default) is today's exact behavior.
     """
     if config.split != "train":
         raise ValueError("train/validation views require the official train split")
     if train_image_size is not None and config.name != "imagenet":
         raise ValueError("train_image_size is only defined for the imagenet dataset")
+    if jpeg_draft_decode and config.name != "imagenet":
+        raise ValueError("jpeg_draft_decode is only defined for the imagenet dataset")
     view_image_size = config.image_size if train_image_size is None else train_image_size
     raw = build_raw_dataset(config)
     split_view = IndexedDataset(raw, _to_tensor)
@@ -914,13 +1072,18 @@ def build_train_validation_views(
             augmentation_seed=augmentation_seed,
             image_size=view_image_size,
             heavy_augmentation=config.imagenet_heavy_augmentation,
+            jpeg_draft_decode=jpeg_draft_decode,
         )
     else:
         train_transform = _to_tensor
     validation_transform: IndexedTransform = (
         ImageNetEvalTransform(image_size=view_image_size) if config.name == "imagenet" else _to_tensor
     )
-    train_view = IndexedDataset(raw, train_transform)
+    train_source: Dataset[Any] = raw
+    if jpeg_draft_decode:
+        assert isinstance(raw, ImageNetDataset)
+        train_source = ImageNetPathView(raw)
+    train_view = IndexedDataset(train_source, train_transform)
     validation_view = IndexedDataset(raw, validation_transform)
     return (
         SourceIndexedSubset(train_view, list(split_train.indices)),

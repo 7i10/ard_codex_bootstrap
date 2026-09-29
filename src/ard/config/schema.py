@@ -447,6 +447,39 @@ class AttackConfig(StrictModel):
         return self
 
 
+def _is_sha256_hex(value: str) -> bool:
+    return len(value) == 64 and all(character in "0123456789abcdef" for character in value)
+
+
+class DerivedDatasetConfig(StrictModel):
+    """A dataset root that is a declared, deterministic derivative of another.
+
+    Produced by ``scripts/build_resized_imagenet.py``: the source's ``train/``
+    tree with identical relative paths (so class indices, source IDs and the
+    seeded validation split are unchanged), every image whose shorter side
+    exceeds ``short_side`` resized to that shorter side (``resample`` filter)
+    and re-encoded as JPEG at ``jpeg_quality``; smaller images copied byte for
+    byte. ``content_sha256`` is the *source* dataset's manifest digest; the
+    derived root's own digest is the enclosing ``dataset.content_sha256``.
+    ``manifest_sha256`` pins the build manifest at the derived root, which is
+    checked against these fields whenever the dataset is loaded.
+    """
+
+    content_sha256: str
+    transform: Literal["resize_short_side"]
+    short_side: int = Field(ge=1)
+    jpeg_quality: int = Field(ge=1, le=100)
+    resample: Literal["lanczos"]
+    manifest_sha256: str
+
+    @model_validator(mode="after")
+    def validate_digests(self) -> DerivedDatasetConfig:
+        for name in ("content_sha256", "manifest_sha256"):
+            if not _is_sha256_hex(getattr(self, name)):
+                raise ValueError(f"dataset.derived_from.{name} must be a lowercase 64-character SHA-256 hex digest")
+        return self
+
+
 class DatasetConfig(StrictModel):
     name: Literal["synthetic_cifar", "cifar10", "cifar100", "tiny_imagenet", "imagenet"] = "synthetic_cifar"
     root: Path | None = None
@@ -481,6 +514,14 @@ class DatasetConfig(StrictModel):
     # a one-off comparison. Default False reproduces today's exact
     # behavior for every existing config.
     imagenet_heavy_augmentation: bool = False
+    # Plan 0103 loader speedup C (human-approved 2026-09-30): the root is a
+    # pre-resized derivative of the dataset named by
+    # derived_from.content_sha256; see DerivedDatasetConfig. The training
+    # pixels differ, so it is part of the dataset identity (and the
+    # enclosing content_sha256 is the derived root's own). ImageNet train
+    # split only. Serialized only when set, so every existing config keeps a
+    # byte-identical resolved config and config hash.
+    derived_from: DerivedDatasetConfig | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def validate_dataset(self) -> DatasetConfig:
@@ -513,6 +554,13 @@ class DatasetConfig(StrictModel):
             or any(character not in "0123456789abcdef" for character in self.content_sha256)
         ):
             raise ValueError("dataset content_sha256 must be a lowercase 64-character SHA-256 hex digest")
+        if self.derived_from is not None:
+            if self.name != "imagenet" or self.split != "train":
+                raise ValueError("dataset.derived_from is only defined for the imagenet train split")
+            if self.content_sha256 is None:
+                raise ValueError("dataset.derived_from requires the derived root's own dataset.content_sha256")
+            if self.content_sha256 == self.derived_from.content_sha256:
+                raise ValueError("dataset.content_sha256 must be the derived root's digest, not its source's")
         return self
 
 
@@ -1042,6 +1090,16 @@ class TrainingConfig(StrictModel):
     # Plan 0103 two-stage run (stage 2); see InitCheckpointConfig. Serialized
     # only when set, like train_image_size.
     init_checkpoint: InitCheckpointConfig | None = Field(default=None, exclude_if=lambda value: value is None)
+    # Plan 0103 loader speedup B (human-approved 2026-09-30). The ImageNet
+    # RandomResizedCrop training view decodes each JPEG at the largest DCT
+    # reduction (1/2, 1/4, 1/8, via PIL Image.draft) that keeps the sampled
+    # crop >= the output size in both dimensions, so the final resize is
+    # still an anti-aliased downscale. Crop boxes, flips and RNG consumption
+    # are identical to the default path; the pixels differ slightly (libjpeg
+    # DCT-domain downscaling), so it is part of the run identity (config
+    # hash and training_protocol_identity). Validation / probe / evaluation
+    # views are unchanged. ImageNet only. Serialized only when true.
+    jpeg_draft_decode: bool = Field(default=False, exclude_if=lambda value: value is False)
 
     @model_validator(mode="after")
     def validate_batch_identity(self) -> TrainingConfig:
@@ -1083,6 +1141,8 @@ def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None
         unsupported.append(("train_image_size", str(training.train_image_size), "null"))
     if training.init_checkpoint is not None:
         unsupported.append(("init_checkpoint", "<set>", "null"))
+    if training.jpeg_draft_decode:
+        unsupported.append(("jpeg_draft_decode", "true", "false"))
     if unsupported:
         requested = ", ".join(f"training.{name}={value}" for name, value, _ in unsupported)
         remediation = ", ".join(f"training.{name}={value}" for name, _, value in unsupported)
@@ -1709,6 +1769,8 @@ class ExperimentConfig(StrictModel):
                 raise ValueError("training.train_image_size is only defined for the imagenet dataset")
             if self.training.train_image_size == self.dataset.image_size:
                 raise ValueError("training.train_image_size equals dataset.image_size; omit it")
+        if self.training.jpeg_draft_decode and self.dataset.name != "imagenet":
+            raise ValueError("training.jpeg_draft_decode is only defined for the imagenet dataset")
         if self.training.init_checkpoint is not None and self.student.pretrained:
             raise ValueError(
                 "training.init_checkpoint cannot be combined with student.pretrained=true: the student would "

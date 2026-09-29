@@ -191,6 +191,10 @@ def _dataset_identity(dataset: Any, *, observed: dict[str, object] | None = None
     }
     if verification is not None:
         identity["content_verification"] = verification
+    # Loader speedup C: present only for a declared derivative root, so every
+    # other dataset identity is byte-identical to before.
+    if getattr(dataset, "derived_from", None) is not None:
+        identity["derived_from"] = dataset.derived_from.model_dump(mode="json")
     return identity
 
 
@@ -318,6 +322,15 @@ def _two_stage_protocol_identity(training: TrainingConfig) -> dict[str, object]:
     if training.init_checkpoint is not None:
         identity["init_checkpoint_sha256"] = training.init_checkpoint.sha256
     return identity
+
+
+def _data_loading_protocol_identity(training: TrainingConfig) -> dict[str, object]:
+    """Loader speedup B, present only when enabled (same byte-identity argument
+    as ``_throughput_protocol_identity``): reduced-scale JPEG decoding changes
+    the training pixels, so such a run never pools with a default-decode run.
+    Speedup C (a pre-resized derivative root) is carried by the training
+    dataset identity instead (``_dataset_identity``'s ``derived_from``)."""
+    return {"jpeg_draft_decode": True} if training.jpeg_draft_decode else {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -619,6 +632,7 @@ def main(argv: list[str] | None = None) -> int:
                         "weight_ema_decay": training_config.training.weight_ema_decay,
                         **_throughput_protocol_identity(training_config.training),
                         **_two_stage_protocol_identity(training_config.training),
+                        **_data_loading_protocol_identity(training_config.training),
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

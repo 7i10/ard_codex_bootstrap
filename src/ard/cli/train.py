@@ -822,6 +822,7 @@ def main(argv: list[str] | None = None) -> int:
             augmentation_seed=config.seeds.augmentation,
             stagewise_late_mask=late_mask,
             train_image_size=config.training.train_image_size,
+            jpeg_draft_decode=config.training.jpeg_draft_decode,
         )
         frozen_risk_lookup: FrozenRiskLookup | None = None
         intervention_mask: FixedInterventionMask | None = None
