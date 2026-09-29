@@ -1623,3 +1623,30 @@ history behind this pivot.)
   - The robust fit level still differs sharply: seen-set clean ~78% under
     clean training versus seen-set PGD-10 ~35% under adversarial training.
     The capacity account concerns the level of fit, not when it saturates.
+- 2026-09-29 (chat): **What the ImageNet-100 AdamW tuning runs can and cannot
+  be used for.** Internal-val PGD-10, LR low -> high:
+  - ConvNeXt-Atto random 25.1 / 34.8 / 43.9, pretrained 58.9 / 60.5 / 60.4.
+  - MobileViT-S random 36.3 / 45.9 / 50.0 (the last value at epoch 49),
+    pretrained 57.2 / 59.8 / 61.8 (the last value at epoch 47).
+  - DeiT-Tiny random 27.5 / 31.9 (still running).
+
+  **Not usable** to pick the ImageNet-1k LR (stage-3 rule failed). Random
+  init prefers the top of the grid for every model, the same bias as the
+  proxy. ImageNet-100 also sits in a different regime: pretrained
+  ConvNeXt-Atto shows a ~20pt seen-vs-unseen PGD gap (overfitting), while
+  ImageNet-1k runs underfit.
+
+  **Usable**, directionally:
+  1. AdamW removes the collapse. ConvNeXt-Atto random init fits the seen
+     set (probe PGD 55%) where SGD on ImageNet-1k collapsed (seen clean
+     31%).
+  2. Pretraining helps, with the sign validated by stage 3:
+     best-vs-best +16.6 ConvNeXt-Atto, +11.8 MobileViT-S, +4.6
+     MobileNetV4-S. The magnitude may be inflated because the random-side
+     argmax sits at the grid edge.
+  3. Heuristic only: the ImageNet-100 argmax is a likely upper bound for the
+     ImageNet-1k optimum, useful for placing ImageNet-1k grids. It rests on
+     one SGD model and is not paper evidence.
+
+  A step-matched proxy (ImageNet-100 x 500 epochs) would cost the same as
+  ImageNet-1k, so it saves nothing.
