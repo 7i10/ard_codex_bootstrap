@@ -798,6 +798,10 @@ def test_resized_stage1_config_is_stage1_except_the_declared_derived_dataset(
     # The official evaluation dataset stays the original root at 224px.
     assert resized["evaluation"] == stage1["evaluation"]
     assert resized["evaluation"]["dataset"]["root"] == str(tmp_path / "imagenet")
+    # S=256 additionally drops per-step diagnostic host syncs (same math, sync-free parity-tested),
+    # human-approved 2026-09-30 because stage 1 at 112 px / batch 128 is kernel-launch bound.
+    assert resized["training"].get("step_diagnostics", True) is (short_side != 256)
+    resized["training"].pop("step_diagnostics", None)
     for payload in (stage1, resized):
         payload["dataset"] = {**payload["dataset"], "root": None, "content_sha256": None}
         payload["dataset"].pop("derived_from", None)

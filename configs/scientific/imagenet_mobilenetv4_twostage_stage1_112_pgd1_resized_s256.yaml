@@ -1,7 +1,9 @@
 # Plan 0103, two-stage low-resolution PGD-AT, STAGE 1 on a PRE-RESIZED training copy, short side 256
 # (loader speedup C, human-approved 2026-09-30). Identical to
 # imagenet_mobilenetv4_twostage_stage1_112_pgd1.yaml except `dataset` (root, content_sha256, derived_from)
-# and tracking.group (imagenet-mobilenetv4-twostage-lowres-stage1-s256); see that file for the design.
+# tracking.group (imagenet-mobilenetv4-twostage-lowres-stage1-s256) and training.step_diagnostics=false (no per-step
+# host syncs for diagnostics; sync-free parity-tested, same math; human-approved 2026-09-30 because stage 1
+# at 112 px, batch 128, is kernel-launch bound); see that file for the design.
 # PREPROCESSING CHANGE (disclosed): the training root is a declared derivative of the original ImageNet
 # train set (dataset.derived_from.content_sha256 = the original's pinned digest), built by
 # scripts/build_resized_imagenet.py: every image whose shorter side exceeds 256 px was resized to a
@@ -30,7 +32,7 @@ student: {architecture: mobilenetv4_conv_small_imagenet, num_classes: 1000, prep
 method: {id: pgd_at, version: 1, selection_step_size_independent: true, attack: {loss: ce, epsilon: "4/255", step_size: "4/255", steps: 1, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
 optimizer: {id: sgd, learning_rate: 0.025, momentum: 0.9, weight_decay: 0.0001, nesterov: true}
 scheduler: {id: warmup_multistep, milestones: [98, 148], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
-training: {epochs: 195, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000, train_image_size: 112}
+training: {epochs: 195, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, step_diagnostics: false, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000, train_image_size: 112}
 tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-twostage-lowres-stage1-s256, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
 evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
 output_dir: "${ARD_JOB_OUTPUT_DIR}"
