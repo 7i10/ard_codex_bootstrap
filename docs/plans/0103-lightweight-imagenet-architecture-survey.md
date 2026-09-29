@@ -1864,3 +1864,13 @@ history behind this pivot.)
   - Implementation is in progress (train resolution separate from
     evaluation; init from our own checkpoint with sha256 lineage), with
     review before use.
+- 2026-09-30 — Two-stage pilot, stage 1 launched (hand-run).
+  - Code merged to master as dc0908d + 6d354d5 (review fixes). The
+    two-stage and related tests pass (252 passed, 3 skipped).
+  - Run id `plan0103-mnv4s-twostage-stage1-112-pgd1-s0-v1`, launched
+    from pinned worktree `source-6d354d5a6d1f`.
+  - Config `imagenet_mobilenetv4_twostage_stage1_112_pgd1.yaml`: 112px
+    training, PGD-1, 195 epochs, batch 128, seed 0.
+  - Hamster GPU0, 16 workers, W&B project `lightweight-imagenet-at`.
+  - Stage 2 is launched from this run's final-epoch `last.pt`, with its
+    sha256.
