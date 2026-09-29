@@ -1874,3 +1874,19 @@ history behind this pivot.)
   - Hamster GPU0, 16 workers, W&B project `lightweight-imagenet-at`.
   - Stage 2 is launched from this run's final-epoch `last.pt`, with its
     sha256.
+- 2026-09-30 — Stage 1 v1 stopped; relaunched as v2 (human-approved).
+  - Why: v1 was loader-bound. Measured CPU read throughput was ~250 MB/s
+    (~2300 img/s), with GPU0 at ~35-40%. That implied ~9 min per epoch,
+    or ~30 h for 195 epochs, versus ~13 h if compute-bound.
+  - v1 (16 workers) was stopped mid-epoch 0 and marked ABANDONED. Its
+    W&B run is kept.
+  - v2 `plan0103-mnv4s-twostage-stage1-112-pgd1-s0-v2` uses the same
+    source (6d354d5), config and seed, with ARD_NUM_WORKERS=32 (option A).
+    The preregistered comparison uses v2, on original images.
+  - Options B and C were approved. They are being implemented off-master
+    and will be reviewed before any use.
+    - B: reduced-size JPEG decode (PIL draft), default-off.
+    - C: pre-resized derived train copies (short side 160 and 256), with
+      a `derived_from` dataset identity and an init-checkpoint rule.
+  - B and C change training pixels, so any run using them is a separate,
+    disclosed preprocessing condition.
