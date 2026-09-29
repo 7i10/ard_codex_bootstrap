@@ -1890,3 +1890,14 @@ history behind this pivot.)
       a `derived_from` dataset identity and an init-checkpoint rule.
   - B and C change training pixels, so any run using them is a separate,
     disclosed preprocessing condition.
+- 2026-09-30 — Hosts reshuffled (human-approved).
+  - Stage 1 v2 stopped (Hamster GPU0) and marked ABANDONED. It was slowed
+    by CPU contention with the option-C dataset build. It will be replaced
+    by a reviewed faster-loader variant, to run on Ferret, which has twice
+    Hamster's CPU threads (104 vs 52), with the same CPU model.
+  - Ferret GPU0 queue stopped. The running DeiT-Tiny IN-100
+    `random-lr5em4-v1` continues to completion.
+  - The three remaining DeiT-Tiny IN-100 pretrained items (lr 6.25e-5,
+    1.25e-4, 2.5e-4) were moved to Hamster GPU0. They run from the same
+    worktree source-5a5dcbaabf0f, keep the same run ids, and go to W&B
+    project `lightweight-imagenet-at-dev`.
