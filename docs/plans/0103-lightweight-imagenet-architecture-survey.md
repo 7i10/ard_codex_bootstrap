@@ -2035,3 +2035,87 @@ history behind this pivot.)
   - Launched `plan0103-mnv4s-twostage-stage1-112-pgd1-s256-s0-v1`:
     Hamster GPU1, pinned worktree source-8333698a3de1, 16 workers,
     seed 0.
+- 2026-09-30 (postrun): **ImageNet-100 LR tuning, DeiT-Tiny AdamW
+  pretrained / lr 1.25e-4 completed.** `plan0103-in100-tune-deit-tiny-adamw-pretrained-lr1p25em4-v1`
+  (Hamster GPU0, RTX 4090) ran 50/50 epochs. `run-bundle/completion.json`
+  reads `completed`, the manifest status is `completed`, and
+  `run-bundle/error-marker.txt` reads "no application error recorded". The
+  watcher re-derived it as terminal and successful. All 50 epoch rows are
+  present (`epoch_metrics_complete: true`). `train.log` has no traceback,
+  NaN or error line (only the wandb git-root warning). `best.pt`, `last.pt`
+  and `epoch-049.pt` are on disk. Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract, as for the
+  other plan 0103/0104 hand-runs. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest summary.
+
+  Fixed identity: identical to the lr 6.25e-5 cell above except the peak
+  LR. ImageNet-100 proxy (100 classes, pinned train/val hashes), DeiT-Tiny
+  (`deit_tiny_imagenet`, `imagenet_standard` profile), ImageNet-1k
+  pretrained init (`pretrained: true`, head re-initialised to 100 classes),
+  plain PGD-AT, no teacher. Training and evaluation-attack seed 0 (split
+  seed 20260911). Training attack: CE PGD-3, l_inf eps 4/255, step 8/765,
+  random start. Selection and validation attack: PGD-10, same eps, eval
+  mode. AdamW (betas 0.9/0.999), peak LR 1.25e-4, wd 0.05, warmup_multistep
+  (10-epoch warmup, x0.1 at epochs 25 and 38), 50 epochs. World size 1,
+  global batch 128. Non-deterministic with cuDNN autotuning, not compiled,
+  step_diagnostics off, fp32. Protocol `controlled_imagenet100_proxy_lr_v1`,
+  config `imagenet100_deit_tiny_adamw_pretrained_lr1p25em4.yaml`, config
+  hash `54b304cf...`. Source SHA `5a5dcbaabf0fed62a0c97dc239f11c1365352b6d`
+  (worktree `source-5a5dcbaabf0f`, clean). "val" is internal validation
+  (2,564 held-out training images), "probe" is 2,000 training images, both
+  in eval mode with PGD-10. No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 1.52 / 0.78 | 1.80 / 1.00 | 4.714 |
+  | 1 | warmup | 5.77 / 4.52 | 5.40 / 4.25 | 4.517 |
+  | 4 | warmup | 59.32 / 33.81 | 61.25 / 35.95 | 3.196 |
+  | 9 | end of warmup | 75.62 / 48.05 | 79.60 / 53.00 | 2.252 |
+  | 24 | end of lr 1.25e-4 | 81.32 / 54.06 | 88.80 / 67.45 | 1.742 |
+  | 25 | first epoch at lr 1.25e-5 | 82.64 / 57.33 | 90.15 / 72.00 | 1.570 |
+  | 29 | best (by val PGD-10) | 83.07 / 57.96 | 91.20 / 72.80 | 1.486 |
+  | 37 | end of lr 1.25e-5 | 83.62 / 57.61 | 92.15 / 73.70 | 1.437 |
+  | 38 | first epoch at lr 1.25e-6 | 83.78 / 57.18 | 92.25 / 74.20 | 1.420 |
+  | 49 | last | 83.81 / 57.45 | 92.25 / 74.90 | 1.397 |
+
+  Reading (n=1, second of three DeiT-Tiny pretrained LR cells, internal
+  validation, PGD-10 only):
+  1. **The run trains normally.** No instability at the end. Val clean
+     ends at 83.8% on 100 classes (chance 1%).
+  2. **The early dip still reaches near chance, but recovery is faster.**
+     Val clean is 1.52% after epoch 0 (LR 1.25e-5) and train loss 4.71,
+     still above ln(100) = 4.61. After epoch 1 val clean is 5.77% (6.25e-5
+     cell: 1.72%), at epoch 4 59.3% (24.8%), at the end of warmup 75.6%
+     (71.6%). So doubling the LR did not make the first-epoch dip
+     shallower, but it shortened it. No pre-training val point is logged.
+  3. **The peak-LR stage is still rising slowly at its end.** Val PGD-10
+     moved from 52.81% (ep 19) to 54.06% (ep 24), +1.25pt over five epochs,
+     about one val SE (6.25e-5 cell: +0.78pt). The first decay then gave
+     +3.28pt PGD-10 and +1.33pt clean in one epoch (6.25e-5: +1.91 / +1.29).
+  4. **The two low-LR stages are flat.** Val PGD-10 stays within
+     56.71-57.96% over epochs 25-37 and 57.18-57.64% over epochs 38-49,
+     inside the val SE (~1.0pt PGD-10, ~0.75pt clean).
+  5. **Best and last are within noise.** Best minus last is 0.51pt PGD-10
+     (`robust_overfit_gap`), under one val SE. The best epoch (29) lies in
+     the flat middle stage.
+  6. **Against lr 6.25e-5.** Best vs best: +0.70pt clean, +1.45pt PGD-10.
+     Last vs last: +1.17 / +1.52. The SE of a difference between two
+     unpaired cells is about 1.4pt PGD-10 and 1.05pt clean, so this is about
+     one SE on PGD-10, one seed each. Direction favours 1.25e-4; size is at
+     noise level.
+  7. **The seen-unseen gap grows with LR.** At the last epoch, probe minus
+     val is +8.4 clean and +17.5 PGD-10 (6.25e-5: +5.7 / +12.0). The same
+     direction was seen in MobileViT-S (1.25e-4: +4.5 / +10.1), and the
+     DeiT-Tiny gap is larger at both LRs.
+  8. **No grid verdict yet.** Argmax so far is 1.25e-4 (grid middle). The
+     2.5e-4 cell decides the DeiT-Tiny pretrained argmax. Pretrained vs
+     random for DeiT-Tiny still waits for the recorded random-init grid.
+
+  Caveats: one seed. Non-deterministic mode, so a rerun would not be
+  bit-identical. ImageNet-100 numbers are not comparable to the ImageNet-1k
+  Phase 1 runs. Cost: wall clock 3.5 h (2026-09-29 20:38 to 2026-09-30
+  00:07 UTC), 549 img/s at epoch 0 and 556 img/s at the last epoch, peak
+  allocated memory 4.6 GB. Checkpoint sha256 was not computed in this
+  postrun. `epoch-metrics.parquet` sha256 `24e26827...`,
+  `sample-stats-train.parquet` sha256 `53060009...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at-dev`, same run id.
