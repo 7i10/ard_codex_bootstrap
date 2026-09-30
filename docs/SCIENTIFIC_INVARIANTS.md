@@ -168,6 +168,11 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   manifest digest) when set; the derived root's own digest is its `content_sha256`, and a derived root cannot be
   loaded without declaring it. `training.jpeg_draft_decode` is in the config hash and in
   `training_protocol_identity`. Both are recorded only when used, so runs with and without them never pool.
+- `training.cuda_graph` (plan 0105, default off) replays the PGD-AT training step as one CUDA graph. It is in the
+  config hash but not in `training_protocol_identity`, like `training.step_diagnostics`: the captured step is
+  bitwise identical to the eager step in deterministic mode (checkpoints, RNG streams, epoch rows, diagnostics),
+  a contract enforced by `tests/integration/test_cuda_graph_training_step.py`. It is refused outside the scope
+  where that is proven (single CUDA device, FP32, deterministic, method `pgd_at`, SGD, no teacher/EMA/policy).
 - Tiny-ImageNetのobserved split digestは、expected digestなしなら`computed`、configのexpected digestと一致したら
   `computed-and-matched`。training configだけから作るidentityの`expected-unverified`は観測済みという意味ではない。
 - 集計ではevaluation/training dataset、student、method、training protocol、evaluation protocol、complete threat、

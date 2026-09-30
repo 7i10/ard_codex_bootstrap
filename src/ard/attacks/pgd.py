@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Final
 
 import torch
@@ -120,6 +121,16 @@ def _budget(value: torch.Tensor | None, scalar: float, *, batch: int, device: to
     return value
 
 
+@dataclass(frozen=True)
+class PGDTrajectory:
+    """Device-side output of ``LinfPGD.perturb`` (no host-derived fields)."""
+
+    adversarial: torch.Tensor
+    initial_delta: torch.Tensor
+    step_losses: tuple[torch.Tensor, ...]
+    captured_adversarial: torch.Tensor | None
+
+
 class LinfPGD(AttackGenerator):
     def __init__(self, config: AttackConfig) -> None:
         if config.norm != "linf" or config.input_domain != "pixel_0_1":
@@ -185,50 +196,47 @@ class LinfPGD(AttackGenerator):
         loss = F.kl_div(F.log_softmax(logits / temperature, dim=1), target, reduction="batchmean")
         return loss * (temperature * temperature) if self.config.temperature_squared else loss
 
-    def generate(self, request: AttackRequest) -> AttackResult:
-        _validate_pixels(request.inputs)
-        clean = request.inputs.detach().float()
+    def budgets(self, request: AttackRequest) -> tuple[torch.Tensor, torch.Tensor]:
+        """Per-sample ``[batch,1,1,1]`` FP32 epsilon and step-size tensors.
+
+        Without overrides this is two fill kernels and no host synchronization;
+        an override is validated on the host (one synchronization each).
+        """
+        batch, device = request.inputs.shape[0], request.inputs.device
         epsilon = self.config.epsilon_value
         step_size = self.config.step_size_value
         assert epsilon is not None and step_size is not None  # resolved by AttackConfig validation
-        epsilon_tensor = _budget(
-            request.epsilon_override,
-            epsilon,
-            batch=clean.shape[0],
-            device=clean.device,
-            name="epsilon",
-        )
-        step_tensor = _budget(
-            request.step_size_override,
-            step_size,
-            batch=clean.shape[0],
-            device=clean.device,
-            name="step_size",
-        )
-        if bool((step_tensor > epsilon_tensor).any()):
-            raise ValueError("per-sample PGD step size cannot exceed epsilon")
-        if request.capture_step is not None and not 1 <= request.capture_step < self.config.steps:
-            raise ValueError("captured PGD step must be a strict positive prefix of the configured trajectory")
-        delta = torch.zeros_like(clean)
-        if self.config.random_start and bool((epsilon_tensor > 0).any()):
-            if self.config.random_start_keying == "sample_keyed_v1":
-                if request.source_ids is None or request.epoch is None or request.attack_seed is None:
-                    raise ValueError("sample-keyed random starts require source_ids, epoch, and attack_seed")
-                delta = sample_keyed_random_start(
-                    clean,
-                    request.source_ids,
-                    attack_seed=request.attack_seed,
-                    epoch=request.epoch,
-                    stream_tag=request.stream_tag,
-                    restart_index=request.restart_index,
-                )
-            else:
-                delta.uniform_(-1.0, 1.0, generator=request.generator)
-            delta = delta * epsilon_tensor
+        epsilon_tensor = _budget(request.epsilon_override, epsilon, batch=batch, device=device, name="epsilon")
+        step_tensor = _budget(request.step_size_override, step_size, batch=batch, device=device, name="step_size")
+        return epsilon_tensor, step_tensor
+
+    def perturb(
+        self,
+        request: AttackRequest,
+        *,
+        epsilon: torch.Tensor,
+        step_size: torch.Tensor,
+        unit_noise: torch.Tensor | None,
+    ) -> PGDTrajectory:
+        """Synchronization-free PGD core shared by ``generate`` and the CUDA-graph step.
+
+        ``unit_noise`` is the raw ``U(-1, 1)`` random-start draw (``None``: no
+        random start). It is scaled by ``epsilon`` and clamped to the pixel box
+        here, exactly as ``generate`` always did. No host validation happens
+        here and no tensor is read back to the host (except the debug-only
+        ``trace_step_losses``, which returns device tensors for the caller to
+        read), so the call can be captured in a CUDA graph. ``generate`` is the
+        validating wrapper; call this directly only after the same checks.
+        """
+        clean = request.inputs.detach().float()
+        if unit_noise is None:
+            delta = torch.zeros_like(clean)
+        else:
+            delta = unit_noise * epsilon
             delta = (clean + delta).clamp(0, 1) - clean
         initial_delta = delta.detach().clone()
         adversarial = (clean + delta).detach()
-        losses: list[float] | None = [] if self.config.trace_step_losses else None
+        losses: list[torch.Tensor] | None = [] if self.config.trace_step_losses else None
         captured = None
         with _temporary_modes(
             request.student,
@@ -244,19 +252,52 @@ class LinfPGD(AttackGenerator):
                     loss = self._loss(logits.float(), request.labels, target_logits, target_probabilities)
                 gradient = torch.autograd.grad(loss, adversarial, only_inputs=True)[0]
                 if losses is not None:
-                    losses.append(float(loss.detach().cpu()))
-                adversarial = adversarial.detach() + step_tensor * gradient.detach().sign()
-                delta = torch.maximum(torch.minimum(adversarial - clean, epsilon_tensor), -epsilon_tensor)
+                    losses.append(loss.detach())
+                adversarial = adversarial.detach() + step_size * gradient.detach().sign()
+                delta = torch.maximum(torch.minimum(adversarial - clean, epsilon), -epsilon)
                 adversarial = (clean + delta).clamp(0, 1).detach()
                 if step == request.capture_step:
                     captured = adversarial.clone()
-        final_delta = adversarial - clean
-        return AttackResult(
+        return PGDTrajectory(
             adversarial=adversarial,
             initial_delta=initial_delta,
             step_losses=() if losses is None else tuple(losses),
-            max_abs_delta=float(final_delta.detach().abs().amax().cpu()),
             captured_adversarial=captured,
+        )
+
+    def generate(self, request: AttackRequest) -> AttackResult:
+        _validate_pixels(request.inputs)
+        clean = request.inputs.detach().float()
+        epsilon_tensor, step_tensor = self.budgets(request)
+        if bool((step_tensor > epsilon_tensor).any()):
+            raise ValueError("per-sample PGD step size cannot exceed epsilon")
+        if request.capture_step is not None and not 1 <= request.capture_step < self.config.steps:
+            raise ValueError("captured PGD step must be a strict positive prefix of the configured trajectory")
+        unit_noise = None
+        if self.config.random_start and bool((epsilon_tensor > 0).any()):
+            if self.config.random_start_keying == "sample_keyed_v1":
+                if request.source_ids is None or request.epoch is None or request.attack_seed is None:
+                    raise ValueError("sample-keyed random starts require source_ids, epoch, and attack_seed")
+                unit_noise = sample_keyed_random_start(
+                    clean,
+                    request.source_ids,
+                    attack_seed=request.attack_seed,
+                    epoch=request.epoch,
+                    stream_tag=request.stream_tag,
+                    restart_index=request.restart_index,
+                )
+            else:
+                unit_noise = torch.zeros_like(clean)
+                unit_noise.uniform_(-1.0, 1.0, generator=request.generator)
+        trajectory = self.perturb(request, epsilon=epsilon_tensor, step_size=step_tensor, unit_noise=unit_noise)
+        adversarial = trajectory.adversarial
+        final_delta = adversarial - clean
+        return AttackResult(
+            adversarial=adversarial,
+            initial_delta=trajectory.initial_delta,
+            step_losses=tuple(float(loss.cpu()) for loss in trajectory.step_losses),
+            max_abs_delta=float(final_delta.detach().abs().amax().cpu()),
+            captured_adversarial=trajectory.captured_adversarial,
         )
 
 

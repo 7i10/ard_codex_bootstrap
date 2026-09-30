@@ -1100,6 +1100,22 @@ class TrainingConfig(StrictModel):
     # hash and training_protocol_identity). Validation / probe / evaluation
     # views are unchanged. ImageNet only. Serialized only when true.
     jpeg_draft_decode: bool = Field(default=False, exclude_if=lambda value: value is False)
+    # Plan 0105 throughput option (human-approved 2026-09-30). Captures the
+    # full PGD-AT training step (attack, forward, loss, backward, SGD update,
+    # epoch accumulators) in one CUDA graph and replays it per full batch.
+    # Bitwise identical to the eager step by contract, so it is allowed only
+    # where that contract is proven: one CUDA device, FP32, deterministic,
+    # step_diagnostics=false (tracking diagnostics are supported), eager
+    # student, method pgd_at with a batch-keyed random start and a fixed
+    # budget, SGD, no teacher/EMA/policy/intervention (see
+    # ExperimentConfig._validate_cuda_graph). The
+    # first full batch of every epoch and the last partial batch run
+    # eagerly; the graph is re-captured every epoch (the scheduler changes
+    # the learning rate only at epoch ends) and a guard refuses to replay
+    # if any optimizer hyperparameter or state tensor changed since
+    # capture. Serialized only when true, so every existing config keeps a
+    # byte-identical resolved config and config hash.
+    cuda_graph: bool = Field(default=False, exclude_if=lambda value: value is False)
 
     @model_validator(mode="after")
     def validate_batch_identity(self) -> TrainingConfig:
@@ -1120,6 +1136,25 @@ class TrainingConfig(StrictModel):
                 "training.compile=true requires training.deterministic=false: bitwise reproducibility of "
                 "torch.compile/inductor kernels is not established"
             )
+        if self.cuda_graph:
+            # (condition that must hold, why) -- every entry fails closed.
+            requirements = (
+                (self.device == "cuda", "training.device=cuda (graphs exist only on CUDA; 'auto' is not enough)"),
+                (self.deterministic, "training.deterministic=true (the bitwise eager-parity contract)"),
+                (not self.amp, "training.amp=false (a GradScaler step syncs and is not captured)"),
+                (not self.compile, "training.compile=false"),
+                (not self.cudnn_benchmark, "training.cudnn_benchmark=false"),
+                (not self.step_diagnostics, "training.step_diagnostics=false"),
+                (
+                    self.global_batch_size == self.per_rank_batch_size,
+                    "global_batch_size == per_rank_batch_size (world size 1; DDP is not captured)",
+                ),
+                (self.epsilon_warmup_epochs is None, "training.epsilon_warmup_epochs unset (per-epoch attack budget)"),
+                (self.weight_ema_decay is None, "training.weight_ema_decay unset (no EMA model)"),
+            )
+            missing = [reason for holds, reason in requirements if not holds]
+            if missing:
+                raise ValueError("training.cuda_graph=true requires " + "; ".join(missing))
         return self
 
 
@@ -1127,7 +1162,8 @@ def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None
     """Refuse a config whose throughput options a runtime does not implement.
 
     Only ``ard.cli.train`` applies ``training.compile``,
-    ``training.cudnn_benchmark`` and ``training.step_diagnostics=false``.
+    ``training.cudnn_benchmark``, ``training.cuda_graph`` and
+    ``training.step_diagnostics=false``.
     Every other Trainer builder would silently run eagerly without
     autotuning, with the diagnostic forwards, while the config says
     otherwise, so it must call this first.
@@ -1143,6 +1179,8 @@ def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None
         unsupported.append(("init_checkpoint", "<set>", "null"))
     if training.jpeg_draft_decode:
         unsupported.append(("jpeg_draft_decode", "true", "false"))
+    if training.cuda_graph:
+        unsupported.append(("cuda_graph", "true", "false"))
     if unsupported:
         requested = ", ".join(f"training.{name}={value}" for name, value, _ in unsupported)
         remediation = ", ".join(f"training.{name}={value}" for name, _, value in unsupported)
@@ -1882,8 +1920,43 @@ class ExperimentConfig(StrictModel):
             expected_profile = "imagenet_raw_identity"
         if self.student.normalization.profile != expected_profile:
             raise ValueError(f"dataset {self.dataset.name} requires student normalization profile {expected_profile}")
+        self._validate_cuda_graph()
         self._validate_protocol_contract()
         return self
+
+    def _validate_cuda_graph(self) -> None:
+        """``training.cuda_graph`` scope: only the step whose eager parity is proven (plan 0105)."""
+        if not self.training.cuda_graph:
+            return
+        attack = self.method.attack
+        requirements = (
+            (self.method.id == "pgd_at", "method.id=pgd_at"),
+            (self.teacher is None, "no teacher"),
+            (self.method.adr is None, "no method.adr"),
+            (self.method.target_policy is None, "no method.target_policy"),
+            (not self.method.oracle_mask, "method.oracle_mask=false"),
+            (self.intervention is None, "no intervention"),
+            (self.prescriptive_v3 is None, "no prescriptive_v3"),
+            (self.observation.profile == "off", "observation.profile=off"),
+            (self.optimizer.id == "sgd", "optimizer.id=sgd (AdamW keeps a host step counter)"),
+            (attack is not None and attack.loss == "ce", "a CE training attack"),
+            (
+                attack is not None and attack.random_start_keying == "batch",
+                "method.attack.random_start_keying=batch (sample-keyed starts are drawn on the host)",
+            ),
+            (attack is not None and not attack.trace_step_losses, "method.attack.trace_step_losses=false"),
+            (
+                attack is not None
+                and attack.epsilon_value is not None
+                and attack.step_size_value is not None
+                and (not attack.random_start or attack.epsilon_value > 0)
+                and attack.step_size_value <= attack.epsilon_value,
+                "a fixed training budget with 0 < epsilon (under a random start) and step_size <= epsilon",
+            ),
+        )
+        missing = [reason for holds, reason in requirements if not holds]
+        if missing:
+            raise ValueError("training.cuda_graph=true requires " + "; ".join(missing))
 
     def _validate_protocol_contract(self) -> None:
         """Fail closed for the runnable, versioned protocol identities."""

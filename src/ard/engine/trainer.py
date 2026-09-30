@@ -16,10 +16,10 @@ from torch import nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
-from ard.attacks import AttackGenerator, AttackRequest
+from ard.attacks import AttackGenerator, AttackRequest, LinfPGD
 from ard.config.schema import AdrConfig
 from ard.data import IndexedBatch
-from ard.objectives import DistillationObjective, ObjectiveTerms
+from ard.objectives import DistillationObjective, ObjectiveTerms, PGDATObjective
 from ard.objectives.adr import rectify_label
 from ard.policies import (
     FixedInterventionMask,
@@ -43,6 +43,7 @@ from ard.targets import AnchoredTeacherTargetPolicy, TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 
 from .checkpoint import TrainingState, capture_rng_state, load_checkpoint, restore_rng_state, save_checkpoint
+from .cuda_graph import CudaGraphStepState, DeferredDiagnostics, momentum_buffers_ready, optimizer_fingerprint
 from .distributed import (
     gather_objects,
     get_rank,
@@ -260,6 +261,7 @@ class Trainer:
         observation_profile: str = "off",
         checkpoint_epochs: tuple[int, ...] = (),
         step_diagnostics: bool = True,
+        cuda_graph: bool = False,
         validation_image_size: int | None = None,
         validation_dataset_derivation: Mapping[str, Any] | None = None,
     ) -> None:
@@ -611,6 +613,87 @@ class Trainer:
         self._teacher_adversarial_logits: torch.Tensor | None = None
         self._teacher_adversarial_forward_calls = 0.0
         self._boundary_epoch_stats: dict[str, float] = {}
+        # Plan 0105 (training.cuda_graph): see ard.engine.cuda_graph.
+        self._cuda_graph: CudaGraphStepState | None = None
+        if cuda_graph:
+            self._validate_cuda_graph_scope()
+            self._cuda_graph = CudaGraphStepState(device=self.device)
+
+    def _validate_cuda_graph_scope(self) -> None:
+        """Refuse every Trainer feature the captured PGD-AT step does not transcribe.
+
+        Mirrors ``ExperimentConfig._validate_cuda_graph`` for direct Trainer
+        construction; the graph body in ``_cuda_graph_body`` implements
+        exactly the eager step that remains when all of these are off.
+        """
+        attack = self.attack
+        attack_config = getattr(attack, "config", None)
+        unwrapped = unwrap_model(self.model)
+        requirements = (
+            (self.device.type == "cuda", "a CUDA device"),
+            (get_world_size() == 1, "world size 1"),
+            (torch.are_deterministic_algorithms_enabled(), "torch deterministic algorithms enabled"),
+            (not torch.backends.cudnn.benchmark, "cuDNN benchmark off"),
+            (self.scaler is None, "no AMP GradScaler"),
+            (not self.step_diagnostics, "step_diagnostics=False"),
+            (type(self.optimizer) is torch.optim.SGD, "a torch.optim.SGD optimizer"),
+            (unwrapped is self.model, "an unwrapped (not DDP or compiled) student"),
+            (type(self.objective) is PGDATObjective, "the PGD-AT objective"),
+            (isinstance(attack, LinfPGD) and attack_config is not None, "a LinfPGD training attack"),
+            (
+                attack_config is not None
+                and attack_config.loss == "ce"
+                and attack_config.random_start_keying == "batch"
+                and not attack_config.trace_step_losses
+                and attack_config.epsilon_value is not None
+                and attack_config.step_size_value is not None
+                and (not attack_config.random_start or attack_config.epsilon_value > 0)
+                and attack_config.step_size_value <= attack_config.epsilon_value,
+                "a CE, batch-keyed, untraced attack with a fixed budget, 0 < epsilon and step <= epsilon",
+            ),
+            (self.teacher is None, "no teacher"),
+            (self.ema_model is None, "no EMA model"),
+            (self.adr_config is None, "no ADR"),
+            (self.policy is None and self.sample_store is None, "no policy or sample state"),
+            (self.observation_profile == "off", "observation_profile=off"),
+            (self.target_policy is None and self.intervention_mask is None, "no target policy or intervention"),
+            (self.anchor_model is None and self.prescriptive_v3_route is None, "no prescriptive route"),
+            (
+                self.dynamic_s3_router is None and self.online_state_s2_router is None,
+                "no dynamic S3 / online S2 router",
+            ),
+            (self.frozen_risk_lookup is None and not self.oracle_mask, "no frozen oracle or oracle mask"),
+            (
+                self.epsilon_warmup_epochs is None
+                and self.selected_attack_epsilon is None
+                and self.selected_attack_step_size is None,
+                "no epsilon warmup or per-sample attack budget",
+            ),
+            (
+                all(
+                    value is None
+                    for value in (
+                        self.adversarial_kd_multiplier,
+                        self.adversarial_ce_coefficient,
+                        self.clean_ce_coefficient,
+                        self.clean_wrong_mode,
+                        self.extra_clean_ce_coefficient,
+                        self.adversarial_bce_coefficient,
+                        self.adaptive_advkd_gamma,
+                        self.margin_coefficient,
+                        self.margin_target_mode,
+                        self.teacher_clean_reliability_mask,
+                        self.boundary_intervention,
+                    )
+                )
+                and not self.clean_wrong_attack_skip
+                and not self.iad_inspired,
+                "no registered treatment",
+            ),
+        )
+        missing = [reason for holds, reason in requirements if not holds]
+        if missing:
+            raise ValueError("cuda_graph requires " + "; ".join(missing))
 
     @staticmethod
     def _dynamic_pair_margins(
@@ -1122,6 +1205,219 @@ class Trainer:
             joint_risk=joint_risk.to(device=logits.device, dtype=logits.dtype),
         )
 
+    def _record_diagnostic_rows(
+        self,
+        *,
+        sample_ids: list[int],
+        valid: list[bool],
+        labels: list[int],
+        clean_predictions: list[int],
+        adversarial_predictions: list[int],
+        teacher_predictions: list[int] | None,
+        teacher_entropies: list[float] | None,
+        prior_margins: list[float] | None,
+        joint_risks: list[float] | None,
+        kd_weights: list[float] | None,
+        panel_media: Mapping[int, tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]],
+        attacked: bool,
+    ) -> None:
+        """Record one step's per-sample diagnostic rows (host lists, no device reads)."""
+        assert self.diagnostics is not None
+        sample_store = self.sample_store
+        for position, sample_id in enumerate(sample_ids):
+            media = panel_media.get(position)
+            has_prior = prior_margins is not None and sample_store is not None and sample_id in sample_store.records
+            prior_value = None
+            unlearnability = None
+            if has_prior:
+                assert prior_margins is not None
+                prior_value = prior_margins[position]
+                unlearnability = (1 - prior_value) / 2
+            self.diagnostics.record(
+                sample_id=sample_id,
+                valid=valid[position],
+                epoch=self.current_epoch,
+                clean_image=None if media is None else media[0],
+                adversarial_image=None if media is None else media[1],
+                perturbation_visualization=None if media is None else media[2],
+                true_label=labels[position],
+                student_clean_prediction=clean_predictions[position],
+                student_adv_prediction=adversarial_predictions[position] if attacked else None,
+                teacher_prediction=None if teacher_predictions is None else teacher_predictions[position],
+                teacher_entropy=None if teacher_entropies is None else teacher_entropies[position],
+                student_robust_margin_ema=prior_value,
+                student_unlearnability=unlearnability,
+                joint_risk=None if joint_risks is None else joint_risks[position],
+                kd_weight=0.0 if kd_weights is None else kd_weights[position],
+                clean_correct=clean_predictions[position] == labels[position],
+                robust_correct=(adversarial_predictions[position] == labels[position]) if attacked else None,
+            )
+
+    def _cuda_graph_body(self) -> None:
+        """One PGD-AT training step on the static buffers; captured once, then replayed.
+
+        A transcription of ``train_epoch``'s eager step for exactly the scope
+        ``_validate_cuda_graph_scope`` admits (single rank; no teacher, EMA,
+        policy, sample state, treatment, AMP or step diagnostics), with the
+        same calls in the same order. The attack runs ``LinfPGD.perturb``, the
+        same core ``LinfPGD.generate`` runs, on the random start the host drew
+        into ``state.noise`` from the same per-step generator. Host-side checks
+        (pixel range, budget) run outside the graph, in
+        ``_cuda_graph_train_step`` and at scope validation. Equality with the
+        eager step is a tested contract
+        (tests/integration/test_cuda_graph_training_step.py), not an assumption.
+        """
+        state = self._cuda_graph
+        assert state is not None and isinstance(self.attack, LinfPGD)
+        assert state.images is not None and state.labels is not None and state.valid is not None
+        assert state.totals is not None
+        self.optimizer.zero_grad(set_to_none=True)
+        mask = state.valid.to(dtype=torch.float32)
+        request = AttackRequest(inputs=state.images, labels=state.labels, student=self.model)
+        epsilon, step_size = self.attack.budgets(request)
+        adversarial = self.attack.perturb(
+            request,
+            epsilon=epsilon,
+            step_size=step_size,
+            unit_noise=state.noise if self.attack.config.random_start else None,
+        ).adversarial
+        logits = self.model(adversarial)
+        terms = self.objective(student_logits=logits, labels=state.labels)
+        if self.diagnostics is not None:
+            # Same pre-update, post-train-forward, eval-mode clean forward as
+            # the eager diagnostics block; its outputs are read after replay.
+            with suspend_ddp_buffer_broadcasts(self.model), _evaluation_mode(self.model), torch.no_grad():
+                diagnostic_clean = self.model(state.images).detach()
+            state.outputs = {
+                "adversarial": adversarial,
+                "clean_predictions": diagnostic_clean.argmax(1),
+                "adversarial_predictions": logits.detach().argmax(1),
+            }
+        global_count = reduce_sums(mask.detach().sum().to(dtype=torch.float64)).clamp_min(1.0)
+        loss = (terms.total * mask).sum() * (get_world_size() / global_count.to(dtype=terms.total.dtype))
+        _assert_finite_training_loss(loss)
+        loss.backward()
+        self.optimizer.step()
+        state.totals += _float64_totals(
+            [
+                (terms.total.detach() * mask).sum(),
+                0.0,
+                ((logits.detach().argmax(1) == state.labels).to(mask.dtype) * mask).sum(),
+                mask.sum(),
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ],
+            device=self.device,
+        )
+
+    def _cuda_graph_train_step(self, batch: IndexedBatch) -> bool:
+        """Run ``batch`` (still on the host) through the captured step; False: run it eagerly."""
+        state = self._cuda_graph
+        assert state is not None
+        if not state.matches(batch.images, batch.labels):
+            return False
+        if state.graph is None and (state.eager_steps_this_epoch == 0 or not momentum_buffers_ready(self.optimizer)):
+            return False
+        assert state.images is not None and state.labels is not None and state.valid is not None
+        assert state.noise is not None
+        state.images.copy_(batch.images, non_blocking=True)
+        state.labels.copy_(batch.labels, non_blocking=True)
+        if batch.state_update_mask is None:
+            state.valid.fill_(True)
+        else:
+            state.valid.copy_(batch.state_update_mask, non_blocking=True)
+        # LinfPGD.generate's pixel-domain check (_validate_pixels: every value
+        # in [0, 1], same NaN semantics; the floating-point half was checked by
+        # ``matches``) on the exact buffer the graph reads, as a device-side
+        # assert instead of a host read. A violation kills the CUDA context
+        # before this step's update can reach a checkpoint.
+        out_of_range = (state.images.amin() < 0) | (state.images.amax() > 1)
+        torch._assert_async(torch.logical_not(out_of_range), "attack inputs must lie in pixel domain [0, 1]")
+        # The eager attack draws this with ``zeros_like(clean).uniform_`` from
+        # the same freshly seeded generator; the graph reads the buffer.
+        state.noise.uniform_(-1.0, 1.0, generator=self._attack_generator())
+        if state.graph is None:
+            graph = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(graph, capture_error_mode="thread_local"):
+                self._cuda_graph_body()
+            state.graph = graph
+            state.fingerprint = optimizer_fingerprint(self.optimizer, self.model)
+            state.captures += 1
+        state.check_replayable(self.optimizer, self.model)
+        state.graph.replay()
+        state.replays_this_epoch += 1
+        if self.diagnostics is not None:
+            valid = (
+                [True] * batch.labels.shape[0]
+                if batch.state_update_mask is None
+                else batch.state_update_mask.to(dtype=torch.float32).to(dtype=torch.bool).tolist()
+            )
+            sample_ids = batch.sample_ids.tolist()
+            panel_positions = (
+                [position for position, sample_id in enumerate(sample_ids) if sample_id in self.diagnostics.panel_ids]
+                if self.diagnostics.mode == "panel"
+                else []
+            )
+            panel_clean = panel_adversarial = None
+            if panel_positions:
+                positions = torch.tensor(panel_positions, device=self.device)
+                panel_clean = state.images.index_select(0, positions)
+                panel_adversarial = state.outputs["adversarial"].index_select(0, positions)
+            state.deferred.append(
+                DeferredDiagnostics(
+                    sample_ids=sample_ids,
+                    valid=valid,
+                    labels=batch.labels.tolist(),
+                    clean_predictions=state.outputs["clean_predictions"].clone(),
+                    adversarial_predictions=state.outputs["adversarial_predictions"].clone(),
+                    panel_positions=panel_positions,
+                    panel_clean_images=panel_clean,
+                    panel_adversarial_images=panel_adversarial,
+                )
+            )
+        self.global_step += 1
+        return True
+
+    def _flush_cuda_graph_diagnostics(self) -> None:
+        """Record the replayed steps' diagnostic rows, in step order, with one device read."""
+        state = self._cuda_graph
+        if state is None or not state.deferred:
+            return
+        deferred, state.deferred = state.deferred, []
+        clean = torch.cat([entry.clean_predictions for entry in deferred]).cpu().tolist()
+        adversarial = torch.cat([entry.adversarial_predictions for entry in deferred]).cpu().tolist()
+        offset = 0
+        for entry in deferred:
+            size = len(entry.sample_ids)
+            panel_media: dict[int, tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]] = {}
+            if entry.panel_positions:
+                assert entry.panel_clean_images is not None and entry.panel_adversarial_images is not None
+                clean_images = entry.panel_clean_images.detach().cpu()
+                adversarial_images = entry.panel_adversarial_images.detach().cpu()
+                perturbations = (adversarial_images - clean_images).detach()
+                panel_media = {
+                    position: (clean_images[index], adversarial_images[index], perturbations[index])
+                    for index, position in enumerate(entry.panel_positions)
+                }
+            self._record_diagnostic_rows(
+                sample_ids=entry.sample_ids,
+                valid=entry.valid,
+                labels=entry.labels,
+                clean_predictions=clean[offset : offset + size],
+                adversarial_predictions=adversarial[offset : offset + size],
+                teacher_predictions=None,
+                teacher_entropies=None,
+                prior_margins=None,
+                joint_risks=None,
+                kd_weights=None,
+                panel_media=panel_media,
+                attacked=True,
+            )
+            offset += size
+
     def train_epoch(
         self,
         loader: DataLoader[IndexedBatch],
@@ -1164,7 +1460,14 @@ class Trainer:
         # "train_robust_accuracy" this project has always reported.
         # Observability only; does not change train_robust_accuracy's own
         # definition or value.
-        totals = torch.zeros(9, dtype=torch.float64, device=self.device)
+        # training.cuda_graph: one static accumulator that the captured step
+        # and the eager steps of the same epoch both add into, in step order.
+        graph_state = self._cuda_graph
+        totals = (
+            torch.zeros(9, dtype=torch.float64, device=self.device)
+            if graph_state is None
+            else graph_state.begin_epoch()
+        )
         # Plan 0101 (scientific review P2-1): the realized training-attack
         # budget, computed once per epoch (constant across its batches) so
         # a warmup-ramped epoch's train_robust_accuracy is not silently
@@ -1199,6 +1502,11 @@ class Trainer:
                 raise TypeError("trainer requires IndexedBatch batches")
             if on_batch_start is not None:
                 on_batch_start(batch_index, batch)
+            if graph_state is not None:
+                if self._cuda_graph_train_step(batch):
+                    continue
+                # Diagnostic rows keep step order across replayed and eager steps.
+                self._flush_cuda_graph_diagnostics()
             batch = batch.to(self.device, non_blocking=True)
             self._teacher_adversarial_logits = None
             self._teacher_adversarial_forward_calls = 0.0
@@ -1663,7 +1971,6 @@ class Trainer:
                     teacher_prediction = teacher_adversarial_logits.argmax(1)
                     teacher_entropy = shannon_entropy(teacher_adversarial_logits)
                 prior_margin = None if self.sample_store is None else self.sample_store.margin_ema(batch.sample_ids)
-                sample_store = self.sample_store
                 # Move scalar diagnostic fields in bounded batches.  This
                 # avoids a GPU synchronization for every individual sample.
                 sample_ids = batch.sample_ids.detach().cpu().tolist()
@@ -1710,36 +2017,20 @@ class Trainer:
                             position: (clean_images[index], None, None)
                             for index, position in enumerate(panel_positions)
                         }
-                for position, sample_id in enumerate(sample_ids):
-                    media = panel_media.get(position)
-                    has_prior = (
-                        prior_margins is not None and sample_store is not None and sample_id in sample_store.records
-                    )
-                    prior_value = None
-                    unlearnability = None
-                    if has_prior:
-                        assert prior_margins is not None
-                        prior_value = prior_margins[position]
-                        unlearnability = (1 - prior_value) / 2
-                    self.diagnostics.record(
-                        sample_id=sample_id,
-                        valid=valid[position],
-                        epoch=self.current_epoch,
-                        clean_image=None if media is None else media[0],
-                        adversarial_image=None if media is None else media[1],
-                        perturbation_visualization=None if media is None else media[2],
-                        true_label=labels[position],
-                        student_clean_prediction=clean_predictions[position],
-                        student_adv_prediction=adversarial_predictions[position] if attacked else None,
-                        teacher_prediction=None if teacher_predictions is None else teacher_predictions[position],
-                        teacher_entropy=None if teacher_entropies is None else teacher_entropies[position],
-                        student_robust_margin_ema=prior_value,
-                        student_unlearnability=unlearnability,
-                        joint_risk=None if joint_risks is None else joint_risks[position],
-                        kd_weight=0.0 if kd_weights is None else kd_weights[position],
-                        clean_correct=clean_predictions[position] == labels[position],
-                        robust_correct=(adversarial_predictions[position] == labels[position]) if attacked else None,
-                    )
+                self._record_diagnostic_rows(
+                    sample_ids=sample_ids,
+                    valid=valid,
+                    labels=labels,
+                    clean_predictions=clean_predictions,
+                    adversarial_predictions=adversarial_predictions,
+                    teacher_predictions=teacher_predictions,
+                    teacher_entropies=teacher_entropies,
+                    prior_margins=prior_margins,
+                    joint_risks=joint_risks,
+                    kd_weights=kd_weights,
+                    panel_media=panel_media,
+                    attacked=attacked,
+                )
                 self._teacher_adversarial_logits = None
             # DDP averages gradients across ranks.  Scale each local masked
             # sum by world_size/global-effective-count so padded ranks cannot
@@ -1813,6 +2104,16 @@ class Trainer:
                 device=self.device,
             )
             self.global_step += 1
+            if graph_state is not None:
+                graph_state.eager_steps_this_epoch += 1
+                # Release this eager step's autograd graph before the next
+                # capture. Its nodes keep every parameter's AccumulateGrad
+                # node (bound to the stream it was created on) alive, and a
+                # capture on the graph's side stream would then fail loudly
+                # (cudaErrorStreamCaptureImplicit). These are the only locals
+                # of the scope _validate_cuda_graph_scope admits that hold one.
+                del logits, terms, loss, objective_inputs
+        self._flush_cuda_graph_diagnostics()
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
             peak_allocated_bytes = torch.cuda.max_memory_allocated(self.device)
@@ -2175,6 +2476,9 @@ class Trainer:
             ema_model=self.ema_model,
         )
         self.global_step, self.best_metric = state.global_step, state.best_metric
+        if self._cuda_graph is not None:
+            # New optimizer state tensors: never replay a graph captured before the load.
+            self._cuda_graph.invalidate()
         if self.ema_model is not None:
             # Absent on a checkpoint written before this feature existed --
             # not a resume failure, EMA-best tracking simply restarts fresh

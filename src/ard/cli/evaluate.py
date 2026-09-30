@@ -306,7 +306,12 @@ def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
     # training.step_diagnostics is deliberately absent: like train_probe_size
     # it is observability-only and proven training-neutral (identical
     # checkpoints either way), so seeds of one arm that differ only in it
-    # must pool.
+    # must pool. training.cuda_graph is absent for the same reason (plan
+    # 0105): the captured step is bitwise identical to the eager step --
+    # checkpoints, RNG streams, epoch rows and diagnostics, across epochs, an
+    # LR milestone, a partial batch and a resume -- which
+    # tests/integration/test_cuda_graph_training_step.py enforces. It stays
+    # in the resolved config and config hash.
     return identity
 
 
