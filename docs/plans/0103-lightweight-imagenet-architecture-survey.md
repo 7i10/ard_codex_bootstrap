@@ -2236,3 +2236,8 @@ history behind this pivot.)
   - A prototype on Ferret showed the graphed step is bitwise identical
     to the eager trainer step in deterministic mode, and about 7x faster
     at 112 px, batch 128.
+- 2026-09-30 — MobileNetV4-M grid cell
+  `plan0103-phase1-mobilenetv4-conv-medium-random-lr00125-v1` launched on
+  Hamster GPU0: worktree source-b87f13962747, 16 workers, seed 0.
+  Remaining: pretrained 0.005 and 0.05, to go on Ferret GPU1 after
+  EfficientNet-B0.
