@@ -40,6 +40,7 @@ from torch.utils.data import DataLoader
 
 import ard.engine.trainer as trainer_module
 from ard.attacks import AttackRequest, LinfPGD
+from ard.cli.train import _seed_everything
 from ard.config.schema import CUDA_GRAPH_ARCHITECTURES, AttackConfig, ModelConfig, NormalizationConfig
 from ard.data import EpochShuffleSampler, IndexedDataset, SyntheticCIFAR, collate_indexed
 from ard.engine.trainer import Trainer
@@ -114,7 +115,9 @@ def _loaders(num_classes: int, image_size: int, *, pin_memory: bool) -> tuple[Da
 def build_trainer(
     output: Path, *, kind: str, cuda_graph: bool, device: torch.device, diagnostics: str = "panel"
 ) -> tuple[Trainer, Any]:
-    torch.manual_seed(1234)
+    # Every RNG stream a checkpoint records (Python, NumPy, torch CPU/CUDA), seeded as ard.cli.train
+    # does: each arm runs in a fresh process, so an unseeded stream would differ between arms.
+    _seed_everything(1234)
     student, num_classes, image_size = _student(kind)
     student = student.to(device)
     optimizer = SGD(student.parameters(), lr=0.05, momentum=0.9, weight_decay=5e-4, nesterov=True)

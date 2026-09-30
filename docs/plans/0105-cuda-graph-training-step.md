@@ -124,3 +124,11 @@ It must refuse every configuration where that is not proven.
   control, dropout RNG check), exact `LinfPGD` type, contiguity check, audit columns and the no-replay
   failure, strict determinism, git-pinned config test and golden attack digests, runbook. The widened
   GPU tests still have to run on a free GPU.
+- 2026-09-30: first GPU run of the widened test failed on the checkpointed `rng` entry only (model,
+  optimizer, rows identical). Cause: the test harness, not the graph path. The `rng` entry holds the
+  Python and NumPy streams as well as torch CPU/CUDA; the test seeded only torch, and each arm now runs
+  in its own process, so the unseeded Python/NumPy states differed between arms (they differed between
+  two eager processes too). torch CPU and CUDA RNG states were identical in every arm, with and without
+  the probe pass. The earlier same-process test passed because both arms shared the one unseeded state,
+  which training never draws from. Fix: the test seeds every stream as `ard.cli.train` does
+  (`_seed_everything`); the comparison is unchanged.
