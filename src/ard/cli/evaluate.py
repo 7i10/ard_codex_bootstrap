@@ -307,11 +307,15 @@ def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
     # it is observability-only and proven training-neutral (identical
     # checkpoints either way), so seeds of one arm that differ only in it
     # must pool. training.cuda_graph is absent for the same reason (plan
-    # 0105): the captured step is bitwise identical to the eager step --
-    # checkpoints, RNG streams, epoch rows and diagnostics, across epochs, an
-    # LR milestone, a partial batch and a resume -- which
-    # tests/integration/test_cuda_graph_training_step.py enforces. It stays
-    # in the resolved config and config hash.
+    # 0105), and ONLY because config validation restricts it to the scope
+    # where tests/integration/test_cuda_graph_training_step.py proves the
+    # captured step bitwise identical to the eager step (checkpoints, RNG
+    # streams, epoch rows, diagnostics; LR milestone, partial batch, probe
+    # pass, resume): the allowlisted architectures
+    # (CUDA_GRAPH_ARCHITECTURES), an eval-mode training attack, deterministic
+    # mode, torch 2.11 on an RTX 4090. Widening that scope, or a torch/driver
+    # upgrade, requires rerunning the parity test first. It stays in the
+    # resolved config and config hash.
     return identity
 
 

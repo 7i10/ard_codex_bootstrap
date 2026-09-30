@@ -30,6 +30,10 @@ import torch
 from torch import nn
 from torch.optim import Optimizer
 
+from ard.config.schema import CUDA_GRAPH_ARCHITECTURES
+
+__all__ = ["CUDA_GRAPH_ARCHITECTURES", "CudaGraphStepState", "momentum_buffers_ready", "optimizer_fingerprint"]
+
 
 def optimizer_fingerprint(optimizer: Optimizer, model: nn.Module) -> tuple[Any, ...]:
     """Everything a captured step bakes in that the host could change between replays."""
@@ -98,7 +102,10 @@ class CudaGraphStepState:
     outputs: dict[str, torch.Tensor] = field(default_factory=dict)
     eager_steps_this_epoch: int = 0
     captures: int = 0
+    captures_this_epoch: int = 0
     replays_this_epoch: int = 0
+    # Batches that fit the static buffers (full batches) this epoch.
+    full_batches_this_epoch: int = 0
     deferred: list[DeferredDiagnostics] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -116,13 +123,21 @@ class CudaGraphStepState:
         """Invalidate, zero the epoch accumulator, and return it (eager steps add into it too)."""
         self.invalidate()
         self.eager_steps_this_epoch = 0
+        self.captures_this_epoch = 0
         self.replays_this_epoch = 0
+        self.full_batches_this_epoch = 0
         assert self.totals is not None
         self.totals.zero_()
         return self.totals
 
     def matches(self, images: torch.Tensor, labels: torch.Tensor) -> bool:
-        """Allocate the static inputs on first use; True iff this batch fits them."""
+        """Allocate the static inputs on first use; True iff this batch fits them.
+
+        A non-contiguous batch never fits (the static buffers are contiguous and
+        a strided copy is not what the eager step reads); it runs eagerly.
+        """
+        if not (images.is_contiguous() and labels.is_contiguous()):
+            return False
         if self.images is None:
             if not images.is_floating_point():
                 return False
@@ -131,12 +146,30 @@ class CudaGraphStepState:
             self.valid = torch.empty(labels.shape, dtype=torch.bool, device=self.device)
             self.noise = torch.empty(images.shape, dtype=torch.float32, device=self.device)
         assert self.labels is not None
-        return (
+        fits = (
             images.shape == self.images.shape
+            and images.stride() == self.images.stride()
             and images.dtype == self.images.dtype
             and labels.shape == self.labels.shape
+            and labels.stride() == self.labels.stride()
             and labels.dtype == self.labels.dtype
         )
+        if fits:
+            self.full_batches_this_epoch += 1
+        return fits
+
+    def check_epoch_used_graph(self) -> None:
+        """Fail loudly if a cuda_graph epoch with at least three full batches never replayed.
+
+        One eager warm-up batch and one capture-and-replay batch are expected,
+        so three full batches must give at least one replay; zero means the
+        option silently degraded to eager training.
+        """
+        if self.full_batches_this_epoch >= 3 and self.replays_this_epoch == 0:
+            raise RuntimeError(
+                f"training.cuda_graph is enabled but this epoch replayed no CUDA graph "
+                f"({self.full_batches_this_epoch} full batches, {self.eager_steps_this_epoch} eager steps)"
+            )
 
     def check_replayable(self, optimizer: Optimizer, model: nn.Module) -> None:
         if self.graph is None or self.fingerprint is None:

@@ -43,7 +43,13 @@ from ard.targets import AnchoredTeacherTargetPolicy, TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 
 from .checkpoint import TrainingState, capture_rng_state, load_checkpoint, restore_rng_state, save_checkpoint
-from .cuda_graph import CudaGraphStepState, DeferredDiagnostics, momentum_buffers_ready, optimizer_fingerprint
+from .cuda_graph import (
+    CUDA_GRAPH_ARCHITECTURES,
+    CudaGraphStepState,
+    DeferredDiagnostics,
+    momentum_buffers_ready,
+    optimizer_fingerprint,
+)
 from .distributed import (
     gather_objects,
     get_rank,
@@ -262,6 +268,7 @@ class Trainer:
         checkpoint_epochs: tuple[int, ...] = (),
         step_diagnostics: bool = True,
         cuda_graph: bool = False,
+        student_architecture: str | None = None,
         validation_image_size: int | None = None,
         validation_dataset_derivation: Mapping[str, Any] | None = None,
     ) -> None:
@@ -616,10 +623,10 @@ class Trainer:
         # Plan 0105 (training.cuda_graph): see ard.engine.cuda_graph.
         self._cuda_graph: CudaGraphStepState | None = None
         if cuda_graph:
-            self._validate_cuda_graph_scope()
+            self._validate_cuda_graph_scope(student_architecture)
             self._cuda_graph = CudaGraphStepState(device=self.device)
 
-    def _validate_cuda_graph_scope(self) -> None:
+    def _validate_cuda_graph_scope(self, student_architecture: str | None) -> None:
         """Refuse every Trainer feature the captured PGD-AT step does not transcribe.
 
         Mirrors ``ExperimentConfig._validate_cuda_graph`` for direct Trainer
@@ -632,24 +639,33 @@ class Trainer:
         requirements = (
             (self.device.type == "cuda", "a CUDA device"),
             (get_world_size() == 1, "world size 1"),
-            (torch.are_deterministic_algorithms_enabled(), "torch deterministic algorithms enabled"),
+            (
+                torch.are_deterministic_algorithms_enabled()
+                and not torch.is_deterministic_algorithms_warn_only_enabled(),
+                "torch deterministic algorithms enabled (not warn_only)",
+            ),
+            (
+                student_architecture in CUDA_GRAPH_ARCHITECTURES,
+                f"a parity-tested student architecture ({', '.join(sorted(CUDA_GRAPH_ARCHITECTURES))})",
+            ),
             (not torch.backends.cudnn.benchmark, "cuDNN benchmark off"),
             (self.scaler is None, "no AMP GradScaler"),
             (not self.step_diagnostics, "step_diagnostics=False"),
             (type(self.optimizer) is torch.optim.SGD, "a torch.optim.SGD optimizer"),
             (unwrapped is self.model, "an unwrapped (not DDP or compiled) student"),
             (type(self.objective) is PGDATObjective, "the PGD-AT objective"),
-            (isinstance(attack, LinfPGD) and attack_config is not None, "a LinfPGD training attack"),
+            (type(attack) is LinfPGD and attack_config is not None, "a LinfPGD (not a subclass) training attack"),
             (
                 attack_config is not None
                 and attack_config.loss == "ce"
+                and attack_config.student_mode == "eval"
                 and attack_config.random_start_keying == "batch"
                 and not attack_config.trace_step_losses
                 and attack_config.epsilon_value is not None
                 and attack_config.step_size_value is not None
                 and (not attack_config.random_start or attack_config.epsilon_value > 0)
                 and attack_config.step_size_value <= attack_config.epsilon_value,
-                "a CE, batch-keyed, untraced attack with a fixed budget, 0 < epsilon and step <= epsilon",
+                "a CE, eval-mode, batch-keyed, untraced attack with a fixed budget, 0 < epsilon and step <= epsilon",
             ),
             (self.teacher is None, "no teacher"),
             (self.ema_model is None, "no EMA model"),
@@ -1346,6 +1362,7 @@ class Trainer:
             state.graph = graph
             state.fingerprint = optimizer_fingerprint(self.optimizer, self.model)
             state.captures += 1
+            state.captures_this_epoch += 1
         state.check_replayable(self.optimizer, self.model)
         state.graph.replay()
         state.replays_this_epoch += 1
@@ -2114,6 +2131,8 @@ class Trainer:
                 # of the scope _validate_cuda_graph_scope admits that hold one.
                 del logits, terms, loss, objective_inputs
         self._flush_cuda_graph_diagnostics()
+        if graph_state is not None:
+            graph_state.check_epoch_used_graph()
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
             peak_allocated_bytes = torch.cuda.max_memory_allocated(self.device)
@@ -2141,6 +2160,11 @@ class Trainer:
             **observability,
             **self._boundary_epoch_stats,
         }
+        if graph_state is not None:
+            # Audit trail for training.cuda_graph (plan 0105): absent otherwise.
+            metrics["cuda_graph_captures"] = float(graph_state.captures_this_epoch)
+            metrics["cuda_graph_replays"] = float(graph_state.replays_this_epoch)
+            metrics["cuda_graph_eager_steps"] = float(graph_state.eager_steps_this_epoch)
         if not self.step_diagnostics:
             # Never measured this epoch: absent, not a fake 0.0.
             for key in _STEP_DIAGNOSTIC_TRAIN_METRICS:
@@ -2409,6 +2433,11 @@ class Trainer:
                     "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
                 }
             )
+            if "cuda_graph_replays" in train_metrics:
+                # training.cuda_graph audit (plan 0105): how many steps of
+                # this epoch were captured / replayed / run eagerly.
+                for key in ("cuda_graph_captures", "cuda_graph_replays", "cuda_graph_eager_steps"):
+                    epoch_metrics[f"train_{key}"] = train_metrics[key]
             if probe_metrics is not None:
                 epoch_metrics["train_probe_clean_accuracy"] = probe_metrics["clean_accuracy"]
                 epoch_metrics["train_probe_pgd_accuracy"] = probe_metrics["pgd_accuracy"]

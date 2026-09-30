@@ -1158,6 +1158,17 @@ class TrainingConfig(StrictModel):
         return self
 
 
+# training.cuda_graph (plan 0105): student architectures whose captured step is
+# shown bitwise equal to the eager step by
+# tests/integration/test_cuda_graph_training_step.py (deterministic, eval-mode
+# attack, torch 2.11 on an RTX 4090) -- the SGD-trained BatchNorm CNNs this
+# project uses. Anything else is refused until that test covers it; rerun it
+# after a torch or driver upgrade.
+CUDA_GRAPH_ARCHITECTURES: frozenset[str] = frozenset(
+    {"mobilenetv4_conv_small_imagenet", "mobilenetv4_conv_medium_imagenet", "efficientnet_b0_imagenet"}
+)
+
+
 def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None:
     """Refuse a config whose throughput options a runtime does not implement.
 
@@ -1930,6 +1941,14 @@ class ExperimentConfig(StrictModel):
             return
         attack = self.method.attack
         requirements = (
+            (
+                self.student.architecture in CUDA_GRAPH_ARCHITECTURES,
+                "a parity-tested student.architecture (" + ", ".join(sorted(CUDA_GRAPH_ARCHITECTURES)) + ")",
+            ),
+            (
+                attack is not None and attack.student_mode == "eval",
+                "method.attack.student_mode=eval (train-mode attacks are not parity-tested)",
+            ),
             (self.method.id == "pgd_at", "method.id=pgd_at"),
             (self.teacher is None, "no teacher"),
             (self.method.adr is None, "no method.adr"),

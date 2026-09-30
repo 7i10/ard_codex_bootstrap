@@ -169,10 +169,13 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   loaded without declaring it. `training.jpeg_draft_decode` is in the config hash and in
   `training_protocol_identity`. Both are recorded only when used, so runs with and without them never pool.
 - `training.cuda_graph` (plan 0105, default off) replays the PGD-AT training step as one CUDA graph. It is in the
-  config hash but not in `training_protocol_identity`, like `training.step_diagnostics`: the captured step is
-  bitwise identical to the eager step in deterministic mode (checkpoints, RNG streams, epoch rows, diagnostics),
-  a contract enforced by `tests/integration/test_cuda_graph_training_step.py`. It is refused outside the scope
-  where that is proven (single CUDA device, FP32, deterministic, method `pgd_at`, SGD, no teacher/EMA/policy).
+  config hash but not in `training_protocol_identity`, like `training.step_diagnostics`. That exclusion holds
+  only because config validation limits the flag to the scope where
+  `tests/integration/test_cuda_graph_training_step.py` proves the captured step bitwise identical to the eager step
+  (checkpoints, RNG streams, epoch rows, diagnostics): the allowlisted students (`CUDA_GRAPH_ARCHITECTURES`:
+  MobileNetV4-Conv-Small/Medium, EfficientNet-B0), an eval-mode training attack, deterministic mode, single CUDA
+  device, FP32, method `pgd_at`, SGD, no teacher/EMA/policy — measured on torch 2.11 with an RTX 4090. Rerun the
+  parity test after a torch or driver upgrade and before widening the scope.
 - Tiny-ImageNetのobserved split digestは、expected digestなしなら`computed`、configのexpected digestと一致したら
   `computed-and-matched`。training configだけから作るidentityの`expected-unverified`は観測済みという意味ではない。
 - 集計ではevaluation/training dataset、student、method、training protocol、evaluation protocol、complete threat、

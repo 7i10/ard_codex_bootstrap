@@ -1169,6 +1169,7 @@ def main(argv: list[str] | None = None) -> int:
             checkpoint_epochs=config.training.checkpoint_epochs,
             step_diagnostics=config.training.step_diagnostics,
             cuda_graph=config.training.cuda_graph,
+            student_architecture=config.student.architecture,
             validation_image_size=config.training.train_image_size,
             validation_dataset_derivation=_validation_dataset_derivation(config),
         )

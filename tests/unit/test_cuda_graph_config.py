@@ -1,5 +1,6 @@
 """``training.cuda_graph`` (plan 0105): default off, byte-identical configs, fail-closed scope,
-the stale-graph fingerprint, and an unchanged ``LinfPGD.generate`` around the new sync-free core.
+the stale-graph fingerprint, static-buffer admission, and an unchanged ``LinfPGD.generate``
+around the new sync-free core.
 
 The GPU parity and guard differentials live in
 ``tests/integration/test_cuda_graph_training_step.py``.
@@ -8,6 +9,7 @@ The GPU parity and guard differentials live in
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import subprocess
 import sys
@@ -25,18 +27,45 @@ from ard.attacks import AttackRequest, LinfPGD
 from ard.cli.evaluate import _throughput_protocol_identity
 from ard.config import load_config
 from ard.config.loader import _expand_environment, resolved_config_dict
-from ard.config.schema import AttackConfig, ExperimentConfig, TrainingConfig, reject_throughput_options
+from ard.config.schema import (
+    CUDA_GRAPH_ARCHITECTURES,
+    AttackConfig,
+    ExperimentConfig,
+    TrainingConfig,
+    reject_throughput_options,
+)
 from ard.engine.checkpoint import config_digest
-from ard.engine.cuda_graph import momentum_buffers_ready, optimizer_fingerprint
+from ard.engine.cuda_graph import CudaGraphStepState, momentum_buffers_ready, optimizer_fingerprint
 from ard.engine.trainer import Trainer
 from ard.objectives import PGDATObjective
 
 pytestmark = pytest.mark.t1
 
 ROOT = Path(__file__).resolve().parents[2]
-# The commit this change is based on: the pre-change schema and attack.
+# The commit this change is based on: the pre-change schema and configs.
 PRE_CHANGE_COMMIT = "4fd5ceb"
 STAGE1 = ROOT / "configs" / "scientific" / "imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized_s256.yaml"
+# LinfPGD.generate outputs of the pre-change attack (PRE_CHANGE_COMMIT's
+# src/ard/attacks/pgd.py) on the seeded cases below, as SHA-256 digests.
+# Regenerate only from that file: ``python tests/unit/test_cuda_graph_config.py``.
+GOLDEN = Path(__file__).with_name("fixtures") / "pgd_generate_golden_4fd5ceb.json"
+
+
+def _git(*args: str) -> str:
+    try:
+        return subprocess.run(["git", *args], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    except (OSError, subprocess.CalledProcessError) as error:  # pragma: no cover - shallow clones
+        pytest.skip(f"git {' '.join(args)} unavailable: {error}")
+
+
+def _pre_change_module(relative: str, name: str, package: str) -> types.ModuleType:
+    source = _git("show", f"{PRE_CHANGE_COMMIT}:{relative}")
+    module = types.ModuleType(name)
+    module.__package__ = package
+    module.__file__ = f"{PRE_CHANGE_COMMIT}:{relative}"
+    sys.modules[name] = module
+    exec(compile(source, module.__file__, "exec"), module.__dict__)
+    return module
 
 
 def _env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -75,21 +104,6 @@ def _env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         monkeypatch.setenv(key, value)
 
 
-def _pre_change_module(relative: str, name: str, package: str) -> types.ModuleType:
-    try:
-        source = subprocess.run(
-            ["git", "show", f"{PRE_CHANGE_COMMIT}:{relative}"], cwd=ROOT, check=True, capture_output=True, text=True
-        ).stdout
-    except (OSError, subprocess.CalledProcessError) as error:  # pragma: no cover - shallow clones
-        pytest.skip(f"pre-change {relative} at {PRE_CHANGE_COMMIT} unavailable from git: {error}")
-    module = types.ModuleType(name)
-    module.__package__ = package
-    module.__file__ = f"{PRE_CHANGE_COMMIT}:{relative}"
-    sys.modules[name] = module
-    exec(compile(source, module.__file__, "exec"), module.__dict__)
-    return module
-
-
 # =========================================================================== config
 
 
@@ -99,22 +113,25 @@ def test_default_off_and_unserialized() -> None:
     assert "cuda_graph" not in json.loads(training.model_dump_json())
 
 
-def test_existing_configs_serialize_exactly_as_under_the_pre_change_schema(
+def test_configs_that_existed_before_the_change_serialize_exactly_as_under_the_pre_change_schema(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Every config as it was at PRE_CHANGE_COMMIT (content read from git, so later edits
+    or new configs cannot break this) resolves and hashes byte-identically."""
     _env(monkeypatch, tmp_path)
     old_schema = _pre_change_module("src/ard/config/schema.py", "_ard_schema_pre_cuda_graph", "ard.config")
+    listed = _git("ls-tree", "-r", "--name-only", PRE_CHANGE_COMMIT, "configs/").splitlines()
     paths = [
         path
-        for directory in ("experiments", "pilot", "production", "scientific")
-        for path in sorted((ROOT / "configs" / directory).glob("*.yaml"))
+        for path in listed
+        if path.endswith(".yaml") and path.split("/")[1] in {"experiments", "pilot", "production", "scientific"}
     ]
     assert len(paths) > 20
     for path in paths:
-        expanded = _expand_environment(yaml.safe_load(path.read_text(encoding="utf-8")))
+        expanded = _expand_environment(yaml.safe_load(_git("show", f"{PRE_CHANGE_COMMIT}:{path}")))
         new = ExperimentConfig.model_validate(expanded)
         old = old_schema.ExperimentConfig.model_validate(expanded)
-        assert resolved_config_dict(new) == json.loads(old.model_dump_json()), path.name
+        assert resolved_config_dict(new) == json.loads(old.model_dump_json()), path
         assert config_digest(resolved_config_dict(new)) == config_digest(json.loads(old.model_dump_json()))
 
 
@@ -140,6 +157,14 @@ def test_stage1_config_accepts_cuda_graph_and_records_it_in_the_hash(
     assert config_digest(resolved_config_dict(enabled)) != config_digest(raw)
     # A saved resolved config reloads to the same setting.
     assert ExperimentConfig.model_validate(resolved_config_dict(enabled)).training.cuda_graph is True
+
+
+def test_allowlist_is_the_parity_tested_sgd_batchnorm_cnns() -> None:
+    assert CUDA_GRAPH_ARCHITECTURES == {
+        "mobilenetv4_conv_small_imagenet",
+        "mobilenetv4_conv_medium_imagenet",
+        "efficientnet_b0_imagenet",
+    }
 
 
 @pytest.mark.parametrize(
@@ -174,6 +199,8 @@ def test_training_scope_fails_closed(training: dict[str, Any], reason: str) -> N
     ("sections", "reason"),
     [
         ({"optimizer": {"id": "adamw", "momentum": None, "nesterov": None, "beta1": 0.9, "beta2": 0.999}}, "sgd"),
+        ({"student": {"architecture": "mobilenet_v3_small_imagenet"}}, "a parity-tested student.architecture"),
+        ({"attack": {"student_mode": "train"}}, "method.attack.student_mode=eval"),
         ({"attack": {"random_start_keying": "sample_keyed_v1"}}, "random_start_keying=batch"),
         ({"attack": {"trace_step_losses": True}}, "trace_step_losses=false"),
         ({"attack": {"epsilon": "0", "step_size": "1/255"}}, "0 < epsilon"),
@@ -223,7 +250,8 @@ def test_runtimes_other_than_the_trainer_cli_refuse_cuda_graph() -> None:
 
 
 def test_cuda_graph_is_not_part_of_the_pooling_identity() -> None:
-    """Bitwise identical to eager by the tested contract (plan 0105), like step_diagnostics."""
+    """Out of the pooling identity only because the scope checks above confine it to the
+    parity-tested allowlist / eval-mode attack / deterministic mode (plan 0105)."""
     base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
     assert _throughput_protocol_identity(TrainingConfig(**base, cuda_graph=True)) == {}
     assert _throughput_protocol_identity(TrainingConfig(**base)) == {}
@@ -250,24 +278,117 @@ def _trainer_kwargs(tmp_path: Path, **overrides: Any) -> dict[str, Any]:
         "seed": 0,
         "step_diagnostics": False,
         "cuda_graph": True,
+        "student_architecture": "mobilenetv4_conv_small_imagenet",
         **overrides,
     }
 
 
+def _refusal(tmp_path: Path, **overrides: Any) -> str:
+    with pytest.raises(ValueError, match="cuda_graph requires") as refused:
+        Trainer(**_trainer_kwargs(tmp_path, **overrides))
+    return str(refused.value)
+
+
+class _PGDSubclass(LinfPGD):
+    pass
+
+
 def test_trainer_refuses_cuda_graph_outside_its_scope(tmp_path: Path) -> None:
     Trainer(**{**_trainer_kwargs(tmp_path), "cuda_graph": False})
-    with pytest.raises(ValueError, match="cuda_graph requires") as refused:
-        Trainer(**_trainer_kwargs(tmp_path, step_diagnostics=True, weight_ema_decay=0.99))
-    message = str(refused.value)
+    message = _refusal(tmp_path, step_diagnostics=True, weight_ema_decay=0.99)
     for reason in ("a CUDA device", "step_diagnostics=False", "no EMA model"):
         assert reason in message
-    with pytest.raises(ValueError, match="a CE, batch-keyed"):
-        Trainer(
-            **_trainer_kwargs(
-                tmp_path,
-                attack=LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", random_start_keying="sample_keyed_v1")),
-            )
-        )
+    # Only the CPU device is out of scope in the base fixture.
+    assert "parity-tested student architecture" not in _refusal(tmp_path)
+    assert "LinfPGD (not a subclass)" not in _refusal(tmp_path)
+    keyed = LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", random_start_keying="sample_keyed_v1"))
+    assert "a CE, eval-mode, batch-keyed" in _refusal(tmp_path, attack=keyed)
+
+
+@pytest.mark.parametrize("architecture", [None, "fixture_cnn", "mobilenet_v3_small_imagenet"])
+def test_trainer_refuses_an_architecture_off_the_allowlist(tmp_path: Path, architecture: str | None) -> None:
+    assert "a parity-tested student architecture" in _refusal(tmp_path, student_architecture=architecture)
+
+
+def test_trainer_refuses_a_train_mode_attack(tmp_path: Path) -> None:
+    train_mode = LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", steps=1, student_mode="train"))
+    assert "a CE, eval-mode, batch-keyed" in _refusal(tmp_path, attack=train_mode)
+
+
+def test_trainer_refuses_a_linf_pgd_subclass(tmp_path: Path) -> None:
+    subclass = _PGDSubclass(AttackConfig(epsilon="4/255", step_size="4/255", steps=1))
+    assert "a LinfPGD (not a subclass) training attack" in _refusal(tmp_path, attack=subclass)
+
+
+@pytest.mark.parametrize(("enabled", "warn_only"), [(False, False), (True, True)])
+def test_trainer_refuses_non_strict_determinism(tmp_path: Path, enabled: bool, warn_only: bool) -> None:
+    previous = (torch.are_deterministic_algorithms_enabled(), torch.is_deterministic_algorithms_warn_only_enabled())
+    torch.use_deterministic_algorithms(enabled, warn_only=warn_only)
+    try:
+        assert "torch deterministic algorithms enabled (not warn_only)" in _refusal(tmp_path)
+        torch.use_deterministic_algorithms(True)
+        assert "torch deterministic algorithms" not in _refusal(tmp_path)
+    finally:
+        torch.use_deterministic_algorithms(previous[0], warn_only=previous[1])
+
+
+# =========================================================================== static buffers
+
+
+def _cpu_state() -> CudaGraphStepState:
+    """A CudaGraphStepState on the CPU (bypassing its CUDA-only constructor) to test host logic."""
+    state = object.__new__(CudaGraphStepState)
+    for name, value in {
+        "device": torch.device("cpu"),
+        "images": None,
+        "labels": None,
+        "valid": None,
+        "noise": None,
+        "totals": torch.zeros(9, dtype=torch.float64),
+        "graph": None,
+        "fingerprint": None,
+        "outputs": {},
+        "eager_steps_this_epoch": 0,
+        "captures": 0,
+        "captures_this_epoch": 0,
+        "replays_this_epoch": 0,
+        "full_batches_this_epoch": 0,
+        "deferred": [],
+    }.items():
+        setattr(state, name, value)
+    return state
+
+
+def test_static_buffers_admit_only_contiguous_batches_of_the_captured_layout() -> None:
+    state = _cpu_state()
+    images, labels = torch.rand(4, 3, 8, 8), torch.arange(4)
+    assert state.matches(images, labels)
+    assert state.matches(torch.rand(4, 3, 8, 8), torch.arange(4))
+    # Non-contiguous (a channels-last view of the same shape) and partial batches run eagerly.
+    channels_last = torch.rand(4, 3, 8, 8).to(memory_format=torch.channels_last)
+    assert channels_last.shape == images.shape and not channels_last.is_contiguous()
+    assert not state.matches(channels_last, labels)
+    assert not state.matches(torch.rand(4, 8, 8, 3).permute(0, 3, 1, 2), labels)
+    assert not state.matches(torch.rand(2, 3, 8, 8), torch.arange(2))
+    assert not state.matches(images, torch.arange(8)[::2])
+    assert state.full_batches_this_epoch == 2
+
+
+def test_a_first_non_float_batch_never_allocates_the_buffers() -> None:
+    state = _cpu_state()
+    assert not state.matches(torch.zeros(4, 3, 8, 8, dtype=torch.uint8), torch.arange(4))
+    assert state.images is None
+
+
+def test_an_epoch_without_replays_fails_loudly() -> None:
+    state = _cpu_state()
+    state.full_batches_this_epoch = 2
+    state.check_epoch_used_graph()  # too few full batches to require a replay
+    state.full_batches_this_epoch, state.eager_steps_this_epoch = 3, 3
+    with pytest.raises(RuntimeError, match="replayed no CUDA graph"):
+        state.check_epoch_used_graph()
+    state.replays_this_epoch = 1
+    state.check_epoch_used_graph()
 
 
 # =========================================================================== fingerprint
@@ -330,90 +451,83 @@ def test_momentum_buffers_ready_only_after_the_first_update() -> None:
 # =========================================================================== attack core
 
 
-def _attack_cases() -> list[tuple[AttackConfig, dict[str, Any]]]:
-    return [
-        (AttackConfig(epsilon="8/255", step_size="2/255", steps=3), {}),
-        (AttackConfig(epsilon="8/255", step_size="2/255", steps=3, random_start=False), {}),
-        (AttackConfig(epsilon="8/255", step_size="2/255", steps=3, trace_step_losses=True), {"capture_step": 2}),
-        (
+def _attack_cases() -> dict[str, tuple[AttackConfig, dict[str, Any]]]:
+    return {
+        "batch_random_start": (AttackConfig(epsilon="8/255", step_size="2/255", steps=3), {}),
+        "no_random_start": (AttackConfig(epsilon="8/255", step_size="2/255", steps=3, random_start=False), {}),
+        "trace_and_capture": (
+            AttackConfig(epsilon="8/255", step_size="2/255", steps=3, trace_step_losses=True),
+            {"capture_step": 2},
+        ),
+        "sample_keyed": (
             AttackConfig(epsilon="8/255", step_size="2/255", steps=2, random_start_keying="sample_keyed_v1"),
             {"source_ids": torch.arange(6), "epoch": 3, "attack_seed": 7},
         ),
-        (
+        "overrides_with_zero_budget": (
             AttackConfig(epsilon="8/255", step_size="2/255", steps=2),
             {
                 "epsilon_override": torch.tensor([0.0, 4 / 255, 8 / 255, 8 / 255, 2 / 255, 0.0]),
                 "step_size_override": torch.tensor([0.0, 1 / 255, 2 / 255, 2 / 255, 1 / 255, 0.0]),
             },
         ),
-        (
+        "kl_student_clean_train_mode": (
             AttackConfig(
                 epsilon="8/255", step_size="2/255", steps=2, loss="kl", kl_target="student_clean", student_mode="train"
             ),
             {},
         ),
-    ]
-
-
-def _result_fields(result: Any) -> dict[str, Any]:
-    return {
-        "adversarial": result.adversarial,
-        "initial_delta": result.initial_delta,
-        "step_losses": result.step_losses,
-        "max_abs_delta": float(result.max_abs_delta).hex(),
-        "captured": result.captured_adversarial,
     }
 
 
-def _same(first: Any, second: Any) -> bool:
-    if isinstance(first, torch.Tensor):
-        return isinstance(second, torch.Tensor) and torch.equal(first, second)
-    if isinstance(first, dict):
-        return first.keys() == second.keys() and all(_same(first[key], second[key]) for key in first)
-    if isinstance(first, tuple):
-        return len(first) == len(second) and all(_same(a, b) for a, b in zip(first, second, strict=True))
-    return first == second
+def _tensor_digest(value: torch.Tensor | None) -> str | None:
+    if value is None:
+        return None
+    tensor = value.detach().cpu().contiguous()
+    return hashlib.sha256(f"{tensor.dtype}|{tuple(tensor.shape)}|".encode() + tensor.numpy().tobytes()).hexdigest()
 
 
-def test_generate_is_bit_identical_to_the_pre_change_attack() -> None:
+def generate_digests(pgd_module: Any) -> dict[str, dict[str, Any]]:
+    """Digest every AttackResult field of ``pgd_module.LinfPGD.generate`` on the seeded cases."""
+    digests = {}
+    for name, (config, extra) in _attack_cases().items():
+        torch.manual_seed(0)
+        student = nn.Sequential(
+            nn.Conv2d(3, 4, 3, padding=1), nn.BatchNorm2d(4), nn.ReLU(), nn.Flatten(), nn.Linear(4 * 16, 3)
+        )
+        images = torch.rand(6, 3, 4, 4, generator=torch.Generator().manual_seed(1))
+        labels = torch.tensor([0, 1, 2, 0, 1, 2])
+        student.train()
+        request = AttackRequest(
+            inputs=images, labels=labels, student=student, generator=torch.Generator().manual_seed(5), **extra
+        )
+        result = pgd_module.LinfPGD(config).generate(request)
+        assert student.training  # mode restored
+        digests[name] = {
+            "adversarial": _tensor_digest(result.adversarial),
+            "initial_delta": _tensor_digest(result.initial_delta),
+            "step_losses": [float(loss).hex() for loss in result.step_losses],
+            "max_abs_delta": float(result.max_abs_delta).hex(),
+            "captured": _tensor_digest(result.captured_adversarial),
+            "student_state": {key: _tensor_digest(value) for key, value in student.state_dict().items()},
+        }
+    return digests
+
+
+def test_generate_is_bit_identical_to_the_pre_change_attack_golden_outputs() -> None:
+    import ard.attacks.pgd as current
+
+    expected = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    assert expected["source"] == f"{PRE_CHANGE_COMMIT}:src/ard/attacks/pgd.py"
+    assert generate_digests(current) == expected["digests"]
+
+
+if __name__ == "__main__":  # pragma: no cover - fixture regeneration from the pre-change attack only
     old_pgd = _pre_change_module("src/ard/attacks/pgd.py", "ard.attacks._pgd_pre_cuda_graph", "ard.attacks")
-    torch.manual_seed(0)
-    student = nn.Sequential(
-        nn.Conv2d(3, 4, 3, padding=1), nn.BatchNorm2d(4), nn.ReLU(), nn.Flatten(), nn.Linear(4 * 16, 3)
-    )
-    images = torch.rand(6, 3, 4, 4)
-    labels = torch.tensor([0, 1, 2, 0, 1, 2])
-    for config, extra in _attack_cases():
-        results = []
-        for attack in (LinfPGD(config), old_pgd.LinfPGD(config)):
-            student.train()
-            request = AttackRequest(
-                inputs=images, labels=labels, student=student, generator=torch.Generator().manual_seed(5), **extra
-            )
-            results.append(_result_fields(attack.generate(request)))
-            assert student.training  # mode restored
-        assert _same(results[0], results[1]), config
-
-
-@pytest.mark.gpu
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")
-def test_perturb_core_never_synchronizes_with_the_host() -> None:
-    device = torch.device("cuda")
-    torch.manual_seed(0)
-    student = nn.Sequential(nn.Conv2d(3, 4, 3, padding=1), nn.BatchNorm2d(4), nn.ReLU(), nn.Flatten(), nn.Linear(64, 3))
-    student = student.to(device)
-    attack = LinfPGD(AttackConfig(epsilon="8/255", step_size="2/255", steps=3))
-    request = AttackRequest(
-        inputs=torch.rand(6, 3, 4, 4, device=device),
-        labels=torch.zeros(6, dtype=torch.long, device=device),
-        student=student,
-    )
-    noise = torch.empty_like(request.inputs).uniform_(-1.0, 1.0)
-    epsilon, step_size = attack.budgets(request)
-    torch.cuda.synchronize()
-    previous = torch.cuda.get_sync_debug_mode()
-    torch.cuda.set_sync_debug_mode("error")
-    try:
-        attack.perturb(request, epsilon=epsilon, step_size=step_size, unit_noise=noise)
-    finally:
-        torch.cuda.set_sync_debug_mode(previous)
+    GOLDEN.parent.mkdir(exist_ok=True)
+    payload = {
+        "source": f"{PRE_CHANGE_COMMIT}:src/ard/attacks/pgd.py",
+        "torch": torch.__version__,
+        "digests": generate_digests(old_pgd),
+    }
+    GOLDEN.write_text(json.dumps(payload, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"wrote {GOLDEN}")
