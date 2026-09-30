@@ -2215,3 +2215,24 @@ history behind this pivot.)
   computed in this postrun. `epoch-metrics.parquet` sha256 `ea4cfb15...`,
   `sample-stats-train.parquet` sha256 `a90de400...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at-dev`, same run id.
+- 2026-09-30 — MobileNetV4-M Phase 1 LR grid started. These are the
+  approved SGD grids: random {0.0125, 0.025, 0.05}, pretrained
+  {0.005, 0.015, 0.05}. Random lr 0.025 is the completed
+  `plan0103-phase1-mobilenetv4-conv-medium-random-v1`.
+  - Configs `imagenet_mobilenetv4_conv_medium_pgd_at_phase1_{random,pretrained}_lr*.yaml`
+    (b87f139). Each is identical to the Phase 1 random config except the
+    lr, `pretrained` and the tracking group.
+  - Launched on Ferret from pinned worktree source-b87f13962747, 16
+    workers, seed 0, W&B `lightweight-imagenet-at`:
+    - GPU0: `plan0103-phase1-mobilenetv4-conv-medium-pretrained-lr0015-v1`.
+    - GPU2: `plan0103-phase1-mobilenetv4-conv-medium-random-lr005-v1`.
+  - Still to run: random 0.0125, pretrained 0.005 and pretrained 0.05.
+    They go on Hamster GPU0 once the CUDA-graph tests release it, and on
+    Ferret GPU1 once EfficientNet-B0 Phase 1 finishes.
+  - Expected cost: about 42 h per run on Ferret (the random lr 0.025 run
+    averaged 420 img/s).
+- 2026-09-30 — CUDA Graphs (human-approved) is separate work under
+  plan 0105.
+  - A prototype on Ferret showed the graphed step is bitwise identical
+    to the eager trainer step in deterministic mode, and about 7x faster
+    at 112 px, batch 128.
