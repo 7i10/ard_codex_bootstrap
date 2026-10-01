@@ -2566,3 +2566,28 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `b99b62b4...`, `sample-stats-train.parquet`
   sha256 `fc393137...` (from the run-bundle manifest). W&B
   `lightweight-imagenet-at`, same run id.
+- 2026-10-02 — Results so far. All figures are internal val, last epoch,
+  clean / PGD-10, seed 0.
+  - Full AT 30 epochs, cuda_graph: 51.16 / 29.03, against 30.71 PGD-10 at
+    50 epochs, i.e. -1.7pt. Human decision: full AT stays at 50 epochs.
+  - Stage 1 at 112 px, before stage 2: 195 ep 49.04 / 21.11; 100 ep
+    48.73 / 20.99; 50 ep S=256 46.63 / 20.44; 50 ep original images
+    46.97 / 20.58. 195 vs 100 epochs differ by -0.1pt PGD-10, and S=256 vs
+    original by -0.14pt.
+  - MobileNetV4-M random SGD lr 0.0125 / 0.025 / 0.05: 37.00 / 39.39 /
+    38.36 PGD-10; the 0.05 run is at epoch 40 of 50. So LR matters for
+    SGD models too.
+  - Human decisions:
+    - LR grid option A: 3 points per model, best-vs-best.
+    - The primary cost metric is Hamster wall-clock, measured with
+      cuda_graph and no co-location; FLOPs are reported too.
+  - Stage 2 was launched late: the session-bound watcher died, so GPUs
+    sat idle for about 12 h. All four stage-2 runs start from each
+    stage-1 `last.pt`.
+    - Hamster: `plan0103-mnv4s-twostage-stage2-224-pgd3-from195-s0-v1`
+      (GPU0) and `-from100-s0-v1` (GPU1), worktree source-030be3f7c6a8.
+    - Ferret: `-from50s256-s0-v1` (GPU0) and `-from50orig-s0-v1` (GPU1),
+      worktree source-bd5a76330e55.
+  - MobileNetV4-S grid cell: `plan0103-mnv4s-fullat-50ep-lr00125-cg-s0-v1`
+    runs on Ferret GPU0 (4b6780e), co-located with the stage-2 run there
+    (about 36% utilisation).
