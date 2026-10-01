@@ -145,18 +145,26 @@ def test_existing_configs_serialize_exactly_as_under_the_pre_change_schema(
     byte-identical to the pre-change schema's."""
     _env(monkeypatch, tmp_path)
     old_schema = _pre_change_module("src/ard/config/schema.py", "_ard_schema_pre_two_stage", "ard.config")
+    # Configs as they were at PRE_CHANGE_COMMIT, content read from git, so configs added
+    # later (which may use newer schema fields) cannot break this check.
+    listed = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", PRE_CHANGE_COMMIT, "configs/"],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    ).stdout.splitlines()
     paths = [
         path
-        for directory in ("experiments", "pilot", "production", "scientific")
-        for path in sorted((ROOT / "configs" / directory).glob("*.yaml"))
-        if path.name not in STAGE_CONFIGS | LATER_CONFIGS
+        for path in listed
+        if path.endswith(".yaml") and path.split("/")[1] in {"experiments", "pilot", "production", "scientific"}
     ]
     assert len(paths) > 20
     for path in paths:
-        expanded = _expand_environment(yaml.safe_load(path.read_text(encoding="utf-8")))
+        text = subprocess.run(
+            ["git", "show", f"{PRE_CHANGE_COMMIT}:{path}"], cwd=ROOT, check=True, capture_output=True, text=True
+        ).stdout
+        expanded = _expand_environment(yaml.safe_load(text))
         new = ExperimentConfig.model_validate(expanded)
         old = old_schema.ExperimentConfig.model_validate(expanded)
-        assert resolved_config_dict(new) == json.loads(old.model_dump_json()), path.name
+        assert resolved_config_dict(new) == json.loads(old.model_dump_json()), path
         assert config_digest(resolved_config_dict(new)) == config_digest(json.loads(old.model_dump_json()))
 
 
