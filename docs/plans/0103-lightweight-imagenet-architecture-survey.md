@@ -2241,3 +2241,28 @@ history behind this pivot.)
   Hamster GPU0: worktree source-b87f13962747, 16 workers, seed 0.
   Remaining: pretrained 0.005 and 0.05, to go on Ferret GPU1 after
   EfficientNet-B0.
+- 2026-10-01 (human, chat): decisions.
+  - CUDA Graphs is the default for new eligible runs: MobileNetV4-S/M or
+    EfficientNet-B0, deterministic pgd_at, attack in eval mode.
+  - The catastrophic-overfitting guard skips epochs 0-4.
+  - No second baseline seed for now.
+  - Anteater may be used.
+  - Low-utilisation runs get a second co-located job.
+  - The human asked whether a ~200-epoch stage 1 is really needed.
+- 2026-10-01 — Stage-1 length check launched from 45befac. Configs are
+  `..._resized_s256_{100,50}ep_cg.yaml`. Milestones are scaled to the
+  same 50% / 76% positions with a 10-epoch warmup, and cuda_graph is on.
+  These runs are not compute-matched. Each will get the same stage 2
+  (224 px, 20 epochs) for comparison with the 195-epoch run.
+  - `plan0103-mnv4s-twostage-stage1-112-pgd1-s256-100ep-cg-s0-v1`:
+    Hamster GPU1, co-located with the 195-epoch run, which is
+    launch-bound and at about 45% utilisation.
+  - `plan0103-mnv4s-twostage-stage1-112-pgd1-s256-50ep-cg-s0-v1`:
+    Ferret GPU1. EfficientNet-B0 Phase 1 random completed there.
+  - Clean-training schedule control
+    `plan0103-mnv4s-standard-50ep-cosine-v1`: Anteater GPU2 (RTX 2080
+    Ti), `imagenet_mobilenetv4_standard_50ep_cosine.yaml` (warmup_cosine).
+    It compares with the multistep 50-epoch clean run; that run used a
+    different GPU type, so compare it at metric level only.
+  - Schema byte-identity tests now read the pre-change configs from git,
+    so new configs cannot break them.
