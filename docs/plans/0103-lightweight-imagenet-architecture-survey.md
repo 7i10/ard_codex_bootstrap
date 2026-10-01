@@ -2379,3 +2379,106 @@ history behind this pivot.)
   not computed in this postrun. `epoch-metrics.parquet` sha256
   `3026bfb5...`, `sample-stats-train.parquet` sha256 `c073a194...` (from
   the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-01 (postrun): **Stage-1 length check, 100 epochs (S=256,
+  cuda_graph) completed.**
+  `plan0103-mnv4s-twostage-stage1-112-pgd1-s256-100ep-cg-s0-v1` (Hamster
+  GPU1, RTX 4090) ran 100/100 epochs. `run-bundle/completion.json` reads
+  `completed`, the manifest status is `completed`, and
+  `run-bundle/error-marker.txt` reads "no application error recorded". The
+  watcher re-derived it as terminal and successful. All 100 epoch rows are
+  present (`epoch_metrics_complete: true`). `train.log` has no traceback,
+  NaN or error line (only the wandb git-root warning). `best.pt`, `last.pt`
+  (epoch 99), `epoch-049.pt` and `epoch-099.pt` are on disk. Nothing is
+  imported into `docs/experiments/`: no aggregator exists for this
+  contract. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest summary.
+
+  Fixed identity: as the 195-epoch stage-1 entry above, except 100 epochs,
+  milestones [50, 76] (same 50% / 76% positions, same 10-epoch warmup) and
+  `cuda_graph: true`. Config
+  `imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized_s256_100ep_cg.yaml`,
+  config hash `2301f19b...`. Source SHA
+  `45befac41a286d1f9326b783681bb087e8f4cef2` (worktree
+  `source-45befac41a28`, clean). Training and evaluation-attack seed 0
+  (split seed 20260911). World size 1, global batch 128, local BN,
+  deterministic, not compiled, fp32. "val" is the same internal validation
+  set as the 195-epoch run (25,620 held-out images of the S=256 copy, 112
+  px); "probe" is 2,000 training images. Neither is the ImageNet val split.
+  No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 0.69 / 0.50 | 1.05 / 0.80 | 6.830 |
+  | 9 | end of warmup | 25.66 / 10.99 | 26.15 / 11.25 | 5.005 |
+  | 29 | lr 0.025 | 35.25 / 15.05 | 37.10 / 16.70 | 4.489 |
+  | 49 | end of lr 0.025 | 36.13 / 15.11 | 39.10 / 16.55 | 4.443 |
+  | 50 | first epoch at lr 0.0025 | 43.53 / 18.83 | 46.95 / 20.25 | 4.137 |
+  | 63 | peak of lr 0.0025 stage | 45.85 / 19.82 | 50.50 / 22.25 | 3.952 |
+  | 75 | end of lr 0.0025 | 45.96 / 19.51 | 49.90 / 22.35 | 3.944 |
+  | 76 | first epoch at lr 0.00025 | 47.74 / 20.60 | 53.20 / 23.75 | 3.840 |
+  | 94 | best (by val PGD-10) | 48.38 / 21.00 | 53.90 / 24.85 | 3.769 |
+  | 99 | last | 48.73 / 20.99 | 54.15 / 24.75 | 3.765 |
+
+  Against the 195-epoch run at the same schedule positions (val clean /
+  PGD-10):
+
+  | position | 100 epochs | 195 epochs |
+  |---|---:|---:|
+  | end of lr 0.025 (ep 49 / 97) | 36.13 / 15.11 | 36.67 / 15.55 |
+  | first epoch at lr 0.0025 (ep 50 / 98) | 43.53 / 18.83 | 43.73 / 19.15 |
+  | end of lr 0.0025 (ep 75 / 147) | 45.96 / 19.51 | 46.28 / 19.52 |
+  | first epoch at lr 0.00025 (ep 76 / 148) | 47.74 / 20.60 | 48.06 / 20.92 |
+  | best (ep 94 / 163) | 48.38 / 21.00 | 48.64 / 21.42 |
+  | last (ep 99 / 194) | 48.73 / 20.99 | 49.04 / 21.11 |
+
+  Reading (n=1 per arm, internal validation at 112 px, PGD-10 only):
+  1. **Epochs 0-49 are the 195-epoch run's epochs 0-49.** Both runs have
+     the same seed, data order and LR up to epoch 49. Val clean, val PGD-10
+     and train loss at epochs 47-49 match the eager 195-epoch run to full
+     float precision, and epochs 0, 4, 9 and 29 match to two decimals
+     including the probe. So `cuda_graph` reproduced the eager trajectory
+     over 50 epochs, and the only effective difference between the two
+     runs is the schedule from epoch 50 on.
+  2. **The run trains normally.** No collapse; the catastrophic-overfitting
+     guard never fires. Over epochs 30-49 val PGD-10 stays within
+     14.67-15.60% and val clean within 35.05-36.60%.
+  3. **First decay.** Epoch 49 to 50: +7.40pt clean, +3.72pt PGD-10 in one
+     epoch (195 epochs: +7.06 / +3.61).
+  4. **Smaller drift in the lr 0.0025 stage.** Val PGD-10 peaks at 19.82%
+     (epoch 63) and ends the stage at 19.51% (epoch 75), -0.31pt (195
+     epochs: -0.69pt over a longer stage). Val clean stays within
+     45.28-46.13% over epochs 55-75.
+  5. **Second decay.** Epoch 75 to 76: +1.78pt clean, +1.09pt PGD-10 (195
+     epochs: +1.78 / +1.40). Over epochs 77-99 val PGD-10 stays within
+     20.72-21.00% and val clean within 47.73-48.77%.
+  6. **Best and last are the same.** Best (epoch 94) 48.38 / 21.00, last
+     (epoch 99) 48.73 / 20.99; `robust_overfit_gap` 0.01pt.
+  7. **Against 195 epochs, last vs last: -0.31pt clean, -0.12pt PGD-10.**
+     Single-measurement val SE is about 0.31pt clean and 0.25pt PGD-10; the
+     two runs are evaluated on the same images, so the unpaired SE of a
+     difference (about 0.44 / 0.36pt) is an upper bound. The PGD-10
+     difference is under half an SE, the clean difference under one SE.
+     Best vs best is -0.26 / -0.42, but the 195-epoch best is a maximum
+     over more epochs selected on the same val set, so last vs last is
+     the fair comparison. At the end of stage 1, halving the epochs
+     (51% of the stage-1 compute) costs no resolvable PGD-10, one seed
+     each.
+  8. **Seen-unseen gap.** At the last epoch probe minus val is +5.4 clean
+     and +3.8 PGD-10 (195 epochs: +7.7 / +4.0).
+  9. **No verdict on the preregistered rule or on the length question.**
+     Both are decided after stage 2 (224 px, PGD-3, 20 epochs) from each
+     run's `last.pt`, compared on last-epoch val PGD-10. These 112 px
+     numbers are not comparable with the single-stage 30.71.
+
+  Caveats: one seed per arm; the ImageNet seed-to-seed spread is not
+  measured. Not compute-matched with the single-stage baseline. Training
+  pixels come from the derived S=256 copy. The cuda_graph equivalence in
+  point 1 is checked on logged metrics only, not on checkpoint bytes
+  (`epoch-049.pt` of both runs could confirm it). Cost: wall clock 7.96 h
+  (2026-10-01 00:05 to 08:03 UTC). Throughput about 4,490 img/s over
+  epochs 0-59 while co-located with the 195-epoch run, and about 6,600
+  img/s over epochs 61-99 alone (the eager 195-epoch run alone: about
+  2,640 img/s). Peak allocated memory 0.84 GB. Checkpoint sha256 was not
+  computed in this postrun. `epoch-metrics.parquet` sha256 `84a1bd1f...`,
+  `sample-stats-train.parquet` sha256 `32e4b0c3...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id.
