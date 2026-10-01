@@ -2266,3 +2266,22 @@ history behind this pivot.)
     different GPU type, so compare it at metric level only.
   - Schema byte-identity tests now read the pre-change configs from git,
     so new configs cannot break them.
+- 2026-10-01 (human, chat): decisions.
+  - **Pretrained init is dropped from the study.** It is either left out
+    of the paper or re-run under the final protocol.
+    `plan0103-phase1-mobilenetv4-conv-medium-pretrained-lr0015-v1` was
+    stopped at epoch 23 of 50 and marked ABANDONED. The queued
+    pretrained 0.005 and 0.05 cells are cancelled.
+  - Full AT vs two-stage is decided after the stage-2 verdicts.
+  - Epoch budget check: full AT 30 epochs, with every phase scaled by
+    30/50 (warmup 6, milestones [15, 23]) and cuda_graph on.
+    `plan0103-mnv4s-fullat-30ep-cg-s0-v1` runs on Ferret GPU0 from bd5a763.
+  - Original-image vs S=256 stage 1, compared at 50 epochs:
+    `plan0103-mnv4s-twostage-stage1-112-pgd1-orig-50ep-cg-s0-v1` (32
+    workers) is queued on Ferret GPU1 behind the S=256 50-epoch run.
+    Same host, so the comparison is clean.
+  - MobileViT-S: run only if time allows.
+  - Training allocation (epochs, schedule, two-stage) is decided before
+    or during Phase 1. Then compare objectives, augmentation,
+    distillation (including label smoothing) and architecture
+    differences.
