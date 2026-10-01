@@ -2285,3 +2285,97 @@ history behind this pivot.)
     or during Phase 1. Then compare objectives, augmentation,
     distillation (including label smoothing) and architecture
     differences.
+- 2026-10-01 (postrun): **Two-stage pilot, stage 1 (195 epochs, S=256)
+  completed.** `plan0103-mnv4s-twostage-stage1-112-pgd1-s256-s0-v1`
+  (Hamster GPU1, RTX 4090) ran 195/195 epochs. `run-bundle/completion.json`
+  reads `completed`, the manifest status is `completed`, and
+  `run-bundle/error-marker.txt` reads "no application error recorded". The
+  watcher re-derived it as terminal and successful. All 195 epoch rows are
+  present (`epoch_metrics_complete: true`). `train.log` has no traceback,
+  NaN or error line (only the wandb git-root warning). `best.pt`, `last.pt`,
+  `epoch-049.pt`, `epoch-099.pt` and `epoch-149.pt` are on disk (the
+  configured epoch-199 checkpoint is past the 195-epoch end; `last.pt` is
+  epoch 194). Nothing is imported into `docs/experiments/`: no aggregator
+  exists for this contract, as for the other plan 0103/0104 hand-runs. The
+  numbers below are read from `outputs/train/epoch-metrics.jsonl` and the
+  run-bundle manifest summary.
+
+  Fixed identity: ImageNet-1k, MobileNetV4-Conv-S
+  (`mobilenetv4_conv_small_imagenet`, `imagenet_standard` profile), random
+  init, plain PGD-AT, no teacher. Training data: the derived S=256 copy
+  (`imagenet_train_s256`, content `65f729c7...`, short side 256, JPEG Q95,
+  LANCZOS, derived from original content `ae033613...`), training view 112 px.
+  Training and evaluation-attack seed 0 (split seed 20260911). Training
+  attack: CE PGD-1, l_inf eps 4/255, step 4/255, random start, eval mode.
+  Selection and validation attack: PGD-10, eps 4/255, step 8/765, random
+  start, eval mode. SGD (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.025,
+  warmup_multistep (10-epoch warmup, x0.1 at epochs 98 and 148), 195
+  epochs. World size 1, global batch 128, local BN. Deterministic, not
+  compiled, no cuda_graph, step_diagnostics off, fp32. Protocol
+  `controlled_imagenet_stage02_two_stage_lowres_v1`, config hash
+  `82dc23ed...`. Source SHA `8333698a3de13d864446d3866a79214b8c6b47d2`
+  (worktree `source-8333698a3de1`, clean). "val" is internal validation:
+  the held-out 2% of the S=256 training copy (25,620 images), evaluated at
+  112 px. "probe" is 2,000 training images, same transform, eval mode and
+  PGD-10. Neither is the ImageNet val split. No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 0.69 / 0.50 | 1.05 / 0.80 | 6.830 |
+  | 4 | warmup | 12.36 / 5.93 | 12.10 / 5.15 | 5.776 |
+  | 9 | end of warmup | 25.66 / 10.99 | 26.15 / 11.25 | 5.005 |
+  | 29 | lr 0.025 | 35.25 / 15.05 | 37.10 / 16.70 | 4.489 |
+  | 97 | end of lr 0.025 | 36.67 / 15.55 | 40.00 / 15.80 | 4.418 |
+  | 98 | first epoch at lr 0.0025 | 43.73 / 19.15 | 48.20 / 21.40 | 4.111 |
+  | 110 | peak of lr 0.0025 stage | 45.50 / 20.21 | 50.75 / 23.15 | 3.932 |
+  | 147 | end of lr 0.0025 | 46.28 / 19.52 | 51.60 / 22.35 | 3.926 |
+  | 148 | first epoch at lr 0.00025 | 48.06 / 20.92 | 55.50 / 24.30 | 3.807 |
+  | 163 | best (by val PGD-10) | 48.64 / 21.42 | 55.55 / 25.30 | 3.736 |
+  | 194 | last | 49.04 / 21.11 | 56.75 / 25.15 | 3.714 |
+
+  Reading (n=1, internal validation at 112 px, PGD-10 only):
+  1. **The run trains normally.** No collapse. The catastrophic-overfitting
+     guard (val PGD-10 below half of its running maximum, epochs 0-4
+     skipped) never fires: val PGD-10 never falls more than 0.9pt below
+     its running maximum (at most 21.42%).
+  2. **The peak-LR stage reaches its plateau early.** Val PGD-10 is 15.05%
+     at epoch 29 and stays within 14.67-15.79% over epochs 30-97; val clean
+     stays within 35.05-37.26%. So 68 of the 89 peak-LR epochs (9-97) add
+     nothing visible on val at that LR. The val SE is about 0.25pt PGD-10
+     and 0.31pt clean (25,620 images). Whether those epochs still help
+     after the decays is what the 100- and 50-epoch length-check runs
+     measure; this run alone cannot say.
+  3. **The first decay gives the largest gain.** Epoch 97 to 98: +7.06pt
+     clean, +3.61pt PGD-10 in one epoch.
+  4. **Slight PGD-10 drift inside the lr 0.0025 stage.** Val PGD-10 peaks
+     at 20.21% (epoch 110) and ends the stage at 19.52% (epoch 147),
+     -0.69pt, while val clean stays within 45.30-46.41% over epochs
+     110-147. That is about
+     2.7 single-measurement SE, but successive epochs use the same val
+     images, so the size is uncertain. The second decay recovers it.
+  5. **The second decay gives a smaller gain.** Epoch 147 to 148: +1.78pt
+     clean, +1.40pt PGD-10. Over epochs 148-194 val PGD-10 stays within
+     20.92-21.42% and val clean within 48.06-49.31%.
+  6. **Best and last are close.** Best (epoch 163) 48.64 / 21.42, last
+     (epoch 194) 49.04 / 21.11. Best minus last is 0.31pt PGD-10
+     (`robust_overfit_gap`), about 1.2 SE. Clean is 0.40pt higher at last.
+  7. **Seen-unseen gap is small.** At the last epoch, probe minus val is
+     +7.7 clean and +4.0 PGD-10.
+  8. **No verdict on the preregistered rule.** The rule compares
+     last-epoch val PGD-10 after stage 2 (224 px) with the single-stage
+     reference 30.71. These stage-1 numbers are at 112 px on a different
+     held-out set (from the S=256 copy), so they are not comparable with
+     30.71 or with any 224 px number. Stage 2 starts from this run's
+     `last.pt` (epoch 194) with its sha256. AdvXL's ViT-B stage-1 figure
+     (68.5 / 39.3) is a different model and evaluation and is not
+     compared.
+
+  Caveats: one seed. Training pixels come from the derived S=256 copy (a
+  disclosed preprocessing condition, see 2026-09-30 loader entries).
+  Cost: wall clock 29.5 h (2026-09-29 23:57 to 2026-10-01 05:29 UTC).
+  Throughput about 2,640 img/s over epochs 0-168 and about 1,800 img/s
+  over epochs 169-194, after the 100-epoch length-check run was co-located
+  on the same GPU. Peak allocated memory 0.79 GB. Checkpoint sha256 was
+  not computed in this postrun. `epoch-metrics.parquet` sha256
+  `3026bfb5...`, `sample-stats-train.parquet` sha256 `c073a194...` (from
+  the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id.
