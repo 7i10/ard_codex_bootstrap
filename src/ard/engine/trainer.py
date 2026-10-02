@@ -640,9 +640,9 @@ class Trainer:
             (self.device.type == "cuda", "a CUDA device"),
             (get_world_size() == 1, "world size 1"),
             # Two tested modes (training.deterministic): strict deterministic
-            # algorithms (bitwise eager parity) or none at all (parity within
-            # eager-vs-eager nondeterministic noise). warn_only mixes the two
-            # per kernel and is neither.
+            # algorithms (bitwise eager parity) or none at all (exact RNG
+            # streams, one step within FP32 rounding of eager). warn_only mixes
+            # the two per kernel and is neither.
             (
                 not (
                     torch.are_deterministic_algorithms_enabled()
@@ -654,10 +654,7 @@ class Trainer:
                 student_architecture in CUDA_GRAPH_ARCHITECTURES,
                 f"a parity-tested student architecture ({', '.join(sorted(CUDA_GRAPH_ARCHITECTURES))})",
             ),
-            (
-                not (torch.backends.cudnn.benchmark and torch.are_deterministic_algorithms_enabled()),
-                "cuDNN benchmark only with deterministic algorithms off",
-            ),
+            (not torch.backends.cudnn.benchmark, "cuDNN benchmark off"),
             (self.scaler is None, "no AMP GradScaler"),
             (not self.step_diagnostics, "step_diagnostics=False"),
             (type(self.optimizer) is torch.optim.SGD, "a torch.optim.SGD optimizer"),

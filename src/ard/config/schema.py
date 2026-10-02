@@ -1103,12 +1103,14 @@ class TrainingConfig(StrictModel):
     # Plan 0105 throughput option (human-approved 2026-09-30). Captures the
     # full PGD-AT training step (attack, forward, loss, backward, SGD update,
     # epoch accumulators) in one CUDA graph and replays it per full batch.
-    # Equal to the eager step by contract -- bitwise in deterministic mode,
-    # within eager-vs-eager run-to-run noise with deterministic=false
-    # (optionally cudnn_benchmark=true) -- so it is allowed only where that
-    # contract is proven: one CUDA device, FP32, step_diagnostics=false
-    # (tracking diagnostics are supported), eager student, method pgd_at
-    # with a batch-keyed random start and a fixed budget, SGD, no teacher/EMA/policy/intervention (see
+    # Equal to the eager step by contract -- bitwise in deterministic mode;
+    # with deterministic=false exact RNG streams and a one-step result within
+    # 4x the FP32 rounding of each tensor group's update (the binding term of
+    # the test's bound) -- so it is allowed only where that contract is
+    # tested (cudnn_benchmark=true is not): one CUDA device, FP32,
+    # step_diagnostics=false (tracking diagnostics are supported), eager
+    # student, method pgd_at with a batch-keyed random start and a fixed
+    # budget, SGD, no teacher/EMA/policy/intervention (see
     # ExperimentConfig._validate_cuda_graph). The
     # first full batch of every epoch and the last partial batch run
     # eagerly; the graph is re-captured every epoch (the scheduler changes
@@ -1141,14 +1143,17 @@ class TrainingConfig(StrictModel):
             # (condition that must hold, why) -- every entry fails closed.
             requirements = (
                 (self.device == "cuda", "training.device=cuda (graphs exist only on CUDA; 'auto' is not enough)"),
-                # deterministic=false (and with it cudnn_benchmark=true) is admitted
-                # (human decision 2026-10-03): the graph replays the eager step's
-                # ops, bitwise equal to eager in deterministic mode; otherwise every
-                # RNG stream stays exact and the numerics differ only within
-                # eager-vs-eager nondeterministic noise
+                # deterministic=false is admitted (human decision 2026-10-03):
+                # bitwise equal to eager in deterministic mode; otherwise every RNG
+                # stream stays exact and one step lands within FP32 rounding of eager
                 # (tests/integration/test_cuda_graph_training_step.py).
                 (not self.amp, "training.amp=false (a GradScaler step syncs and is not captured)"),
                 (not self.compile, "training.compile=false"),
+                (
+                    not self.cudnn_benchmark,
+                    "training.cudnn_benchmark=false (under benchmark a captured step was seen to use a "
+                    "different cuDNN algorithm than the eager step of the same process; plan 0105)",
+                ),
                 (not self.step_diagnostics, "training.step_diagnostics=false"),
                 (
                     self.global_batch_size == self.per_rank_batch_size,
@@ -1166,7 +1171,7 @@ class TrainingConfig(StrictModel):
 # training.cuda_graph (plan 0105): student architectures whose captured step is
 # shown equal to the eager step by
 # tests/integration/test_cuda_graph_training_step.py (bitwise when
-# deterministic, within eager-vs-eager noise when not; eval-mode attack,
+# deterministic, one step within FP32 rounding when not; eval-mode attack,
 # torch 2.11 on an RTX 4090) -- the SGD-trained BatchNorm CNNs this
 # project uses. Anything else is refused until that test covers it; rerun it
 # after a torch or driver upgrade.

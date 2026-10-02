@@ -4,11 +4,16 @@ The Trainer owns the step body (``Trainer._cuda_graph_body``); this module owns
 the buffers the captured graph reads and writes, the capture lifecycle, and the
 guard that refuses to replay a graph whose baked-in optimizer values are stale.
 
-Contract (bitwise equal to the eager step in deterministic mode; with
-deterministic algorithms off -- optionally cuDNN benchmark -- the same kernels
-replay, so RNG streams stay exactly equal and the numerics differ from eager
-only within eager-vs-eager nondeterministic noise; both tested in
-tests/integration/test_cuda_graph_training_step.py):
+Contract, tested in tests/integration/test_cuda_graph_training_step.py:
+bitwise equal to the eager step in deterministic mode. With deterministic
+algorithms off (cuDNN benchmark stays off) the graph is NOT guaranteed to
+replay exactly the eager kernels; what the tests observe is that every RNG
+stream stays exactly equal over whole runs, and that one step from one exact
+state lands within 4x max(the spread of the eager outcomes, one FP32 rounding
+of the new value) of the nearest eager outcome, per tensor group (parameters,
+momentum buffers, BatchNorm buffers). In practice the FP32 rounding term is the
+binding one, so this is an "equal to FP32 rounding" bound, not a measured
+run-to-run noise level.
 
 * A graph bakes SGD's ``lr``/``momentum``/``weight_decay``/... in as Python
   scalars and the addresses of every parameter, gradient, momentum buffer and

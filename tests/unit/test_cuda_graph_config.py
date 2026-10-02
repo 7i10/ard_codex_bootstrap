@@ -173,6 +173,7 @@ def test_allowlist_is_the_parity_tested_sgd_batchnorm_cnns() -> None:
         ({"device": "auto"}, "training.device=cuda"),
         ({"amp": True}, "training.amp=false"),
         ({"deterministic": False, "compile": True}, "training.compile=false"),
+        ({"deterministic": False, "cudnn_benchmark": True}, "training.cudnn_benchmark=false"),
         ({"step_diagnostics": True}, "training.step_diagnostics=false"),
         ({"global_batch_size": 256}, "world size 1"),
         ({"epsilon_warmup_epochs": 5}, "training.epsilon_warmup_epochs unset"),
@@ -193,11 +194,11 @@ def test_training_scope_fails_closed(training: dict[str, Any], reason: str) -> N
     assert reason in str(refused.value)
 
 
-@pytest.mark.parametrize("training", [{"deterministic": False}, {"deterministic": False, "cudnn_benchmark": True}])
+@pytest.mark.parametrize("training", [{"deterministic": False}])
 def test_nondeterministic_mode_admits_cuda_graph(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, training: dict[str, Any]
 ) -> None:
-    """Human decision 2026-10-03: deterministic=false (optionally with cuDNN benchmark) may use the graph;
+    """Human decision 2026-10-03: deterministic=false may use the graph (cuDNN benchmark may not);
     equivalence within eager-vs-eager noise is tested in tests/integration/test_cuda_graph_training_step.py."""
     base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
     assert TrainingConfig(**base, **training, cuda_graph=True).cuda_graph is True
@@ -269,18 +270,18 @@ def test_runtimes_other_than_the_trainer_cli_refuse_cuda_graph() -> None:
     )
 
 
-def test_cuda_graph_is_not_part_of_the_pooling_identity() -> None:
-    """Out of the pooling identity only because the scope checks above confine it to the
-    parity-tested allowlist / eval-mode attack, where the graph equals eager bitwise (deterministic)
-    or within eager-vs-eager noise (nondeterministic) (plan 0105). ``deterministic`` itself and
-    ``cudnn_benchmark`` stay in the identity, so the graph never bridges those classes."""
+def test_cuda_graph_pooling_identity_depends_on_the_determinism_class() -> None:
+    """Deterministic: out of the pooling identity, only because the scope checks above confine it to
+    the parity-tested allowlist / eval-mode attack where it is bitwise equal to eager (plan 0105).
+    Nondeterministic: recorded (equal only within FP32 rounding, not bitwise), so a graph run never pools
+    silently with a nondeterministic eager run. (cudnn_benchmark, recorded when true, is refused with it.)"""
     base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
     assert _throughput_protocol_identity(TrainingConfig(**base, cuda_graph=True)) == {}
     assert _throughput_protocol_identity(TrainingConfig(**base)) == {}
     nondeterministic = {**base, "deterministic": False}
-    assert _throughput_protocol_identity(TrainingConfig(**nondeterministic, cuda_graph=True)) == {}
+    assert _throughput_protocol_identity(TrainingConfig(**nondeterministic, cuda_graph=True)) == {"cuda_graph": True}
+    assert _throughput_protocol_identity(TrainingConfig(**nondeterministic)) == {}
     benchmark = {**nondeterministic, "cudnn_benchmark": True}
-    assert _throughput_protocol_identity(TrainingConfig(**benchmark, cuda_graph=True)) == {"cudnn_benchmark": True}
     assert _throughput_protocol_identity(TrainingConfig(**benchmark)) == {"cudnn_benchmark": True}
 
 
@@ -353,9 +354,9 @@ def test_trainer_refuses_a_linf_pgd_subclass(tmp_path: Path) -> None:
         (True, False, False, None),
         (False, False, False, None),  # training.deterministic=false
         (False, True, False, None),  # warn_only is inert while the mode is off
-        (False, False, True, None),  # deterministic=false with cudnn_benchmark=true
         (True, True, False, "torch deterministic algorithms strictly on or off (not warn_only)"),
-        (True, False, True, "cuDNN benchmark only with deterministic algorithms off"),
+        (False, False, True, "cuDNN benchmark off"),
+        (True, False, True, "cuDNN benchmark off"),
     ],
 )
 def test_trainer_determinism_scope(

@@ -306,22 +306,25 @@ def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
     # training.step_diagnostics is deliberately absent: like train_probe_size
     # it is observability-only and proven training-neutral (identical
     # checkpoints either way), so seeds of one arm that differ only in it
-    # must pool. training.cuda_graph is absent for the same reason (plan
-    # 0105), and ONLY because config validation restricts it to the scope
-    # where tests/integration/test_cuda_graph_training_step.py proves the
-    # captured step equal to the eager step of the same determinism class:
-    # bitwise with training.deterministic=true (checkpoints, RNG streams,
-    # epoch rows, diagnostics; LR milestone, partial batch, probe pass,
-    # resume), and with deterministic=false (optionally cudnn_benchmark)
-    # exact RNG streams and audit counts plus a model distance of the same
-    # order as eager-vs-eager nondeterministic noise -- the same standard
-    # under which two nondeterministic eager seeds of one arm already pool.
-    # deterministic (always) and cudnn_benchmark (when true) stay in the
-    # identity, so the graph never bridges determinism classes. Scope: the
-    # allowlisted architectures (CUDA_GRAPH_ARCHITECTURES), an eval-mode
-    # training attack, torch 2.11 on an RTX 4090. Widening that scope, or a
-    # torch/driver upgrade, requires rerunning those tests first. It stays
-    # in the resolved config and config hash.
+    # must pool.
+    #
+    # training.cuda_graph (plan 0105) depends on the determinism class:
+    # - deterministic=true: absent, for the step_diagnostics reason, and ONLY
+    #   because config validation restricts it to the scope where
+    #   tests/integration/test_cuda_graph_training_step.py proves the captured
+    #   step bitwise identical to the eager step (checkpoints, RNG streams,
+    #   epoch rows, diagnostics; LR milestone, partial batch, probe pass,
+    #   resume): the allowlisted architectures (CUDA_GRAPH_ARCHITECTURES), an
+    #   eval-mode training attack, torch 2.11 on an RTX 4090.
+    # - deterministic=false: present. There the tests show exact RNG streams
+    #   and a one-step result within FP32 rounding of eager, but not bitwise
+    #   equality, so a graph run is recorded as such and never pools silently
+    #   with a nondeterministic eager run. (Nondeterministic graph runs did not
+    #   exist before 2026-10-03, so no recorded identity changes.)
+    # Widening the scope, or a torch/driver upgrade, requires rerunning those
+    # tests first. It stays in the resolved config and config hash either way.
+    if training.cuda_graph and not training.deterministic:
+        identity["cuda_graph"] = True
     return identity
 
 

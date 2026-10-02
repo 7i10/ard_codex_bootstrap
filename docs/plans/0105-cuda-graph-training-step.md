@@ -14,7 +14,7 @@ on 2026-09-30.
 A default-off option `training.cuda_graph` that replays the PGD-AT training step as one CUDA graph.
 It must give bit-identical checkpoints, RNG streams, epoch rows and diagnostics to the eager trainer
 in deterministic mode. With `training.deterministic: false` (allowed since 2026-10-03, see below) it must
-keep every RNG stream exactly and differ from eager only within nondeterministic noise.
+keep every RNG stream exactly and one step must match an eager step to FP32 rounding.
 It must refuse every configuration where that is not proven.
 
 ## Design
@@ -26,15 +26,14 @@ It must refuse every configuration where that is not proven.
   golden output digests produced by the pre-change file, `tests/unit/fixtures/pgd_generate_golden_4fd5ceb.json`).
 - **Config.** `training.cuda_graph: bool = False`, serialized only when true, so every existing config
   keeps a byte-identical resolved config and hash (tested against the pre-change schema). It is refused
-  unless: `device: cuda`, no AMP, no compile, `step_diagnostics: false`, world size 1 (`global_batch_size == per_rank_batch_size`), no epsilon
-  warmup, no weight EMA, method `pgd_at`, SGD, no teacher / ADR / target policy / intervention /
+  unless: `device: cuda`, no AMP, no compile, `step_diagnostics: false`, world size 1
+  (`global_batch_size == per_rank_batch_size`), no epsilon warmup, no weight EMA, method `pgd_at`, SGD, no teacher / ADR / target policy / intervention /
   prescriptive route / observation profile, and a CE, eval-mode, batch-keyed, untraced attack with a
   fixed budget (0 < epsilon, step <= epsilon). The student architecture must be on the parity-tested
   allowlist `CUDA_GRAPH_ARCHITECTURES` (MobileNetV4-Conv-Small, MobileNetV4-Conv-Medium, EfficientNet-B0).
-  Both `deterministic: true` and (since 2026-10-03) `deterministic: false`, optionally with
-  `cudnn_benchmark: true`, are admitted. The Trainer repeats the same checks for direct construction (it also
-  refuses a `LinfPGD` subclass, deterministic `warn_only` mode, and cuDNN benchmark with deterministic
-  algorithms on).
+  Both `deterministic: true` and (since 2026-10-03) `deterministic: false` are admitted; `cudnn_benchmark`
+  stays refused (see Verification). The Trainer repeats the same checks for direct construction (it also
+  refuses a `LinfPGD` subclass, deterministic `warn_only` mode and cuDNN benchmark).
   Only `ard.cli.train` applies the option; `reject_throughput_options` refuses it everywhere else.
 - **Capture lifecycle.** Static device buffers for images, labels, the valid mask and the random-start
   noise. The loader batch is copied into them (non-blocking from pinned memory). The first full batch
@@ -67,22 +66,21 @@ It must refuse every configuration where that is not proven.
 - **Diagnostics.** Production configs require panel diagnostics, so they are supported: the eval-mode
   clean forward runs inside the graph at the same point as in the eager step, and its predictions are
   read back in one transfer per epoch (and before any eager step, to keep row order).
-- **Pooling identity.** `training.cuda_graph` is in the config hash but not in
-  `training_protocol_identity`, like `step_diagnostics`. This holds only because the scope checks confine
-  the flag to what the tests prove equal to the eager step of the same determinism class: the allowlisted
-  architectures and an eval-mode training attack, measured on torch 2.11 with an RTX 4090.
-  - Deterministic mode: bitwise equal end to end (checkpoints, RNG, rows, diagnostics; LR milestones,
-    partial batch, probe pass, resume). The production-shape check below matched too.
-  - Nondeterministic mode (`deterministic: false`, with or without `cudnn_benchmark`): every RNG stream,
-    the global step, scheduler and sampler state are exactly equal over whole runs, and one step from one
-    exact state is within eager-vs-eager noise (see Verification). Not bitwise: two eager nondeterministic
-    runs are not bitwise equal either.
-  `training.deterministic` is already in `training_protocol_identity`, and `cudnn_benchmark` is there when
-  true, so this exclusion never pools across determinism classes: a deterministic run pools only with
-  deterministic runs, and a nondeterministic run only with nondeterministic runs of the same benchmark
-  setting, whether or not they use the graph. This is the existing rule for nondeterministic eager seeds,
-  which also differ run to run and pool. Widening the scope, or upgrading torch or the driver, requires
-  rerunning the parity and equivalence tests first.
+- **Pooling identity.** `training.cuda_graph` is always in the config hash. Whether it is in
+  `training_protocol_identity` depends on the determinism class:
+  - Deterministic mode: not in it, like `step_diagnostics`, so graph and eager seeds of one arm pool. This
+    holds only because the scope checks confine the flag to what the parity test proves bitwise equal end
+    to end (checkpoints, RNG, rows, diagnostics; LR milestones, partial batch, probe pass, resume): the
+    allowlisted architectures and an eval-mode training attack, measured on torch 2.11 with an RTX 4090.
+    The production-shape check below matched too.
+  - Nondeterministic mode (`deterministic: false`): `cuda_graph: true`
+    is recorded (2026-10-03 review). The tests show exact RNG streams and a one-step result equal to FP32
+    rounding, but not bitwise equality, so a graph run is never
+    pooled silently with a nondeterministic eager run. No such run existed before, so no recorded identity
+    changes.
+  `training.deterministic` is always in `training_protocol_identity`, and `cudnn_benchmark` when true, so
+  deterministic and nondeterministic runs never pool. Widening the scope, or upgrading torch or the
+  driver, requires rerunning the parity and equivalence tests first.
 
 ## Runbook
 
@@ -107,7 +105,7 @@ It must refuse every configuration where that is not proven.
   any checkpoint; in-graph pixel and finite-loss asserts fire from a replay; an out-of-range pixel on the
   graph path aborts before any checkpoint; `perturb` makes no host sync.
 - Nondeterministic mode, same file (human decision 2026-10-03), for the fixture and every allowlisted
-  architecture, the architectures also with cuDNN benchmark. Bitwise parity is impossible here, so:
+  architecture. Bitwise parity is impossible here, so:
   (1) whole runs (the 3-epoch run above, eager and graph each in their own process): Python/NumPy/torch
   CPU/CUDA RNG states in `last.pt`, the final CUDA RNG state (the fixture's dropout advances it inside the
   graph), the seed and final philox state of every per-step attack generator, global step, scheduler and
@@ -116,22 +114,66 @@ It must refuse every configuration where that is not proven.
   sign step makes training chaotic. A 1e-9 relative state difference flips the sign of up to a quarter of
   the attack's input gradients one step later, so two eager nondeterministic runs drift apart to the size of
   a different seed within a few steps (measured).
-  (2) One step from one exact state: a reference eager run, three eager replicas, two graph runs and a
-  graph negative control (attack seed + 1) each take the capture step (batch 1) and a later replay
-  (batch 3) from the reference's exact state (parameters, BatchNorm buffers, momentum buffers and CUDA RNG
-  state copied in place, so the graph stays valid). Distance = relative L2 change of the model state,
-  divided by the reference step's update size. Rule: graph <= 4 x max(eager replicas, one FP32 rounding of
-  the new state), and negative control >= 100 x that bound. Measured: real architectures 1e-23 to 1e-13
-  for both eager replicas and graph (FP32 rounding level 1.2e-7 to 1.8e-7), negative control 4e-3 to 1.3e-2;
-  fixture: eager replicas 0 to 2.5e-8, graph 0 to 5.7e-8 (FP32 rounding 2e-6), negative control 1.2e-2.
-  In the fixture the graph step can differ from eager by a fixed sub-rounding amount while eager replicas
-  agree bitwise, so in nondeterministic mode the graph is not guaranteed to pick exactly the eager kernels;
-  the difference is a summation-order effect below one FP32 rounding.
+  (2) One step from one exact state (rewritten after the 2026-10-03 review; the first version compared one
+  L2 norm over parameters and exploding BatchNorm buffers, so the FP32 floor of the buffers decided it and a
+  graph arm with lr = 0 passed). A reference eager process saves its exact state (parameters, BatchNorm
+  buffers, SGD momentum buffers, CUDA RNG) before the capture step (batch 1) and a later replay (batch 3),
+  and its state after each step. Every other process loads that state in place (addresses unchanged, so
+  the graph stays valid) and takes the same step: two `pair` processes with two eager and two graph arms
+  each, and a `controls` process with two eager arms and four defective graph arms (attack seed + 1,
+  lr = 0, lr x 1.001, weight decay 0, set before the capture step). Per tensor group (parameters, momentum
+  buffers, BatchNorm buffers), distances are relative to the reference's own update of that group, with a
+  floor of one FP32 rounding of the group's new value on the same scale. One step's nondeterminism can be
+  bimodal: a summation-order difference flips the sign of an attack input gradient and moves the whole step,
+  in eager arms too (seen at production shapes: some eager arms 4e-3 and 3e-2 of a step away from the
+  others). So each graph outcome is compared with its nearest eager outcome (the six eager arms), and the
+  noise level is the eager outcomes' spread (each one's distance to its nearest other). Rule: graph <=
+  4 x max(spread, floor) in every group, and every control >= 10 x that bound in some group. The
+  cross-process difference (eager_a vs the reference) is reported, not used. Regime: 64 px, batch 32,
+  10 classes, PGD-2, lr 0.002 (EfficientNet-B0 0.015, fixture 8 px and 0.05), so the reference step is sane
+  (BatchNorm running variances <= 10, parameter update about 1% of the weights, both asserted).
+  Measured in this regime: graph arms sit as close to the nearest eager outcome as eager arms sit to each
+  other (parameters 1e-7 to 3e-7 of the update, momentum 2e-8 to 2e-7, BatchNorm buffers bitwise equal;
+  the fixture is bitwise equal throughout), against FP32 floors of about 1e-5 (parameters) and 2e-7
+  (momentum). Controls: lr = 0 gives 1.0, lr x 1.001 gives 1.0e-3, weight decay 0 gives 2e-4 to 6e-3,
+  attack seed + 1 gives 0.04 to 1.2, each at least 10x above the bound.
+  cuDNN benchmark: with the same rule, a graph arm of MobileNetV4-Conv-Medium (64 px, benchmark on) landed
+  0.27 (parameters) and 0.30 (momentum) of a step away from every eager outcome of its process, whose spread
+  was 1.3e-7: the captured step had used a different cuDNN algorithm than the eager steps. That is the size
+  of the difference between two separate benchmark runs (0.1 to 0.3 of a step at production shapes), not a
+  rounding, so `cudnn_benchmark` stays refused together with `cuda_graph` until that is understood. (In 24
+  earlier benchmark graph arms at production shapes, the graph matched its process's eager arms to 1e-7.)
+  (3) Production shapes, run once (not part of the test suite; Hamster GPU1, shared with a production job,
+  which matters for speed only): the same one-step check, batch 128, 1000 classes, cuDNN benchmark off.
+  MobileNetV4-Conv-Small from trained plan-0103 checkpoints (stage 1 at 112 px; stage 2 at 224 px),
+  MobileNetV4-Conv-Medium from the trained plan-0103 phase-1 checkpoint (both shapes), EfficientNet-B0 from
+  random initialisation (no checkpoint on Hamster; lr 0.5 so its update clears the FP32 floor). Stage 1:
+  112 px, PGD-1, step 4/255, lr 0.025; full AT: 224 px, PGD-3, step 8/765, lr 0.05; epsilon 4/255.
+  All six cases pass, at both sync points. Distances relative to the reference's update:
+
+  | student, shape | update / weights | graph vs nearest eager (params / momentum) | eager spread (params / momentum) | FP32 floor (params / momentum) | lr x 1.001 | weight decay 0 | attack seed + 1 |
+  |---|---|---|---|---|---|---|---|
+  | MNv4-S, 112 px | 8.6e-3 | 4.7e-7 / 3.6e-7 | 5.1e-7 / 3.5e-7 | 1.4e-5 / 1.6e-7 | 1.0e-3 | 6.1e-4 | 0.40 |
+  | MNv4-S, 224 px | 1.6e-2 | 4.6e-7 / 4.7e-7 | 4.7e-7 / 4.7e-7 | 7.3e-6 / 1.6e-7 | 1.0e-3 | 6.3e-4 | 0.37 |
+  | MNv4-M, 112 px | 9.3e-3 | 8.3e-8 / 7.5e-8 | 8.6e-8 / 7.8e-8 | 1.3e-5 / 1.6e-7 | 1.0e-3 | 5.6e-4 | 0.41 |
+  | MNv4-M, 224 px | 1.6e-2 | 1.7e-7 / 1.7e-7 | 1.8e-7 / 1.7e-7 | 7.5e-6 / 1.6e-7 | 1.0e-3 | 6.5e-4 | 0.29 |
+  | EffB0, 112 px | 9.9e-3 | 3.0e-7 / 3.0e-7 | 2.7e-7 / 2.7e-7 | 1.2e-5 / 1.4e-7 | 1.0e-3 | 1.0e-2 | 0.31 |
+  | EffB0, 224 px | 5.1e-3 | 4.6e-7 / 4.8e-7 | 4.6e-7 / 4.9e-7 | 2.3e-5 / 1.6e-7 | 1.0e-3 | 2.0e-2 | 0.08 |
+
+  (Capture step, batch 1; the later replay, batch 3, gives the same picture. Control columns: the
+  largest group distance; lr = 0 gives 1.0 everywhere. BatchNorm buffers were bitwise equal in every
+  graph arm; maximum running variance 3.9.) For the momentum buffers the eager spread, not the floor,
+  sets the bound, so there the graph is shown equal to a measured noise level. The earlier run of this
+  check, before the rule was changed to the nearest eager outcome, also covered cuDNN benchmark on for all
+  six cases: graph arms matched their process's eager arms to 1e-7 everywhere, separate benchmark processes
+  differed by 0.1 to 0.3 of a step, and some eager arms landed in the other mode of a bimodal step (EffB0
+  224 px: 4e-3; MNv4-S 224 px: 3e-2), which is what led to the nearest-outcome rule.
 - `tests/unit/test_cuda_graph_config.py` (CPU): default off and unserialized; every config that existed at
   4fd5ceb (read from git) resolves and hashes byte-identically; every fail-closed combination (including an
   off-list architecture and a train-mode attack); `deterministic: false` with and without
-  `cudnn_benchmark` admitted while the other restrictions hold; the Trainer's determinism scope (strict on,
-  off, off with benchmark admitted; `warn_only` and benchmark with deterministic algorithms refused); `reject_throughput_options`; Trainer scope (architecture,
+  the other restrictions (cuDNN benchmark included) still refused; the Trainer's determinism scope (strict
+  on and off admitted; `warn_only` and cuDNN benchmark refused);
+  the pooling identity in both determinism classes; `reject_throughput_options`; Trainer scope (architecture,
   train-mode attack, `LinfPGD` subclass, `warn_only` determinism); static-buffer admission (contiguity,
   layout); the no-replay check; fingerprint sensitivity; `generate` against the golden digests.
 - Throughput on Hamster GPU0 (GPU1 was running the stage-1 production job), stage-1 S=256 config,
@@ -163,9 +205,12 @@ It must refuse every configuration where that is not proven.
   | nondeterministic + cudnn_benchmark, eager | 1788 | 617 |
   | nondeterministic + cudnn_benchmark, cuda_graph | 3710-3766 | 780-942 |
 
-  Under this contention, dropping deterministic mode adds about 15-20% to the graph step at 112 px and
-  about 20-25% at 224 px; cuDNN benchmark adds a little more (about 23% and 40-50% over the deterministic
-  graph). A clean measurement needs a free GPU.
+  The medians of these contended runs put the nondeterministic graph step about 19% above the
+  deterministic graph step at 112 px (3605 vs 3028) and about 23% at 224 px (684 vs 554), and cuDNN
+  benchmark about 24% (3750) and 54% (851) (benchmark is refused with the graph since the review). These
+  are indicative only: the production job's load varied
+  during the runs (the deterministic eager rate alone spans 1580-2297 and 512-732), so a clean
+  measurement needs a free GPU.
 
 ## Progress log
 
@@ -193,3 +238,14 @@ It must refuse every configuration where that is not proven.
   eager-vs-eager noise) for the fixture and all allowlisted students, with and without cuDNN benchmark; all
   pass on Hamster GPU1. Pooling identity: unchanged rule (`deterministic` and `cudnn_benchmark` stay in the
   identity; `cuda_graph` stays out). Not merged, not launched.
+- 2026-10-03, scientific review of 861b288 (P1, P2, P3), all fixed in one batch: the one-step test is
+  rewritten (per-group distances with their own floors, sane regime asserted, parameter-only controls
+  that must fail, eager arms in separate processes, each graph outcome compared with the nearest eager
+  outcome because one step's nondeterminism can be bimodal); production shapes checked once (above);
+  `cuda_graph: true` is now recorded in `training_protocol_identity` when `deterministic` is false; docs
+  say what is observed rather than implied. The rewritten test found that under cuDNN benchmark a captured
+  step can use a different cuDNN algorithm than the eager steps of its process, so `cudnn_benchmark` is
+  refused with `cuda_graph` again (schema and Trainer); only `deterministic: false` is newly admitted.
+  The parity proof now runs without a `CUBLAS_WORKSPACE_CONFIG` override, as production does (no launcher
+  sets it, and torch 2.11 neither errors nor warns without it in deterministic mode); the deterministic
+  parity tests pass in that setting.

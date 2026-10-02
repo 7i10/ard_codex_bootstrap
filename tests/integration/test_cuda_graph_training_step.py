@@ -255,107 +255,240 @@ class _StopEpoch(Exception):
 # batch 3 a later replay. The state after that one step is read at the start
 # of the next batch.
 _SYNC_BATCHES = (1, 3)
-_SINGLE_STEP_EAGER_REPLICAS = 3
-_SINGLE_STEP_GRAPH_REPLICAS = 2
+# Graph arms with a deliberate defect confined to one step, set after the sync
+# and before the capture step (so the stale-graph guard does not see it). Each
+# must FAIL the equivalence rule: they show it resolves parameter-update errors.
+_SINGLE_STEP_CONTROLS = ("attack_seed_plus_one", "lr_zero", "lr_times_1p001", "weight_decay_zero")
 
 
-def _state_vector(trainer: Trainer) -> torch.Tensor:
-    state = trainer.model.state_dict()
-    return torch.cat(
-        [value.detach().double().flatten().cpu() for _, value in sorted(state.items()) if value.is_floating_point()]
+def _single_step_trainer(
+    spec: dict[str, Any], output: Path, *, cuda_graph: bool
+) -> tuple[Trainer, DataLoader, DataLoader]:
+    """A PGD-AT trainer and a five-batch synthetic loader for the one-step comparison."""
+    _seed_everything(1234)
+    device = torch.device("cuda")
+    kind = spec["kind"]
+    if kind == _FIXTURE:
+        student, num_classes, _ = _student(kind)
+    else:
+        num_classes = spec["num_classes"]
+        config = ModelConfig(
+            architecture=kind,  # type: ignore[arg-type]
+            num_classes=num_classes,
+            pretrained=False,
+            normalization=NormalizationConfig(profile="imagenet_standard"),
+        )
+        student = build_student(config, tier="dev")
+    if spec.get("checkpoint"):
+        student.load_state_dict(torch.load(spec["checkpoint"], map_location="cpu", weights_only=False)["model"])
+    student = student.to(device)
+    optimizer = SGD(
+        student.parameters(),
+        lr=spec["learning_rate"],
+        momentum=0.9,
+        weight_decay=spec["weight_decay"],
+        nesterov=True,
+    )
+    size = 5 * spec["batch"]
+    trainer = Trainer(
+        model=student,
+        optimizer=optimizer,
+        scheduler=None,
+        scaler=None,
+        attack=LinfPGD(
+            AttackConfig(epsilon=spec["epsilon"], step_size=spec["step_size"], steps=spec["steps"], random_start=True)
+        ),
+        selection_attack=LinfPGD(
+            AttackConfig(epsilon=spec["epsilon"], step_size="1/255", steps=1, student_mode="eval", teacher_mode="eval")
+        ),
+        objective=PGDATObjective(),
+        device=device,
+        output_dir=output,
+        config_hash="c" * 64,
+        seed=11,
+        tracker_run_id="single-step",
+        diagnostics=TrainingDiagnostics.for_ids(list(range(size)), seed=0, size=5, mode="panel"),
+        step_diagnostics=False,
+        cuda_graph=cuda_graph,
+        student_architecture=kind,
     )
 
-
-def single_step_equivalence(root: Path, kind: str) -> dict[str, Any]:
-    """One training step from one exact state: graph vs eager, and eager vs eager.
-
-    PGD's sign step makes PGD-AT training chaotic: a 1e-9 relative state
-    difference flips the sign of a large share of the attack's input
-    gradients within a step or two, so whole nondeterministic runs drift
-    apart to the size of a different seed and say little about one step.
-    Here every arm instead takes the SAME step from the SAME state: at the
-    start of each batch in _SYNC_BATCHES the arm's parameters, BatchNorm
-    buffers, momentum buffers and CUDA RNG state are overwritten in place
-    (addresses unchanged, so the captured graph stays valid) with the
-    reference eager run's, and the state after that one step is compared
-    with the reference's. Eager replicas give the nondeterministic noise of
-    one step; graph arms must match it; a graph arm with a shifted attack
-    stream is the negative control. Distances are relative to the size of
-    the reference step's own update.
-    """
-    device = torch.device("cuda")
-    synced: dict[int, dict[str, Any]] = {}
-    after: dict[str, dict[int, torch.Tensor]] = {}
-
-    def run(name: str, *, cuda_graph: bool) -> None:
-        trainer, (num_classes, image_size) = build_trainer(
-            root / name, kind=kind, cuda_graph=cuda_graph, device=device, diagnostics="panel"
+    def loader(dataset_size: int, seed: int) -> DataLoader:
+        dataset = SyntheticCIFAR(size=dataset_size, num_classes=num_classes, image_size=spec["image_size"], seed=seed)
+        return DataLoader(
+            IndexedDataset(dataset),
+            batch_size=spec["batch"],
+            sampler=EpochShuffleSampler(dataset_size, seed=5, shuffle=True),
+            pin_memory=True,
+            collate_fn=collate_indexed,
         )
-        loader, validation_loader, _ = _loaders(num_classes, image_size, pin_memory=True)
-        parameters = [parameter for group in trainer.optimizer.param_groups for parameter in group["params"]]
-        after[name] = {}
+
+    return trainer, loader(size, 3), loader(spec["batch"], 99)
+
+
+def _single_step_state(trainer: Trainer) -> dict[str, Any]:
+    """Parameters, model buffers, SGD momentum buffers and the CUDA RNG state, copied to the host."""
+    names = {name for name, _ in trainer.model.named_parameters()}
+    state = trainer.model.state_dict()
+    parameters = [parameter for group in trainer.optimizer.param_groups for parameter in group["params"]]
+    return {
+        "parameters": {key: value.detach().cpu().clone() for key, value in state.items() if key in names},
+        "buffers": {key: value.detach().cpu().clone() for key, value in state.items() if key not in names},
+        "momentum": [trainer.optimizer.state[p]["momentum_buffer"].detach().cpu().clone() for p in parameters],
+        "cuda_rng": torch.cuda.get_rng_state(),
+    }
+
+
+def _load_single_step_state(trainer: Trainer, saved: dict[str, Any]) -> None:
+    """Overwrite the trainer's state in place: tensor addresses, and so a captured graph, stay valid."""
+    state = trainer.model.state_dict()
+    parameters = [parameter for group in trainer.optimizer.param_groups for parameter in group["params"]]
+    with torch.no_grad():
+        for key, value in state.items():
+            value.copy_(saved["parameters"][key] if key in saved["parameters"] else saved["buffers"][key])
+        for parameter, buffer in zip(parameters, saved["momentum"], strict=True):
+            trainer.optimizer.state[parameter]["momentum_buffer"].copy_(buffer)
+    torch.cuda.set_rng_state(saved["cuda_rng"])
+
+
+def single_step_arm(root: Path, spec_json: str, name: str) -> dict[str, Any]:
+    """One process of the one-step comparison.
+
+    ``reference`` (eager) saves its exact state at the start of each batch in
+    _SYNC_BATCHES and its state after that one step. Every other process runs
+    two eager arms (``eager_a``, ``eager_b``) and then either two graph arms
+    (``graph_a``, ``graph_b``; process name ``pair<i>``) or one graph arm per
+    _SINGLE_STEP_CONTROLS entry (process ``controls``, capture step only).
+    Each arm loads the reference's state in place at the sync points and saves
+    its state after the step as ``<process>.<arm>_after<sync>.pt``. The arms of
+    one process share its cuDNN algorithm choices (benchmark cache), so they
+    isolate what the graph changes; distances across processes (eager_a vs the
+    reference) measure run-to-run variation, algorithm choice included.
+    """
+    spec = json.loads(spec_json)
+    state_dir = Path(spec["state_dir"])
+    original_generator = Trainer._attack_generator
+
+    def run_one(arm_name: str, *, cuda_graph: bool, control: str | None = None) -> None:
+        syncs = (1,) if control is not None else _SYNC_BATCHES
+        trainer, loader, validation_loader = _single_step_trainer(spec, root / arm_name, cuda_graph=cuda_graph)
 
         def hook(epoch: int, batch_index: int, _batch: Any) -> None:
-            if batch_index - 1 in _SYNC_BATCHES:
-                after[name][batch_index - 1] = _state_vector(trainer)
-            if batch_index in _SYNC_BATCHES:
-                if name == "reference":
-                    synced[batch_index] = {
-                        "model": {key: value.detach().clone() for key, value in trainer.model.state_dict().items()},
-                        "momentum": [
-                            trainer.optimizer.state[p]["momentum_buffer"].detach().clone() for p in parameters
-                        ],
-                        "cuda_rng": torch.cuda.get_rng_state(),
-                        "vector": _state_vector(trainer),
-                    }
-                else:
-                    state = synced[batch_index]
-                    with torch.no_grad():
-                        for key, value in trainer.model.state_dict().items():
-                            value.copy_(state["model"][key])
-                        for parameter, buffer in zip(parameters, state["momentum"], strict=True):
-                            trainer.optimizer.state[parameter]["momentum_buffer"].copy_(buffer)
-                    torch.cuda.set_rng_state(state["cuda_rng"])
-            if batch_index > max(_SYNC_BATCHES):
+            if batch_index - 1 in syncs:
+                torch.save(_single_step_state(trainer), state_dir / f"{arm_name}_after{batch_index - 1}.pt")
+            if batch_index in syncs and arm_name == "reference":
+                torch.save(_single_step_state(trainer), state_dir / f"sync{batch_index}.pt")
+            elif batch_index in syncs:
+                _load_single_step_state(trainer, torch.load(state_dir / f"sync{batch_index}.pt", weights_only=False))
+                group = trainer.optimizer.param_groups[0]
+                if control == "lr_zero":
+                    group["lr"] = 0.0
+                elif control == "lr_times_1p001":
+                    group["lr"] *= 1.001
+                elif control == "weight_decay_zero":
+                    group["weight_decay"] = 0.0
+            if batch_index > max(syncs):
                 raise _StopEpoch
 
+        if control == "attack_seed_plus_one":
+
+            def shifted(self: Trainer) -> torch.Generator:
+                generator = original_generator(self)
+                return generator.manual_seed(generator.initial_seed() + 1)
+
+            Trainer._attack_generator = shifted  # type: ignore[method-assign]
         try:
             trainer.fit(loader, validation_loader=validation_loader, epochs=1, on_batch_start=hook)
         except _StopEpoch:
             pass
+        finally:
+            Trainer._attack_generator = original_generator  # type: ignore[method-assign]
         if cuda_graph:
-            graph_state = trainer._cuda_graph
-            assert graph_state is not None, name
-            assert (graph_state.captures_this_epoch, graph_state.replays_this_epoch) == (1, 3), name
-        assert sorted(after[name]) == list(_SYNC_BATCHES), name
+            assert trainer._cuda_graph is not None
+            counts = (trainer._cuda_graph.captures_this_epoch, trainer._cuda_graph.replays_this_epoch)
+            assert counts == ((1, 3) if control is None else (1, 1)), (arm_name, counts)
 
-    run("reference", cuda_graph=False)
-    for index in range(_SINGLE_STEP_EAGER_REPLICAS):
-        run(f"eager{index}", cuda_graph=False)
-    for index in range(_SINGLE_STEP_GRAPH_REPLICAS):
-        run(f"graph{index}", cuda_graph=True)
-    original = Trainer._attack_generator
+    if name == "reference":
+        run_one(name, cuda_graph=False)
+    else:
+        run_one(f"{name}.eager_a", cuda_graph=False)
+        run_one(f"{name}.eager_b", cuda_graph=False)
+        if name == "controls":
+            for control in _SINGLE_STEP_CONTROLS:
+                run_one(f"{name}.{control}", cuda_graph=True, control=control)
+        else:
+            run_one(f"{name}.graph_a", cuda_graph=True)
+            run_one(f"{name}.graph_b", cuda_graph=True)
+    return {
+        "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
+        "cudnn_benchmark": torch.backends.cudnn.benchmark,
+    }
 
-    def shifted(self: Trainer) -> torch.Generator:
-        generator = original(self)
-        return generator.manual_seed(generator.initial_seed() + 1)
 
-    Trainer._attack_generator = shifted  # type: ignore[method-assign]
-    run("negative", cuda_graph=True)
-    result: dict[str, Any] = {}
-    for batch_index in _SYNC_BATCHES:
-        reference = after["reference"][batch_index]
-        update = float((reference - synced[batch_index]["vector"]).norm())
-        assert update > 0
-        result[str(batch_index)] = {
-            name: float((values[batch_index] - reference).norm()) / update
-            for name, values in after.items()
-            if name != "reference"
-        }
-        # One FP32 rounding of every element of the new state, on the same scale.
-        result[f"{batch_index}:fp32_rounding"] = torch.finfo(torch.float32).eps * float(reference.norm()) / update
-    result["deterministic_algorithms"] = torch.are_deterministic_algorithms_enabled()
-    result["cudnn_benchmark"] = torch.backends.cudnn.benchmark
+def _flat(tensors: Any) -> torch.Tensor:
+    values = tensors.values() if isinstance(tensors, dict) else tensors
+    return torch.cat([value.double().flatten() for value in values if value.is_floating_point()])
+
+
+_GROUPS = ("parameters", "momentum", "buffers")
+
+
+def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> dict[str, Any]:
+    """Per tensor group (parameters, momentum buffers, BatchNorm buffers): the eager outcomes' spread
+    and every graph / control arm's distance to its NEAREST eager outcome, all relative to the
+    reference's own update of that group; plus the FP32 floor (one rounding of every element of the
+    group's new value, on the same scale), the cross-process differences and reference sanity.
+
+    Eager outcomes are every process's eager_a / eager_b. One step's nondeterminism
+    can be bimodal (a summation-order difference that flips the sign of an attack input gradient moves
+    the whole step, in eager and graph arms alike), so a graph outcome is compared with the closest
+    outcome some eager arm produced, and the noise level is each eager outcome's distance to its
+    closest other eager outcome (the within-mode spread)."""
+    before = torch.load(state_dir / f"sync{sync}.pt", weights_only=False)
+    states = {"reference": torch.load(state_dir / f"reference_after{sync}.pt", weights_only=False)}
+    for path in sorted(state_dir.glob(f"*.*_after{sync}.pt")):
+        process = path.name.split(".", 1)[0]
+        if process in processes:
+            states[path.name[: -len(f"_after{sync}.pt")]] = torch.load(path, weights_only=False)
+    reference = states["reference"]
+    flat = {name: {group: _flat(state[group]) for group in _GROUPS} for name, state in states.items()}
+    result: dict[str, Any] = {"update": {}, "floor": {}, "relative_update": {}}
+    for group in _GROUPS:
+        new, old = flat["reference"][group], _flat(before[group])
+        update = float((new - old).norm())
+        result["update"][group] = update
+        result["relative_update"][group] = update / float(old.norm())
+        result["floor"][group] = torch.finfo(torch.float32).eps * float(new.norm()) / update
+
+    def distance(left: str, right: str, group: str) -> float:
+        return float((flat[left][group] - flat[right][group]).norm()) / result["update"][group]
+
+    # The reference only supplies the state and the scale: it is alone in its process, and under cuDNN
+    # benchmark a process's algorithm choice can put its outcome far from every other process's.
+    eager = [name for name in states if name.split(".")[-1].startswith("eager")]
+    others = [name for name in states if name not in eager and name != "reference"]
+    result["eager_spread"] = {
+        group: max(min(distance(name, other, group) for other in eager if other != name) for name in eager)
+        for group in _GROUPS
+    }
+    result["arms"] = {
+        name: {group: min(distance(name, other, group) for other in eager) for group in _GROUPS} for name in others
+    }
+    result["cross_process"] = {
+        group: max(distance(f"{process}.eager_a", "reference", group) for process in processes) for group in _GROUPS
+    }
+    result["integer_buffers_equal"] = all(
+        torch.equal(state["buffers"][key], value)
+        for state in states.values()
+        for key, value in reference["buffers"].items()
+        if not value.is_floating_point()
+    )
+    running_vars = [value for key, value in reference["buffers"].items() if key.endswith("running_var")]
+    result["max_running_var"] = max((float(value.max()) for value in running_vars), default=0.0)
+    result["finite"] = all(
+        bool(torch.isfinite(flat["reference"][group]).all()) and bool(torch.isfinite(_flat(before[group])).all())
+        for group in _GROUPS
+    )
     return result
 
 
@@ -496,11 +629,10 @@ def _run(
     environment = os.environ.copy()
     environment["PYTHONPATH"] = os.pathsep.join([str(_ROOT / "src"), str(_ROOT)])
     environment["ARD_CUDA_GRAPH_TEST_DETERMINISM"] = determinism
-    if determinism == "deterministic":
-        environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    else:
-        # A nondeterministic production run sets no cuBLAS workspace override.
-        environment.pop("CUBLAS_WORKSPACE_CONFIG", None)
+    # Production runs (ard.cli.train under the launchers) set no cuBLAS
+    # workspace override, deterministic or not, and torch 2.11 neither errors
+    # nor warns without it; the proof runs in that same setting.
+    environment.pop("CUBLAS_WORKSPACE_CONFIG", None)
     return subprocess.run(
         [sys.executable, "-c", _SCRIPT, str(_ROOT), name, *args],
         cwd=_ROOT,
@@ -658,19 +790,7 @@ def test_perturb_core_never_synchronizes_with_the_host() -> None:
 #    scheduler and sampler state -- and the audit counts must show the graph
 #    ran. (Model weights are not compared here: PGD's sign step makes whole
 #    nondeterministic runs drift apart chaotically, eager vs eager included.)
-# 2. One step from one exact state (single_step_equivalence): the graph's
-#    capture step and a later replay, each taken from the reference eager
-#    run's exact state, must land as close to the reference's result as eager
-#    replicas do: at most _SAME_ORDER times the largest eager-vs-eager
-#    distance, or _SAME_ORDER times one FP32 rounding of the new state when
-#    the eager replicas happen to agree bitwise (below that a difference is a
-#    summation-order effect, which is all nondeterministic kernels change). A
-#    graph negative control (attack seed + 1) must be at least
-#    _NEGATIVE_CONTROL_MARGIN times farther, so the distance resolves any
-#    real defect (a missed, extra or stale op moves the step by far more than
-#    a rounding).
-_SAME_ORDER = 4.0
-_NEGATIVE_CONTROL_MARGIN = 100.0
+# 2. One step from one exact state: see run_single_step_check below.
 _EXACT_UNDER_NONDETERMINISM = (
     "last.pt:rng",
     "cuda_rng",
@@ -683,10 +803,14 @@ _EXACT_UNDER_NONDETERMINISM = (
     "last.pt:sampler_state",
     "has_probe",
 )
+# cuDNN benchmark stays refused with the graph: in this one-step test a captured
+# step under benchmark once landed 0.27 of a step away from every eager outcome
+# of its process (a different cuDNN algorithm choice). The script keeps the
+# "nondeterministic_benchmark" mode so that finding can be reproduced (with the
+# Trainer's benchmark refusal lifted locally).
 _NONDETERMINISTIC_CASES = [
     (_FIXTURE, "nondeterministic"),
     *((architecture, "nondeterministic") for architecture in sorted(CUDA_GRAPH_ARCHITECTURES)),
-    *((architecture, "nondeterministic_benchmark") for architecture in sorted(CUDA_GRAPH_ARCHITECTURES)),
 ]
 
 
@@ -710,18 +834,109 @@ def test_nondeterministic_graph_run_keeps_every_rng_stream_exact(kind: str, dete
         assert eager["cuda_rng_advanced"]
 
 
+# 2. One step from one exact state (single_step_arm): a reference eager
+#    process saves its exact state (parameters, BatchNorm buffers, SGD
+#    momentum buffers, CUDA RNG) before the capture step (batch 1) and before
+#    a later replay (batch 3), and its state after each step. Other processes
+#    load that state in place and take the same step: two eager arms and two
+#    graph arms per ``pair`` process, and two eager arms plus the controls in
+#    the ``controls`` process. Within one process the arms share cuDNN's
+#    algorithm choices, so eager_b vs eager_a is the noise of the kernels
+#    themselves (atomic summation order) and graph vs eager_a isolates what
+#    the graph changes. Per tensor group -- parameters, momentum buffers,
+#    BatchNorm buffers -- distances are relative to the reference's own update
+#    of that group, with a floor of one FP32 rounding of the group's new value.
+#    One step's nondeterminism can be bimodal (a summation-order difference
+#    that flips the sign of an attack input gradient moves the whole step, in
+#    eager and graph arms alike), so each graph outcome is compared with the
+#    NEAREST eager outcome (every eager_a / eager_b), and the noise
+#    level is the eager outcomes' within-mode spread (each one's distance to
+#    its nearest other). Rule, every group: graph <= _SAME_ORDER *
+#    max(spread, floor). Power: graph arms with a defect confined to one step
+#    (attack seed + 1, lr = 0, lr * 1.001, weight decay 0), set before the
+#    capture step, must each exceed that bound by _CONTROL_MARGIN in some
+#    group. The regime is chosen so the reference step is sane (finite,
+#    BatchNorm running variances bounded, parameter update a small fraction of
+#    the weights). The cross-process difference (eager_a vs the reference) is
+#    reported, not used as the bound: under cuDNN benchmark it includes a
+#    different algorithm choice, which PGD's sign step can amplify to a
+#    sizeable fraction of the update.
+_SAME_ORDER = 4.0
+_CONTROL_MARGIN = 10.0
+_SINGLE_STEP_PAIR_PROCESSES = 2
+_MAX_RUNNING_VAR = 1e4
+_MAX_RELATIVE_PARAMETER_UPDATE = 0.05
+# Unit-test-sized regime for every student. The parameter update must clear
+# the FP32 floor (eps * |weights| / |update|) by enough that the lr * 1.001
+# control is detectable, so the fixture (which keeps its 8 px input) and
+# EfficientNet-B0 (smaller gradients) get a larger learning rate; every
+# update stays around 1% of the weights.
+_SINGLE_STEP_OVERRIDES: dict[str, dict[str, Any]] = {
+    _FIXTURE: {"image_size": 8, "learning_rate": 0.05},
+    "efficientnet_b0_imagenet": {"learning_rate": 0.015},
+}
+_SINGLE_STEP_REGIME = {
+    "image_size": 64,
+    "batch": 32,
+    "num_classes": 10,
+    "learning_rate": 0.002,
+    "weight_decay": 5e-4,
+    "epsilon": "4/255",
+    "step_size": "4/255",
+    "steps": 2,
+}
+
+
+def run_single_step_check(state_dir: Path, spec: dict[str, Any], determinism: str) -> dict[str, Any]:
+    """Run every process of the one-step comparison; return the per-group distances."""
+    spec = {**spec, "state_dir": str(state_dir)}
+    processes = [*(f"pair{index}" for index in range(_SINGLE_STEP_PAIR_PROCESSES)), "controls"]
+    modes = set()
+    for name in ("reference", *processes):
+        result = _result(_run("single_step_arm", json.dumps(spec), name, determinism=determinism))
+        modes.add((result["deterministic_algorithms"], result["cudnn_benchmark"]))
+    assert modes == {(False, determinism == "nondeterministic_benchmark")}, modes
+    return {str(sync): single_step_distances(state_dir, processes, sync) for sync in _SYNC_BATCHES}
+
+
+def single_step_verdict(distances: dict[str, Any]) -> list[str]:
+    """Return every violation of the one-step rule (empty when it holds)."""
+    failures = []
+    for sync, result in distances.items():
+        if not result["finite"] or result["max_running_var"] > _MAX_RUNNING_VAR:
+            failures.append(f"sync {sync}: reference step not sane ({result['finite']=}, {result['max_running_var']=})")
+        if result["relative_update"]["parameters"] > _MAX_RELATIVE_PARAMETER_UPDATE:
+            failures.append(f"sync {sync}: parameter update {result['relative_update']['parameters']} too large")
+        if not result["integer_buffers_equal"]:
+            failures.append(f"sync {sync}: integer buffers differ between arms")
+        bound = {group: _SAME_ORDER * max(result["floor"][group], result["eager_spread"][group]) for group in _GROUPS}
+        graphs = [name for name in result["arms"] if name.split(".")[-1].startswith("graph")]
+        controls = [name for name in result["arms"] if name.split(".")[-1] in _SINGLE_STEP_CONTROLS]
+        if not graphs:
+            failures.append(f"sync {sync}: no graph arm ran")
+        for name in graphs:
+            failures.extend(
+                f"sync {sync}: {name} {group} {result['arms'][name][group]:.3g} > bound {bound[group]:.3g}"
+                for group in _GROUPS
+                if result["arms"][name][group] > bound[group]
+            )
+        if sync == "1" and len(controls) != len(_SINGLE_STEP_CONTROLS):
+            failures.append(f"sync {sync}: controls missing ({controls})")
+        for name in controls:
+            ratio = max(result["arms"][name][group] / bound[group] for group in _GROUPS)
+            if ratio < _CONTROL_MARGIN:
+                failures.append(f"sync {sync}: control {name} not detected (max distance/bound {ratio:.3g})")
+    return failures
+
+
 @pytest.mark.gpu
 @requires_cuda
 @pytest.mark.parametrize(("kind", "determinism"), _NONDETERMINISTIC_CASES)
-def test_nondeterministic_graph_step_matches_eager_within_one_step_noise(kind: str, determinism: str) -> None:
-    result = _result(_run("single_step_equivalence", kind, determinism=determinism))
-    assert result["deterministic_algorithms"] is False
-    assert result["cudnn_benchmark"] is (determinism == "nondeterministic_benchmark")
-    for batch_index in map(str, _SYNC_BATCHES):
-        distances = result[batch_index]
-        eager = [distances[f"eager{index}"] for index in range(_SINGLE_STEP_EAGER_REPLICAS)]
-        graph = [distances[f"graph{index}"] for index in range(_SINGLE_STEP_GRAPH_REPLICAS)]
-        noise = max(*eager, result[f"{batch_index}:fp32_rounding"])
-        summary = f"batch {batch_index}: {distances}, fp32 rounding {result[f'{batch_index}:fp32_rounding']}"
-        assert max(graph) <= _SAME_ORDER * noise, summary
-        assert distances["negative"] >= _NEGATIVE_CONTROL_MARGIN * _SAME_ORDER * noise, summary
+def test_nondeterministic_graph_step_matches_eager_within_one_step_noise(
+    tmp_path: Path, kind: str, determinism: str
+) -> None:
+    spec = {**_SINGLE_STEP_REGIME, "kind": kind}
+    spec.update(_SINGLE_STEP_OVERRIDES.get(kind, {}))
+    distances = run_single_step_check(tmp_path, spec, determinism)
+    failures = single_step_verdict(distances)
+    assert not failures, (failures, distances)
