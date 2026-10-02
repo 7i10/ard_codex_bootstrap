@@ -181,11 +181,12 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
     bitwise. What the tests observe (an observation, not a consequence of "same kernels"): (1) over whole runs every
     RNG stream (checkpointed Python/NumPy/torch CPU/CUDA states, the CUDA RNG state, the seed and draw count of every
     attack generator), the global step, scheduler and sampler state are exactly equal; (2) one step from one exact
-    state, per tensor group (parameters, SGD momentum buffers, BatchNorm buffers), lands within 4x max(the spread
-    of the eager outcomes of the same step, one FP32 rounding of the group's new value) of the nearest eager outcome.
-    In practice the FP32 rounding term decides, so this is "equal to FP32 rounding", not a measured run-to-run noise
-    level. Graph controls with lr = 0, lr x 1.001, weight decay 0 or attack seed + 1 all fail that rule by at least
-    10x. One step's nondeterminism can be bimodal (a summation-order difference flips the sign of an attack input
+    state, in every tensor group (parameters, SGD momentum buffers, BatchNorm buffers), lands within 4x max(the
+    median spread of the eager outcomes of the same step, one FP32 rounding of the group's new value) of one nearest
+    eager outcome; a spread above 100x the floor fails the check. For parameters the FP32 rounding sets the bound;
+    for momentum buffers at production shapes the measured eager spread does. Graph controls with lr = 0,
+    lr x 1.001, weight decay 0 or attack seed + 1 (baked into the graph) fail that rule by at least 10x, both at the
+    capture step and at a later replay. One step's nondeterminism can be bimodal (a summation-order difference flips the sign of an attack input
     gradient and moves the whole step, in eager arms as well). Under cuDNN benchmark a captured step was seen to
     use a different cuDNN algorithm than the eager steps of its process (0.27 of a step away), which is why
     benchmark is refused with the graph. Because the equivalence is not

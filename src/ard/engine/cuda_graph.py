@@ -9,11 +9,11 @@ bitwise equal to the eager step in deterministic mode. With deterministic
 algorithms off (cuDNN benchmark stays off) the graph is NOT guaranteed to
 replay exactly the eager kernels; what the tests observe is that every RNG
 stream stays exactly equal over whole runs, and that one step from one exact
-state lands within 4x max(the spread of the eager outcomes, one FP32 rounding
-of the new value) of the nearest eager outcome, per tensor group (parameters,
-momentum buffers, BatchNorm buffers). In practice the FP32 rounding term is the
-binding one, so this is an "equal to FP32 rounding" bound, not a measured
-run-to-run noise level.
+state lands within 4x max(the median spread of the eager outcomes, one FP32
+rounding of the new value) of one nearest eager outcome, in every tensor group
+(parameters, momentum buffers, BatchNorm buffers). Which term sets the bound
+depends on the group: for parameters it is the FP32 rounding, for momentum
+buffers at production shapes it is the measured eager spread.
 
 * A graph bakes SGD's ``lr``/``momentum``/``weight_decay``/... in as Python
   scalars and the addresses of every parameter, gradient, momentum buffer and

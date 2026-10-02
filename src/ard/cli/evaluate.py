@@ -317,7 +317,7 @@ def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
     #   resume): the allowlisted architectures (CUDA_GRAPH_ARCHITECTURES), an
     #   eval-mode training attack, torch 2.11 on an RTX 4090.
     # - deterministic=false: present. There the tests show exact RNG streams
-    #   and a one-step result within FP32 rounding of eager, but not bitwise
+    #   and a one-step result within eager noise / FP32 rounding, not bitwise
     #   equality, so a graph run is recorded as such and never pools silently
     #   with a nondeterministic eager run. (Nondeterministic graph runs did not
     #   exist before 2026-10-03, so no recorded identity changes.)

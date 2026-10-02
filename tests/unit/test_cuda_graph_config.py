@@ -199,7 +199,8 @@ def test_nondeterministic_mode_admits_cuda_graph(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, training: dict[str, Any]
 ) -> None:
     """Human decision 2026-10-03: deterministic=false may use the graph (cuDNN benchmark may not);
-    equivalence within eager-vs-eager noise is tested in tests/integration/test_cuda_graph_training_step.py."""
+    exact RNG streams and one-step equivalence (within 4x max(eager spread, FP32 rounding) of the nearest eager
+    outcome) are tested in tests/integration/test_cuda_graph_training_step.py."""
     base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
     assert TrainingConfig(**base, **training, cuda_graph=True).cuda_graph is True
     raw = _stage1(monkeypatch, tmp_path)

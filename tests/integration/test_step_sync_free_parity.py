@@ -310,8 +310,9 @@ def test_cuda_shipped_path_is_bit_identical_to_pre_change_path(method: str) -> N
     root = Path(__file__).resolve().parents[2]
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(root / "src")
-    # Required by deterministic cuBLAS; must be set before CUDA initializes.
-    environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    # Production runs set no cuBLAS workspace override (torch 2.11 neither errors nor warns without it in
+    # deterministic mode), so the differential runs without one too.
+    environment.pop("CUBLAS_WORKSPACE_CONFIG", None)
     completed = subprocess.run(
         [sys.executable, "-c", _CUDA_DIFFERENTIAL_SCRIPT, str(Path(__file__).resolve().parent), method],
         cwd=root,

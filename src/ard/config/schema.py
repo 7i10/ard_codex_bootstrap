@@ -1105,9 +1105,9 @@ class TrainingConfig(StrictModel):
     # epoch accumulators) in one CUDA graph and replays it per full batch.
     # Equal to the eager step by contract -- bitwise in deterministic mode;
     # with deterministic=false exact RNG streams and a one-step result within
-    # 4x the FP32 rounding of each tensor group's update (the binding term of
-    # the test's bound) -- so it is allowed only where that contract is
-    # tested (cudnn_benchmark=true is not): one CUDA device, FP32,
+    # 4x max(eager spread, FP32 rounding) of the nearest eager outcome, per
+    # tensor group -- so it is allowed only where that contract is tested
+    # (cudnn_benchmark=true is not): one CUDA device, FP32,
     # step_diagnostics=false (tracking diagnostics are supported), eager
     # student, method pgd_at with a batch-keyed random start and a fixed
     # budget, SGD, no teacher/EMA/policy/intervention (see
@@ -1145,7 +1145,7 @@ class TrainingConfig(StrictModel):
                 (self.device == "cuda", "training.device=cuda (graphs exist only on CUDA; 'auto' is not enough)"),
                 # deterministic=false is admitted (human decision 2026-10-03):
                 # bitwise equal to eager in deterministic mode; otherwise every RNG
-                # stream stays exact and one step lands within FP32 rounding of eager
+                # stream stays exact and one step lands within eager noise / FP32 rounding
                 # (tests/integration/test_cuda_graph_training_step.py).
                 (not self.amp, "training.amp=false (a GradScaler step syncs and is not captured)"),
                 (not self.compile, "training.compile=false"),
@@ -1171,7 +1171,7 @@ class TrainingConfig(StrictModel):
 # training.cuda_graph (plan 0105): student architectures whose captured step is
 # shown equal to the eager step by
 # tests/integration/test_cuda_graph_training_step.py (bitwise when
-# deterministic, one step within FP32 rounding when not; eval-mode attack,
+# deterministic, one step within eager noise / FP32 rounding when not; eval-mode attack,
 # torch 2.11 on an RTX 4090) -- the SGD-trained BatchNorm CNNs this
 # project uses. Anything else is refused until that test covers it; rerun it
 # after a torch or driver upgrade.

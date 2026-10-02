@@ -14,7 +14,7 @@ on 2026-09-30.
 A default-off option `training.cuda_graph` that replays the PGD-AT training step as one CUDA graph.
 It must give bit-identical checkpoints, RNG streams, epoch rows and diagnostics to the eager trainer
 in deterministic mode. With `training.deterministic: false` (allowed since 2026-10-03, see below) it must
-keep every RNG stream exactly and one step must match an eager step to FP32 rounding.
+keep every RNG stream exactly and one step must match an eager step within eager noise / FP32 rounding.
 It must refuse every configuration where that is not proven.
 
 ## Design
@@ -126,25 +126,34 @@ It must refuse every configuration where that is not proven.
   floor of one FP32 rounding of the group's new value on the same scale. One step's nondeterminism can be
   bimodal: a summation-order difference flips the sign of an attack input gradient and moves the whole step,
   in eager arms too (seen at production shapes: some eager arms 4e-3 and 3e-2 of a step away from the
-  others). So each graph outcome is compared with its nearest eager outcome (the six eager arms), and the
-  noise level is the eager outcomes' spread (each one's distance to its nearest other). Rule: graph <=
-  4 x max(spread, floor) in every group, and every control >= 10 x that bound in some group. The
-  cross-process difference (eager_a vs the reference) is reported, not used. Regime: 64 px, batch 32,
-  10 classes, PGD-2, lr 0.002 (EfficientNet-B0 0.015, fixture 8 px and 0.05), so the reference step is sane
-  (BatchNorm running variances <= 10, parameter update about 1% of the weights, both asserted).
+  others). So each graph outcome is compared with one nearest eager outcome (the same eager arm for all
+  groups), and the noise level is the eager outcomes' spread: the median over the six eager arms of the
+  distance to their nearest other one, so a single eager arm in the other mode cannot widen the bound.
+  Rule: graph <= 4 x max(spread, floor) in every group; a spread above 100 x the floor fails the check;
+  every control >= 10 x that bound from every eager outcome, at both sync points (the defect is set before
+  the capture step, so the later replay carries it too). The cross-process difference (eager_a vs the
+  reference) is reported, not used. Regime: 64 px, batch 32, 10 classes, PGD-2, lr 0.002 (EfficientNet-B0
+  0.015, fixture 8 px and 0.05). Asserted: finite step, BatchNorm running variances <= 1e4, parameter update
+  <= 5% of the weights; measured: running variances <= 10, update about 1% of the weights.
   Measured in this regime: graph arms sit as close to the nearest eager outcome as eager arms sit to each
   other (parameters 1e-7 to 3e-7 of the update, momentum 2e-8 to 2e-7, BatchNorm buffers bitwise equal;
   the fixture is bitwise equal throughout), against FP32 floors of about 1e-5 (parameters) and 2e-7
   (momentum). Controls: lr = 0 gives 1.0, lr x 1.001 gives 1.0e-3, weight decay 0 gives 2e-4 to 6e-3,
-  attack seed + 1 gives 0.04 to 1.2, each at least 10x above the bound.
+  attack seed + 1 gives 0.04 to 1.2 (capture step); every control is at least 10x the bound at both sync
+  points (asserted; GPU1 peak with the production job beside it: 5.4 GB in total).
   cuDNN benchmark: with the same rule, a graph arm of MobileNetV4-Conv-Medium (64 px, benchmark on) landed
   0.27 (parameters) and 0.30 (momentum) of a step away from every eager outcome of its process, whose spread
   was 1.3e-7: the captured step had used a different cuDNN algorithm than the eager steps. That is the size
   of the difference between two separate benchmark runs (0.1 to 0.3 of a step at production shapes), not a
   rounding, so `cudnn_benchmark` stays refused together with `cuda_graph` until that is understood. (In 24
   earlier benchmark graph arms at production shapes, the graph matched its process's eager arms to 1e-7.)
-  (3) Production shapes, run once (not part of the test suite; Hamster GPU1, shared with a production job,
-  which matters for speed only): the same one-step check, batch 128, 1000 classes, cuDNN benchmark off.
+  (3) Production shapes: committed as the opt-in test
+  `test_production_shape_graph_step_matches_eager_within_one_step_noise` (skipped unless
+  `ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1`; checkpoints from `ARD_CG_CHECK_MNV4S_STAGE1_CKPT`,
+  `ARD_CG_CHECK_MNV4S_FULL_CKPT`, `ARD_CG_CHECK_MNV4M_CKPT`; the exact command is in the test file). It needs
+  about 15 GB of GPU memory per process: run it on a FREE GPU only. The numbers below are from one run on
+  2026-10-03, before the median-spread / common-nearest / both-sync-controls rule (the controls then ran at
+  the capture step only): the same one-step check, batch 128, 1000 classes, cuDNN benchmark off.
   MobileNetV4-Conv-Small from trained plan-0103 checkpoints (stage 1 at 112 px; stage 2 at 224 px),
   MobileNetV4-Conv-Medium from the trained plan-0103 phase-1 checkpoint (both shapes), EfficientNet-B0 from
   random initialisation (no checkpoint on Hamster; lr 0.5 so its update clears the FP32 floor). Stage 1:
@@ -249,3 +258,10 @@ It must refuse every configuration where that is not proven.
   The parity proof now runs without a `CUBLAS_WORKSPACE_CONFIG` override, as production does (no launcher
   sets it, and torch 2.11 neither errors nor warns without it in deterministic mode); the deterministic
   parity tests pass in that setting.
+- 2026-10-03, re-review of 093e654, final batch: spread is the median of the eager outcomes'
+  nearest-other distances and a spread above 100 x the floor fails the check (one eager arm in the other
+  mode no longer widens the bound; a CPU test pins this); each graph arm has one common nearest eager
+  outcome across groups; the controls run at both sync points; the production-shape check is committed as
+  an opt-in test; `test_step_sync_free_parity.py` also runs without `CUBLAS_WORKSPACE_CONFIG` (passes).
+  Incident: the earlier production-shape run on Hamster GPU1 (about 14 GB per process, next to a production
+  job) OOM-killed that production run. Production-shape checks run on a free GPU only.

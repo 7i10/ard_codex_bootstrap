@@ -641,7 +641,7 @@ class Trainer:
             (get_world_size() == 1, "world size 1"),
             # Two tested modes (training.deterministic): strict deterministic
             # algorithms (bitwise eager parity) or none at all (exact RNG
-            # streams, one step within FP32 rounding of eager). warn_only mixes
+            # streams, one step within eager noise / FP32 rounding). warn_only mixes
             # the two per kernel and is neither.
             (
                 not (
