@@ -2591,3 +2591,103 @@ history behind this pivot.)
   - MobileNetV4-S grid cell: `plan0103-mnv4s-fullat-50ep-lr00125-cg-s0-v1`
     runs on Ferret GPU0 (4b6780e), co-located with the stage-2 run there
     (about 36% utilisation).
+- 2026-10-02 (postrun): **Two-stage pilot, stage 2 from the 195-epoch
+  stage 1 completed.**
+  `plan0103-mnv4s-twostage-stage2-224-pgd3-from195-s0-v1` (Hamster GPU0,
+  RTX 4090) ran 20/20 epochs. `run-bundle/completion.json` reads
+  `completed`, the manifest status is `completed`, and
+  `run-bundle/error-marker.txt` reads "no application error recorded". The
+  watcher re-derived it as terminal and successful. All 20 epoch rows are
+  present (`epoch_metrics_complete: true`). `train.log` has no traceback,
+  NaN or error line (only the wandb git-root warning). `best.pt` (epoch 11)
+  and `last.pt` (epoch 19) are on disk; no `epoch-NNN.pt` was written,
+  because the configured checkpoint epochs (49, 99, ...) lie beyond 20
+  epochs. Nothing is imported into `docs/experiments/`: no aggregator
+  exists for this contract. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest summary.
+
+  Fixed identity: ImageNet-1k (original images, content `ae033613...`),
+  MobileNetV4-Conv-S (`mobilenetv4_conv_small_imagenet`,
+  `imagenet_standard` profile), plain PGD-AT, no teacher, 224 px training.
+  Init: stage-1 195-epoch `last.pt` (epoch 194,
+  `plan0103-mnv4s-twostage-stage1-112-pgd1-s256-s0-v1`, sha256
+  `b29eb82a...`, strict load, model entry only). Training and
+  evaluation-attack seed 0 (split seed 20260911). Training attack: CE
+  PGD-3, l_inf eps 4/255, step 8/765, random start, eval mode. Selection
+  and validation attack: PGD-10, same eps and step, random start, eval
+  mode. SGD (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.0025,
+  warmup_multistep (2-epoch warmup, x0.1 at epochs 10 and 15), 20 epochs.
+  World size 1, global batch 128, local BN. Deterministic, not compiled,
+  no cuda_graph, fp32. Config
+  `imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft.yaml`, protocol
+  `controlled_imagenet_stage02_two_stage_lowres_v1`, config hash
+  `b733761b...`. Source SHA `030be3f7c6a8d79fd0bd1b608f09d2ea393d7032`
+  (worktree `source-030be3f7c6a8`, clean). "val" is internal validation:
+  the held-out 2% of the original ImageNet train split (25,620 images, 224
+  px), the same slice as the single-stage reference. "probe" is 2,000
+  training images, eval mode, PGD-10. Neither is the ImageNet val split.
+  No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup (lr 0.00125) | 51.86 / 28.40 | 57.75 / 32.00 | 3.908 |
+  | 1 | first epoch at lr 0.0025 | 50.64 / 27.34 | 55.85 / 32.00 | 3.931 |
+  | 5 | lr 0.0025 | 51.26 / 28.29 | 57.00 / 33.10 | 3.876 |
+  | 9 | end of lr 0.0025 | 50.72 / 27.30 | 56.60 / 31.15 | 3.849 |
+  | 10 | first epoch at lr 0.00025 | 53.57 / 28.70 | 59.75 / 34.10 | 3.684 |
+  | 11 | best (by val PGD-10) | 54.31 / 29.11 | 60.60 / 33.80 | 3.646 |
+  | 14 | end of lr 0.00025 | 53.73 / 28.54 | 59.95 / 33.70 | 3.605 |
+  | 15 | first epoch at lr 0.000025 | 54.63 / 28.59 | 60.95 / 33.90 | 3.566 |
+  | 17 | lr 0.000025 | 54.90 / 28.86 | 60.80 / 33.80 | 3.552 |
+  | 18 | lr 0.000025 | 54.54 / 27.59 | 60.80 / 32.60 | 3.546 |
+  | 19 | last | 54.91 / 28.45 | 61.40 / 33.70 | 3.542 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Preregistered rule: worse.** Last-epoch val PGD-10 is 28.45%
+     against the single-stage random-init reference 30.71% (MobileNetV4-S,
+     lr 0.025, 50 epochs, plan 0104: same attacks, same val slice, also
+     deterministic). That is -2.26pt, past the -1pt line, so for this seed
+     and this stage-1 length the two-stage schedule is worse on PGD-10 at
+     the FLOP-matched budget. Clean is +1.06pt (54.91 vs 53.85).
+  2. **The verdict does not depend on the last-epoch choice.** No stage-2
+     epoch reaches 29.71% (reference minus 1pt); the best is 29.11%
+     (epoch 11), -1.60pt. The val SE is about 0.28pt PGD-10 and 0.31pt
+     clean, so the unpaired SE of the difference is about 0.40pt PGD-10.
+     The only ImageNet seed pair measured (Arm A, seeds 0 and 1) differs
+     by 0.01pt PGD-10, but one pair does not give a seed noise floor.
+  3. **Stage 2 adds clean accuracy, not PGD-10.** After its first epoch
+     (warmup, lr 0.00125) val PGD-10 is already 28.40%. Over the remaining
+     19 epochs it peaks at +0.71pt and ends at +0.05pt, while val clean
+     rises +3.05pt. In the lr 0.0025 stage (epochs 1-9) val PGD-10 stays
+     within 27.30-28.29% and val clean within 50.52-51.67%.
+  4. **Decays.** Epoch 9 to 10: +2.85 clean / +1.40 PGD-10. Epoch 14 to
+     15: +0.90 / +0.05.
+  5. **One-epoch PGD-10 dip in the last stage.** Epoch 17 to 18 val
+     PGD-10 falls 1.27pt (28.86% to 27.59%) at lr 0.000025, with clean
+     -0.36pt, and recovers to 28.45% at epoch 19. Probe PGD-10 falls by
+     1.20pt at the same epoch (33.80% to 32.60%), so it is a change in the
+     model, not val sampling. The cause was not investigated. It means a
+     single last-epoch reading here can move by about 1pt between
+     neighbouring epochs; point 2 shows the verdict survives that.
+  6. **Best and last.** Best (epoch 11) 54.31 / 29.11, last (epoch 19)
+     54.91 / 28.45; `robust_overfit_gap` 0.66pt.
+  7. **Seen-unseen gap.** At the last epoch probe minus val is +6.5 clean
+     and +5.2 PGD-10.
+  8. **What is still open.** This is one of four stage-2 arms. The
+     stage-1 length question (195 vs 100 vs 50 epochs) and the S=256 vs
+     original-image question need `-from100-s0-v1` (Hamster GPU1) and
+     `-from50s256-s0-v1` / `-from50orig-s0-v1` (Ferret), all still
+     running.
+
+  Caveats: one seed. Stage 1 trained on the derived S=256 copy (a
+  disclosed preprocessing condition); stage 2 trained on original images.
+  The compute match is a FLOP estimate (backward taken as 2x forward), not
+  measured wall-clock; the human's primary cost metric (Hamster
+  wall-clock with cuda_graph, no co-location) has not been measured for
+  either arm. AdvXL's ViT-B result is a different model and recipe and is
+  not compared. Cost: wall clock 7.87 h (2026-10-01 18:03 to 2026-10-02
+  01:56 UTC), 931-943 img/s throughout, eager. Peak allocated memory
+  2.87 GB. Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `5f9d3aa3...`,
+  `sample-stats-train.parquet` sha256 `052b0765...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id.
