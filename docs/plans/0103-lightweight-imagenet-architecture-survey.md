@@ -2691,3 +2691,110 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `5f9d3aa3...`,
   `sample-stats-train.parquet` sha256 `052b0765...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-02 (postrun): **Two-stage pilot, stage 2 from the 100-epoch
+  stage 1 completed.**
+  `plan0103-mnv4s-twostage-stage2-224-pgd3-from100-s0-v1` (Hamster GPU1,
+  RTX 4090) ran 20/20 epochs. `run-bundle/completion.json` reads
+  `completed`, the manifest status is `completed`, and
+  `run-bundle/error-marker.txt` reads "no application error recorded". The
+  watcher re-derived it as terminal and successful. All 20 epoch rows are
+  present (`epoch_metrics_complete: true`). `train.log` has no traceback,
+  NaN or error line (only the wandb git-root warning). `best.pt` (epoch 0)
+  and `last.pt` (epoch 19) are on disk; no `epoch-NNN.pt` was written,
+  because the configured checkpoint epochs lie beyond 20 epochs. Nothing
+  is imported into `docs/experiments/`: no aggregator exists for this
+  contract. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest summary.
+
+  Fixed identity: identical to the from-195 stage 2 above except the init
+  checkpoint. ImageNet-1k (original images, content `ae033613...`),
+  MobileNetV4-Conv-S (`mobilenetv4_conv_small_imagenet`,
+  `imagenet_standard` profile), plain PGD-AT, no teacher, 224 px training.
+  Init: stage-1 100-epoch `last.pt` (epoch 99,
+  `plan0103-mnv4s-twostage-stage1-112-pgd1-s256-100ep-cg-s0-v1`, sha256
+  `200a94fd...`, strict load, model entry only). Training and
+  evaluation-attack seed 0 (split seed 20260911). Training attack: CE
+  PGD-3, l_inf eps 4/255, step 8/765, random start, eval mode. Selection
+  and validation attack: PGD-10, same eps and step, random start, eval
+  mode. SGD (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.0025,
+  warmup_multistep (2-epoch warmup, x0.1 at epochs 10 and 15), 20 epochs.
+  World size 1, global batch 128, local BN. Deterministic, not compiled,
+  no cuda_graph, fp32. Protocol
+  `controlled_imagenet_stage02_two_stage_lowres_v1`, config hash
+  `ae2411f5...` (differs from the from-195 run's only through the init
+  checkpoint). Source SHA `030be3f7c6a8d79fd0bd1b608f09d2ea393d7032`
+  (worktree `source-030be3f7c6a8`, clean). "val" is internal validation:
+  the held-out 2% of the original ImageNet train split (25,620 images, 224
+  px), the same slice as the single-stage reference. "probe" is 2,000
+  training images, eval mode, PGD-10. Neither is the ImageNet val split.
+  No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup (lr 0.00125); best (by val PGD-10) | 51.70 / 28.40 | 57.45 / 32.90 | 3.943 |
+  | 1 | first epoch at lr 0.0025 | 50.77 / 27.60 | 55.35 / 32.60 | 3.939 |
+  | 4 | lr 0.0025 | 51.11 / 27.97 | 56.50 / 31.60 | 3.888 |
+  | 9 | end of lr 0.0025 | 51.25 / 26.57 | 55.40 / 31.00 | 3.845 |
+  | 10 | first epoch at lr 0.00025 | 53.55 / 28.00 | 59.25 / 33.10 | 3.676 |
+  | 14 | end of lr 0.00025 | 53.90 / 28.08 | 59.70 / 32.40 | 3.597 |
+  | 15 | first epoch at lr 0.000025 | 54.90 / 27.81 | 60.55 / 32.25 | 3.566 |
+  | 16 | lr 0.000025 | 54.67 / 28.31 | 60.75 / 33.25 | 3.561 |
+  | 17 | lr 0.000025 | 55.03 / 28.26 | 60.85 / 33.00 | 3.558 |
+  | 18 | lr 0.000025 | 54.69 / 27.59 | 60.15 / 31.85 | 3.559 |
+  | 19 | last | 55.12 / 28.19 | 60.85 / 32.70 | 3.557 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Preregistered rule: worse.** Last-epoch val PGD-10 is 28.19%
+     against the single-stage random-init reference 30.71% (MobileNetV4-S,
+     lr 0.025, 50 epochs: same attacks, same val slice, also
+     deterministic). That is -2.52pt, past the -1pt line. Clean is +1.27pt
+     (55.12 vs 53.85). The rule was written for the compute-matched
+     195-epoch arm. This arm uses less compute (FLOP estimate: 100 x 0.154
+     + 20 = 35.4 reference-epoch equivalents, about 71% of the reference's
+     50), so here "worse" means worse at about 71% of the compute.
+  2. **The verdict does not depend on the last-epoch choice.** No stage-2
+     epoch reaches 29.71% (reference minus 1pt); the best is 28.40%
+     (epoch 0), -2.31pt. The unpaired SE of the difference is about 0.40pt
+     PGD-10 (val SE about 0.28pt PGD-10, 0.31pt clean).
+  3. **Stage-1 length: no resolvable difference after stage 2.** Against
+     stage 2 from the 195-epoch stage 1 (same stage-2 config, same val
+     images), last vs last is +0.21 clean / -0.26 PGD-10 (55.12 / 28.19 vs
+     54.91 / 28.45), under one SE of the difference; one seed each. Best
+     vs best is -0.71 PGD-10, but best is a maximum selected on the same
+     val set, so last vs last is the fair comparison. Halving stage 1 (51%
+     of the stage-1 compute) cost no resolvable PGD-10 here, as at the end
+     of stage 1 (-0.12pt).
+  4. **Stage 2 again adds clean accuracy, not PGD-10.** Val PGD-10 after
+     the first stage-2 epoch is 28.40%, the same value as in the 195-epoch
+     arm. No later epoch exceeds it; the run ends 0.21pt below it while val
+     clean rises +3.42pt. In the lr 0.0025 stage (epochs 1-9) val PGD-10
+     drifts down from 27.97% (epoch 4) to 26.57% (epoch 9), -1.40pt, with
+     clean flat (50.48-51.35%); the 195 arm stayed within 27.30-28.29%
+     there.
+  5. **Decays.** Epoch 9 to 10: +2.30 clean / +1.43 PGD-10. Epoch 14 to
+     15: +1.00 / -0.27.
+  6. **One-epoch PGD-10 dip at epoch 18 again.** Epoch 17 to 18 val
+     PGD-10 falls 0.67pt (28.26% to 27.59%) with clean -0.34pt, and
+     recovers to 28.19% at epoch 19; probe PGD-10 falls 1.15pt at the same
+     epoch. The 195-epoch arm dipped at the same epoch (-1.27pt). Both arms
+     share seed-0 data order and attack seeds, so the epoch-18 batches are
+     a candidate cause; not investigated.
+  7. **Best and last.** Best (epoch 0) 51.70 / 28.40, last (epoch 19)
+     55.12 / 28.19; `robust_overfit_gap` 0.21pt.
+  8. **Seen-unseen gap.** At the last epoch probe minus val is +5.7 clean
+     and +4.5 PGD-10 (195 arm: +6.5 / +5.2).
+  9. **What is still open.** Two of four stage-2 arms are done. The S=256
+     vs original-image question needs `-from50s256-s0-v1` and
+     `-from50orig-s0-v1` (Ferret), still running.
+
+  Caveats: one seed. Stage 1 trained on the derived S=256 copy (a
+  disclosed preprocessing condition); stage 2 trained on original images.
+  The compute figure is a FLOP estimate (backward taken as 2x forward),
+  not measured wall-clock; Hamster wall-clock with cuda_graph and no
+  co-location has not been measured for either arm. Cost: wall clock
+  7.95 h (2026-10-01 18:03 to 2026-10-02 02:01 UTC), 919-931 img/s
+  throughout, eager; the from-195 stage 2 ran on GPU0 at the same time.
+  Peak allocated memory 2.87 GB. Checkpoint sha256 was not computed in
+  this postrun. `epoch-metrics.parquet` sha256 `ce1cc603...`,
+  `sample-stats-train.parquet` sha256 `bd8f035e...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id.
