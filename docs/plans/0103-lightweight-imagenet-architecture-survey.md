@@ -2798,3 +2798,49 @@ history behind this pivot.)
   this postrun. `epoch-metrics.parquet` sha256 `ce1cc603...`,
   `sample-stats-train.parquet` sha256 `bd8f035e...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-03 — **Stage-2 verdicts (seed 0, internal val, last epoch,
+  clean / PGD-10).**
+  - Preregistered verdict, 195-epoch two-stage vs single-stage 50-epoch
+    full AT (lr 0.025, 30.71): 54.91 / 28.45, i.e. -2.26pt PGD-10.
+    **Worse.**
+  - Post-hoc variants (not preregistered):
+    - stage 1 of 100 epochs: 55.12 / 28.19;
+    - stage 1 of 50 epochs on S=256: 53.13 / 29.84 (-0.87);
+    - stage 1 of 50 epochs on original images: 53.13 / 29.84.
+  - Longer stage 1 gives worse PGD-10 after stage 2. With stage 1 at 195
+    or 100 epochs, PGD-10 does not grow during stage 2.
+  - S=256 and original images give the same result after stage 2.
+  - Clean-training cosine control: 71.28 vs 70.86 for multistep, inside
+    noise.
+  - MobileNetV4-M random-init LR grid: 0.0125 / 0.025 / 0.05 give
+    37.00 / 39.39 / 39.10 PGD-10; argmax 0.025.
+- 2026-10-03 (human): measure full AT and two-stage in their fastest
+  configurations, and run the generalisation check.
+  - **Preregistered rule (two-stage generalisation check, written before
+    launch).**
+    - Arms: MobileNetV4-M and EfficientNet-B0, random init, seed 0.
+      - Stage 1: 112 px on S=256, PGD-1, 50 epochs, lr 0.025,
+        milestones [25, 38], cuda_graph on.
+      - Stage 2: 224 px original images, PGD-3, 20 epochs from stage-1
+        `last.pt`, lr 0.0025, cuda_graph on.
+    - References: each model's existing full-AT 50-epoch lr-0.025 run.
+      - MobileNetV4-M: 39.39.
+      - EfficientNet-B0: 35.93.
+      - Both references ran non-deterministic; deterministic vs
+        non-deterministic changes only bitwise reproducibility, and this
+        is disclosed.
+    - Metric: stage-2 last-epoch internal-val PGD-10.
+    - Two-stage is adopted as the Phase 1 method for the BN-CNN family
+      (MobileNetV4-S/M, EfficientNet-B0) only if BOTH models are within
+      1pt of their reference (>= ref - 1.0). Otherwise Phase 1 uses full
+      AT for 50 epochs.
+    - ConvNeXt-Atto and DeiT-Tiny are not covered by this rule. They are
+      not cuda_graph-eligible, and DeiT at 112 px needs
+      position-embedding handling.
+    - Clean accuracy is reported but not part of the rule.
+  - Configs:
+    - `imagenet_{mnv4m,effb0}_twostage_stage1_112_pgd1_resized_s256_50ep_cg.yaml`
+    - `imagenet_{mnv4m,effb0}_twostage_stage2_224_pgd3_ft_cg.yaml`
+    - fastest-config MobileNetV4-S:
+      `imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft_cg.yaml` and
+      `imagenet_mobilenetv4_pgd_at_random_init_lr0025_cg.yaml`
