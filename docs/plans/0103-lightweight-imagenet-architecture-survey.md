@@ -2957,3 +2957,53 @@ history behind this pivot.)
   sense (see point 7). `epoch-metrics.parquet` sha256 `676c1c92...`,
   `sample-stats-train.parquet` sha256 `e73fb33c...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-03 (postrun): **Fastest-config timing, MobileNetV4-S stage 2 on
+  Hamster failed at the start of epoch 2 of 20 (CUDA out of memory caused
+  by a foreign process).**
+  `plan0103-mnv4s-twostage-stage2-224-cg-from50s256-hamster-s0-v1` (hand-run,
+  pinned worktree source-65369a36668b, config
+  `imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft_cg.yaml`, init
+  `plan0103-mnv4s-twostage-stage1-112-s256-50ep-cg-hamster-s0-v1/last.pt`
+  sha256 `d4e1d8fe...`, 16 workers, seed 0). The watcher reports
+  `terminal: true`, `success: false`, `failure_class: unknown`; the manifest
+  status is `failed`, `error-marker.txt` reads "application failure
+  recorded", and there is no `completion.json`.
+  - Diagnosis (`train.log`): `torch.OutOfMemoryError` in `pgd.py:253`
+    (`torch.autograd.grad`), called from `_cuda_graph_body`, right after
+    epoch 1 finished (last progress 20:26:18 UTC, failure 20:26:24 UTC). The
+    OOM message: the GPU had 32 MiB free of 23.52 GiB; this process held
+    3.64 GiB; **process 2384146 held 19.80 GiB**. That is the only other
+    process listed, so the device was not the one running the full-AT
+    timing run (PID 2201374, physical GPU 0, still running at 4.6 GiB). PID
+    2384146 is not in the current GPU process list and was not identified.
+    The run's own peak reserved memory was 8.7 GB, so it fits a 24 GB card
+    alone. The failure point fits the cuda_graph schedule: the graph is
+    re-captured every epoch (1 capture, 2 eager steps per epoch), so the
+    run needs fresh memory at each epoch boundary, after validation.
+  - Classification: technical (external memory pressure), not scientific.
+    The watcher labels it `unknown`, so per the postrun contract this goes
+    to decision packet 0031 and nothing is retried here.
+  - What the two completed epochs show (internal val at 224 px, PGD-10,
+    not an official test): epoch 0 clean 50.12 / PGD-10 27.49, epoch 1
+    49.48 / 27.09. `best.pt` and `last.pt` (epoch 1) exist. Training time
+    1,165 s and 1,156 s per epoch; wall-clock 2,596 s for two epochs
+    (19:43:02 to 20:26:18 UTC), about 21.6 min per epoch, which
+    extrapolates to about 7.2 h for 20 epochs (eager was about 7.9 h). This
+    is an extrapolation from two epochs, not a measurement.
+  - Proposed retry (not run; needs the human's choice in 0031): a fresh
+    `-v2` run with its own output directory, same config, init and SHA, on
+    the GPU the failed run used (CUDA index 1 assumed, since physical GPU 0
+    holds the full-AT run), after checking that GPU is empty:
+    `cd <runtime>/worktrees/source-65369a36668b && CUDA_VISIBLE_DEVICES=1
+    PYTHONPATH=src ARD_SEED=0 ARD_NUM_WORKERS=16
+    ARD_IMAGENET_ROOT=/home/shunsukenaito/workspace-local/datasets/imagenet
+    ARD_STAGE1_CHECKPOINT=<runtime>/runs/plan0103-mnv4s-twostage-stage1-112-s256-50ep-cg-hamster-s0-v1/outputs/train/last.pt
+    ARD_STAGE1_CHECKPOINT_SHA256=d4e1d8fef8e36d6333a89de96d1e25adba5532ab0ff3bf88cd29b8dccab24753
+    WANDB_ENTITY=shunsuke-n-waseda-university
+    WANDB_PROJECT=lightweight-imagenet-at
+    ARD_RUN_ID=plan0103-mnv4s-twostage-stage2-224-cg-from50s256-hamster-s0-v2
+    ARD_JOB_OUTPUT_DIR=<runtime>/runs/plan0103-mnv4s-twostage-stage2-224-cg-from50s256-hamster-s0-v2/outputs/train
+    /home/shunsukenaito/.conda/envs/ard-v2/bin/python -m ard.cli.train
+    --config configs/scientific/imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft_cg.yaml`,
+    where `<runtime>` is
+    `/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap`.
