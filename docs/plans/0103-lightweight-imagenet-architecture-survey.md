@@ -2863,3 +2863,97 @@ history behind this pivot.)
     - Rule: adopt the shortest length whose last-epoch internal-val
       PGD-10 is >= 29.34 (reference - 0.5pt); otherwise keep 20 epochs.
       Seed 0 only. Clean accuracy is reported, not ruled on.
+- 2026-10-03 (postrun): **Fastest-config timing, MobileNetV4-S stage 1
+  (50 epochs, S=256, cuda_graph) on Hamster completed.**
+  `plan0103-mnv4s-twostage-stage1-112-s256-50ep-cg-hamster-s0-v1` (Hamster,
+  one RTX 4090) ran 50/50 epochs. It is the Hamster re-run of the Ferret
+  50-epoch stage 1 (`plan0103-mnv4s-twostage-stage1-112-pgd1-s256-50ep-cg-s0-v1`),
+  made to measure two-stage wall-clock in its fastest configuration (human,
+  2026-10-03). Its launch was not logged in this plan.
+  `run-bundle/completion.json` reads `completed`, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful.
+  All 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `train.log` has no traceback, NaN or error line (only the wandb git-root
+  warning). `best.pt`, `last.pt` (epoch 49) and `epoch-049.pt` are on disk.
+  Nothing is imported into `docs/experiments/`: no aggregator exists for
+  this contract. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest.
+
+  Fixed identity: as the 195-epoch stage-1 entry (2026-10-01) except 50
+  epochs, milestones [25, 38] (10-epoch warmup) and `cuda_graph: true`.
+  ImageNet-1k, derived S=256 training copy (`imagenet_train_s256`, content
+  `65f729c7...`), 112 px training view, MobileNetV4-Conv-S random init,
+  plain PGD-AT, no teacher. Training attack CE PGD-1, l_inf eps 4/255, step
+  4/255, random start, eval mode. Selection and validation attack PGD-10,
+  eps 4/255, step 8/765, random start, eval mode. SGD (Nesterov, momentum
+  0.9, wd 1e-4), peak LR 0.025. Training and evaluation-attack seed 0
+  (split seed 20260911). World size 1, global batch 128, local BN.
+  Deterministic, not compiled, fp32, 16 workers. Config
+  `imagenet_mobilenetv4_twostage_stage1_112_pgd1_resized_s256_50ep_cg.yaml`,
+  protocol `controlled_imagenet_stage02_two_stage_lowres_v1`, config hash
+  `e69ebd4c...`. Source SHA `65369a36668b70c789c3e0afbf8f5b3a4870bfc7`
+  (worktree `source-65369a36668b`, clean). "val" is internal validation
+  (25,620 held-out images of the S=256 copy, 112 px); "probe" is 2,000
+  training images. Neither is the ImageNet val split. No AutoAttack has
+  run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 0.69 / 0.50 | 1.05 / 0.80 | 6.830 |
+  | 4 | warmup | 12.36 / 5.93 | 12.10 / 5.15 | 5.776 |
+  | 9 | end of warmup | 25.66 / 10.99 | 26.15 / 11.25 | 5.005 |
+  | 24 | end of lr 0.025 | 34.52 / 14.42 | 36.15 / 16.40 | 4.521 |
+  | 25 | first epoch at lr 0.0025 | 41.70 / 18.31 | 43.85 / 20.25 | 4.218 |
+  | 37 | end of lr 0.0025 | 44.80 / 19.13 | 48.15 / 21.05 | 4.018 |
+  | 38 | first epoch at lr 0.00025 | 46.03 / 19.88 | 50.30 / 21.75 | 3.939 |
+  | 49 | last = best (by val PGD-10) | 46.63 / 20.44 | 52.00 / 22.65 | 3.888 |
+
+  Reading (n=1, internal validation at 112 px, PGD-10 only):
+  1. **Same result as the Ferret run.** Last-epoch val 46.63 / 20.44 equals
+     the Ferret 50-epoch S=256 stage 1 (46.63 / 20.44, 2026-10-02 summary)
+     to two decimals. Same config, seed and deterministic mode, different
+     host and source SHA. Epochs 0, 4 and 9 also match the eager 195-epoch
+     run to two decimals, including the probe. Only these logged values
+     were compared; the Ferret per-epoch rows were not read here. The
+     `last.pt` files differ in sha256 (`d4e1d8fe...` here, `cedf09c5...` on
+     Ferret), but the file holds run metadata, so this is not a weight
+     comparison.
+  2. **The run trains normally.** Val PGD-10 never falls more than 0.36pt
+     below its running maximum (epoch 30); the catastrophic-overfitting
+     guard never fires. Val SE is about 0.31pt clean and 0.25pt PGD-10.
+  3. **The peak-LR stage is still rising slowly when it ends.** Val PGD-10
+     goes 13.56% (epoch 15) to 14.42% (epoch 24), within 14.18-14.69% over
+     epochs 20-24. The 195-epoch run reached 15.05% at epoch 29.
+  4. **Decays.** Epoch 24 to 25: +7.18 clean / +3.89 PGD-10. Epoch 37 to 38:
+     +1.23 / +0.75. No PGD-10 drift in the lr 0.0025 stage (peak 19.36% at
+     epoch 32, end 19.13%). In the last stage val PGD-10 stays within
+     19.88-20.44% and still creeps up.
+  5. **Best and last are the same epoch** (49); `robust_overfit_gap` 0.0.
+  6. **Seen-unseen gap.** At the last epoch probe minus val is +5.4 clean
+     and +2.2 PGD-10.
+  7. **Wall-clock (the purpose of this run).** 3.45 h from start to finish
+     (2026-10-02 16:15:58 to 19:42:48 UTC, 12,410 s). Summed per-epoch
+     training time is 10,077 s (2.80 h); the remaining 2,333 s (about 47 s
+     per epoch) is validation, probe, checkpointing and start-up.
+     Throughput is 6,540-6,620 img/s in epochs 0-11 and mostly 6,200-6,570
+     img/s afterwards, with two slow stretches: epochs 24-27 (5,353, then
+     4,170-4,260 img/s) and epochs 47-49 (6,225 to 5,614 img/s). Their
+     cause was not identified. The other Hamster GPU ran
+     `plan0103-mnv4s-fullat-50ep-lr0025-cg-s0-v1` (same source, started the
+     same second) for the whole run, sharing CPU, disk and data loading. So
+     the GPU was not shared, but the host was. At the typical ~194 s per
+     epoch, the slow epochs cost about 0.1 h. cuda_graph: 1 capture, 2
+     eager steps and 9,807 replays per epoch. Peak allocated memory
+     0.84 GB, reserved 2.24 GB.
+  8. **No verdict here.** No preregistered rule reads this run on its own.
+     The wall-clock comparison with full AT needs the full-AT timing run
+     (at epoch 10 of 50 when this run ended) and the Hamster stage 2 from
+     this `last.pt`, `plan0103-mnv4s-twostage-stage2-224-cg-from50s256-hamster-s0-v1`,
+     which started at 19:43:02 UTC (init sha256 `d4e1d8fe...`).
+
+  Caveats: one seed. Training pixels come from the derived S=256 copy.
+  The timing is not a "no co-location" host measurement in the strict
+  sense (see point 7). `epoch-metrics.parquet` sha256 `676c1c92...`,
+  `sample-stats-train.parquet` sha256 `e73fb33c...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id.
