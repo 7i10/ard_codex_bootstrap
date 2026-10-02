@@ -171,11 +171,26 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
 - `training.cuda_graph` (plan 0105, default off) replays the PGD-AT training step as one CUDA graph. It is in the
   config hash but not in `training_protocol_identity`, like `training.step_diagnostics`. That exclusion holds
   only because config validation limits the flag to the scope where
-  `tests/integration/test_cuda_graph_training_step.py` proves the captured step bitwise identical to the eager step
-  (checkpoints, RNG streams, epoch rows, diagnostics): the allowlisted students (`CUDA_GRAPH_ARCHITECTURES`:
-  MobileNetV4-Conv-Small/Medium, EfficientNet-B0), an eval-mode training attack, deterministic mode, single CUDA
-  device, FP32, method `pgd_at`, SGD, no teacher/EMA/policy — measured on torch 2.11 with an RTX 4090. Rerun the
-  parity test after a torch or driver upgrade and before widening the scope.
+  `tests/integration/test_cuda_graph_training_step.py` proves the captured step equal to the eager step of the
+  same determinism class: the allowlisted students (`CUDA_GRAPH_ARCHITECTURES`:
+  MobileNetV4-Conv-Small/Medium, EfficientNet-B0), an eval-mode training attack, single CUDA
+  device, FP32, method `pgd_at`, SGD, no teacher/EMA/policy — measured on torch 2.11 with an RTX 4090.
+  - `training.deterministic: true`: **bitwise** equal (checkpoints, RNG streams, epoch rows, diagnostics).
+  - `training.deterministic: false`, with or without `cudnn_benchmark: true` (human decision 2026-10-03): bitwise
+    equality is impossible, because two eager nondeterministic runs already differ. What is proven instead, in
+    every allowlisted student with and without cuDNN benchmark: (1) over whole runs, every RNG stream
+    (checkpointed Python/NumPy/torch CPU/CUDA states, the CUDA RNG state, the seed and draw count of every attack
+    generator), the global step, scheduler and sampler state are **exactly** equal, and the audit counts show the
+    graph ran; (2) one training step taken from one exact state (the capture step and a later replay) lands within
+    4x the eager-vs-eager distance of the same step (or 4x one FP32 rounding of the new state when eager replicas
+    agree bitwise), while a negative control is at least 100x farther. This is "equal within nondeterministic
+    noise", not bitwise. Whole-run weights are not compared: PGD's sign step makes nondeterministic runs drift
+    apart chaotically, eager vs eager included.
+  - `training.deterministic` itself stays in `training_protocol_identity`, and `cudnn_benchmark` is recorded there
+    when true, as before. So a deterministic run and a nondeterministic run never pool, with or without the graph;
+    a nondeterministic graph run pools only with nondeterministic eager runs of the same arm, exactly as two
+    nondeterministic eager runs already do.
+  Rerun the parity and equivalence tests after a torch or driver upgrade and before widening the scope.
 - Tiny-ImageNetのobserved split digestは、expected digestなしなら`computed`、configのexpected digestと一致したら
   `computed-and-matched`。training configだけから作るidentityの`expected-unverified`は観測済みという意味ではない。
 - 集計ではevaluation/training dataset、student、method、training protocol、evaluation protocol、complete threat、

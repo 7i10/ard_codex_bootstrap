@@ -171,10 +171,8 @@ def test_allowlist_is_the_parity_tested_sgd_batchnorm_cnns() -> None:
     ("training", "reason"),
     [
         ({"device": "auto"}, "training.device=cuda"),
-        ({"deterministic": False}, "training.deterministic=true"),
         ({"amp": True}, "training.amp=false"),
         ({"deterministic": False, "compile": True}, "training.compile=false"),
-        ({"deterministic": False, "cudnn_benchmark": True}, "training.cudnn_benchmark=false"),
         ({"step_diagnostics": True}, "training.step_diagnostics=false"),
         ({"global_batch_size": 256}, "world size 1"),
         ({"epsilon_warmup_epochs": 5}, "training.epsilon_warmup_epochs unset"),
@@ -193,6 +191,28 @@ def test_training_scope_fails_closed(training: dict[str, Any], reason: str) -> N
     with pytest.raises(ValueError, match="training.cuda_graph=true requires") as refused:
         TrainingConfig(**{**base, **training}, cuda_graph=True)
     assert reason in str(refused.value)
+
+
+@pytest.mark.parametrize("training", [{"deterministic": False}, {"deterministic": False, "cudnn_benchmark": True}])
+def test_nondeterministic_mode_admits_cuda_graph(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, training: dict[str, Any]
+) -> None:
+    """Human decision 2026-10-03: deterministic=false (optionally with cuDNN benchmark) may use the graph;
+    equivalence within eager-vs-eager noise is tested in tests/integration/test_cuda_graph_training_step.py."""
+    base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
+    assert TrainingConfig(**base, **training, cuda_graph=True).cuda_graph is True
+    raw = _stage1(monkeypatch, tmp_path)
+    enabled = ExperimentConfig.model_validate(_with(raw, training={**training, "cuda_graph": True}))
+    assert enabled.training.deterministic is False and enabled.training.cuda_graph is True
+    # Every other scope restriction still holds in nondeterministic mode.
+    with pytest.raises(ValueError, match="training.cuda_graph=true requires") as refused:
+        TrainingConfig(**base, **training, amp=True, cuda_graph=True)
+    assert "training.amp=false" in str(refused.value)
+    off_list = _with(
+        raw, training={**training, "cuda_graph": True}, student={"architecture": "mobilenet_v3_small_imagenet"}
+    )
+    with pytest.raises(ValueError, match="a parity-tested student.architecture"):
+        ExperimentConfig.model_validate(off_list)
 
 
 @pytest.mark.parametrize(
@@ -251,10 +271,17 @@ def test_runtimes_other_than_the_trainer_cli_refuse_cuda_graph() -> None:
 
 def test_cuda_graph_is_not_part_of_the_pooling_identity() -> None:
     """Out of the pooling identity only because the scope checks above confine it to the
-    parity-tested allowlist / eval-mode attack / deterministic mode (plan 0105)."""
+    parity-tested allowlist / eval-mode attack, where the graph equals eager bitwise (deterministic)
+    or within eager-vs-eager noise (nondeterministic) (plan 0105). ``deterministic`` itself and
+    ``cudnn_benchmark`` stay in the identity, so the graph never bridges those classes."""
     base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
     assert _throughput_protocol_identity(TrainingConfig(**base, cuda_graph=True)) == {}
     assert _throughput_protocol_identity(TrainingConfig(**base)) == {}
+    nondeterministic = {**base, "deterministic": False}
+    assert _throughput_protocol_identity(TrainingConfig(**nondeterministic, cuda_graph=True)) == {}
+    benchmark = {**nondeterministic, "cudnn_benchmark": True}
+    assert _throughput_protocol_identity(TrainingConfig(**benchmark, cuda_graph=True)) == {"cudnn_benchmark": True}
+    assert _throughput_protocol_identity(TrainingConfig(**benchmark)) == {"cudnn_benchmark": True}
 
 
 # =========================================================================== trainer scope
@@ -320,16 +347,36 @@ def test_trainer_refuses_a_linf_pgd_subclass(tmp_path: Path) -> None:
     assert "a LinfPGD (not a subclass) training attack" in _refusal(tmp_path, attack=subclass)
 
 
-@pytest.mark.parametrize(("enabled", "warn_only"), [(False, False), (True, True)])
-def test_trainer_refuses_non_strict_determinism(tmp_path: Path, enabled: bool, warn_only: bool) -> None:
-    previous = (torch.are_deterministic_algorithms_enabled(), torch.is_deterministic_algorithms_warn_only_enabled())
+@pytest.mark.parametrize(
+    ("enabled", "warn_only", "benchmark", "refusal"),
+    [
+        (True, False, False, None),
+        (False, False, False, None),  # training.deterministic=false
+        (False, True, False, None),  # warn_only is inert while the mode is off
+        (False, False, True, None),  # deterministic=false with cudnn_benchmark=true
+        (True, True, False, "torch deterministic algorithms strictly on or off (not warn_only)"),
+        (True, False, True, "cuDNN benchmark only with deterministic algorithms off"),
+    ],
+)
+def test_trainer_determinism_scope(
+    tmp_path: Path, enabled: bool, warn_only: bool, benchmark: bool, refusal: str | None
+) -> None:
+    previous = (
+        torch.are_deterministic_algorithms_enabled(),
+        torch.is_deterministic_algorithms_warn_only_enabled(),
+        torch.backends.cudnn.benchmark,
+    )
     torch.use_deterministic_algorithms(enabled, warn_only=warn_only)
+    torch.backends.cudnn.benchmark = benchmark
     try:
-        assert "torch deterministic algorithms enabled (not warn_only)" in _refusal(tmp_path)
-        torch.use_deterministic_algorithms(True)
-        assert "torch deterministic algorithms" not in _refusal(tmp_path)
+        message = _refusal(tmp_path)  # the CPU device is the base fixture's only other refusal
+        if refusal is None:
+            assert "torch deterministic algorithms" not in message and "cuDNN benchmark" not in message
+        else:
+            assert refusal in message
     finally:
         torch.use_deterministic_algorithms(previous[0], warn_only=previous[1])
+        torch.backends.cudnn.benchmark = previous[2]
 
 
 # =========================================================================== static buffers
