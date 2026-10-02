@@ -2844,3 +2844,22 @@ history behind this pivot.)
     - fastest-config MobileNetV4-S:
       `imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft_cg.yaml` and
       `imagenet_mobilenetv4_pgd_at_random_init_lr0025_cg.yaml`
+- 2026-10-03 (human): determinism may be dropped for new runs; AMP and
+  BF16 are not used; training PGD stays at 3 steps. Checkpoint and
+  validation policy waits for a literature check plus our best-vs-last
+  data.
+  - Best minus last internal-val PGD-10 over 29 completed ImageNet-1k AT
+    runs, excluding the collapsed revisiting-recipe run: median about
+    0.1pt, max 0.66pt, mostly under 0.35pt. The val SE is about 0.3pt.
+  - **Preregistered rule (stage-2 length check, written before launch).**
+    - Arms: from the same stage-1 `last.pt`
+      (`plan0103-mnv4s-twostage-stage1-112-pgd1-s256-50ep-cg-s0-v1`,
+      sha256 cedf09c5…), run stage 2 at 224 px for 5 and 10 epochs.
+      Milestones and warmup are scaled from 20 epochs; deterministic,
+      cuda_graph on. Configs are
+      `imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft_cg_{5,10}ep.yaml`.
+    - Reference: the existing 20-epoch stage 2 from that checkpoint,
+      29.84 PGD-10 (last epoch).
+    - Rule: adopt the shortest length whose last-epoch internal-val
+      PGD-10 is >= 29.34 (reference - 0.5pt); otherwise keep 20 epochs.
+      Seed 0 only. Clean accuracy is reported, not ruled on.
