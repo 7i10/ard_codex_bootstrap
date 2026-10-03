@@ -3007,3 +3007,110 @@ history behind this pivot.)
     --config configs/scientific/imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft_cg.yaml`,
     where `<runtime>` is
     `/home/shunsukenaito/workspace-local/ard-runtime/ard_codex_bootstrap`.
+- 2026-10-03 (postrun): **Fastest-config timing, MobileNetV4-S stage 2
+  (20 epochs, cuda_graph) on Hamster completed (-v2 rerun).**
+  `plan0103-mnv4s-twostage-stage2-224-cg-from50s256-hamster-s0-v2` (hand-run,
+  Hamster, one RTX 4090) ran 20/20 epochs. It is option A of decision 0031
+  (a fresh rerun of the OOM-failed `-v1`, same config, init and SHA). Its
+  launch was not logged in this plan, and 0031's `chosen` field is still
+  null. `run-bundle/completion.json` reads `completed`, the manifest status
+  is `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful.
+  All 20 epoch rows are present (`epoch_metrics_complete: true`).
+  `train.log` has no traceback, NaN or error line (only the wandb git-root
+  warning). `best.pt` (epoch 16) and `last.pt` (epoch 19) are on disk.
+  Nothing is imported into `docs/experiments/`: no aggregator exists for
+  this contract. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest.
+
+  Fixed identity: as the from-195 stage 2 (2026-10-02) except the init
+  checkpoint and `cuda_graph: true`. ImageNet-1k (original images, content
+  `ae033613...`), MobileNetV4-Conv-S, plain PGD-AT, no teacher, 224 px
+  training. Init: the Hamster stage-1 50-epoch S=256 `last.pt` (epoch 49,
+  `plan0103-mnv4s-twostage-stage1-112-s256-50ep-cg-hamster-s0-v1`, sha256
+  `d4e1d8fe...`, strict load, model entry only). Training and
+  evaluation-attack seed 0 (split seed 20260911). Training attack CE PGD-3,
+  l_inf eps 4/255, step 8/765, random start, eval mode. Selection and
+  validation attack PGD-10, same eps and step, random start, eval mode. SGD
+  (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.0025, warmup_multistep
+  (2-epoch warmup, x0.1 at epochs 10 and 15), 20 epochs. World size 1,
+  global batch 128, local BN. Deterministic, not compiled, cuda_graph, fp32.
+  Config `imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft_cg.yaml`,
+  protocol `controlled_imagenet_stage02_two_stage_lowres_v1`, config hash
+  `fdd7454f...`. Source SHA `65369a36668b70c789c3e0afbf8f5b3a4870bfc7`
+  (worktree `source-65369a36668b`, clean). "val" is internal validation
+  (25,620 held-out original train images, 224 px, the same slice as the
+  single-stage reference); "probe" is 2,000 training images. Neither is the
+  ImageNet val split. No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup (lr 0.00125) | 50.12 / 27.49 | 54.35 / 30.75 | 4.052 |
+  | 1 | first epoch at lr 0.0025 | 49.48 / 27.09 | 53.35 / 30.85 | 4.012 |
+  | 5 | lr 0.0025 | 50.28 / 27.80 | 54.50 / 31.65 | 3.943 |
+  | 9 | end of lr 0.0025 | 50.60 / 27.91 | 54.25 / 31.55 | 3.913 |
+  | 10 | first epoch at lr 0.00025 | 52.54 / 29.46 | 57.55 / 34.00 | 3.803 |
+  | 14 | end of lr 0.00025 | 52.75 / 29.66 | 57.80 / 33.45 | 3.759 |
+  | 15 | first epoch at lr 0.000025 | 53.14 / 29.73 | 58.55 / 33.55 | 3.746 |
+  | 16 | best (by val PGD-10) | 53.15 / 29.86 | 58.45 / 34.00 | 3.743 |
+  | 17 | lr 0.000025 | 53.08 / 29.77 | 58.45 / 34.05 | 3.740 |
+  | 18 | lr 0.000025 | 53.14 / 29.77 | 57.80 / 33.85 | 3.740 |
+  | 19 | last | 53.13 / 29.84 | 58.30 / 34.30 | 3.740 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Reproduces both earlier runs.** Epochs 0 and 1 equal the failed
+     `-v1` (50.12 / 27.49 and 49.48 / 27.09) to two decimals, which is the
+     check 0031 A asked for. The last epoch, 53.13 / 29.84, equals the
+     Ferret stage 2 from the Ferret 50-epoch S=256 stage 1
+     (`-from50s256-s0-v1`, 53.13 / 29.84, 2026-10-03 verdict summary) to two
+     decimals. Only those logged values were compared; the Ferret per-epoch
+     rows were not read here. So the accuracy side of the fastest
+     configuration is the already-reported one, and no new accuracy verdict
+     comes from this run.
+  2. **Wall-clock (the purpose of this run).** 6.30 h from start to finish
+     (run-bundle `created_at` 2026-10-02 20:40:59 to `finished_at`
+     2026-10-03 02:59:10 UTC, 22,691 s). Summed per-epoch training time is
+     21,188 s (5.89 h); the remaining 1,503 s (about 75 s per epoch) is
+     validation, probe, checkpointing and start-up. Throughput 1,153 img/s
+     in epoch 0, 1,172 in epoch 1, then 1,186-1,188 img/s for every
+     remaining epoch; no slow stretch. The 2-epoch extrapolation in 0031
+     (7.2 h) was 14% too high: `-v1` trained epochs 0/1 in 1,165 / 1,156 s,
+     this run in 1,089 / 1,071 s, presumably because the foreign process
+     that later caused the OOM was already sharing `-v1`'s GPU (not
+     verified). The full-AT timing run
+     (`plan0103-mnv4s-fullat-50ep-lr0025-cg-s0-v1`) held the other Hamster
+     GPU for the whole run, so as in stage 1 the GPU was not shared but the
+     host was. cuda_graph: 1 capture, 2 eager steps and 9,807 replays per
+     epoch. Peak allocated memory 3.04 GB, reserved 8.71 GB (epoch 1).
+  3. **Two-stage total on Hamster.** Stage 1 (3.45 h, 12,410 s) plus this
+     stage 2 (6.30 h, 22,691 s) is 35,101 s, 9.75 h, start to finish, not
+     counting the gap between the two runs. Context only: the eager stage 2
+     runs (from195 / from100, source `030be3f`, both Hamster GPUs busy with
+     stage 2) took 7.87 / 7.95 h at 919-943 img/s, so cuda_graph here gives
+     about 1.26-1.29x their throughput; different source and co-location, so this
+     is not a controlled speed-up measurement.
+  4. **Stage 2 adds PGD-10 from this stage 1.** Unlike the from-195 and
+     from-100 arms, val PGD-10 does not drift down in the lr 0.0025 stage
+     (27.09-27.93%, ending at 27.91%) and ends 2.35pt above its epoch-0
+     value. Decays: epoch 9 to 10 +1.94 clean / +1.55 PGD-10; epoch 14 to 15
+     +0.39 / +0.07. The last stage is flat (29.73-29.86%).
+  5. **No epoch-18 dip.** Epoch 17 to 18 val PGD-10 is unchanged (29.77%),
+     whereas the from-195 and from-100 arms both dipped at epoch 18 (-1.27 /
+     -0.67pt). All three share seed-0 data order and attack seeds, so the
+     epoch-18 batches alone do not cause the dip; not investigated further.
+  6. **Best and last.** Best (epoch 16) 53.15 / 29.86, last (epoch 19)
+     53.13 / 29.84; `robust_overfit_gap` 0.03pt, well under the val SE
+     (about 0.28pt PGD-10).
+  7. **Seen-unseen gap.** At the last epoch probe minus val is +5.2 clean
+     and +4.5 PGD-10.
+  8. **No verdict here.** The preregistered wall-clock comparison (0030 A:
+     two-stage time / full-AT time in 0.9-1.1 reads "equal") needs the
+     full-AT timing run, still running on the other Hamster GPU.
+
+  Caveats: one seed. Stage 1 trained on the derived S=256 copy (a disclosed
+  preprocessing condition); stage 2 trained on original images. The timing
+  is not a "no co-location" host measurement in the strict sense (point 2).
+  Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `0828de5d...`,
+  `sample-stats-train.parquet` sha256 `121923a9...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id.
