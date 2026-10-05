@@ -3224,3 +3224,43 @@ history behind this pivot.)
   postrun. `epoch-metrics.parquet` sha256 `0b797039...`,
   `sample-stats-train.parquet` sha256 `a1e5167b...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-05 — **Verdicts.** Seed 0, internal val, last epoch, clean /
+  PGD-10.
+  - Fastest-config timing on Hamster, MobileNetV4-S (decisions 0030-0033):
+    - full AT, 50 epochs, cuda_graph: 53.85 / 30.71, bitwise equal to the
+      eager run; 15.45 h wall.
+    - two-stage 50 + 20 epochs, cuda_graph: 53.13 / 29.84, bitwise equal
+      to the Ferret run; 3.45 + 6.30 = 9.75 h.
+    - Ratio 0.63.
+    - Stage 2 -v1 failed from a co-located test's OOM; -v2 was rerun.
+  - **Stage-2 length (preregistered rule: shortest length with PGD-10 >=
+    29.34):** 5 epochs 51.57 / 28.77 (fails); 10 epochs 52.18 / 29.38
+    (passes). So 10 epochs would be adopted if two-stage were used.
+  - **Two-stage generalisation (preregistered rule: both models within
+    1pt of their full-AT 50-epoch reference).**
+    - MobileNetV4-M: 63.04 / 37.99 vs 39.39, i.e. -1.40. **Fails.**
+    - EfficientNet-B0 stage 2 OOMed at 224 px with cuda_graph. Peak was
+      about 22.6 GB: the graph's private pool plus the eager allocations.
+      Stage 1 (112 px) ran: 49.97 / 24.74. The verdict does not depend on
+      it, because MobileNetV4-M already fails.
+    - **Phase 1 therefore uses full AT, 50 epochs.**
+    - Limitation: cuda_graph does not fit EfficientNet-B0 at 224 px,
+      batch 128, on 24 GB. EfficientNet-B0 at 224 runs without cuda_graph.
+  - **Phase 1 grid launched (option A: 3 LRs per model, full AT 50
+    epochs, random init, seed 0).**
+    - Best-vs-best uses last-epoch internal-val PGD-10 to pick each
+      model's LR. Official-val evaluation (clean, PGD, AutoAttack in a
+      separate process) is run only on the chosen LR.
+    - Complete already:
+      - MobileNetV4-S: 0.0125 / 0.025 / 0.05 / 0.1, giving 29.16 / 30.71
+        / (plan 0104) / 29.18.
+      - MobileNetV4-M: 0.0125 / 0.025 / 0.05, giving 37.00 / 39.39 /
+        39.10.
+      - EfficientNet-B0: 0.025, giving 35.93.
+    - New, non-deterministic with cudnn_benchmark (determinism dropped,
+      human 2026-10-03):
+      - ConvNeXt-Atto and DeiT-Tiny, AdamW 1.25e-4 / 2.5e-4 / 5e-4
+        (`imagenet_{convnext_atto,deit_tiny}_pgd_at_phase1_adamw_random_lr*.yaml`).
+      - EfficientNet-B0 0.0125 / 0.05: same identity as its 0.025 run,
+        i.e. compile and non-deterministic.
+    - MobileViT-S: only if time allows.
