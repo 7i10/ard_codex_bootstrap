@@ -3348,3 +3348,16 @@ history behind this pivot.)
   computed in this postrun. `epoch-metrics.parquet` sha256 `78cdce7d...`,
   `sample-stats-train.parquet` sha256 `0e9c2132...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-06 — Phase 1 AdamW grid, interim results (internal val, last
+  epoch, clean / PGD-10).
+  - ConvNeXt-Atto: 2.5e-4 gives 55.98 / 34.23; 5e-4 gives 58.83 / 36.35.
+  - DeiT-Tiny: 1.25e-4 gives 49.18 / 27.17 (epoch 45); 2.5e-4 gives
+    54.54 / 31.24 (epoch 49); 5e-4 gives 56.85 / 33.27.
+  - For both models the argmax sits at the top grid point, so a 1e-3 cell
+    is added for each, on the idle Ferret GPUs 1 and 2. The MobileNetV4-S
+    grid also extended past its first range (0.1).
+  - Seed 0. The cuda_graph production-shape check: 5/6 cases passed. The
+    MobileNetV4-M 224 px non-deterministic case failed: a graph arm landed
+    0.026 of a step from every eager outcome. So non-deterministic +
+    cuda_graph is not used in production; cuda_graph runs stay
+    deterministic (bitwise proven).
