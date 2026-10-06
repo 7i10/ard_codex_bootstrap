@@ -3361,3 +3361,95 @@ history behind this pivot.)
     0.026 of a step from every eager outcome. So non-deterministic +
     cuda_graph is not used in production; cuda_graph runs stay
     deterministic (bitwise proven).
+- 2026-10-06 (postrun): **Phase 1 LR grid, DeiT-Tiny AdamW random init /
+  lr 2.5e-4 completed.** `plan0103-phase1-deit-tiny-adamw-random-lr2p5em4-v1`
+  (hand-run, Hamster GPU1, one RTX 4090) ran 50/50 epochs.
+  `run-bundle/completion.json` reads `completed`, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful.
+  All 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `train.log` has no traceback, NaN or error line (only the wandb git-root
+  warning; the wandb internal log has one retried HTTP 503). `best.pt`,
+  `last.pt` and `epoch-049.pt` are on disk (best = epoch 45, last =
+  epoch 49). Nothing is imported into `docs/experiments/`: no aggregator
+  exists for this contract. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest.
+
+  Fixed identity: identical to the lr 5e-4 cell (2026-10-06 postrun above)
+  except the peak LR. ImageNet-1k (original images, content
+  `ae033613...`), DeiT-Tiny (`deit_tiny_imagenet`, `imagenet_standard`
+  profile) random init, plain PGD-AT, no teacher, 224 px training.
+  Training and evaluation-attack seed 0 (split seed 20260911). Training
+  attack CE PGD-3, l_inf eps 4/255, step 8/765, random start. Selection
+  and validation attack PGD-10, same eps and step, random start, eval
+  mode. AdamW (betas 0.9/0.999, wd 0.05), peak LR 2.5e-4,
+  warmup_multistep (10-epoch warmup, x0.1 at epochs 25 and 38), 50
+  epochs. World size 1, global batch 128, local BN mode (DeiT has no BN).
+  Non-deterministic with cudnn_benchmark, not compiled, no cuda_graph,
+  fp32, 16 workers. Config
+  `imagenet_deit_tiny_pgd_at_phase1_adamw_random_lr2p5em4.yaml`, protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`, config
+  hash `747462db...`. Source SHA `609e6fa913d7b0f20ca8e9143f2a8604f68ea77f`
+  (worktree `source-609e6fa913d7`, clean). "val" is internal validation
+  (25,620 held-out original train images, 224 px); "probe" is 2,000
+  training images. Neither is the ImageNet val split. No AutoAttack has
+  run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 2.02 / 1.32 | 1.90 / 1.25 | 6.733 |
+  | 9 | end of warmup | 26.81 / 13.19 | 27.40 / 13.60 | 5.201 |
+  | 24 | end of lr 2.5e-4 | 44.51 / 23.88 | 47.30 / 25.85 | 4.237 |
+  | 25 | first epoch at lr 2.5e-5 | 50.34 / 28.54 | 54.25 / 31.65 | 3.896 |
+  | 37 | end of lr 2.5e-5 | 53.57 / 30.61 | 58.40 / 34.40 | 3.659 |
+  | 38 | first epoch at lr 2.5e-6 | 54.24 / 30.98 | 58.90 / 35.70 | 3.602 |
+  | 45 | best (by val PGD-10) | 54.48 / 31.30 | 59.10 / 35.85 | 3.578 |
+  | 49 | last | 54.57 / 31.25 | 59.45 / 36.40 | 3.574 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Second DeiT-Tiny Phase 1 cell: lr 5e-4 beats lr 2.5e-4 by 2.02pt
+     last-epoch val PGD-10** (33.27 vs 31.25; clean 56.85 vs 54.57,
+     +2.28). The two-run val SE of the difference is about 0.41pt, so the
+     gap is about 5 SE; it is still one seed per cell. The lr 1.25e-4
+     cell had not finished at this postrun (49.18 / 27.17 at epoch 45 in
+     the interim entry above), so the 3-point argmax is not final.
+  2. **Packet 0034 option B condition.** Between the two finished cells,
+     5e-4 is the argmax and leads 2.5e-4 by 2.02pt (>= 1.0pt). 0034
+     `chosen` is still null; the lr 1e-3 DeiT-Tiny cell was already added
+     (interim entry above, commit `b8f9101`). That addition was made after
+     the 2.5e-4 cell's epoch-48 numbers were known, so for DeiT-Tiny the
+     rule is post hoc, as 0034 B already says it would be in that case.
+  3. **Correction to the interim entry above.** It lists 2.5e-4 as
+     "54.54 / 31.24 (epoch 49)"; those are the epoch-48 values. The
+     epoch-49 (last) values are 54.57 / 31.25. The difference (at most
+     0.03pt) does not change any reading.
+  4. **Trains normally.** Val PGD-10 rises in every LR stage and never
+     falls more than 0.14pt below its running maximum (epoch 34); the
+     catastrophic-overfitting guard never fires.
+  5. **Decays.** Epoch 24 to 25: +5.83 clean / +4.66 PGD-10. Epoch 37 to
+     38: +0.68 / +0.37. The lr 2.5e-5 stage still rises by +2.06pt
+     PGD-10 after its first epoch. The last stage is almost flat: epochs
+     38-49 within 30.98-31.30%, epochs 39-49 within 31.18-31.30%. Both
+     decay jumps are smaller than in the 5e-4 cell (+6.26 and +0.88).
+  6. **Best and last.** Best epoch 45 (54.48 / 31.30), last epoch 49
+     (54.57 / 31.25); `robust_overfit_gap` 0.05pt. Val SE is about 0.31pt
+     clean and 0.29pt PGD-10, so best and last are not distinguishable.
+  7. **Seen-unseen gap.** At the last epoch probe minus val is +4.9 clean
+     and +5.2 PGD-10 (5e-4 cell: +4.3 / +5.2).
+  8. **Cost.** 33.76 h from start to finish (run-bundle `created_at`
+     2026-10-05 03:55:43 to `finished_at` 2026-10-06 13:41:01 UTC,
+     121,518 s). Summed per-epoch training time is about 115,050 s
+     (32.0 h); the rest (about 129 s per epoch) is validation, probe,
+     checkpointing and start-up. Throughput 545-547 img/s in every epoch,
+     no slow stretch; about 2% below the 5e-4 cell (557-559 img/s) on the
+     other GPU of the same host, cause not checked. The other Hamster GPU
+     ran the lr 5e-4 cell until 2026-10-06 12:50 UTC, then EfficientNet-B0
+     lr 0.05. Peak allocated memory 4.64 GB; reserved 5.02 GB at epoch 0,
+     6.43 GB from epoch 1.
+
+  Caveats: one seed, two LRs of three (plus the added 1e-3) finished.
+  Non-deterministic mode, so a rerun would not reproduce these numbers
+  bit for bit. Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `83121f50...`,
+  `sample-stats-train.parquet` sha256 `c9d89771...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id.
