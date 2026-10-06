@@ -3453,3 +3453,10 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `83121f50...`,
   `sample-stats-train.parquet` sha256 `c9d89771...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-06 (human): the AdamW grid moves up for ConvNeXt-Atto and
+  DeiT-Tiny, to {2.5e-4, 5e-4, 1e-3}. If 1e-3 is the best point, 2e-3 is
+  added.
+  - The queued ConvNeXt-Atto 1.25e-4 cell is cancelled.
+  - DeiT-Tiny 1.25e-4 was nearly finished, so it is kept as a reference.
+  - ConvNeXt-Atto 2e-3 takes the cancelled cell's slot on Ferret GPU0. It
+    starts pre-emptively, because 2.5e-4 -> 5e-4 gained +2.1pt PGD-10.
