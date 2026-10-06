@@ -3264,3 +3264,87 @@ history behind this pivot.)
       - EfficientNet-B0 0.0125 / 0.05: same identity as its 0.025 run,
         i.e. compile and non-deterministic.
     - MobileViT-S: only if time allows.
+- 2026-10-06 (postrun): **Phase 1 LR grid, DeiT-Tiny AdamW random init /
+  lr 5e-4 completed.** `plan0103-phase1-deit-tiny-adamw-random-lr5em4-v1`
+  (hand-run, Hamster, one RTX 4090) ran 50/50 epochs.
+  `run-bundle/completion.json` reads `completed`, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful.
+  All 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `train.log` has no traceback, NaN or error line (only the wandb git-root
+  warning). `best.pt`, `last.pt` and `epoch-049.pt` are on disk (best =
+  epoch 45, last = epoch 49). Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract. The numbers
+  below are read from `outputs/train/epoch-metrics.jsonl` and the
+  run-bundle manifest.
+
+  Fixed identity: ImageNet-1k (original images, content `ae033613...`),
+  DeiT-Tiny (`deit_tiny_imagenet`, `imagenet_standard` profile) random
+  init, plain PGD-AT, no teacher, 224 px training. Training and
+  evaluation-attack seed 0 (split seed 20260911). Training attack CE PGD-3,
+  l_inf eps 4/255, step 8/765, random start. Selection and validation
+  attack PGD-10, same eps and step, random start, eval mode. AdamW (betas
+  0.9/0.999, wd 0.05), peak LR 5e-4, warmup_multistep (10-epoch warmup,
+  x0.1 at epochs 25 and 38), 50 epochs. World size 1, global batch 128,
+  local BN mode (DeiT has no BN). Non-deterministic with cudnn_benchmark,
+  not compiled, no cuda_graph, fp32, 16 workers. Config
+  `imagenet_deit_tiny_pgd_at_phase1_adamw_random_lr5em4.yaml`, protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`, config
+  hash `0430192e...`. Source SHA `609e6fa913d7b0f20ca8e9143f2a8604f68ea77f`
+  (worktree `source-609e6fa913d7`, clean). "val" is internal validation
+  (25,620 held-out original train images, 224 px); "probe" is 2,000
+  training images. Neither is the ImageNet val split. No AutoAttack has
+  run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 3.07 / 1.80 | 2.70 / 1.75 | 6.644 |
+  | 9 | end of warmup | 29.25 / 14.58 | 30.35 / 15.15 | 5.070 |
+  | 24 | end of lr 5e-4 | 43.25 / 23.18 | 45.65 / 24.90 | 4.310 |
+  | 25 | first epoch at lr 5e-5 | 51.58 / 29.44 | 54.80 / 31.70 | 3.887 |
+  | 37 | end of lr 5e-5 | 55.16 / 32.01 | 59.35 / 36.40 | 3.593 |
+  | 38 | first epoch at lr 5e-6 | 56.20 / 32.89 | 60.80 / 37.60 | 3.510 |
+  | 45 | best (by val PGD-10) | 56.71 / 33.35 | 61.00 / 38.30 | 3.473 |
+  | 49 | last | 56.85 / 33.27 | 61.15 / 38.45 | 3.465 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **First DeiT-Tiny Phase 1 cell; no grid verdict yet.** Last-epoch
+     val PGD-10 is 33.27% (the selection metric of the Phase 1 grid).
+     The lr 2.5e-4 cell was at epoch 47 of 50 on the other Hamster GPU
+     at this postrun; the 1.25e-4 cell has not run. lr 5e-4 is the top
+     edge of the approved grid, so if it stays the argmax, the optimum
+     may lie above the grid.
+  2. **AdamW trains DeiT-Tiny normally.** Val PGD-10 rises every LR
+     stage and never falls more than 0.16pt below its running maximum
+     (epoch 21); the catastrophic-overfitting guard never fires. There is
+     no sign of the ~30%-clean failure seen in the SGD fixed-recipe runs
+     (2026-09-28). The SGD DeiT-Tiny run was stopped at epoch 38 and is
+     not a result, so no SGD-vs-AdamW number is given.
+  3. **Decays.** Epoch 24 to 25: +8.33 clean / +6.26 PGD-10. Epoch 37 to
+     38: +1.04 / +0.88. The lr 5e-5 stage still rises by +2.57pt PGD-10
+     after its first epoch. The last stage is almost flat: epochs 38-49
+     within 32.89-33.35%, epochs 45-49 within 33.21-33.35%.
+  4. **Best and last.** Best epoch 45 (56.71 / 33.35), last epoch 49
+     (56.85 / 33.27); `robust_overfit_gap` 0.07pt. Val SE is about 0.31pt
+     clean and 0.29pt PGD-10, so best and last are not distinguishable.
+  5. **Seen-unseen gap.** At the last epoch probe minus val is +4.3 clean
+     and +5.2 PGD-10.
+  6. **Context, other Phase 1 models (last val PGD-10, each at its best
+     LR so far, not yet best-vs-best).** MobileNetV4-S 30.71 (lr 0.025),
+     MobileNetV4-M 39.39 (lr 0.025), EfficientNet-B0 35.93 (lr 0.025,
+     the other two LRs pending). Those runs use SGD; this one uses AdamW
+     per the family recipe.
+  7. **Cost.** 33.00 h from start to finish (run-bundle `created_at`
+     2026-10-05 03:50:28 to `finished_at` 2026-10-06 12:50:43 UTC,
+     118,815 s). Summed per-epoch training time is about 112,460 s
+     (31.2 h); the rest (about 127 s per epoch) is validation, probe,
+     checkpointing and start-up. Throughput 557-559 img/s in every epoch,
+     no slow stretch. The other Hamster GPU ran the lr 2.5e-4 cell for
+     the whole run. Peak allocated memory 4.64 GB; reserved 5.02 GB at
+     epoch 0, 6.43 GB from epoch 1.
+
+  Caveats: one seed, one LR of three. Non-deterministic mode, so a rerun
+  would not reproduce these numbers bit for bit. Checkpoint sha256 was not
+  computed in this postrun. `epoch-metrics.parquet` sha256 `78cdce7d...`,
+  `sample-stats-train.parquet` sha256 `0e9c2132...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id.
