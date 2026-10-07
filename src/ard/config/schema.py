@@ -610,6 +610,19 @@ class DatasetConfig(StrictModel):
     # a one-off comparison. Default False reproduces today's exact
     # behavior for every existing config.
     imagenet_heavy_augmentation: bool = False
+    # Plan 0103 Phase 2 batch C (human-approved 2026-10-08): IDBH (Li &
+    # Spratling, ICLR 2023, "Data augmentation alone can improve adversarial
+    # training") adapted to the ImageNet RandomResizedCrop pipeline -- see
+    # ard.data.datasets.EpochImageNetTransform. Unlike
+    # imagenet_heavy_augmentation, every IDBH draw comes from a generator
+    # keyed by (augmentation seed, epoch, source id), so a resumed epoch
+    # reproduces the same view per sample. "idbh_weak" / "idbh_strong" are
+    # the upstream cifar10-weak / cifar10-strong distributions (Random
+    # Erasing p=0.5 / p=1). Serialized only when not "standard", so every
+    # existing config keeps a byte-identical resolved config and config hash.
+    imagenet_augmentation: Literal["standard", "idbh_weak", "idbh_strong"] = Field(
+        default="standard", exclude_if=lambda value: value == "standard"
+    )
     # Plan 0103 loader speedup C (human-approved 2026-09-30): the root is a
     # pre-resized derivative of the dataset named by
     # derived_from.content_sha256; see DerivedDatasetConfig. The training
@@ -640,6 +653,11 @@ class DatasetConfig(StrictModel):
             raise ValueError("non-canonical augmentation policies are currently defined only for CIFAR datasets")
         if self.imagenet_heavy_augmentation and self.name != "imagenet":
             raise ValueError("imagenet_heavy_augmentation is only defined for the imagenet dataset")
+        if self.imagenet_augmentation != "standard":
+            if self.name != "imagenet" or self.split != "train":
+                raise ValueError("imagenet_augmentation is only defined for the imagenet train split")
+            if self.imagenet_heavy_augmentation:
+                raise ValueError("imagenet_augmentation and imagenet_heavy_augmentation are mutually exclusive")
         if self.augmentation_policy == "stagewise":
             if self.stagewise_switch_epoch is None or self.stagewise_late_policy is None:
                 raise ValueError("stagewise augmentation requires a switch epoch and late policy")

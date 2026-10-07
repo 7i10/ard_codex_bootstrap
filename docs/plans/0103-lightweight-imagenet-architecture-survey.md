@@ -3554,3 +3554,17 @@ history behind this pivot.)
     `external.lock.yaml` (`awp`, a7acf5d8) and the parity test imports its `utils_awp.py`; our AWP is
     "AWP on our PGD-AT" (eval-mode attack by default), not an AT-AWP reproduction. Also: split BN with
     `init_checkpoint` refused; preflight refusals before any tracker run; `train_mixed_batch_weighted_loss`.
+- 2026-10-08: **Phase 2 batch C (augmentation x epochs 2x2), code and configs
+  ready, not launched.** New option `dataset.imagenet_augmentation`
+  (`standard` default, unserialized; `idbh_weak`, `idbh_strong`). It appends
+  IDBH (Li & Spratling, ICLR 2023) after RandomResizedCrop + flip: CropShift
+  (upstream level U{0..10} scaled by size/32, so 0-70 px in steps of 7 at
+  224), ColorShape('color') with upstream magnitudes, Random Erasing p=0.5
+  (weak) or 1.0 (strong). Every draw is keyed by (augmentation seed, epoch,
+  source id); crop and flip stay bit-identical to the standard path. In the
+  config hash and the evaluation pooling identity. Configs (all with
+  `selection_subset_size: 5000`, cuda_graph kept): `..._lr0025_idbh_cg.yaml`
+  (IDBH, 50 ep), `..._lr0025_idbh_100ep_cg.yaml` (IDBH, 100 ep, [50, 76]),
+  `..._lr0025_100ep_cg.yaml` (standard, 100 ep, [50, 76]); the standard 50-ep
+  cell is the Phase 1 run. CPU cost, real ImageNet JPEGs, one process:
+  decode + transform 204 -> 160 img/s (-22%).

@@ -375,6 +375,16 @@ def _selection_protocol_identity(training: TrainingConfig, selection_metadata: o
     return {"selection_subset_size": size, "selection_subset_sha256": subset["ids_sha256"]}
 
 
+def _augmentation_protocol_identity(dataset: Any) -> dict[str, object]:
+    """Plan 0103 Phase 2 batch C, present only when set (same byte-identity
+    argument as ``_throughput_protocol_identity``): an IDBH-trained run shares
+    its protocol id with the standard-augmentation arm it is compared with, so
+    the augmentation must appear here or the mixed-identity guard would pool
+    the two arms."""
+    augmentation = getattr(dataset, "imagenet_augmentation", "standard")
+    return {} if augmentation == "standard" else {"imagenet_augmentation": augmentation}
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.checkpoint_dir is not None:
@@ -694,6 +704,7 @@ def main(argv: list[str] | None = None) -> int:
                                 )
                             }
                         ),
+                        **_augmentation_protocol_identity(training_config.dataset),
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

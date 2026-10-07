@@ -106,6 +106,14 @@ def _apply_cropshift(image: Any, *, generator: torch.Generator, high: int) -> An
     # Match IDBH ordering: RandomHorizontalFlip before CropShift.
     if bool(torch.randint(0, 2, (), generator=generator).item()):
         image = transform_functional.hflip(image)
+    return _cropshift_translate(image, generator=generator, strength=strength)
+
+
+def _cropshift_translate(image: Any, *, generator: torch.Generator, strength: int) -> Any:
+    """Upstream ``CropShift.forward`` after its strength draw: split ``strength``
+    between the two axes, crop that much away, zero-pad back, re-crop at a
+    random offset. Output size equals input size."""
+    width, height = transform_functional.get_image_size(image)
     crop_x = int(torch.randint(0, strength + 1, (), generator=generator).item())
     crop_y = strength - crop_x
     crop_width, crop_height = width - crop_x, height - crop_y
@@ -644,6 +652,26 @@ class EpochImageNetTransform:
     RandAugment's ~14 operations against a local generator. A resumed
     epoch still reproduces the same crop and flip, but not the same
     RandAugment/RandomErasing draw.
+
+    ``augmentation="idbh_weak"`` / ``"idbh_strong"``
+    (``DatasetConfig.imagenet_augmentation``, plan 0103 Phase 2 batch C):
+    IDBH (Li & Spratling, ICLR 2023; pinned upstream
+    ``.external/DA-Alone-Improves-AT/src/data/idbh.py``) appended after the
+    crop and flip, which stay bit-identical to the standard path (same
+    generator, same draws). Upstream's CIFAR pipeline is flip -> CropShift(0,
+    11) -> ColorShape('color') -> ToTensor -> RandomErasing(p=0.5 weak / 1.0
+    strong); here it is RandomResizedCrop -> flip -> CropShift(0, high) ->
+    ColorShape('color') -> ToTensor -> RandomErasing. RandomResizedCrop stays
+    because ImageNet's spatial baseline is it, not pad-and-crop. The only
+    absolute-pixel magnitude, CropShift's largest strength (10 px at 32 px),
+    is scaled with the output side (``idbh_cropshift_strength``: level k of
+    U{0..10} becomes round(k * size / 32) px, so 0..70 in steps of 7 at 224);
+    every other magnitude (colour factors, shear in radians,
+    rotation in degrees, erasing area fraction / aspect) is scale-free and
+    kept verbatim. Each IDBH layer draws from its own named substream of
+    (augmentation seed, epoch, source id) (``_layer_generator``), so the
+    whole view is reproducible per sample and FKD-style precomputation is
+    possible; nothing touches the global RNG.
     """
 
     _SCALE = (0.08, 1.0)
@@ -657,9 +685,15 @@ class EpochImageNetTransform:
         image_size: int,
         heavy_augmentation: bool = False,
         jpeg_draft_decode: bool = False,
+        augmentation: str = "standard",
     ) -> None:
         if image_size < 1:
             raise ValueError("ImageNet augmentation image_size must be a positive integer")
+        if augmentation not in _IMAGENET_ERASE_PROBABILITY:
+            raise ValueError(f"unsupported ImageNet augmentation: {augmentation}")
+        if augmentation != "standard" and heavy_augmentation:
+            raise ValueError("IDBH and heavy_augmentation are mutually exclusive")
+        self.augmentation = augmentation
         self.augmentation_seed = augmentation_seed
         self.image_size = image_size
         # TrainingConfig.jpeg_draft_decode: this transform then receives the
@@ -818,10 +852,52 @@ class EpochImageNetTransform:
             # comment; the deterministic local generator above still governs
             # the crop and flip.
             cropped = self._rand_augment(cropped)
+        if self.augmentation != "standard":
+            return self._idbh(cropped, source_id=source_id)
         tensor = _to_tensor(cropped)
         if self._random_erasing is not None:
             tensor = self._random_erasing(tensor)
         return tensor
+
+    def _idbh(self, image: Any, *, source_id: int) -> torch.Tensor:
+        """CropShift -> ColorShape('color') -> ToTensor -> RandomErasing, each
+        layer on its own keyed substream (see the class docstring)."""
+
+        def layer(name: str) -> torch.Generator:
+            return _layer_generator(
+                augmentation_seed=self.augmentation_seed, epoch=self.epoch, source_id=source_id, layer=name
+            )
+
+        shift_generator = layer("imagenet_idbh_cropshift")
+        width, height = transform_functional.get_image_size(image)
+        level = int(torch.randint(0, _IDBH_CROPSHIFT_HIGH, (), generator=shift_generator).item())
+        strength = min(idbh_cropshift_strength(level, self.image_size), width - 1, height - 1)
+        image = _cropshift_translate(image, generator=shift_generator, strength=strength)
+        image = _idbh_color_with_generator(image, generator=layer("imagenet_idbh_colorshape"))
+        return _random_erase_with_generator(
+            _to_tensor(image),
+            generator=layer("imagenet_idbh_erase"),
+            p=_IMAGENET_ERASE_PROBABILITY[self.augmentation],
+        )
+
+
+# Upstream IDBH Random Erasing probability per version (cifar10-weak 0.5,
+# cifar10-strong 1.0); "standard" means no IDBH at all.
+_IMAGENET_ERASE_PROBABILITY: dict[str, float] = {"standard": 0.0, "idbh_weak": 0.5, "idbh_strong": 1.0}
+
+
+# Upstream ``CropShift(0, 11)``: strength level ~ U{0, ..., 10} (exclusive 11).
+_IDBH_CROPSHIFT_HIGH = 11
+
+
+def idbh_cropshift_strength(level: int, image_size: int) -> int:
+    """Pixels of total shift for an upstream strength ``level`` (drawn exactly
+    as upstream, U{0..10}, i.e. paper Tab. 12's "Cropshift 1-10, prob 0.909"),
+    defined at 32 px and scaled to ``image_size`` with round-half-up: level
+    10 is 10 px at 32, 35 at 112, 70 at 224. The distribution of the shift
+    *fraction* {0, 1/32, ..., 10/32} of the side -- including the 1/11 chance
+    of no shift -- is therefore exactly upstream's."""
+    return (level * image_size + 16) // 32
 
 
 class ImageNetPathView(Dataset[tuple[Path, int]]):
@@ -1096,6 +1172,7 @@ def build_train_validation_views(
             image_size=view_image_size,
             heavy_augmentation=config.imagenet_heavy_augmentation,
             jpeg_draft_decode=jpeg_draft_decode,
+            augmentation=config.imagenet_augmentation,
         )
     else:
         train_transform = _to_tensor
