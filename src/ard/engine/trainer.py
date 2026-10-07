@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 from ard.attacks import AttackGenerator, AttackRequest, LinfPGD
 from ard.config.schema import AdrConfig
 from ard.data import IndexedBatch
+from ard.distillation.trainer_hooks import DistillationTargetHooks, bank_clean_logits
 from ard.objectives import DistillationObjective, ObjectiveTerms, PGDATObjective
 from ard.objectives.adr import rectify_label
 from ard.policies import (
@@ -277,6 +278,7 @@ class Trainer:
         validation_dataset_derivation: Mapping[str, Any] | None = None,
         selection_subset: Mapping[str, Any] | None = None,
         selection_subset_ids: Sequence[int] | None = None,
+        distillation_hooks: DistillationTargetHooks | None = None,
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -317,6 +319,7 @@ class Trainer:
                 "dynamic_s3_router": dynamic_s3_router,
                 "online_state_s2_router": online_state_s2_router,
                 "frozen_risk_lookup": frozen_risk_lookup,
+                "distillation_hooks": distillation_hooks,
             }
             supplied = sorted(name for name, value in attack_dependent.items() if value is not None)
             if clean_wrong_attack_skip:
@@ -332,6 +335,12 @@ class Trainer:
             if supplied:
                 raise ValueError("training without an attack (method standard) cannot use: " + ", ".join(supplied))
         self.device, self.output_dir, self.config_hash, self.seed = device, output_dir, config_hash, seed
+        # Plan 0103 Phase 2 batch D (ard.distillation.trainer_hooks): None for
+        # every pre-existing run, which then follows the unchanged code paths.
+        self.distillation_hooks = distillation_hooks
+        if distillation_hooks is not None and distillation_hooks.adversarial_teacher_target:
+            if teacher is None or target_policy is not None or iad_inspired:
+                raise ValueError("rslad_advt requires a teacher and no other adversarial-target transform")
         self.evaluation_attack_seed = seed if evaluation_attack_seed is None else evaluation_attack_seed
         self.tracker_run_id = tracker_run_id
         self.checkpoint_epochs = tuple(checkpoint_epochs)
@@ -1501,6 +1510,8 @@ class Trainer:
             "boundary_teacher_input_grad_l1_sum": 0.0,
             "boundary_teacher_input_grad_l1_max": 0.0,
         }
+        if self.distillation_hooks is not None:
+            self.distillation_hooks.reset_epoch(self.device)
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
             torch.cuda.reset_peak_memory_stats(self.device)
@@ -1589,13 +1600,17 @@ class Trainer:
                 # This is the one detached FP32 target for both inner and outer
                 # RSLAD-family computations.  It has no teacher parameter or
                 # input graph and remains valid while the student is updated.
-                with (
-                    _evaluation_mode(self.teacher),
-                    torch.no_grad(),
-                    torch.autocast(device_type=self.device.type, enabled=False),
-                ):
-                    teacher_clean_logits = self.teacher(batch.images.float()).detach().float()
-                teacher_clean_forward_calls = 1.0
+                # A soft-label bank teacher answers from the precomputed bank
+                # (crop keys checked); it is not a teacher forward.
+                teacher_clean_logits = bank_clean_logits(self.teacher, batch, epoch=self.current_epoch)
+                if teacher_clean_logits is None:
+                    with (
+                        _evaluation_mode(self.teacher),
+                        torch.no_grad(),
+                        torch.autocast(device_type=self.device.type, enabled=False),
+                    ):
+                        teacher_clean_logits = self.teacher(batch.images.float()).detach().float()
+                    teacher_clean_forward_calls = 1.0
             valid_mask = mask.to(dtype=torch.bool)
             intervention_risk = None
             if self.intervention_mask is not None:
@@ -1823,6 +1838,18 @@ class Trainer:
                     ),
                 )
                 objective_inputs["adversarial_target_probabilities"] = target_output.probabilities
+            if self.distillation_hooks is not None and self.distillation_hooks.adversarial_teacher_target:
+                # rslad_advt: the 5/6 adversarial KL targets softmax(T(x')/tau),
+                # from the one cached and counted teacher forward on x'.
+                if teacher_clean_logits is None:
+                    raise ValueError("rslad_advt requires the clean teacher target")
+                objective_inputs["adversarial_target_probabilities"] = self.distillation_hooks.adversarial_target(
+                    teacher=self.teacher,
+                    teacher_adversarial_logits=self._teacher_adversarial_response(adversarial),
+                    teacher_clean_logits=teacher_clean_logits,
+                    labels=batch.labels,
+                    mask=mask,
+                )
             dynamic_s3_decision = None
             if self.dynamic_s3_router is not None:
                 if clean_student_logits is None or teacher_clean_logits is None or self.teacher is None:
@@ -2021,7 +2048,16 @@ class Trainer:
                 with suspend_ddp_buffer_broadcasts(self.model), _evaluation_mode(self.model), torch.no_grad():
                     diagnostic_clean = self.model(batch.images).detach()
                 teacher_prediction = teacher_entropy = None
-                if self.teacher is not None:
+                # Distillation runs (plan 0103 Phase 2) never pay for a teacher
+                # forward that exists only for diagnostics: the teacher fields
+                # are filled only when the step already ran the teacher on x'
+                # (rslad_advt), so online RSLAD, bank RSLAD and advT differ in
+                # teacher compute only by what their objectives need. Every
+                # earlier run (distillation_hooks None) is unchanged.
+                diagnostic_teacher = self.teacher is not None and (
+                    self.distillation_hooks is None or self._teacher_adversarial_logits is not None
+                )
+                if diagnostic_teacher:
                     teacher_adversarial_logits = self._teacher_adversarial_response(adversarial)
                     teacher_prediction = teacher_adversarial_logits.argmax(1)
                     teacher_entropy = shannon_entropy(teacher_adversarial_logits)
@@ -2198,6 +2234,8 @@ class Trainer:
             **observability,
             **self._boundary_epoch_stats,
         }
+        if self.distillation_hooks is not None:
+            metrics.update(self.distillation_hooks.epoch_metrics(reduce_sums))
         if graph_state is not None:
             # Audit trail for training.cuda_graph (plan 0105): absent otherwise.
             metrics["cuda_graph_captures"] = float(graph_state.captures_this_epoch)
@@ -2636,6 +2674,10 @@ class Trainer:
                 # this epoch were captured / replayed / run eagerly.
                 for key in ("cuda_graph_captures", "cuda_graph_replays", "cuda_graph_eager_steps"):
                     epoch_metrics[f"train_{key}"] = train_metrics[key]
+            for key, value in train_metrics.items():
+                if key.startswith(DistillationTargetHooks.METRIC_PREFIX):
+                    # rslad_advt observability: teacher accuracy on x' and mean KL(T(x')||T(x)).
+                    epoch_metrics[f"train_{key}"] = value
             if probe_metrics is not None:
                 epoch_metrics["train_probe_clean_accuracy"] = probe_metrics["clean_accuracy"]
                 epoch_metrics["train_probe_pgd_accuracy"] = probe_metrics["pgd_accuracy"]

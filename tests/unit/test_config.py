@@ -604,6 +604,16 @@ def test_top_level_configs_resolve_under_controlled_environment(
         "ARD_FROZEN_ORACLE_MANIFEST_SHA256": "c" * 64,
         "ARD_STAGE1_CHECKPOINT": str(tmp_path / "stage1" / "last.pt"),
         "ARD_STAGE1_CHECKPOINT_SHA256": "d" * 64,
+        # Plan 0103 Phase 2 batch D distillation configs.
+        "ARD_EXTERNAL_CHECKPOINT_ROOT": str(tmp_path / "external-checkpoints"),
+        "ARD_SOFT_LABEL_BANK_ROOT": str(tmp_path / "banks"),
+        "ARD_SOFT_LABEL_BANK_SHA256_SALMAN_R50": "1" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_CONVNEXT_T_CVST": "2" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_VIT_S_CVST": "3" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_CONVNEXT_B_CVST": "4" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_MNV4M_OWN": "5" * 64,
+        "ARD_PHASE2_ADAMW_LR_CONVNEXT_ATTO": "5e-4",
+        "ARD_PHASE2_ADAMW_LR_DEIT_TINY": "5e-4",
     }
     for key, value in values.items():
         monkeypatch.setenv(key, value)
@@ -627,6 +637,7 @@ def test_top_level_configs_resolve_under_controlled_environment(
                 "pgd_at",
                 "trades",
                 "rslad",
+                "rslad_advt",
                 "rslad_frozen_oracle_softening",
                 "adr",
                 "adr_trades",

@@ -8,7 +8,7 @@ import json
 import random
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import torch
 from torch import nn
@@ -21,6 +21,7 @@ from ard.analysis.frozen_oracle import FrozenRiskLookup, load_frozen_risk_lookup
 from ard.analysis.ordering_telemetry import OrderingTelemetry
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, load_config, save_resolved_config
+from ard.config.distillation import ADVERSARIAL_TEACHER_TARGET_METHODS
 from ard.config.loader import resolved_config_dict
 from ard.config.schema import validate_global_batch_size
 from ard.data import (
@@ -35,6 +36,14 @@ from ard.data import (
     load_stagewise_late_mask,
     seed_data_loader_worker,
 )
+from ard.distillation.crop_keys import CropKeyedSubset, collate_crop_keyed
+from ard.distillation.soft_label_bank import (
+    SoftLabelBank,
+    SoftLabelBankTeacher,
+    bank_identity,
+    read_bank_manifest,
+)
+from ard.distillation.trainer_hooks import DistillationTargetHooks
 from ard.engine import Trainer, config_digest, get_rank, get_world_size
 from ard.engine.checkpoint import load_init_student_weights, validate_resume_checkpoint
 from ard.engine.distributed import (
@@ -47,7 +56,15 @@ from ard.engine.distributed import (
     wrap_ddp,
 )
 from ard.models import build_student, build_teacher
-from ard.objectives import ADRObjective, ADRTRADESObjective, DistillationObjective, PGDATObjective, RSLADObjective, TRADESObjective
+from ard.models.imagenet_teacher_registry import validate_imagenet_teacher_config
+from ard.objectives import (
+    ADRObjective,
+    ADRTRADESObjective,
+    DistillationObjective,
+    PGDATObjective,
+    RSLADObjective,
+    TRADESObjective,
+)
 from ard.policies import (
     EntropyOnlyPolicy,
     FixedInterventionMask,
@@ -490,6 +507,15 @@ def _build_method(
                 )
             ),
         )
+    if method.id == "rslad_advt":
+        # The objective is RSLAD's own; the Trainer supplies the adversarial
+        # target softmax(T(x')/tau) through DistillationTargetHooks.
+        return (
+            RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
+            RSLADBaselinePolicy(),
+            None,
+            None,
+        )
     if method.id == "rslad_entropy":
         return (
             RSLADObjective(temperature=method.temperature, temperature_squared=method.temperature_squared),
@@ -681,6 +707,42 @@ def _attach_prescriptive_v3_input_artifacts(
     coordinator(tracker, phase="prescriptive v3 input artifacts", action=record)
 
 
+def _uses_soft_label_bank(config: ExperimentConfig) -> bool:
+    return config.distillation is not None and config.distillation.target_source == "soft_label_bank"
+
+
+def _open_configured_bank(config: ExperimentConfig, train_ids: list[int]) -> SoftLabelBank:
+    bank = config.distillation.bank if config.distillation is not None else None
+    if bank is None:
+        raise ValueError("soft_label_bank target source requires distillation.bank")
+    return SoftLabelBank.open(
+        bank.path,
+        expected_manifest_sha256=bank.manifest_sha256,
+        expected_identity=bank_identity(config),
+        expected_top_k=bank.top_k,
+        required_epochs=config.training.epochs,
+        train_ids=train_ids,
+    )
+
+
+def _build_distillation_teacher(config: ExperimentConfig, train_dataset: Any) -> nn.Module:
+    """The frozen teacher, or (bank mode) the verified bank teacher.
+
+    In bank mode the online teacher is still loaded for ``rslad_advt``, which
+    needs the teacher on the adversarial example; plain ``rslad`` never runs it.
+    """
+    assert config.teacher is not None
+    if not _uses_soft_label_bank(config):
+        return build_teacher(config.teacher, tier=config.tier)
+    bank = _open_configured_bank(config, list(train_dataset.indices))
+    online = (
+        build_teacher(config.teacher, tier=config.tier)
+        if config.method.id in ADVERSARIAL_TEACHER_TARGET_METHODS
+        else None
+    )
+    return SoftLabelBankTeacher(bank, online_teacher=online, sentinel_view=CropKeyedSubset(train_dataset))
+
+
 def _loader_pin_memory(device: torch.device) -> bool:
     """Pin host batches only when they are copied to a CUDA device.
 
@@ -808,6 +870,22 @@ def main(argv: list[str] | None = None) -> int:
             _guard_output(output_dir, resume=args.resume, config_hash=config_hash)
             _validate_intervention_resume(args.resume, config, config_hash=config_hash)
             _validate_required_fork_resume(args.resume, config, config_hash=config_hash)
+            if config.teacher is not None and config.teacher.source == "imagenet_registry":
+                # Fail before any output or tracker run exists (no file I/O):
+                # the teacher block must restate its pinned profile exactly,
+                # also in bank mode where plain rslad never builds the teacher.
+                validate_imagenet_teacher_config(config.teacher)
+            if _uses_soft_label_bank(config):
+                # Fail before any output or tracker run exists: the bank's
+                # manifest digest, identity, K and epoch coverage.
+                assert config.distillation is not None and config.distillation.bank is not None
+                read_bank_manifest(
+                    config.distillation.bank.path,
+                    expected_manifest_sha256=config.distillation.bank.manifest_sha256,
+                    expected_identity=bank_identity(config),
+                    expected_top_k=config.distillation.bank.top_k,
+                    required_epochs=config.training.epochs,
+                )
             init_checkpoint = config.training.init_checkpoint
             if init_checkpoint is not None and args.resume is None:
                 # Fail before any output or tracker run exists (dry-run
@@ -1004,7 +1082,9 @@ def main(argv: list[str] | None = None) -> int:
             # copies and resume use ``unwrap_model``, which strips it, so saved
             # state_dict keys never gain an ``_orig_mod.`` prefix.
             student = cast(nn.Module, torch.compile(student))
-        teacher = None if config.teacher is None else build_teacher(config.teacher, tier=config.tier)
+        teacher: nn.Module | None = (
+            None if config.teacher is None else _build_distillation_teacher(config, train_dataset)
+        )
         anchor_model: nn.Module | None = None
         if config.prescriptive_v3 is not None and config.prescriptive_v3.arm.startswith("PF_"):
             anchor_path = config.prescriptive_v3.anchor_checkpoint
@@ -1083,15 +1163,22 @@ def main(argv: list[str] | None = None) -> int:
             shuffle=False,
         )
         pin_memory = _loader_pin_memory(device)
+        # Soft-label bank mode: the training loader also yields each image's
+        # crop key, which the bank teacher checks against the bank.
+        train_loader_dataset: Any = train_dataset
+        train_collate: Any = collate_indexed
+        if _uses_soft_label_bank(config):
+            train_loader_dataset = CropKeyedSubset(train_dataset)
+            train_collate = collate_crop_keyed
         loader = cast(
             DataLoader[IndexedBatch],
             DataLoader(
-                train_dataset,
+                train_loader_dataset,
                 batch_size=config.training.per_rank_batch_size,
                 sampler=sampler,
                 num_workers=config.training.num_workers,
                 pin_memory=pin_memory,
-                collate_fn=collate_indexed,
+                collate_fn=train_collate,
                 generator=data_loader_generator(config.seeds.data_order),
                 worker_init_fn=seed_data_loader_worker,
             ),
@@ -1258,6 +1345,14 @@ def main(argv: list[str] | None = None) -> int:
             validation_dataset_derivation=_validation_dataset_derivation(config),
             selection_subset=selection_subset,
             selection_subset_ids=selection_subset_ids,
+            distillation_hooks=(
+                None
+                if config.distillation is None
+                else DistillationTargetHooks(
+                    adversarial_teacher_target=config.method.id in ADVERSARIAL_TEACHER_TARGET_METHODS,
+                    temperature=config.method.temperature,
+                )
+            ),
         )
         start_epoch = 0
         if args.resume is not None:

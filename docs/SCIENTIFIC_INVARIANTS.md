@@ -303,3 +303,29 @@ weight EMA)。`Trainer.ema_model`・`_update_ema`・`best-ema.pt`書き込み・
 (scientific review、2026-09-15)。`training.weight_ema_decay`と`method.adr`
 は**互いに排他**——ADRは既に自分自身のEMAを蒸留ターゲットとして持っているため、
 独立な第二のシャドウモデルは併用できない(schema・Trainer両方で拒否)。
+
+## ImageNet distillation (plan 0103 Phase 2 batch D, human-approved 2026-10-08)
+
+- Teachers come only from `ard.models.imagenet_teacher_registry` (`teacher.source: imagenet_registry`): checkpoint
+  SHA-256, architecture, parameter count, threat (Linf 4/255, pixel space) and normalization are pinned there and
+  restated in the config. Inputs are `[0,1]` pixels at 224 px; the teacher adapter applies the teacher's own
+  normalization, compared bit-exactly (FP32) with any normalizer embedded in the checkpoint. Singh et al. ConvNeXt-T/B
+  ConvStem are raw-pixel models (`imagenet_raw_identity`); the ViT-S ConvStem embeds a mean that differs from the
+  textbook ImageNet mean by <5e-5 and is applied exactly as embedded (`custom`).
+- `distillation.target_source` is explicit. `online_teacher` runs the frozen teacher on each clean training batch.
+  `soft_label_bank` reads `softmax(T(x))` for the exact training crop from a digest-pinned bank (top-K fp16 + residual
+  mass spread uniformly over the other classes, renormalized; RSLAD consumes `log p`). Every batch's crop keys
+  `(epoch, top, left, height, width, flip)` must equal the bank's, and the bank identity (dataset digest, partition,
+  augmentation seed, view size, `jpeg_draft_decode`, teacher digest) must equal the run's. Bank mode is refused with
+  `imagenet_heavy_augmentation` and with a temperature other than 1. With K = class count the two sources give the
+  same target up to fp16 storage rounding and FP32/TF32 kernel noise of the teacher forward; the online-vs-bank
+  comparison therefore isolates the top-K truncation. A per-epoch pixel sentinel (uint8 hash of a few re-drawn crops)
+  refuses a run whose decoder/resize produces different pixels for the same crop keys. The bank digest is per-run
+  lineage (`distillation_lineage`), not part of the pooled identity, so seeds of one arm pool.
+- `rslad_advt`: RSLAD's attack (student-crafted KL to the clean-teacher target), coefficients (5/6, 1/6), temperature
+  and `T^2` are unchanged; only the 5/6 adversarial KL target becomes `softmax(T(x')/tau)` from the one cached teacher
+  forward on the training adversarial example. In bank mode `T(x')` runs online and receives the bank's exact top-K
+  storage and reconstruction. Do not reuse the CIFAR `iad_inspired` branch for it.
+- Distillation configs record `training_protocol_identity.distillation` (target source, teacher registry ID and
+  digest, bank storage format and K); runs that differ in any of them never pool. In distillation runs the panel
+  diagnostics never trigger a teacher forward of their own.

@@ -11,6 +11,8 @@ from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .distillation import IMAGENET_TEACHER_REGISTRY_IDS, DistillationConfig, validate_distillation_cross_fields
+
 
 def parse_rational(value: str) -> float:
     if not isinstance(value, str) or not value.strip():
@@ -641,7 +643,11 @@ class ModelConfig(StrictModel):
 
 
 class TeacherConfig(StrictModel):
-    source: Literal["checkpoint", "fixture", "robustbench"] = "fixture"
+    # Plan 0103 Phase 2 batch D: ``imagenet_registry`` teachers are the pinned
+    # ImageNet-1k Linf 4/255 profiles in ard.models.imagenet_teacher_registry
+    # (checkpoint SHA-256, architecture, normalization and threat restated
+    # here and checked against the profile at build time).
+    source: Literal["checkpoint", "fixture", "robustbench", "imagenet_registry"] = "fixture"
     architecture: Literal[
         "saad_resnet18_cifar_v1",
         "torchvision_resnet18_cifar_norm_v1",
@@ -650,6 +656,11 @@ class TeacherConfig(StrictModel):
         "fixture_cnn",
         "robustbench_wide_resnet",
         "robustbench_dm_wide_resnet",
+        "resnet50_imagenet",
+        "convnext_tiny_convstem_imagenet",
+        "vit_s_convstem_imagenet",
+        "convnext_base_convstem_imagenet",
+        "mobilenetv4_conv_medium_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
@@ -661,6 +672,11 @@ class TeacherConfig(StrictModel):
             "chen2021_ltd_wrn34_10",
             "chen2021_ltd_wrn34_20",
             "bartoldson2024_adversarial_wrn94_16",
+            "salman2020_resnet50_linf_eps4",
+            "singh2023_convnext_t_convstem",
+            "singh2023_vit_s_convstem",
+            "singh2023_convnext_b_convstem",
+            "ard_mobilenetv4_conv_medium_phase1_random",
         ]
         | None
     ) = None
@@ -670,12 +686,27 @@ class TeacherConfig(StrictModel):
 
     @model_validator(mode="after")
     def validate_source(self) -> TeacherConfig:
-        if self.source in {"checkpoint", "robustbench"} and (self.checkpoint is None or self.checkpoint_sha256 is None):
+        imagenet_ids = IMAGENET_TEACHER_REGISTRY_IDS
+        if self.source in {"checkpoint", "robustbench", "imagenet_registry"} and (
+            self.checkpoint is None or self.checkpoint_sha256 is None
+        ):
             raise ValueError(f"{self.source} teachers require checkpoint and checkpoint_sha256")
-        if self.source == "robustbench" and self.registry_id is None:
-            raise ValueError("robustbench teachers require registry_id")
-        if self.source != "robustbench" and self.registry_id is not None:
-            raise ValueError("registry_id is only valid for robustbench teachers")
+        if self.source in {"robustbench", "imagenet_registry"} and self.registry_id is None:
+            raise ValueError(f"{self.source} teachers require registry_id")
+        if self.source not in {"robustbench", "imagenet_registry"} and self.registry_id is not None:
+            raise ValueError("registry_id is only valid for robustbench and imagenet_registry teachers")
+        if self.source == "robustbench" and self.registry_id in imagenet_ids:
+            raise ValueError("ImageNet registry IDs require teacher.source=imagenet_registry")
+        if self.source == "imagenet_registry":
+            if self.registry_id not in imagenet_ids:
+                raise ValueError("teacher.source=imagenet_registry requires an ImageNet registry ID")
+            if self.threat_epsilon != "4/255" or self.preprocessing_owner != "teacher_adapter":
+                raise ValueError(
+                    "ImageNet registry teachers are Linf 4/255 with teacher_adapter-owned preprocessing"
+                )
+            # The full profile (architecture, normalization, digest) is checked
+            # against ard.models.imagenet_teacher_registry when the teacher is built.
+            return self._validate_digest()
         if (
             self.source == "robustbench"
             and self.registry_id == "chen2021_ltd_wrn34_10"
@@ -687,6 +718,9 @@ class TeacherConfig(StrictModel):
                 raise ValueError("model_embedded preprocessing is restricted to the Bartoldson RobustBench teacher")
         if self.threat_epsilon != "8/255":
             raise ValueError("teacher threat_epsilon must remain the explicit canonical value 8/255")
+        return self._validate_digest()
+
+    def _validate_digest(self) -> TeacherConfig:
         if self.checkpoint_sha256 is not None and (
             len(self.checkpoint_sha256) != 64 or any(char not in "0123456789abcdef" for char in self.checkpoint_sha256)
         ):
@@ -704,6 +738,13 @@ class MethodConfig(StrictModel):
         "pgd_at",
         "trades",
         "rslad",
+        # Plan 0103 Phase 2 batch D (human-approved 2026-10-08): RSLAD whose
+        # 5/6 adversarial KL targets the teacher on the student's adversarial
+        # example, softmax(T(x')/tau), instead of T(x); attack, clean term,
+        # coefficients and temperature are RSLAD's. AdaAD's outer loss (Huang
+        # et al. CVPR 2023, Eq. 11) with RSLAD's attack. ImageNet distillation
+        # only (see ard.config.distillation).
+        "rslad_advt",
         "rslad_entropy",
         "rslad_student",
         "rslad_joint",
@@ -799,6 +840,7 @@ class MethodConfig(StrictModel):
         expected_target = {
             "trades": "student_clean",
             "rslad": "teacher_clean",
+            "rslad_advt": "teacher_clean",
             "rslad_entropy": "teacher_clean",
             "rslad_student": "teacher_clean",
             "rslad_joint": "teacher_clean",
@@ -1795,6 +1837,10 @@ class ExperimentConfig(StrictModel):
     intervention: InterventionConfig | None = None
     prescriptive_v3: PrescriptiveV3Config | None = None
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
+    # Plan 0103 Phase 2 batch D (see ard.config.distillation). Serialized only
+    # when set, so every existing config keeps a byte-identical resolved
+    # config and config hash.
+    distillation: DistillationConfig | None = Field(default=None, exclude_if=lambda value: value is None)
     output_dir: Path = Path("outputs/dev")
     # Compatibility with M1 checkpoints/configs.  New paths use tracking.run_id.
     tracker_run_id: str | None = None
@@ -1913,6 +1959,7 @@ class ExperimentConfig(StrictModel):
             raise ValueError("teacher and dataset num_classes must match")
         rslad_methods = {
             "rslad",
+            "rslad_advt",
             "rslad_entropy",
             "rslad_student",
             "rslad_joint",
@@ -1991,6 +2038,7 @@ class ExperimentConfig(StrictModel):
             expected_profile = "imagenet_raw_identity"
         if self.student.normalization.profile != expected_profile:
             raise ValueError(f"dataset {self.dataset.name} requires student normalization profile {expected_profile}")
+        validate_distillation_cross_fields(self)
         self._validate_cuda_graph()
         self._validate_protocol_contract()
         return self

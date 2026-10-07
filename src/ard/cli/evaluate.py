@@ -682,9 +682,29 @@ def main(argv: list[str] | None = None) -> int:
                         **_selection_protocol_identity(
                             training_config.training, checkpoint_payload.get("selection_metadata")
                         ),
+                        # Plan 0103 Phase 2 batch D: present only for distillation
+                        # runs (target source, teacher profile + digest, bank digest + K),
+                        # so every earlier identity is byte-identical.
+                        **(
+                            {}
+                            if training_config.distillation is None
+                            else {
+                                "distillation": training_config.distillation.protocol_identity(
+                                    training_config.teacher
+                                )
+                            }
+                        ),
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,
+                    # Plan 0103 Phase 2 batch D: per-run (per-seed) bank lineage,
+                    # deliberately outside the pooled training_protocol_identity.
+                    **(
+                        {}
+                        if training_config.distillation is None
+                        or training_config.distillation.run_lineage() is None
+                        else {"distillation_lineage": training_config.distillation.run_lineage()}
+                    ),
                     "teacher_identity": (
                         None if training_config.teacher is None else training_config.teacher.model_dump(mode="json")
                     ),

@@ -677,6 +677,14 @@ class EpochImageNetTransform:
         self.heavy_augmentation = heavy_augmentation
         self._rand_augment = transforms.RandAugment(num_ops=2, magnitude=9) if heavy_augmentation else None
         self._random_erasing = transforms.RandomErasing(p=0.25) if heavy_augmentation else None
+        # Plan 0103 Phase 2 (soft-label bank): the crop key of the most recent
+        # call, ``(epoch, top, left, height, width, flip)`` in original-image
+        # pixels. Observation only -- written after the view is drawn, never
+        # read by this transform, so pixels and RNG consumption are unchanged.
+        # ard.distillation.crop_keys reads it right after each __getitem__
+        # (one worker process handles one item at a time).
+        self.last_crop_key: tuple[int, int, int, int, int, int] | None = None
+        self._last_box: tuple[int, int, int, int] | None = None
 
     def set_epoch(self, epoch: int) -> None:
         if epoch < 0:
@@ -751,6 +759,7 @@ class EpochImageNetTransform:
         with Image.open(path) as image:
             width, height = image.size
             (top, left, crop_height, crop_width), scale = self.draft_plan(width, height, generator)
+            self._last_box = (top, left, crop_height, crop_width)
             if scale > 1:
                 drafted = image.draft("RGB", (width // scale, height // scale))
                 if drafted is None:
@@ -786,17 +795,24 @@ class EpochImageNetTransform:
         generator = torch.Generator().manual_seed(
             self.augmentation_seed + 1_000_003 * self.epoch + 10_007 * source_id
         )
+        self.last_crop_key = None
         if self.jpeg_draft_decode:
             if not isinstance(image, (str, Path)):
                 raise TypeError("jpeg_draft_decode requires the ImageNet train view to supply image paths")
+            self._last_box = None
             cropped = self._draft_resized_crop(Path(image), generator)
+            assert self._last_box is not None
+            box = self._last_box
         else:
             top, left, height, width = self._crop_box(image, generator)
+            box = (top, left, height, width)
             cropped = transform_functional.resized_crop(
                 image, top, left, height, width, [self.image_size, self.image_size]
             )
-        if bool(torch.randint(0, 2, (), generator=generator).item()):
+        flip = bool(torch.randint(0, 2, (), generator=generator).item())
+        if flip:
             cropped = transform_functional.hflip(cropped)
+        self.last_crop_key = (self.epoch, *box, int(flip))
         if self._rand_augment is not None:
             # Global RNG from here on -- see __init__'s heavy_augmentation
             # comment; the deterministic local generator above still governs

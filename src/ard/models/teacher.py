@@ -110,6 +110,10 @@ def build_teacher(config: TeacherConfig, *, tier: str) -> TeacherAdapter:
             checkpoint_sha256="0" * 64,
         )
         return TeacherAdapter(model, metadata)
+    if config.source == "imagenet_registry":
+        from .imagenet_teacher_registry import build_imagenet_teacher
+
+        return build_imagenet_teacher(config)
     if config.source == "robustbench":
         registry = TeacherRegistry.load()
         spec = registry.validate_config(config)
