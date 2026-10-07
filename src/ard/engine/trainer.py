@@ -63,7 +63,7 @@ from .distributed import (
     suspend_ddp_buffer_broadcasts,
     unwrap_model,
 )
-from .mixed_batch import AuxiliaryBatchNorm, adversarial_count, example_weights
+from .mixed_batch import AuxiliaryBatchNorm, adversarial_count, check_split_batchnorm_batch, example_weights
 
 # Trainer(selection_subset=...): what the selection record must state.
 SELECTION_SUBSET_KEYS = frozenset({"size", "ids_sha256", "full_split_size", "seed", "sampling", "source"})
@@ -711,6 +711,7 @@ class Trainer:
             (self.attack is not None, "a training attack"),
             (type(self.objective) is PGDATObjective, "the PGD-AT objective"),
             (self.teacher is None, "no teacher"),
+            (self.distillation_hooks is None, "no distillation hooks"),
             (self.adr_config is None, "no ADR"),
             (self.policy is None and self.sample_store is None, "no policy or sample state"),
             (self.observation_profile == "off", "observation_profile=off"),
@@ -725,6 +726,8 @@ class Trainer:
                 all(value is None for value in treatments) and not self.clean_wrong_attack_skip and not self.iad_inspired,
                 "no registered treatment",
             ),
+            # The mixed-batch normalizer and split BN are tested in a single process only.
+            (self.mixed_batch is None or get_world_size() == 1, "world size 1 for mixed_batch"),
         ]
         if split:
             assert self.auxiliary_batchnorm is not None
@@ -1630,7 +1633,8 @@ class Trainer:
         # Mixed batch (plan 0103 Phase 2 batch A): adversarial valid count, clean
         # valid count, clean-position train-mode correct, adversarial-position
         # loss sum, clean-position loss sum. Absent otherwise.
-        mixed_totals = None if self.mixed_batch is None else torch.zeros(5, dtype=torch.float64, device=self.device)
+        # Slots 5/6: the lambda-weighted loss sum and the weight sum (the objective's own normalizer).
+        mixed_totals = None if self.mixed_batch is None else torch.zeros(7, dtype=torch.float64, device=self.device)
         awp_active = (
             self._awp is not None
             and self.awp_config is not None
@@ -1890,7 +1894,12 @@ class Trainer:
             if self.auxiliary_batchnorm is not None:
                 # Split BN: the adversarial sub-batch through the model's own (main,
                 # adversarial) BN, the clean sub-batch through the auxiliary BN.
-                assert mixed_count is not None
+                assert mixed_count is not None and self.mixed_batch is not None
+                # Fail loudly (never trim) if a sub-batch would hold one example; the
+                # schema and ard.cli.train refuse such batch sizes before training.
+                check_split_batchnorm_batch(
+                    adversarial.shape[0], self.mixed_batch.adversarial_fraction, where="a training batch"
+                )
                 parts = [] if mixed_count == 0 else [self.model(adversarial[:mixed_count])]
                 parts.append(self.auxiliary_batchnorm.forward_clean(self.model, adversarial[mixed_count:]))
                 logits = torch.cat(parts)
@@ -2381,6 +2390,8 @@ class Trainer:
                         ((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * clean_mask).sum(),
                         (per_example * robust_mask).sum(),
                         (per_example * clean_mask).sum(),
+                        (per_example * weighted_mask.detach()).sum(),
+                        weighted_mask.detach().sum(),
                     ],
                     device=self.device,
                 )
@@ -2444,7 +2455,10 @@ class Trainer:
             # Plan 0103 Phase 2 batch A: robust accuracies are over the attacked
             # positions only (their counts here); the clean positions get their
             # own train-mode accuracy. "loss" stays the unweighted per-example
-            # mean over all valid examples; the two branch means are added.
+            # mean over all valid examples; the two branch means and the
+            # lambda-weighted (optimized) loss are added. Under split BN the
+            # clean-position train-mode accuracy is measured through the
+            # auxiliary (clean) BN, the BN its forward used.
             mixed = reduce_sums(mixed_totals)
             adversarial_examples = float(mixed[0].item())
             clean_examples = float(mixed[1].item())
@@ -2456,6 +2470,9 @@ class Trainer:
             metrics["mixed_batch_clean_accuracy_train_mode"] = float(mixed[2].item()) / max(clean_examples, 1.0)
             metrics["mixed_batch_adversarial_loss"] = float(mixed[3].item()) / adversarial_denominator
             metrics["mixed_batch_clean_loss"] = float(mixed[4].item()) / max(clean_examples, 1.0)
+            # The optimized objective: sum(lambda_i * L_i) / sum(lambda_i) over the epoch.
+            weight_total = float(mixed[6].item())
+            metrics["mixed_batch_weighted_loss"] = float(mixed[5].item()) / weight_total if weight_total > 0 else 0.0
         if self._awp is not None:
             metrics["awp_active"] = 1.0 if awp_active else 0.0
         if graph_state is not None:

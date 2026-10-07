@@ -10,6 +10,7 @@ identity, the pure helpers, and one-step Trainer equivalence against independent
 from __future__ import annotations
 
 import copy
+import importlib.util
 import json
 import math
 import subprocess
@@ -40,9 +41,15 @@ from ard.config.schema import (
     reject_phase2_batch_a_options,
 )
 from ard.data import EpochShuffleSampler, IndexedBatch, IndexedDataset, SyntheticCIFAR, collate_indexed
+from ard.distillation.trainer_hooks import DistillationTargetHooks
 from ard.engine.awp import AWP_EPS, AdversarialWeightPerturbation
 from ard.engine.checkpoint import config_digest
-from ard.engine.mixed_batch import AuxiliaryBatchNorm, adversarial_count, example_weights
+from ard.engine.mixed_batch import (
+    AuxiliaryBatchNorm,
+    adversarial_count,
+    check_split_batchnorm_batch,
+    example_weights,
+)
 from ard.engine.trainer import Trainer
 from ard.objectives import PGDATObjective
 from tests.unit.test_cuda_graph_config import _env
@@ -51,7 +58,7 @@ pytestmark = pytest.mark.t1
 
 ROOT = Path(__file__).resolve().parents[2]
 # The commit this change is based on: the pre-change schema and configs.
-PRE_CHANGE_COMMIT = "922222a"
+PRE_CHANGE_COMMIT = "1a36f57"
 SYNTHETIC = ROOT / "configs" / "experiments" / "synthetic_pgd_at.yaml"
 
 
@@ -73,6 +80,23 @@ def _pre_change_schema() -> types.ModuleType:
     return module
 
 
+def _env_all(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Every variable a repository config interpolates, including the batch-D distillation configs."""
+    _env(monkeypatch, tmp_path)
+    for key, value in {
+        "ARD_EXTERNAL_CHECKPOINT_ROOT": str(tmp_path / "external-checkpoints"),
+        "ARD_SOFT_LABEL_BANK_ROOT": str(tmp_path / "banks"),
+        "ARD_SOFT_LABEL_BANK_SHA256_SALMAN_R50": "1" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_CONVNEXT_T_CVST": "2" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_VIT_S_CVST": "3" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_CONVNEXT_B_CVST": "4" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_MNV4M_OWN": "5" * 64,
+        "ARD_PHASE2_ADAMW_LR_CONVNEXT_ATTO": "5e-4",
+        "ARD_PHASE2_ADAMW_LR_DEIT_TINY": "5e-4",
+    }.items():
+        monkeypatch.setenv(key, value)
+
+
 def _synthetic(**sections: dict[str, Any]) -> dict[str, Any]:
     raw = yaml.safe_load(SYNTHETIC.read_text(encoding="utf-8"))
     for section, values in sections.items():
@@ -86,7 +110,7 @@ def _synthetic(**sections: dict[str, Any]) -> dict[str, Any]:
 def test_configs_that_existed_before_the_change_serialize_exactly_as_under_the_pre_change_schema(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _env(monkeypatch, tmp_path)
+    _env_all(monkeypatch, tmp_path)
     old_schema = _pre_change_schema()
     listed = _git("ls-tree", "-r", "--name-only", PRE_CHANGE_COMMIT, "configs/").splitlines()
     paths = [
@@ -208,12 +232,85 @@ def test_out_of_scope_combinations_fail_closed(sections: dict[str, Any], message
         ExperimentConfig.model_validate(raw)
 
 
-def test_mixed_batch_without_split_bn_works_under_ddp_shapes() -> None:
+@pytest.mark.parametrize(
+    "sections",
+    [
+        {"method": {"mixed_batch": {"adversarial_fraction": 0.5, "adversarial_weight": 0.3}}},
+        {"method": {"awp": {}}},
+    ],
+)
+def test_mixed_batch_and_awp_refuse_ddp_shapes(sections: dict[str, Any]) -> None:
+    raw = _synthetic(training={"global_batch_size": 8}, **sections)
+    with pytest.raises(ValueError, match="requires world size 1"):
+        ExperimentConfig.model_validate(raw)
+
+
+@pytest.mark.parametrize(
+    ("per_rank", "fraction", "admitted"),
+    [(4, 0.5, True), (4, 0.25, False), (4, 0.75, False), (3, 0.5, False), (5, 0.4, True), (128, 0.5, True)],
+)
+def test_split_bn_refuses_a_one_example_sub_batch_in_the_schema(per_rank: int, fraction: float, admitted: bool) -> None:
     raw = _synthetic(
-        method={"mixed_batch": {"adversarial_fraction": 0.5, "adversarial_weight": 0.3}},
-        training={"global_batch_size": 8},
+        method={"mixed_batch": {"adversarial_fraction": fraction, "adversarial_weight": 0.3, "split_batchnorm": True}},
+        training={"per_rank_batch_size": per_rank, "global_batch_size": per_rank},
     )
-    assert ExperimentConfig.model_validate(raw).method.mixed_batch is not None
+    if admitted:
+        ExperimentConfig.model_validate(raw)
+    else:
+        with pytest.raises(ValueError, match="at least 2 adversarial and 2 clean"):
+            ExperimentConfig.model_validate(raw)
+    # Without split BN the same shapes are fine (one forward over the whole batch).
+    raw["method"]["mixed_batch"]["split_batchnorm"] = False
+    ExperimentConfig.model_validate(raw)
+
+
+@pytest.mark.parametrize(
+    ("batch", "refused"),
+    [(123, False), (128, False), (6, False), (5, False), (4, False), (3, True), (2, True), (1, True)],
+)
+def test_last_batch_check(batch: int, refused: bool) -> None:
+    """f = 0.5: 3 -> 1/2, 2 -> 1/1, 1 -> 0/1 hold a 1-example sub-batch; an empty adversarial half is fine."""
+    if refused:
+        with pytest.raises(ValueError, match="1-example BatchNorm sub-batch"):
+            check_split_batchnorm_batch(batch, 0.5, where="the last batch of every epoch")
+    else:
+        check_split_batchnorm_batch(batch, 0.5, where="the last batch of every epoch")
+
+
+def test_imagenet_phase2_split_last_batch_is_admitted() -> None:
+    """1,255,547 training images (validation_fraction 0.02, seeds.split 20260911; plan 0103 Phase 1 runs'
+    train_valid_examples), per-rank 128, f = 0.5: 9808 full batches (64/64) and a last batch of 123 (61/62)."""
+    assert divmod(1_255_547, 128) == (9808, 123)
+    assert adversarial_count(123, 0.5) == 61
+    check_split_batchnorm_batch(128, 0.5, where="a full batch")
+    check_split_batchnorm_batch(123, 0.5, where="the last batch of every epoch")
+
+
+@pytest.mark.parametrize(
+    ("sections", "message"),
+    [
+        ({"observation": {"profile": "student_history"}}, "observation.profile=off"),
+    ],
+)
+def test_mixed_batch_and_awp_preflight_refusals(sections: dict[str, Any], message: str) -> None:
+    for option in ({"mixed_batch": {"adversarial_fraction": 0.5, "adversarial_weight": 0.3}}, {"awp": {}}):
+        raw = _synthetic(method=option)
+        raw.update(sections)
+        with pytest.raises(ValueError, match=message):
+            ExperimentConfig.model_validate(raw)
+
+
+def test_split_bn_refuses_an_init_checkpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _env(monkeypatch, tmp_path)
+    stage2 = ROOT / "configs" / "scientific" / "imagenet_mobilenetv4_twostage_stage2_224_pgd3_ft_cg_5ep.yaml"
+    raw = _expand_environment(yaml.safe_load(stage2.read_text(encoding="utf-8")))
+    raw["training"].pop("cuda_graph", None)
+    ExperimentConfig.model_validate(raw)
+    raw["method"]["mixed_batch"] = {"adversarial_fraction": 0.5, "adversarial_weight": 0.3, "split_batchnorm": True}
+    with pytest.raises(ValueError, match="cannot be combined with training.init_checkpoint"):
+        ExperimentConfig.model_validate(raw)
+    raw["method"]["mixed_batch"]["split_batchnorm"] = False
+    ExperimentConfig.model_validate(raw)
 
 
 @pytest.mark.parametrize(
@@ -586,29 +683,25 @@ def test_trainer_refuses_mixed_batch_and_awp_outside_plain_pgd_at(tmp_path: Path
 # --------------------------------------------------------------------------- AWP
 
 
-# Verbatim transcription of csdongxian/AWP AT_AWP/utils_awp.py (the reference, not our code).
-_UPSTREAM_EPS = 1e-20
+# The reference is the official code itself: csdongxian/AWP at the commit pinned in external.lock.yaml,
+# vendored by ``scripts/bootstrap_external.py --repository awp`` into .external/awp.
+_AWP_ROOT = ROOT / ".external" / "awp"
 
 
-def _upstream_diff_in_weights(model: nn.Module, proxy: nn.Module) -> OrderedDict[str, torch.Tensor]:
-    diff_dict: OrderedDict[str, torch.Tensor] = OrderedDict()
-    model_state_dict = model.state_dict()
-    proxy_state_dict = proxy.state_dict()
-    for (old_k, old_w), (_new_k, new_w) in zip(model_state_dict.items(), proxy_state_dict.items()):
-        if len(old_w.size()) <= 1:
-            continue
-        if "weight" in old_k:
-            diff_w = new_w - old_w
-            diff_dict[old_k] = old_w.norm() / (diff_w.norm() + _UPSTREAM_EPS) * diff_w
-    return diff_dict
-
-
-def _upstream_add_into_weights(model: nn.Module, diff: OrderedDict[str, torch.Tensor], coeff: float = 1.0) -> None:
-    names_in_diff = diff.keys()
-    with torch.no_grad():
-        for name, param in model.named_parameters():
-            if name in names_in_diff:
-                param.add_(coeff * diff[name])
+def _upstream_awp() -> types.ModuleType:
+    lock = yaml.safe_load((ROOT / "external.lock.yaml").read_text(encoding="utf-8"))["repositories"]["awp"]
+    source = _AWP_ROOT / "AT_AWP" / "utils_awp.py"
+    if not source.is_file():
+        pytest.skip("csdongxian/AWP is not vendored: run scripts/bootstrap_external.py --repository awp")
+    head = subprocess.run(
+        ["git", "-C", str(_AWP_ROOT), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    assert head == lock["commit"], "vendored AWP checkout is not at the locked commit"
+    spec = importlib.util.spec_from_file_location("_upstream_utils_awp", source)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _upstream_calc_awp(
@@ -618,17 +711,17 @@ def _upstream_calc_awp(
     inputs_adv: torch.Tensor,
     targets: torch.Tensor,
 ) -> OrderedDict[str, torch.Tensor]:
-    proxy.load_state_dict(model.state_dict())
-    proxy.train()
-    loss = -F.cross_entropy(proxy(inputs_adv), targets)
-    proxy_optim.zero_grad()
-    loss.backward()
-    proxy_optim.step()
-    return _upstream_diff_in_weights(model, proxy)
+    """Upstream ``AdvWeightPerturb.calc_awp`` (train_cifar10.py: proxy SGD lr 0.01)."""
+    adversary = _upstream_awp().AdvWeightPerturb(model=model, proxy=proxy, proxy_optim=proxy_optim, gamma=0.01)
+    return adversary.calc_awp(inputs_adv=inputs_adv, targets=targets)
+
+
+def _upstream_add_into_weights(model: nn.Module, diff: OrderedDict[str, torch.Tensor], coeff: float = 1.0) -> None:
+    _upstream_awp().add_into_weights(model, diff, coeff=coeff)
 
 
 def test_awp_constants_match_upstream() -> None:
-    assert AWP_EPS == _UPSTREAM_EPS
+    assert AWP_EPS == _upstream_awp().EPS
 
 
 def test_awp_direction_matches_the_official_code() -> None:
@@ -747,3 +840,95 @@ def test_awp_inactive_during_warmup_is_exactly_plain_pgd_at(tmp_path: Path) -> N
     assert {k: v for k, v in warm_metrics.items() if k != "seconds" and "per_second" not in k} == {
         k: v for k, v in plain_metrics.items() if k != "seconds" and "per_second" not in k
     }
+
+
+# --------------------------------------------------------------------------- review fixes (2026-10-08)
+
+
+def _head_bn_model() -> nn.Module:
+    """MobileNetV4-like head: a BatchNorm on globally pooled 1x1 features (timm's norm_head)."""
+    torch.manual_seed(0)
+    return nn.Sequential(
+        nn.Conv2d(3, 4, 3, padding=1),
+        nn.BatchNorm2d(4),
+        nn.ReLU(),
+        nn.AdaptiveAvgPool2d(1),
+        nn.Conv2d(4, 8, 1),
+        nn.BatchNorm2d(8),
+        nn.ReLU(),
+        nn.Flatten(),
+        nn.Linear(8, 3),
+    )
+
+
+def test_split_bn_refuses_a_one_example_sub_batch_at_runtime_instead_of_crashing(tmp_path: Path) -> None:
+    model = _head_bn_model()
+    auxiliary = AuxiliaryBatchNorm(model)
+    trainer = _trainer(
+        model,
+        SGD([*model.parameters(), *auxiliary.parameters()], lr=0.1),
+        tmp_path,
+        mixed_batch=MixedBatchConfig(adversarial_fraction=0.5, adversarial_weight=0.3, split_batchnorm=True),
+        auxiliary_batchnorm=auxiliary,
+    )
+    before = _state(model)
+    with pytest.raises(ValueError, match="1-example BatchNorm sub-batch"):
+        trainer.train_epoch([_batch(3)])  # type: ignore[arg-type]
+    # Refused before the training forward: no BN statistic or weight moved.
+    for key, value in before.items():
+        assert torch.equal(model.state_dict()[key], value), key
+    # A batch of 4 (2 / 2) trains.
+    trainer.train_epoch([_batch(4)])  # type: ignore[arg-type]
+
+
+def test_mixed_batch_logs_the_lambda_weighted_objective(tmp_path: Path) -> None:
+    batch = _batch(6)
+    model = _bn_model()
+    reference = copy.deepcopy(model)
+    trainer = _trainer(
+        model,
+        SGD(model.parameters(), lr=0.1),
+        tmp_path,
+        mixed_batch=MixedBatchConfig(adversarial_fraction=0.5, adversarial_weight=0.3),
+    )
+    metrics = trainer.train_epoch([batch])  # type: ignore[arg-type]
+    reference.train()
+    adversarial = _attack_subset(reference, batch, 3)
+    reference.train()
+    with torch.no_grad():
+        ce = F.cross_entropy(reference(torch.cat([adversarial, batch.images[3:]])), batch.labels, reduction="none")
+    expected = (ce[3:].sum() + 0.3 * ce[:3].sum()) / (3 + 0.3 * 3)
+    assert metrics["mixed_batch_weighted_loss"] == pytest.approx(float(expected), rel=1e-6)
+
+
+def test_trainer_refuses_mixed_batch_and_awp_with_distillation_hooks(tmp_path: Path) -> None:
+    model = _bn_model()
+    for option in (
+        {"mixed_batch": MixedBatchConfig(adversarial_fraction=0.5, adversarial_weight=0.3)},
+        {"awp": AwpConfig()},
+    ):
+        with pytest.raises(ValueError, match="no distillation hooks"):
+            hooks = DistillationTargetHooks(adversarial_teacher_target=False, temperature=1.0)
+            _trainer(model, SGD(model.parameters(), lr=0.1), tmp_path, distillation_hooks=hooks, **option)
+
+
+def test_awp_with_weight_ema_averages_the_restored_weights(tmp_path: Path) -> None:
+    """EMA after one AWP step = decay * initial + (1 - decay) * restored (unperturbed) weights."""
+    decay = 0.9
+    model = _bn_model()
+    initial = _state(model)
+    trainer = _trainer(
+        model,
+        SGD(model.parameters(), lr=0.1, momentum=0.9),
+        tmp_path,
+        awp=AwpConfig(gamma=0.01),
+        weight_ema_decay=decay,
+    )
+    trainer.train_epoch([_batch(6)])  # type: ignore[arg-type]
+    assert trainer.ema_model is not None
+    restored = model.state_dict()
+    for key, ema_value in trainer.ema_model.state_dict().items():
+        if not ema_value.is_floating_point():
+            continue
+        expected = initial[key] * decay + restored[key] * (1.0 - decay)
+        torch.testing.assert_close(ema_value, expected, rtol=1e-6, atol=1e-7, msg=key)

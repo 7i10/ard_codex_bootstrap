@@ -317,8 +317,8 @@ class MixedBatchConfig(StrictModel):
     data that changes every epoch. ``adversarial_weight`` is lambda. Only the
     ``k`` selected examples are attacked (the configured training attack, its
     random start drawn for those ``k`` only); the other ``m - k`` enter the
-    training forward clean. The normalizer counts valid (non-padding) examples
-    only, summed over ranks.
+    training forward clean. The normalizer counts valid examples. World size 1
+    only (the schema and the Trainer refuse DDP).
 
     ``split_batchnorm`` (Xie & Yuille 2019, arXiv:1906.03787, "MBN"; the same
     mechanism as AdvProp's auxiliary BN, arXiv:1911.09665): the adversarial
@@ -330,7 +330,11 @@ class MixedBatchConfig(StrictModel):
     during training and is checkpointed separately for resume. BatchNorm
     models only (refused when the student has no BatchNorm layer, e.g.
     LayerNorm-only ViT/ConvNeXt); LayerNorm/GroupNorm layers, which hold no
-    batch statistics, stay shared. Single process only.
+    batch statistics, stay shared. Refused unless every sub-batch has at least
+    2 examples: the schema checks the full per-rank batch, ``ard.cli.train`` the
+    last partial batch of the epoch (examples are never dropped); refused with
+    ``training.compile`` and ``training.init_checkpoint``. The train-mode
+    clean-position accuracy is measured through the auxiliary BN.
     """
 
     adversarial_fraction: float = Field(gt=0, lt=1)
@@ -348,7 +352,12 @@ class AwpConfig(StrictModel):
     """Plan 0103 Phase 2 batch A: Adversarial Weight Perturbation on top of ``pgd_at``.
 
     Wu, Xia & Wang 2020 (arXiv:2004.05884), official code csdongxian/AWP
-    ``AT_AWP/`` (``utils_awp.py``, ``train_cifar10.py``): after the PGD attack, a
+    ``AT_AWP/`` (``utils_awp.py``, ``train_cifar10.py``; pinned in
+    external.lock.yaml as ``awp`` at a7acf5d8, vendored under ``.external/awp``
+    and imported by the parity test). This is AWP on this project's PGD-AT,
+    not an AT-AWP reproduction: upstream crafts its PGD examples with the model
+    in train mode, ours with the configured ``attack.student_mode`` (default
+    eval), plus our own data, schedule and architecture. After the PGD attack, a
     proxy copy of the student (train mode) takes one SGD step (lr 0.01) that
     ascends the adversarial loss; the per-layer difference ``d`` is rescaled to
     ``||w_l|| / (||d_l|| + 1e-20) * d_l`` for every state entry with ndim > 1
@@ -2168,23 +2177,41 @@ class ExperimentConfig(StrictModel):
         return self
 
     def _validate_phase2_batch_a(self) -> None:
-        """Plan 0103 Phase 2 batch A: runtime limits of split BN and AWP (single process)."""
-        single_process = self.training.global_batch_size == self.training.per_rank_batch_size
+        """Plan 0103 Phase 2 batch A: runtime limits of mixed batch, split BN and AWP (single process)."""
         mixed_batch, awp = self.method.mixed_batch, self.method.awp
-        if mixed_batch is not None and mixed_batch.split_batchnorm:
-            if not single_process:
-                raise ValueError(
-                    "method.mixed_batch.split_batchnorm requires world size 1 (global_batch_size == "
-                    "per_rank_batch_size): the auxiliary BN parameters are not registered with DDP"
-                )
-            if self.training.compile:
-                raise ValueError("method.mixed_batch.split_batchnorm cannot be combined with training.compile")
+        if mixed_batch is None and awp is None:
+            return
+        feature = "method.mixed_batch" if mixed_batch is not None else "method.awp"
+        single_process = self.training.global_batch_size == self.training.per_rank_batch_size
+        if not single_process:
+            raise ValueError(
+                f"{feature} requires world size 1 (global_batch_size == per_rank_batch_size); the mixed-batch "
+                "normalizer, split BN and the AWP perturbation are tested only in a single process"
+            )
+        # Mirrors the Trainer's scope check so a config fails before any tracker run exists.
+        if self.observation.profile != "off":
+            raise ValueError(f"{feature} requires observation.profile=off")
+        if self.teacher is not None or self.distillation is not None:
+            raise ValueError(f"{feature} is defined for plain pgd_at without a teacher or distillation block")
+        if mixed_batch is not None:
+            per_rank = self.training.per_rank_batch_size
+            adversarial = math.floor(mixed_batch.adversarial_fraction * per_rank)
+            if mixed_batch.split_batchnorm:
+                if adversarial < 2 or per_rank - adversarial < 2:
+                    raise ValueError(
+                        "method.mixed_batch.split_batchnorm needs at least 2 adversarial and 2 clean examples per "
+                        f"batch (BatchNorm on a 1-example sub-batch, e.g. a head BN after pooling, is undefined); "
+                        f"per_rank_batch_size {per_rank} with adversarial_fraction "
+                        f"{mixed_batch.adversarial_fraction} gives {adversarial} / {per_rank - adversarial}"
+                    )
+                if self.training.compile:
+                    raise ValueError("method.mixed_batch.split_batchnorm cannot be combined with training.compile")
+                if self.training.init_checkpoint is not None:
+                    raise ValueError(
+                        "method.mixed_batch.split_batchnorm cannot be combined with training.init_checkpoint (the "
+                        "auxiliary BN state is not carried between stages)"
+                    )
         if awp is not None:
-            if not single_process:
-                raise ValueError(
-                    "method.awp requires world size 1 (global_batch_size == per_rank_batch_size): the official "
-                    "code computes one perturbation from the whole batch"
-                )
             if self.training.amp:
                 raise ValueError("method.awp cannot be combined with training.amp")
             if awp.warmup_epochs >= self.training.epochs:

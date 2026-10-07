@@ -94,4 +94,5 @@ def test_split_bn_refuses_a_student_without_batchnorm(tmp_path: Path) -> None:
     completed = run_cli(ROOT, "--config", str(path))
     assert completed.returncode != 0
     assert "requires a student with BatchNorm layers" in completed.stderr
-    assert not (output / "last.pt").exists()
+    # Refused in the pre-tracker preflight: no output directory, resolved config or tracker run exists.
+    assert not output.exists()

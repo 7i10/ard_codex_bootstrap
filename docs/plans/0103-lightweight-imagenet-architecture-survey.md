@@ -3537,7 +3537,7 @@ history behind this pivot.)
     runs best minus last is 0.1pt (median).
 - 2026-10-08 (human-approved): **Phase 2 implementation batch A** (code only; nothing launched).
   All options default off; every earlier config resolves and hashes byte-identically (tested against
-  `922222a`). Contracts in `docs/SCIENTIFIC_INVARIANTS.md` ("Plan 0103 Phase 2 batch A training options").
+  `1a36f57`, after batches B and D). Contracts in `docs/SCIENTIFIC_INVARIANTS.md` ("Plan 0103 Phase 2 batch A training options").
   - `method.mixed_batch` (pgd_at): Kurakin et al. 2017 mixed clean+adversarial batch. The first
     `floor(fraction * m)` positions of each batch are attacked; loss weight `adversarial_weight` on them.
     Optional `split_batchnorm`: the clean half uses an auxiliary BN; the main BN (used by attack,
@@ -3547,3 +3547,10 @@ history behind this pivot.)
   - `training.cuda_graph` now also admits `training.weight_ema_decay` (bitwise equal to eager in
     deterministic mode), `method.label_smoothing` and the SGD exclusion; it refuses mixed batch and AWP
     (plan 0105 progress log).
+  - Review fixes (scientific review of 5c9e6cf, no P0/P1): split BN refuses any 1-example BN sub-batch
+    (schema for the full batch, `ard.cli.train` for the epoch's last batch; never drops examples). The
+    ImageNet-1k Phase 2 split has 1,255,547 training images, so per-rank 128 with f 0.5 gives 64/64 and a
+    last batch of 123 (61/62): admitted. Mixed batch is single-GPU only. csdongxian/AWP is pinned in
+    `external.lock.yaml` (`awp`, a7acf5d8) and the parity test imports its `utils_awp.py`; our AWP is
+    "AWP on our PGD-AT" (eval-mode attack by default), not an AT-AWP reproduction. Also: split BN with
+    `init_checkpoint` refused; preflight refusals before any tracker run; `train_mixed_batch_weighted_loss`.

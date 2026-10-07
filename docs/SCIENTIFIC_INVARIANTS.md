@@ -345,25 +345,41 @@ None of them touches the attack identity, selection, or evaluation.
   batch of `m`, the first `k = floor(adversarial_fraction * m)` positions are attacked with the configured training
   attack (random start drawn for those `k` only); the rest enter the training forward clean. Loss
   `(sum_clean L + lambda * sum_adv L) / ((m - k) + lambda * k)` with `lambda = adversarial_weight`, over valid
-  examples, normalizer summed over ranks. The sampler shuffles every epoch, so the attacked subset is a seeded random
-  subset that changes per epoch; no extra RNG draw. `train_robust_accuracy` (and `_eval_mode`) count the attacked
-  positions only; `train_mixed_batch_*` give the counts, the clean-position train-mode accuracy and both branch
-  losses. `train_loss` stays the unweighted per-example mean.
+  examples. World size 1 only (schema and Trainer refuse DDP). The sampler shuffles every epoch, so the attacked
+  subset is a seeded random subset that changes per epoch; no extra RNG draw. `train_robust_accuracy` (and
+  `_eval_mode`) count the attacked positions only; `train_mixed_batch_*` give the counts, the clean-position
+  train-mode accuracy, both branch losses and `train_mixed_batch_weighted_loss` (the optimized objective,
+  `sum(lambda_i L_i) / sum(lambda_i)` over the epoch). `train_loss` stays the unweighted per-example mean.
   - `split_batchnorm: true` (Xie & Yuille 2019, arXiv:1906.03787; AdvProp's auxiliary BN): the adversarial sub-batch
     uses the model's own BatchNorm layers (the **main BN = adversarial BN**); the clean sub-batch uses an auxiliary
     copy of every BatchNorm layer's affine parameters and running statistics (`ard.engine.mixed_batch`). Attack,
     validation, selection, the saved `model` weights, EMA and evaluation all use the main (adversarial) BN only; the
     auxiliary BN is checkpointed separately (`auxiliary_batchnorm`, required on resume). BatchNorm students only
     (refused for a student with no BatchNorm layer, e.g. LayerNorm-only ConvNeXt/DeiT); LayerNorm/GroupNorm stay
-    shared. World size 1, no `training.compile`.
-- `method.awp` (`pgd_at` only; Wu, Xia & Wang 2020, arXiv:2004.05884; official `csdongxian/AWP` `AT_AWP`): after
+    shared. No `training.compile`, no `training.init_checkpoint`. Every BN sub-batch must hold at least 2 examples
+    (train-mode BN on one example is undefined, e.g. MobileNetV4's head BN after pooling): the schema refuses a
+    per-rank batch with `floor(f * m) < 2` or `m - floor(f * m) < 2`, and `ard.cli.train` refuses at startup when the
+    epoch's last partial batch (`len(train) % per_rank_batch_size`) would give a 1-example sub-batch. Examples are
+    never dropped. The ImageNet-1k Phase 2 split (`validation_fraction` 0.02, `seeds.split` 20260911) has 1,255,547
+    training images (the plan 0103 Phase 1 runs' `train_valid_examples`); with per-rank 128 and f = 0.5 every full
+    batch splits 64 / 64 and the last batch of 123 splits 61 / 62, so it is admitted. The clean-position train-mode
+    accuracy (`train_mixed_batch_clean_accuracy_train_mode`) goes through the auxiliary BN.
+- `method.awp` (`pgd_at` only; Wu, Xia & Wang 2020, arXiv:2004.05884; official `csdongxian/AWP` `AT_AWP`, pinned in
+  `external.lock.yaml` as `awp` at commit `a7acf5d842fccf1bbb4b91644352ce157d370a26`, vendored under `.external/awp`
+  by `scripts/bootstrap_external.py --repository awp`; the parity test imports its `AT_AWP/utils_awp.py`). This is
+  **AWP on this project's PGD-AT, not an AT-AWP reproduction**: upstream crafts its PGD examples with the model in
+  train mode (except the first batch of each later epoch, which inherits eval mode from the test pass), ours with
+  the configured `attack.student_mode` (default eval), on our data, schedule and students. After
   the attack, a proxy copy (train mode) takes one SGD step (lr 0.01) ascending the masked-mean PGD-AT loss (the
   official plain CE when `label_smoothing` is 0); for every state entry with ndim > 1 whose name contains `weight`
   the difference is rescaled to `||w|| / (||d|| + 1e-20) * d`; the student is moved by `gamma * d`, takes its step,
   and `gamma * d` is subtracted after the optimizer step (before the EMA update). Defaults are the AT-AWP code's
   `gamma = 0.01`, `warmup_epochs = 0`. Extra compute: one proxy forward+backward per step and one model copy.
-  World size 1, no AMP. Not combinable with `mixed_batch`.
+  World size 1, no AMP. Not combinable with `mixed_batch`. The pre-update observability of an AWP step
+  (`train_robust_accuracy`, diagnostic rows) is measured at the perturbed weights the training forward used.
 - `optimizer.exclude_norm_bias_from_weight_decay` (SGD only): parameters with ndim <= 1 (normalization affine,
   biases) go into a `weight_decay = 0` group, the same split AdamW always uses.
+- Mixed batch and AWP also require `observation.profile: off`, no teacher and no `distillation` block (schema, before
+  any tracker run; the Trainer repeats the scope check).
 - `training.cuda_graph` refuses `mixed_batch` and `awp`; only `ard.cli.train` applies the three options and every
   other Trainer builder refuses them (`reject_phase2_batch_a_options`).

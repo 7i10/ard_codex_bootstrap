@@ -39,3 +39,11 @@ repositories:
     license_status: unclear
     license_evidence:
       sha256: 488d32514d983bb48e0e75dab8f02bdc148fc0c34a52bea2bdbfdee2c43e8206
+  awp:
+    url: https://github.com/csdongxian/AWP.git
+    commit: a7acf5d842fccf1bbb4b91644352ce157d370a26
+    fetched_at: '2026-10-07T18:15:11.868295+00:00'
+    license_file: LICENSE
+    license_status: unclear
+    license_evidence:
+      sha256: 4ce96a53547afb633ec52e427188cb8fd62d8b40df0acc32dbfc2a308871f963

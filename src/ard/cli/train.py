@@ -46,7 +46,7 @@ from ard.distillation.soft_label_bank import (
 from ard.distillation.trainer_hooks import DistillationTargetHooks
 from ard.engine import Trainer, config_digest, get_rank, get_world_size
 from ard.engine.checkpoint import load_init_student_weights, validate_resume_checkpoint
-from ard.engine.mixed_batch import AuxiliaryBatchNorm
+from ard.engine.mixed_batch import AuxiliaryBatchNorm, check_split_batchnorm_batch
 from ard.engine.distributed import (
     barrier,
     initialize_from_env,
@@ -902,6 +902,13 @@ def main(argv: list[str] | None = None) -> int:
                     expected_top_k=config.distillation.bank.top_k,
                     required_epochs=config.training.epochs,
                 )
+            mixed_batch = config.method.mixed_batch
+            if mixed_batch is not None and mixed_batch.split_batchnorm:
+                # Fail before any output or tracker run exists: the student must
+                # have BatchNorm layers to split (a throwaway, unloaded copy).
+                AuxiliaryBatchNorm(
+                    build_student(config.student.model_copy(update={"pretrained": False}), tier=config.tier)
+                )
             init_checkpoint = config.training.init_checkpoint
             if init_checkpoint is not None and args.resume is None:
                 # Fail before any output or tracker run exists (dry-run
@@ -979,6 +986,16 @@ def main(argv: list[str] | None = None) -> int:
             train_image_size=config.training.train_image_size,
             jpeg_draft_decode=config.training.jpeg_draft_decode,
         )
+        mixed_batch_config = config.method.mixed_batch
+        if mixed_batch_config is not None and mixed_batch_config.split_batchnorm:
+            # Single process (schema): the last batch of every epoch holds
+            # len(train) % per_rank examples. Refuse a 1-example BN sub-batch
+            # there before any step runs; examples are never dropped.
+            last_batch = len(train_dataset) % config.training.per_rank_batch_size
+            if last_batch:
+                check_split_batchnorm_batch(
+                    last_batch, mixed_batch_config.adversarial_fraction, where="the last batch of every epoch"
+                )
         frozen_risk_lookup: FrozenRiskLookup | None = None
         intervention_mask: FixedInterventionMask | None = None
         if config.method.id == "rslad_frozen_oracle_softening":

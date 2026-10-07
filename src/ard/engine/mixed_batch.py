@@ -30,7 +30,7 @@ from torch import nn
 from torch.func import functional_call
 from torch.nn.modules.batchnorm import _BatchNorm
 
-__all__ = ["AuxiliaryBatchNorm", "adversarial_count", "example_weights"]
+__all__ = ["AuxiliaryBatchNorm", "adversarial_count", "check_split_batchnorm_batch", "example_weights"]
 
 
 def adversarial_count(batch_size: int, fraction: float) -> int:
@@ -40,6 +40,25 @@ def adversarial_count(batch_size: int, fraction: float) -> int:
     if not 0.0 < fraction < 1.0:
         raise ValueError("adversarial_fraction must lie in (0, 1)")
     return int(math.floor(fraction * batch_size))
+
+
+def check_split_batchnorm_batch(batch_size: int, fraction: float, *, where: str) -> None:
+    """Refuse a batch whose split-BN sub-batches would hold exactly one example.
+
+    BatchNorm in train mode on one example is undefined wherever the layer has
+    a single value per channel (e.g. MobileNetV4's head BN after global
+    pooling) and degenerate elsewhere. An empty adversarial sub-batch is fine
+    (no adversarial forward). The batch is refused, never trimmed: dropping
+    examples would silently change the data each epoch sees.
+    """
+    adversarial = adversarial_count(batch_size, fraction)
+    clean = batch_size - adversarial
+    if adversarial == 1 or clean == 1:
+        raise ValueError(
+            f"method.mixed_batch.split_batchnorm: {where} of {batch_size} examples splits into {adversarial} "
+            f"adversarial / {clean} clean; a 1-example BatchNorm sub-batch is refused (choose a per_rank_batch_size "
+            "or adversarial_fraction that avoids it)"
+        )
 
 
 def example_weights(
