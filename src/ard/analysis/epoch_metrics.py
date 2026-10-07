@@ -172,7 +172,15 @@ def epoch_range_summary(
     return summary
 
 
-def epoch_trajectory_summary(rows: Sequence[Mapping[str, Any]], *, expected_epochs: int) -> dict[str, Any]:
+def epoch_trajectory_summary(
+    rows: Sequence[Mapping[str, Any]], *, expected_epochs: int, validation_prefix: str = "val"
+) -> dict[str, Any]:
+    """``validation_prefix`` names the per-epoch selection columns read and the
+    summary keys written: ``val`` (default, the full held-out split) or
+    ``val_subset`` (``training.selection_subset_size``), so a subset trajectory
+    is never summarized under full-split names."""
+    if validation_prefix not in {"val", "val_subset"}:
+        raise EpochMetricsError(f"unknown validation prefix {validation_prefix!r}")
     if expected_epochs < 1:
         raise EpochMetricsError("expected epoch count must be positive")
     normalized = merge_epoch_rows((), rows)
@@ -188,7 +196,8 @@ def epoch_trajectory_summary(rows: Sequence[Mapping[str, Any]], *, expected_epoc
     if expected_epochs != CANONICAL_EPOCHS or not complete:
         return summary
 
-    for metric, prefix in (("val_pgd_accuracy", "val_pgd"), ("val_clean_accuracy", "val_clean")):
+    pgd_prefix, clean_prefix = f"{validation_prefix}_pgd", f"{validation_prefix}_clean"
+    for metric, prefix in ((f"{pgd_prefix}_accuracy", pgd_prefix), (f"{clean_prefix}_accuracy", clean_prefix)):
         values = _metric_values(normalized, metric=metric)
         late = values[-LATE_WINDOW:]
         summary.update(
@@ -198,14 +207,14 @@ def epoch_trajectory_summary(rows: Sequence[Mapping[str, Any]], *, expected_epoc
                 f"{prefix}_slope_per_epoch": _slope(values),
             }
         )
-        if prefix == "val_pgd":
+        if prefix == pgd_prefix:
             summary.update(
                 {
-                    "val_pgd_mean_epoch_100_199": sum(values[100:]) / 100,
-                    "val_pgd_mean_epoch_120_199": sum(values[120:]) / 80,
-                    "val_pgd_mean_epoch_150_199": sum(values[150:]) / 50,
-                    "val_pgd_normalized_auc_epoch_100_199": _normalized_auc(values[100:]),
-                    "val_pgd_slope_epoch_120_199": _slope(values[120:]),
+                    f"{pgd_prefix}_mean_epoch_100_199": sum(values[100:]) / 100,
+                    f"{pgd_prefix}_mean_epoch_120_199": sum(values[120:]) / 80,
+                    f"{pgd_prefix}_mean_epoch_150_199": sum(values[150:]) / 50,
+                    f"{pgd_prefix}_normalized_auc_epoch_100_199": _normalized_auc(values[100:]),
+                    f"{pgd_prefix}_slope_epoch_120_199": _slope(values[120:]),
                 }
             )
     return summary

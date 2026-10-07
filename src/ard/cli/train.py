@@ -744,9 +744,11 @@ def _selection_subset_summary(
 ) -> dict[str, object]:
     """Run-summary entries for training.selection_subset_size; empty when unset.
 
-    The summary's best_*/last_*/robust_overfit_gap stay the selection numbers
-    (on the subset); these entries label them and add the final full-split
-    numbers for best and last under distinct keys."""
+    The subset selection numbers themselves are best_subset_* / last_subset_*
+    (see ``_finalize``); these entries state the subset and add the final
+    full held-out split and complement (held-out minus subset) numbers for
+    best and last. last_full_* is the like-for-like internal number across
+    runs with and without the option (the weights are identical)."""
     subset = selection_metadata.get("selection_subset")
     if not isinstance(subset, Mapping):
         return {}
@@ -757,25 +759,24 @@ def _selection_subset_summary(
         "selection_subset_size": subset["size"],
         "selection_subset_sha256": subset["ids_sha256"],
         "val_full_num_examples": full["num_examples"],
+        "val_complement_num_examples": full["complement_num_examples"],
         "best_full_epoch": full["best_epoch"],
-        "best_full_clean_accuracy": full["best_clean_accuracy"],
-        "best_full_pgd_accuracy": full["best_pgd_accuracy"],
-        "last_full_clean_accuracy": full["last_clean_accuracy"],
-        "last_full_pgd_accuracy": full["last_pgd_accuracy"],
-        "robust_overfit_gap_full": _selection_metric(full["best_pgd_accuracy"], name="best full-split PGD accuracy")
-        - _selection_metric(full["last_pgd_accuracy"], name="last full-split PGD accuracy"),
     }
+    for which in ("best", "last"):
+        for part, name in (("", "full"), ("complement_", "complement")):
+            for metric in ("clean", "pgd"):
+                summary[f"{which}_{name}_{metric}_accuracy"] = full[f"{which}_{part}{metric}_accuracy"]
+    for part, name in (("", "full"), ("complement_", "complement")):
+        summary[f"robust_overfit_gap_{name}"] = _selection_metric(
+            full[f"best_{part}pgd_accuracy"], name=f"best {name} PGD accuracy"
+        ) - _selection_metric(full[f"last_{part}pgd_accuracy"], name=f"last {name} PGD accuracy")
     full_ema = None if selection_metadata_ema is None else selection_metadata_ema.get("full_split_final")
     if isinstance(full_ema, Mapping):
-        summary.update(
-            {
-                "best_ema_full_epoch": full_ema["best_epoch"],
-                "best_ema_full_clean_accuracy": full_ema["best_clean_accuracy"],
-                "best_ema_full_pgd_accuracy": full_ema["best_pgd_accuracy"],
-                "last_ema_full_clean_accuracy": full_ema["last_clean_accuracy"],
-                "last_ema_full_pgd_accuracy": full_ema["last_pgd_accuracy"],
-            }
-        )
+        summary["best_ema_full_epoch"] = full_ema["best_epoch"]
+        for which in ("best", "last"):
+            for part, name in (("", "full"), ("complement_", "complement")):
+                for metric in ("clean", "pgd"):
+                    summary[f"{which}_ema_{name}_{metric}_accuracy"] = full_ema[f"{which}_{part}{metric}_accuracy"]
     return summary
 
 
@@ -1121,10 +1122,12 @@ def main(argv: list[str] | None = None) -> int:
         # and best. The train / held-out partition is untouched.
         full_validation_loader: DataLoader[IndexedBatch] | None = None
         selection_subset: dict[str, object] | None = None
+        selection_subset_ids: list[int] | None = None
         if config.training.selection_subset_size is not None:
             subset_view = build_selection_subset_view(
                 validation_dataset, size=config.training.selection_subset_size, seed=config.seeds.split
             )
+            selection_subset_ids = list(subset_view.indices)
             selection_subset = {
                 "size": len(subset_view),
                 "ids_sha256": selected_ids_sha256(tuple(subset_view.indices)),
@@ -1254,6 +1257,7 @@ def main(argv: list[str] | None = None) -> int:
             validation_image_size=config.training.train_image_size,
             validation_dataset_derivation=_validation_dataset_derivation(config),
             selection_subset=selection_subset,
+            selection_subset_ids=selection_subset_ids,
         )
         start_epoch = 0
         if args.resume is not None:
@@ -1477,15 +1481,21 @@ def main(argv: list[str] | None = None) -> int:
                 active_tracker.log_artifact(
                     stats_path, name=f"sample-stats-{active_tracker.run_id}", artifact_type="sample-stats"
                 )
+            # training.selection_subset_size: the selection numbers are subset
+            # numbers, so they are named best_subset_* / last_subset_* (and the
+            # trajectory summary reads val_subset_*), never the full-split
+            # names; best_metric is omitted (it equals best_subset_pgd_accuracy).
+            subset_on = config.training.selection_subset_size is not None
+            tag = "_subset" if subset_on else ""
             active_tracker.set_summary(
                 {
-                    "best_metric": trainer.best_metric,
+                    **({} if subset_on else {"best_metric": trainer.best_metric}),
                     "best_epoch": best_epoch,
-                    "best_clean_accuracy": selected_clean,
-                    "best_pgd_accuracy": selected_pgd,
-                    "last_clean_accuracy": last_clean,
-                    "last_pgd_accuracy": last_pgd,
-                    "robust_overfit_gap": selected_pgd - last_pgd,
+                    f"best{tag}_clean_accuracy": selected_clean,
+                    f"best{tag}_pgd_accuracy": selected_pgd,
+                    f"last{tag}_clean_accuracy": last_clean,
+                    f"last{tag}_pgd_accuracy": last_pgd,
+                    f"robust_overfit_gap{tag}": selected_pgd - last_pgd,
                     **(
                         {"validation_image_size": config.training.train_image_size}
                         if config.training.train_image_size is not None
@@ -1493,7 +1503,11 @@ def main(argv: list[str] | None = None) -> int:
                     ),
                     **_validation_derivation_fields(config),
                     **_selection_subset_summary(trainer.selection_metadata, trainer.selection_metadata_ema),
-                    **epoch_trajectory_summary(epoch_rows, expected_epochs=config.training.epochs),
+                    **epoch_trajectory_summary(
+                        epoch_rows,
+                        expected_epochs=config.training.epochs,
+                        validation_prefix="val_subset" if subset_on else "val",
+                    ),
                 }
             )
             bundle = output_dir / "run-bundle"

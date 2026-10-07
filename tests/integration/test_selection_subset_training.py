@@ -162,7 +162,7 @@ def test_selection_subset_cli_trains_identically_selects_on_the_subset_and_repor
     assert (record["size"], record["full_split_size"], record["sampling"]) == (2, 6, "class_stratified")
     assert record["source"] == "held_out_validation_split"
     full = subset_last["selection_metadata"]["full_split_final"]
-    assert full["num_examples"] == 6 and full["last_epoch"] == 1
+    assert full["num_examples"] == 6 and full["complement_num_examples"] == 4 and full["last_epoch"] == 1
     best_payload = torch.load(subset_out / "best.pt", map_location="cpu", weights_only=False)
     assert best_payload["epoch"] == full["best_epoch"]
     assert best_payload["selection_metadata"]["selection_subset"] == record
@@ -172,9 +172,17 @@ def test_selection_subset_cli_trains_identically_selects_on_the_subset_and_repor
     assert rows[0]["val_full_pgd_accuracy"] is None and rows[0]["best_val_full_pgd_accuracy"] is None
     assert rows[1]["val_full_pgd_accuracy"] == full["last_pgd_accuracy"]
     assert rows[1]["best_val_full_pgd_accuracy"] == full["best_pgd_accuracy"]
-    assert rows[1]["val_full_num_examples"] == 6
+    assert rows[1]["val_full_num_examples"] == 6 and rows[1]["val_complement_num_examples"] == 4
+    assert rows[1]["val_complement_pgd_accuracy"] == full["last_complement_pgd_accuracy"]
+    assert rows[1]["best_val_complement_clean_accuracy"] == full["best_complement_clean_accuracy"]
+    # Subset selection numbers have their own names; the Phase-1 names are absent.
+    assert all("val_pgd_accuracy" not in row and row["val_subset_pgd_accuracy"] is not None for row in rows)
     plain_rows = pq.read_table(plain_out / "epoch-metrics.parquet").to_pylist()
-    assert not any(key.startswith(("val_full", "best_val_full", "val_selection")) for key in plain_rows[0])
+    assert all(row["val_pgd_accuracy"] is not None for row in plain_rows)
+    assert not any(
+        key.startswith(("val_full", "best_val_full", "val_selection", "val_subset", "val_complement"))
+        for key in plain_rows[0]
+    )
     summary = json.loads((subset_out / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))["summary"]
     assert summary["selection_subset_size"] == 2 and summary["selection_subset_sha256"] == record["ids_sha256"]
     assert summary["val_full_num_examples"] == 6
@@ -188,11 +196,23 @@ def test_selection_subset_cli_trains_identically_selects_on_the_subset_and_repor
         full["last_pgd_accuracy"],
     )
     assert summary["robust_overfit_gap_full"] == pytest.approx(full["best_pgd_accuracy"] - full["last_pgd_accuracy"])
+    assert summary["last_complement_pgd_accuracy"] == full["last_complement_pgd_accuracy"]
+    assert summary["val_complement_num_examples"] == 4
+    selection = subset_last["selection_metadata"]
+    assert summary["best_subset_pgd_accuracy"] == selection["selected_pgd_accuracy"]
+    assert summary["last_subset_clean_accuracy"] == selection["last_clean_accuracy"]
+    assert "robust_overfit_gap_subset" in summary
+    for phase1 in ("best_metric", "best_pgd_accuracy", "last_pgd_accuracy", "robust_overfit_gap"):
+        assert phase1 not in summary
     plain_summary = json.loads((plain_out / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))["summary"]
-    assert not any("full" in key or "selection_subset" in key for key in plain_summary)
+    assert not any(
+        part in key for key in plain_summary for part in ("full", "selection_subset", "subset", "complement")
+    )
+    for phase1 in ("best_metric", "best_pgd_accuracy", "last_pgd_accuracy", "robust_overfit_gap"):
+        assert phase1 in plain_summary
 
     # Official evaluation: unchanged apart from the pooling identity entry.
-    for output, expected in ((plain_out, None), (subset_out, 2)):
+    for output, expected in ((plain_out, None), (subset_out, (2, record["ids_sha256"]))):
         evaluated = _run(
             [
                 "-m",
@@ -207,4 +227,8 @@ def test_selection_subset_cli_trains_identically_selects_on_the_subset_and_repor
         results = json.loads((output / "evaluation" / "evaluation-results.json").read_text(encoding="utf-8"))
         assert sorted(item["checkpoint_alias"] for item in results) == ["best", "last"]
         for item in results:
-            assert item["training_protocol_identity"].get("selection_subset_size") == expected
+            identity = item["training_protocol_identity"]
+            if expected is None:
+                assert "selection_subset_size" not in identity and "selection_subset_sha256" not in identity
+            else:
+                assert (identity["selection_subset_size"], identity["selection_subset_sha256"]) == expected

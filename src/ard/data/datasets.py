@@ -1140,12 +1140,18 @@ def selection_subset_ids(indices: Sequence[int], targets: Sequence[int], *, size
     ``seeds.split`` -- so it is the same every epoch and identical across
     every run and seed that shares the split. It must be strictly smaller
     than the split: an equal size would duplicate the full-split evaluation
-    under a misleading label.
+    under a misleading label. It must hold at least one image per class
+    present in the split, so "class-stratified" is true of every subset.
     """
     if not 1 <= size < len(indices):
         raise ValueError(
             f"training.selection_subset_size must be in [1, {len(indices) - 1}] "
             f"(strictly smaller than the {len(indices)}-image held-out split), got {size}"
+        )
+    classes = len({int(targets[source_id]) for source_id in indices})
+    if size < classes:
+        raise ValueError(
+            f"training.selection_subset_size ({size}) must be at least the {classes} classes of the held-out split"
         )
     return _stratified_fixed_ids(indices, targets, size=size, seed=seed)
 

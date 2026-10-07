@@ -1077,21 +1077,27 @@ class TrainingConfig(StrictModel):
     # attack). Never used for checkpoint selection. None (default) disables it.
     train_probe_size: int | None = Field(default=None, ge=1)
     # Plan 0103 Phase 2 (human decision 2026-10-08): lighter per-epoch
-    # validation. When set, the per-epoch selection metric (val_clean /
-    # val_pgd_accuracy, so best.pt / best-ema.pt and anything read from those
-    # rows, e.g. the catastrophic-overfitting check) is measured on a FIXED,
-    # class-stratified subset of this many images of the held-out validation
-    # split, seeded by seeds.split (ard.data.selection_subset_ids). The
-    # train / held-out partition itself is unchanged (validation_fraction
-    # keeps its meaning; the training data are identical). At the final
-    # epoch the last weights AND best.pt (and best-ema.pt) are additionally
-    # evaluated on the FULL held-out split, recorded under val_full_* /
-    # best_val_full_* keys, so best and last are compared on the same,
-    # full image set. It changes which checkpoint is "best", so it is part
-    # of the config hash and of the evaluation training_protocol_identity.
-    # Only ard.cli.train implements it. None (default) is today's exact
-    # behavior; serialized only when set, so every existing config keeps a
-    # byte-identical resolved config and config hash.
+    # validation. When set, the per-epoch selection metric (so best.pt /
+    # best-ema.pt and the catastrophic-overfitting check) is measured on a
+    # FIXED, class-stratified subset of this many images of the held-out
+    # validation split, seeded by seeds.split (ard.data.selection_subset_ids;
+    # at least dataset.num_classes). Those numbers are named val_subset_* in
+    # the epoch rows and best_subset_* / last_subset_* in the run summary,
+    # never val_* / best_* / last_*, so they cannot be read as full-split
+    # numbers. The train / held-out partition itself is unchanged
+    # (validation_fraction keeps its meaning; the training data are
+    # identical). Nothing that drives training reads the selection metric
+    # (refused with ADR's gap-adaptive lambda, which does), so the trained
+    # weights and last.pt are identical with or without it. At the final
+    # epoch the last weights AND best.pt (and best-ema.pt) are evaluated on
+    # the FULL held-out split and on its complement (held-out minus the
+    # subset) in one pass each, with shared random starts: val_full_* /
+    # best_val_full_* and val_complement_* / best_val_complement_*. It
+    # changes which checkpoint is "best", so it is part of the config hash
+    # and of the evaluation training_protocol_identity. Only ard.cli.train
+    # implements it. None (default) is today's exact behavior; serialized
+    # only when set, so every existing config keeps a byte-identical
+    # resolved config and config hash.
     selection_subset_size: int | None = Field(default=None, ge=1, exclude_if=lambda value: value is None)
     # Plan 0103 two-stage run (stage 1). The square output size of the
     # *training-partition* views only: the RandomResizedCrop training crop
@@ -1848,6 +1854,19 @@ class ExperimentConfig(StrictModel):
                 raise ValueError("training.train_image_size is only defined for the imagenet dataset")
             if self.training.train_image_size == self.dataset.image_size:
                 raise ValueError("training.train_image_size equals dataset.image_size; omit it")
+        subset_size = self.training.selection_subset_size
+        if subset_size is not None:
+            if self.method.adr is not None and self.method.adr.lambda_source == "gap_adaptive":
+                raise ValueError(
+                    "training.selection_subset_size cannot be combined with method.adr.lambda_source=gap_adaptive: "
+                    "the gap-adaptive lambda reads the per-epoch validation PGD accuracy, so the subset would "
+                    "change the training trajectory, not only checkpoint selection"
+                )
+            if subset_size < self.dataset.num_classes:
+                raise ValueError(
+                    f"training.selection_subset_size ({subset_size}) must be at least dataset.num_classes "
+                    f"({self.dataset.num_classes}) so the class-stratified subset holds every class"
+                )
         if self.training.jpeg_draft_decode and self.dataset.name != "imagenet":
             raise ValueError("training.jpeg_draft_decode is only defined for the imagenet dataset")
         if self.training.init_checkpoint is not None and self.student.pretrained:

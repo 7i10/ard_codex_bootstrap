@@ -16,11 +16,13 @@ import types
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 import torch
 import yaml
 
+from ard.analysis.epoch_metrics import EpochMetricsError, epoch_trajectory_summary
 from ard.cli.evaluate import _selection_protocol_identity
 from ard.config.loader import _expand_environment, resolved_config_dict
 from ard.config.schema import ExperimentConfig, TrainingConfig, reject_throughput_options
@@ -156,12 +158,57 @@ def test_runtimes_other_than_the_trainer_cli_refuse_it() -> None:
         reject_throughput_options(training, runtime="fixture")
 
 
-def test_pooling_identity_records_it_only_when_set() -> None:
+def _config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str) -> dict[str, Any]:
+    _env(monkeypatch, tmp_path)
+    path = next(p for p in _pre_change_configs() if p.endswith(name))
+    return resolved_config_dict(
+        ExperimentConfig.model_validate(
+            _expand_environment(yaml.safe_load(_git("show", f"{PRE_CHANGE_COMMIT}:{path}")))
+        )
+    )
+
+
+def test_gap_adaptive_adr_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gap-adaptive lambda reads the per-epoch validation PGD accuracy, so the subset would
+    change training itself, not only selection."""
+    raw = _config(monkeypatch, tmp_path, "cifar10_r18_adr_gap.yaml")
+    assert raw["method"]["adr"]["lambda_source"] == "gap_adaptive"
+    with pytest.raises(ValueError, match="cannot be combined with method.adr.lambda_source=gap_adaptive"):
+        ExperimentConfig.model_validate({**raw, "training": {**raw["training"], "selection_subset_size": 100}})
+    cosine = {**raw, "method": {**raw["method"], "adr": {**raw["method"]["adr"], "lambda_source": "cosine"}}}
+    cosine["method"]["adr"].pop("gap_smoothing_beta", None)
+    accepted = ExperimentConfig.model_validate(
+        {**cosine, "training": {**cosine["training"], "selection_subset_size": 100}}
+    )
+    assert accepted.training.selection_subset_size == 100
+
+
+def test_subset_smaller_than_the_class_count_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = _config(monkeypatch, tmp_path, "imagenet_mobilenetv4_pgd_at_random_init_lr0025.yaml")
+    assert raw["dataset"]["num_classes"] == 1000
+    with pytest.raises(ValueError, match="at least dataset.num_classes"):
+        ExperimentConfig.model_validate({**raw, "training": {**raw["training"], "selection_subset_size": 999}})
+    ExperimentConfig.model_validate({**raw, "training": {**raw["training"], "selection_subset_size": 1000}})
+
+
+def test_pooling_identity_records_size_and_digest_only_when_set() -> None:
     """It changes which epoch is best.pt, so a subset-selected run never pools with a
-    full-split-selected one; unset keeps every recorded identity byte-identical."""
-    assert _selection_protocol_identity(TrainingConfig(per_rank_batch_size=4, global_batch_size=4)) == {}
+    full-split-selected one; unset keeps every recorded identity byte-identical. The digest
+    comes from the checkpoint's own selection record, which must agree with the config."""
+    assert _selection_protocol_identity(TrainingConfig(per_rank_batch_size=4, global_batch_size=4), {}) == {}
     enabled = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, selection_subset_size=5000)
-    assert _selection_protocol_identity(enabled) == {"selection_subset_size": 5000}
+    record = {"selection_subset": {"size": 5000, "ids_sha256": "e" * 64}}
+    assert _selection_protocol_identity(enabled, record) == {
+        "selection_subset_size": 5000,
+        "selection_subset_sha256": "e" * 64,
+    }
+    for broken in (
+        {},
+        {"selection_subset": {"size": 4000, "ids_sha256": "e" * 64}},
+        {"selection_subset": {"size": 5000}},
+    ):
+        with pytest.raises(ValueError, match="does not state a matching selection subset"):
+            _selection_protocol_identity(enabled, broken)
 
 
 # =========================================================================== subset
@@ -195,6 +242,27 @@ def test_subset_size_must_be_strictly_smaller_than_the_held_out_split() -> None:
     with pytest.raises(ValueError, match="strictly smaller"):
         selection_subset_ids(validation, targets, size=0, seed=11)
     assert len(selection_subset_ids(validation, targets, size=len(validation) - 1, seed=11)) == len(validation) - 1
+
+
+def test_subset_must_hold_every_class_of_the_held_out_split() -> None:
+    _, validation, targets = _split()
+    with pytest.raises(ValueError, match="at least the 10 classes"):
+        selection_subset_ids(validation, targets, size=9, seed=11)
+    assert Counter(targets[i] for i in selection_subset_ids(validation, targets, size=10, seed=11)) == Counter(
+        range(10)
+    )
+
+
+def test_trajectory_summary_names_follow_the_validation_prefix() -> None:
+    rows = [{"epoch": epoch, "val_subset_pgd_accuracy": 0.3, "val_subset_clean_accuracy": 0.5} for epoch in range(200)]
+    summary = epoch_trajectory_summary(rows, expected_epochs=200, validation_prefix="val_subset")
+    assert summary["val_subset_pgd_mean_epoch_150_199"] == pytest.approx(0.3)
+    assert summary["val_subset_clean_normalized_auc"] == pytest.approx(0.5)
+    assert not any(key.startswith(("val_pgd", "val_clean")) for key in summary)
+    with pytest.raises(EpochMetricsError, match="lacks finite val_pgd_accuracy"):
+        epoch_trajectory_summary(rows, expected_epochs=200)
+    with pytest.raises(EpochMetricsError, match="unknown validation prefix"):
+        epoch_trajectory_summary(rows, expected_epochs=200, validation_prefix="val_full")
 
 
 def test_view_shares_the_held_out_transform_and_leaves_the_train_partition_alone() -> None:

@@ -3505,16 +3505,31 @@ history behind this pivot.)
     (5 images per class at 5000) and seeded by `seeds.split`, so it is the
     same every epoch and for every seed of one split. The training data and
     the held-out split are unchanged; `validation_fraction` keeps its meaning.
-    The train probe is unchanged.
+    The train probe is unchanged. It cannot be combined with ADR's
+    gap-adaptive lambda (which reads the selection metric), so the trained
+    weights are the same with or without it.
+  - Names: with the option on, the per-epoch numbers are `val_subset_*` in
+    the epoch rows and `best_subset_*` / `last_subset_*` /
+    `robust_overfit_gap_subset` in the run summary. The Phase-1 names
+    (`val_pgd_accuracy`, `best_pgd_accuracy`, ...) are absent, so nothing can
+    read a subset number as a full-split one. **The catastrophic-overfitting
+    check for a Phase 2 run reads `val_subset_pgd_accuracy`.** Every row and
+    the summary also carry the subset size and digest.
   - At the final epoch, last and `best.pt` are both evaluated on the full
-    held-out split. These numbers are stored as `val_full_*` /
-    `best_val_full_*` (epoch row), `full_split_final` (selection metadata of
-    `last.pt`) and `best_full_*` / `last_full_*` (run summary). The plain
-    `val_*`, `best_*` and `last_*` keys stay the subset numbers, and every
-    row and summary carries `selection_subset_size` and the subset digest.
-    The official evaluation (`ard.cli.evaluate`) is unchanged.
+    held-out split and on its complement (held-out minus the subset, about
+    20.6k images at 5000), with the same random starts: `val_full_*`,
+    `val_complement_*`, `best_val_full_*`, `best_val_complement_*` (epoch
+    row), `full_split_final` (selection metadata of `last.pt`) and
+    `best_full_*`, `last_full_*`, `best_complement_*`, `last_complement_*`
+    (run summary). The complement numbers are independent of the images
+    that chose `best.pt`. The official evaluation (`ard.cli.evaluate`) is
+    unchanged.
+  - Comparing across phases: compare "best" between Phase 1 and Phase 2 only
+    with the official evaluation, because the two phases choose `best.pt`
+    differently. Inside training, `last_full_*` is the like-for-like number
+    (last weights do not depend on the option).
   - The option is in the config hash and in the evaluation pooling identity
-    (`training_protocol_identity.selection_subset_size`), so runs with and
+    (`selection_subset_size` and `selection_subset_sha256`), so runs with and
     without it never pool. Existing configs hash byte-identically.
   - **Phase 2 template:** add `selection_subset_size: 5000` to the
     `training:` block of every Phase 2 config. Basis: Singh/Croce/Hein 2023

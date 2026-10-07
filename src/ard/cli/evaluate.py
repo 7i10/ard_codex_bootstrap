@@ -351,18 +351,28 @@ def _data_loading_protocol_identity(training: TrainingConfig) -> dict[str, objec
     return {"jpeg_draft_decode": True} if training.jpeg_draft_decode else {}
 
 
-def _selection_protocol_identity(training: TrainingConfig) -> dict[str, object]:
+def _selection_protocol_identity(training: TrainingConfig, selection_metadata: object) -> dict[str, object]:
     """``training.selection_subset_size`` (plan 0103 Phase 2), present only
     when set (same byte-identity argument as ``_throughput_protocol_identity``).
     Per-epoch selection on a fixed subset of the held-out split changes which
     epoch is best.pt / best-ema.pt, so such a run never pools with a
-    full-split-selection run. (last.pt is training-identical either way; the
-    entry is still recorded for every checkpoint, the conservative choice.)
-    The subset itself is a deterministic function of the size, the held-out
-    split (``validation_fraction``, ``seeds.split``) and the labels, so the
-    size identifies it within one split."""
+    full-split-selection run. The trained weights are identical either way
+    (config validation refuses the one combination where the selection
+    metric feeds training, ADR's gap-adaptive lambda), so last.pt numbers
+    could pool in principle; the entry is still recorded for every
+    checkpoint, the conservative choice. The subset is identified by its
+    size and by the SHA-256 of its sorted source IDs, read from the
+    checkpoint's own selection record, which must agree with the config."""
     size = training.selection_subset_size
-    return {} if size is None else {"selection_subset_size": size}
+    if size is None:
+        return {}
+    subset = selection_metadata.get("selection_subset") if isinstance(selection_metadata, Mapping) else None
+    if not isinstance(subset, Mapping) or subset.get("size") != size or not isinstance(subset.get("ids_sha256"), str):
+        raise ValueError(
+            f"training.selection_subset_size={size}, but the checkpoint's selection record does not state a "
+            f"matching selection subset: {subset!r}"
+        )
+    return {"selection_subset_size": size, "selection_subset_sha256": subset["ids_sha256"]}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -449,6 +459,10 @@ def main(argv: list[str] | None = None) -> int:
                     f"--weights=ema requires a checkpoint selected on the EMA's own accuracy, but "
                     f"{checkpoint.name} was not (selection_source={source!r}) -- point at best-ema.pt instead"
                 )
+    # Fail before any evaluation work when a checkpoint's selection record
+    # contradicts training.selection_subset_size.
+    for payload in checkpoint_payloads:
+        _selection_protocol_identity(training_config.training, payload.get("selection_metadata"))
     train_run_id = checkpoint_payloads[0].get("tracker_run_id")
     if not isinstance(train_run_id, str):
         raise ValueError("saved checkpoint lacks a stable tracking run ID")
@@ -665,7 +679,9 @@ def main(argv: list[str] | None = None) -> int:
                         **_throughput_protocol_identity(training_config.training),
                         **_two_stage_protocol_identity(training_config.training),
                         **_data_loading_protocol_identity(training_config.training),
-                        **_selection_protocol_identity(training_config.training),
+                        **_selection_protocol_identity(
+                            training_config.training, checkpoint_payload.get("selection_metadata")
+                        ),
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

@@ -144,6 +144,16 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
 - terminal no-op resumeは、prior manifestが`completed`または`sync_pending`であること、completion marker、
   best/last・sample-stats・run-bundle artifactの存在、およびfile artifactのsource/local copy hashを先に検証する。
 - mid-epoch exact resumeは実装済みと主張しない。
+- `training.selection_subset_size` (plan 0103 Phase 2, default off): best is selected on a fixed, class-stratified
+  subset of the held-out split (seeded by `seeds.split`, at least one image per class). The selection record states
+  the subset (`selection_subset`: size, SHA-256 of its sorted source IDs, full-split size, seed) and names its metric
+  `val_subset_pgd_accuracy`; epoch rows use `val_subset_*` and the run summary `best_subset_*` / `last_subset_*`,
+  never the full-split names. At the final epoch last and `best.pt` (and `best-ema.pt`) are evaluated on the full
+  held-out split and on its complement (held-out minus subset), one pass each with shared random starts
+  (`val_full_*`, `val_complement_*`, `best_val_*`, `full_split_final`). Resume requires the same subset and checks
+  that `best.pt` is the recorded epoch of this run; a fresh fork child adopts its own subset (or none) and drops
+  the parent's final record. Refused with ADR's gap-adaptive lambda (which reads the selection metric), so the
+  trained weights are identical with and without the option.
 
 ## 7. Evaluation integrity
 
@@ -195,6 +205,11 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   - `training.deterministic` itself is always in `training_protocol_identity`, and `cudnn_benchmark` when true, so
     deterministic and nondeterministic runs never pool.
   Rerun the parity and equivalence tests after a torch or driver upgrade and before widening the scope.
+- `training.selection_subset_size` is in the config hash and, when set, in `training_protocol_identity`
+  (`selection_subset_size`, `selection_subset_sha256` from the checkpoint's selection record, which must agree with
+  the config), so subset-selected and full-split-selected runs never pool. Training-time subset/full/complement
+  numbers are not official results; cross-run comparisons of "best" use the official evaluation, and `last_full_*`
+  is the like-for-like internal number (last weights are identical with and without the option).
 - Tiny-ImageNetのobserved split digestは、expected digestなしなら`computed`、configのexpected digestと一致したら
   `computed-and-matched`。training configだけから作るidentityの`expected-unverified`は観測済みという意味ではない。
 - 集計ではevaluation/training dataset、student、method、training protocol、evaluation protocol、complete threat、
