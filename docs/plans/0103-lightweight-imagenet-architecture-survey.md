@@ -3497,3 +3497,26 @@ history behind this pivot.)
   - Caveat: the 2080 Ti has no TF32, so convolutions run in full fp32
     rather than TF32 as on the 4090s. Numbers may differ very slightly
     from rows evaluated on Ferret. The evaluation settings are unchanged.
+- 2026-10-08 (chat): **Lighter per-epoch validation for Phase 2** (human
+  decision). New option `training.selection_subset_size` (default off).
+  - What it does: per-epoch selection (clean + PGD-10, so `best.pt` and the
+    catastrophic-overfitting check) runs on a fixed subset of the held-out
+    split instead of all ~25.6k images. The subset is class-stratified
+    (5 images per class at 5000) and seeded by `seeds.split`, so it is the
+    same every epoch and for every seed of one split. The training data and
+    the held-out split are unchanged; `validation_fraction` keeps its meaning.
+    The train probe is unchanged.
+  - At the final epoch, last and `best.pt` are both evaluated on the full
+    held-out split. These numbers are stored as `val_full_*` /
+    `best_val_full_*` (epoch row), `full_split_final` (selection metadata of
+    `last.pt`) and `best_full_*` / `last_full_*` (run summary). The plain
+    `val_*`, `best_*` and `last_*` keys stay the subset numbers, and every
+    row and summary carries `selection_subset_size` and the subset digest.
+    The official evaluation (`ard.cli.evaluate`) is unchanged.
+  - The option is in the config hash and in the evaluation pooling identity
+    (`training_protocol_identity.selection_subset_size`), so runs with and
+    without it never pool. Existing configs hash byte-identically.
+  - **Phase 2 template:** add `selection_subset_size: 5000` to the
+    `training:` block of every Phase 2 config. Basis: Singh/Croce/Hein 2023
+    select on 4k held-out images, Gowal 2020 on 1,024, and over 29 of our
+    runs best minus last is 0.1pt (median).

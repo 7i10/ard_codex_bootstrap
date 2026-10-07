@@ -1076,6 +1076,23 @@ class TrainingConfig(StrictModel):
     # metrics cannot serve (augmented crops, train-mode BatchNorm, 3-step
     # attack). Never used for checkpoint selection. None (default) disables it.
     train_probe_size: int | None = Field(default=None, ge=1)
+    # Plan 0103 Phase 2 (human decision 2026-10-08): lighter per-epoch
+    # validation. When set, the per-epoch selection metric (val_clean /
+    # val_pgd_accuracy, so best.pt / best-ema.pt and anything read from those
+    # rows, e.g. the catastrophic-overfitting check) is measured on a FIXED,
+    # class-stratified subset of this many images of the held-out validation
+    # split, seeded by seeds.split (ard.data.selection_subset_ids). The
+    # train / held-out partition itself is unchanged (validation_fraction
+    # keeps its meaning; the training data are identical). At the final
+    # epoch the last weights AND best.pt (and best-ema.pt) are additionally
+    # evaluated on the FULL held-out split, recorded under val_full_* /
+    # best_val_full_* keys, so best and last are compared on the same,
+    # full image set. It changes which checkpoint is "best", so it is part
+    # of the config hash and of the evaluation training_protocol_identity.
+    # Only ard.cli.train implements it. None (default) is today's exact
+    # behavior; serialized only when set, so every existing config keeps a
+    # byte-identical resolved config and config hash.
+    selection_subset_size: int | None = Field(default=None, ge=1, exclude_if=lambda value: value is None)
     # Plan 0103 two-stage run (stage 1). The square output size of the
     # *training-partition* views only: the RandomResizedCrop training crop
     # and the in-training validation / train-probe views (ImageNetEvalTransform
@@ -1203,6 +1220,8 @@ def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None
         unsupported.append(("jpeg_draft_decode", "true", "false"))
     if training.cuda_graph:
         unsupported.append(("cuda_graph", "true", "false"))
+    if training.selection_subset_size is not None:
+        unsupported.append(("selection_subset_size", str(training.selection_subset_size), "null"))
     if unsupported:
         requested = ", ".join(f"training.{name}={value}" for name, value, _ in unsupported)
         remediation = ", ".join(f"training.{name}={value}" for name, _, value in unsupported)

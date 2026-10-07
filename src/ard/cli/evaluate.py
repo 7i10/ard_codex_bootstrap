@@ -351,6 +351,20 @@ def _data_loading_protocol_identity(training: TrainingConfig) -> dict[str, objec
     return {"jpeg_draft_decode": True} if training.jpeg_draft_decode else {}
 
 
+def _selection_protocol_identity(training: TrainingConfig) -> dict[str, object]:
+    """``training.selection_subset_size`` (plan 0103 Phase 2), present only
+    when set (same byte-identity argument as ``_throughput_protocol_identity``).
+    Per-epoch selection on a fixed subset of the held-out split changes which
+    epoch is best.pt / best-ema.pt, so such a run never pools with a
+    full-split-selection run. (last.pt is training-identical either way; the
+    entry is still recorded for every checkpoint, the conservative choice.)
+    The subset itself is a deterministic function of the size, the held-out
+    split (``validation_fraction``, ``seeds.split``) and the labels, so the
+    size identifies it within one split."""
+    size = training.selection_subset_size
+    return {} if size is None else {"selection_subset_size": size}
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.checkpoint_dir is not None:
@@ -651,6 +665,7 @@ def main(argv: list[str] | None = None) -> int:
                         **_throughput_protocol_identity(training_config.training),
                         **_two_stage_protocol_identity(training_config.training),
                         **_data_loading_protocol_identity(training_config.training),
+                        **_selection_protocol_identity(training_config.training),
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

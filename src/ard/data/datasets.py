@@ -1098,12 +1098,10 @@ def build_train_validation_views(
     )
 
 
-def train_probe_ids(indices: Sequence[int], targets: Sequence[int], *, size: int, seed: int) -> list[int]:
-    """Fixed, sorted, class-stratified sample of training-partition source IDs
-    for the per-epoch train probe (``size // n_classes`` per class, remainder
-    filled at random). Depends only on the partition, labels and seed."""
-    if not 1 <= size <= len(indices):
-        raise ValueError(f"train probe size must be in [1, {len(indices)}], got {size}")
+def _stratified_fixed_ids(indices: Sequence[int], targets: Sequence[int], *, size: int, seed: int) -> list[int]:
+    """Fixed, sorted, class-stratified sample of ``size`` source IDs from
+    ``indices`` (``size // n_classes`` per class, remainder filled at random
+    from the leftovers). Depends only on the IDs, their labels and the seed."""
     generator = torch.Generator().manual_seed(seed)
     by_label: dict[int, list[int]] = defaultdict(list)
     for source_id in indices:
@@ -1122,6 +1120,46 @@ def train_probe_ids(indices: Sequence[int], targets: Sequence[int], *, size: int
         fill = torch.randperm(len(leftover), generator=generator).tolist()[:remainder]
         chosen.extend(leftover[position] for position in fill)
     return sorted(chosen)
+
+
+def train_probe_ids(indices: Sequence[int], targets: Sequence[int], *, size: int, seed: int) -> list[int]:
+    """Fixed, sorted, class-stratified sample of training-partition source IDs
+    for the per-epoch train probe (``size // n_classes`` per class, remainder
+    filled at random). Depends only on the partition, labels and seed."""
+    if not 1 <= size <= len(indices):
+        raise ValueError(f"train probe size must be in [1, {len(indices)}], got {size}")
+    return _stratified_fixed_ids(indices, targets, size=size, seed=seed)
+
+
+def selection_subset_ids(indices: Sequence[int], targets: Sequence[int], *, size: int, seed: int) -> list[int]:
+    """``training.selection_subset_size``: the fixed per-epoch selection subset.
+
+    A sorted, class-stratified sample of ``size`` source IDs drawn from the
+    held-out validation split ``indices`` (``size // n_classes`` per class,
+    the remainder filled uniformly from the leftovers), seeded by
+    ``seeds.split`` -- so it is the same every epoch and identical across
+    every run and seed that shares the split. It must be strictly smaller
+    than the split: an equal size would duplicate the full-split evaluation
+    under a misleading label.
+    """
+    if not 1 <= size < len(indices):
+        raise ValueError(
+            f"training.selection_subset_size must be in [1, {len(indices) - 1}] "
+            f"(strictly smaller than the {len(indices)}-image held-out split), got {size}"
+        )
+    return _stratified_fixed_ids(indices, targets, size=size, seed=seed)
+
+
+def build_selection_subset_view(
+    validation_dataset: SourceIndexedSubset, *, size: int, seed: int
+) -> SourceIndexedSubset:
+    """The held-out validation view restricted to ``selection_subset_ids``
+    (same transform, same raw dataset; only the ID list shrinks)."""
+    targets = getattr(validation_dataset.dataset.dataset, "targets", None)
+    if not isinstance(targets, (list, tuple)):
+        raise TypeError("selection subset requires a label-only targets sequence on the raw dataset")
+    subset_ids = selection_subset_ids(validation_dataset.indices, targets, size=size, seed=seed)
+    return SourceIndexedSubset(validation_dataset.dataset, subset_ids)
 
 
 def build_train_probe_view(

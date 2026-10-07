@@ -27,6 +27,7 @@ from ard.data import (
     EpochShuffleSampler,
     HistoryBalancedSampler,
     IndexedBatch,
+    build_selection_subset_view,
     build_train_probe_view,
     build_train_validation_views,
     collate_indexed,
@@ -58,6 +59,7 @@ from ard.policies import (
     WeightPolicy,
     load_fixed_intervention_mask,
 )
+from ard.policies.fixed_mask import selected_ids_sha256
 from ard.protocols import ensure_local_trainable, get_protocol
 from ard.schedules import build_scheduler
 from ard.state import SampleStateStore
@@ -737,6 +739,46 @@ def _validation_derivation_fields(config: ExperimentConfig) -> dict[str, object]
     return {f"validation_dataset_derived_{key}": value for key, value in derivation.items()}
 
 
+def _selection_subset_summary(
+    selection_metadata: Mapping[str, object], selection_metadata_ema: Mapping[str, object] | None = None
+) -> dict[str, object]:
+    """Run-summary entries for training.selection_subset_size; empty when unset.
+
+    The summary's best_*/last_*/robust_overfit_gap stay the selection numbers
+    (on the subset); these entries label them and add the final full-split
+    numbers for best and last under distinct keys."""
+    subset = selection_metadata.get("selection_subset")
+    if not isinstance(subset, Mapping):
+        return {}
+    full = selection_metadata.get("full_split_final")
+    if not isinstance(full, Mapping):
+        raise RuntimeError("a selection-subset run finished without its final full-split evaluation")
+    summary: dict[str, object] = {
+        "selection_subset_size": subset["size"],
+        "selection_subset_sha256": subset["ids_sha256"],
+        "val_full_num_examples": full["num_examples"],
+        "best_full_epoch": full["best_epoch"],
+        "best_full_clean_accuracy": full["best_clean_accuracy"],
+        "best_full_pgd_accuracy": full["best_pgd_accuracy"],
+        "last_full_clean_accuracy": full["last_clean_accuracy"],
+        "last_full_pgd_accuracy": full["last_pgd_accuracy"],
+        "robust_overfit_gap_full": _selection_metric(full["best_pgd_accuracy"], name="best full-split PGD accuracy")
+        - _selection_metric(full["last_pgd_accuracy"], name="last full-split PGD accuracy"),
+    }
+    full_ema = None if selection_metadata_ema is None else selection_metadata_ema.get("full_split_final")
+    if isinstance(full_ema, Mapping):
+        summary.update(
+            {
+                "best_ema_full_epoch": full_ema["best_epoch"],
+                "best_ema_full_clean_accuracy": full_ema["best_clean_accuracy"],
+                "best_ema_full_pgd_accuracy": full_ema["best_pgd_accuracy"],
+                "last_ema_full_clean_accuracy": full_ema["last_clean_accuracy"],
+                "last_ema_full_pgd_accuracy": full_ema["last_pgd_accuracy"],
+            }
+        )
+    return summary
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config = load_config(args.config, args.overrides)
@@ -1072,6 +1114,45 @@ def main(argv: list[str] | None = None) -> int:
                 worker_init_fn=seed_data_loader_worker,
             ),
         )
+        # training.selection_subset_size (plan 0103 Phase 2): per-epoch
+        # selection reads a fixed, class-stratified subset of the held-out
+        # split (seeded by seeds.split); the full held-out loader above is
+        # then used only for the final-epoch full-split evaluation of last
+        # and best. The train / held-out partition is untouched.
+        full_validation_loader: DataLoader[IndexedBatch] | None = None
+        selection_subset: dict[str, object] | None = None
+        if config.training.selection_subset_size is not None:
+            subset_view = build_selection_subset_view(
+                validation_dataset, size=config.training.selection_subset_size, seed=config.seeds.split
+            )
+            selection_subset = {
+                "size": len(subset_view),
+                "ids_sha256": selected_ids_sha256(tuple(subset_view.indices)),
+                "full_split_size": len(validation_dataset),
+                "seed": config.seeds.split,
+                "sampling": "class_stratified",
+                "source": "held_out_validation_split",
+            }
+            full_validation_loader = validation_loader
+            validation_loader = cast(
+                DataLoader[IndexedBatch],
+                DataLoader(
+                    subset_view,
+                    batch_size=config.training.per_rank_batch_size,
+                    sampler=EpochShuffleSampler(
+                        len(subset_view),
+                        seed=config.seeds.data_order,
+                        rank=get_rank(),
+                        world_size=get_world_size(),
+                        shuffle=False,
+                    ),
+                    num_workers=config.training.num_workers,
+                    pin_memory=pin_memory,
+                    collate_fn=collate_indexed,
+                    generator=data_loader_generator(config.seeds.data_order + 3),
+                    worker_init_fn=seed_data_loader_worker,
+                ),
+            )
         probe_loader: DataLoader[IndexedBatch] | None = None
         if config.training.train_probe_size is not None:
             probe_view = build_train_probe_view(
@@ -1172,6 +1253,7 @@ def main(argv: list[str] | None = None) -> int:
             student_architecture=config.student.architecture,
             validation_image_size=config.training.train_image_size,
             validation_dataset_derivation=_validation_dataset_derivation(config),
+            selection_subset=selection_subset,
         )
         start_epoch = 0
         if args.resume is not None:
@@ -1296,6 +1378,7 @@ def main(argv: list[str] | None = None) -> int:
             loader,
             validation_loader=validation_loader,
             probe_loader=probe_loader,
+            full_validation_loader=full_validation_loader,
             epochs=config.training.epochs,
             start_epoch=start_epoch,
             on_epoch_end=_record_epoch,
@@ -1409,6 +1492,7 @@ def main(argv: list[str] | None = None) -> int:
                         else {}
                     ),
                     **_validation_derivation_fields(config),
+                    **_selection_subset_summary(trainer.selection_metadata, trainer.selection_metadata_ema),
                     **epoch_trajectory_summary(epoch_rows, expected_epochs=config.training.epochs),
                 }
             )

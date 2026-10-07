@@ -61,6 +61,9 @@ from .distributed import (
     unwrap_model,
 )
 
+# Trainer(selection_subset=...): what the selection record must state.
+SELECTION_SUBSET_KEYS = frozenset({"size", "ids_sha256", "full_split_size", "seed", "sampling", "source"})
+
 if TYPE_CHECKING:
     from ard.analysis.frozen_oracle import FrozenRiskLookup
 
@@ -271,6 +274,7 @@ class Trainer:
         student_architecture: str | None = None,
         validation_image_size: int | None = None,
         validation_dataset_derivation: Mapping[str, Any] | None = None,
+        selection_subset: Mapping[str, Any] | None = None,
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -604,6 +608,21 @@ class Trainer:
         if validation_dataset_derivation is not None:
             self.selection_metadata["validation_dataset_derivation"] = dict(validation_dataset_derivation)
             self.selection_metadata_ema["validation_dataset_derivation"] = dict(validation_dataset_derivation)
+        # training.selection_subset_size (plan 0103 Phase 2): fit()'s
+        # validation_loader is then a fixed subset of the held-out split, so
+        # every selection number (val_* rows, selected_*/last_* here) is a
+        # subset number; say so in every checkpoint's selection record.
+        # Absent (default) means the full held-out split, as before.
+        self.selection_subset: dict[str, Any] | None = None
+        if selection_subset is not None:
+            missing = SELECTION_SUBSET_KEYS.difference(selection_subset)
+            if missing:
+                raise ValueError("selection_subset lacks " + ", ".join(sorted(missing)))
+            if not 1 <= int(selection_subset["size"]) < int(selection_subset["full_split_size"]):
+                raise ValueError("selection_subset size must be in [1, full_split_size)")
+            self.selection_subset = dict(selection_subset)
+            self.selection_metadata["selection_subset"] = dict(selection_subset)
+            self.selection_metadata_ema["selection_subset"] = dict(selection_subset)
         if prescriptive_v3_route is not None:
             self.selection_metadata["prescriptive_v3"] = {
                 "route": prescriptive_v3_route,
@@ -2229,6 +2248,117 @@ class Trainer:
         count = max(float(totals[2].item()), 1.0)
         return {"clean_accuracy": float(totals[0].item()) / count, "pgd_accuracy": float(totals[1].item()) / count}
 
+    def _validate_saved_weights(
+        self, loader: DataLoader[IndexedBatch], path: Path, *, key: str, model: nn.Module, expected_epoch: object
+    ) -> dict[str, float]:
+        """Validate the ``key`` weights saved in ``path`` with ``model``'s
+        architecture, then restore ``model``'s live weights exactly.
+
+        The weights are copied in place (``load_state_dict``), so parameter
+        tensors keep their identity (optimizer state, a captured CUDA graph)
+        and the restore is bitwise. The file must be the one selection
+        recorded: this run's config hash and ``expected_epoch``.
+        """
+        payload = torch.load(path, map_location="cpu", weights_only=False)
+        if payload.get("config_hash") != self.config_hash:
+            raise RuntimeError(f"{path.name} was written under a different config hash")
+        if payload.get("epoch") != expected_epoch:
+            raise RuntimeError(
+                f"{path.name} holds epoch {payload.get('epoch')!r}, but selection recorded epoch {expected_epoch!r}"
+            )
+        target = unwrap_model(model)
+        live = {name: tensor.detach().to("cpu", copy=True) for name, tensor in target.state_dict().items()}
+        try:
+            target.load_state_dict(payload[key])
+            return self.validate_epoch(loader, model=model)
+        finally:
+            target.load_state_dict(live)
+
+    def _final_full_split_evaluation(
+        self, loader: DataLoader[IndexedBatch], *, epoch: int, improved: bool, improved_ema: bool
+    ) -> dict[str, Any]:
+        """training.selection_subset_size: at the final epoch, evaluate the
+        last weights and best.pt (and, with an EMA model, the last EMA weights
+        and best-ema.pt) on the FULL held-out split, so best and last are
+        compared on the same, full image set. Every pass uses this epoch's
+        selection generator, so the passes share random starts per batch.
+        Observation only: RNG streams are captured and restored, live weights
+        are restored bitwise, selection is not revisited.
+
+        Returns the flat epoch-row entries; also records the same numbers
+        under ``selection_metadata["full_split_final"]`` (and the EMA's).
+        """
+        assert self.selection_subset is not None
+        num_examples = int(self.selection_subset["full_split_size"])
+        rng_state = capture_rng_state()
+        try:
+            last = self.validate_epoch(loader)
+            best_epoch = self.selection_metadata["selected_epoch"]
+            # When this epoch improved, best.pt is about to be written from
+            # these very weights; re-running the identical pass is redundant.
+            best = (
+                last
+                if improved
+                else self._validate_saved_weights(
+                    loader, self.output_dir / "best.pt", key="model", model=self.model, expected_epoch=best_epoch
+                )
+            )
+            last_ema: dict[str, float] | None = None
+            best_ema: dict[str, float] | None = None
+            if self.ema_model is not None:
+                last_ema = self.validate_epoch(loader, model=self.ema_model)
+                best_ema = (
+                    last_ema
+                    if improved_ema
+                    else self._validate_saved_weights(
+                        loader,
+                        self.output_dir / "best-ema.pt",
+                        key="ema",
+                        model=self.ema_model,
+                        expected_epoch=self.selection_metadata_ema["selected_epoch"],
+                    )
+                )
+        finally:
+            restore_rng_state(rng_state)
+        self.selection_metadata["full_split_final"] = {
+            "num_examples": num_examples,
+            "last_epoch": epoch,
+            "last_clean_accuracy": last["clean_accuracy"],
+            "last_pgd_accuracy": last["pgd_accuracy"],
+            "best_epoch": best_epoch,
+            "best_clean_accuracy": best["clean_accuracy"],
+            "best_pgd_accuracy": best["pgd_accuracy"],
+        }
+        row: dict[str, Any] = {
+            "val_full_num_examples": num_examples,
+            "val_full_clean_accuracy": last["clean_accuracy"],
+            "val_full_pgd_accuracy": last["pgd_accuracy"],
+            "best_val_full_epoch": best_epoch,
+            "best_val_full_clean_accuracy": best["clean_accuracy"],
+            "best_val_full_pgd_accuracy": best["pgd_accuracy"],
+        }
+        if last_ema is not None and best_ema is not None:
+            best_ema_epoch = self.selection_metadata_ema["selected_epoch"]
+            self.selection_metadata_ema["full_split_final"] = {
+                "num_examples": num_examples,
+                "last_epoch": epoch,
+                "last_clean_accuracy": last_ema["clean_accuracy"],
+                "last_pgd_accuracy": last_ema["pgd_accuracy"],
+                "best_epoch": best_ema_epoch,
+                "best_clean_accuracy": best_ema["clean_accuracy"],
+                "best_pgd_accuracy": best_ema["pgd_accuracy"],
+            }
+            row.update(
+                {
+                    "val_full_clean_accuracy_ema": last_ema["clean_accuracy"],
+                    "val_full_pgd_accuracy_ema": last_ema["pgd_accuracy"],
+                    "best_ema_val_full_epoch": best_ema_epoch,
+                    "best_ema_val_full_clean_accuracy": best_ema["clean_accuracy"],
+                    "best_ema_val_full_pgd_accuracy": best_ema["pgd_accuracy"],
+                }
+            )
+        return row
+
     def fit(
         self,
         loader: DataLoader[IndexedBatch],
@@ -2239,7 +2369,17 @@ class Trainer:
         on_epoch_end: Callable[[Mapping[str, float], bool], None] | None = None,
         on_batch_start: Callable[[int, int, IndexedBatch], None] | None = None,
         probe_loader: DataLoader[IndexedBatch] | None = None,
+        full_validation_loader: DataLoader[IndexedBatch] | None = None,
     ) -> list[dict[str, float]]:
+        """Train ``start_epoch..epochs-1``.
+
+        With ``selection_subset`` (training.selection_subset_size),
+        ``validation_loader`` is the fixed selection subset and
+        ``full_validation_loader`` the full held-out split, used only at the
+        final epoch (see ``_final_full_split_evaluation``). Both or neither.
+        """
+        if (self.selection_subset is None) != (full_validation_loader is None):
+            raise ValueError("a selection subset and a full_validation_loader must be given together")
         history = []
         for epoch in range(start_epoch, epochs):
             self.current_epoch = epoch
@@ -2342,6 +2482,13 @@ class Trainer:
                     **({} if self.fork_lineage is None else self.fork_lineage),
                     "gap_adaptive_state": self._gap_adaptive_state.to_dict(),
                 }
+            # Before the checkpoint writes, so last.pt (and a best.pt written
+            # this epoch) carry selection_metadata["full_split_final"].
+            full_split_row: dict[str, Any] | None = None
+            if full_validation_loader is not None and epoch + 1 == epochs:
+                full_split_row = self._final_full_split_evaluation(
+                    full_validation_loader, epoch=epoch, improved=improved, improved_ema=improved_ema
+                )
             common = dict(
                 epoch=epoch,
                 model=self.model,
@@ -2450,6 +2597,12 @@ class Trainer:
             if ema_validation_metrics is not None:
                 epoch_metrics["val_clean_accuracy_ema"] = ema_validation_metrics["clean_accuracy"]
                 epoch_metrics["val_pgd_accuracy_ema"] = ema_validation_metrics["pgd_accuracy"]
+            if self.selection_subset is not None:
+                # val_* above are selection-subset numbers; label every row.
+                epoch_metrics["val_selection_subset_size"] = self.selection_subset["size"]
+                epoch_metrics["val_selection_subset_sha256"] = self.selection_subset["ids_sha256"]
+            if full_split_row is not None:
+                epoch_metrics.update(full_split_row)
             if self.adr_config is not None:
                 # Diagnostic only (plan 0098): a train-only candidate signal,
                 # logged for comparison against the validation-based
