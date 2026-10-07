@@ -26,7 +26,7 @@ from torch.utils.data import DataLoader
 
 from ard.attacks import AttackRequest, LinfPGD
 from ard.config import load_config
-from ard.config.schema import reject_throughput_options
+from ard.config.schema import reject_phase2_batch_a_options, reject_throughput_options
 from ard.data import (
     EpochShuffleSampler,
     build_train_validation_views,
@@ -201,6 +201,7 @@ def main() -> int:
     device = torch.device(args.device)
     config = load_config(args.config)
     reject_throughput_options(config.training, runtime="ert_rslad_runtime_benchmark")
+    reject_phase2_batch_a_options(config, runtime="ert_rslad_runtime_benchmark")
     _seed(args.seed)
     if config.training.deterministic:
         torch.use_deterministic_algorithms(True)

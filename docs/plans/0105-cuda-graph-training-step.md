@@ -27,13 +27,19 @@ It must refuse every configuration where that is not proven.
 - **Config.** `training.cuda_graph: bool = False`, serialized only when true, so every existing config
   keeps a byte-identical resolved config and hash (tested against the pre-change schema). It is refused
   unless: `device: cuda`, no AMP, no compile, `step_diagnostics: false`, world size 1
-  (`global_batch_size == per_rank_batch_size`), no epsilon warmup, no weight EMA, method `pgd_at`, SGD, no teacher / ADR / target policy / intervention /
+  (`global_batch_size == per_rank_batch_size`), no epsilon warmup, method `pgd_at` without `mixed_batch` / `awp`,
+  SGD, no teacher / ADR / target policy / intervention /
   prescriptive route / observation profile, and a CE, eval-mode, batch-keyed, untraced attack with a
   fixed budget (0 < epsilon, step <= epsilon). The student architecture must be on the parity-tested
   allowlist `CUDA_GRAPH_ARCHITECTURES` (MobileNetV4-Conv-Small, MobileNetV4-Conv-Medium, EfficientNet-B0).
   Both `deterministic: true` and (since 2026-10-03) `deterministic: false` are admitted; `cudnn_benchmark`
   stays refused (see Verification). The Trainer repeats the same checks for direct construction (it also
   refuses a `LinfPGD` subclass, deterministic `warn_only` mode and cuDNN benchmark).
+  Since 2026-10-08 (plan 0103 Phase 2 batch A) three options are in scope: a plain weight EMA
+  (`training.weight_ema_decay`; `_update_ema` runs inside the captured step right after the SGD update, the
+  same kernels as the eager step, and the stale-graph fingerprint covers the EMA tensors' addresses),
+  `method.label_smoothing` (part of the captured objective) and `optimizer.exclude_norm_bias_from_weight_decay`
+  (two SGD parameter groups, each with its own baked-in weight decay).
   Only `ard.cli.train` applies the option; `reject_throughput_options` refuses it everywhere else.
 - **Capture lifecycle.** Static device buffers for images, labels, the valid mask and the random-start
   noise. The loader batch is copied into them (non-blocking from pinned memory). The first full batch
@@ -265,3 +271,18 @@ It must refuse every configuration where that is not proven.
   an opt-in test; `test_step_sync_free_parity.py` also runs without `CUBLAS_WORKSPACE_CONFIG` (passes).
   Incident: the earlier production-shape run on Hamster GPU1 (about 14 GB per process, next to a production
   job) OOM-killed that production run. Production-shape checks run on a free GPU only.
+- 2026-10-08 (plan 0103 Phase 2 batch A, human-approved): scope widened by three options, nothing else
+  relaxed. (1) `training.weight_ema_decay`: `_update_ema` runs inside the captured step right after the SGD
+  update (the eager step's own kernels and order, decay baked in as the same Python scalar); the stale-graph
+  fingerprint now also covers the EMA tensors' addresses (new guard test `ema_tensor`). (2)
+  `method.label_smoothing` (it was not refused before but had no parity test). (3)
+  `optimizer.exclude_norm_bias_from_weight_decay` (two SGD groups). `method.mixed_batch` and `method.awp`
+  are refused (schema and Trainer). Tests on Hamster GPU1 next to the production job, all passing:
+  deterministic bitwise parity for each option alone on the fixture and all three together on every
+  allowlisted architecture (rows, `last.pt`/`best.pt` incl. `ema`, diagnostics, RNG; the EMA visibly
+  differs from the student), resumed-graph = eager (fixture EMA; MobileNetV4-S all three),
+  nondeterministic whole-run RNG exactness (fixture, MobileNetV4-S), and the one-step rule with the EMA
+  state as a fourth group (fixture: bitwise; MobileNetV4-S: graph at most 0.04 of the bound; EMA group
+  graph 2.5e-8 vs eager spread 1.9e-8 and floor 8.7e-6; controls 15x-2e6 x the bound). Peak reserved
+  memory per test process under 0.2 GiB. Pooling identity unchanged (`weight_ema_decay` is already in
+  `training_protocol_identity`; `cuda_graph` stays out of it in deterministic mode).

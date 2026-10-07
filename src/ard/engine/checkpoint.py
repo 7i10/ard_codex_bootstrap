@@ -141,6 +141,7 @@ def save_checkpoint(
     ema_model: nn.Module | None = None,
     best_metric_ema: float | None = None,
     selection_metadata_ema: Mapping[str, Any] | None = None,
+    auxiliary_batchnorm: nn.Module | None = None,
 ) -> None:
     local_sampler_state = sampler.state_dict() if sampler is not None and hasattr(sampler, "state_dict") else {}
     rng_by_rank = gather_objects(capture_rng_state())
@@ -173,6 +174,11 @@ def save_checkpoint(
         # written before adr/adr_trades existed keep loading unmodified.
         if ema_model is not None:
             payload["ema"] = unwrap_model(ema_model).state_dict()
+        # Optional (plan 0103 Phase 2 batch A, mixed_batch.split_batchnorm): the
+        # clean-branch auxiliary BatchNorm state. "model" keeps the main
+        # (adversarial) BN only, so evaluation never sees the auxiliary copy.
+        if auxiliary_batchnorm is not None:
+            payload["auxiliary_batchnorm"] = auxiliary_batchnorm.state_dict()
         if best_metric_ema is not None:
             payload["best_metric_ema"] = best_metric_ema
             payload["selection_metadata_ema"] = dict(selection_metadata_ema or {})
@@ -402,6 +408,7 @@ def load_checkpoint(
     expected_config_hash: str,
     device: torch.device,
     ema_model: nn.Module | None = None,
+    auxiliary_batchnorm: nn.Module | None = None,
 ) -> TrainingState:
     validate_resume_checkpoint(path, expected_config_hash=expected_config_hash)
     payload = torch.load(path, map_location="cpu", weights_only=False)
@@ -425,6 +432,17 @@ def load_checkpoint(
             # mismatched EMA state means the wrong architecture or a
             # corrupted checkpoint, not something to paper over.
             raise ValueError(f"checkpoint EMA state does not match the current EMA model: {exc}") from exc
+    if auxiliary_batchnorm is not None:
+        raw_auxiliary = payload.get("auxiliary_batchnorm")
+        if raw_auxiliary is None:
+            raise ValueError(
+                "this run uses mixed_batch.split_batchnorm, but the checkpoint being resumed carries no "
+                "'auxiliary_batchnorm' state"
+            )
+        try:
+            auxiliary_batchnorm.load_state_dict(raw_auxiliary, strict=True)
+        except RuntimeError as exc:
+            raise ValueError(f"checkpoint auxiliary BatchNorm state does not match this student: {exc}") from exc
     optimizer.load_state_dict(payload["optimizer"])
     _optimizer_to(optimizer, device)
     if scheduler is not None:

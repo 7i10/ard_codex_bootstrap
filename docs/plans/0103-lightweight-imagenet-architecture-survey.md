@@ -3535,3 +3535,15 @@ history behind this pivot.)
     `training:` block of every Phase 2 config. Basis: Singh/Croce/Hein 2023
     select on 4k held-out images, Gowal 2020 on 1,024, and over 29 of our
     runs best minus last is 0.1pt (median).
+- 2026-10-08 (human-approved): **Phase 2 implementation batch A** (code only; nothing launched).
+  All options default off; every earlier config resolves and hashes byte-identically (tested against
+  `922222a`). Contracts in `docs/SCIENTIFIC_INVARIANTS.md` ("Plan 0103 Phase 2 batch A training options").
+  - `method.mixed_batch` (pgd_at): Kurakin et al. 2017 mixed clean+adversarial batch. The first
+    `floor(fraction * m)` positions of each batch are attacked; loss weight `adversarial_weight` on them.
+    Optional `split_batchnorm`: the clean half uses an auxiliary BN; the main BN (used by attack,
+    validation, selection, saved weights and evaluation) is the adversarial BN. BatchNorm students only.
+  - `method.awp` (pgd_at): AWP after the official AT-AWP code (gamma 0.01, warmup 0 by default).
+  - `optimizer.exclude_norm_bias_from_weight_decay` (SGD): no weight decay on ndim <= 1 parameters.
+  - `training.cuda_graph` now also admits `training.weight_ema_decay` (bitwise equal to eager in
+    deterministic mode), `method.label_smoothing` and the SGD exclusion; it refuses mixed batch and AWP
+    (plan 0105 progress log).

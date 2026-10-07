@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader
 from ard.attacks import LinfPGD
 from ard.cli.train import _build_method, _seed_everything
 from ard.config import load_config
-from ard.config.schema import reject_throughput_options
+from ard.config.schema import reject_phase2_batch_a_options, reject_throughput_options
 from ard.data import (
     EpochShuffleSampler,
     build_train_validation_views,
@@ -149,6 +149,7 @@ def main() -> int:
 
     config = source_config
     reject_throughput_options(config.training, runtime="materialize_stagewise_parents")
+    reject_phase2_batch_a_options(config, runtime="materialize_stagewise_parents")
     _seed_everything(config.seeds.model_init)
     torch.use_deterministic_algorithms(True)
     if args.device == "cuda":

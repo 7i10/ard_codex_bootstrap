@@ -6,7 +6,7 @@ import argparse
 import hashlib
 import json
 import random
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -46,6 +46,7 @@ from ard.distillation.soft_label_bank import (
 from ard.distillation.trainer_hooks import DistillationTargetHooks
 from ard.engine import Trainer, config_digest, get_rank, get_world_size
 from ard.engine.checkpoint import load_init_student_weights, validate_resume_checkpoint
+from ard.engine.mixed_batch import AuxiliaryBatchNorm
 from ard.engine.distributed import (
     barrier,
     initialize_from_env,
@@ -53,6 +54,7 @@ from ard.engine.distributed import (
     run_rank_zero_phase,
     run_rank_zero_value,
     teardown,
+    unwrap_model,
     wrap_ddp,
 )
 from ard.models import build_student, build_teacher
@@ -156,6 +158,25 @@ def _seed_everything(seed: int) -> None:
         pass
 
 
+def _weight_decay_parameter_groups(
+    parameters: Iterable[nn.Parameter], *, weight_decay: float
+) -> list[dict[str, object]]:
+    """Decay / no-decay groups: ``ndim > 1`` decays, ``ndim <= 1`` (norm affine, biases) does not.
+
+    The split ``_adamw_parameter_groups`` always applies (see there for why),
+    and SGD applies when ``optimizer.exclude_norm_bias_from_weight_decay`` is
+    true (plan 0103 Phase 2 batch A). Parameter order inside each group is the
+    input order.
+    """
+    trainable = [parameter for parameter in parameters if parameter.requires_grad]
+    decay = [parameter for parameter in trainable if parameter.ndim > 1]
+    no_decay = [parameter for parameter in trainable if parameter.ndim <= 1]
+    return [
+        {"params": decay, "weight_decay": weight_decay},
+        {"params": no_decay, "weight_decay": 0.0},
+    ]
+
+
 def _adamw_parameter_groups(model: nn.Module, *, weight_decay: float) -> list[dict[str, object]]:
     """Split parameters into decay / no-decay groups before constructing AdamW.
 
@@ -174,12 +195,7 @@ def _adamw_parameter_groups(model: nn.Module, *, weight_decay: float) -> list[di
     them and confounding "does the recipe stop the collapse" with "did
     weight decay crush the normalization layers".
     """
-    decay = [parameter for parameter in model.parameters() if parameter.requires_grad and parameter.ndim > 1]
-    no_decay = [parameter for parameter in model.parameters() if parameter.requires_grad and parameter.ndim <= 1]
-    return [
-        {"params": decay, "weight_decay": weight_decay},
-        {"params": no_decay, "weight_decay": 0.0},
-    ]
+    return _weight_decay_parameter_groups(model.parameters(), weight_decay=weight_decay)
 
 
 def _guard_output(output_dir: Path, *, resume: Path | None, config_hash: str) -> None:
@@ -1103,10 +1119,24 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("prescriptive v3 anchor is not the exact epoch-79 end-boundary checkpoint")
             anchor_model = build_student(config.student, tier=config.tier)
             anchor_model.load_state_dict(anchor_payload["model"], strict=True)
+        # Plan 0103 Phase 2 batch A, mixed_batch.split_batchnorm: the clean-branch
+        # auxiliary BN, copied from the student's BN after every initialization
+        # (pretrained / init checkpoint) and optimized with it; built before the
+        # optimizer so its parameters (all 1-D) are in the optimizer state.
+        auxiliary_batchnorm: AuxiliaryBatchNorm | None = None
+        if config.method.mixed_batch is not None and config.method.mixed_batch.split_batchnorm:
+            auxiliary_batchnorm = AuxiliaryBatchNorm(unwrap_model(student)).to(device)
+        optimized_parameters = list(student.parameters()) + (
+            [] if auxiliary_batchnorm is None else list(auxiliary_batchnorm.parameters())
+        )
         if config.optimizer.id == "sgd":
             assert config.optimizer.momentum is not None and config.optimizer.nesterov is not None
             optimizer: SGD | AdamW = SGD(
-                student.parameters(),
+                (
+                    _weight_decay_parameter_groups(optimized_parameters, weight_decay=config.optimizer.weight_decay)
+                    if config.optimizer.exclude_norm_bias_from_weight_decay
+                    else optimized_parameters
+                ),
                 lr=config.optimizer.learning_rate,
                 momentum=config.optimizer.momentum,
                 weight_decay=config.optimizer.weight_decay,
@@ -1115,7 +1145,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             assert config.optimizer.beta1 is not None and config.optimizer.beta2 is not None
             optimizer = AdamW(
-                _adamw_parameter_groups(student, weight_decay=config.optimizer.weight_decay),
+                _weight_decay_parameter_groups(optimized_parameters, weight_decay=config.optimizer.weight_decay),
                 lr=config.optimizer.learning_rate,
                 betas=(config.optimizer.beta1, config.optimizer.beta2),
             )
@@ -1353,6 +1383,9 @@ def main(argv: list[str] | None = None) -> int:
                     temperature=config.method.temperature,
                 )
             ),
+            mixed_batch=config.method.mixed_batch,
+            auxiliary_batchnorm=auxiliary_batchnorm,
+            awp=config.method.awp,
         )
         start_epoch = 0
         if args.resume is not None:

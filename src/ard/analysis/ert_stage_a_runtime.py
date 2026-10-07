@@ -31,7 +31,7 @@ from ard.analysis.ert_rslad_rng_sources import (
 )
 from ard.attacks import LinfPGD
 from ard.config import load_config
-from ard.config.schema import reject_throughput_options
+from ard.config.schema import reject_phase2_batch_a_options, reject_throughput_options
 from ard.data import (
     EpochShuffleSampler,
     SampleRef,
@@ -670,6 +670,7 @@ def run_stage_a_arm(
         if keyed_attack.identity_sha256() != SAMPLE_KEYED_KL10_ATTACK_IDENTITY_SHA256:
             raise StageARuntimeError("forced training attack does not match the registered sample-keyed KL10 identity")
     reject_throughput_options(config.training, runtime="ERT Stage-A runtime")
+    reject_phase2_batch_a_options(config, runtime="ERT Stage-A runtime")
     if config.training.deterministic:
         # Stage-A forks are compared at an exact parent boundary.  The
         # ordinary train CLI applies these flags, but this standalone runtime

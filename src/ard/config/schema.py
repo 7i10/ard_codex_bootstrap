@@ -156,6 +156,15 @@ class OptimizerConfig(StrictModel):
     nesterov: bool | None = None
     beta1: float | None = Field(default=None, gt=0, lt=1)
     beta2: float | None = Field(default=None, gt=0, lt=1)
+    # Plan 0103 Phase 2 batch A (human-approved 2026-10-08), sgd only: put
+    # every parameter with ndim <= 1 (normalization affine weights/biases and
+    # every bias) in a weight_decay=0 parameter group -- the same split AdamW
+    # always uses (ard.cli.train._weight_decay_parameter_groups). AdamW refuses
+    # the flag (it is already on there). Serialized only when true, so every
+    # existing config keeps a byte-identical resolved config and hash; when
+    # true it is in the optimizer dump, hence in the evaluation record's
+    # training_protocol_identity.
+    exclude_norm_bias_from_weight_decay: bool = Field(default=False, exclude_if=lambda value: value is False)
 
     @model_validator(mode="after")
     def validate_by_id(self) -> OptimizerConfig:
@@ -171,6 +180,11 @@ class OptimizerConfig(StrictModel):
                 raise ValueError("adamw requires beta1 and beta2")
             if self.momentum is not None or self.nesterov is not None:
                 raise ValueError("adamw does not use momentum/nesterov")
+            if self.exclude_norm_bias_from_weight_decay:
+                raise ValueError(
+                    "optimizer.exclude_norm_bias_from_weight_decay is only for sgd; adamw always excludes "
+                    "normalization affine parameters and biases from weight decay"
+                )
         return self
 
 
@@ -286,6 +300,77 @@ class AdrConfig(StrictModel):
             raise ValueError("lambda_low must not exceed lambda_high (lambda anneals upward)")
         if self.lambda_source == "cosine" and self.gap_smoothing_beta != 0.9:
             raise ValueError("gap_smoothing_beta is only meaningful when lambda_source=gap_adaptive")
+        return self
+
+
+class MixedBatchConfig(StrictModel):
+    """Plan 0103 Phase 2 batch A: mixed clean + adversarial batches for ``pgd_at``.
+
+    Kurakin, Goodfellow & Bengio 2017 (arXiv:1611.01236, Sec. 3.1): of every
+    minibatch of ``m`` examples, ``k`` are replaced by adversarial examples and
+    the loss is ``(sum_clean L + lambda * sum_adv L) / ((m - k) + lambda * k)``
+    (paper: m=32, k=16, lambda=0.3). Here ``k = floor(adversarial_fraction * m)``
+    for each per-rank batch of ``m`` examples (the last partial batch included)
+    and the adversarial examples are the FIRST ``k`` positions of the batch:
+    fixed by position, no extra random draw. The sampler already shuffles every
+    epoch, so the attacked subset is a seeded, uniformly random subset of the
+    data that changes every epoch. ``adversarial_weight`` is lambda. Only the
+    ``k`` selected examples are attacked (the configured training attack, its
+    random start drawn for those ``k`` only); the other ``m - k`` enter the
+    training forward clean. The normalizer counts valid (non-padding) examples
+    only, summed over ranks.
+
+    ``split_batchnorm`` (Xie & Yuille 2019, arXiv:1906.03787, "MBN"; the same
+    mechanism as AdvProp's auxiliary BN, arXiv:1911.09665): the adversarial
+    sub-batch goes through the model's own BatchNorm layers (the MAIN BN) and
+    the clean sub-batch through an auxiliary copy of every BatchNorm layer's
+    affine parameters and running statistics. The main BN is the adversarial
+    BN: the training attack, validation, checkpoint selection, saved ``model``
+    weights and evaluation all use it; the auxiliary (clean) BN exists only
+    during training and is checkpointed separately for resume. BatchNorm
+    models only (refused when the student has no BatchNorm layer, e.g.
+    LayerNorm-only ViT/ConvNeXt); LayerNorm/GroupNorm layers, which hold no
+    batch statistics, stay shared. Single process only.
+    """
+
+    adversarial_fraction: float = Field(gt=0, lt=1)
+    adversarial_weight: float = Field(gt=0)
+    split_batchnorm: bool = False
+
+    @model_validator(mode="after")
+    def validate_weight(self) -> MixedBatchConfig:
+        if not math.isfinite(self.adversarial_weight):
+            raise ValueError("mixed_batch.adversarial_weight must be finite")
+        return self
+
+
+class AwpConfig(StrictModel):
+    """Plan 0103 Phase 2 batch A: Adversarial Weight Perturbation on top of ``pgd_at``.
+
+    Wu, Xia & Wang 2020 (arXiv:2004.05884), official code csdongxian/AWP
+    ``AT_AWP/`` (``utils_awp.py``, ``train_cifar10.py``): after the PGD attack, a
+    proxy copy of the student (train mode) takes one SGD step (lr 0.01) that
+    ascends the adversarial loss; the per-layer difference ``d`` is rescaled to
+    ``||w_l|| / (||d_l|| + 1e-20) * d_l`` for every state entry with ndim > 1
+    whose name contains ``weight``; the student is perturbed by ``gamma * d``,
+    takes its ordinary training step at the perturbed weights, and the
+    perturbation is subtracted again after the optimizer step. Defaults are the
+    AT-AWP code's ``--awp-gamma 0.01`` and ``--awp-warmup 0`` (AWP active from
+    epoch ``warmup_epochs`` on). Extra compute: one proxy forward+backward per
+    step plus a state-dict copy (PGD-K step: K+1 -> K+2 forward/backward passes)
+    and one more model copy in memory. Single process only. The step's pre-update
+    observability (``train_robust_accuracy``, per-sample diagnostic rows) is
+    measured at the perturbed weights the training forward used; post-step
+    metrics, validation, EMA and checkpoints see the restored weights.
+    """
+
+    gamma: float = Field(default=0.01, gt=0)
+    warmup_epochs: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_gamma(self) -> AwpConfig:
+        if not math.isfinite(self.gamma):
+            raise ValueError("awp.gamma must be finite")
         return self
 
 
@@ -791,6 +876,22 @@ class MethodConfig(StrictModel):
     # training.train_image_size set. Serialized only when true, so every
     # existing config keeps a byte-identical resolved config.
     selection_step_size_independent: bool = Field(default=False, exclude_if=lambda value: value is False)
+    # Plan 0103 Phase 2 batch A (human-approved 2026-10-08), pgd_at only,
+    # mutually exclusive; see MixedBatchConfig / AwpConfig. Serialized only
+    # when set, so every existing config keeps a byte-identical resolved
+    # config and hash; when set they are in method_identity (and so the
+    # evaluation record's identity) through the method dump.
+    mixed_batch: MixedBatchConfig | None = Field(default=None, exclude_if=lambda value: value is None)
+    awp: AwpConfig | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode="after")
+    def validate_phase2_batch_a_options(self) -> MethodConfig:
+        for name in ("mixed_batch", "awp"):
+            if getattr(self, name) is not None and self.id != "pgd_at":
+                raise ValueError(f"method.{name} is defined only for method pgd_at")
+        if self.mixed_batch is not None and self.awp is not None:
+            raise ValueError("method.mixed_batch and method.awp are not specified together")
+        return self
 
     @property
     def name(self) -> str:
@@ -1186,8 +1287,8 @@ class TrainingConfig(StrictModel):
     # (cudnn_benchmark=true is not): one CUDA device, FP32,
     # step_diagnostics=false (tracking diagnostics are supported), eager
     # student, method pgd_at with a batch-keyed random start and a fixed
-    # budget, SGD, no teacher/EMA/policy/intervention (see
-    # ExperimentConfig._validate_cuda_graph). The
+    # budget, SGD, no teacher/policy/intervention/mixed batch/AWP (see
+    # ExperimentConfig._validate_cuda_graph); a plain weight EMA is admitted. The
     # first full batch of every epoch and the last partial batch run
     # eagerly; the graph is re-captured every epoch (the scheduler changes
     # the learning rate only at epoch ends) and a guard refuses to replay
@@ -1236,7 +1337,9 @@ class TrainingConfig(StrictModel):
                     "global_batch_size == per_rank_batch_size (world size 1; DDP is not captured)",
                 ),
                 (self.epsilon_warmup_epochs is None, "training.epsilon_warmup_epochs unset (per-epoch attack budget)"),
-                (self.weight_ema_decay is None, "training.weight_ema_decay unset (no EMA model)"),
+                # training.weight_ema_decay is admitted (plan 0103 Phase 2 batch A,
+                # 2026-10-08): the EMA update runs inside the captured step, right
+                # after the SGD update, with the eager step's exact kernels (parity-tested).
             )
             missing = [reason for holds, reason in requirements if not holds]
             if missing:
@@ -1287,6 +1390,26 @@ def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None
         raise ValueError(
             f"{runtime} does not implement {requested}; run it with {remediation} "
             "(only ard.cli.train applies these options)"
+        )
+
+
+def reject_phase2_batch_a_options(config: ExperimentConfig, *, runtime: str) -> None:
+    """Refuse plan 0103 Phase 2 batch A options a Trainer builder does not implement.
+
+    Only ``ard.cli.train`` wires ``method.mixed_batch``, ``method.awp`` and
+    ``optimizer.exclude_norm_bias_from_weight_decay`` into the Trainer and its
+    optimizer; every other builder would silently train without them.
+    """
+    requested = []
+    if config.method.mixed_batch is not None:
+        requested.append("method.mixed_batch")
+    if config.method.awp is not None:
+        requested.append("method.awp")
+    if config.optimizer.exclude_norm_bias_from_weight_decay:
+        requested.append("optimizer.exclude_norm_bias_from_weight_decay")
+    if requested:
+        raise ValueError(
+            f"{runtime} does not implement {', '.join(requested)}; only ard.cli.train applies these options"
         )
 
 
@@ -2039,9 +2162,33 @@ class ExperimentConfig(StrictModel):
         if self.student.normalization.profile != expected_profile:
             raise ValueError(f"dataset {self.dataset.name} requires student normalization profile {expected_profile}")
         validate_distillation_cross_fields(self)
+        self._validate_phase2_batch_a()
         self._validate_cuda_graph()
         self._validate_protocol_contract()
         return self
+
+    def _validate_phase2_batch_a(self) -> None:
+        """Plan 0103 Phase 2 batch A: runtime limits of split BN and AWP (single process)."""
+        single_process = self.training.global_batch_size == self.training.per_rank_batch_size
+        mixed_batch, awp = self.method.mixed_batch, self.method.awp
+        if mixed_batch is not None and mixed_batch.split_batchnorm:
+            if not single_process:
+                raise ValueError(
+                    "method.mixed_batch.split_batchnorm requires world size 1 (global_batch_size == "
+                    "per_rank_batch_size): the auxiliary BN parameters are not registered with DDP"
+                )
+            if self.training.compile:
+                raise ValueError("method.mixed_batch.split_batchnorm cannot be combined with training.compile")
+        if awp is not None:
+            if not single_process:
+                raise ValueError(
+                    "method.awp requires world size 1 (global_batch_size == per_rank_batch_size): the official "
+                    "code computes one perturbation from the whole batch"
+                )
+            if self.training.amp:
+                raise ValueError("method.awp cannot be combined with training.amp")
+            if awp.warmup_epochs >= self.training.epochs:
+                raise ValueError("method.awp.warmup_epochs must be smaller than training.epochs (AWP never active)")
 
     def _validate_cuda_graph(self) -> None:
         """``training.cuda_graph`` scope: only the step whose eager parity is proven (plan 0105)."""
@@ -2065,6 +2212,8 @@ class ExperimentConfig(StrictModel):
             (self.intervention is None, "no intervention"),
             (self.prescriptive_v3 is None, "no prescriptive_v3"),
             (self.observation.profile == "off", "observation.profile=off"),
+            (self.method.mixed_batch is None, "no method.mixed_batch (not parity-tested)"),
+            (self.method.awp is None, "no method.awp (not parity-tested)"),
             (self.optimizer.id == "sgd", "optimizer.id=sgd (AdamW keeps a host step counter)"),
             (attack is not None and attack.loss == "ce", "a CE training attack"),
             (

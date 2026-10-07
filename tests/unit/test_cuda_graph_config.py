@@ -30,7 +30,9 @@ from ard.config.loader import _expand_environment, resolved_config_dict
 from ard.config.schema import (
     CUDA_GRAPH_ARCHITECTURES,
     AttackConfig,
+    AwpConfig,
     ExperimentConfig,
+    MixedBatchConfig,
     TrainingConfig,
     reject_throughput_options,
 )
@@ -177,7 +179,6 @@ def test_allowlist_is_the_parity_tested_sgd_batchnorm_cnns() -> None:
         ({"step_diagnostics": True}, "training.step_diagnostics=false"),
         ({"global_batch_size": 256}, "world size 1"),
         ({"epsilon_warmup_epochs": 5}, "training.epsilon_warmup_epochs unset"),
-        ({"weight_ema_decay": 0.999}, "training.weight_ema_decay unset"),
     ],
 )
 def test_training_scope_fails_closed(training: dict[str, Any], reason: str) -> None:
@@ -192,6 +193,54 @@ def test_training_scope_fails_closed(training: dict[str, Any], reason: str) -> N
     with pytest.raises(ValueError, match="training.cuda_graph=true requires") as refused:
         TrainingConfig(**{**base, **training}, cuda_graph=True)
     assert reason in str(refused.value)
+
+
+@pytest.mark.parametrize("deterministic", [True, False])
+def test_weight_ema_and_label_smoothing_are_admitted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, deterministic: bool
+) -> None:
+    """Plan 0103 Phase 2 batch A (2026-10-08): the plain weight EMA is updated inside the captured
+    step and label smoothing is part of the captured objective; both are parity-tested in
+    tests/integration/test_cuda_graph_training_step.py. The EMA stays refused with ADR."""
+    base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
+    assert TrainingConfig(**base, deterministic=deterministic, weight_ema_decay=0.999, cuda_graph=True).cuda_graph
+    raw = _stage1(monkeypatch, tmp_path)
+    enabled = ExperimentConfig.model_validate(
+        _with(
+            raw,
+            training={"deterministic": deterministic, "weight_ema_decay": 0.999, "cuda_graph": True},
+            method={"label_smoothing": 0.1},
+        )
+    )
+    assert enabled.training.weight_ema_decay == 0.999 and enabled.method.label_smoothing == 0.1
+    # Deterministic: still out of the pooling identity (bitwise parity); otherwise recorded.
+    assert _throughput_protocol_identity(enabled.training) == ({} if deterministic else {"cuda_graph": True})
+
+
+@pytest.mark.parametrize(
+    ("method", "reason"),
+    [
+        ({"mixed_batch": {"adversarial_fraction": 0.5, "adversarial_weight": 0.3}}, "no method.mixed_batch"),
+        ({"awp": {"gamma": 0.01}}, "no method.awp"),
+    ],
+)
+def test_mixed_batch_and_awp_are_outside_the_graph_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: dict[str, Any], reason: str
+) -> None:
+    raw = _stage1(monkeypatch, tmp_path)
+    ExperimentConfig.model_validate(_with(raw, method=method))
+    with pytest.raises(ValueError, match="training.cuda_graph=true requires") as refused:
+        ExperimentConfig.model_validate(_with(raw, method=method, training={"cuda_graph": True}))
+    assert reason in str(refused.value)
+
+
+def test_sgd_norm_bias_exclusion_is_admitted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two SGD parameter groups (weight decay 0 on ndim <= 1); parity-tested with the graph."""
+    raw = _stage1(monkeypatch, tmp_path)
+    enabled = ExperimentConfig.model_validate(
+        _with(raw, optimizer={"exclude_norm_bias_from_weight_decay": True}, training={"cuda_graph": True})
+    )
+    assert enabled.optimizer.exclude_norm_bias_from_weight_decay
 
 
 @pytest.mark.parametrize("training", [{"deterministic": False}])
@@ -325,8 +374,13 @@ class _PGDSubclass(LinfPGD):
 def test_trainer_refuses_cuda_graph_outside_its_scope(tmp_path: Path) -> None:
     Trainer(**{**_trainer_kwargs(tmp_path), "cuda_graph": False})
     message = _refusal(tmp_path, step_diagnostics=True, weight_ema_decay=0.99)
-    for reason in ("a CUDA device", "step_diagnostics=False", "no EMA model"):
+    for reason in ("a CUDA device", "step_diagnostics=False"):
         assert reason in message
+    # A plain weight EMA is in scope (plan 0103 Phase 2 batch A); mixed batch and AWP are not.
+    assert "EMA" not in message
+    mixed = MixedBatchConfig(adversarial_fraction=0.5, adversarial_weight=0.3)
+    assert "no mixed batch or AWP" in _refusal(tmp_path, mixed_batch=mixed)
+    assert "no mixed batch or AWP" in _refusal(tmp_path, awp=AwpConfig())
     # Only the CPU device is out of scope in the base fixture.
     assert "parity-tested student architecture" not in _refusal(tmp_path)
     assert "LinfPGD (not a subclass)" not in _refusal(tmp_path)
@@ -472,6 +526,20 @@ def test_fingerprint_detects_every_change_a_replay_would_ignore(mutate: Any) -> 
     assert optimizer_fingerprint(optimizer, model) == before
     mutate(model, optimizer)
     assert optimizer_fingerprint(optimizer, model) != before
+
+
+def test_fingerprint_covers_the_ema_tensors_the_captured_step_writes() -> None:
+    model, optimizer = _stepped_sgd()
+    ema = copy.deepcopy(model)
+    before = optimizer_fingerprint(optimizer, model, ema_model=ema)
+    assert before != optimizer_fingerprint(optimizer, model)
+    # In-place EMA updates (what a replay does) keep it; a new EMA tensor does not.
+    with torch.no_grad():
+        for value in ema.state_dict().values():
+            value.mul_(1)
+    assert optimizer_fingerprint(optimizer, model, ema_model=ema) == before
+    ema[0].weight = nn.Parameter(ema[0].weight.detach().clone())
+    assert optimizer_fingerprint(optimizer, model, ema_model=ema) != before
 
 
 def test_fingerprint_ignores_in_place_value_updates_and_refuses_tensor_hyperparameters() -> None:

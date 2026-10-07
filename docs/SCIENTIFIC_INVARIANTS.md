@@ -182,8 +182,11 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   in the config hash. Config validation limits it to the scope tested by
   `tests/integration/test_cuda_graph_training_step.py`: the allowlisted students (`CUDA_GRAPH_ARCHITECTURES`:
   MobileNetV4-Conv-Small/Medium, EfficientNet-B0), an eval-mode training attack, single CUDA device, FP32, method
-  `pgd_at`, SGD, no teacher/EMA/policy — measured on torch 2.11 with an RTX 4090, with no `CUBLAS_WORKSPACE_CONFIG`
-  override (as production runs).
+  `pgd_at`, SGD, no teacher/ADR/policy/mixed batch/AWP — measured on torch 2.11 with an RTX 4090, with no
+  `CUBLAS_WORKSPACE_CONFIG` override (as production runs). Since 2026-10-08 (plan 0103 Phase 2 batch A) a plain
+  weight EMA (`training.weight_ema_decay`, updated inside the captured step right after the SGD update with the
+  eager kernels), `method.label_smoothing` and `optimizer.exclude_norm_bias_from_weight_decay` (two SGD groups) are
+  in scope, under the same parity and equivalence tests (the EMA state is a fourth tensor group in the one-step rule).
   - `training.deterministic: true`: **bitwise** equal to the eager step (checkpoints, RNG streams, epoch rows,
     diagnostics). Not in `training_protocol_identity`, like `training.step_diagnostics`, so it pools with eager runs
     of the same arm.
@@ -329,3 +332,38 @@ weight EMA)。`Trainer.ema_model`・`_update_ema`・`best-ema.pt`書き込み・
 - Distillation configs record `training_protocol_identity.distillation` (target source, teacher registry ID and
   digest, bank storage format and K); runs that differ in any of them never pool. In distillation runs the panel
   diagnostics never trigger a teacher forward of their own.
+
+## Plan 0103 Phase 2 batch A training options (human-approved 2026-10-08)
+
+All three default off and are serialized only when set, so every earlier config keeps a byte-identical resolved
+config and hash (tested against the pre-change commit's schema and configs, read from git). When set they are in
+the config hash and in the evaluation record: `method.mixed_batch` / `method.awp` through `method_identity`,
+`optimizer.exclude_norm_bias_from_weight_decay` through the optimizer entry of `training_protocol_identity`.
+None of them touches the attack identity, selection, or evaluation.
+
+- `method.mixed_batch` (`pgd_at` only; Kurakin, Goodfellow & Bengio 2017, arXiv:1611.01236). Of each per-rank
+  batch of `m`, the first `k = floor(adversarial_fraction * m)` positions are attacked with the configured training
+  attack (random start drawn for those `k` only); the rest enter the training forward clean. Loss
+  `(sum_clean L + lambda * sum_adv L) / ((m - k) + lambda * k)` with `lambda = adversarial_weight`, over valid
+  examples, normalizer summed over ranks. The sampler shuffles every epoch, so the attacked subset is a seeded random
+  subset that changes per epoch; no extra RNG draw. `train_robust_accuracy` (and `_eval_mode`) count the attacked
+  positions only; `train_mixed_batch_*` give the counts, the clean-position train-mode accuracy and both branch
+  losses. `train_loss` stays the unweighted per-example mean.
+  - `split_batchnorm: true` (Xie & Yuille 2019, arXiv:1906.03787; AdvProp's auxiliary BN): the adversarial sub-batch
+    uses the model's own BatchNorm layers (the **main BN = adversarial BN**); the clean sub-batch uses an auxiliary
+    copy of every BatchNorm layer's affine parameters and running statistics (`ard.engine.mixed_batch`). Attack,
+    validation, selection, the saved `model` weights, EMA and evaluation all use the main (adversarial) BN only; the
+    auxiliary BN is checkpointed separately (`auxiliary_batchnorm`, required on resume). BatchNorm students only
+    (refused for a student with no BatchNorm layer, e.g. LayerNorm-only ConvNeXt/DeiT); LayerNorm/GroupNorm stay
+    shared. World size 1, no `training.compile`.
+- `method.awp` (`pgd_at` only; Wu, Xia & Wang 2020, arXiv:2004.05884; official `csdongxian/AWP` `AT_AWP`): after
+  the attack, a proxy copy (train mode) takes one SGD step (lr 0.01) ascending the masked-mean PGD-AT loss (the
+  official plain CE when `label_smoothing` is 0); for every state entry with ndim > 1 whose name contains `weight`
+  the difference is rescaled to `||w|| / (||d|| + 1e-20) * d`; the student is moved by `gamma * d`, takes its step,
+  and `gamma * d` is subtracted after the optimizer step (before the EMA update). Defaults are the AT-AWP code's
+  `gamma = 0.01`, `warmup_epochs = 0`. Extra compute: one proxy forward+backward per step and one model copy.
+  World size 1, no AMP. Not combinable with `mixed_batch`.
+- `optimizer.exclude_norm_bias_from_weight_decay` (SGD only): parameters with ndim <= 1 (normalization affine,
+  biases) go into a `weight_decay = 0` group, the same split AdamW always uses.
+- `training.cuda_graph` refuses `mixed_batch` and `awp`; only `ard.cli.train` applies the three options and every
+  other Trainer builder refuses them (`reject_phase2_batch_a_options`).

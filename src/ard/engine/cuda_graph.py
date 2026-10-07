@@ -11,13 +11,14 @@ replay exactly the eager kernels; what the tests observe is that every RNG
 stream stays exactly equal over whole runs, and that one step from one exact
 state lands within 4x max(the median spread of the eager outcomes, one FP32
 rounding of the new value) of one nearest eager outcome, in every tensor group
-(parameters, momentum buffers, BatchNorm buffers). Which term sets the bound
+(parameters, momentum buffers, BatchNorm buffers, and the weight-EMA state when
+``training.weight_ema_decay`` is set). Which term sets the bound
 depends on the group: for parameters it is the FP32 rounding, for momentum
 buffers at production shapes it is the measured eager spread.
 
 * A graph bakes SGD's ``lr``/``momentum``/``weight_decay``/... in as Python
-  scalars and the addresses of every parameter, gradient, momentum buffer and
-  BatchNorm buffer. It is therefore captured again at the start of every epoch
+  scalars and the addresses of every parameter, gradient, momentum buffer,
+  BatchNorm buffer and (with a weight EMA) EMA tensor. It is therefore captured again at the start of every epoch
   (the scheduler changes the learning rate only at epoch ends; resume loads
   new optimizer state tensors), and :meth:`CudaGraphStepState.check_replayable`
   compares a fingerprint of all of those before every replay and raises on any
@@ -44,8 +45,14 @@ from ard.config.schema import CUDA_GRAPH_ARCHITECTURES
 __all__ = ["CUDA_GRAPH_ARCHITECTURES", "CudaGraphStepState", "momentum_buffers_ready", "optimizer_fingerprint"]
 
 
-def optimizer_fingerprint(optimizer: Optimizer, model: nn.Module) -> tuple[Any, ...]:
-    """Everything a captured step bakes in that the host could change between replays."""
+def optimizer_fingerprint(
+    optimizer: Optimizer, model: nn.Module, *, ema_model: nn.Module | None = None
+) -> tuple[Any, ...]:
+    """Everything a captured step bakes in that the host could change between replays.
+
+    With a weight EMA (``training.weight_ema_decay``) the captured step also
+    writes every EMA state tensor in place, so their addresses are included.
+    """
     groups = []
     for group in optimizer.param_groups:
         hyperparameters = []
@@ -64,7 +71,8 @@ def optimizer_fingerprint(optimizer: Optimizer, model: nn.Module) -> tuple[Any, 
             tensors.append((id(parameter), parameter.data_ptr(), None if buffer is None else buffer.data_ptr()))
         groups.append((tuple(hyperparameters), tuple(tensors)))
     buffers = tuple(buffer.data_ptr() for buffer in model.buffers())
-    return (id(optimizer), tuple(groups), buffers, model.training)
+    ema = None if ema_model is None else tuple(value.data_ptr() for value in ema_model.state_dict().values())
+    return (id(optimizer), tuple(groups), buffers, model.training, ema)
 
 
 def momentum_buffers_ready(optimizer: Optimizer) -> bool:
@@ -180,11 +188,12 @@ class CudaGraphStepState:
                 f"({self.full_batches_this_epoch} full batches, {self.eager_steps_this_epoch} eager steps)"
             )
 
-    def check_replayable(self, optimizer: Optimizer, model: nn.Module) -> None:
+    def check_replayable(self, optimizer: Optimizer, model: nn.Module, *, ema_model: nn.Module | None = None) -> None:
         if self.graph is None or self.fingerprint is None:
             raise RuntimeError("no captured CUDA graph to replay")
-        if optimizer_fingerprint(optimizer, model) != self.fingerprint:
+        if optimizer_fingerprint(optimizer, model, ema_model=ema_model) != self.fingerprint:
             raise RuntimeError(
-                "CUDA graph is stale: an optimizer hyperparameter, parameter, momentum buffer, model buffer or "
-                "the model mode changed since capture; refusing to replay values baked in at capture time"
+                "CUDA graph is stale: an optimizer hyperparameter, parameter, momentum buffer, model buffer, "
+                "EMA tensor or the model mode changed since capture; refusing to replay values baked in at "
+                "capture time"
             )

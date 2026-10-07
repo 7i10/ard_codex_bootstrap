@@ -20,6 +20,11 @@ fire from inside a replay; a pixel-range violation on the graph path kills
 the process before anything is checkpointed; and the ``LinfPGD.perturb`` core
 never synchronizes with the host.
 
+Plan 0103 Phase 2 batch A (2026-10-08) widened the scope by three options, each covered by the same
+differentials (``variant``): a plain weight EMA updated inside the captured step
+(``training.weight_ema_decay``), label smoothing in the captured objective, and SGD with a
+weight-decay-free group for ndim <= 1 parameters (``optimizer.exclude_norm_bias_from_weight_decay``).
+
 training.deterministic=false (end of file): bitwise parity is impossible, so
 exact RNG streams and audit counts over whole runs, plus a one-step
 equivalence test against eager-vs-eager nondeterministic noise.
@@ -141,15 +146,46 @@ def _loaders(num_classes: int, image_size: int, *, pin_memory: bool) -> tuple[Da
     return ordered(train, shuffle=True), ordered(validation, shuffle=False), ordered(probe, shuffle=False)
 
 
+# Plan 0103 Phase 2 batch A options a variant ("base" or "+"-joined names) switches on.
+_VARIANT_OPTIONS = frozenset({"ema", "label_smoothing", "exclude_norm_bias"})
+_ALL_OPTIONS = "ema+label_smoothing+exclude_norm_bias"
+_EMA_DECAY = 0.9  # large steps, so the EMA visibly moves within a 3-epoch fixture run
+_LABEL_SMOOTHING = 0.1
+
+
+def _variant(variant: str) -> set[str]:
+    options = set() if variant == "base" else set(variant.split("+"))
+    assert options <= _VARIANT_OPTIONS, variant
+    return options
+
+
+def _optimizer_parameters(student: nn.Module, options: set[str], weight_decay: float) -> Any:
+    if "exclude_norm_bias" not in options:
+        return student.parameters()
+    # What ard.cli.train builds for optimizer.exclude_norm_bias_from_weight_decay=true.
+    from ard.cli.train import _weight_decay_parameter_groups
+
+    return _weight_decay_parameter_groups(student.parameters(), weight_decay=weight_decay)
+
+
 def build_trainer(
-    output: Path, *, kind: str, cuda_graph: bool, device: torch.device, diagnostics: str = "panel"
+    output: Path,
+    *,
+    kind: str,
+    cuda_graph: bool,
+    device: torch.device,
+    diagnostics: str = "panel",
+    variant: str = "base",
 ) -> tuple[Trainer, Any]:
     # Every RNG stream a checkpoint records (Python, NumPy, torch CPU/CUDA), seeded as ard.cli.train
     # does: each arm runs in a fresh process, so an unseeded stream would differ between arms.
     _seed_everything(1234)
+    options = _variant(variant)
     student, num_classes, image_size = _student(kind)
     student = student.to(device)
-    optimizer = SGD(student.parameters(), lr=0.05, momentum=0.9, weight_decay=5e-4, nesterov=True)
+    optimizer = SGD(
+        _optimizer_parameters(student, options, 5e-4), lr=0.05, momentum=0.9, weight_decay=5e-4, nesterov=True
+    )
     trainer = Trainer(
         model=student,
         optimizer=optimizer,
@@ -159,7 +195,8 @@ def build_trainer(
         selection_attack=LinfPGD(
             AttackConfig(epsilon="4/255", step_size="1/255", steps=2, student_mode="eval", teacher_mode="eval")
         ),
-        objective=PGDATObjective(),
+        objective=PGDATObjective(label_smoothing=_LABEL_SMOOTHING if "label_smoothing" in options else 0.0),
+        weight_ema_decay=_EMA_DECAY if "ema" in options else None,
         device=device,
         output_dir=output,
         config_hash="c" * 64,
@@ -206,7 +243,7 @@ def _fingerprint(trainer: Trainer, history: list[dict[str, Any]], output: Path) 
     return result
 
 
-def arm(root: Path, kind: str, mode: str, diagnostics: str) -> dict[str, Any]:
+def arm(root: Path, kind: str, mode: str, diagnostics: str, variant: str = "base") -> dict[str, Any]:
     """One arm in this (fresh) process: eager | graph | graph_seed_plus_one | resumed."""
     device = torch.device("cuda")
     if mode == "graph_seed_plus_one":
@@ -220,7 +257,7 @@ def arm(root: Path, kind: str, mode: str, diagnostics: str) -> dict[str, Any]:
         Trainer._attack_generator = shifted  # type: ignore[method-assign]
     cuda_graph = mode != "eager"
     trainer, (num_classes, image_size) = build_trainer(
-        root, kind=kind, cuda_graph=cuda_graph, device=device, diagnostics=diagnostics
+        root, kind=kind, cuda_graph=cuda_graph, device=device, diagnostics=diagnostics, variant=variant
     )
     post_seed_cuda_rng = _digest(torch.cuda.get_rng_state())
     loader, validation_loader, probe_loader = _loaders(num_classes, image_size, pin_memory=True)
@@ -228,7 +265,9 @@ def arm(root: Path, kind: str, mode: str, diagnostics: str) -> dict[str, Any]:
     if mode == "resumed":
         history = trainer.fit(loader, epochs=1, **loaders)
         del trainer
-        trainer, _ = build_trainer(root, kind=kind, cuda_graph=True, device=device, diagnostics=diagnostics)
+        trainer, _ = build_trainer(
+            root, kind=kind, cuda_graph=True, device=device, diagnostics=diagnostics, variant=variant
+        )
         loader, validation_loader, probe_loader = _loaders(num_classes, image_size, pin_memory=True)
         start = trainer.resume(root / "last.pt", sampler=loader.sampler).next_epoch
         assert start == 1
@@ -241,10 +280,18 @@ def arm(root: Path, kind: str, mode: str, diagnostics: str) -> dict[str, Any]:
     fingerprint["cuda_rng_advanced"] = fingerprint["cuda_rng"] != post_seed_cuda_rng
     fingerprint["audit"] = [[row.get(key) for key in _AUDIT_KEYS] for row in history]
     fingerprint["has_probe"] = all("train_probe_pgd_accuracy" in row for row in history)
+    fingerprint["has_ema"] = all("val_pgd_accuracy_ema" in row for row in history)
+    if trainer.ema_model is not None:
+        # The EMA really averaged: it differs from the live student at the end.
+        live = trainer.model.state_dict()
+        fingerprint["ema_differs_from_model"] = any(
+            not torch.equal(value, live[key]) for key, value in trainer.ema_model.state_dict().items()
+        )
+    fingerprint["optimizer_groups"] = [group["weight_decay"] for group in trainer.optimizer.param_groups]
     return fingerprint
 
 
-def nondeterministic_arm(root: Path, kind: str, mode: str) -> dict[str, Any]:
+def nondeterministic_arm(root: Path, kind: str, mode: str, variant: str = "base") -> dict[str, Any]:
     """``arm`` under training.deterministic=false, plus the attack-generator stream.
 
     Records every attack generator the run creates (seed and final philox
@@ -261,7 +308,7 @@ def nondeterministic_arm(root: Path, kind: str, mode: str) -> dict[str, Any]:
         return generator
 
     Trainer._attack_generator = recorded  # type: ignore[method-assign]
-    fingerprint = arm(root, kind, mode, "panel")
+    fingerprint = arm(root, kind, mode, "panel", variant)
     fingerprint["attack_generators"] = _digest(
         [(generator.initial_seed(), generator.get_state()) for generator in generators]
     )
@@ -308,8 +355,9 @@ def _single_step_trainer(
     if spec.get("checkpoint"):
         student.load_state_dict(torch.load(spec["checkpoint"], map_location="cpu", weights_only=False)["model"])
     student = student.to(device)
+    options = _variant(spec.get("variant", "base"))
     optimizer = SGD(
-        student.parameters(),
+        _optimizer_parameters(student, options, spec["weight_decay"]),
         lr=spec["learning_rate"],
         momentum=0.9,
         weight_decay=spec["weight_decay"],
@@ -327,7 +375,8 @@ def _single_step_trainer(
         selection_attack=LinfPGD(
             AttackConfig(epsilon=spec["epsilon"], step_size="1/255", steps=1, student_mode="eval", teacher_mode="eval")
         ),
-        objective=PGDATObjective(),
+        objective=PGDATObjective(label_smoothing=_LABEL_SMOOTHING if "label_smoothing" in options else 0.0),
+        weight_ema_decay=_EMA_DECAY if "ema" in options else None,
         device=device,
         output_dir=output,
         config_hash="c" * 64,
@@ -353,16 +402,20 @@ def _single_step_trainer(
 
 
 def _single_step_state(trainer: Trainer) -> dict[str, Any]:
-    """Parameters, model buffers, SGD momentum buffers and the CUDA RNG state, copied to the host."""
+    """Parameters, model buffers, SGD momentum buffers, the EMA state (when the variant has one) and the
+    CUDA RNG state, copied to the host."""
     names = {name for name, _ in trainer.model.named_parameters()}
     state = trainer.model.state_dict()
     parameters = [parameter for group in trainer.optimizer.param_groups for parameter in group["params"]]
-    return {
+    saved = {
         "parameters": {key: value.detach().cpu().clone() for key, value in state.items() if key in names},
         "buffers": {key: value.detach().cpu().clone() for key, value in state.items() if key not in names},
         "momentum": [trainer.optimizer.state[p]["momentum_buffer"].detach().cpu().clone() for p in parameters],
         "cuda_rng": torch.cuda.get_rng_state(),
     }
+    if trainer.ema_model is not None:
+        saved["ema"] = {key: value.detach().cpu().clone() for key, value in trainer.ema_model.state_dict().items()}
+    return saved
 
 
 def _load_single_step_state(trainer: Trainer, saved: dict[str, Any]) -> None:
@@ -374,6 +427,9 @@ def _load_single_step_state(trainer: Trainer, saved: dict[str, Any]) -> None:
             value.copy_(saved["parameters"][key] if key in saved["parameters"] else saved["buffers"][key])
         for parameter, buffer in zip(parameters, saved["momentum"], strict=True):
             trainer.optimizer.state[parameter]["momentum_buffer"].copy_(buffer)
+        if trainer.ema_model is not None:
+            for key, value in trainer.ema_model.state_dict().items():
+                value.copy_(saved["ema"][key])
     torch.cuda.set_rng_state(saved["cuda_rng"])
 
 
@@ -405,13 +461,13 @@ def single_step_arm(root: Path, spec_json: str, name: str) -> dict[str, Any]:
                 torch.save(_single_step_state(trainer), state_dir / f"sync{batch_index}.pt")
             elif batch_index in _SYNC_BATCHES:
                 _load_single_step_state(trainer, torch.load(state_dir / f"sync{batch_index}.pt", weights_only=False))
-                group = trainer.optimizer.param_groups[0]
-                if batch_index == _SYNC_BATCHES[0] and control == "lr_zero":
-                    group["lr"] = 0.0
-                elif batch_index == _SYNC_BATCHES[0] and control == "lr_times_1p001":
-                    group["lr"] *= 1.001
-                elif batch_index == _SYNC_BATCHES[0] and control == "weight_decay_zero":
-                    group["weight_decay"] = 0.0
+                for group in trainer.optimizer.param_groups:
+                    if batch_index == _SYNC_BATCHES[0] and control == "lr_zero":
+                        group["lr"] = 0.0
+                    elif batch_index == _SYNC_BATCHES[0] and control == "lr_times_1p001":
+                        group["lr"] *= 1.001
+                    elif batch_index == _SYNC_BATCHES[0] and control == "weight_decay_zero":
+                        group["weight_decay"] = 0.0
             if batch_index > max(_SYNC_BATCHES):
                 raise _StopEpoch
 
@@ -463,6 +519,12 @@ def _flat(tensors: Any) -> torch.Tensor:
 
 
 _GROUPS = ("parameters", "momentum", "buffers")
+# With a weight EMA (variant "ema") its state is a fourth group, held to the same rule.
+_EMA_GROUPS = (*_GROUPS, "ema")
+
+
+def _groups(result: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(result["floor"])
 
 
 def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> dict[str, Any]:
@@ -477,9 +539,10 @@ def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> d
         if path.name.split(".", 1)[0] in processes:
             states[path.name[: -len(f"_after{sync}.pt")]] = torch.load(path, weights_only=False)
     reference = states["reference"]
-    flat = {name: {group: _flat(state[group]) for group in _GROUPS} for name, state in states.items()}
+    groups = _EMA_GROUPS if "ema" in reference else _GROUPS
+    flat = {name: {group: _flat(state[group]) for group in groups} for name, state in states.items()}
     result: dict[str, Any] = {"update": {}, "floor": {}, "relative_update": {}}
-    for group in _GROUPS:
+    for group in groups:
         new, old = flat["reference"][group], _flat(before[group])
         update = float((new - old).norm())
         result["update"][group] = update
@@ -488,7 +551,7 @@ def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> d
 
     def distance(left: str, right: str) -> dict[str, float]:
         return {
-            group: float((flat[left][group] - flat[right][group]).norm()) / result["update"][group] for group in _GROUPS
+            group: float((flat[left][group] - flat[right][group]).norm()) / result["update"][group] for group in groups
         }
 
     # The reference only supplies the state and the scale: it is alone in its process, and a
@@ -496,12 +559,12 @@ def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> d
     eager = [name for name in states if name.split(".")[-1].startswith("eager")]
     others = [name for name in states if name not in eager and name != "reference"]
     result["eager_nearest"] = {
-        name: {group: min(distance(name, other)[group] for other in eager if other != name) for group in _GROUPS}
+        name: {group: min(distance(name, other)[group] for other in eager if other != name) for group in groups}
         for name in eager
     }
     result["to_eager"] = {name: {other: distance(name, other) for other in eager} for name in others}
     result["cross_process"] = {
-        group: max(distance(f"{process}.eager_a", "reference")[group] for process in processes) for group in _GROUPS
+        group: max(distance(f"{process}.eager_a", "reference")[group] for process in processes) for group in groups
     }
     result["integer_buffers_equal"] = all(
         torch.equal(state["buffers"][key], value)
@@ -513,7 +576,7 @@ def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> d
     result["max_running_var"] = max((float(value.max()) for value in running_vars), default=0.0)
     result["finite"] = all(
         bool(torch.isfinite(flat["reference"][group]).all()) and bool(torch.isfinite(_flat(before[group])).all())
-        for group in _GROUPS
+        for group in groups
     )
     return result
 
@@ -521,7 +584,9 @@ def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> d
 def stale_guard(root: Path, mutation: str) -> str:
     """Mutate the optimizer mid-epoch after capture; return the error text."""
     device = torch.device("cuda")
-    trainer, (num_classes, image_size) = build_trainer(root, kind=_FIXTURE, cuda_graph=True, device=device)
+    trainer, (num_classes, image_size) = build_trainer(
+        root, kind=_FIXTURE, cuda_graph=True, device=device, variant="ema" if mutation == "ema_tensor" else "base"
+    )
     loader, validation_loader, _ = _loaders(num_classes, image_size, pin_memory=False)
 
     def mutate(epoch: int, batch_index: int, _batch: Any) -> None:
@@ -539,6 +604,11 @@ def stale_guard(root: Path, mutation: str) -> str:
             optimizer.load_state_dict(copy.deepcopy(optimizer.state_dict()))
         elif mutation == "model_mode":
             trainer.model.eval()
+        elif mutation == "ema_tensor":
+            # A new EMA tensor (as a non-in-place EMA load would give): the graph writes the old one.
+            assert trainer.ema_model is not None
+            batchnorm = next(module for module in trainer.ema_model.modules() if isinstance(module, nn.BatchNorm2d))
+            batchnorm.register_buffer("running_mean", batchnorm.running_mean.clone())
         else:
             raise AssertionError(mutation)
 
@@ -677,7 +747,7 @@ def _result(completed: subprocess.CompletedProcess[str]) -> Any:
 
 
 def _comparable(fingerprint: dict[str, Any], *, diagnostics: bool = True) -> dict[str, Any]:
-    ignored = {"cuda_rng_advanced", "audit", "has_probe"}
+    ignored = {"cuda_rng_advanced", "audit", "has_probe", "has_ema", "ema_differs_from_model", "optimizer_groups"}
     return {
         key: value
         for key, value in fingerprint.items()
@@ -715,6 +785,47 @@ def test_graph_step_is_bit_identical_to_the_eager_step(kind: str, diagnostics: s
         assert eager["cuda_rng_advanced"] and graph["cuda_rng_advanced"]
 
 
+# Plan 0103 Phase 2 batch A: each option alone on the fixture, all three together on every allowlisted
+# architecture.
+_VARIANT_PARITY_CASES = [
+    (_FIXTURE, "ema"),
+    (_FIXTURE, "label_smoothing"),
+    (_FIXTURE, "exclude_norm_bias"),
+    *((architecture, _ALL_OPTIONS) for architecture in sorted(CUDA_GRAPH_ARCHITECTURES)),
+]
+
+
+def _assert_variant_ran(result: dict[str, Any], variant: str) -> None:
+    options = _variant(variant)
+    assert result["has_ema"] is ("ema" in options)
+    if "ema" in options:
+        assert result["ema_differs_from_model"]
+        assert "last.pt:ema" in result and "best.pt:ema" in result
+    assert result["optimizer_groups"] == ([5e-4, 0.0] if "exclude_norm_bias" in options else [5e-4])
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize(("kind", "variant"), _VARIANT_PARITY_CASES)
+def test_graph_step_with_phase2_options_is_bit_identical_to_the_eager_step(kind: str, variant: str) -> None:
+    eager = _result(_run("arm", kind, "eager", "panel", variant))
+    graph = _result(_run("arm", kind, "graph", "panel", variant))
+    _assert_variant_ran(eager, variant)
+    _assert_variant_ran(graph, variant)
+    assert graph["audit"] == _EXPECTED_AUDIT
+    assert _comparable(graph) == _comparable(eager)
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize(("kind", "variant"), [(_FIXTURE, "ema"), ("mobilenetv4_conv_small_imagenet", _ALL_OPTIONS)])
+def test_graph_run_with_phase2_options_resumed_mid_run_equals_the_eager_run(kind: str, variant: str) -> None:
+    eager = _result(_run("arm", kind, "eager", "panel", variant))
+    resumed = _result(_run("arm", kind, "resumed", "panel", variant))
+    _assert_variant_ran(resumed, variant)
+    assert _comparable(resumed, diagnostics=False) == _comparable(eager, diagnostics=False)
+
+
 @pytest.mark.gpu
 @requires_cuda
 @pytest.mark.parametrize("kind", [_FIXTURE, "mobilenetv4_conv_small_imagenet"])
@@ -737,7 +848,9 @@ def test_negative_control_a_shifted_attack_stream_is_detected() -> None:
 
 @pytest.mark.gpu
 @requires_cuda
-@pytest.mark.parametrize("mutation", ["lr", "momentum", "weight_decay", "load_state_dict", "model_mode"])
+@pytest.mark.parametrize(
+    "mutation", ["lr", "momentum", "weight_decay", "load_state_dict", "model_mode", "ema_tensor"]
+)
 def test_mid_epoch_optimizer_change_is_refused_not_replayed(mutation: str) -> None:
     message = _result(_run("stale_guard", mutation))
     assert "CUDA graph is stale" in message
@@ -944,16 +1057,18 @@ def single_step_summary(result: dict[str, Any]) -> dict[str, Any]:
     minimises the largest group distance in units of the bound."""
     spread = {
         group: statistics.median(distances[group] for distances in result["eager_nearest"].values())
-        for group in _GROUPS
+        for group in _groups(result)
     }
-    bound = {group: _SAME_ORDER * max(spread[group], result["floor"][group]) for group in _GROUPS}
+    bound = {group: _SAME_ORDER * max(spread[group], result["floor"][group]) for group in _groups(result)}
     arms = {}
     for name, to_eager in result["to_eager"].items():
-        nearest = min(to_eager, key=lambda eager: max(to_eager[eager][group] / bound[group] for group in _GROUPS))
+        nearest = min(
+            to_eager, key=lambda eager: max(to_eager[eager][group] / bound[group] for group in _groups(result))
+        )
         arms[name] = {
             "nearest": nearest,
             **to_eager[nearest],
-            "ratio": max(to_eager[nearest][group] / bound[group] for group in _GROUPS),
+            "ratio": max(to_eager[nearest][group] / bound[group] for group in _groups(result)),
         }
     return {"spread": spread, "bound": bound, "arms": arms}
 
@@ -969,7 +1084,7 @@ def single_step_verdict(distances: dict[str, Any]) -> list[str]:
         if not result["integer_buffers_equal"]:
             failures.append(f"sync {sync}: integer buffers differ between arms")
         summary = single_step_summary(result)
-        for group in _GROUPS:
+        for group in _groups(result):
             if summary["spread"][group] > _MAX_SPREAD_OVER_FLOOR * result["floor"][group]:
                 failures.append(
                     f"sync {sync}: eager outcomes too spread to resolve a defect ({group} spread "
@@ -1032,6 +1147,34 @@ def test_single_step_verdict_is_not_widened_by_one_eager_arm_in_the_other_mode()
     # Controls are required at both sync points.
     no_controls = _verdict_fixture([1e-7] * 6, 2e-7, controls=False)
     assert any("controls missing" in failure for failure in single_step_verdict({"1": clean, "3": no_controls}))
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("kind", [_FIXTURE, "mobilenetv4_conv_small_imagenet"])
+def test_nondeterministic_graph_run_with_phase2_options_keeps_every_rng_stream_exact(kind: str) -> None:
+    eager = _result(_run("nondeterministic_arm", kind, "eager", _ALL_OPTIONS, determinism="nondeterministic"))
+    graph = _result(_run("nondeterministic_arm", kind, "graph", _ALL_OPTIONS, determinism="nondeterministic"))
+    _assert_variant_ran(eager, _ALL_OPTIONS)
+    _assert_variant_ran(graph, _ALL_OPTIONS)
+    assert graph["audit"] == _EXPECTED_AUDIT
+    for key in _EXACT_UNDER_NONDETERMINISM:
+        assert graph[key] == eager[key], key
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("kind", [_FIXTURE, "mobilenetv4_conv_small_imagenet"])
+def test_nondeterministic_graph_step_with_phase2_options_matches_eager_within_one_step_noise(
+    tmp_path: Path, kind: str
+) -> None:
+    """The one-step rule with all three options on; the EMA state is a fourth tensor group."""
+    spec = {**_SINGLE_STEP_REGIME, "kind": kind, "variant": _ALL_OPTIONS}
+    spec.update(_SINGLE_STEP_OVERRIDES.get(kind, {}))
+    distances = run_single_step_check(tmp_path, spec, "nondeterministic")
+    assert all("ema" in result["floor"] for result in distances.values())
+    failures = single_step_verdict(distances)
+    assert not failures, (failures, {sync: single_step_summary(result) for sync, result in distances.items()})
 
 
 @pytest.mark.gpu

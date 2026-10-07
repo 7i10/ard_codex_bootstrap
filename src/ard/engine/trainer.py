@@ -17,7 +17,7 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
 from ard.attacks import AttackGenerator, AttackRequest, LinfPGD
-from ard.config.schema import AdrConfig
+from ard.config.schema import AdrConfig, AwpConfig, MixedBatchConfig
 from ard.data import IndexedBatch
 from ard.distillation.trainer_hooks import DistillationTargetHooks, bank_clean_logits
 from ard.objectives import DistillationObjective, ObjectiveTerms, PGDATObjective
@@ -44,6 +44,7 @@ from ard.state import SampleStateStore
 from ard.targets import AnchoredTeacherTargetPolicy, TeacherTargetPolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 
+from .awp import AdversarialWeightPerturbation
 from .checkpoint import TrainingState, capture_rng_state, load_checkpoint, restore_rng_state, save_checkpoint
 from .cuda_graph import (
     CUDA_GRAPH_ARCHITECTURES,
@@ -62,6 +63,7 @@ from .distributed import (
     suspend_ddp_buffer_broadcasts,
     unwrap_model,
 )
+from .mixed_batch import AuxiliaryBatchNorm, adversarial_count, example_weights
 
 # Trainer(selection_subset=...): what the selection record must state.
 SELECTION_SUBSET_KEYS = frozenset({"size", "ids_sha256", "full_split_size", "seed", "sampling", "source"})
@@ -279,6 +281,9 @@ class Trainer:
         selection_subset: Mapping[str, Any] | None = None,
         selection_subset_ids: Sequence[int] | None = None,
         distillation_hooks: DistillationTargetHooks | None = None,
+        mixed_batch: MixedBatchConfig | None = None,
+        auxiliary_batchnorm: AuxiliaryBatchNorm | None = None,
+        awp: AwpConfig | None = None,
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -661,11 +666,82 @@ class Trainer:
         self._teacher_adversarial_logits: torch.Tensor | None = None
         self._teacher_adversarial_forward_calls = 0.0
         self._boundary_epoch_stats: dict[str, float] = {}
+        # Plan 0103 Phase 2 batch A: mixed clean/adversarial batches (optional
+        # split BN) and AWP, pgd_at only; see ard.engine.mixed_batch / awp.
+        self.mixed_batch = mixed_batch
+        self.auxiliary_batchnorm = auxiliary_batchnorm
+        self.awp_config = awp
+        self._awp: AdversarialWeightPerturbation | None = None
+        self._validate_phase2_batch_a_scope()
+        if awp is not None:
+            self._awp = AdversarialWeightPerturbation(unwrap_model(self.model), gamma=awp.gamma)
         # Plan 0105 (training.cuda_graph): see ard.engine.cuda_graph.
         self._cuda_graph: CudaGraphStepState | None = None
         if cuda_graph:
             self._validate_cuda_graph_scope(student_architecture)
             self._cuda_graph = CudaGraphStepState(device=self.device)
+
+    def _validate_phase2_batch_a_scope(self) -> None:
+        """Mixed batch / split BN / AWP are defined for a plain PGD-AT step only (mirrors the schema)."""
+        if self.mixed_batch is None and self.awp_config is None:
+            if self.auxiliary_batchnorm is not None:
+                raise ValueError("auxiliary_batchnorm requires mixed_batch.split_batchnorm")
+            return
+        if self.mixed_batch is not None and self.awp_config is not None:
+            raise ValueError("mixed_batch and awp are not specified together")
+        split = self.mixed_batch is not None and self.mixed_batch.split_batchnorm
+        if split != (self.auxiliary_batchnorm is not None):
+            raise ValueError("mixed_batch.split_batchnorm and auxiliary_batchnorm must be supplied together")
+        treatments = (
+            self.adversarial_kd_multiplier,
+            self.adversarial_ce_coefficient,
+            self.clean_ce_coefficient,
+            self.clean_wrong_mode,
+            self.extra_clean_ce_coefficient,
+            self.adversarial_bce_coefficient,
+            self.adaptive_advkd_gamma,
+            self.margin_coefficient,
+            self.margin_target_mode,
+            self.teacher_clean_reliability_mask,
+            self.boundary_intervention,
+            self.selected_attack_epsilon,
+            self.selected_attack_step_size,
+        )
+        requirements = [
+            (self.attack is not None, "a training attack"),
+            (type(self.objective) is PGDATObjective, "the PGD-AT objective"),
+            (self.teacher is None, "no teacher"),
+            (self.adr_config is None, "no ADR"),
+            (self.policy is None and self.sample_store is None, "no policy or sample state"),
+            (self.observation_profile == "off", "observation_profile=off"),
+            (self.target_policy is None and self.intervention_mask is None, "no target policy or intervention"),
+            (self.anchor_model is None and self.prescriptive_v3_route is None, "no prescriptive route"),
+            (
+                self.dynamic_s3_router is None and self.online_state_s2_router is None,
+                "no dynamic S3 / online S2 router",
+            ),
+            (self.frozen_risk_lookup is None and not self.oracle_mask, "no frozen oracle or oracle mask"),
+            (
+                all(value is None for value in treatments) and not self.clean_wrong_attack_skip and not self.iad_inspired,
+                "no registered treatment",
+            ),
+        ]
+        if split:
+            assert self.auxiliary_batchnorm is not None
+            requirements += [
+                (get_world_size() == 1, "world size 1 for split BN"),
+                (unwrap_model(self.model) is self.model, "an unwrapped (not DDP or compiled) student for split BN"),
+                (self.auxiliary_batchnorm.matches(self.model), "an auxiliary BN built from this student"),
+            ]
+        if self.awp_config is not None:
+            requirements += [
+                (get_world_size() == 1, "world size 1 for AWP"),
+                (self.scaler is None, "no AMP GradScaler for AWP"),
+            ]
+        missing = [reason for holds, reason in requirements if not holds]
+        if missing:
+            feature = "mixed_batch" if self.mixed_batch is not None else "awp"
+            raise ValueError(f"{feature} requires " + "; ".join(missing))
 
     def _validate_cuda_graph_scope(self, student_architecture: str | None) -> None:
         """Refuse every Trainer feature the captured PGD-AT step does not transcribe.
@@ -715,8 +791,10 @@ class Trainer:
                 "a CE, eval-mode, batch-keyed, untraced attack with a fixed budget, 0 < epsilon and step <= epsilon",
             ),
             (self.teacher is None, "no teacher"),
-            (self.ema_model is None, "no EMA model"),
-            (self.adr_config is None, "no ADR"),
+            # A plain weight EMA (training.weight_ema_decay) is admitted: _cuda_graph_body
+            # runs the eager step's _update_ema right after the SGD update (parity-tested).
+            (self.adr_config is None, "no ADR (or its EMA target)"),
+            (self.mixed_batch is None and self.awp_config is None, "no mixed batch or AWP"),
             (self.policy is None and self.sample_store is None, "no policy or sample state"),
             (self.observation_profile == "off", "observation_profile=off"),
             (self.target_policy is None and self.intervention_mask is None, "no target policy or intervention"),
@@ -1282,12 +1360,16 @@ class Trainer:
         joint_risks: list[float] | None,
         kd_weights: list[float] | None,
         panel_media: Mapping[int, tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]],
-        attacked: bool,
+        attacked: bool | Sequence[bool],
     ) -> None:
-        """Record one step's per-sample diagnostic rows (host lists, no device reads)."""
+        """Record one step's per-sample diagnostic rows (host lists, no device reads).
+
+        ``attacked`` is one flag for the whole step, or one per position (mixed batch).
+        """
         assert self.diagnostics is not None
         sample_store = self.sample_store
         for position, sample_id in enumerate(sample_ids):
+            attacked_here = attacked if isinstance(attacked, bool) else bool(attacked[position])
             media = panel_media.get(position)
             has_prior = prior_margins is not None and sample_store is not None and sample_id in sample_store.records
             prior_value = None
@@ -1305,7 +1387,7 @@ class Trainer:
                 perturbation_visualization=None if media is None else media[2],
                 true_label=labels[position],
                 student_clean_prediction=clean_predictions[position],
-                student_adv_prediction=adversarial_predictions[position] if attacked else None,
+                student_adv_prediction=adversarial_predictions[position] if attacked_here else None,
                 teacher_prediction=None if teacher_predictions is None else teacher_predictions[position],
                 teacher_entropy=None if teacher_entropies is None else teacher_entropies[position],
                 student_robust_margin_ema=prior_value,
@@ -1313,16 +1395,17 @@ class Trainer:
                 joint_risk=None if joint_risks is None else joint_risks[position],
                 kd_weight=0.0 if kd_weights is None else kd_weights[position],
                 clean_correct=clean_predictions[position] == labels[position],
-                robust_correct=(adversarial_predictions[position] == labels[position]) if attacked else None,
+                robust_correct=(adversarial_predictions[position] == labels[position]) if attacked_here else None,
             )
 
     def _cuda_graph_body(self) -> None:
         """One PGD-AT training step on the static buffers; captured once, then replayed.
 
         A transcription of ``train_epoch``'s eager step for exactly the scope
-        ``_validate_cuda_graph_scope`` admits (single rank; no teacher, EMA,
-        policy, sample state, treatment, AMP or step diagnostics), with the
-        same calls in the same order. The attack runs ``LinfPGD.perturb``, the
+        ``_validate_cuda_graph_scope`` admits (single rank; no teacher, ADR,
+        policy, sample state, treatment, mixed batch, AWP, AMP or step
+        diagnostics; a plain weight EMA is updated right after the SGD update,
+        as in the eager step), with the same calls in the same order. The attack runs ``LinfPGD.perturb``, the
         same core ``LinfPGD.generate`` runs, on the random start the host drew
         into ``state.noise`` from the same per-step generator. Host-side checks
         (pixel range, budget) run outside the graph, in
@@ -1361,6 +1444,9 @@ class Trainer:
         _assert_finite_training_loss(loss)
         loss.backward()
         self.optimizer.step()
+        # training.weight_ema_decay: the eager step's own update (same kernels,
+        # same order, decay baked in as the same Python scalar); a no-op without EMA.
+        self._update_ema()
         state.totals += _float64_totals(
             [
                 (terms.total.detach() * mask).sum(),
@@ -1407,10 +1493,10 @@ class Trainer:
             with torch.cuda.graph(graph, capture_error_mode="thread_local"):
                 self._cuda_graph_body()
             state.graph = graph
-            state.fingerprint = optimizer_fingerprint(self.optimizer, self.model)
+            state.fingerprint = optimizer_fingerprint(self.optimizer, self.model, ema_model=self.ema_model)
             state.captures += 1
             state.captures_this_epoch += 1
-        state.check_replayable(self.optimizer, self.model)
+        state.check_replayable(self.optimizer, self.model, ema_model=self.ema_model)
         state.graph.replay()
         state.replays_this_epoch += 1
         if self.diagnostics is not None:
@@ -1541,6 +1627,15 @@ class Trainer:
         # Always populated (even without epsilon_warmup_epochs configured),
         # from the resolved AttackConfig's own fixed values, so the metric
         # is self-describing regardless of config.
+        # Mixed batch (plan 0103 Phase 2 batch A): adversarial valid count, clean
+        # valid count, clean-position train-mode correct, adversarial-position
+        # loss sum, clean-position loss sum. Absent otherwise.
+        mixed_totals = None if self.mixed_batch is None else torch.zeros(5, dtype=torch.float64, device=self.device)
+        awp_active = (
+            self._awp is not None
+            and self.awp_config is not None
+            and self.current_epoch >= self.awp_config.warmup_epochs
+        )
         epoch_attack_epsilon = 0.0
         epoch_attack_step_size = 0.0
         if self.epsilon_warmup_epochs is not None and self.selected_attack_epsilon is None:
@@ -1666,6 +1761,12 @@ class Trainer:
                     (batch.images.shape[0],), epoch_attack_step_size, device=batch.images.device, dtype=batch.images.dtype
                 )
             rectified_target = self._rectified_target(batch.images, batch.labels) if requires_rectified_target else None
+            # Mixed batch: the first ``mixed_count`` positions are attacked.
+            mixed_count = (
+                None
+                if self.mixed_batch is None
+                else adversarial_count(batch.images.shape[0], self.mixed_batch.adversarial_fraction)
+            )
             skip_selected = (
                 self.clean_wrong_attack_skip and treatment_risk is not None and bool((treatment_risk > 0).any())
             )
@@ -1677,6 +1778,31 @@ class Trainer:
                 # generator is constructed, so no training-attack RNG exists.
                 adversarial = batch.images
                 attack_result = None
+            elif mixed_count is not None:
+                # Kurakin et al. 2017: only the first ``mixed_count`` examples are
+                # replaced by adversarial ones; the rest enter the forward clean.
+                # The scope check confines this to plain pgd_at (no teacher, mask,
+                # treatment or per-sample budget), so only the epoch-warmup
+                # override can exist here, sliced to the attacked positions.
+                attack_result = None
+                adversarial = batch.images
+                if mixed_count > 0:
+                    attack_result = self.attack.generate(
+                        AttackRequest(
+                            inputs=batch.images[:mixed_count],
+                            labels=batch.labels[:mixed_count],
+                            student=self.model,
+                            generator=self._attack_generator(),
+                            source_ids=batch.sample_ids[:mixed_count],
+                            epoch=self.current_epoch,
+                            attack_seed=self.seed,
+                            stream_tag="train_pgd",
+                            restart_index=0,
+                            epsilon_override=None if epsilon_override is None else epsilon_override[:mixed_count],
+                            step_size_override=None if step_override is None else step_override[:mixed_count],
+                        )
+                    )
+                    adversarial = torch.cat([attack_result.adversarial, batch.images[mixed_count:].float()])
             elif skip_selected:
                 if treatment_risk is None:
                     raise RuntimeError("clean-wrong attack skip lost its intervention mask")
@@ -1747,7 +1873,29 @@ class Trainer:
                 adversarial = torch.where(
                     selected[:, None, None, None], attack_result.captured_adversarial, adversarial
                 )
-            logits = self.model(adversarial)
+            awp_diff = None
+            if awp_active:
+                # AWP (Wu et al. 2020; official AT_AWP order): perturb the weights
+                # after the attack, before the training forward; restored after
+                # the optimizer step below.
+                assert self._awp is not None
+                awp_diff = self._awp.compute(
+                    adversarial,
+                    lambda proxy_logits: (
+                        (self.objective(student_logits=proxy_logits, labels=batch.labels).total * mask).sum()
+                        / mask.sum().clamp_min(1.0)
+                    ),
+                )
+                self._awp.perturb(awp_diff)
+            if self.auxiliary_batchnorm is not None:
+                # Split BN: the adversarial sub-batch through the model's own (main,
+                # adversarial) BN, the clean sub-batch through the auxiliary BN.
+                assert mixed_count is not None
+                parts = [] if mixed_count == 0 else [self.model(adversarial[:mixed_count])]
+                parts.append(self.auxiliary_batchnorm.forward_clean(self.model, adversarial[mixed_count:]))
+                logits = torch.cat(parts)
+            else:
+                logits = self.model(adversarial)
             observed_teacher_clean = observed_teacher_adversarial = None
             teacher_clean_to_adversarial_margin_response = teacher_clean_to_adversarial_js_response = None
             if self._records_teacher_response:
@@ -2093,7 +2241,24 @@ class Trainer:
                 # those panel fields are None rather than the clean batch
                 # relabelled as adversarial.
                 attacked = self.attack is not None
-                if panel_positions:
+                # Mixed batch: only the first mixed_count positions were attacked.
+                attacked_positions = (
+                    None if mixed_count is None else [position < mixed_count for position in range(len(sample_ids))]
+                )
+                if attacked_positions is not None and panel_positions:
+                    positions = torch.tensor(panel_positions, device=self.device)
+                    clean_images = batch.images.index_select(0, positions).detach().cpu()
+                    adversarial_images = adversarial.index_select(0, positions).detach().cpu()
+                    perturbations = (adversarial_images - clean_images).detach()
+                    panel_media = {
+                        position: (
+                            (clean_images[index], adversarial_images[index], perturbations[index])
+                            if attacked_positions[position]
+                            else (clean_images[index], None, None)
+                        )
+                        for index, position in enumerate(panel_positions)
+                    }
+                elif panel_positions:
                     positions = torch.tensor(panel_positions, device=self.device)
                     clean_images = batch.images.index_select(0, positions).detach().cpu()
                     if attacked:
@@ -2120,14 +2285,33 @@ class Trainer:
                     joint_risks=joint_risks,
                     kd_weights=kd_weights,
                     panel_media=panel_media,
-                    attacked=attacked,
+                    attacked=attacked if attacked_positions is None else attacked_positions,
                 )
                 self._teacher_adversarial_logits = None
             # DDP averages gradients across ranks.  Scale each local masked
             # sum by world_size/global-effective-count so padded ranks cannot
             # dilute the update (including the size < world_size case).
-            global_count = reduce_sums(mask.detach().sum().to(dtype=torch.float64)).clamp_min(1.0)
-            loss = (terms.total * mask).sum() * (get_world_size() / global_count.to(dtype=terms.total.dtype))
+            adversarial_positions = None
+            if mixed_count is None:
+                global_count = reduce_sums(mask.detach().sum().to(dtype=torch.float64)).clamp_min(1.0)
+                loss = (terms.total * mask).sum() * (get_world_size() / global_count.to(dtype=terms.total.dtype))
+            else:
+                # Kurakin et al. 2017: (sum_clean L + lambda sum_adv L) / ((m - k) + lambda k),
+                # over valid examples, the normalizer summed over ranks.
+                assert self.mixed_batch is not None
+                adversarial_positions = torch.arange(mask.shape[0], device=mask.device) < mixed_count
+                weighted_mask = mask * example_weights(
+                    mask.shape[0],
+                    mixed_count,
+                    self.mixed_batch.adversarial_weight,
+                    device=mask.device,
+                    dtype=mask.dtype,
+                )
+                global_weight = reduce_sums(weighted_mask.detach().sum().to(dtype=torch.float64))
+                global_weight = torch.where(global_weight > 0, global_weight, torch.ones_like(global_weight))
+                loss = (terms.total * weighted_mask).sum() * (
+                    get_world_size() / global_weight.to(dtype=terms.total.dtype)
+                )
             _assert_finite_training_loss(loss)
             if self.scaler is None:
                 loss.backward()
@@ -2140,6 +2324,9 @@ class Trainer:
             else:
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
+            if awp_diff is not None:
+                assert self._awp is not None
+                self._awp.restore(awp_diff)
             self._update_ema()
             ema_student_agreement_sum: torch.Tensor | float = 0.0
             clean_correct_sum: torch.Tensor | float = 0.0
@@ -2165,7 +2352,8 @@ class Trainer:
                 clean_correct_sum = ((clean_logits.argmax(1) == batch.labels).to(mask.dtype) * mask).sum()
                 if adversarial_logits_eval_mode is not None:
                     robust_eval_mode_correct_sum = (
-                        (adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype) * mask
+                        (adversarial_logits_eval_mode.argmax(1) == batch.labels).to(mask.dtype)
+                        * (mask if adversarial_positions is None else mask * adversarial_positions.to(mask.dtype))
                     ).sum()
             # With step_diagnostics=False the three slots above stay 0.0 and
             # their epoch metrics are dropped below. Under DDP the skipped
@@ -2180,11 +2368,27 @@ class Trainer:
                 else (self._pending_rectified_true_class_mass * mask).sum()
             )
             self._pending_rectified_true_class_mass = None
+            # Mixed batch: train-mode "robust" correctness counts the attacked positions only.
+            robust_mask = mask if adversarial_positions is None else mask * adversarial_positions.to(mask.dtype)
+            if mixed_totals is not None:
+                assert adversarial_positions is not None
+                clean_mask = mask * (~adversarial_positions).to(mask.dtype)
+                per_example = terms.total.detach()
+                mixed_totals += _float64_totals(
+                    [
+                        robust_mask.sum(),
+                        clean_mask.sum(),
+                        ((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * clean_mask).sum(),
+                        (per_example * robust_mask).sum(),
+                        (per_example * clean_mask).sum(),
+                    ],
+                    device=self.device,
+                )
             totals += _float64_totals(
                 [
                     (terms.total.detach() * mask).sum(),
                     clean_correct_sum,
-                    ((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * mask).sum(),
+                    ((logits.detach().argmax(1) == batch.labels).to(mask.dtype) * robust_mask).sum(),
                     mask.sum(),
                     teacher_clean_forward_calls,
                     self._teacher_adversarial_forward_calls,
@@ -2236,6 +2440,24 @@ class Trainer:
         }
         if self.distillation_hooks is not None:
             metrics.update(self.distillation_hooks.epoch_metrics(reduce_sums))
+        if mixed_totals is not None:
+            # Plan 0103 Phase 2 batch A: robust accuracies are over the attacked
+            # positions only (their counts here); the clean positions get their
+            # own train-mode accuracy. "loss" stays the unweighted per-example
+            # mean over all valid examples; the two branch means are added.
+            mixed = reduce_sums(mixed_totals)
+            adversarial_examples = float(mixed[0].item())
+            clean_examples = float(mixed[1].item())
+            adversarial_denominator = max(adversarial_examples, 1.0)
+            metrics["robust_accuracy"] = float(totals[2].item()) / adversarial_denominator
+            metrics["robust_accuracy_eval_mode"] = float(totals[8].item()) / adversarial_denominator
+            metrics["mixed_batch_adversarial_examples"] = adversarial_examples
+            metrics["mixed_batch_clean_examples"] = clean_examples
+            metrics["mixed_batch_clean_accuracy_train_mode"] = float(mixed[2].item()) / max(clean_examples, 1.0)
+            metrics["mixed_batch_adversarial_loss"] = float(mixed[3].item()) / adversarial_denominator
+            metrics["mixed_batch_clean_loss"] = float(mixed[4].item()) / max(clean_examples, 1.0)
+        if self._awp is not None:
+            metrics["awp_active"] = 1.0 if awp_active else 0.0
         if graph_state is not None:
             # Audit trail for training.cuda_graph (plan 0105): absent otherwise.
             metrics["cuda_graph_captures"] = float(graph_state.captures_this_epoch)
@@ -2588,6 +2810,7 @@ class Trainer:
                 config_hash=self.config_hash,
                 fork_lineage=self.fork_lineage,
                 ema_model=self.ema_model,
+                auxiliary_batchnorm=self.auxiliary_batchnorm,
             )
             save_checkpoint(self.output_dir / "last.pt", **common)
             if epoch + 1 in self.checkpoint_epochs:
@@ -2731,6 +2954,14 @@ class Trainer:
             epoch_metrics.update(
                 {f"train_{key}": value for key, value in train_metrics.items() if key.startswith("boundary_")}
             )
+            # Plan 0103 Phase 2 batch A observability (absent unless enabled).
+            epoch_metrics.update(
+                {
+                    f"train_{key}": value
+                    for key, value in train_metrics.items()
+                    if key.startswith("mixed_batch_") or key == "awp_active"
+                }
+            )
             history.append(epoch_metrics)
             # The callback is deliberately after both atomic checkpoints; it
             # is observational only and cannot alter model/state selection.
@@ -2749,6 +2980,7 @@ class Trainer:
             expected_config_hash=self.config_hash,
             device=self.device,
             ema_model=self.ema_model,
+            auxiliary_batchnorm=self.auxiliary_batchnorm,
         )
         self.global_step, self.best_metric = state.global_step, state.best_metric
         # A fork child (intervention / schedule / routing forks copy the
