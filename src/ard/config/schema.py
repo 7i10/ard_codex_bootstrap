@@ -599,6 +599,15 @@ class ModelConfig(StrictModel):
         "convnext_atto_imagenet",
         "deit_tiny_imagenet",
         "mobilevit_s_imagenet",
+        # Plan 0103 Phase 2 architecture variants (human-approved 2026-10-08), random init only
+        # (absent from the pretrained allowlist below) -- see ard.models.variants.
+        "mobilenetv4_conv_small_silu_imagenet",
+        "mobilenetv4_conv_small_gelu_imagenet",
+        "mobilenetv4_conv_small_se_imagenet",
+        "mobilenetv4_conv_small_silu_se_imagenet",
+        "deit_tiny_convstem_imagenet",
+        "convnext_atto_deep_narrow_imagenet",
+        "convnext_atto_ols_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)

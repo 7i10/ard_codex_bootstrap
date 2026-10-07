@@ -7,6 +7,7 @@ from torch import nn
 from torchvision import models
 
 from ard.config.schema import ModelConfig, NormalizationConfig
+from ard.models.variants import VARIANT_BUILDERS
 
 
 class PixelNormalization(nn.Module):
@@ -257,6 +258,11 @@ def build_architecture(architecture: str, num_classes: int, *, pretrained: bool 
         import timm
 
         return timm.create_model("mobilevit_s.cvnets_in1k", pretrained=pretrained, num_classes=num_classes)
+    if architecture in VARIANT_BUILDERS:
+        # Plan 0103 Phase 2 architecture variants (human-approved 2026-10-08): random init only --
+        # pretrained=True is refused above because these ids are absent from that allowlist. See
+        # ard.models.variants for each variant's definition and measured params/MACs.
+        return VARIANT_BUILDERS[architecture](num_classes=num_classes)
     if architecture == "convnext_tiny_imagenet":
         # NOT torchvision.models.convnext_tiny. Registered to validate this
         # project's AutoAttack evaluation pipeline at ImageNet scale against
