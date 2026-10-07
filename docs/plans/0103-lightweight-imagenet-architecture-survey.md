@@ -3460,3 +3460,40 @@ history behind this pivot.)
   - DeiT-Tiny 1.25e-4 was nearly finished, so it is kept as a reference.
   - ConvNeXt-Atto 2e-3 takes the cancelled cell's slot on Ferret GPU0. It
     starts pre-emptively, because 2.5e-4 -> 5e-4 gained +2.1pt PGD-10.
+- 2026-10-08 (chat): **Official evaluation of the Phase 1 chosen-LR cells
+  starts on Anteater** (GPUs 2 and 3 only, RTX 2080 Ti), launched
+  2026-10-07 15:11Z.
+  - Runs: MobileNetV4-S random-init lr 0.025
+    (`plan0104-mobilenetv4-random-init-lr0025-v1`, copied from Hamster) on
+    GPU2, and MobileNetV4-M random-init lr 0.025
+    (`plan0103-phase1-mobilenetv4-conv-medium-random-v1`, copied from
+    Ferret through Hamster) on GPU3. `best.pt`, `last.pt`,
+    `resolved_config.yaml` and `run-bundle/` were copied, and the sha256 of
+    every file matches the source.
+  - Source: pinned worktree `source-e1d9c3b1916a` (commit `e1d9c3b`),
+    `ard.cli.evaluate` in a separate process with `--allow-autoattack`.
+  - Evaluation identity is the same as the 2026-09-27 Ferret official
+    evaluation: the training config's own `evaluation:` block (official
+    val 50k, eps 4/255, PGD-10, step 8/765, random start), plus
+    `configs/evaluation/autoattack_saved_checkpoint.yaml` (best and last,
+    seed 0, AutoAttack standard, batch 128), plus
+    `autoattack_sample_count: 500`. The only change is
+    `evaluation.dataset.root`, which points at Anteater's SSD copy. The
+    val manifest digest (`abc0ee80...`) is still checked, and a mismatch
+    stops the run. A diff of the resolved evaluation block against the
+    earlier Ferret evaluation shows only the root path. The overlay
+    carries the full dataset mapping, because the evaluation overlay is
+    merged one level deep and a `dataset.root` override alone would drop
+    the split and digest.
+  - Outputs go to `runs/<run id>/outputs/train/evaluation-official-n500/`
+    under Anteater's `~/workspace-local/ard-runtime/ard_codex_bootstrap`.
+    W&B project `lightweight-imagenet-at`.
+  - The queue is
+    `queues/official_eval_queue.sh <gpu> <run id> ...`. It runs one job at
+    a time per GPU (a per-GPU lock), skips runs that already have results,
+    and logs start, end and rc to `queues/official_eval_gpu<gpu>.log`.
+    ConvNeXt-Atto, DeiT-Tiny and EfficientNet-B0 will be added when their
+    grids finish.
+  - Caveat: the 2080 Ti has no TF32, so convolutions run in full fp32
+    rather than TF32 as on the 4090s. Numbers may differ very slightly
+    from rows evaluated on Ferret. The evaluation settings are unchanged.
