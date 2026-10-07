@@ -11,7 +11,8 @@ LR milestones inside it, a partial last batch, a train-probe pass between
 epochs, and re-captures every epoch. Students: every allowlisted architecture
 (``CUDA_GRAPH_ARCHITECTURES``) at 32 px, plus a BatchNorm + dropout fixture
 (so a default-generator draw happens inside the graph), with panel, summary
-and no tracking diagnostics.
+and no tracking diagnostics. Allowlist candidates (``_CANDIDATE_ARCHITECTURES``, plan 0103
+Phase 2 MobileNetV4-S variants) run the same cases only with ``ARD_CUDA_GRAPH_CANDIDATES=1``.
 
 Guard tests: a mid-epoch optimizer change is refused rather than replayed
 stale; an epoch that never replays fails loudly; the in-graph device asserts
@@ -66,6 +67,27 @@ _BATCH = 4
 _EPOCHS = 3
 _FIXTURE = "fixture_bn_dropout"
 _AUDIT_KEYS = ("train_cuda_graph_captures", "train_cuda_graph_replays", "train_cuda_graph_eager_steps")
+# Plan 0103 Phase 2 MobileNetV4-S architecture variants: allowlist CANDIDATES, not allowlisted. Their
+# cases run only on request (ARD_CUDA_GRAPH_CANDIDATES=1, on a free GPU); inside the test subprocess the
+# Trainer's allowlist is extended for that one candidate, exactly as for the fixture. Adding an id to
+# schema.CUDA_GRAPH_ARCHITECTURES remains a separate, human decision after these pass.
+_CANDIDATE_ARCHITECTURES = (
+    "mobilenetv4_conv_small_silu_imagenet",
+    "mobilenetv4_conv_small_gelu_imagenet",
+    "mobilenetv4_conv_small_se_imagenet",
+    "mobilenetv4_conv_small_silu_se_imagenet",
+    "mobilenetv4_conv_small_se_fullhead_imagenet",
+)
+_candidate_opt_in = pytest.mark.skipif(
+    os.environ.get("ARD_CUDA_GRAPH_CANDIDATES") != "1",
+    reason="opt-in allowlist-candidate parity case (needs a free GPU): set ARD_CUDA_GRAPH_CANDIDATES=1",
+)
+
+
+def _admit_candidate(kind: str) -> None:
+    """Test-only allowlist extension for one candidate, confined to the test subprocess."""
+    if kind in _CANDIDATE_ARCHITECTURES:
+        trainer_module.CUDA_GRAPH_ARCHITECTURES = CUDA_GRAPH_ARCHITECTURES | {kind}  # type: ignore[attr-defined]
 
 
 def _bn_dropout_student(num_classes: int) -> nn.Module:
@@ -90,6 +112,7 @@ def _student(kind: str) -> tuple[nn.Module, int, int]:
         # A test-only extension of the allowlist, confined to this subprocess.
         trainer_module.CUDA_GRAPH_ARCHITECTURES = CUDA_GRAPH_ARCHITECTURES | {_FIXTURE}  # type: ignore[attr-defined]
         return _bn_dropout_student(3), 3, 8
+    _admit_candidate(kind)
     config = ModelConfig(
         architecture=kind,  # type: ignore[arg-type]
         num_classes=10,
@@ -273,6 +296,7 @@ def _single_step_trainer(
     if kind == _FIXTURE:
         student, num_classes, _ = _student(kind)
     else:
+        _admit_candidate(kind)
         num_classes = spec["num_classes"]
         config = ModelConfig(
             architecture=kind,  # type: ignore[arg-type]
@@ -670,6 +694,7 @@ _PARITY_CASES = [
     (_FIXTURE, "summary"),
     (_FIXTURE, "none"),
     *((architecture, "panel") for architecture in sorted(CUDA_GRAPH_ARCHITECTURES)),
+    *(pytest.param(architecture, "panel", marks=_candidate_opt_in) for architecture in _CANDIDATE_ARCHITECTURES),
 ]
 
 
@@ -813,6 +838,10 @@ _EXACT_UNDER_NONDETERMINISM = (
 _NONDETERMINISTIC_CASES = [
     (_FIXTURE, "nondeterministic"),
     *((architecture, "nondeterministic") for architecture in sorted(CUDA_GRAPH_ARCHITECTURES)),
+    *(
+        pytest.param(architecture, "nondeterministic", marks=_candidate_opt_in)
+        for architecture in _CANDIDATE_ARCHITECTURES
+    ),
 ]
 
 
@@ -1048,7 +1077,9 @@ _PRODUCTION_CHECKPOINT_ENV = {
     ("mobilenetv4_conv_medium_imagenet", "stage1"): "ARD_CG_CHECK_MNV4M_CKPT",
     ("mobilenetv4_conv_medium_imagenet", "full"): "ARD_CG_CHECK_MNV4M_CKPT",
 }
-_PRODUCTION_RANDOM_INIT_LR = {"efficientnet_b0_imagenet": 0.5}
+# Random-init cases use lr 0.5 so the one-step update clears the FP32 floor (EfficientNet-B0's
+# rationale above); the Phase 2 MobileNetV4-S candidates have no checkpoints, so they do the same.
+_PRODUCTION_RANDOM_INIT_LR = {"efficientnet_b0_imagenet": 0.5, **dict.fromkeys(_CANDIDATE_ARCHITECTURES, 0.5)}
 
 
 @pytest.mark.gpu
@@ -1058,7 +1089,13 @@ _PRODUCTION_RANDOM_INIT_LR = {"efficientnet_b0_imagenet": 0.5}
     reason="opt-in production-shape check (needs a free GPU): set ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1",
 )
 @pytest.mark.parametrize("shape", sorted(_PRODUCTION_SHAPES))
-@pytest.mark.parametrize("kind", sorted(CUDA_GRAPH_ARCHITECTURES))
+@pytest.mark.parametrize(
+    "kind",
+    [
+        *sorted(CUDA_GRAPH_ARCHITECTURES),
+        *(pytest.param(architecture, marks=_candidate_opt_in) for architecture in _CANDIDATE_ARCHITECTURES),
+    ],
+)
 def test_production_shape_graph_step_matches_eager_within_one_step_noise(tmp_path: Path, kind: str, shape: str) -> None:
     spec = {**_PRODUCTION_COMMON, **_PRODUCTION_SHAPES[shape], "kind": kind}
     if kind in _PRODUCTION_RANDOM_INIT_LR:

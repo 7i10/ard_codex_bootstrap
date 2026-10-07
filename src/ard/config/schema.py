@@ -608,6 +608,8 @@ class ModelConfig(StrictModel):
         "deit_tiny_convstem_imagenet",
         "convnext_atto_deep_narrow_imagenet",
         "convnext_atto_ols_imagenet",
+        "convnext_atto_convstem_imagenet",
+        "mobilenetv4_conv_small_se_fullhead_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)

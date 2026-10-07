@@ -6,7 +6,7 @@ weights into a modified network is not a defined initialization here. The regist
 ``pretrained=True`` for every id built in this module.
 
 Parameter / MAC numbers below are measured with :mod:`ard.models.complexity` (one 3x224x224 image,
-1000 classes) and pinned in ``tests/unit/test_registry_variants.py``.
+1000 classes; MACs are conv+linear unless stated) and pinned in ``tests/unit/test_registry_variants.py``.
 """
 
 from __future__ import annotations
@@ -88,7 +88,9 @@ class ConvStemPatchEmbed(nn.Module):
     """Convolutional stem replacing ViT's 16x16 patchify embedding (drop-in for timm ``PatchEmbed``).
 
     Singh/Croce/Hein 2023 (arXiv:2303.01870, "ConvStem", their ViT-S stem scaled to DeiT-Tiny's width)
-    after Xiao et al. 2021 ("Early convolutions help transformers see better"): four 3x3 stride-2 convs
+    after Xiao et al. 2021 ("Early convolutions help transformers see better"); the same layers as their
+    released ``ConvBlock`` (robustbench ``convstem_models.py``; ``vit_s_cvst`` = ``ConvBlock(48, end_siz=8)``
+    as ``patch_embed.proj``), here ``ConvBlock(24, end_siz=8)`` for width 192: four 3x3 stride-2 convs
     with channels 24, 48, 96, 192 (embed_dim/8 doubling), each followed by channels-first LayerNorm and
     GELU, then a 1x1 conv to ``embed_dim``. Total stride 16, so a 224 input yields the same 14x14 token
     grid as patch-16 and the 197-entry positional embedding stays valid. Same fixed-size contract as the
@@ -158,9 +160,55 @@ def build_convnext_atto_deep_narrow(*, num_classes: int) -> nn.Module:
 
 
 def build_convnext_atto_ols(*, num_classes: int) -> nn.Module:
+    """timm ``convnext_atto_ols``: ``stem_type='overlap_tiered'`` -- conv3x3/s2 (3->24) then conv3x3/s2
+    (24->40), with NO norm or activation between them and one LayerNorm2d after. Its stem is
+    therefore an overlapping *linear* stem, not Singh/Croce/Hein's ConvStem (which puts LN + GELU after
+    each conv); that one is ``convnext_atto_convstem_imagenet`` below."""
     import timm
 
     return timm.create_model("convnext_atto_ols", pretrained=False, num_classes=num_classes)
+
+
+class ConvNeXtConvStem(nn.Module):
+    """Singh/Croce/Hein 2023 ConvStem for ConvNeXt, scaled to Atto.
+
+    Same structure as their released ``ConvBlock1`` (``.external/robustbench/robustbench/model_zoo/
+    architectures/convstem_models.py``; ``convnext_t_cvst`` uses ``ConvBlock1(48)`` for ConvNeXt-T's
+    96-wide stage 0): conv3x3/s2 (3 -> w/2), channels-first LayerNorm (eps 1e-6), GELU, conv3x3/s2
+    (w/2 -> w), LayerNorm, GELU, where w = stage-0 width (40 for Atto, so ``ConvBlock1(20)``). Replaces
+    the whole timm stem (4x4/s4 patchify conv + LayerNorm2d) as their code does; total stride 4 is
+    unchanged, so every stage sees the same spatial sizes. timm ``LayerNorm2d`` computes the same
+    channels-first LayerNorm as their hand-written one.
+    """
+
+    def __init__(self, in_chans: int, width: int) -> None:
+        super().__init__()
+        from timm.layers import LayerNorm2d
+
+        if width % 2:
+            raise ValueError("ConvNeXtConvStem needs an even stage-0 width")
+        half = width // 2
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_chans, half, kernel_size=3, stride=2, padding=1),
+            LayerNorm2d(half, eps=1e-6),
+            nn.GELU(),
+            nn.Conv2d(half, width, kernel_size=3, stride=2, padding=1),
+            LayerNorm2d(width, eps=1e-6),
+            nn.GELU(),
+        )
+
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        return self.stem(images)
+
+
+def build_convnext_atto_convstem(*, num_classes: int) -> nn.Module:
+    """ConvNeXt-Atto with its stem replaced after construction, as ``get_convstem_models`` does (the new
+    stem keeps PyTorch's default conv init, like theirs)."""
+    import timm
+
+    model = timm.create_model("convnext_atto", pretrained=False, num_classes=num_classes)
+    model.stem = ConvNeXtConvStem(3, model.stages[0].blocks[0].conv_dw.in_channels)
+    return model
 
 
 # id -> builder(num_classes) for every Phase 2 variant; all random-init only.
@@ -179,4 +227,9 @@ VARIANT_BUILDERS = {
     "deit_tiny_convstem_imagenet": build_deit_tiny_convstem,
     "convnext_atto_deep_narrow_imagenet": build_convnext_atto_deep_narrow,
     "convnext_atto_ols_imagenet": build_convnext_atto_ols,
+    "convnext_atto_convstem_imagenet": build_convnext_atto_convstem,
+    # SE control with the untrimmed 1280-wide head (+6.61% params): the matched SE arm above changes
+    # two things at once (adds SE, narrows the head 1280 -> 1152); this id isolates SE alone. Run only
+    # if the matched SE effect lands in the ambiguous 0.5-1.5 pt band (reviewer, 2026-10-08).
+    "mobilenetv4_conv_small_se_fullhead_imagenet": partial(build_mobilenetv4_conv_small_variant, se=True),
 }
