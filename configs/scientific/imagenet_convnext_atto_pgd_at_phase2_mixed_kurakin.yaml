@@ -1,3 +1,4 @@
+# LR set to 1e-3: ConvNeXt-Atto AdamW Phase 1 grid closed 2026-10-09 (2.5e-4/5e-4/1e-3/2e-3 -> 34.23/36.35/37.02/36.65).
 # Plan 0103 Phase 2 (human-approved 2026-10-08), ConvNeXt-Atto: Kurakin et al. 2017 mixed clean+adversarial batch (method.mixed_batch: adversarial_fraction 0.5, adversarial_weight 0.3, shared BN).
 # Identical to imagenet_convnext_atto_pgd_at_phase1_adamw_random_lr5em4.yaml except the Phase 2 template: training.selection_subset_size 5000, training.weight_ema_decay 0.9999 (EMA kept in every Phase 2 run and evaluated alongside the raw weights). the change named above, and tracking.group. AdamW LR from ARD_PHASE2_ADAMW_LR_CONVNEXT_ATTO (the AdamW LR grid is still finishing; set it to the chosen LR before launch; unset fails closed).
 # No training.cuda_graph: this clone keeps the Phase 1 throughput options (cudnn_benchmark / compile), which the schema refuses together with cuda_graph; it also changes nothing else of the Phase 1 training block.
@@ -8,7 +9,7 @@ seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", a
 dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
 student: {architecture: convnext_atto_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: false, normalization: {profile: imagenet_standard}}
 method: {id: pgd_at, version: 1, mixed_batch: {adversarial_fraction: 0.5, adversarial_weight: 0.3, split_batchnorm: false}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
-optimizer: {id: adamw, learning_rate: "${ARD_PHASE2_ADAMW_LR_CONVNEXT_ATTO}", beta1: 0.9, beta2: 0.999, weight_decay: 0.05}
+optimizer: {id: adamw, learning_rate: 1e-3, beta1: 0.9, beta2: 0.999, weight_decay: 0.05}
 scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
 training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: false, cudnn_benchmark: true, step_diagnostics: false, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000, selection_subset_size: 5000, weight_ema_decay: 0.9999}
 tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-convnext-atto-pgd-at-phase2-mixed_kurakin, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}

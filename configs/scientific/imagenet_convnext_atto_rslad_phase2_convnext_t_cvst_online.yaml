@@ -1,3 +1,4 @@
+# LR set to 1e-3: ConvNeXt-Atto AdamW Phase 1 grid closed 2026-10-09 (2.5e-4/5e-4/1e-3/2e-3 -> 34.23/36.35/37.02/36.65).
 # Plan 0103 Phase 2 batch D (human-approved 2026-10-08): ImageNet adversarial-distillation verification.
 # RSLAD, teacher singh2023_convnext_t_convstem, target: online teacher forward each step.
 # Student: ConvNeXt-Atto, AdamW; LR from ARD_PHASE2_ADAMW_LR_CONVNEXT_ATTO (the AdamW LR grid is still finishing; write the chosen LR here literally before launch).
@@ -13,7 +14,7 @@ dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: 
 student: {architecture: convnext_atto_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: false, normalization: {profile: imagenet_standard}}
 method: {id: rslad, version: 1, attack: {loss: kl, kl_target: teacher_clean, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}, temperature: 1.0, temperature_squared: true}
 teacher: {source: imagenet_registry, registry_id: singh2023_convnext_t_convstem, architecture: convnext_tiny_convstem_imagenet, num_classes: 1000, normalization: {profile: imagenet_raw_identity}, preprocessing_owner: teacher_adapter, checkpoint: "${ARD_EXTERNAL_CHECKPOINT_ROOT}/singh2023_revisiting_at/convnext_t_cvst/convnext_tiny_cvst_robust.pt", checkpoint_sha256: 0c725da1789c28168e5697c87b1adf7228527d07f7ad3b5b376271bb22da4ce3, threat_norm: linf, threat_epsilon: "4/255"}
-optimizer: {id: adamw, learning_rate: "${ARD_PHASE2_ADAMW_LR_CONVNEXT_ATTO}", beta1: 0.9, beta2: 0.999, weight_decay: 0.05}
+optimizer: {id: adamw, learning_rate: 1e-3, beta1: 0.9, beta2: 0.999, weight_decay: 0.05}
 scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
 training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: false, cudnn_benchmark: true, step_diagnostics: false, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000, selection_subset_size: 5000, weight_ema_decay: 0.9999}
 tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-convnext-atto-pgd-at-phase1-random-adamw-lr5em4-phase2-rslad-convnext-t-cvst-online, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
