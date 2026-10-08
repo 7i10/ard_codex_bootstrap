@@ -3698,3 +3698,96 @@ history behind this pivot.)
   sha256 was not computed in this postrun. `epoch-metrics.parquet` sha256
   `1532f1d8...`, `sample-stats-train.parquet` sha256 `6941081a...` (from
   the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-09 (postrun): **Phase 1 LR grid, EfficientNet-B0 random init /
+  SGD lr 0.0125 completed.** `plan0103-phase1-efficientnet-b0-random-lr00125-v1`
+  (hand-run, Hamster GPU1, one RTX 4090) ran 50/50 epochs.
+  `run-bundle/completion.json` reads `completed`, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful.
+  All 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `train.log` has no traceback, NaN or error line (only the wandb git-root
+  warning). The wandb internal log has six transient `file_stream` retries
+  (2026-10-06 20:08-20:21 and 2026-10-07 21:00 UTC); the local metrics are
+  complete, and the W&B history was not checked. `best.pt`, `last.pt` and
+  `epoch-049.pt` are on disk (best = epoch 48, last = epoch 49). Nothing is
+  imported into `docs/experiments/`: no aggregator exists for this
+  contract. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest.
+
+  Fixed identity: same as the lr 0.05 cell above except the LR. ImageNet-1k
+  (original images, content `ae033613...`), EfficientNet-B0
+  (`efficientnet_b0_imagenet`, `imagenet_standard` profile) random init,
+  plain PGD-AT, no teacher, 224 px training. Training and
+  evaluation-attack seed 0 (split seed 20260911). Training attack CE
+  PGD-3, l_inf eps 4/255, step 8/765, random start. Selection and
+  validation attack PGD-10, same eps and step, random start, eval mode.
+  SGD (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.0125,
+  warmup_multistep (10-epoch warmup, x0.1 at epochs 25 and 38), 50
+  epochs. World size 1, global batch 128, local BN. Non-deterministic with
+  cudnn_benchmark, compiled (`torch.compile`), no cuda_graph, fp32.
+  Config `imagenet_efficientnet_b0_pgd_at_phase1_random_lr00125.yaml`
+  (differs from the lr 0.05 config only in the LR and the W&B group;
+  unchanged since the source SHA), protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`, config
+  hash `433ed1bd...`. Source SHA
+  `609e6fa913d7b0f20ca8e9143f2a8604f68ea77f` (worktree
+  `source-609e6fa913d7`, clean). "val" is internal validation (25,620
+  held-out original train images, 224 px); "probe" is 2,000 training
+  images. Neither is the ImageNet val split. No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 0.25 / 0.17 | 0.35 / 0.10 | 6.906 |
+  | 9 | end of warmup | 29.20 / 16.09 | 29.10 / 15.35 | 4.944 |
+  | 24 | end of lr 0.0125 | 46.55 / 26.91 | 49.20 / 28.85 | 4.094 |
+  | 25 | first epoch at lr 0.00125 | 51.99 / 31.55 | 55.20 / 33.65 | 3.803 |
+  | 37 | end of lr 0.00125 | 54.64 / 33.14 | 58.50 / 37.70 | 3.640 |
+  | 38 | first epoch at lr 0.000125 | 55.32 / 34.00 | 59.45 / 39.10 | 3.574 |
+  | 48 | best (by val PGD-10) | 55.98 / 34.32 | 59.50 / 38.85 | 3.539 |
+  | 49 | last | 56.08 / 34.25 | 59.85 / 39.65 | 3.539 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **The three-point grid is complete.** Last-epoch val PGD-10:
+     0.0125 / 0.025 / 0.05 = 34.25 / 35.93 / 35.88. lr 0.0125 is 1.68pt
+     below 0.025 and 1.63pt below 0.05 (about 4 two-run SE, two-run SE of
+     a difference about 0.42pt). Clean: 56.08 vs 57.86 at 0.05 (-1.78);
+     the 0.025 clean number is still not re-read (Ferret run).
+  2. **Argmax.** On last-epoch val PGD-10 the argmax of the three points
+     is 0.025, ahead of 0.05 by 0.05pt (inside noise). This is the rule
+     preregistered as option A of packet 0036; 0036 `chosen` is still
+     null, so the adopted LR and the lr 0.1 question remain the human's.
+     The lower edge (0.0125) is clearly the worst point, so no lower-edge
+     question arises.
+  3. **Same shape as MobileNetV4-M.** 0.0125 / 0.025 / 0.05 =
+     37.00 / 39.39 / 39.10 there; here 34.25 / 35.93 / 35.88. In both
+     models 0.0125 is about 1.7-2.4pt below a flat 0.025-0.05 top.
+  4. **Trains normally, but slower.** Val PGD-10 never falls more than
+     0.20pt below its running maximum (epoch 47, 34.11 after 34.31 at
+     epoch 45); the catastrophic-overfitting guard (below half of the
+     running maximum) never fires. Unlike lr 0.05, the peak-LR stage has
+     not flattened by epoch 24 (26.25 / 26.55 / 26.91 over epochs 22-24).
+  5. **Decays.** Epoch 24 to 25: +5.44 clean / +4.64 PGD-10 (lr 0.05:
+     +9.90 / +7.98). Epoch 37 to 38: +0.68 / +0.86. The lr 0.00125 stage
+     creeps up (epochs 27-37 within 32.20-33.17%); the last stage is flat
+     (34.00 at epoch 38, 33.98-34.32 over epochs 39-49).
+  6. **Best and last.** Best epoch 48 (55.98 / 34.32), last epoch 49
+     (56.08 / 34.25); `robust_overfit_gap` 0.07pt, inside one val SE.
+  7. **Seen-unseen gap.** At the last epoch probe minus val is +3.8 clean
+     and +5.4 PGD-10 (lr 0.05: +3.4 / +3.7).
+  8. **Cost.** 49.30 h from start to finish (run-bundle `created_at`
+     2026-10-06 13:41:33 to `finished_at` 2026-10-08 14:59:50 UTC,
+     177,497 s). Summed per-epoch training time is about 167,930 s
+     (46.6 h); the rest (about 191 s per epoch) is validation, probe,
+     checkpointing and start-up. Throughput 410 img/s in epoch 0, then
+     374-376 img/s, with two slow stretches (epochs 27-29 at 364-370 and
+     epochs 39-41 at 346-360 img/s, cause not checked). The other Hamster
+     GPU ran EfficientNet-B0 lr 0.05 until 2026-10-08 13:28 UTC. Peak
+     allocated memory 8.56 GB at epoch 0, 8.03 GB after; reserved
+     9.97 GB at epoch 0, 10.58-10.59 GB after.
+
+  Caveats: one seed per LR; the 0.025 cell ran on a different host
+  (Ferret) and source SHA (`086072b`). Non-deterministic mode, so a rerun
+  would not reproduce these numbers bit for bit. Checkpoint sha256 was
+  not computed in this postrun. `epoch-metrics.parquet` sha256
+  `0b628558...`, `sample-stats-train.parquet` sha256 `1db471c4...` (from
+  the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id.
