@@ -365,7 +365,7 @@ def test_phase2_configs_change_only_architecture_and_group(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_file: str
 ) -> None:
     """Cloned from the base model's Phase 1 chosen-LR config plus the Phase 2 template's
-    training.selection_subset_size 5000; MobileNetV4-S additionally drops training.cuda_graph
+    training.selection_subset_size 5000 and weight_ema_decay 0.9999; MobileNetV4-S additionally drops training.cuda_graph
     (variants are not in CUDA_GRAPH_ARCHITECTURES)."""
     for key, value in {
         "ARD_SEED": "7",
@@ -386,9 +386,12 @@ def test_phase2_configs_change_only_architecture_and_group(
     assert "cuda_graph" not in variant["training"]  # excluded from the dump only when false
     assert variant["training"]["selection_subset_size"] == 5000
     assert "selection_subset_size" not in base["training"]
+    assert variant["training"]["weight_ema_decay"] == 0.9999  # EMA kept in every Phase 2 run
+    assert base["training"].get("weight_ema_decay") is None
     for payload in (base, variant):
         payload["student"]["architecture"] = None
         payload["tracking"]["group"] = None
         payload["training"].pop("cuda_graph", None)
         payload["training"].pop("selection_subset_size", None)
+        payload["training"].pop("weight_ema_decay", None)
     assert variant == base

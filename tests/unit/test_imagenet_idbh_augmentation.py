@@ -447,6 +447,8 @@ def test_phase2_augmentation_configs_differ_from_the_baseline_only_where_declare
     # Plan 0103 Phase 2 template: per-epoch selection on a fixed 5000-image subset.
     assert arm["training"]["selection_subset_size"] == 5000
     assert "selection_subset_size" not in baseline["training"]
+    assert arm["training"]["weight_ema_decay"] == 0.9999  # EMA kept in every Phase 2 run
+    assert baseline["training"].get("weight_ema_decay") is None
     assert arm["scheduler"]["milestones"] == ([25, 38] if epochs == 50 else [50, 76])
     assert arm["scheduler"]["warmup_epochs"] == 10
     assert arm["tracking"]["group"] != baseline["tracking"]["group"]
@@ -456,6 +458,7 @@ def test_phase2_augmentation_configs_differ_from_the_baseline_only_where_declare
         payload["dataset"].pop("imagenet_augmentation", None)
         payload["training"]["epochs"] = None
         payload["training"].pop("selection_subset_size", None)
+        payload["training"].pop("weight_ema_decay", None)
         payload["scheduler"]["milestones"] = None
         payload["tracking"]["group"] = None
     assert arm == baseline
