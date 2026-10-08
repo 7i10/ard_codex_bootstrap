@@ -1,8 +1,9 @@
 """Plan 0103 Phase 2 batch C (human-approved 2026-10-08): IDBH for ImageNet.
 
-``dataset.imagenet_augmentation: idbh_weak | idbh_strong`` appends upstream
-IDBH (Li & Spratling, ICLR 2023) -- CropShift, ColorShape('color'), Random
-Erasing -- after the ImageNet RandomResizedCrop + flip. Every draw comes from
+``dataset.imagenet_augmentation: idbh_weak_nocropshift | idbh_weak |
+idbh_strong`` appends IDBH (Li & Spratling, ICLR 2023) -- ColorShape('color')
+and Random Erasing, plus a fraction-preserving CropShift adaptation for
+idbh_weak / idbh_strong -- after the ImageNet RandomResizedCrop + flip. Every draw comes from
 a generator keyed by (augmentation seed, epoch, source id), never from the
 global RNG. Default "standard" is unserialized, so every existing config and
 every default view is byte-identical to the pre-change code.
@@ -95,6 +96,16 @@ def _env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "WANDB_PROJECT": "project",
         "ARD_STAGE1_CHECKPOINT": str(tmp_path / "stage1" / "last.pt"),
         "ARD_STAGE1_CHECKPOINT_SHA256": "d" * 64,
+        # Phase 2 batches B/D configs.
+        "ARD_EXTERNAL_CHECKPOINT_ROOT": str(tmp_path / "external"),
+        "ARD_SOFT_LABEL_BANK_ROOT": str(tmp_path / "banks"),
+        "ARD_SOFT_LABEL_BANK_SHA256_CONVNEXT_B_CVST": "e" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_CONVNEXT_T_CVST": "e" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_MNV4M_OWN": "e" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_SALMAN_R50": "e" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_VIT_S_CVST": "e" * 64,
+        "ARD_PHASE2_ADAMW_LR_CONVNEXT_ATTO": "0.0005",
+        "ARD_PHASE2_ADAMW_LR_DEIT_TINY": "0.0005",
     }.items():
         monkeypatch.setenv(key, value)
 
@@ -196,7 +207,7 @@ def test_default_views_are_bit_identical_to_the_pre_change_views(tmp_path: Path)
 # =========================================================================== IDBH transform
 
 
-@pytest.mark.parametrize("augmentation", ("idbh_weak", "idbh_strong"))
+@pytest.mark.parametrize("augmentation", ("idbh_weak_nocropshift", "idbh_weak", "idbh_strong"))
 @pytest.mark.parametrize(("image_size", "source_size"), ((224, (500, 375)), (112, (300, 400)), (32, (40, 40))))
 def test_idbh_shapes_dtype_and_range(augmentation: str, image_size: int, source_size: tuple[int, int]) -> None:
     transform = EpochImageNetTransform(augmentation_seed=3, image_size=image_size, augmentation=augmentation)
@@ -208,7 +219,7 @@ def test_idbh_shapes_dtype_and_range(augmentation: str, image_size: int, source_
         assert float(tensor.min()) >= 0.0 and float(tensor.max()) <= 1.0
 
 
-@pytest.mark.parametrize("augmentation", ("idbh_weak", "idbh_strong"))
+@pytest.mark.parametrize("augmentation", ("idbh_weak_nocropshift", "idbh_weak", "idbh_strong"))
 def test_idbh_is_keyed_by_seed_epoch_and_source_id_only(augmentation: str) -> None:
     image = _textured(160, 120, seed=2)
 
@@ -255,9 +266,10 @@ def test_idbh_keeps_the_standard_crop_and_flip(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_idbh_layers_follow_the_upstream_distribution(monkeypatch: pytest.MonkeyPatch) -> None:
-    """CropShift level ~ U{0..10} scaled by size/32; ColorShape('color') via the
-    shared upstream implementation; Random Erasing p=0.5 (weak) / 1.0 (strong)
-    with torchvision's default scale and ratio."""
+    """CropShift (idbh_weak / idbh_strong only) level ~ U{0..10} scaled by
+    size/32; ColorShape('color') via the shared upstream implementation; Random
+    Erasing p=0.5 (weak, weak_nocropshift) / 1.0 (strong) with torchvision's
+    default scale and ratio."""
     assert [idbh_cropshift_strength(level, 32) for level in range(11)] == list(range(11))
     assert idbh_cropshift_strength(10, 224) == 70
     assert idbh_cropshift_strength(10, 112) == 35
@@ -287,16 +299,41 @@ def test_idbh_layers_follow_the_upstream_distribution(monkeypatch: pytest.Monkey
     monkeypatch.setattr(data_module, "_idbh_color_with_generator", colour)
     monkeypatch.setattr(data_module, "_random_erase_with_generator", erase)
     image = _textured(300, 240, seed=4)
-    for augmentation, p in (("idbh_weak", 0.5), ("idbh_strong", 1.0)):
+    for augmentation, p, cropshift in (
+        ("idbh_weak_nocropshift", 0.5, False),
+        ("idbh_weak", 0.5, True),
+        ("idbh_strong", 1.0, True),
+    ):
         strengths.clear()
         erase_p.clear()
         transform = EpochImageNetTransform(augmentation_seed=0, image_size=224, augmentation=augmentation)
         for source_id in range(200):
             transform(image, source_id=source_id)
         assert set(erase_p) == {p}
-        assert set(strengths) <= {7 * level for level in range(11)}
-        assert len(set(strengths)) == 11  # every level occurs in 200 draws
-    assert len(colour_calls) == 400
+        if cropshift:
+            assert set(strengths) <= {7 * level for level in range(11)}
+            assert len(set(strengths)) == 11  # every level occurs in 200 draws
+        else:
+            assert strengths == []
+    assert len(colour_calls) == 600
+
+
+def test_nocropshift_equals_idbh_weak_without_its_cropshift_layer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The layers use independent keyed substreams, so idbh_weak_nocropshift is
+    exactly idbh_weak with the CropShift layer removed: same crop/flip, same
+    ColorShape op and magnitude, same erasing rectangle per sample."""
+    image = _textured(220, 170, seed=6)
+    nocrop = EpochImageNetTransform(augmentation_seed=4, image_size=64, augmentation="idbh_weak_nocropshift")
+    weak = EpochImageNetTransform(augmentation_seed=4, image_size=64, augmentation="idbh_weak")
+    for epoch in (0, 7):
+        nocrop.set_epoch(epoch)
+        weak.set_epoch(epoch)
+        reference = [nocrop(image, source_id=source_id) for source_id in range(12)]
+        with monkeypatch.context() as patch:
+            patch.setattr(data_module, "_cropshift_translate", lambda image, *, generator, strength: image)
+            assert all(torch.equal(weak(image, source_id=i), view) for i, view in enumerate(reference))
+        # With its CropShift, idbh_weak differs for at least one sample (10/11 shift).
+        assert any(not torch.equal(weak(image, source_id=i), view) for i, view in enumerate(reference))
 
 
 def test_idbh_strong_erases_almost_every_view_and_weak_about_half(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -309,12 +346,13 @@ def test_idbh_strong_erases_almost_every_view_and_weak_about_half(monkeypatch: p
     image = Image.new("RGB", (64, 64), (200, 200, 200))
     rates = {}
     trials = 400
-    for augmentation in ("idbh_weak", "idbh_strong"):
+    for augmentation in ("idbh_weak_nocropshift", "idbh_weak", "idbh_strong"):
         transform = EpochImageNetTransform(augmentation_seed=0, image_size=32, augmentation=augmentation)
         erased = sum(bool((transform(image, source_id=source_id) == 0).any()) for source_id in range(trials))
         rates[augmentation] = erased / trials
     assert rates["idbh_strong"] >= 0.95
     assert 0.4 < rates["idbh_weak"] < 0.6
+    assert rates["idbh_weak_nocropshift"] == rates["idbh_weak"]  # same keyed erase substream
 
 
 def test_idbh_composes_with_jpeg_draft_decode(tmp_path: Path) -> None:
@@ -383,8 +421,12 @@ def _load(name: str) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("name", "augmentation", "epochs"),
     (
-        ("imagenet_mobilenetv4_pgd_at_random_init_lr0025_idbh_cg.yaml", "idbh_weak", 50),
-        ("imagenet_mobilenetv4_pgd_at_random_init_lr0025_idbh_100ep_cg.yaml", "idbh_weak", 100),
+        ("imagenet_mobilenetv4_pgd_at_random_init_lr0025_idbh_weak_nocropshift_cg.yaml", "idbh_weak_nocropshift", 50),
+        (
+            "imagenet_mobilenetv4_pgd_at_random_init_lr0025_idbh_weak_nocropshift_100ep_cg.yaml",
+            "idbh_weak_nocropshift",
+            100,
+        ),
         ("imagenet_mobilenetv4_pgd_at_random_init_lr0025_100ep_cg.yaml", "standard", 100),
     ),
 )
@@ -408,6 +450,8 @@ def test_phase2_augmentation_configs_differ_from_the_baseline_only_where_declare
     assert arm["scheduler"]["milestones"] == ([25, 38] if epochs == 50 else [50, 76])
     assert arm["scheduler"]["warmup_epochs"] == 10
     assert arm["tracking"]["group"] != baseline["tracking"]["group"]
+    assert augmentation.replace("_", "-") in arm["tracking"]["group"]  # variant named in the W&B group
+    assert arm["protocol"] == baseline["protocol"]  # shared contract; identity carries the arm
     for payload in (baseline, arm):
         payload["dataset"].pop("imagenet_augmentation", None)
         payload["training"]["epochs"] = None
@@ -427,7 +471,7 @@ def test_cpu_throughput_micro_benchmark_single_process(capsys: pytest.CaptureFix
     path). Reported, with only a loose floor so the test cannot flake."""
     images = [_textured(500, 375, seed=seed) for seed in range(8)]
     rates: dict[str, float] = {}
-    for augmentation in ("standard", "idbh_weak", "idbh_strong"):
+    for augmentation in ("standard", "idbh_weak_nocropshift", "idbh_weak", "idbh_strong"):
         transform = EpochImageNetTransform(augmentation_seed=0, image_size=224, augmentation=augmentation)
         for source_id in range(8):  # warm-up
             transform(images[source_id], source_id=source_id)
@@ -441,5 +485,6 @@ def test_cpu_throughput_micro_benchmark_single_process(capsys: pytest.CaptureFix
         print("\nImageNet 224px train-transform CPU throughput (img/s, 1 process): " + json.dumps(
             {key: round(value, 1) for key, value in rates.items()}
         ))
+    assert rates["idbh_weak_nocropshift"] > 0.2 * rates["standard"]
     assert rates["idbh_weak"] > 0.2 * rates["standard"]
     assert rates["idbh_strong"] > 0.2 * rates["standard"]

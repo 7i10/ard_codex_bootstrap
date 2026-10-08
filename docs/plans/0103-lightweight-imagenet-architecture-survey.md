@@ -3554,17 +3554,57 @@ history behind this pivot.)
     `external.lock.yaml` (`awp`, a7acf5d8) and the parity test imports its `utils_awp.py`; our AWP is
     "AWP on our PGD-AT" (eval-mode attack by default), not an AT-AWP reproduction. Also: split BN with
     `init_checkpoint` refused; preflight refusals before any tracker run; `train_mixed_batch_weighted_loss`.
-- 2026-10-08: **Phase 2 batch C (augmentation x epochs 2x2), code and configs
-  ready, not launched.** New option `dataset.imagenet_augmentation`
-  (`standard` default, unserialized; `idbh_weak`, `idbh_strong`). It appends
-  IDBH (Li & Spratling, ICLR 2023) after RandomResizedCrop + flip: CropShift
-  (upstream level U{0..10} scaled by size/32, so 0-70 px in steps of 7 at
-  224), ColorShape('color') with upstream magnitudes, Random Erasing p=0.5
-  (weak) or 1.0 (strong). Every draw is keyed by (augmentation seed, epoch,
-  source id); crop and flip stay bit-identical to the standard path. In the
-  config hash and the evaluation pooling identity. Configs (all with
-  `selection_subset_size: 5000`, cuda_graph kept): `..._lr0025_idbh_cg.yaml`
-  (IDBH, 50 ep), `..._lr0025_idbh_100ep_cg.yaml` (IDBH, 100 ep, [50, 76]),
-  `..._lr0025_100ep_cg.yaml` (standard, 100 ep, [50, 76]); the standard 50-ep
-  cell is the Phase 1 run. CPU cost, real ImageNet JPEGs, one process:
-  decode + transform 204 -> 160 img/s (-22%).
+- 2026-10-08 (human-approved): **Phase 2 batch C (augmentation x epochs 2x2 on
+  MobileNetV4-S), code and configs ready, not launched.**
+  - Option `dataset.imagenet_augmentation` (`standard` default and not serialized,
+    so every earlier config hashes byte-identically). Values:
+    - `idbh_weak_nocropshift` (**the chosen arm**, human 2026-10-08):
+      RandomResizedCrop -> flip -> ColorShape('color') -> ToTensor ->
+      RandomErasing(p=0.5). Upstream IDBH (Li & Spratling, ICLR 2023) uses
+      CropShift *instead of* CIFAR's pad-and-crop. On ImageNet,
+      RandomResizedCrop plays that role, so stacking CropShift on top of it has
+      no precedent.
+    - `idbh_weak` / `idbh_strong` (implemented, not used): the same plus
+      CropShift as a *fraction-preserving adaptation*, not upstream itself.
+      The level is drawn as upstream (U{0..10}) and becomes round(k x size / 32)
+      px, i.e. 0-70 px in steps of 7 at 224. Erasing p = 0.5 / 1.0.
+    - Upstream precedent: the code has no ImageNet version. Its Tiny-ImageNet
+      (64 px) run reused the 32 px CIFAR PRN18 parameters with CropShift
+      unscaled (paper App. C/D, Tab. 12; "not optimized" for TIN).
+  - Colour factors, shear (radians), rotation (degrees) and erasing
+    area/aspect are kept verbatim. Known deviation: Sharpness (PIL 3x3 kernel)
+    and NEAREST shear/rotate act per pixel, so at 224 px they are effectively
+    weaker than at 32 px.
+  - Determinism: every layer draws from its own substream keyed by
+    (augmentation seed, epoch, source id). Crop and flip are bit-identical to
+    the standard path, and nothing uses the global RNG, so FKD-style
+    precomputation is possible.
+  - Identity: in the config hash and in the evaluation `training_protocol_identity`
+    (`imagenet_augmentation`). An end-to-end test (train, `ard.cli.evaluate`,
+    `summarize_checkpoint_groups`) shows an IDBH run is refused when pooled with a
+    standard run.
+  - Protocol id: unchanged (`controlled_imagenet_stage02_init_lr_grid_v1`), as
+    for Phase 2 batches B and D on the same baseline. The arms share the
+    baseline's scientific contract (data split, threat model, evaluation);
+    what differs is carried by the config hash and the identity entry above.
+    A separate protocol id would put one Phase 2 batch under a different
+    contract from the others and from its own baseline.
+  - Configs (cuda_graph kept: the augmentation is data-side only;
+    `selection_subset_size: 5000` per the Phase 2 template; variant in the W&B
+    group):
+    - `imagenet_mobilenetv4_pgd_at_random_init_lr0025_idbh_weak_nocropshift_cg.yaml` (50 ep).
+    - `imagenet_mobilenetv4_pgd_at_random_init_lr0025_idbh_weak_nocropshift_100ep_cg.yaml`
+      (100 ep, milestones [50, 76], warmup 10).
+    - `imagenet_mobilenetv4_pgd_at_random_init_lr0025_100ep_cg.yaml` (standard, 100 ep).
+  - **Comparing the cells.** The standard-50 cell is the Phase 1 run
+    `imagenet_mobilenetv4_pgd_at_random_init_lr0025_cg.yaml`, whose best.pt was
+    picked on the full held-out split; the other three pick best.pt on the
+    5000-image subset. The clean comparison is therefore last.pt,
+    `last_full_*` and the official evaluation (best and last on the official
+    val). Training-batch accuracy is measured on augmented images, so it is
+    not comparable across augmentation arms; compare fitting with the train
+    probe (un-augmented eval-transform views).
+  - CPU cost (128 real ImageNet JPEGs, one process, decode + transform, Hamster
+    under load): standard 222 img/s, `idbh_weak_nocropshift` 199 img/s (-11%),
+    `idbh_weak` 193 img/s. Transform-only numbers are printed by the unit
+    benchmark.

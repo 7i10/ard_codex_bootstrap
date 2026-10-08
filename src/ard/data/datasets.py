@@ -653,25 +653,38 @@ class EpochImageNetTransform:
     epoch still reproduces the same crop and flip, but not the same
     RandAugment/RandomErasing draw.
 
-    ``augmentation="idbh_weak"`` / ``"idbh_strong"``
-    (``DatasetConfig.imagenet_augmentation``, plan 0103 Phase 2 batch C):
-    IDBH (Li & Spratling, ICLR 2023; pinned upstream
+    ``augmentation`` (``DatasetConfig.imagenet_augmentation``, plan 0103
+    Phase 2 batch C): IDBH (Li & Spratling, ICLR 2023; pinned upstream
     ``.external/DA-Alone-Improves-AT/src/data/idbh.py``) appended after the
     crop and flip, which stay bit-identical to the standard path (same
     generator, same draws). Upstream's CIFAR pipeline is flip -> CropShift(0,
-    11) -> ColorShape('color') -> ToTensor -> RandomErasing(p=0.5 weak / 1.0
-    strong); here it is RandomResizedCrop -> flip -> CropShift(0, high) ->
-    ColorShape('color') -> ToTensor -> RandomErasing. RandomResizedCrop stays
-    because ImageNet's spatial baseline is it, not pad-and-crop. The only
-    absolute-pixel magnitude, CropShift's largest strength (10 px at 32 px),
-    is scaled with the output side (``idbh_cropshift_strength``: level k of
-    U{0..10} becomes round(k * size / 32) px, so 0..70 in steps of 7 at 224);
-    every other magnitude (colour factors, shear in radians,
-    rotation in degrees, erasing area fraction / aspect) is scale-free and
-    kept verbatim. Each IDBH layer draws from its own named substream of
-    (augmentation seed, epoch, source id) (``_layer_generator``), so the
-    whole view is reproducible per sample and FKD-style precomputation is
-    possible; nothing touches the global RNG.
+    11) -> ColorShape('color') -> ToTensor -> RandomErasing (p=0.5 weak, 1.0
+    strong). Upstream has no ImageNet version; its Tiny-ImageNet (64 px) run
+    reused the 32 px CIFAR parameters unscaled.
+
+    - ``"idbh_weak_nocropshift"`` (the human-chosen Phase 2 arm, 2026-10-08):
+      RandomResizedCrop -> flip -> ColorShape('color') -> ToTensor ->
+      RandomErasing(p=0.5). RandomResizedCrop is ImageNet's spatial
+      augmentation, and upstream's CropShift *replaces* CIFAR's pad-and-crop,
+      so stacking CropShift on top of RandomResizedCrop has no precedent.
+    - ``"idbh_weak"`` / ``"idbh_strong"``: the same plus CropShift between the
+      flip and ColorShape, as a *fraction-preserving adaptation* (not upstream
+      itself): the level is drawn as upstream, U{0..10}, and becomes
+      round(k * size / 32) px (``idbh_cropshift_strength``; 0..70 in steps of
+      7 at 224), so the shift as a fraction of the side has upstream's
+      distribution. Erasing p=0.5 / 1.0.
+
+    Every other magnitude (colour factors, shear in radians, rotation in
+    degrees, erasing area fraction and aspect) is kept verbatim. Known
+    deviation: Sharpness (PIL's fixed 3x3 smoothing kernel) and the NEAREST
+    resampling of shear/rotate act per pixel, so at 224 px they are
+    effectively weaker / finer-grained than at 32 px; kept verbatim for
+    fidelity rather than rescaled. Each IDBH layer draws from its own named
+    substream of (augmentation seed, epoch, source id)
+    (``_layer_generator``), so the whole view is reproducible per sample,
+    FKD-style precomputation is possible, and the ColorShape / erasing draws
+    of a sample are the same with or without the CropShift layer; nothing
+    touches the global RNG.
     """
 
     _SCALE = (0.08, 1.0)
@@ -689,7 +702,7 @@ class EpochImageNetTransform:
     ) -> None:
         if image_size < 1:
             raise ValueError("ImageNet augmentation image_size must be a positive integer")
-        if augmentation not in _IMAGENET_ERASE_PROBABILITY:
+        if augmentation not in _IMAGENET_IDBH_VARIANTS:
             raise ValueError(f"unsupported ImageNet augmentation: {augmentation}")
         if augmentation != "standard" and heavy_augmentation:
             raise ValueError("IDBH and heavy_augmentation are mutually exclusive")
@@ -860,7 +873,7 @@ class EpochImageNetTransform:
         return tensor
 
     def _idbh(self, image: Any, *, source_id: int) -> torch.Tensor:
-        """CropShift -> ColorShape('color') -> ToTensor -> RandomErasing, each
+        """[CropShift ->] ColorShape('color') -> ToTensor -> RandomErasing, each
         layer on its own keyed substream (see the class docstring)."""
 
         def layer(name: str) -> torch.Generator:
@@ -868,22 +881,30 @@ class EpochImageNetTransform:
                 augmentation_seed=self.augmentation_seed, epoch=self.epoch, source_id=source_id, layer=name
             )
 
-        shift_generator = layer("imagenet_idbh_cropshift")
-        width, height = transform_functional.get_image_size(image)
-        level = int(torch.randint(0, _IDBH_CROPSHIFT_HIGH, (), generator=shift_generator).item())
-        strength = min(idbh_cropshift_strength(level, self.image_size), width - 1, height - 1)
-        image = _cropshift_translate(image, generator=shift_generator, strength=strength)
+        cropshift, erase_probability = _IMAGENET_IDBH_VARIANTS[self.augmentation]
+        if cropshift:
+            shift_generator = layer("imagenet_idbh_cropshift")
+            width, height = transform_functional.get_image_size(image)
+            level = int(torch.randint(0, _IDBH_CROPSHIFT_HIGH, (), generator=shift_generator).item())
+            strength = min(idbh_cropshift_strength(level, self.image_size), width - 1, height - 1)
+            image = _cropshift_translate(image, generator=shift_generator, strength=strength)
         image = _idbh_color_with_generator(image, generator=layer("imagenet_idbh_colorshape"))
         return _random_erase_with_generator(
             _to_tensor(image),
             generator=layer("imagenet_idbh_erase"),
-            p=_IMAGENET_ERASE_PROBABILITY[self.augmentation],
+            p=erase_probability,
         )
 
 
-# Upstream IDBH Random Erasing probability per version (cifar10-weak 0.5,
-# cifar10-strong 1.0); "standard" means no IDBH at all.
-_IMAGENET_ERASE_PROBABILITY: dict[str, float] = {"standard": 0.0, "idbh_weak": 0.5, "idbh_strong": 1.0}
+# ImageNet augmentation value -> (CropShift layer present, Random Erasing p).
+# Erasing p is upstream's per version (cifar10-weak 0.5, cifar10-strong 1.0);
+# "standard" means no IDBH at all (never reaches _idbh).
+_IMAGENET_IDBH_VARIANTS: dict[str, tuple[bool, float]] = {
+    "standard": (False, 0.0),
+    "idbh_weak_nocropshift": (False, 0.5),
+    "idbh_weak": (True, 0.5),
+    "idbh_strong": (True, 1.0),
+}
 
 
 # Upstream ``CropShift(0, 11)``: strength level ~ U{0, ..., 10} (exclusive 11).
@@ -896,7 +917,8 @@ def idbh_cropshift_strength(level: int, image_size: int) -> int:
     defined at 32 px and scaled to ``image_size`` with round-half-up: level
     10 is 10 px at 32, 35 at 112, 70 at 224. The distribution of the shift
     *fraction* {0, 1/32, ..., 10/32} of the side -- including the 1/11 chance
-    of no shift -- is therefore exactly upstream's."""
+    of no shift -- is preserved (a fraction-preserving adaptation; the pixel
+    granularity, steps of size/32, is coarser than a native CropShift's)."""
     return (level * image_size + 16) // 32
 
 

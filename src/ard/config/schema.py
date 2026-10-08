@@ -612,15 +612,17 @@ class DatasetConfig(StrictModel):
     imagenet_heavy_augmentation: bool = False
     # Plan 0103 Phase 2 batch C (human-approved 2026-10-08): IDBH (Li &
     # Spratling, ICLR 2023, "Data augmentation alone can improve adversarial
-    # training") adapted to the ImageNet RandomResizedCrop pipeline -- see
+    # training") appended to the ImageNet RandomResizedCrop + flip -- see
     # ard.data.datasets.EpochImageNetTransform. Unlike
     # imagenet_heavy_augmentation, every IDBH draw comes from a generator
     # keyed by (augmentation seed, epoch, source id), so a resumed epoch
-    # reproduces the same view per sample. "idbh_weak" / "idbh_strong" are
-    # the upstream cifar10-weak / cifar10-strong distributions (Random
-    # Erasing p=0.5 / p=1). Serialized only when not "standard", so every
-    # existing config keeps a byte-identical resolved config and config hash.
-    imagenet_augmentation: Literal["standard", "idbh_weak", "idbh_strong"] = Field(
+    # reproduces the same view per sample. "idbh_weak_nocropshift" (the
+    # human-chosen Phase 2 arm): ColorShape('color') + Random Erasing p=0.5,
+    # no CropShift on top of RandomResizedCrop. "idbh_weak" / "idbh_strong":
+    # additionally a fraction-preserving CropShift adaptation, erasing p=0.5 /
+    # 1.0. Serialized only when not "standard", so every existing config keeps
+    # a byte-identical resolved config and config hash.
+    imagenet_augmentation: Literal["standard", "idbh_weak_nocropshift", "idbh_weak", "idbh_strong"] = Field(
         default="standard", exclude_if=lambda value: value == "standard"
     )
     # Plan 0103 loader speedup C (human-approved 2026-09-30): the root is a
