@@ -1,5 +1,5 @@
 # Plan 0103 Phase 2 batch D (human-approved 2026-10-08): ImageNet adversarial-distillation verification.
-# RSLAD-advT: RSLAD with the 5/6 adversarial KL targeting softmax(T(x')) (human-approved 2026-10-08), teacher salman2020_resnet50_linf_eps4, target: FKD soft-label bank (top-10 provisional; bank path/digest from the environment until built).
+# RSLAD-advT: RSLAD with the 5/6 adversarial KL targeting softmax(T(x')) (human-approved 2026-10-08), teacher salman2020_resnet50_linf_eps4, target: FKD soft-label bank (top-500, FP16 storage: human decision 2026-10-08/09; bank path/digest from the environment).
 # Student: MobileNetV4-Conv-Small, SGD lr 0.025 (Phase 1 chosen LR); cuda_graph removed (refused with a teacher), otherwise identical to that config.
 # Cloned from imagenet_mobilenetv4_pgd_at_random_init_lr0025_cg.yaml: only method/teacher/distillation, tracking.group and the Phase 2
 # selection_subset_size (human 2026-10-08) changed; AdamW LR comes from an env var until chosen;
@@ -18,5 +18,5 @@ scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epo
 training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: true, step_diagnostics: false, validation_fraction: 0.02, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000, selection_subset_size: 5000, weight_ema_decay: 0.9999}
 tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-mobilenetv4-pgd-at-init-lr-grid-phase2-rslad-advt-salman-r50-fkd, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}
 evaluation: {checkpoints: both, seed: 0, dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: val, download: false, num_classes: 1000, image_size: 224, content_sha256: abc0ee800b31bc6c24f02c5d7f41e2a96259f34538be5cfe157b11444a75a642}, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true}, autoattack: false, autoattack_batch_size: 128, autoattack_sample_count: 5000, write_sample_stats: false, panel_size: 24}
-distillation: {target_source: soft_label_bank, bank: {path: "${ARD_SOFT_LABEL_BANK_ROOT}/salman2020_resnet50_linf_eps4-aug${ARD_SEED}-k10", manifest_sha256: "${ARD_SOFT_LABEL_BANK_SHA256_SALMAN_R50}", top_k: 10}}
+distillation: {target_source: soft_label_bank, bank: {path: "${ARD_SOFT_LABEL_BANK_ROOT}/salman2020_resnet50_linf_eps4-aug${ARD_SEED}-k500", manifest_sha256: "${ARD_SOFT_LABEL_BANK_SHA256_SALMAN_R50}", top_k: 500}}
 output_dir: "${ARD_JOB_OUTPUT_DIR}"
