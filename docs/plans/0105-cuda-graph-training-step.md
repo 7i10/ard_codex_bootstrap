@@ -366,3 +366,14 @@ It must refuse every configuration where that is not proven.
   224 px / batch 128 estimated ~16.4 GiB instead of ~29.5 GiB). Existing configs unchanged (the flag stays off
   everywhere; no config edited). Pooling identity unchanged. Not merged, not launched; enabling the flag in the
   Phase 2 configs (and the batch-128 memory measurement on a free GPU) is the human's decision.
+- 2026-10-08, scientific review of d2e82b2 (no P0/P1), one batch: P2-1 the admitted scope is narrowed to
+  the proven one: `rslad_advt` only from a soft-label bank (online advT refused) and RSLAD / advT only at
+  temperature 1 (method, attack and hooks; schema and Trainer, refusal tests). P3-1 opt-in production-shape
+  BITWISE check for distillation (`test_production_shape_distillation_graph_run_is_bit_identical`: MNv4-S,
+  224 px, batch 128, 1000 classes, PGD-3; online RSLAD with ConvNeXt-B-cvst and ViT-S-cvst, bank RSLAD, bank
+  advT with ResNet-50; real teacher checkpoints from `ARD_EXTERNAL_CHECKPOINT_ROOT` when present, registry
+  normalization); not run (needs a free GPU, command in the test file); its harness was smoke-checked bitwise
+  at batch 8 on GPU1. P3-2 end-to-end: a NaN bank row in a replayed batch, with the pool release active,
+  kills the process before `last.pt` (tested). P3-3 `tests/unit/test_device_checks_equivalence.py`: 23 good /
+  bad inputs through the converted checks give the pre-change (git d5bae49) accepted values, exception types
+  and messages.

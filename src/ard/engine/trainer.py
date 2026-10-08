@@ -728,7 +728,9 @@ class Trainer:
             ),
             (self.frozen_risk_lookup is None and not self.oracle_mask, "no frozen oracle or oracle mask"),
             (
-                all(value is None for value in treatments) and not self.clean_wrong_attack_skip and not self.iad_inspired,
+                all(value is None for value in treatments)
+                and not self.clean_wrong_attack_skip
+                and not self.iad_inspired,
                 "no registered treatment",
             ),
             # The mixed-batch normalizer and split BN are tested in a single process only.
@@ -843,6 +845,19 @@ class Trainer:
                 + ")",
             ),
             (not (distillation and bank_teacher and advt) or step_teacher is not None, "an advT online teacher"),
+            # Admitted scope == parity-tested scope: advT only from a bank, temperature 1 everywhere.
+            (not (distillation and advt) or bank_teacher, "RSLAD-advT only from a soft-label bank"),
+            (
+                not distillation
+                or (
+                    getattr(self.objective, "temperature", None) == 1.0
+                    and attack_config is not None
+                    and attack_config.temperature == 1.0
+                    and hooks is not None
+                    and hooks.temperature == 1.0
+                ),
+                "RSLAD at temperature 1 (objective, attack and hooks; the parity-tested value)",
+            ),
             # A plain weight EMA (training.weight_ema_decay) is admitted: _cuda_graph_body
             # runs the eager step's _update_ema right after the SGD update (parity-tested).
             (self.adr_config is None, "no ADR (or its EMA target)"),
@@ -1560,9 +1575,7 @@ class Trainer:
             # Kurakin et al. 2017: only the first k positions are attacked (as the eager step).
             adversarial = images
             if mixed_count > 0:
-                request = AttackRequest(
-                    inputs=images[:mixed_count], labels=labels[:mixed_count], student=self.model
-                )
+                request = AttackRequest(inputs=images[:mixed_count], labels=labels[:mixed_count], student=self.model)
                 epsilon, step_size = self.attack.budgets(request)
                 attacked = self.attack.perturb(
                     request,
@@ -2086,7 +2099,10 @@ class Trainer:
                     (batch.images.shape[0],), epoch_attack_epsilon, device=batch.images.device, dtype=batch.images.dtype
                 )
                 step_override = torch.full(
-                    (batch.images.shape[0],), epoch_attack_step_size, device=batch.images.device, dtype=batch.images.dtype
+                    (batch.images.shape[0],),
+                    epoch_attack_step_size,
+                    device=batch.images.device,
+                    dtype=batch.images.dtype,
                 )
             rectified_target = self._rectified_target(batch.images, batch.labels) if requires_rectified_target else None
             # Mixed batch: the first ``mixed_count`` positions are attacked.

@@ -289,7 +289,38 @@ def test_rslad_and_rslad_advt_distillation_are_admitted(
     assert _throughput_protocol_identity(enabled.training) == ({} if deterministic else {"cuda_graph": True})
     online = _with(raw, training={"cuda_graph": True}, distillation={"target_source": "online_teacher", "bank": None})
     online["distillation"].pop("bank")
-    assert ExperimentConfig.model_validate(online).distillation.target_source == "online_teacher"
+    if enabled.method.id == "rslad":
+        assert ExperimentConfig.model_validate(online).distillation.target_source == "online_teacher"
+    else:
+        # Review of d2e82b2 (P2-1): online advT is not parity-tested, so it is refused with the graph.
+        online_without_graph = copy.deepcopy(online)
+        online_without_graph["training"].pop("cuda_graph")
+        ExperimentConfig.model_validate(online_without_graph)
+        with pytest.raises(ValueError, match="training.cuda_graph=true requires") as refused:
+            ExperimentConfig.model_validate(online)
+        assert "rslad_advt with distillation.target_source=soft_label_bank" in str(refused.value)
+
+
+@pytest.mark.parametrize("target_source", ["soft_label_bank", "online_teacher"])
+@pytest.mark.parametrize("where", ["method", "attack"])
+def test_rslad_at_a_temperature_other_than_1_is_refused_with_the_graph(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target_source: str, where: str
+) -> None:
+    """Review of d2e82b2 (P2-1): only temperature 1 is parity-tested (the bank requires it anyway)."""
+    raw = _phase2(monkeypatch, tmp_path, _RSLAD_BANK)
+    if target_source == "online_teacher":
+        raw = _with(raw, distillation={"target_source": "online_teacher"})
+        raw["distillation"].pop("bank")
+    if where == "method":
+        raw["method"]["temperature"] = 2.0
+    else:
+        raw["method"]["attack"]["temperature"] = 2.0
+    graph = _with(raw, training={"cuda_graph": True})
+    with pytest.raises(ValueError) as refused:
+        ExperimentConfig.model_validate(graph)
+    if target_source == "online_teacher":
+        ExperimentConfig.model_validate(raw)  # valid without the graph
+        assert "method.temperature=1 and method.attack.temperature=1 for rslad/rslad_advt" in str(refused.value)
 
 
 @pytest.mark.parametrize(("path", "refused"), [(_RSLAD_BANK, False), (_RSLAD_ADVT_BANK, True)])
@@ -550,6 +581,17 @@ def test_trainer_refuses_rslad_outside_its_scope(tmp_path: Path) -> None:
     assert "KL-to-teacher-clean" in _rslad(tmp_path, teacher=_bank_teacher(), attack=ce)
     # PGD-AT keeps refusing a teacher.
     assert "no teacher (PGD-AT)" in _refusal(tmp_path, teacher=_fixture_teacher())
+    # Review of d2e82b2 (P2-1): online advT and temperatures other than 1 are not parity-tested.
+    assert "RSLAD-advT only from a soft-label bank" in _rslad(tmp_path, teacher=_fixture_teacher(), advt=True)
+    temperature = "RSLAD at temperature 1"
+    assert temperature in _rslad(tmp_path, teacher=_fixture_teacher(), objective=RSLADObjective(temperature=2.0))
+    hot = LinfPGD(
+        AttackConfig(epsilon="4/255", step_size="4/255", steps=1, loss="kl", kl_target="teacher_clean", temperature=2.0)
+    )
+    assert temperature in _rslad(tmp_path, teacher=_fixture_teacher(), attack=hot)
+    hooks = DistillationTargetHooks(adversarial_teacher_target=False, temperature=2.0)
+    assert temperature in _rslad(tmp_path, teacher=_bank_teacher(), distillation_hooks=hooks)
+    assert temperature not in _rslad(tmp_path, teacher=_bank_teacher())
 
 
 @pytest.mark.parametrize("architecture", [None, "fixture_cnn", "mobilenet_v3_small_imagenet"])

@@ -996,6 +996,27 @@ def out_of_range_batch(root: Path) -> None:
     print("training completed without a device assert", flush=True)
 
 
+def nan_bank_row(root: Path) -> None:
+    """A replayed RSLAD-bank batch with one NaN stored probability (graph pool release active, nothing patched):
+    the in-step reconstruction assert must kill the process before anything is checkpointed."""
+    device = torch.device("cuda")
+    trainer, (num_classes, image_size) = build_trainer(
+        root, kind=_FIXTURE, cuda_graph=True, device=device, method="rslad_bank"
+    )
+    loader, validation_loader, _ = _loaders(num_classes, image_size, pin_memory=False, crop_keyed=True)
+    order = list(iter(loader.sampler))
+    # Position 4*4 is in the fifth batch of epoch 0: a replayed step.
+    bad = order[4 * _BATCH].index
+    assert isinstance(trainer.teacher, SoftLabelBankTeacher)
+    arrays = trainer.teacher.bank._epochs[0]
+    arrays.prob[bad, 0] = np.float16("nan")
+    try:
+        trainer.fit(loader, validation_loader=validation_loader, epochs=1)
+    finally:
+        print("last.pt exists:", (root / "last.pt").exists(), flush=True)
+    print("training completed without a device assert", flush=True)
+
+
 _SCRIPT = r"""
 import json, os, sys, tempfile
 from pathlib import Path
@@ -1193,6 +1214,18 @@ def test_out_of_range_pixels_on_the_graph_path_abort_before_any_checkpoint() -> 
     assert "device-side assert" in completed.stderr
     # The host-launched copy of LinfPGD.generate's pixel check, ahead of the replay.
     assert "attack inputs must lie in pixel domain [0, 1]" in completed.stderr
+    assert "last.pt exists: False" in completed.stdout
+
+
+@pytest.mark.gpu
+@requires_cuda
+def test_a_nan_bank_row_in_a_replayed_batch_aborts_before_any_checkpoint() -> None:
+    """Review of d2e82b2 (P3-2): end to end, with the per-epoch graph-pool release active."""
+    completed = _run("nan_bank_row")
+    assert "training completed without a device assert" not in completed.stdout
+    assert completed.returncode != 0
+    assert "device-side assert" in completed.stderr
+    assert "bank row reconstructs to a non-finite or empty distribution" in completed.stderr
     assert "last.pt exists: False" in completed.stdout
 
 
@@ -1733,3 +1766,161 @@ def test_production_shape_graph_step_matches_eager_within_one_step_noise(tmp_pat
     print(json.dumps({"kind": kind, "shape": shape, "distances": distances, "summary": summaries}, default=str))
     failures = single_step_verdict(distances)
     assert not failures, (failures, summaries)
+
+
+# Review of d2e82b2 (P3-1): the same opt-in production-shape regime for the 2026-10-08 distillation scope,
+# deterministic and BITWISE: MobileNetV4-Conv-Small at 224 px, batch 128, 1000 classes, full-AT attack (PGD-3,
+# step 8/765, epsilon 4/255), one epoch of 4 full batches (eager warm-up, capture, 3 replays) plus a partial
+# batch of 64 and a validation pass, eager vs graph in separate processes. Teachers load their real checkpoints
+# from ARD_EXTERNAL_CHECKPOINT_ROOT when present (same relative paths as the Phase 2 configs, registry
+# normalization: imagenet_raw_identity for ConvNeXt-B-cvst, the embedded custom profile for ViT-S-cvst,
+# imagenet_standard for ResNet-50), random weights otherwise. FREE GPU only (about 12-16 GB per process):
+#
+#   ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1 ARD_EXTERNAL_CHECKPOINT_ROOT=<root> \
+#   [ARD_CG_CHECK_MNV4S_FULL_CKPT=<plan0103 MNv4-S stage-2 last.pt>] \
+#   CUDA_VISIBLE_DEVICES=<free gpu> PYTHONPATH=src python -m pytest -s \
+#     tests/integration/test_cuda_graph_training_step.py -k production_shape_distillation
+_PRODUCTION_TEACHER_CHECKPOINTS = {
+    "convnext_base_convstem_imagenet": (
+        "singh2023_convnext_b_convstem",
+        "singh2023_revisiting_at/convnext_b_cvst/convnext_b_cvst_robust.pt",
+    ),
+    "vit_s_convstem_imagenet": ("singh2023_vit_s_convstem", "singh2023_revisiting_at/vit_s_cvst/vit_s_cvst_robust.pt"),
+    "resnet50_imagenet": ("salman2020_resnet50_linf_eps4", "madrylab/resnet50_linf_eps4.0.ckpt"),
+}
+_PRODUCTION_DISTILLATION_CASES = [
+    ("rslad_online", "convnext_base_convstem_imagenet"),
+    ("rslad_online", "vit_s_convstem_imagenet"),
+    ("rslad_bank", "resnet50_imagenet"),
+    ("rslad_advt_bank", "resnet50_imagenet"),
+]
+_PRODUCTION_BATCH = 128
+_PRODUCTION_FULL_BATCHES = 4
+
+
+def _production_teacher(teacher_kind: str) -> tuple[TeacherAdapter, bool]:
+    """The registry teacher (real checkpoint when available) with its registry normalization."""
+    from ard.models.imagenet_teacher_registry import (
+        build_imagenet_teacher_architecture,
+        load_imagenet_teacher_network,
+        spec_for,
+    )
+
+    registry_id, relative = _PRODUCTION_TEACHER_CHECKPOINTS[teacher_kind]
+    spec = spec_for(registry_id)
+    root = os.environ.get("ARD_EXTERNAL_CHECKPOINT_ROOT")
+    path = None if not root else Path(root) / relative
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(4321)
+        if path is not None and path.is_file():
+            model, real = load_imagenet_teacher_network(spec, path), True
+        else:
+            model, real = build_imagenet_teacher_architecture(spec.architecture), False
+    metadata = TeacherMetadata(
+        architecture=spec.architecture,
+        num_classes=1000,
+        normalization=spec.normalization(),
+        checkpoint_sha256=spec.checkpoint_sha256,
+    )
+    return TeacherAdapter(model, metadata), real
+
+
+def production_distillation_arm(root: Path, method: str, teacher_kind: str, mode: str) -> dict[str, Any]:
+    """One eager or graph process of the production-shape distillation check (deterministic)."""
+    _seed_everything(1234)
+    device = torch.device("cuda")
+    kind = "mobilenetv4_conv_small_imagenet"
+    student = build_student(
+        ModelConfig(
+            architecture=kind,  # type: ignore[arg-type]
+            num_classes=1000,
+            pretrained=False,
+            normalization=NormalizationConfig(profile="imagenet_standard"),
+        ),
+        tier="dev",
+    )
+    checkpoint = os.environ.get("ARD_CG_CHECK_MNV4S_FULL_CKPT")
+    if checkpoint:
+        student.load_state_dict(torch.load(checkpoint, map_location="cpu", weights_only=False)["model"])
+    student = student.to(device)
+    optimizer = SGD(student.parameters(), lr=0.025, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    size = _PRODUCTION_FULL_BATCHES * _PRODUCTION_BATCH + _PRODUCTION_BATCH // 2
+    teacher, real_teacher = _production_teacher(teacher_kind)
+    if method == "rslad_online":
+        distillation_teacher: nn.Module = teacher
+    else:
+        online = teacher if method == "rslad_advt_bank" else None
+        distillation_teacher = SoftLabelBankTeacher(_fixture_bank(1000, size, 1), online_teacher=online)
+    trainer = Trainer(
+        model=student,
+        optimizer=optimizer,
+        scheduler=None,
+        scaler=None,
+        attack=LinfPGD(
+            AttackConfig(
+                epsilon="4/255", step_size="8/765", steps=3, random_start=True, loss="kl", kl_target="teacher_clean"
+            )
+        ),
+        selection_attack=LinfPGD(AttackConfig(epsilon="4/255", step_size="8/765", steps=2)),
+        objective=RSLADObjective(temperature=1.0, temperature_squared=True),
+        policy=RSLADBaselinePolicy(),
+        teacher=distillation_teacher,
+        distillation_hooks=DistillationTargetHooks(
+            adversarial_teacher_target=method == "rslad_advt_bank", temperature=1.0
+        ),
+        device=device,
+        output_dir=root,
+        config_hash="c" * 64,
+        seed=11,
+        tracker_run_id="production-shape-distillation",
+        diagnostics=TrainingDiagnostics.for_ids(list(range(size)), seed=0, size=24, mode="panel"),
+        step_diagnostics=False,
+        cuda_graph=mode == "graph",
+        student_architecture=kind,
+    )
+
+    def loader(dataset_size: int, seed: int, *, keyed: bool) -> DataLoader:
+        dataset = IndexedDataset(SyntheticCIFAR(size=dataset_size, num_classes=1000, image_size=224, seed=seed))
+        return DataLoader(
+            _CropKeyed(dataset) if keyed else dataset,
+            batch_size=_PRODUCTION_BATCH,
+            sampler=EpochShuffleSampler(dataset_size, seed=5, shuffle=True),
+            pin_memory=True,
+            collate_fn=collate_crop_keyed if keyed else collate_indexed,
+        )
+
+    history = trainer.fit(
+        loader(size, 3, keyed=method != "rslad_online"),
+        validation_loader=loader(_PRODUCTION_BATCH, 99, keyed=False),
+        epochs=1,
+    )
+    fingerprint = _fingerprint(trainer, history, root)
+    fingerprint["audit"] = [[row.get(key) for key in _AUDIT_KEYS] for row in history]
+    fingerprint["real_teacher"] = real_teacher
+    fingerprint["peak_reserved_gib"] = torch.cuda.max_memory_reserved() / 2**30
+    return fingerprint
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.skipif(
+    os.environ.get("ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK") != "1",
+    reason="opt-in production-shape check (needs a free GPU): set ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1",
+)
+@pytest.mark.parametrize(("method", "teacher_kind"), _PRODUCTION_DISTILLATION_CASES)
+def test_production_shape_distillation_graph_run_is_bit_identical(method: str, teacher_kind: str) -> None:
+    eager = _result(_run("production_distillation_arm", method, teacher_kind, "eager", timeout=3600))
+    graph = _result(_run("production_distillation_arm", method, teacher_kind, "graph", timeout=3600))
+    print(
+        json.dumps(
+            {
+                "method": method,
+                "teacher": teacher_kind,
+                "real_teacher": graph["real_teacher"],
+                "peak_reserved_gib": [eager["peak_reserved_gib"], graph["peak_reserved_gib"]],
+            }
+        )
+    )
+    assert graph["audit"] == [[1.0, float(_PRODUCTION_FULL_BATCHES - 1), 2.0]]
+    ignored = {"audit", "real_teacher", "peak_reserved_gib"}
+    assert {k: v for k, v in graph.items() if k not in ignored} == {k: v for k, v in eager.items() if k not in ignored}

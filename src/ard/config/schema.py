@@ -815,9 +815,7 @@ class TeacherConfig(StrictModel):
             if self.registry_id not in imagenet_ids:
                 raise ValueError("teacher.source=imagenet_registry requires an ImageNet registry ID")
             if self.threat_epsilon != "4/255" or self.preprocessing_owner != "teacher_adapter":
-                raise ValueError(
-                    "ImageNet registry teachers are Linf 4/255 with teacher_adapter-owned preprocessing"
-                )
+                raise ValueError("ImageNet registry teachers are Linf 4/255 with teacher_adapter-owned preprocessing")
             # The full profile (architecture, normalization, digest) is checked
             # against ard.models.imagenet_teacher_registry when the teacher is built.
             return self._validate_digest()
@@ -2282,6 +2280,18 @@ class ExperimentConfig(StrictModel):
             (
                 not distillation or (self.teacher is not None and self.distillation is not None),
                 "rslad/rslad_advt with a teacher and a distillation block (ImageNet distillation)",
+            ),
+            # Admitted scope == parity-tested scope (review of d2e82b2, P2-1): advT only from a bank, and
+            # distillation at temperature 1 only (the tested value; the bank already requires it).
+            (
+                method_id != "rslad_advt"
+                or (self.distillation is not None and self.distillation.target_source == "soft_label_bank"),
+                "rslad_advt with distillation.target_source=soft_label_bank (online advT is not parity-tested)",
+            ),
+            (
+                not distillation
+                or (self.method.temperature == 1.0 and attack is not None and attack.temperature == 1.0),
+                "method.temperature=1 and method.attack.temperature=1 for rslad/rslad_advt (the parity-tested value)",
             ),
             (
                 not teacher_in_step

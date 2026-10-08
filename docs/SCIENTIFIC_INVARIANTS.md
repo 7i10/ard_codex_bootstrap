@@ -188,7 +188,8 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   eager kernels), `method.label_smoothing` and `optimizer.exclude_norm_bias_from_weight_decay` (two SGD groups) are
   in scope, under the same parity and equivalence tests (the EMA state is a fourth tensor group in the one-step rule).
   Since 2026-10-08 (human decision, speedups worth >= 1 GPU-hour per run) also in scope, under the same tests:
-  ImageNet `rslad` / `rslad_advt` distillation with a `distillation` block (KL-to-teacher-clean training attack,
+  ImageNet `rslad` / `rslad_advt` distillation with a `distillation` block at temperature 1 (advT from a bank
+  only; KL-to-teacher-clean training attack,
   RSLAD baseline policy) -- from a soft-label bank (the batch's stored top-K rows are copied into static buffers and
   reconstructed inside the captured step with the bank's own kernels; crop-key and pixel-sentinel checks stay on the
   host) or from an online teacher; a teacher whose forward runs inside the step (online target, advT's forward on
