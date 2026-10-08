@@ -3608,3 +3608,93 @@ history behind this pivot.)
     under load): standard 222 img/s, `idbh_weak_nocropshift` 199 img/s (-11%),
     `idbh_weak` 193 img/s. Transform-only numbers are printed by the unit
     benchmark.
+- 2026-10-08 (postrun): **Phase 1 LR grid, EfficientNet-B0 random init /
+  SGD lr 0.05 completed.** `plan0103-phase1-efficientnet-b0-random-lr005-v1`
+  (hand-run, Hamster GPU0, one RTX 4090) ran 50/50 epochs.
+  `run-bundle/completion.json` reads `completed`, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful.
+  All 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `train.log` has no traceback, NaN or error line (only the wandb git-root
+  warning and the inductor TF32 notice); the wandb internal log has no
+  error or retry line. `best.pt`, `last.pt` and `epoch-049.pt` are on disk
+  (best = epoch 48, last = epoch 49). Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract. The numbers
+  below are read from `outputs/train/epoch-metrics.jsonl` and the
+  run-bundle manifest.
+
+  Fixed identity: ImageNet-1k (original images, content `ae033613...`),
+  EfficientNet-B0 (`efficientnet_b0_imagenet`, `imagenet_standard`
+  profile) random init, plain PGD-AT, no teacher, 224 px training.
+  Training and evaluation-attack seed 0 (split seed 20260911). Training
+  attack CE PGD-3, l_inf eps 4/255, step 8/765, random start. Selection
+  and validation attack PGD-10, same eps and step, random start, eval
+  mode. SGD (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.05,
+  warmup_multistep (10-epoch warmup, x0.1 at epochs 25 and 38), 50
+  epochs. World size 1, global batch 128, local BN. Non-deterministic with
+  cudnn_benchmark, compiled (`torch.compile`), no cuda_graph, fp32.
+  Config `imagenet_efficientnet_b0_pgd_at_phase1_random_lr005.yaml`
+  (identical to the lr 0.025 config except the LR and the W&B group),
+  protocol `controlled_imagenet_stage02_lightweight_architecture_survey_v1`,
+  config hash `4467459b...`. Source SHA
+  `609e6fa913d7b0f20ca8e9143f2a8604f68ea77f` (worktree
+  `source-609e6fa913d7`, clean). "val" is internal validation (25,620
+  held-out original train images, 224 px); "probe" is 2,000 training
+  images. Neither is the ImageNet val split. No AutoAttack has run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 0.91 / 0.66 | 0.55 / 0.25 | 6.835 |
+  | 9 | end of warmup | 35.43 / 19.54 | 35.10 / 19.30 | 4.619 |
+  | 24 | end of lr 0.05 | 41.93 / 23.46 | 43.10 / 24.30 | 4.298 |
+  | 25 | first epoch at lr 0.005 | 51.83 / 31.44 | 53.45 / 33.60 | 3.862 |
+  | 37 | end of lr 0.005 | 53.92 / 32.49 | 56.00 / 35.30 | 3.697 |
+  | 38 | first epoch at lr 0.0005 | 56.58 / 35.13 | 59.20 / 38.85 | 3.540 |
+  | 48 | best (by val PGD-10) | 57.79 / 36.00 | 61.60 / 38.80 | 3.460 |
+  | 49 | last | 57.86 / 35.88 | 61.30 / 39.55 | 3.460 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **lr 0.05 ties lr 0.025 on last-epoch val PGD-10** (35.88 vs 35.93,
+     -0.05pt). Val SE is about 0.31pt clean and 0.30pt PGD-10, so the
+     two-run SE of the difference is about 0.42pt; the gap is about 0.1
+     SE. Only the lr 0.025 PGD-10 (35.93) is recorded in this plan; its
+     clean and best-epoch numbers were not re-read in this postrun (the
+     run lives on Ferret). The lr 0.025 run used a different host (Ferret)
+     and source SHA (`086072b`); the config differs only in LR and group.
+  2. **Grid state.** lr 0.0125 (`plan0103-phase1-efficientnet-b0-random-lr00125-v1`,
+     Hamster GPU1, same source `609e6fa`) is at epoch 47 of 50, so the
+     3-point argmax is not final. Of the two finished cells 0.025 is
+     higher by 0.05pt, inside noise.
+  3. **Edge-extension rule.** The lr 0.1 config (commit `5b6b443`)
+     carries the human rule "extend when the top grid point is best"
+     (2026-10-08). On last-epoch val PGD-10 the top point (0.05) is not
+     the argmax, by 0.05pt; the two are tied. Whether that tie triggers
+     the 0.1 cell is the human's decision (decision packet).
+  4. **Trains normally.** Val PGD-10 never falls more than 0.69pt below
+     its running maximum (epoch 18, 22.44 after 23.13 at epoch 16); the
+     catastrophic-overfitting guard (below half of the running maximum)
+     never fires. The lr 0.05 stage flattens: epochs 19-24 stay within
+     22.97-23.47%.
+  5. **Decays.** Epoch 24 to 25: +9.90 clean / +7.98 PGD-10. Epoch 37 to
+     38: +2.66 / +2.64. The lr 0.005 stage is flat after its third epoch
+     (epochs 27-37 within 32.29-32.78%). The last stage still creeps up:
+     35.13 at epoch 38, 35.39-36.00 over epochs 39-49.
+  6. **Best and last.** Best epoch 48 (57.79 / 36.00), last epoch 49
+     (57.86 / 35.88); `robust_overfit_gap` 0.11pt, inside one val SE.
+  7. **Seen-unseen gap.** At the last epoch probe minus val is +3.4 clean
+     and +3.7 PGD-10, smaller than DeiT-Tiny's (+4.3 to +5.2).
+  8. **Cost.** 48.62 h from start to finish (run-bundle `created_at`
+     2026-10-06 12:51:16 to `finished_at` 2026-10-08 13:28:38 UTC,
+     175,042 s). Summed per-epoch training time is about 165,570 s
+     (46.0 h); the rest (about 189 s per epoch) is validation, probe,
+     checkpointing and start-up. Throughput 409 img/s in epoch 0, then
+     373-379 img/s (373-374 in epochs 28-29, cause not checked). The other
+     Hamster GPU ran DeiT-Tiny lr 2.5e-4 until 2026-10-06 13:41 UTC, then
+     EfficientNet-B0 lr 0.0125. Peak allocated memory 8.56 GB at epoch 0,
+     8.03 GB after; reserved 10.29-10.59 GB.
+
+  Caveats: one seed, two LRs of three finished. Non-deterministic mode,
+  so a rerun would not reproduce these numbers bit for bit. Checkpoint
+  sha256 was not computed in this postrun. `epoch-metrics.parquet` sha256
+  `1532f1d8...`, `sample-stats-train.parquet` sha256 `6941081a...` (from
+  the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id.
