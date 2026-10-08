@@ -3791,3 +3791,21 @@ history behind this pivot.)
   not computed in this postrun. `epoch-metrics.parquet` sha256
   `0b628558...`, `sample-stats-train.parquet` sha256 `1db471c4...` (from
   the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-09 — Phase 1 LR grids (internal val, last epoch PGD-10, seed 0).
+  - EfficientNet-B0: 0.0125 / 0.025 / 0.05 give 34.25 / **35.93** / 35.88.
+    The argmax is interior, so the grid is closed at 0.025.
+  - ConvNeXt-Atto AdamW: 2.5e-4 / 5e-4 / 1e-3 / 2e-3 give 34.23 / 36.35 /
+    **37.02** / 36.65. The argmax is interior, so the grid is closed at
+    1e-3. The 1.25e-4 cell was cancelled.
+  - DeiT-Tiny AdamW: 1.25e-4 / 2.5e-4 / 5e-4 / 1e-3 give 27.19 / 31.25 /
+    33.27 / 35.00. The argmax is at the top edge, so 2e-3 was launched
+    automatically on Ferret GPU2 (edge-extension rule, human 2026-10-08).
+  - MobileNetV4-S and MobileNetV4-M stay at 0.025.
+  - Seed-1 runs:
+    - MobileNetV4-S 0.025 on Ferret GPU1 (running), then EfficientNet-B0
+      0.025 queued on the same GPU.
+    - MobileNetV4-M 0.025 on Hamster GPU0 (running).
+    - ConvNeXt-Atto 1e-3 on Ferret GPU0 (launched).
+    - DeiT-Tiny after its grid closes.
+  - Distillation soft-label banks (K=500, FP16, seed 0, all 5 teachers)
+    are being built on Anteater GPUs 2/3; the estimate is about 3 days.
