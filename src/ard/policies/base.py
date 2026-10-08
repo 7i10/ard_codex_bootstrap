@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 import torch
 
+from ard.device_checks import require
+
 
 @dataclass(frozen=True)
 class PolicyContext:
@@ -32,14 +34,19 @@ class PolicyWeights:
     def __post_init__(self) -> None:
         if self.hard_weight.shape != self.kd_weight.shape or self.kd_weight.ndim != 1:
             raise ValueError("policy weights must be same-shape unreduced vectors")
-        if not torch.isfinite(self.hard_weight).all() or not torch.isfinite(self.kd_weight).all():
-            raise FloatingPointError("policy weights must be finite")
+        # require(): a host check, or a device assert inside a captured CUDA graph (plan 0105).
+        require(
+            torch.isfinite(self.hard_weight).all() & torch.isfinite(self.kd_weight).all(),
+            "policy weights must be finite",
+            FloatingPointError,
+        )
         risk = self.joint_risk
         if risk is None:
             risk = torch.zeros_like(self.kd_weight)
             object.__setattr__(self, "joint_risk", risk)
-        if risk.shape != self.kd_weight.shape or not torch.isfinite(risk).all():
+        if risk.shape != self.kd_weight.shape:
             raise ValueError("policy joint_risk must be a finite unreduced vector")
+        require(torch.isfinite(risk).all(), "policy joint_risk must be a finite unreduced vector")
 
 
 # The prior name remains a source-compatible alias for integrations that used

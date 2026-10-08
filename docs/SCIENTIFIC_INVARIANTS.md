@@ -187,6 +187,19 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   weight EMA (`training.weight_ema_decay`, updated inside the captured step right after the SGD update with the
   eager kernels), `method.label_smoothing` and `optimizer.exclude_norm_bias_from_weight_decay` (two SGD groups) are
   in scope, under the same parity and equivalence tests (the EMA state is a fourth tensor group in the one-step rule).
+  Since 2026-10-08 (human decision, speedups worth >= 1 GPU-hour per run) also in scope, under the same tests:
+  ImageNet `rslad` / `rslad_advt` distillation with a `distillation` block (KL-to-teacher-clean training attack,
+  RSLAD baseline policy) -- from a soft-label bank (the batch's stored top-K rows are copied into static buffers and
+  reconstructed inside the captured step with the bank's own kernels; crop-key and pixel-sentinel checks stay on the
+  host) or from an online teacher; a teacher whose forward runs inside the step (online target, advT's forward on
+  x') must be frozen, in eval mode and on `CUDA_GRAPH_TEACHER_ARCHITECTURES` (the five Phase 2 ImageNet teachers,
+  each parity-tested); `method.mixed_batch` without split BN (the last partial batch, with its own `k`, stays
+  eager); `method.awp` (proxy reload, proxy SGD step, perturb and restore inside the step) with
+  `training.deterministic: true` only (under nondeterministic kernels the eager outcomes of one AWP step were
+  too spread for the one-step check to resolve a defect). Split BN stays refused.
+  The value checks those paths share with the eager step (bank reconstruction, advT target, KL target validation,
+  policy weights, teacher entropy) go through `ard.device_checks.require`: the unchanged host check outside a
+  capture, a device assert (fatal before any checkpoint) inside one; never removed or widened.
   - `training.deterministic: true`: **bitwise** equal to the eager step (checkpoints, RNG streams, epoch rows,
     diagnostics). Not in `training_protocol_identity`, like `training.step_diagnostics`, so it pools with eager runs
     of the same arm.
@@ -381,5 +394,6 @@ None of them touches the attack identity, selection, or evaluation.
   biases) go into a `weight_decay = 0` group, the same split AdamW always uses.
 - Mixed batch and AWP also require `observation.profile: off`, no teacher and no `distillation` block (schema, before
   any tracker run; the Trainer repeats the scope check).
-- `training.cuda_graph` refuses `mixed_batch` and `awp`; only `ard.cli.train` applies the three options and every
+- `training.cuda_graph` admits `mixed_batch` (not `split_batchnorm`) and `awp` (deterministic only) since 2026-10-08 (bitwise parity
+  tested, plan 0105); only `ard.cli.train` applies the three options and every
   other Trainer builder refuses them (`reject_phase2_batch_a_options`).

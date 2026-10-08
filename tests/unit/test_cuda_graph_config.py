@@ -17,18 +17,21 @@ import types
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 import torch
 import yaml
 from torch import nn
 from torch.optim import SGD
 
+import ard.config.schema as schema_module
 from ard.attacks import AttackRequest, LinfPGD
 from ard.cli.evaluate import _throughput_protocol_identity
 from ard.config import load_config
 from ard.config.loader import _expand_environment, resolved_config_dict
 from ard.config.schema import (
     CUDA_GRAPH_ARCHITECTURES,
+    CUDA_GRAPH_TEACHER_ARCHITECTURES,
     AttackConfig,
     AwpConfig,
     ExperimentConfig,
@@ -36,10 +39,22 @@ from ard.config.schema import (
     TrainingConfig,
     reject_throughput_options,
 )
+from ard.device_checks import require
+from ard.distillation.soft_label_bank import SoftLabelBank, SoftLabelBankTeacher
+from ard.distillation.trainer_hooks import DistillationTargetHooks
 from ard.engine.checkpoint import config_digest
-from ard.engine.cuda_graph import CudaGraphStepState, momentum_buffers_ready, optimizer_fingerprint
+from ard.engine.cuda_graph import (
+    CudaGraphStepState,
+    module_fingerprint,
+    momentum_buffers_ready,
+    optimizer_fingerprint,
+    optimizer_groups_fingerprint,
+)
+from ard.engine.mixed_batch import AuxiliaryBatchNorm
 from ard.engine.trainer import Trainer
-from ard.objectives import PGDATObjective
+from ard.models.teacher import TeacherAdapter, TeacherMetadata
+from ard.objectives import PGDATObjective, RSLADObjective
+from ard.policies import RSLADBaselinePolicy
 
 pytestmark = pytest.mark.t1
 
@@ -102,6 +117,10 @@ def _env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "WANDB_PROJECT": "project",
         "ARD_STAGE1_CHECKPOINT": str(tmp_path / "stage1" / "last.pt"),
         "ARD_STAGE1_CHECKPOINT_SHA256": "d" * 64,
+        "ARD_SOFT_LABEL_BANK_ROOT": str(tmp_path / "banks"),
+        "ARD_SOFT_LABEL_BANK_SHA256_SALMAN_R50": "e" * 64,
+        "ARD_SOFT_LABEL_BANK_SHA256_CONVNEXT_B_CVST": "f" * 64,
+        "ARD_EXTERNAL_CHECKPOINT_ROOT": str(tmp_path / "external"),
     }.items():
         monkeypatch.setenv(key, value)
 
@@ -217,21 +236,91 @@ def test_weight_ema_and_label_smoothing_are_admitted(
     assert _throughput_protocol_identity(enabled.training) == ({} if deterministic else {"cuda_graph": True})
 
 
+@pytest.mark.parametrize("deterministic", [True, False])
 @pytest.mark.parametrize(
-    ("method", "reason"),
-    [
-        ({"mixed_batch": {"adversarial_fraction": 0.5, "adversarial_weight": 0.3}}, "no method.mixed_batch"),
-        ({"awp": {"gamma": 0.01}}, "no method.awp"),
-    ],
+    "method",
+    [{"mixed_batch": {"adversarial_fraction": 0.5, "adversarial_weight": 0.3}}, {"awp": {"gamma": 0.01}}],
 )
-def test_mixed_batch_and_awp_are_outside_the_graph_scope(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: dict[str, Any], reason: str
+def test_mixed_batch_and_awp_are_admitted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: dict[str, Any], deterministic: bool
 ) -> None:
+    """Human decision 2026-10-08: transcribed in the captured step and parity-tested (bitwise when
+    deterministic, the one-step rule otherwise) in tests/integration/test_cuda_graph_training_step.py.
+    AWP is admitted only in deterministic mode (its nondeterministic one-step check could not resolve it)."""
     raw = _stage1(monkeypatch, tmp_path)
+    updated = _with(raw, method=method, training={"cuda_graph": True, "deterministic": deterministic})
+    if "awp" in method and not deterministic:
+        with pytest.raises(ValueError, match="method.awp only with training.deterministic=true"):
+            ExperimentConfig.model_validate(updated)
+        return
+    enabled = ExperimentConfig.model_validate(updated)
+    assert enabled.training.cuda_graph
+    assert _throughput_protocol_identity(enabled.training) == ({} if deterministic else {"cuda_graph": True})
+
+
+def test_split_batchnorm_stays_outside_the_graph_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = _stage1(monkeypatch, tmp_path)
+    method = {"mixed_batch": {"adversarial_fraction": 0.5, "adversarial_weight": 0.3, "split_batchnorm": True}}
     ExperimentConfig.model_validate(_with(raw, method=method))
     with pytest.raises(ValueError, match="training.cuda_graph=true requires") as refused:
         ExperimentConfig.model_validate(_with(raw, method=method, training={"cuda_graph": True}))
-    assert reason in str(refused.value)
+    assert "no method.mixed_batch.split_batchnorm" in str(refused.value)
+
+
+_RSLAD_BANK = ROOT / "configs" / "scientific" / "imagenet_mobilenetv4_rslad_phase2_salman_r50_fkd.yaml"
+_RSLAD_ADVT_BANK = ROOT / "configs" / "scientific" / "imagenet_mobilenetv4_rslad_advt_phase2_convnext_b_cvst_fkd.yaml"
+
+
+def _phase2(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, path: Path) -> dict[str, Any]:
+    _env(monkeypatch, tmp_path)
+    return resolved_config_dict(load_config(path))
+
+
+@pytest.mark.parametrize("path", [_RSLAD_BANK, _RSLAD_ADVT_BANK])
+@pytest.mark.parametrize("deterministic", [True, False])
+def test_rslad_and_rslad_advt_distillation_are_admitted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path: Path, deterministic: bool
+) -> None:
+    """Human decision 2026-10-08: ImageNet RSLAD / RSLAD-advT (bank target; advT's teacher forward inside the
+    step) with an allowlisted student and teacher."""
+    raw = _phase2(monkeypatch, tmp_path, path)
+    enabled = ExperimentConfig.model_validate(_with(raw, training={"cuda_graph": True, "deterministic": deterministic}))
+    assert enabled.training.cuda_graph and enabled.method.id in {"rslad", "rslad_advt"}
+    assert _throughput_protocol_identity(enabled.training) == ({} if deterministic else {"cuda_graph": True})
+    online = _with(raw, training={"cuda_graph": True}, distillation={"target_source": "online_teacher", "bank": None})
+    online["distillation"].pop("bank")
+    assert ExperimentConfig.model_validate(online).distillation.target_source == "online_teacher"
+
+
+@pytest.mark.parametrize(("path", "refused"), [(_RSLAD_BANK, False), (_RSLAD_ADVT_BANK, True)])
+def test_a_teacher_inside_the_step_must_be_allowlisted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path: Path, refused: bool
+) -> None:
+    """Plain bank RSLAD never runs the teacher; advT (and an online target) runs it inside the step."""
+    raw = _with(_phase2(monkeypatch, tmp_path, path), training={"cuda_graph": True})
+    monkeypatch.setattr(schema_module, "CUDA_GRAPH_TEACHER_ARCHITECTURES", frozenset())
+    if not refused:
+        ExperimentConfig.model_validate(raw)
+        online = _with(raw, distillation={"target_source": "online_teacher"})
+        online["distillation"].pop("bank")
+        raw = online
+    with pytest.raises(ValueError, match="training.cuda_graph=true requires") as error:
+        ExperimentConfig.model_validate(raw)
+    assert "a parity-tested teacher.architecture" in str(error.value)
+
+
+def test_allowlisted_teachers_are_the_phase2_imagenet_teachers() -> None:
+    from ard.models.imagenet_teacher_registry import IMAGENET_TEACHER_SPECS
+
+    assert CUDA_GRAPH_TEACHER_ARCHITECTURES == {spec.architecture for spec in IMAGENET_TEACHER_SPECS.values()}
+
+
+def test_rslad_scope_still_refuses_a_sample_keyed_attack(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = _with(_phase2(monkeypatch, tmp_path, _RSLAD_BANK), training={"cuda_graph": True})
+    keyed = copy.deepcopy(raw)
+    keyed["method"]["attack"]["random_start_keying"] = "sample_keyed_v1"
+    with pytest.raises(ValueError, match="random_start_keying=batch"):
+        ExperimentConfig.model_validate(keyed)
 
 
 def test_sgd_norm_bias_exclusion_is_admitted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -376,16 +465,91 @@ def test_trainer_refuses_cuda_graph_outside_its_scope(tmp_path: Path) -> None:
     message = _refusal(tmp_path, step_diagnostics=True, weight_ema_decay=0.99)
     for reason in ("a CUDA device", "step_diagnostics=False"):
         assert reason in message
-    # A plain weight EMA is in scope (plan 0103 Phase 2 batch A); mixed batch and AWP are not.
+    # A plain weight EMA is in scope (plan 0103 Phase 2 batch A); since 2026-10-08 so are mixed batch
+    # (without split BN) and AWP: only the CPU device is refused for them here.
     assert "EMA" not in message
     mixed = MixedBatchConfig(adversarial_fraction=0.5, adversarial_weight=0.3)
-    assert "no mixed batch or AWP" in _refusal(tmp_path, mixed_batch=mixed)
-    assert "no mixed batch or AWP" in _refusal(tmp_path, awp=AwpConfig())
+    assert _refusal(tmp_path, mixed_batch=mixed) == "cuda_graph requires a CUDA device"
+    previous = torch.are_deterministic_algorithms_enabled()
+    try:
+        torch.use_deterministic_algorithms(True)
+        assert _refusal(tmp_path, awp=AwpConfig()) == "cuda_graph requires a CUDA device"
+        # AWP with the graph only under deterministic algorithms (nondeterministic one-step check unresolved).
+        torch.use_deterministic_algorithms(False)
+        assert "AWP only with deterministic algorithms" in _refusal(tmp_path, awp=AwpConfig())
+    finally:
+        torch.use_deterministic_algorithms(previous)
     # Only the CPU device is out of scope in the base fixture.
     assert "parity-tested student architecture" not in _refusal(tmp_path)
     assert "LinfPGD (not a subclass)" not in _refusal(tmp_path)
     keyed = LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", random_start_keying="sample_keyed_v1"))
-    assert "a CE, eval-mode, batch-keyed" in _refusal(tmp_path, attack=keyed)
+    assert "an eval-mode, batch-keyed" in _refusal(tmp_path, attack=keyed)
+    kl = LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", loss="kl", kl_target="teacher_clean"))
+    assert "a CE training attack (PGD-AT)" in _refusal(tmp_path, attack=kl)
+
+
+def test_trainer_refuses_split_batchnorm(tmp_path: Path) -> None:
+    model = nn.Sequential(nn.Conv2d(3, 4, 1), nn.BatchNorm2d(4), nn.Flatten(), nn.Linear(16, 3))
+    mixed = MixedBatchConfig(adversarial_fraction=0.5, adversarial_weight=0.3, split_batchnorm=True)
+    auxiliary = AuxiliaryBatchNorm(model)
+    optimizer = SGD([*model.parameters(), *auxiliary.parameters()], lr=0.1, momentum=0.9)
+    message = _refusal(tmp_path, model=model, optimizer=optimizer, mixed_batch=mixed, auxiliary_batchnorm=auxiliary)
+    assert "no split BN" in message
+
+
+def _fixture_teacher(architecture: str = "resnet50_imagenet") -> TeacherAdapter:
+    metadata = TeacherMetadata(
+        architecture=architecture,
+        num_classes=3,
+        normalization={"profile": "fixture_unit"},  # type: ignore[arg-type]
+        checkpoint_sha256="0" * 64,
+    )
+    return TeacherAdapter(nn.Sequential(nn.Flatten(), nn.Linear(12, 3)), metadata)
+
+
+def _bank_teacher(online: TeacherAdapter | None = None) -> SoftLabelBankTeacher:
+    bank = SoftLabelBank(Path("in-memory"), {"top_k": 2, "num_classes": 3, "epoch_records": {}}, np.arange(4))
+    return SoftLabelBankTeacher(bank, online_teacher=online)
+
+
+def _rslad(tmp_path: Path, *, teacher: nn.Module, advt: bool = False, **overrides: Any) -> str:
+    kl = LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", steps=1, loss="kl", kl_target="teacher_clean"))
+    return _refusal(
+        tmp_path,
+        **{
+            "attack": kl,
+            "objective": RSLADObjective(),
+            "policy": RSLADBaselinePolicy(),
+            "teacher": teacher,
+            "distillation_hooks": DistillationTargetHooks(adversarial_teacher_target=advt, temperature=1.0),
+            **overrides,
+        },
+    )
+
+
+def test_trainer_admits_rslad_from_a_bank_and_an_allowlisted_frozen_teacher(tmp_path: Path) -> None:
+    only_device = "cuda_graph requires a CUDA device"
+    assert _rslad(tmp_path, teacher=_bank_teacher()) == only_device
+    assert _rslad(tmp_path, teacher=_bank_teacher(_fixture_teacher()), advt=True) == only_device
+    assert _rslad(tmp_path, teacher=_fixture_teacher()) == only_device
+
+
+def test_trainer_refuses_rslad_outside_its_scope(tmp_path: Path) -> None:
+    in_step = "a frozen eval-mode teacher with a parity-tested architecture inside the step"
+    assert in_step in _rslad(tmp_path, teacher=_fixture_teacher("fixture_cnn"))
+    assert in_step in _rslad(tmp_path, teacher=_bank_teacher(_fixture_teacher("fixture_cnn")), advt=True)
+    # A bank without advT never runs the teacher: any (even off-list) online teacher is irrelevant there.
+    assert in_step not in _rslad(tmp_path, teacher=_bank_teacher(_fixture_teacher("fixture_cnn")))
+    trainable = _fixture_teacher()
+    nn.Module.train(trainable, True)  # bypass the adapter's eval-only override
+    assert in_step in _rslad(tmp_path, teacher=trainable)
+    assert "an advT online teacher" in _rslad(tmp_path, teacher=_bank_teacher(), advt=True)
+    assert "RSLAD baseline policy" in _rslad(tmp_path, teacher=_bank_teacher(), policy=None)
+    assert "RSLAD baseline policy" in _rslad(tmp_path, teacher=_bank_teacher(), distillation_hooks=None)
+    ce = LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", steps=1))
+    assert "KL-to-teacher-clean" in _rslad(tmp_path, teacher=_bank_teacher(), attack=ce)
+    # PGD-AT keeps refusing a teacher.
+    assert "no teacher (PGD-AT)" in _refusal(tmp_path, teacher=_fixture_teacher())
 
 
 @pytest.mark.parametrize("architecture", [None, "fixture_cnn", "mobilenet_v3_small_imagenet"])
@@ -395,7 +559,7 @@ def test_trainer_refuses_an_architecture_off_the_allowlist(tmp_path: Path, archi
 
 def test_trainer_refuses_a_train_mode_attack(tmp_path: Path) -> None:
     train_mode = LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", steps=1, student_mode="train"))
-    assert "a CE, eval-mode, batch-keyed" in _refusal(tmp_path, attack=train_mode)
+    assert "an eval-mode, batch-keyed" in _refusal(tmp_path, attack=train_mode)
 
 
 def test_trainer_refuses_a_linf_pgd_subclass(tmp_path: Path) -> None:
@@ -447,7 +611,12 @@ def _cpu_state() -> CudaGraphStepState:
         "labels": None,
         "valid": None,
         "noise": None,
+        "bank_index": None,
+        "bank_prob": None,
+        "bank_residual": None,
         "totals": torch.zeros(9, dtype=torch.float64),
+        "mixed_totals": None,
+        "awp_active": False,
         "graph": None,
         "fingerprint": None,
         "outputs": {},
@@ -475,6 +644,13 @@ def test_static_buffers_admit_only_contiguous_batches_of_the_captured_layout() -
     assert not state.matches(torch.rand(2, 3, 8, 8), torch.arange(2))
     assert not state.matches(images, torch.arange(8)[::2])
     assert state.full_batches_this_epoch == 2
+
+
+def test_the_noise_buffer_holds_the_attacked_rows_only() -> None:
+    state = _cpu_state()
+    assert state.matches(torch.rand(4, 3, 8, 8), torch.arange(4), noise_rows=2)
+    assert state.noise is not None and state.noise.shape == (2, 3, 8, 8)
+    assert state.images is not None and state.images.shape == (4, 3, 8, 8)
 
 
 def test_a_first_non_float_batch_never_allocates_the_buffers() -> None:
@@ -553,6 +729,35 @@ def test_fingerprint_ignores_in_place_value_updates_and_refuses_tensor_hyperpara
     optimizer.param_groups[0]["lr"] = torch.tensor(0.1)
     with pytest.raises(RuntimeError, match="Python-scalar optimizer 'lr'"):
         optimizer_fingerprint(optimizer, model)
+
+
+def test_fingerprint_covers_the_extra_inputs_of_the_2026_10_08_scope() -> None:
+    model, optimizer = _stepped_sgd()
+    teacher = nn.Sequential(nn.Linear(3, 4), nn.BatchNorm1d(4)).eval()
+    before = module_fingerprint(teacher)
+    assert module_fingerprint(teacher) == before
+    with torch.no_grad():
+        teacher[0].weight.mul_(2)  # in place: same tensors, same fingerprint
+    assert module_fingerprint(teacher) == before
+    teacher[1].train()
+    assert module_fingerprint(teacher) != before
+    teacher[1].eval()
+    teacher[0].weight = nn.Parameter(teacher[0].weight.detach().clone())
+    assert module_fingerprint(teacher) != before
+    proxy = SGD(nn.Linear(3, 2).parameters(), lr=0.01)
+    proxy_before = optimizer_groups_fingerprint(proxy)
+    proxy.param_groups[0]["lr"] = 0.02
+    assert optimizer_groups_fingerprint(proxy) != proxy_before
+    # The Trainer's extra tuple (static buffers, teacher, mixed k, AWP) is part of the compared fingerprint.
+    assert optimizer_fingerprint(optimizer, model, extra=(1,)) != optimizer_fingerprint(optimizer, model, extra=(2,))
+
+
+def test_require_is_the_host_check_outside_a_capture() -> None:
+    require(torch.tensor(True), "never raised")
+    with pytest.raises(FloatingPointError, match="^bad value$"):
+        require(torch.tensor(False), "bad value", FloatingPointError)
+    with pytest.raises(ValueError, match="^bad value$"):
+        require(torch.tensor(False), "bad value")
 
 
 def test_momentum_buffers_ready_only_after_the_first_update() -> None:

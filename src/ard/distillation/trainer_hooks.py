@@ -18,6 +18,8 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
+from ard.device_checks import require
+
 from .soft_label_bank import SoftLabelBankTeacher, kl_rows, truncate_like_bank
 
 
@@ -67,8 +69,10 @@ class DistillationTargetHooks:
                         weights.sum(),
                     ]
                 )
-            if not bool(torch.isfinite(target).all()):
-                raise FloatingPointError("rslad_advt adversarial teacher target is non-finite")
+            # A host check, or a device assert inside a captured CUDA graph (plan 0105).
+            require(
+                torch.isfinite(target).all(), "rslad_advt adversarial teacher target is non-finite", FloatingPointError
+            )
         return target.detach()
 
     def epoch_metrics(self, reduce_sums: Any) -> dict[str, float]:

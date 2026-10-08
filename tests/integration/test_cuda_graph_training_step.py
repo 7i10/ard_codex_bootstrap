@@ -25,6 +25,13 @@ differentials (``variant``): a plain weight EMA updated inside the captured step
 (``training.weight_ema_decay``), label smoothing in the captured objective, and SGD with a
 weight-decay-free group for ndim <= 1 parameters (``optimizer.exclude_norm_bias_from_weight_decay``).
 
+Human decision 2026-10-08 widened it again (``method``): RSLAD and RSLAD-advT distillation from a
+soft-label bank (bank rows copied into static buffers, reconstructed inside the step; the advT teacher
+forward on x' inside the step), RSLAD from an online frozen teacher, ``method.mixed_batch`` without split
+BN, and ``method.awp``. Each has the same bitwise differentials, resume, a method-specific negative
+control and the nondeterministic rules; every teacher architecture that may run inside the step
+(``CUDA_GRAPH_TEACHER_ARCHITECTURES``) has its own bitwise case.
+
 training.deterministic=false (end of file): bitwise parity is impossible, so
 exact RNG streams and audit counts over whole runs, plus a one-step
 equivalence test against eager-vs-eager nondeterministic noise.
@@ -43,6 +50,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 import torch
 from torch import nn
@@ -53,12 +61,30 @@ from torch.utils.data import DataLoader
 import ard.engine.trainer as trainer_module
 from ard.attacks import AttackRequest, LinfPGD
 from ard.cli.train import _seed_everything
-from ard.config.schema import CUDA_GRAPH_ARCHITECTURES, AttackConfig, ModelConfig, NormalizationConfig
+from ard.config.schema import (
+    CUDA_GRAPH_ARCHITECTURES,
+    CUDA_GRAPH_TEACHER_ARCHITECTURES,
+    AttackConfig,
+    AwpConfig,
+    MixedBatchConfig,
+    ModelConfig,
+    NormalizationConfig,
+)
 from ard.data import EpochShuffleSampler, IndexedDataset, SyntheticCIFAR, collate_indexed
+from ard.distillation.crop_keys import collate_crop_keyed
+from ard.distillation.soft_label_bank import (
+    SoftLabelBank,
+    SoftLabelBankTeacher,
+    _EpochArrays,
+    compress_probabilities,
+)
+from ard.distillation.trainer_hooks import DistillationTargetHooks
 from ard.engine.trainer import Trainer
 from ard.models import build_student
 from ard.models.registry import PixelModel
-from ard.objectives import PGDATObjective
+from ard.models.teacher import TeacherAdapter, TeacherMetadata
+from ard.objectives import PGDATObjective, RSLADObjective
+from ard.policies import RSLADBaselinePolicy
 from ard.tracking.diagnostics import TrainingDiagnostics
 from tests.integration.test_step_sync_free_parity import _STATE_KEYS, _TIMING_SUFFIXES, _canonical
 
@@ -71,6 +97,7 @@ _TRAIN_SIZE = 26
 _BATCH = 4
 _EPOCHS = 3
 _FIXTURE = "fixture_bn_dropout"
+_FIXTURE_TEACHER = "fixture_teacher"
 _AUDIT_KEYS = ("train_cuda_graph_captures", "train_cuda_graph_replays", "train_cuda_graph_eager_steps")
 # Plan 0103 Phase 2 MobileNetV4-S architecture variants: allowlist CANDIDATES, not allowlisted. Their
 # cases run only on request (ARD_CUDA_GRAPH_CANDIDATES=1, on a free GPU); inside the test subprocess the
@@ -111,11 +138,17 @@ def _bn_dropout_student(num_classes: int) -> nn.Module:
     return PixelModel(inner, NormalizationConfig(profile="fixture_unit"))
 
 
-def _student(kind: str) -> tuple[nn.Module, int, int]:
+# Teacher-architecture cases: the fixture student at the teacher's resolution, 1000 classes (ViT-S needs 224 px).
+_TEACHER_IMAGE_SIZE = {"vit_s_convstem_imagenet": 224}
+
+
+def _student(kind: str, *, teacher_kind: str = _FIXTURE_TEACHER) -> tuple[nn.Module, int, int]:
     """Return (student, num_classes, image_size) for a fixture or an allowlisted architecture."""
     if kind == _FIXTURE:
         # A test-only extension of the allowlist, confined to this subprocess.
         trainer_module.CUDA_GRAPH_ARCHITECTURES = CUDA_GRAPH_ARCHITECTURES | {_FIXTURE}  # type: ignore[attr-defined]
+        if teacher_kind != _FIXTURE_TEACHER:
+            return _bn_dropout_student(1000), 1000, _TEACHER_IMAGE_SIZE.get(teacher_kind, 32)
         return _bn_dropout_student(3), 3, 8
     _admit_candidate(kind)
     config = ModelConfig(
@@ -127,23 +160,43 @@ def _student(kind: str) -> tuple[nn.Module, int, int]:
     return build_student(config, tier="dev"), 10, 32
 
 
-def _loaders(num_classes: int, image_size: int, *, pin_memory: bool) -> tuple[DataLoader, DataLoader, DataLoader]:
+class _CropKeyed(torch.utils.data.Dataset):
+    """Test stand-in for CropKeyedSubset: every item also carries a crop key (0, source_id, 0, 0, 0, 0)."""
+
+    def __init__(self, inner: Any) -> None:
+        self.inner = inner
+
+    def __len__(self) -> int:
+        return len(self.inner)
+
+    def __getitem__(self, index: Any) -> Any:
+        item = self.inner[index]
+        return (*item, (0, int(item[2]), 0, 0, 0, 0))
+
+
+def _loaders(
+    num_classes: int, image_size: int, *, pin_memory: bool, crop_keyed: bool = False
+) -> tuple[DataLoader, DataLoader, DataLoader]:
     train = IndexedDataset(SyntheticCIFAR(size=_TRAIN_SIZE, num_classes=num_classes, image_size=image_size, seed=3))
     validation = IndexedDataset(SyntheticCIFAR(size=6, num_classes=num_classes, image_size=image_size, seed=99))
     # Train-probe pass (production stage 1 runs one every epoch): fixed
     # training-partition images, between the graph epochs.
     probe = IndexedDataset(SyntheticCIFAR(size=6, num_classes=num_classes, image_size=image_size, seed=3))
 
-    def ordered(dataset: Any, *, shuffle: bool) -> DataLoader:
+    def ordered(dataset: Any, *, shuffle: bool, keyed: bool = False) -> DataLoader:
         return DataLoader(
-            dataset,
+            _CropKeyed(dataset) if keyed else dataset,
             batch_size=_BATCH,
             sampler=EpochShuffleSampler(len(dataset), seed=5, shuffle=shuffle),
             pin_memory=pin_memory,
-            collate_fn=collate_indexed,
+            collate_fn=collate_crop_keyed if keyed else collate_indexed,
         )
 
-    return ordered(train, shuffle=True), ordered(validation, shuffle=False), ordered(probe, shuffle=False)
+    return (
+        ordered(train, shuffle=True, keyed=crop_keyed),
+        ordered(validation, shuffle=False),
+        ordered(probe, shuffle=False),
+    )
 
 
 # Plan 0103 Phase 2 batch A options a variant ("base" or "+"-joined names) switches on.
@@ -168,6 +221,90 @@ def _optimizer_parameters(student: nn.Module, options: set[str], weight_decay: f
     return _weight_decay_parameter_groups(student.parameters(), weight_decay=weight_decay)
 
 
+# Training methods a parity case runs (human decision 2026-10-08 added all but pgd_at).
+_METHODS = ("pgd_at", "rslad_bank", "rslad_online", "rslad_advt_bank", "mixed_batch", "awp")
+_DISTILLATION_METHODS = ("rslad_bank", "rslad_online", "rslad_advt_bank")
+_BANK_METHODS = ("rslad_bank", "rslad_advt_bank")
+_MIXED = MixedBatchConfig(adversarial_fraction=0.5, adversarial_weight=0.3)
+# AWP is off in epoch 0 and on afterwards, so a run covers both; gamma large enough to move the weights.
+_AWP = AwpConfig(gamma=0.05, warmup_epochs=1)
+
+
+def _bank_top_k(num_classes: int) -> int:
+    """A truncating bank (K < C), so the residual-mass reconstruction and the advT truncation both act."""
+    return {3: 2, 10: 3}.get(num_classes, 10)
+
+
+def _fixture_bank(num_classes: int, size: int, epochs: int) -> SoftLabelBank:
+    """An in-memory soft-label bank over source IDs 0..size-1, a different random teacher distribution per
+    epoch, stored exactly as the builder stores it (compress_probabilities), crop key (0, id, 0, 0, 0, 0)."""
+    top_k = _bank_top_k(num_classes)
+    ids = np.arange(size, dtype=np.int64)
+    bank = SoftLabelBank(Path("in-memory"), {"top_k": top_k, "num_classes": num_classes, "epoch_records": {}}, ids)
+    generator = torch.Generator().manual_seed(77)
+    keys = np.zeros((size, 6), dtype=np.int32)
+    keys[:, 1] = ids
+    for epoch in range(epochs):
+        probabilities = (torch.randn(size, num_classes, generator=generator) * 2.0).softmax(dim=1)
+        index, prob16, residual16 = compress_probabilities(probabilities, top_k)
+        bank._epochs[epoch] = _EpochArrays(
+            index=index.numpy().astype(np.uint16), prob=prob16.numpy(), residual=residual16.numpy(), keys=keys
+        )
+    return bank
+
+
+def _teacher(teacher_kind: str, num_classes: int) -> TeacherAdapter:
+    """A frozen eval-mode teacher: a BatchNorm + dropout fixture (test-only allowlist entry, confined to the
+    subprocess) or a randomly initialised allowlisted ImageNet teacher architecture (1000 classes)."""
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(4321)
+        if teacher_kind == _FIXTURE_TEACHER:
+            trainer_module.CUDA_GRAPH_TEACHER_ARCHITECTURES = (  # type: ignore[attr-defined]
+                CUDA_GRAPH_TEACHER_ARCHITECTURES | {_FIXTURE_TEACHER}
+            )
+            model = _bn_dropout_student(num_classes).model
+            normalization = NormalizationConfig(profile="fixture_unit")
+        else:
+            from ard.models.imagenet_teacher_registry import build_imagenet_teacher_architecture
+
+            assert num_classes == 1000
+            model = build_imagenet_teacher_architecture(teacher_kind)
+            normalization = NormalizationConfig(profile="imagenet_standard")
+    metadata = TeacherMetadata(
+        architecture=teacher_kind, num_classes=num_classes, normalization=normalization, checkpoint_sha256="0" * 64
+    )
+    return TeacherAdapter(model, metadata)
+
+
+def _method_parts(
+    method: str, *, num_classes: int, train_size: int, epochs: int, teacher_kind: str, attack: dict[str, Any]
+) -> dict[str, Any]:
+    """Trainer keyword arguments (attack, objective, teacher, policy, hooks, mixed batch, AWP) of a method."""
+    assert method in _METHODS, method
+    if method not in _DISTILLATION_METHODS:
+        return {
+            "attack": LinfPGD(AttackConfig(**attack, random_start=True)),
+            "mixed_batch": _MIXED if method == "mixed_batch" else None,
+            "awp": _AWP if method == "awp" else None,
+        }
+    teacher: nn.Module
+    if method == "rslad_online":
+        teacher = _teacher(teacher_kind, num_classes)
+    else:
+        bank = _fixture_bank(num_classes, train_size, epochs)
+        online = _teacher(teacher_kind, num_classes) if method == "rslad_advt_bank" else None
+        teacher = SoftLabelBankTeacher(bank, online_teacher=online)
+    return {
+        "attack": LinfPGD(AttackConfig(**attack, random_start=True, loss="kl", kl_target="teacher_clean")),
+        "objective": RSLADObjective(temperature=1.0, temperature_squared=True),
+        "policy": RSLADBaselinePolicy(),
+        "teacher": teacher,
+        "distillation_hooks": DistillationTargetHooks(
+            adversarial_teacher_target=method == "rslad_advt_bank", temperature=1.0
+        ),
+    }
+
+
 def build_trainer(
     output: Path,
     *,
@@ -176,26 +313,38 @@ def build_trainer(
     device: torch.device,
     diagnostics: str = "panel",
     variant: str = "base",
+    method: str = "pgd_at",
+    teacher_kind: str = _FIXTURE_TEACHER,
 ) -> tuple[Trainer, Any]:
     # Every RNG stream a checkpoint records (Python, NumPy, torch CPU/CUDA), seeded as ard.cli.train
     # does: each arm runs in a fresh process, so an unseeded stream would differ between arms.
     _seed_everything(1234)
     options = _variant(variant)
-    student, num_classes, image_size = _student(kind)
+    student, num_classes, image_size = _student(kind, teacher_kind=teacher_kind)
     student = student.to(device)
     optimizer = SGD(
         _optimizer_parameters(student, options, 5e-4), lr=0.05, momentum=0.9, weight_decay=5e-4, nesterov=True
+    )
+    parts = _method_parts(
+        method,
+        num_classes=num_classes,
+        train_size=_TRAIN_SIZE,
+        epochs=_EPOCHS,
+        teacher_kind=teacher_kind,
+        attack={"epsilon": "4/255", "step_size": "4/255", "steps": 2},
+    )
+    parts.setdefault(
+        "objective", PGDATObjective(label_smoothing=_LABEL_SMOOTHING if "label_smoothing" in options else 0.0)
     )
     trainer = Trainer(
         model=student,
         optimizer=optimizer,
         scheduler=MultiStepLR(optimizer, milestones=[1, 2], gamma=0.1),
         scaler=None,
-        attack=LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", steps=2, random_start=True)),
         selection_attack=LinfPGD(
             AttackConfig(epsilon="4/255", step_size="1/255", steps=2, student_mode="eval", teacher_mode="eval")
         ),
-        objective=PGDATObjective(label_smoothing=_LABEL_SMOOTHING if "label_smoothing" in options else 0.0),
+        **parts,
         weight_ema_decay=_EMA_DECAY if "ema" in options else None,
         device=device,
         output_dir=output,
@@ -243,9 +392,71 @@ def _fingerprint(trainer: Trainer, history: list[dict[str, Any]], output: Path) 
     return result
 
 
-def arm(root: Path, kind: str, mode: str, diagnostics: str, variant: str = "base") -> dict[str, Any]:
-    """One arm in this (fresh) process: eager | graph | graph_seed_plus_one | resumed."""
+def _install_method_control(method: str) -> None:
+    """``graph_control``: a defect confined to the graph path of ``method``; the run must then differ.
+
+    Bank methods: the bank rows copied into the static buffers belong to the next sample (rolled by one).
+    rslad_online: the in-step teacher sees a slightly shifted clean batch. mixed_batch: the graph attacks
+    k + 1 positions (and weights them as adversarial). awp: the graph never perturbs the weights.
+    pgd_at: the graph's random start is negated.
+    """
+    if method in _BANK_METHODS:
+        original_rows = SoftLabelBankTeacher.clean_rows
+
+        def rolled(self: SoftLabelBankTeacher, batch: Any, *, epoch: int) -> Any:
+            return tuple(row.roll(1, dims=0) for row in original_rows(self, batch, epoch=epoch))
+
+        SoftLabelBankTeacher.clean_rows = rolled  # type: ignore[method-assign]
+    elif method == "rslad_online":
+        original_forward = TeacherAdapter.forward
+
+        def shifted_forward(self: TeacherAdapter, pixels: torch.Tensor) -> torch.Tensor:
+            if torch.cuda.is_current_stream_capturing():
+                pixels = (pixels * 0.99).detach()
+            return original_forward(self, pixels)
+
+        TeacherAdapter.forward = shifted_forward  # type: ignore[method-assign]
+    elif method == "mixed_batch":
+        original_count = Trainer._cuda_graph_mixed_count
+
+        def more(self: Trainer, batch_size: int) -> int | None:
+            count = original_count(self, batch_size)
+            return None if count is None else count + 1
+
+        Trainer._cuda_graph_mixed_count = more  # type: ignore[method-assign]
+    elif method == "awp":
+        original_step = Trainer._cuda_graph_train_step
+
+        def without_awp(self: Trainer, batch: Any) -> bool:
+            assert self._cuda_graph is not None
+            self._cuda_graph.awp_active = False
+            return original_step(self, batch)
+
+        Trainer._cuda_graph_train_step = without_awp  # type: ignore[method-assign]
+    else:
+        original_body = Trainer._cuda_graph_body
+
+        def negated(self: Trainer) -> None:
+            assert self._cuda_graph is not None and self._cuda_graph.noise is not None
+            self._cuda_graph.noise.neg_()
+            original_body(self)
+
+        Trainer._cuda_graph_body = negated  # type: ignore[method-assign]
+
+
+def arm(
+    root: Path,
+    kind: str,
+    mode: str,
+    diagnostics: str,
+    variant: str = "base",
+    method: str = "pgd_at",
+    teacher_kind: str = _FIXTURE_TEACHER,
+) -> dict[str, Any]:
+    """One arm in this (fresh) process: eager | graph | graph_seed_plus_one | graph_control | resumed."""
     device = torch.device("cuda")
+    if mode == "graph_control":
+        _install_method_control(method)
     if mode == "graph_seed_plus_one":
         # Negative control: the graph path draws from a different attack stream.
         original = Trainer._attack_generator
@@ -256,19 +467,19 @@ def arm(root: Path, kind: str, mode: str, diagnostics: str, variant: str = "base
 
         Trainer._attack_generator = shifted  # type: ignore[method-assign]
     cuda_graph = mode != "eager"
-    trainer, (num_classes, image_size) = build_trainer(
-        root, kind=kind, cuda_graph=cuda_graph, device=device, diagnostics=diagnostics, variant=variant
-    )
+    common = {"diagnostics": diagnostics, "variant": variant, "method": method, "teacher_kind": teacher_kind}
+    trainer, (num_classes, image_size) = build_trainer(root, kind=kind, cuda_graph=cuda_graph, device=device, **common)
     post_seed_cuda_rng = _digest(torch.cuda.get_rng_state())
-    loader, validation_loader, probe_loader = _loaders(num_classes, image_size, pin_memory=True)
+    crop_keyed = method in _BANK_METHODS
+    loader, validation_loader, probe_loader = _loaders(num_classes, image_size, pin_memory=True, crop_keyed=crop_keyed)
     loaders = {"validation_loader": validation_loader, "probe_loader": probe_loader}
     if mode == "resumed":
         history = trainer.fit(loader, epochs=1, **loaders)
         del trainer
-        trainer, _ = build_trainer(
-            root, kind=kind, cuda_graph=True, device=device, diagnostics=diagnostics, variant=variant
+        trainer, _ = build_trainer(root, kind=kind, cuda_graph=True, device=device, **common)
+        loader, validation_loader, probe_loader = _loaders(
+            num_classes, image_size, pin_memory=True, crop_keyed=crop_keyed
         )
-        loader, validation_loader, probe_loader = _loaders(num_classes, image_size, pin_memory=True)
         start = trainer.resume(root / "last.pt", sampler=loader.sampler).next_epoch
         assert start == 1
         history += trainer.fit(
@@ -288,10 +499,29 @@ def arm(root: Path, kind: str, mode: str, diagnostics: str, variant: str = "base
             not torch.equal(value, live[key]) for key, value in trainer.ema_model.state_dict().items()
         )
     fingerprint["optimizer_groups"] = [group["weight_decay"] for group in trainer.optimizer.param_groups]
+    # Evidence the method's own step ran (method columns of the epoch rows).
+    fingerprint["method_rows"] = [
+        {
+            key: row[key]
+            for key in (
+                "train_teacher_clean_forward_calls",
+                "train_teacher_adversarial_forward_calls",
+                "train_awp_active",
+                "train_mixed_batch_adversarial_examples",
+                "train_mixed_batch_clean_examples",
+            )
+            if key in row
+        }
+        | {key: True for key in row if key.startswith("train_advt_")}
+        for row in history
+    ]
+    fingerprint["peak_reserved_gib"] = torch.cuda.max_memory_reserved() / 2**30
     return fingerprint
 
 
-def nondeterministic_arm(root: Path, kind: str, mode: str, variant: str = "base") -> dict[str, Any]:
+def nondeterministic_arm(
+    root: Path, kind: str, mode: str, variant: str = "base", method: str = "pgd_at"
+) -> dict[str, Any]:
     """``arm`` under training.deterministic=false, plus the attack-generator stream.
 
     Records every attack generator the run creates (seed and final philox
@@ -308,7 +538,7 @@ def nondeterministic_arm(root: Path, kind: str, mode: str, variant: str = "base"
         return generator
 
     Trainer._attack_generator = recorded  # type: ignore[method-assign]
-    fingerprint = arm(root, kind, mode, "panel", variant)
+    fingerprint = arm(root, kind, mode, "panel", variant, method)
     fingerprint["attack_generators"] = _digest(
         [(generator.initial_seed(), generator.get_state()) for generator in generators]
     )
@@ -336,7 +566,8 @@ _SINGLE_STEP_CONTROLS = ("attack_seed_plus_one", "lr_zero", "lr_times_1p001", "w
 def _single_step_trainer(
     spec: dict[str, Any], output: Path, *, cuda_graph: bool
 ) -> tuple[Trainer, DataLoader, DataLoader]:
-    """A PGD-AT trainer and a five-batch synthetic loader for the one-step comparison."""
+    """A trainer (``spec["method"]``, default PGD-AT) and a five-batch synthetic loader for the one-step
+    comparison."""
     _seed_everything(1234)
     device = torch.device("cuda")
     kind = spec["kind"]
@@ -364,18 +595,30 @@ def _single_step_trainer(
         nesterov=True,
     )
     size = 5 * spec["batch"]
+    method = spec.get("method", "pgd_at")
+    parts = _method_parts(
+        method,
+        num_classes=num_classes,
+        train_size=size,
+        epochs=1,
+        teacher_kind=_FIXTURE_TEACHER,
+        attack={"epsilon": spec["epsilon"], "step_size": spec["step_size"], "steps": spec["steps"]},
+    )
+    if parts.get("awp") is not None:
+        # Active in the single epoch, at the production (AT-AWP default) gamma.
+        parts["awp"] = AwpConfig(gamma=0.01, warmup_epochs=0)
+    parts.setdefault(
+        "objective", PGDATObjective(label_smoothing=_LABEL_SMOOTHING if "label_smoothing" in options else 0.0)
+    )
     trainer = Trainer(
         model=student,
         optimizer=optimizer,
         scheduler=None,
         scaler=None,
-        attack=LinfPGD(
-            AttackConfig(epsilon=spec["epsilon"], step_size=spec["step_size"], steps=spec["steps"], random_start=True)
-        ),
         selection_attack=LinfPGD(
             AttackConfig(epsilon=spec["epsilon"], step_size="1/255", steps=1, student_mode="eval", teacher_mode="eval")
         ),
-        objective=PGDATObjective(label_smoothing=_LABEL_SMOOTHING if "label_smoothing" in options else 0.0),
+        **parts,
         weight_ema_decay=_EMA_DECAY if "ema" in options else None,
         device=device,
         output_dir=output,
@@ -388,17 +631,19 @@ def _single_step_trainer(
         student_architecture=kind,
     )
 
-    def loader(dataset_size: int, seed: int) -> DataLoader:
-        dataset = SyntheticCIFAR(size=dataset_size, num_classes=num_classes, image_size=spec["image_size"], seed=seed)
+    def loader(dataset_size: int, seed: int, *, keyed: bool = False) -> DataLoader:
+        dataset = IndexedDataset(
+            SyntheticCIFAR(size=dataset_size, num_classes=num_classes, image_size=spec["image_size"], seed=seed)
+        )
         return DataLoader(
-            IndexedDataset(dataset),
+            _CropKeyed(dataset) if keyed else dataset,
             batch_size=spec["batch"],
             sampler=EpochShuffleSampler(dataset_size, seed=5, shuffle=True),
             pin_memory=True,
-            collate_fn=collate_indexed,
+            collate_fn=collate_crop_keyed if keyed else collate_indexed,
         )
 
-    return trainer, loader(size, 3), loader(spec["batch"], 99)
+    return trainer, loader(size, 3, keyed=method in _BANK_METHODS), loader(spec["batch"], 99)
 
 
 def _single_step_state(trainer: Trainer) -> dict[str, Any]:
@@ -581,13 +826,32 @@ def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> d
     return result
 
 
+# Stale-graph mutations of the 2026-10-08 scope and the method each needs.
+_METHOD_MUTATIONS = {
+    "bank_buffer": "rslad_bank",
+    "teacher_weight": "rslad_advt_bank",
+    "teacher_mode": "rslad_online",
+    "awp_proxy_tensor": "awp",
+    "awp_gamma": "awp",
+    "mixed_weight": "mixed_batch",
+}
+
+
 def stale_guard(root: Path, mutation: str) -> str:
-    """Mutate the optimizer mid-epoch after capture; return the error text."""
+    """Mutate the optimizer (or another baked-in input of the step) mid-epoch after capture; return the error."""
     device = torch.device("cuda")
+    method = _METHOD_MUTATIONS.get(mutation, "pgd_at")
     trainer, (num_classes, image_size) = build_trainer(
-        root, kind=_FIXTURE, cuda_graph=True, device=device, variant="ema" if mutation == "ema_tensor" else "base"
+        root,
+        kind=_FIXTURE,
+        cuda_graph=True,
+        device=device,
+        variant="ema" if mutation == "ema_tensor" else "base",
+        method=method,
     )
-    loader, validation_loader, _ = _loaders(num_classes, image_size, pin_memory=False)
+    loader, validation_loader, _ = _loaders(
+        num_classes, image_size, pin_memory=False, crop_keyed=method in _BANK_METHODS
+    )
 
     def mutate(epoch: int, batch_index: int, _batch: Any) -> None:
         if epoch != 0 or batch_index != 3:  # batch 0 eager, 1 captured and replayed, 2 replayed
@@ -609,6 +873,29 @@ def stale_guard(root: Path, mutation: str) -> str:
             assert trainer.ema_model is not None
             batchnorm = next(module for module in trainer.ema_model.modules() if isinstance(module, nn.BatchNorm2d))
             batchnorm.register_buffer("running_mean", batchnorm.running_mean.clone())
+        elif mutation == "bank_buffer":
+            # A reallocated static bank buffer: the graph reads the old one.
+            state = trainer._cuda_graph
+            assert state is not None and state.bank_prob is not None
+            state.bank_prob = state.bank_prob.clone()
+        elif mutation == "teacher_weight":
+            # A teacher reload that is not in place: the graph reads the old weights.
+            assert isinstance(trainer.teacher, SoftLabelBankTeacher) and trainer.teacher.online_teacher is not None
+            layer = next(m for m in trainer.teacher.online_teacher.modules() if isinstance(m, nn.Conv2d))
+            layer.weight = nn.Parameter(layer.weight.detach().clone(), requires_grad=False)
+        elif mutation == "teacher_mode":
+            assert trainer.teacher is not None
+            nn.Module.train(trainer.teacher, True)  # bypass the adapter's eval-only override
+        elif mutation == "awp_proxy_tensor":
+            assert trainer._awp is not None
+            layer = next(m for m in trainer._awp.proxy.modules() if isinstance(m, nn.BatchNorm2d))
+            layer.register_buffer("running_var", layer.running_var.clone())
+        elif mutation == "awp_gamma":
+            assert trainer._awp is not None
+            trainer._awp.gamma *= 2.0
+        elif mutation == "mixed_weight":
+            assert trainer.mixed_batch is not None
+            trainer.mixed_batch = trainer.mixed_batch.model_copy(update={"adversarial_weight": 0.5})
         else:
             raise AssertionError(mutation)
 
@@ -642,8 +929,15 @@ def poisoned_replay(root: Path, poison: str) -> None:
     [0, 1] guards (every comparison is false) and trips the finite-loss assert.
     """
     device = torch.device("cuda")
-    trainer, (num_classes, image_size) = build_trainer(root, kind=_FIXTURE, cuda_graph=True, device=device)
-    loader, validation_loader, _ = _loaders(num_classes, image_size, pin_memory=False)
+    # Keep the epoch's graph alive past the epoch end (it is normally released there to free its pool).
+    Trainer._release_cuda_graph = lambda self: None  # type: ignore[method-assign]
+    method = "rslad_bank" if poison == "bank_nan" else "pgd_at"
+    trainer, (num_classes, image_size) = build_trainer(
+        root, kind=_FIXTURE, cuda_graph=True, device=device, method=method
+    )
+    loader, validation_loader, _ = _loaders(
+        num_classes, image_size, pin_memory=False, crop_keyed=method in _BANK_METHODS
+    )
     trainer.fit(loader, validation_loader=validation_loader, epochs=1)
     state = trainer._cuda_graph
     assert state is not None and state.graph is not None and state.images is not None
@@ -653,6 +947,10 @@ def poisoned_replay(root: Path, poison: str) -> None:
         state.images.fill_(1.5)
     elif poison == "nan":
         state.images.fill_(float("nan"))
+    elif poison == "bank_nan":
+        # A corrupt bank row: reconstruct_probabilities' check is a device assert inside the step.
+        assert state.bank_prob is not None
+        state.bank_prob.fill_(float("nan"))
     else:
         raise AssertionError(poison)
     state.graph.replay()
@@ -747,7 +1045,16 @@ def _result(completed: subprocess.CompletedProcess[str]) -> Any:
 
 
 def _comparable(fingerprint: dict[str, Any], *, diagnostics: bool = True) -> dict[str, Any]:
-    ignored = {"cuda_rng_advanced", "audit", "has_probe", "has_ema", "ema_differs_from_model", "optimizer_groups"}
+    ignored = {
+        "cuda_rng_advanced",
+        "audit",
+        "has_probe",
+        "has_ema",
+        "ema_differs_from_model",
+        "optimizer_groups",
+        "method_rows",
+        "peak_reserved_gib",
+    }
     return {
         key: value
         for key, value in fingerprint.items()
@@ -848,9 +1155,7 @@ def test_negative_control_a_shifted_attack_stream_is_detected() -> None:
 
 @pytest.mark.gpu
 @requires_cuda
-@pytest.mark.parametrize(
-    "mutation", ["lr", "momentum", "weight_decay", "load_state_dict", "model_mode", "ema_tensor"]
-)
+@pytest.mark.parametrize("mutation", ["lr", "momentum", "weight_decay", "load_state_dict", "model_mode", "ema_tensor"])
 def test_mid_epoch_optimizer_change_is_refused_not_replayed(mutation: str) -> None:
     message = _result(_run("stale_guard", mutation))
     assert "CUDA graph is stale" in message
@@ -913,6 +1218,120 @@ def test_perturb_core_never_synchronizes_with_the_host() -> None:
         attack.perturb(request, epsilon=epsilon, step_size=step_size, unit_noise=noise)
     finally:
         torch.cuda.set_sync_debug_mode(previous)
+
+
+# ======================================= human decision 2026-10-08: RSLAD / RSLAD-advT, mixed batch, AWP
+_NEW_METHODS = ("rslad_bank", "rslad_online", "rslad_advt_bank", "mixed_batch", "awp")
+_NEW_METHOD_CASES = [
+    (kind, method) for kind in (_FIXTURE, *sorted(CUDA_GRAPH_ARCHITECTURES)) for method in _NEW_METHODS
+]
+
+
+def _assert_method_ran(result: dict[str, Any], method: str) -> None:
+    """The epoch rows show the method's own step (and the graph replayed it)."""
+    rows = result["method_rows"]
+    assert len(rows) == _EPOCHS
+    steps = float(_FULL_BATCHES + 1)
+    for epoch, row in enumerate(rows):
+        clean_calls = steps if method == "rslad_online" else 0.0
+        adversarial_calls = steps if method == "rslad_advt_bank" else 0.0
+        assert row["train_teacher_clean_forward_calls"] == clean_calls, (method, row)
+        assert row["train_teacher_adversarial_forward_calls"] == adversarial_calls, (method, row)
+        assert ("train_advt_teacher_adversarial_accuracy" in row) is (method == "rslad_advt_bank")
+        if method == "awp":
+            assert row["train_awp_active"] == (1.0 if epoch >= _AWP.warmup_epochs else 0.0)
+        if method == "mixed_batch":
+            # k = 2 of every full batch of 4, k = 1 of the partial batch of 2.
+            assert row["train_mixed_batch_adversarial_examples"] == 2 * _FULL_BATCHES + 1
+            assert row["train_mixed_batch_clean_examples"] == 2 * _FULL_BATCHES + 1
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize(("kind", "method"), _NEW_METHOD_CASES)
+def test_graph_step_of_rslad_mixed_batch_and_awp_is_bit_identical_to_the_eager_step(kind: str, method: str) -> None:
+    eager = _result(_run("arm", kind, "eager", "panel", "base", method))
+    graph = _result(_run("arm", kind, "graph", "panel", "base", method))
+    _assert_method_ran(eager, method)
+    _assert_method_ran(graph, method)
+    assert eager["has_probe"] and graph["has_probe"]
+    assert graph["audit"] == _EXPECTED_AUDIT
+    assert _comparable(graph) == _comparable(eager)
+    if kind == _FIXTURE and method in ("awp", "rslad_advt_bank", "rslad_online"):
+        # Dropout drew from the default CUDA generator inside the graph (student; AWP proxy).
+        assert eager["cuda_rng_advanced"] and graph["cuda_rng_advanced"]
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", _NEW_METHODS)
+@pytest.mark.parametrize("kind", [_FIXTURE, "mobilenetv4_conv_small_imagenet"])
+def test_graph_step_of_new_methods_with_the_phase2_weight_ema_is_bit_identical(kind: str, method: str) -> None:
+    """Every Phase 2 config also sets training.weight_ema_decay: each new method together with the EMA."""
+    eager = _result(_run("arm", kind, "eager", "panel", "ema", method))
+    graph = _result(_run("arm", kind, "graph", "panel", "ema", method))
+    _assert_method_ran(graph, method)
+    _assert_variant_ran(eager, "ema")
+    _assert_variant_ran(graph, "ema")
+    assert graph["audit"] == _EXPECTED_AUDIT
+    assert _comparable(graph) == _comparable(eager)
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", ["rslad_online", "rslad_advt_bank"])
+@pytest.mark.parametrize("teacher_kind", sorted(CUDA_GRAPH_TEACHER_ARCHITECTURES))
+def test_in_step_teacher_forward_of_every_allowlisted_teacher_is_bit_identical(teacher_kind: str, method: str) -> None:
+    """Every teacher architecture that may run inside the captured step (random weights, 1000 classes; the
+    fixture student at 32 px, ViT-S at 224 px)."""
+    eager = _result(_run("arm", _FIXTURE, "eager", "panel", "base", method, teacher_kind))
+    graph = _result(_run("arm", _FIXTURE, "graph", "panel", "base", method, teacher_kind))
+    _assert_method_ran(eager, method)
+    assert graph["audit"] == _EXPECTED_AUDIT
+    assert _comparable(graph) == _comparable(eager)
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", _NEW_METHODS)
+@pytest.mark.parametrize("kind", [_FIXTURE, "mobilenetv4_conv_small_imagenet"])
+def test_new_method_graph_run_resumed_mid_run_equals_the_eager_run(kind: str, method: str) -> None:
+    eager = _result(_run("arm", kind, "eager", "panel", "base", method))
+    resumed = _result(_run("arm", kind, "resumed", "panel", "base", method))
+    _assert_method_ran(resumed, method)
+    assert _comparable(resumed, diagnostics=False) == _comparable(eager, diagnostics=False)
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", _NEW_METHODS)
+def test_negative_control_a_graph_only_defect_of_each_new_method_is_detected(method: str) -> None:
+    """Bank rows of the wrong sample, a shifted online-teacher input, k + 1 attacked positions, AWP off
+    inside the graph: each confined to the graph path, each must change the run."""
+    eager = _result(_run("arm", _FIXTURE, "eager", "panel", "base", method))
+    control = _result(_run("arm", _FIXTURE, "graph_control", "panel", "base", method))
+    assert control["audit"] == _EXPECTED_AUDIT
+    assert control["last.pt:model"] != eager["last.pt:model"]
+    assert control["rows"] != eager["rows"]
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("mutation", sorted(_METHOD_MUTATIONS))
+def test_mid_epoch_change_of_a_new_baked_in_input_is_refused_not_replayed(mutation: str) -> None:
+    message = _result(_run("stale_guard", mutation))
+    assert "CUDA graph is stale" in message
+
+
+@pytest.mark.gpu
+@requires_cuda
+def test_a_corrupt_bank_row_fires_the_in_graph_reconstruction_assert() -> None:
+    completed = _run("poisoned_replay", "bank_nan")
+    assert "captured" in completed.stdout, completed.stderr[-4000:]
+    assert "replayed without a device assert" not in completed.stdout
+    assert completed.returncode != 0
+    assert "device-side assert" in completed.stderr
+    assert "bank row reconstructs to a non-finite or empty distribution" in completed.stderr
 
 
 # ============================================== training.deterministic=false (human decision 2026-10-03)
@@ -1186,6 +1605,66 @@ def test_nondeterministic_graph_step_matches_eager_within_one_step_noise(
     spec = {**_SINGLE_STEP_REGIME, "kind": kind}
     spec.update(_SINGLE_STEP_OVERRIDES.get(kind, {}))
     distances = run_single_step_check(tmp_path, spec, determinism)
+    failures = single_step_verdict(distances)
+    assert not failures, (failures, {sync: single_step_summary(result) for sync, result in distances.items()})
+
+
+# AWP is admitted with the graph in deterministic mode only (bitwise parity above). Under deterministic=false
+# the one-step check could not resolve it: on MobileNetV4-S (64 px, batch 32, gamma 0.01) the EAGER outcomes of
+# one AWP step were 0.012-0.014 of a step apart at one sync point in one of two runs (the proxy-normalized
+# perturbation amplifies kernel noise into a bimodal step), above 100x the FP32 floor, so the rule fails as
+# designed; the schema and the Trainer therefore refuse method.awp with cuda_graph when deterministic=false.
+_NONDETERMINISTIC_NEW_METHODS = tuple(method for method in _NEW_METHODS if method != "awp")
+
+
+def nondeterministic_awp_refusal(root: Path) -> str:
+    """AWP + graph under deterministic=false (this subprocess): the Trainer must refuse it."""
+    try:
+        build_trainer(root, kind=_FIXTURE, cuda_graph=True, device=torch.device("cuda"), method="awp")
+    except ValueError as error:
+        return str(error)
+    return "no error"
+
+
+@pytest.mark.gpu
+@requires_cuda
+def test_nondeterministic_awp_is_refused_with_the_graph() -> None:
+    message = _result(_run("nondeterministic_awp_refusal", determinism="nondeterministic"))
+    assert "AWP only with deterministic algorithms" in message
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", _NONDETERMINISTIC_NEW_METHODS)
+@pytest.mark.parametrize("kind", [_FIXTURE, "mobilenetv4_conv_small_imagenet"])
+def test_nondeterministic_new_method_graph_run_keeps_every_rng_stream_exact(kind: str, method: str) -> None:
+    eager = _result(_run("nondeterministic_arm", kind, "eager", "base", method, determinism="nondeterministic"))
+    graph = _result(_run("nondeterministic_arm", kind, "graph", "base", method, determinism="nondeterministic"))
+    _assert_method_ran(eager, method)
+    _assert_method_ran(graph, method)
+    assert graph["audit"] == _EXPECTED_AUDIT
+    for key in _EXACT_UNDER_NONDETERMINISM:
+        assert graph[key] == eager[key], key
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", _NONDETERMINISTIC_NEW_METHODS)
+def test_nondeterministic_new_method_graph_step_matches_eager_within_one_step_noise(
+    tmp_path: Path, method: str
+) -> None:
+    """The one-step rule (same bound, same controls) for each 2026-10-08 method on MobileNetV4-Conv-Small.
+
+    Regime: the KL objective's gradients are smaller than CE's, so at lr 0.002 the lr x 1.001 control sat only
+    8-9x the bound (FP32 floor-limited); RSLAD runs at lr 0.006 (update about 1% of the weights, as for every
+    other student). AWP runs at the production gamma 0.01: at gamma 0.05 the EAGER outcomes alone were 0.04 of
+    a step apart (the check then cannot resolve a defect and fails as designed)."""
+    kind = "mobilenetv4_conv_small_imagenet"
+    spec = {**_SINGLE_STEP_REGIME, "kind": kind, "method": method}
+    spec.update(_SINGLE_STEP_OVERRIDES.get(kind, {}))
+    if method in _DISTILLATION_METHODS:
+        spec["learning_rate"] = 0.006
+    distances = run_single_step_check(tmp_path, spec, "nondeterministic")
     failures = single_step_verdict(distances)
     assert not failures, (failures, {sync: single_step_summary(result) for sync, result in distances.items()})
 

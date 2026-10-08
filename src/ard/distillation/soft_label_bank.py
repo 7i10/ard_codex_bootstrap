@@ -41,6 +41,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from ard.device_checks import require
+
 BANK_FORMAT = "ard-soft-label-bank-v1"
 STORAGE = "top_k_marginal_smoothing_v1"
 _ARRAYS = ("topk_index.npy", "topk_prob.npy", "residual_mass.npy", "crop_keys.npy")
@@ -97,13 +99,18 @@ def reconstruct_probabilities(
     if tail < 0:
         raise ValueError("top_k exceeds the class count")
     fill = residual16.float() / tail if tail > 0 else torch.zeros_like(residual16, dtype=torch.float32)
-    if tail == 0 and bool((residual16 != 0).any()):
-        raise SoftLabelBankError("a full-K bank row has non-zero residual mass")
+    # require(): a host check, or a device assert inside a captured CUDA graph
+    # (training.cuda_graph reconstructs the bank rows inside the step; plan 0105).
+    if tail == 0:
+        require(~(residual16 != 0).any(), "a full-K bank row has non-zero residual mass", SoftLabelBankError)
     full = fill[:, None].expand(batch, num_classes).clone()
     full.scatter_(1, indices.long(), probabilities16.float())
     total = full.sum(dim=1, keepdim=True)
-    if not bool(torch.isfinite(full).all()) or bool((total <= 0).any()):
-        raise SoftLabelBankError("bank row reconstructs to a non-finite or empty distribution")
+    require(
+        torch.isfinite(full).all() & ~(total <= 0).any(),
+        "bank row reconstructs to a non-finite or empty distribution",
+        SoftLabelBankError,
+    )
     return full / total
 
 
@@ -458,6 +465,21 @@ class SoftLabelBank:
 
     def probabilities(self, sample_ids: torch.Tensor, crop_keys: torch.Tensor, *, epoch: int) -> torch.Tensor:
         """Reconstructed FP32 teacher probabilities for one batch; refuses any crop-key mismatch."""
+        device = sample_ids.device
+        index, prob, residual = self.rows(sample_ids, crop_keys, epoch=epoch)
+        return reconstruct_probabilities(
+            index.to(device), prob.to(device), residual.to(device), num_classes=self.num_classes
+        )
+
+    def rows(
+        self, sample_ids: torch.Tensor, crop_keys: torch.Tensor, *, epoch: int
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """The stored rows of one batch on the host: int64 top-K indices, fp16 probabilities, fp16 residual.
+
+        Refuses any source ID outside the bank and any crop-key mismatch. ``probabilities`` moves
+        them to ``sample_ids``' device and reconstructs; the CUDA-graph step (plan 0105) copies them
+        into static device buffers and reconstructs inside the captured step, with the same kernels.
+        """
         arrays = self._arrays(epoch)
         ids = sample_ids.detach().cpu().numpy().astype(np.int64)
         positions = np.searchsorted(self.source_ids, ids)
@@ -476,11 +498,10 @@ class SoftLabelBank:
                 f"batch {batch_keys.tolist()[bad] if batch_keys.ndim == 2 else batch_keys.tolist()} "
                 f"vs bank {stored_keys[bad].tolist()}"
             )
-        device = sample_ids.device
-        index = torch.from_numpy(np.asarray(arrays.index[positions], dtype=np.int64)).to(device)
-        prob = torch.from_numpy(np.asarray(arrays.prob[positions])).to(device)
-        residual = torch.from_numpy(np.asarray(arrays.residual[positions])).to(device)
-        return reconstruct_probabilities(index, prob, residual, num_classes=self.num_classes)
+        index = torch.from_numpy(np.asarray(arrays.index[positions], dtype=np.int64))
+        prob = torch.from_numpy(np.asarray(arrays.prob[positions]))
+        residual = torch.from_numpy(np.asarray(arrays.residual[positions]))
+        return index, prob, residual
 
 
 class SoftLabelBankTeacher(nn.Module):
@@ -525,12 +546,25 @@ class SoftLabelBankTeacher(nn.Module):
         return self.online_teacher is not None
 
     def clean_logits(self, batch: Any, *, epoch: int) -> torch.Tensor:
+        crop_keys = self._checked_crop_keys(batch, epoch=epoch)
+        return pseudo_logits(self.bank.probabilities(batch.sample_ids, crop_keys, epoch=epoch)).detach()
+
+    def clean_rows(self, batch: Any, *, epoch: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """``clean_logits``' host half (same checks): the stored rows, for the CUDA-graph step (plan 0105).
+
+        ``pseudo_logits(reconstruct_probabilities(*rows on the device, num_classes=...))`` is
+        ``clean_logits``, kernel for kernel.
+        """
+        crop_keys = self._checked_crop_keys(batch, epoch=epoch)
+        return self.bank.rows(batch.sample_ids, crop_keys, epoch=epoch)
+
+    def _checked_crop_keys(self, batch: Any, *, epoch: int) -> torch.Tensor:
         crop_keys = getattr(batch, "crop_keys", None)
         if crop_keys is None:
             raise SoftLabelBankError("bank-mode training batches must carry crop keys (CropKeyedSubset)")
         if self.sentinel_view is not None and epoch not in self._sentinel_verified:
             self.verify_pixel_sentinel(epoch)
-        return pseudo_logits(self.bank.probabilities(batch.sample_ids, crop_keys, epoch=epoch)).detach()
+        return crop_keys
 
     def verify_pixel_sentinel(self, epoch: int) -> None:
         record = self.bank.manifest["epoch_records"].get(str(epoch), {})

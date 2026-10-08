@@ -29,6 +29,19 @@ buffers at production shapes it is the measured eager spread.
   partial batch) also runs eagerly.
 * The random start is drawn outside the graph, into a static buffer, from the
   same per-step generator the eager attack uses.
+* Since 2026-10-08 the captured step also covers RSLAD / RSLAD-advT distillation
+  (soft-label bank rows copied into static buffers and reconstructed inside the
+  step; an online or advT teacher forward runs inside the step when the teacher
+  is a frozen eval-mode, allowlisted module), ``method.mixed_batch`` without
+  split BN, and ``method.awp`` (proxy reload, proxy SGD step, perturb and
+  restore inside the step). The fingerprint then also covers every tensor
+  those write or read by address (static buffers, teacher weights, the AWP
+  proxy and its optimizer, the advT metric accumulator) and the Python scalars
+  they bake in (mixed-batch ``k`` / lambda, AWP gamma and activity).
+* Memory: the graph's private pool is released (and the CUDA cache emptied)
+  before any eager step that follows a capture (the last partial batch) and at
+  the end of every training epoch, so validation, the train probe and eager
+  steps never hold their allocations next to the pool.
 """
 
 from __future__ import annotations
@@ -42,17 +55,49 @@ from torch.optim import Optimizer
 
 from ard.config.schema import CUDA_GRAPH_ARCHITECTURES
 
-__all__ = ["CUDA_GRAPH_ARCHITECTURES", "CudaGraphStepState", "momentum_buffers_ready", "optimizer_fingerprint"]
+__all__ = [
+    "CUDA_GRAPH_ARCHITECTURES",
+    "CudaGraphStepState",
+    "module_fingerprint",
+    "momentum_buffers_ready",
+    "optimizer_fingerprint",
+    "optimizer_groups_fingerprint",
+]
+
+
+def module_fingerprint(module: nn.Module) -> tuple[Any, ...]:
+    """Identity, parameter / buffer addresses and every submodule's mode of a module a captured step uses."""
+    return (
+        id(module),
+        tuple(parameter.data_ptr() for parameter in module.parameters()),
+        tuple(buffer.data_ptr() for buffer in module.buffers()),
+        tuple(submodule.training for submodule in module.modules()),
+    )
 
 
 def optimizer_fingerprint(
-    optimizer: Optimizer, model: nn.Module, *, ema_model: nn.Module | None = None
+    optimizer: Optimizer, model: nn.Module, *, ema_model: nn.Module | None = None, extra: tuple[Any, ...] = ()
 ) -> tuple[Any, ...]:
     """Everything a captured step bakes in that the host could change between replays.
 
     With a weight EMA (``training.weight_ema_decay``) the captured step also
     writes every EMA state tensor in place, so their addresses are included.
+    ``extra`` is whatever else the step reads or writes by address or bakes in
+    as a Python scalar (static buffers, teacher, AWP proxy and its optimizer,
+    mixed-batch ``k``; built by the Trainer).
     """
+    groups = _optimizer_groups(optimizer)
+    buffers = tuple(buffer.data_ptr() for buffer in model.buffers())
+    ema = None if ema_model is None else tuple(value.data_ptr() for value in ema_model.state_dict().values())
+    return (id(optimizer), tuple(groups), buffers, model.training, ema, extra)
+
+
+def optimizer_groups_fingerprint(optimizer: Optimizer) -> tuple[Any, ...]:
+    """A second optimizer's hyperparameters and parameter / state addresses (the AWP proxy's SGD)."""
+    return (id(optimizer), tuple(_optimizer_groups(optimizer)))
+
+
+def _optimizer_groups(optimizer: Optimizer) -> list[tuple[Any, ...]]:
     groups = []
     for group in optimizer.param_groups:
         hyperparameters = []
@@ -70,9 +115,7 @@ def optimizer_fingerprint(
             buffer = optimizer.state.get(parameter, {}).get("momentum_buffer")
             tensors.append((id(parameter), parameter.data_ptr(), None if buffer is None else buffer.data_ptr()))
         groups.append((tuple(hyperparameters), tuple(tensors)))
-    buffers = tuple(buffer.data_ptr() for buffer in model.buffers())
-    ema = None if ema_model is None else tuple(value.data_ptr() for value in ema_model.state_dict().values())
-    return (id(optimizer), tuple(groups), buffers, model.training, ema)
+    return groups
 
 
 def momentum_buffers_ready(optimizer: Optimizer) -> bool:
@@ -102,6 +145,12 @@ class DeferredDiagnostics:
     panel_positions: list[int]
     panel_clean_images: torch.Tensor | None
     panel_adversarial_images: torch.Tensor | None
+    # RSLAD (policy weights) and RSLAD-advT (teacher on x'); mixed batch: the attacked prefix length.
+    kd_weights: torch.Tensor | None = None
+    joint_risks: torch.Tensor | None = None
+    teacher_predictions: torch.Tensor | None = None
+    teacher_entropies: torch.Tensor | None = None
+    mixed_count: int | None = None
 
 
 @dataclass
@@ -111,7 +160,15 @@ class CudaGraphStepState:
     labels: torch.Tensor | None = None
     valid: torch.Tensor | None = None
     noise: torch.Tensor | None = None
+    # Soft-label bank rows of the batch (int64 top-K indices, fp16 probabilities, fp16 residual mass).
+    bank_index: torch.Tensor | None = None
+    bank_prob: torch.Tensor | None = None
+    bank_residual: torch.Tensor | None = None
     totals: torch.Tensor | None = None
+    # method.mixed_batch: the epoch's mixed-batch accumulator (7 slots, as in the eager step).
+    mixed_totals: torch.Tensor | None = None
+    # method.awp: whether this epoch's step perturbs the weights (constant within an epoch).
+    awp_active: bool = False
     graph: torch.cuda.CUDAGraph | None = None
     fingerprint: tuple[Any, ...] | None = None
     # Tensors allocated during capture that stay valid (and are overwritten)
@@ -136,8 +193,8 @@ class CudaGraphStepState:
         self.fingerprint = None
         self.outputs = {}
 
-    def begin_epoch(self) -> torch.Tensor:
-        """Invalidate, zero the epoch accumulator, and return it (eager steps add into it too)."""
+    def begin_epoch(self, *, mixed: bool = False) -> torch.Tensor:
+        """Invalidate, zero the epoch accumulator(s), and return the main one (eager steps add into it too)."""
         self.invalidate()
         self.eager_steps_this_epoch = 0
         self.captures_this_epoch = 0
@@ -145,13 +202,36 @@ class CudaGraphStepState:
         self.full_batches_this_epoch = 0
         assert self.totals is not None
         self.totals.zero_()
+        if mixed:
+            if self.mixed_totals is None:
+                self.mixed_totals = torch.zeros(7, dtype=torch.float64, device=self.device)
+            self.mixed_totals.zero_()
         return self.totals
 
-    def matches(self, images: torch.Tensor, labels: torch.Tensor) -> bool:
+    def static_fingerprint(self) -> tuple[Any, ...]:
+        """Addresses of every static buffer the captured step reads or writes."""
+        return tuple(
+            None if tensor is None else tensor.data_ptr()
+            for tensor in (
+                self.images,
+                self.labels,
+                self.valid,
+                self.noise,
+                self.bank_index,
+                self.bank_prob,
+                self.bank_residual,
+                self.totals,
+                self.mixed_totals,
+            )
+        )
+
+    def matches(self, images: torch.Tensor, labels: torch.Tensor, *, noise_rows: int | None = None) -> bool:
         """Allocate the static inputs on first use; True iff this batch fits them.
 
         A non-contiguous batch never fits (the static buffers are contiguous and
         a strided copy is not what the eager step reads); it runs eagerly.
+        ``noise_rows`` (default: the batch size) is the number of attacked
+        examples whose random start the noise buffer holds (``k`` for a mixed batch).
         """
         if not (images.is_contiguous() and labels.is_contiguous()):
             return False
@@ -161,7 +241,8 @@ class CudaGraphStepState:
             self.images = torch.empty(images.shape, dtype=images.dtype, device=self.device)
             self.labels = torch.empty(labels.shape, dtype=labels.dtype, device=self.device)
             self.valid = torch.empty(labels.shape, dtype=torch.bool, device=self.device)
-            self.noise = torch.empty(images.shape, dtype=torch.float32, device=self.device)
+            rows = images.shape[0] if noise_rows is None else noise_rows
+            self.noise = torch.empty((rows, *images.shape[1:]), dtype=torch.float32, device=self.device)
         assert self.labels is not None
         fits = (
             images.shape == self.images.shape
@@ -188,12 +269,19 @@ class CudaGraphStepState:
                 f"({self.full_batches_this_epoch} full batches, {self.eager_steps_this_epoch} eager steps)"
             )
 
-    def check_replayable(self, optimizer: Optimizer, model: nn.Module, *, ema_model: nn.Module | None = None) -> None:
+    def check_replayable(
+        self,
+        optimizer: Optimizer,
+        model: nn.Module,
+        *,
+        ema_model: nn.Module | None = None,
+        extra: tuple[Any, ...] = (),
+    ) -> None:
         if self.graph is None or self.fingerprint is None:
             raise RuntimeError("no captured CUDA graph to replay")
-        if optimizer_fingerprint(optimizer, model, ema_model=ema_model) != self.fingerprint:
+        if optimizer_fingerprint(optimizer, model, ema_model=ema_model, extra=extra) != self.fingerprint:
             raise RuntimeError(
                 "CUDA graph is stale: an optimizer hyperparameter, parameter, momentum buffer, model buffer, "
-                "EMA tensor or the model mode changed since capture; refusing to replay values baked in at "
-                "capture time"
+                "EMA tensor, the model mode, a static buffer, the teacher, the AWP proxy or a baked-in step "
+                "setting changed since capture; refusing to replay values baked in at capture time"
             )

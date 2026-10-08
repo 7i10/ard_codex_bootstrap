@@ -1315,9 +1315,11 @@ class TrainingConfig(StrictModel):
     # tensor group -- so it is allowed only where that contract is tested
     # (cudnn_benchmark=true is not): one CUDA device, FP32,
     # step_diagnostics=false (tracking diagnostics are supported), eager
-    # student, method pgd_at with a batch-keyed random start and a fixed
-    # budget, SGD, no teacher/policy/intervention/mixed batch/AWP (see
-    # ExperimentConfig._validate_cuda_graph); a plain weight EMA is admitted. The
+    # student, method pgd_at (optionally with method.mixed_batch without split
+    # BN, or method.awp) or ImageNet rslad / rslad_advt distillation (bank or
+    # online target; an in-step teacher must be allowlisted), a batch-keyed
+    # random start and a fixed budget, SGD, no policy treatment/intervention
+    # (see ExperimentConfig._validate_cuda_graph); a plain weight EMA is admitted. The
     # first full batch of every epoch and the last partial batch run
     # eagerly; the graph is re-captured every epoch (the scheduler changes
     # the learning rate only at epoch ends) and a guard refuses to replay
@@ -1386,6 +1388,22 @@ class TrainingConfig(StrictModel):
 CUDA_GRAPH_ARCHITECTURES: frozenset[str] = frozenset(
     {"mobilenetv4_conv_small_imagenet", "mobilenetv4_conv_medium_imagenet", "efficientnet_b0_imagenet"}
 )
+# training.cuda_graph with a teacher that runs INSIDE the captured step (RSLAD with
+# distillation.target_source=online_teacher, and rslad_advt's teacher forward on x'):
+# frozen eval-mode ImageNet teacher architectures whose captured forward is
+# parity-tested bitwise (tests/integration/test_cuda_graph_training_step.py, human
+# decision 2026-10-08). RSLAD from a soft-label bank never runs the teacher.
+CUDA_GRAPH_TEACHER_ARCHITECTURES: frozenset[str] = frozenset(
+    {
+        "resnet50_imagenet",
+        "convnext_tiny_convstem_imagenet",
+        "convnext_base_convstem_imagenet",
+        "vit_s_convstem_imagenet",
+        "mobilenetv4_conv_medium_imagenet",
+    }
+)
+# Methods whose step the graph transcribes (plan 0105; RSLAD / RSLAD-advT since 2026-10-08).
+CUDA_GRAPH_METHODS: frozenset[str] = frozenset({"pgd_at", "rslad", "rslad_advt"})
 
 
 def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None:
@@ -2242,6 +2260,14 @@ class ExperimentConfig(StrictModel):
         if not self.training.cuda_graph:
             return
         attack = self.method.attack
+        method_id = self.method.id
+        distillation = method_id in {"rslad", "rslad_advt"}
+        # The teacher runs inside the captured step for an online target or rslad_advt's forward on x'.
+        teacher_in_step = distillation and (
+            method_id == "rslad_advt"
+            or (self.distillation is not None and self.distillation.target_source == "online_teacher")
+        )
+        mixed_batch = self.method.mixed_batch
         requirements = (
             (
                 self.student.architecture in CUDA_GRAPH_ARCHITECTURES,
@@ -2251,18 +2277,44 @@ class ExperimentConfig(StrictModel):
                 attack is not None and attack.student_mode == "eval",
                 "method.attack.student_mode=eval (train-mode attacks are not parity-tested)",
             ),
-            (self.method.id == "pgd_at", "method.id=pgd_at"),
-            (self.teacher is None, "no teacher"),
+            (method_id in CUDA_GRAPH_METHODS, "method.id in " + ", ".join(sorted(CUDA_GRAPH_METHODS))),
+            (method_id != "pgd_at" or self.teacher is None, "no teacher (pgd_at)"),
+            (
+                not distillation or (self.teacher is not None and self.distillation is not None),
+                "rslad/rslad_advt with a teacher and a distillation block (ImageNet distillation)",
+            ),
+            (
+                not teacher_in_step
+                or (self.teacher is not None and self.teacher.architecture in CUDA_GRAPH_TEACHER_ARCHITECTURES),
+                "a parity-tested teacher.architecture when the teacher runs inside the step ("
+                + ", ".join(sorted(CUDA_GRAPH_TEACHER_ARCHITECTURES))
+                + ")",
+            ),
             (self.method.adr is None, "no method.adr"),
             (self.method.target_policy is None, "no method.target_policy"),
             (not self.method.oracle_mask, "method.oracle_mask=false"),
             (self.intervention is None, "no intervention"),
             (self.prescriptive_v3 is None, "no prescriptive_v3"),
             (self.observation.profile == "off", "observation.profile=off"),
-            (self.method.mixed_batch is None, "no method.mixed_batch (not parity-tested)"),
-            (self.method.awp is None, "no method.awp (not parity-tested)"),
+            (
+                mixed_batch is None or not mixed_batch.split_batchnorm,
+                "no method.mixed_batch.split_batchnorm (not parity-tested)",
+            ),
+            (
+                self.method.awp is None or self.training.deterministic,
+                "method.awp only with training.deterministic=true (the nondeterministic one-step check could not "
+                "resolve an AWP step: its eager outcomes were too spread; plan 0105)",
+            ),
             (self.optimizer.id == "sgd", "optimizer.id=sgd (AdamW keeps a host step counter)"),
-            (attack is not None and attack.loss == "ce", "a CE training attack"),
+            (
+                attack is not None
+                and (
+                    attack.loss == "ce"
+                    if method_id == "pgd_at"
+                    else attack.loss == "kl" and attack.kl_target == "teacher_clean"
+                ),
+                "a CE training attack (pgd_at) or a KL-to-teacher-clean training attack (rslad/rslad_advt)",
+            ),
             (
                 attack is not None and attack.random_start_keying == "batch",
                 "method.attack.random_start_keying=batch (sample-keyed starts are drawn on the host)",

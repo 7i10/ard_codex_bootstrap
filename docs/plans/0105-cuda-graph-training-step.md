@@ -40,7 +40,36 @@ It must refuse every configuration where that is not proven.
   same kernels as the eager step, and the stale-graph fingerprint covers the EMA tensors' addresses),
   `method.label_smoothing` (part of the captured objective) and `optimizer.exclude_norm_bias_from_weight_decay`
   (two SGD parameter groups, each with its own baked-in weight decay).
+  Since 2026-10-08 (human decision: speedups that save >= 1 GPU-hour per run) the scope also covers, under the
+  same bitwise / one-step tests and nothing else relaxed:
+  (1) ImageNet `rslad` and `rslad_advt` with a `distillation` block (KL-to-teacher-clean training attack, RSLAD
+  baseline policy, distillation hooks). Soft-label bank target: the host looks up the batch's stored rows
+  (`SoftLabelBankTeacher.clean_rows`: crop-key and pixel-sentinel checks, no device sync) and copies them into
+  three static buffers like images and labels; the captured step reconstructs the target with the bank's own
+  kernels (`reconstruct_probabilities`, `pseudo_logits`). The advT teacher forward on x' and an online
+  (`target_source: online_teacher`) clean teacher forward run INSIDE the captured step; that teacher must be
+  frozen (no trainable parameter), in eval mode (every submodule) and on `CUDA_GRAPH_TEACHER_ARCHITECTURES`
+  (the five Phase 2 ImageNet teachers, each parity-tested); plain bank RSLAD never runs the teacher.
+  (2) `method.mixed_batch` without split BN: `k` is fixed by the full batch size, the noise buffer holds the
+  `k` attacked rows, the mixed-batch accumulator is a static buffer; the last partial batch (own `k`) stays
+  eager. Split BN stays refused.
+  (3) `method.awp`: proxy `load_state_dict`, proxy forward/backward and SGD step, rescaled difference, perturb
+  and (after the SGD step) restore are all captured; the AWP activity is per epoch (re-captured every epoch).
+  The host checks the shared code makes on values (bank reconstruction, advT target, KL-target validation,
+  policy weights, teacher entropy) go through `ard.device_checks.require`: the unchanged host check outside a
+  capture, a `torch._assert_async` inside one (fires from every replay; fatal before any checkpoint).
+  The stale-graph fingerprint also covers: every static buffer's address (images, labels, mask, noise, bank
+  rows, accumulators), the advT metric accumulator, the in-step teacher (parameter / buffer addresses, every
+  submodule's mode), the AWP proxy (addresses, modes) and its SGD (hyperparameters, parameters), and the baked-in
+  Python scalars (mixed `k`, fraction, lambda; AWP gamma and activity).
   Only `ard.cli.train` applies the option; `reject_throughput_options` refuses it everywhere else.
+- **Memory (2026-10-08).** The graph's private pool used to stay allocated until the next epoch's re-capture,
+  so the eager last partial batch, the validation pass and the train probe allocated their activations next
+  to it (EfficientNet-B0, 224 px, batch 128: OOM at ~22.6 GB on a 24 GB 4090). The Trainer now releases the
+  graph (and the parameter gradients the last replay left in its pool) and empties the CUDA cache before any
+  eager step that follows a capture and at the end of every training epoch (`Trainer._release_cuda_graph`).
+  `torch.cuda.graph` already empties the cache before a capture. Nothing that reaches a checkpoint, a row or
+  an RNG stream changes (the parity tests are unchanged and pass).
 - **Capture lifecycle.** Static device buffers for images, labels, the valid mask and the random-start
   noise. The loader batch is copied into them (non-blocking from pinned memory). The first full batch
   of every epoch runs eagerly (it creates SGD momentum buffers on a fresh run and warms up lazily
@@ -183,6 +212,49 @@ It must refuse every configuration where that is not proven.
   six cases: graph arms matched their process's eager arms to 1e-7 everywhere, separate benchmark processes
   differed by 0.1 to 0.3 of a step, and some eager arms landed in the other mode of a bimodal step (EffB0
   224 px: 4e-3; MNv4-S 224 px: 3e-2), which is what led to the nearest-outcome rule.
+- 2026-10-08 scope widening, same file, Hamster GPU1 next to the production job (every test process <= 0.5 GB
+  peak reserved), all passing (deterministic unless stated):
+  bitwise eager = graph (rows, `last.pt`/`best.pt` state, diagnostics rows and panel media incl. kd weights and
+  advT teacher predictions/entropies, CUDA RNG) for RSLAD from a top-K bank (K < C, so the residual-mass
+  reconstruction acts), RSLAD from an online teacher, RSLAD-advT from a bank (teacher forward and top-K truncation
+  of T(x') inside the step), mixed batch (k = 2 of 4; partial batch k = 1 eager) and AWP (inactive in epoch 0,
+  active after; dropout in the student and the AWP proxy draws the CUDA RNG inside the graph) on the fixture and
+  every allowlisted student; each method with the Phase 2 weight EMA (fixture, MobileNetV4-S); the in-step teacher
+  forward of every `CUDA_GRAPH_TEACHER_ARCHITECTURES` entry (random weights, 1000 classes; RSLAD online and advT;
+  ViT-S at 224 px); graph run resumed at epoch 1 = eager run (fixture, MobileNetV4-S, every method); negative
+  controls confined to the graph path (bank rows of the neighbouring sample, a 1% shifted online-teacher input,
+  k + 1 attacked positions, AWP off inside the graph) all change the run; stale-graph refusals for a reallocated
+  bank buffer, a non-in-place teacher weight, a train-mode teacher, a reallocated AWP proxy buffer, a changed AWP
+  gamma and a changed mixed-batch lambda; a NaN bank row fires the in-graph reconstruction assert from a replay.
+  Nondeterministic: whole-run RNG exactness for every new method (fixture, MobileNetV4-S) and the one-step rule on
+  MobileNetV4-S for RSLAD bank / online / advT (lr 0.006: at lr 0.002 the KL objective's smaller update left the
+  lr x 1.001 control only 8-9x the bound) and mixed batch: graph arms at 0.03-0.04 of the bound, controls >= 14x.
+  AWP failed the nondeterministic rule (not the graph: the EAGER outcomes of one AWP step were 0.012-0.014 of a
+  step apart at one sync point in one of two runs at gamma 0.01, and 0.04 at gamma 0.05; above 100x the FP32 floor,
+  so the check cannot resolve a defect), so AWP + graph is admitted only with `deterministic: true` (schema and
+  Trainer; tested). Earlier tests of this file all still pass with the pool release.
+- Memory (2026-10-08, `scripts/cuda_graph_benchmark.py`, process-wide peak over 2 epochs incl. the last partial
+  batch and validation, EfficientNet-B0, 224 px, PGD-3, deterministic, GPU1 next to production):
+
+  | batch | eager | graph, pool kept (old) | graph, pool released (new) |
+  |---|---|---|---|
+  | 8 | 0.89 GiB | 1.84 | 1.04 |
+  | 16 | 1.76 | 3.71 | 2.08 |
+  | 24 | 2.63 | 5.53 | 3.09 |
+
+  Linear in the batch: the old behaviour costs 0.231 GiB per example (batch 128 ~ 29.5 GiB: the OOM), the new
+  one 0.128 GiB (batch 128 ~ 16.4 GiB, ~7 GiB headroom on a 24 GB 4090; eager ~ 13.9 GiB). Allocated (live) memory
+  is the same in both graph modes: the old peak was the pool's freed-but-reserved blocks next to the eager
+  partial batch and validation. Batch 128 must be measured on a FREE GPU:
+
+      CUDA_VISIBLE_DEVICES=<free gpu> PYTHONPATH=src python scripts/cuda_graph_benchmark.py \
+        --architecture efficientnet_b0_imagenet --image-size 224 --batch-size 128 --batches 4 --partial 127 \
+        --epochs 2 --mode graph            # then --mode eager, and --mode graph --keep-graph-pool (old)
+
+- Throughput (2026-10-08, same script, MobileNetV4-S, 112 px, batch 64, PGD-3, deterministic, 40 batches, second
+  epoch's img/s; GPU1 SHARED with the production job, so only ratios are indicative): PGD-AT 774 -> 1558 (2.0x),
+  RSLAD bank 530 -> 1145 (2.2x), RSLAD-advT bank with a ResNet-50 teacher 409 -> 868 (2.1x), mixed batch 772 ->
+  1766 (2.3x), AWP 547 -> 1110 (2.0x).
 - `tests/unit/test_cuda_graph_config.py` (CPU): default off and unserialized; every config that existed at
   4fd5ceb (read from git) resolves and hashes byte-identically; every fail-closed combination (including an
   off-list architecture and a train-mode attack); `deterministic: false` with and without
@@ -286,3 +358,11 @@ It must refuse every configuration where that is not proven.
   graph 2.5e-8 vs eager spread 1.9e-8 and floor 8.7e-6; controls 15x-2e6 x the bound). Peak reserved
   memory per test process under 0.2 GiB. Pooling identity unchanged (`weight_ema_decay` is already in
   `training_protocol_identity`; `cuda_graph` stays out of it in deterministic mode).
+- 2026-10-08 (human decision: speedups worth >= 1 GPU-hour per run): scope widened to ImageNet RSLAD /
+  RSLAD-advT (bank or online target; in-step teachers allowlisted and parity-tested), mixed batch without split
+  BN, and AWP (deterministic mode only, see Verification); value checks of the shared code become device asserts
+  under capture (`ard.device_checks.require`), fingerprint extended (static buffers, teacher, AWP proxy and its
+  SGD, baked-in scalars); the graph pool is released before eager steps and at every epoch end (EfficientNet-B0
+  224 px / batch 128 estimated ~16.4 GiB instead of ~29.5 GiB). Existing configs unchanged (the flag stays off
+  everywhere; no config edited). Pooling identity unchanged. Not merged, not launched; enabling the flag in the
+  Phase 2 configs (and the batch-128 memory measurement on a free GPU) is the human's decision.
