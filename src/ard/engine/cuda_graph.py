@@ -16,8 +16,10 @@ rounding of the new value) of one nearest eager outcome, in every tensor group
 depends on the group: for parameters it is the FP32 rounding, for momentum
 buffers at production shapes it is the measured eager spread.
 
-* A graph bakes SGD's ``lr``/``momentum``/``weight_decay``/... in as Python
-  scalars and the addresses of every parameter, gradient, momentum buffer,
+* A graph bakes SGD's ``lr``/``momentum``/``weight_decay``/... (or AdamW's
+  ``lr``/``betas``/``eps``/``weight_decay``, per group; since 2026-10-09) in as Python
+  scalars and the addresses of every parameter, gradient, momentum buffer (AdamW:
+  ``exp_avg``, ``exp_avg_sq`` and the capturable device ``step`` counter),
   BatchNorm buffer and (with a weight EMA) EMA tensor. It is therefore captured again at the start of every epoch
   (the scheduler changes the learning rate only at epoch ends; resume loads
   new optimizer state tensors), and :meth:`CudaGraphStepState.check_replayable`
@@ -62,6 +64,7 @@ __all__ = [
     "momentum_buffers_ready",
     "optimizer_fingerprint",
     "optimizer_groups_fingerprint",
+    "optimizer_state_ready",
 ]
 
 
@@ -105,15 +108,22 @@ def _optimizer_groups(optimizer: Optimizer) -> list[tuple[Any, ...]]:
             if key == "params":
                 continue
             value = group[key]
-            if isinstance(value, torch.Tensor):
-                # A tensor learning rate takes a different (not bitwise-equal)
+            if isinstance(value, torch.Tensor) or (
+                isinstance(value, tuple) and any(isinstance(item, torch.Tensor) for item in value)
+            ):
+                # A tensor learning rate (or AdamW beta) takes a different (not bitwise-equal)
                 # foreach path; the graph step is defined for Python scalars only.
                 raise RuntimeError(f"training.cuda_graph requires a Python-scalar optimizer {key!r}, not a tensor")
             hyperparameters.append((key, value))
         tensors = []
         for parameter in group["params"]:
-            buffer = optimizer.state.get(parameter, {}).get("momentum_buffer")
-            tensors.append((id(parameter), parameter.data_ptr(), None if buffer is None else buffer.data_ptr()))
+            # Every per-parameter state tensor the captured step reads or writes by address: SGD's
+            # momentum buffer; AdamW's exp_avg, exp_avg_sq and (capturable) device step counter.
+            state = optimizer.state.get(parameter, {})
+            addresses = tuple(
+                (key, value.data_ptr()) for key, value in sorted(state.items()) if isinstance(value, torch.Tensor)
+            )
+            tensors.append((id(parameter), parameter.data_ptr(), addresses))
         groups.append((tuple(hyperparameters), tuple(tensors)))
     return groups
 
@@ -129,6 +139,28 @@ def momentum_buffers_ready(optimizer: Optimizer) -> bool:
             continue
         for parameter in group["params"]:
             if optimizer.state.get(parameter, {}).get("momentum_buffer") is None:
+                return False
+    return True
+
+
+_ADAMW_STATE_KEYS = ("step", "exp_avg", "exp_avg_sq")
+
+
+def optimizer_state_ready(optimizer: Optimizer) -> bool:
+    """True once the optimizer's lazily created per-parameter state exists, so a capture records the update.
+
+    SGD: :func:`momentum_buffers_ready`. AdamW: every parameter has its ``step`` counter (on the
+    parameter's device: capturable), ``exp_avg`` and ``exp_avg_sq`` -- AdamW creates them on a
+    parameter's first update, and a capture before that would record the zero initialization.
+    """
+    if type(optimizer) is not torch.optim.AdamW:
+        return momentum_buffers_ready(optimizer)
+    for group in optimizer.param_groups:
+        for parameter in group["params"]:
+            state = optimizer.state.get(parameter, {})
+            if any(not isinstance(state.get(key), torch.Tensor) for key in _ADAMW_STATE_KEYS):
+                return False
+            if state["step"].device != parameter.device:
                 return False
     return True
 

@@ -63,6 +63,23 @@ It must refuse every configuration where that is not proven.
   submodule's mode), the AWP proxy (addresses, modes) and its SGD (hyperparameters, parameters), and the baked-in
   Python scalars (mixed `k`, fraction, lambda; AWP gamma and activity).
   Only `ard.cli.train` applies the option; `reject_throughput_options` refuses it everywhere else.
+- **AdamW and the ConvNeXt-Atto / DeiT-Tiny family (2026-10-09, human-approved).** `optimizer.id: adamw` is
+  admitted (every method above). torch's AdamW is captured through its own capturable foreach implementation
+  (device step counter, bias corrections computed on the device); `ard.cli.train` builds AdamW with
+  `capturable=True` exactly when `training.cuda_graph` is on, so the run's eager steps (first full batch, partial
+  batch) and its replays use the same arithmetic. Without the flag the AdamW call is unchanged. Capturable and
+  default (`capturable=False`: host float64 bias corrections) AdamW are NOT bitwise equal (tested), so for AdamW
+  `cuda_graph: true` is recorded in `training_protocol_identity` in both determinism classes (SGD keeps its rule);
+  no AdamW graph run existed before, so no recorded identity changes. The Trainer admits only
+  `torch.optim.AdamW` with `capturable=True`, foreach (not fused), amsgrad / maximize / differentiable off; capture
+  waits until every parameter has its AdamW state (`optimizer_state_ready`). The stale-graph fingerprint covers
+  every per-parameter optimizer state tensor by address (SGD momentum; AdamW `exp_avg`, `exp_avg_sq`, `step`) and
+  every group hyperparameter (lr, betas, eps, weight decay, flags; a tensor beta is refused like a tensor lr). The
+  allowlist adds `convnext_atto_imagenet`, `convnext_atto_deep_narrow_imagenet`, `convnext_atto_ols_imagenet`,
+  `convnext_atto_convstem_imagenet`, `deit_tiny_imagenet`, `deit_tiny_convstem_imagenet` (LayerNorm, GELU,
+  depthwise 7x7, SDPA attention), after their parity tests passed with SGD and AdamW. `cudnn_benchmark` stays
+  refused with the graph, so the Phase 1/2 ConvNeXt / DeiT configs (nondeterministic + benchmark today) need
+  `cudnn_benchmark: false` to use it; no config is edited here.
 - **Memory (2026-10-08).** The graph's private pool used to stay allocated until the next epoch's re-capture,
   so the eager last partial batch, the validation pass and the train probe allocated their activations next
   to it (EfficientNet-B0, 224 px, batch 128: OOM at ~22.6 GB on a 24 GB 4090). The Trainer now releases the
@@ -299,6 +316,57 @@ It must refuse every configuration where that is not proven.
   during the runs (the deterministic eager rate alone spans 1580-2297 and 512-732), so a clean
   measurement needs a free GPU.
 
+- 2026-10-09 AdamW / ConvNeXt-Atto / DeiT-Tiny, same file, Hamster GPU1 next to the production job (every test
+  process <= 0.65 GB on nvidia-smi, peak reserved <= 0.53 GiB), all passing:
+  deterministic bitwise eager (capturable AdamW) = graph -- rows, `last.pt`/`best.pt` (model, optimizer incl.
+  exp_avg / exp_avg_sq / step, scheduler, EMA, RNG), diagnostics, CUDA RNG -- for AdamW on the fixture, AdamW + EMA +
+  label smoothing on every allowlisted student (MobileNetV4-S/M, EfficientNet-B0 and the six new ones; ConvNeXt at
+  64 px, DeiT at 224 px), AdamW + EMA with RSLAD bank / online / advT, mixed batch and AWP on the fixture,
+  ConvNeXt-Atto and DeiT-Tiny; graph run resumed at epoch 1 = eager run (fixture, ConvNeXt-Atto, DeiT-Tiny); a
+  graph-only defect (every AdamW step counter advanced once more inside the step) changes model, optimizer and
+  rows; stale-graph refusals for lr (group 1), beta1, beta2, eps, the norm/bias group's weight decay, a reallocated
+  exp_avg / exp_avg_sq / step tensor and an optimizer `load_state_dict`; eager capturable=False vs capturable=True
+  differ (models, optimizer, rows). The SGD cases of the file (parity, Phase 2 options, all five methods, the
+  in-step teachers) also ran for the six new students and passed. Nondeterministic: whole-run RNG exactness with
+  AdamW + EMA + label smoothing (fixture and the six new students) and with AdamW + EMA for RSLAD bank / online /
+  advT and mixed batch (ConvNeXt-Atto, DeiT-Tiny), SGD (the six new students); the one-step rule with AdamW
+  (exp_avg and exp_avg_sq are tensor groups, step counters must be exact, a group the step leaves unchanged --
+  e.g. pixel-normalization constants of a model without BatchNorm -- must be bitwise equal; fixture and the six
+  new students, lr 6e-4 (fixture 3e-3); RSLAD bank / online / advT and mixed batch on ConvNeXt-Atto) and with SGD
+  (the six new students, lr 0.02, convstem 0.04: at lr 0.002 the lr x 1.001 control sat only 1.1-2.0x the bound).
+  Measured (AdamW one-step, 64 px ConvNeXt-Atto / 224 px DeiT-Tiny, batch 32 / 8): update 1.0-1.3% of the weights;
+  graph arms at 0.05-0.09 of the bound (ConvNeXt) and bitwise equal to the nearest eager outcome (DeiT); controls
+  lr x 1.001 16-26x, weight decay 0 35-37x, attack seed + 1 >= 78x, lr = 0 >= 15,000x the bound.
+  Opt-in production shape (not run: needs a FREE GPU, about 6-8 GB per process):
+  `test_production_shape_adamw_graph_run_is_bit_identical` (224 px, batch 128, 1000 classes, PGD-3, AdamW lr 1e-3
+  + EMA 0.9999, 4 full batches + a partial batch, deterministic, bitwise), command in the test file.
+- Throughput potential, AdamW ConvNeXt-Atto / DeiT-Tiny (2026-10-09, `scripts/cuda_graph_benchmark.py --optimizer
+  adamw`, real `Trainer.fit`, 224 px, PGD-3, panel diagnostics, 40 batches, second epoch). NO GPU WAS FREE (Hamster
+  GPU0/1 and all three Ferret GPUs busy), so it ran on Hamster GPU1 SHARED with a production job at batch 2 / 4 / 6
+  only (<= 0.5 GiB reserved; batch 8 already needed 0.53 and cuDNN benchmark's trial workspaces 1.08 GiB at batch
+  4, so the benchmark baseline could not be measured). ms per step, mean of 2 interleaved repeats:
+
+  | student, mode | b2 eager / graph | b4 eager / graph | b6 eager / graph |
+  |---|---|---|---|
+  | ConvNeXt-Atto, nondeterministic | 70.5 / 17.5 | 68.7 / 22.3 | 70.0 / 25.9 |
+  | ConvNeXt-Atto, deterministic | 74.3 / 20.6 | 73.5 / 25.3 | 72.8 / 29.1 |
+  | DeiT-Tiny, nondeterministic | 84.7 / 34.7 | 85.2 / 39.4 | 85.3 / 43.3 |
+  | DeiT-Tiny, deterministic | 92.6 / 55.6 | 93.3 / 61.0 | 93.9 / 64.7 |
+  | MobileNetV4-S (SGD, anchor), nondeterministic | 76.5 / 16.4 | 77.0 / 17.3 | 74.2 / 18.0 |
+  | MobileNetV4-S (SGD, anchor), deterministic | 87.7 / 18.7 | 87.5 / 21.1 | 84.3 / 22.5 |
+
+  The eager step is flat in the batch size: its host time (launching about 70 ms of kernels for ConvNeXt-Atto,
+  85-93 ms for DeiT-Tiny, 75-87 ms for MobileNetV4-S) bounds it at these sizes, so these ratios are NOT the
+  production speedup. At batch 128 the eager steps take about 147 ms (ConvNeXt-Atto) and 203 ms (DeiT-Tiny) on an
+  idle 4090 (plan 0103, 2026-09-27 probe, nondeterministic + cuDNN benchmark), i.e. longer than their host time, so
+  only part of the host time is exposed there. Anchor: MobileNetV4-S at 224 px / batch 128 / PGD-3 has a similar
+  host time and its graph saved about 30 ms per step in production (eager 919-943 img/s, graph 1,186-1,207;
+  different sources, not controlled). Scaling that saving by host time gives an estimate of roughly 25-30 ms per
+  step for ConvNeXt-Atto (about 15-20% faster) and DeiT-Tiny (about 15%), but DeiT's uniform, large kernels may
+  hide more of the host time, deterministic DeiT runs the slow attention path (graph 55-65 ms vs 35-43 ms
+  nondeterministic here), and losing cuDNN benchmark costs an unmeasured amount. Extrapolated, not measured: the
+  decision needs the free-GPU command in `scripts/cuda_graph_benchmark.py` (all five arms, batch 128).
+
 ## Progress log
 
 - 2026-09-30: implemented (attack core split, config flag and scope checks, Trainer capture lifecycle,
@@ -377,3 +445,11 @@ It must refuse every configuration where that is not proven.
   kills the process before `last.pt` (tested). P3-3 `tests/unit/test_device_checks_equivalence.py`: 23 good /
   bad inputs through the converted checks give the pre-change (git d5bae49) accepted values, exception types
   and messages.
+- 2026-10-09 (human-approved: AdamW cuda_graph for the ConvNeXt-Atto / DeiT-Tiny runs if it saves >= ~1 h per
+  ~30 h run): measured first (no free GPU: shared GPU1 at batch 2-6, extrapolated, see Verification; the
+  production-shape number is still owed), then implemented AdamW (capturable, built only with the flag), the
+  six-architecture allowlist extension after the tests passed, the AdamW fingerprint / readiness, the AdamW
+  identity rule, and the tests above; `scripts/cuda_graph_benchmark.py` gained `--optimizer adamw` and
+  `--cudnn-benchmark`. Existing configs resolve and hash byte-identically (the git-pinned test) and their
+  optimizer is built exactly as before. No config edited; not merged, not launched; switching the Phase 2
+  ConvNeXt / DeiT configs to `cudnn_benchmark: false` + `cuda_graph: true` is the human's decision.

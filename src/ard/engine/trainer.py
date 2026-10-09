@@ -54,9 +54,9 @@ from .cuda_graph import (
     CudaGraphStepState,
     DeferredDiagnostics,
     module_fingerprint,
-    momentum_buffers_ready,
     optimizer_fingerprint,
     optimizer_groups_fingerprint,
+    optimizer_state_ready,
 )
 from .distributed import (
     gather_objects,
@@ -219,6 +219,22 @@ def _reduce_epoch_observability(
         # overfitting/label leaking without re-running training.
         "robust_accuracy_eval_mode": (float(global_totals[8].item()) / valid_examples) if valid_examples > 0 else 0.0,
     }
+
+
+def _capturable_adamw(optimizer: torch.optim.Optimizer) -> bool:
+    """The one AdamW configuration ``training.cuda_graph`` captures (plan 0105, 2026-10-09)."""
+    if type(optimizer) is not torch.optim.AdamW:
+        return False
+    return all(
+        group.get("capturable") is True
+        and group.get("foreach") in (None, True)
+        and not group.get("fused")
+        and not group.get("amsgrad")
+        and not group.get("maximize")
+        and not group.get("differentiable")
+        and group.get("decoupled_weight_decay", True) is True
+        for group in optimizer.param_groups
+    )
 
 
 class Trainer:
@@ -796,7 +812,16 @@ class Trainer:
             (not torch.backends.cudnn.benchmark, "cuDNN benchmark off"),
             (self.scaler is None, "no AMP GradScaler"),
             (not self.step_diagnostics, "step_diagnostics=False"),
-            (type(self.optimizer) is torch.optim.SGD, "a torch.optim.SGD optimizer"),
+            # AdamW (2026-10-09, human-approved): only the capturable foreach implementation, whose
+            # bias corrections run on the device step counter. The eager steps of the same run use the
+            # same optimizer, so graph = eager bitwise (parity-tested); a capturable=False eager run
+            # computes the bias corrections on the host and is numerically different (see
+            # ard.cli.evaluate._throughput_protocol_identity).
+            (
+                type(self.optimizer) is torch.optim.SGD or _capturable_adamw(self.optimizer),
+                "a torch.optim.SGD optimizer or a torch.optim.AdamW with capturable=True, foreach (not fused), "
+                "amsgrad/maximize/differentiable off",
+            ),
             (unwrapped is self.model, "an unwrapped (not DDP or compiled) student"),
             (
                 type(self.objective) is PGDATObjective or distillation,
@@ -1745,7 +1770,7 @@ class Trainer:
         mixed_count = self._cuda_graph_mixed_count(batch.images.shape[0])
         if not state.matches(batch.images, batch.labels, noise_rows=mixed_count):
             return False
-        if state.graph is None and (state.eager_steps_this_epoch == 0 or not momentum_buffers_ready(self.optimizer)):
+        if state.graph is None and (state.eager_steps_this_epoch == 0 or not optimizer_state_ready(self.optimizer)):
             return False
         assert state.images is not None and state.labels is not None and state.valid is not None
         assert state.noise is not None

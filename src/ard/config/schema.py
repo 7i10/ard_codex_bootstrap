@@ -1316,7 +1316,8 @@ class TrainingConfig(StrictModel):
     # student, method pgd_at (optionally with method.mixed_batch without split
     # BN, or method.awp) or ImageNet rslad / rslad_advt distillation (bank or
     # online target; an in-step teacher must be allowlisted), a batch-keyed
-    # random start and a fixed budget, SGD, no policy treatment/intervention
+    # random start and a fixed budget, SGD or (since 2026-10-09) AdamW built with capturable=True,
+    # no policy treatment/intervention
     # (see ExperimentConfig._validate_cuda_graph); a plain weight EMA is admitted. The
     # first full batch of every epoch and the last partial batch run
     # eagerly; the graph is re-captured every epoch (the scheduler changes
@@ -1384,7 +1385,19 @@ class TrainingConfig(StrictModel):
 # project uses. Anything else is refused until that test covers it; rerun it
 # after a torch or driver upgrade.
 CUDA_GRAPH_ARCHITECTURES: frozenset[str] = frozenset(
-    {"mobilenetv4_conv_small_imagenet", "mobilenetv4_conv_medium_imagenet", "efficientnet_b0_imagenet"}
+    {
+        "mobilenetv4_conv_small_imagenet",
+        "mobilenetv4_conv_medium_imagenet",
+        "efficientnet_b0_imagenet",
+        # 2026-10-09 (human-approved; LayerNorm / GELU / depthwise 7x7 / SDPA attention, SGD and AdamW):
+        # the plan 0103 ConvNeXt-Atto and DeiT-Tiny students and their batch-B variants.
+        "convnext_atto_imagenet",
+        "convnext_atto_deep_narrow_imagenet",
+        "convnext_atto_ols_imagenet",
+        "convnext_atto_convstem_imagenet",
+        "deit_tiny_imagenet",
+        "deit_tiny_convstem_imagenet",
+    }
 )
 # training.cuda_graph with a teacher that runs INSIDE the captured step (RSLAD with
 # distillation.target_source=online_teacher, and rslad_advt's teacher forward on x'):
@@ -2315,7 +2328,9 @@ class ExperimentConfig(StrictModel):
                 "method.awp only with training.deterministic=true (the nondeterministic one-step check could not "
                 "resolve an AWP step: its eager outcomes were too spread; plan 0105)",
             ),
-            (self.optimizer.id == "sgd", "optimizer.id=sgd (AdamW keeps a host step counter)"),
+            # AdamW since 2026-10-09 (human-approved): ard.cli.train then builds it with capturable=True
+            # (device step counter, device bias corrections), for the eager and the captured steps alike.
+            (self.optimizer.id in {"sgd", "adamw"}, "optimizer.id=sgd or adamw"),
             (
                 attack is not None
                 and (

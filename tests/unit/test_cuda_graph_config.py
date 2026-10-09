@@ -22,7 +22,7 @@ import pytest
 import torch
 import yaml
 from torch import nn
-from torch.optim import SGD
+from torch.optim import SGD, Adam, AdamW
 
 import ard.config.schema as schema_module
 from ard.attacks import AttackRequest, LinfPGD
@@ -49,6 +49,7 @@ from ard.engine.cuda_graph import (
     momentum_buffers_ready,
     optimizer_fingerprint,
     optimizer_groups_fingerprint,
+    optimizer_state_ready,
 )
 from ard.engine.mixed_batch import AuxiliaryBatchNorm
 from ard.engine.trainer import Trainer
@@ -180,11 +181,18 @@ def test_stage1_config_accepts_cuda_graph_and_records_it_in_the_hash(
     assert ExperimentConfig.model_validate(resolved_config_dict(enabled)).training.cuda_graph is True
 
 
-def test_allowlist_is_the_parity_tested_sgd_batchnorm_cnns() -> None:
+def test_allowlist_is_the_parity_tested_students() -> None:
     assert CUDA_GRAPH_ARCHITECTURES == {
         "mobilenetv4_conv_small_imagenet",
         "mobilenetv4_conv_medium_imagenet",
         "efficientnet_b0_imagenet",
+        # 2026-10-09: the ConvNeXt-Atto / DeiT-Tiny family (SGD and AdamW parity-tested).
+        "convnext_atto_imagenet",
+        "convnext_atto_deep_narrow_imagenet",
+        "convnext_atto_ols_imagenet",
+        "convnext_atto_convstem_imagenet",
+        "deit_tiny_imagenet",
+        "deit_tiny_convstem_imagenet",
     }
 
 
@@ -389,7 +397,6 @@ def test_nondeterministic_mode_admits_cuda_graph(
 @pytest.mark.parametrize(
     ("sections", "reason"),
     [
-        ({"optimizer": {"id": "adamw", "momentum": None, "nesterov": None, "beta1": 0.9, "beta2": 0.999}}, "sgd"),
         ({"student": {"architecture": "mobilenet_v3_small_imagenet"}}, "a parity-tested student.architecture"),
         ({"attack": {"student_mode": "train"}}, "method.attack.student_mode=eval"),
         ({"attack": {"random_start_keying": "sample_keyed_v1"}}, "random_start_keying=batch"),
@@ -453,6 +460,83 @@ def test_cuda_graph_pooling_identity_depends_on_the_determinism_class() -> None:
     assert _throughput_protocol_identity(TrainingConfig(**nondeterministic)) == {}
     benchmark = {**nondeterministic, "cudnn_benchmark": True}
     assert _throughput_protocol_identity(TrainingConfig(**benchmark)) == {"cudnn_benchmark": True}
+
+
+def test_adamw_cuda_graph_is_recorded_in_both_determinism_classes() -> None:
+    """2026-10-09: a cuda_graph AdamW run uses torch's capturable AdamW (device bias corrections), bitwise equal to
+    its own eager steps but not to the capturable=False AdamW of an eager run, so it is recorded even when
+    deterministic. SGD keeps its rule; without the flag nothing is recorded (existing identities unchanged)."""
+    base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
+    for deterministic in (True, False):
+        training = {**base, "deterministic": deterministic}
+        graph = TrainingConfig(**training, cuda_graph=True)
+        assert _throughput_protocol_identity(graph, optimizer_id="adamw") == {"cuda_graph": True}
+        assert _throughput_protocol_identity(TrainingConfig(**training), optimizer_id="adamw") == {}
+        assert _throughput_protocol_identity(graph, optimizer_id="sgd") == (
+            {} if deterministic else {"cuda_graph": True}
+        )
+    assert _throughput_protocol_identity(TrainingConfig(**base, cuda_graph=True)) == {}
+
+
+_ADAMW_PHASE2_CONFIGS = sorted(
+    path.name
+    for path in (ROOT / "configs" / "scientific").glob("imagenet_*.yaml")
+    if path.name.startswith(("imagenet_convnext_atto", "imagenet_deit_tiny"))
+    and "optimizer: {id: adamw" in path.read_text()
+)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "imagenet_convnext_atto_pgd_at_phase2_cosine.yaml",
+        "imagenet_convnext_atto_rslad_phase2_convnext_b_cvst_fkd.yaml",
+        "imagenet_deit_tiny_pgd_at_phase2_mixed_kurakin.yaml",
+    ],
+)
+def test_adamw_convnext_and_deit_configs_admit_cuda_graph_without_cudnn_benchmark(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """The Phase 2 AdamW ConvNeXt-Atto / DeiT-Tiny configs (deterministic=false, cudnn_benchmark=true today) are
+    admitted with cuda_graph once cudnn_benchmark is off -- and refused with it on."""
+    assert name in _ADAMW_PHASE2_CONFIGS
+    _env(monkeypatch, tmp_path)
+    monkeypatch.setenv("ARD_PHASE2_ADAMW_LR_DEIT_TINY", "5e-4")
+    raw = resolved_config_dict(load_config(ROOT / "configs" / "scientific" / name))
+    assert raw["optimizer"]["id"] == "adamw" and raw["training"]["cudnn_benchmark"] is True
+    with pytest.raises(ValueError, match="training.cudnn_benchmark=false"):
+        ExperimentConfig.model_validate(_with(raw, training={"cuda_graph": True}))
+    enabled = ExperimentConfig.model_validate(_with(raw, training={"cuda_graph": True, "cudnn_benchmark": False}))
+    assert enabled.training.cuda_graph is True and enabled.optimizer.id == "adamw"
+
+
+def test_adamw_is_built_capturable_exactly_with_cuda_graph(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """ard.cli.train: without training.cuda_graph the AdamW call is the pre-change one (torch defaults, so
+    capturable=False and host bias corrections: no existing run changes); with it, capturable=True."""
+    from ard.cli.train import _build_optimizer
+
+    _env(monkeypatch, tmp_path)
+    raw = resolved_config_dict(
+        load_config(ROOT / "configs" / "scientific" / "imagenet_convnext_atto_pgd_at_phase2_cosine.yaml")
+    )
+    model = nn.Sequential(nn.Linear(3, 4), nn.LayerNorm(4), nn.Linear(4, 2))
+    eager = _build_optimizer(ExperimentConfig.model_validate(raw), list(model.parameters()))
+    reference = AdamW(
+        [
+            {"params": [p for p in model.parameters() if p.ndim > 1], "weight_decay": raw["optimizer"]["weight_decay"]},
+            {"params": [p for p in model.parameters() if p.ndim <= 1], "weight_decay": 0.0},
+        ],
+        lr=raw["optimizer"]["learning_rate"],
+        betas=(raw["optimizer"]["beta1"], raw["optimizer"]["beta2"]),
+    )
+    assert type(eager) is AdamW
+    strip = lambda groups: [{k: v for k, v in g.items() if k != "params"} for g in groups]  # noqa: E731
+    assert strip(eager.param_groups) == strip(reference.param_groups)
+    assert all(group["capturable"] is False for group in eager.param_groups)
+    graph_config = ExperimentConfig.model_validate(_with(raw, training={"cuda_graph": True, "cudnn_benchmark": False}))
+    graph = _build_optimizer(graph_config, list(model.parameters()))
+    assert all(group["capturable"] is True for group in graph.param_groups)
+    assert strip(graph.param_groups) == [{**group, "capturable": True} for group in strip(reference.param_groups)]
 
 
 # =========================================================================== trainer scope
@@ -602,6 +686,30 @@ def test_trainer_refuses_an_architecture_off_the_allowlist(tmp_path: Path, archi
 def test_trainer_refuses_a_train_mode_attack(tmp_path: Path) -> None:
     train_mode = LinfPGD(AttackConfig(epsilon="4/255", step_size="4/255", steps=1, student_mode="train"))
     assert "an eval-mode, batch-keyed" in _refusal(tmp_path, attack=train_mode)
+
+
+def _adamw(model: nn.Module, **options: Any) -> AdamW:
+    return AdamW(model.parameters(), lr=1e-3, **{"capturable": True, **options})
+
+
+def test_trainer_admits_only_the_capturable_foreach_adamw(tmp_path: Path) -> None:
+    model = nn.Sequential(nn.Flatten(), nn.Linear(12, 3))
+    # In scope: only the CPU device is refused.
+    assert _refusal(tmp_path, model=model, optimizer=_adamw(model)) == "cuda_graph requires a CUDA device"
+    assert _refusal(tmp_path, model=model, optimizer=_adamw(model, foreach=True)) == (
+        "cuda_graph requires a CUDA device"
+    )
+    for optimizer in (
+        AdamW(model.parameters(), lr=1e-3),  # capturable=False: host step counter and bias corrections
+        _adamw(model, foreach=False),
+        _adamw(model, amsgrad=True),
+        _adamw(model, maximize=True),
+        Adam(model.parameters(), lr=1e-3, capturable=True),  # coupled weight decay: not the recipe
+        torch.optim.RMSprop(model.parameters(), lr=1e-3),
+    ):
+        assert "a torch.optim.SGD optimizer or a torch.optim.AdamW with capturable=True" in _refusal(
+            tmp_path, model=model, optimizer=optimizer
+        ), optimizer
 
 
 def test_trainer_refuses_a_linf_pgd_subclass(tmp_path: Path) -> None:
@@ -792,6 +900,76 @@ def test_fingerprint_covers_the_extra_inputs_of_the_2026_10_08_scope() -> None:
     assert optimizer_groups_fingerprint(proxy) != proxy_before
     # The Trainer's extra tuple (static buffers, teacher, mixed k, AWP) is part of the compared fingerprint.
     assert optimizer_fingerprint(optimizer, model, extra=(1,)) != optimizer_fingerprint(optimizer, model, extra=(2,))
+
+
+def _stepped_adamw() -> tuple[nn.Module, AdamW]:
+    torch.manual_seed(0)
+    model = nn.Sequential(nn.Linear(3, 4), nn.LayerNorm(4), nn.Linear(4, 2))
+    decay = [p for p in model.parameters() if p.ndim > 1]
+    no_decay = [p for p in model.parameters() if p.ndim <= 1]
+    optimizer = AdamW([{"params": decay, "weight_decay": 0.05}, {"params": no_decay, "weight_decay": 0.0}], lr=1e-3)
+    model(torch.randn(5, 3)).sum().backward()
+    optimizer.step()
+    return model, optimizer
+
+
+def _replace_state(key: str) -> Any:
+    def mutate(model: nn.Module, optimizer: AdamW) -> None:
+        first = optimizer.param_groups[0]["params"][0]
+        optimizer.state[first][key] = optimizer.state[first][key].clone()
+
+    return mutate
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda model, opt: opt.param_groups[0].__setitem__("lr", 5e-4),
+        lambda model, opt: opt.param_groups[1].__setitem__("lr", 5e-4),
+        lambda model, opt: opt.param_groups[0].__setitem__("betas", (0.8, 0.999)),
+        lambda model, opt: opt.param_groups[0].__setitem__("betas", (0.9, 0.99)),
+        lambda model, opt: opt.param_groups[0].__setitem__("eps", 1e-6),
+        lambda model, opt: opt.param_groups[0].__setitem__("weight_decay", 0.1),
+        lambda model, opt: opt.param_groups[1].__setitem__("weight_decay", 0.05),
+        lambda model, opt: opt.param_groups[0].__setitem__("amsgrad", True),
+        _replace_state("exp_avg"),
+        _replace_state("exp_avg_sq"),
+        _replace_state("step"),
+        lambda model, opt: opt.load_state_dict(copy.deepcopy(opt.state_dict())),
+    ],
+)
+def test_fingerprint_covers_every_adamw_input_of_the_captured_step(mutate: Any) -> None:
+    model, optimizer = _stepped_adamw()
+    before = optimizer_fingerprint(optimizer, model)
+    # What a replay does (in-place updates of the same tensors) keeps it.
+    model(torch.randn(5, 3)).sum().backward()
+    optimizer.step()
+    assert optimizer_fingerprint(optimizer, model) == before
+    mutate(model, optimizer)
+    assert optimizer_fingerprint(optimizer, model) != before
+
+
+def test_fingerprint_refuses_tensor_adamw_betas() -> None:
+    model, optimizer = _stepped_adamw()
+    optimizer.param_groups[0]["betas"] = (torch.tensor(0.9), 0.999)
+    with pytest.raises(RuntimeError, match="Python-scalar optimizer 'betas'"):
+        optimizer_fingerprint(optimizer, model)
+
+
+def test_adamw_state_ready_only_after_the_first_update() -> None:
+    model = nn.Linear(3, 2)
+    optimizer = AdamW(model.parameters(), lr=1e-3)
+    assert not optimizer_state_ready(optimizer)
+    model(torch.randn(4, 3)).sum().backward()
+    optimizer.step()
+    assert optimizer_state_ready(optimizer)
+    # A step counter that does not live on the parameter's device (a non-capturable state) is not ready.
+    first = next(iter(model.parameters()))
+    optimizer.state[first]["step"] = torch.zeros((), device="meta")
+    assert not optimizer_state_ready(optimizer)
+    # SGD keeps its momentum-buffer rule.
+    sgd = SGD(nn.Linear(3, 2).parameters(), lr=0.1, momentum=0.9)
+    assert optimizer_state_ready(sgd) is momentum_buffers_ready(sgd) is False
 
 
 def test_require_is_the_host_check_outside_a_capture() -> None:

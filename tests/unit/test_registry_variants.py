@@ -143,9 +143,21 @@ def test_pretrained_is_refused_for_variants(architecture: str) -> None:
         ModelConfig(architecture=architecture, num_classes=1000, pretrained=True)
 
 
+# Variants admitted by training.cuda_graph after their own parity tests (plan 0105, human-approved 2026-10-09:
+# the ConvNeXt-Atto / DeiT-Tiny batch-B variants, SGD and AdamW). Every other variant stays refused.
+_CUDA_GRAPH_VARIANTS = frozenset(
+    {
+        "convnext_atto_deep_narrow_imagenet",
+        "convnext_atto_ols_imagenet",
+        "convnext_atto_convstem_imagenet",
+        "deit_tiny_convstem_imagenet",
+    }
+)
+
+
 @pytest.mark.parametrize("architecture", sorted(VARIANTS))
-def test_variants_are_not_cuda_graph_eligible(architecture: str) -> None:
-    assert architecture not in CUDA_GRAPH_ARCHITECTURES
+def test_only_parity_tested_variants_are_cuda_graph_eligible(architecture: str) -> None:
+    assert (architecture in CUDA_GRAPH_ARCHITECTURES) is (architecture in _CUDA_GRAPH_VARIANTS)
 
 
 def _activation_types(model: nn.Module) -> set[type]:

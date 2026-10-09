@@ -18,6 +18,21 @@ Examples (Hamster GPU1 only, next to a production job: keep every process small)
 
 The EfficientNet-B0 224 px / batch 128 measurement needs a FREE 24 GB GPU (about 20 GB with the
 old behaviour); see docs/plans/0105-cuda-graph-training-step.md for the command.
+
+``--optimizer adamw`` is the plan 0103 ConvNeXt-Atto / DeiT-Tiny recipe (betas 0.9/0.999, weight decay
+0.05 without norm/bias; capturable in graph mode, as ard.cli.train builds it). ``--cudnn-benchmark`` is
+the eager nondeterministic baseline those runs use today (refused with the graph). The production-shape
+comparison (FREE GPU; one process per line, each about 5-8 GB)::
+
+    for arch in convnext_atto_imagenet deit_tiny_imagenet; do
+      for arm in "eager --nondeterministic --cudnn-benchmark" "eager --nondeterministic" \
+                 "graph --nondeterministic" "eager" "graph"; do
+        set -- $arm; mode=$1; shift
+        CUDA_VISIBLE_DEVICES=<free gpu> PYTHONPATH=src python scripts/cuda_graph_benchmark.py \
+          --architecture $arch --optimizer adamw --image-size 224 --batch-size 128 --batches 40 \
+          --epochs 2 --validation-batches 1 --mode $mode "$@"
+      done
+    done
 """
 
 from __future__ import annotations
@@ -32,11 +47,11 @@ from typing import Any
 
 import numpy as np
 import torch
-from torch.optim import SGD
+from torch.optim import SGD, AdamW
 from torch.optim.lr_scheduler import MultiStepLR
 
 from ard.attacks import LinfPGD
-from ard.cli.train import _seed_everything
+from ard.cli.train import _seed_everything, _weight_decay_parameter_groups
 from ard.config.schema import AttackConfig, AwpConfig, MixedBatchConfig, ModelConfig, NormalizationConfig
 from ard.data import EpochShuffleSampler, IndexedDataset, SyntheticCIFAR, collate_indexed
 from ard.distillation.crop_keys import CropKeyedBatch
@@ -124,6 +139,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         torch.use_deterministic_algorithms(False)
     else:
         torch.use_deterministic_algorithms(True)
+    if args.cudnn_benchmark:
+        if args.mode == "graph" or not args.nondeterministic:
+            raise SystemExit("--cudnn-benchmark is the eager nondeterministic baseline only (refused with cuda_graph)")
+        torch.backends.cudnn.benchmark = True
     if args.keep_graph_pool:
         Trainer._release_cuda_graph = lambda self: None  # type: ignore[method-assign]
     # Process-wide peaks: the trainer resets the peak at every epoch start.
@@ -138,7 +157,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         ),
         tier="dev",
     ).to(device)
-    optimizer = SGD(student.parameters(), lr=0.025, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    optimizer: SGD | AdamW
+    if args.optimizer == "sgd":
+        optimizer = SGD(student.parameters(), lr=0.025, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    else:
+        # The Phase 1/2 ConvNeXt-Atto / DeiT-Tiny recipe (ard.cli.train): betas 0.9/0.999, wd 0.05 with
+        # norm/bias excluded; capturable only with the graph (as ard.cli.train builds it).
+        optimizer = AdamW(
+            _weight_decay_parameter_groups(student.parameters(), weight_decay=0.05),
+            lr=1e-3,
+            betas=(0.9, 0.999),
+            **({"capturable": True} if args.mode == "graph" else {}),
+        )
     method = args.method
     distillation = method.startswith("rslad")
     budget = {"epsilon": "4/255", "step_size": args.step_size, "steps": args.steps, "random_start": True}
@@ -211,6 +241,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "batch_size": args.batch_size,
         "steps": args.steps,
         "deterministic": not args.nondeterministic,
+        "cudnn_benchmark": args.cudnn_benchmark,
+        "optimizer": args.optimizer,
         "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2**30,
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2**30,
         # The last epoch's rate (its first full batch eager, the second captured, the rest replayed).
@@ -237,6 +269,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--step-size", default="8/765")
     parser.add_argument("--selection-steps", type=int, default=10)
     parser.add_argument("--nondeterministic", action="store_true")
+    parser.add_argument("--optimizer", choices=("sgd", "adamw"), default="sgd")
+    parser.add_argument(
+        "--cudnn-benchmark", action="store_true", help="eager nondeterministic baseline with cuDNN autotuning"
+    )
     args = parser.parse_args(argv)
     print(json.dumps(run(args)), flush=True)
     return 0

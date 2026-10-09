@@ -198,6 +198,33 @@ def _adamw_parameter_groups(model: nn.Module, *, weight_decay: float) -> list[di
     return _weight_decay_parameter_groups(model.parameters(), weight_decay=weight_decay)
 
 
+def _build_optimizer(config: ExperimentConfig, optimized_parameters: list[nn.Parameter]) -> SGD | AdamW:
+    """The run's optimizer. AdamW is capturable exactly when training.cuda_graph is on (plan 0105, 2026-10-09)."""
+    if config.optimizer.id == "sgd":
+        assert config.optimizer.momentum is not None and config.optimizer.nesterov is not None
+        return SGD(
+            (
+                _weight_decay_parameter_groups(optimized_parameters, weight_decay=config.optimizer.weight_decay)
+                if config.optimizer.exclude_norm_bias_from_weight_decay
+                else optimized_parameters
+            ),
+            lr=config.optimizer.learning_rate,
+            momentum=config.optimizer.momentum,
+            weight_decay=config.optimizer.weight_decay,
+            nesterov=config.optimizer.nesterov,
+        )
+    assert config.optimizer.beta1 is not None and config.optimizer.beta2 is not None
+    return AdamW(
+        _weight_decay_parameter_groups(optimized_parameters, weight_decay=config.optimizer.weight_decay),
+        lr=config.optimizer.learning_rate,
+        betas=(config.optimizer.beta1, config.optimizer.beta2),
+        # training.cuda_graph: the capturable implementation (device step counter and bias corrections) for
+        # every step of such a run, eager and captured alike. Without the flag the call is unchanged
+        # (capturable=False, host bias corrections), so no existing run's numerics change.
+        **({"capturable": True} if config.training.cuda_graph else {}),
+    )
+
+
 def _guard_output(output_dir: Path, *, resume: Path | None, config_hash: str) -> None:
     """Reject collisions before the resolved config or checkpoint can be written."""
     if resume is None:
@@ -1146,26 +1173,7 @@ def main(argv: list[str] | None = None) -> int:
         optimized_parameters = list(student.parameters()) + (
             [] if auxiliary_batchnorm is None else list(auxiliary_batchnorm.parameters())
         )
-        if config.optimizer.id == "sgd":
-            assert config.optimizer.momentum is not None and config.optimizer.nesterov is not None
-            optimizer: SGD | AdamW = SGD(
-                (
-                    _weight_decay_parameter_groups(optimized_parameters, weight_decay=config.optimizer.weight_decay)
-                    if config.optimizer.exclude_norm_bias_from_weight_decay
-                    else optimized_parameters
-                ),
-                lr=config.optimizer.learning_rate,
-                momentum=config.optimizer.momentum,
-                weight_decay=config.optimizer.weight_decay,
-                nesterov=config.optimizer.nesterov,
-            )
-        else:
-            assert config.optimizer.beta1 is not None and config.optimizer.beta2 is not None
-            optimizer = AdamW(
-                _weight_decay_parameter_groups(optimized_parameters, weight_decay=config.optimizer.weight_decay),
-                lr=config.optimizer.learning_rate,
-                betas=(config.optimizer.beta1, config.optimizer.beta2),
-            )
+        optimizer = _build_optimizer(config, optimized_parameters)
         scheduler = build_scheduler(optimizer, config.scheduler, total_epochs=config.training.epochs)
         selection_attack_config = config.method.selection_attack
         assert selection_attack_config is not None  # resolved by MethodConfig validation

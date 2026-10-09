@@ -181,8 +181,9 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
 - `training.cuda_graph` (plan 0105, default off) replays the PGD-AT training step as one CUDA graph. It is always
   in the config hash. Config validation limits it to the scope tested by
   `tests/integration/test_cuda_graph_training_step.py`: the allowlisted students (`CUDA_GRAPH_ARCHITECTURES`:
-  MobileNetV4-Conv-Small/Medium, EfficientNet-B0), an eval-mode training attack, single CUDA device, FP32, method
-  `pgd_at`, SGD, no teacher/ADR/policy/mixed batch/AWP — measured on torch 2.11 with an RTX 4090, with no
+  MobileNetV4-Conv-Small/Medium, EfficientNet-B0; ConvNeXt-Atto / DeiT-Tiny family since 2026-10-09), an eval-mode
+  training attack, single CUDA device, FP32, method `pgd_at`, SGD (AdamW since 2026-10-09), no
+  teacher/ADR/policy/mixed batch/AWP — measured on torch 2.11 with an RTX 4090, with no
   `CUBLAS_WORKSPACE_CONFIG` override (as production runs). Since 2026-10-08 (plan 0103 Phase 2 batch A) a plain
   weight EMA (`training.weight_ema_decay`, updated inside the captured step right after the SGD update with the
   eager kernels), `method.label_smoothing` and `optimizer.exclude_norm_bias_from_weight_decay` (two SGD groups) are
@@ -201,9 +202,18 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   The value checks those paths share with the eager step (bank reconstruction, advT target, KL target validation,
   policy weights, teacher entropy) go through `ard.device_checks.require`: the unchanged host check outside a
   capture, a device assert (fatal before any checkpoint) inside one; never removed or widened.
+  Since 2026-10-09 (human-approved) AdamW is in scope (`optimizer.id: adamw`, every method above) and the
+  allowlist adds ConvNeXt-Atto, DeiT-Tiny and their batch-B variants (deep-narrow, ols, convstem; DeiT convstem),
+  each parity-tested with SGD and AdamW. A cuda_graph AdamW run is built with torch's capturable AdamW (device step
+  counter, bias corrections computed on the device) for all of its steps, eager and captured; that is bitwise equal
+  to the captured step but NOT to the default (`capturable=False`, host float64 bias corrections) AdamW of an eager
+  run (tested), so for AdamW `cuda_graph: true` is recorded in `training_protocol_identity` in both determinism
+  classes and an AdamW graph run never pools with an eager AdamW run. Without the flag the AdamW call is unchanged.
+  The stale-graph guard also covers every AdamW hyperparameter per group (lr, betas, eps, weight decay, flags) and
+  the addresses of `exp_avg`, `exp_avg_sq` and the step counter.
   - `training.deterministic: true`: **bitwise** equal to the eager step (checkpoints, RNG streams, epoch rows,
-    diagnostics). Not in `training_protocol_identity`, like `training.step_diagnostics`, so it pools with eager runs
-    of the same arm.
+    diagnostics). With SGD not in `training_protocol_identity`, like `training.step_diagnostics`, so it pools with
+    eager runs of the same arm (with AdamW it is recorded, see above).
   - `training.deterministic: false` (human decision 2026-10-03; `cudnn_benchmark` stays refused with it): not
     bitwise. What the tests observe (an observation, not a consequence of "same kernels"): (1) over whole runs every
     RNG stream (checkpointed Python/NumPy/torch CPU/CUDA states, the CUDA RNG state, the seed and draw count of every

@@ -54,7 +54,7 @@ import numpy as np
 import pytest
 import torch
 from torch import nn
-from torch.optim import SGD
+from torch.optim import SGD, AdamW
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 
@@ -116,9 +116,28 @@ _candidate_opt_in = pytest.mark.skipif(
 )
 
 
+# Plan 0103 ConvNeXt-Atto / DeiT-Tiny students and their batch-B variants (AdamW recipe; human-approved
+# 2026-10-09). LayerNorm, GELU, depthwise 7x7 convolutions (ConvNeXt) and SDPA attention (DeiT): every case
+# of this file runs for them (SGD and AdamW). DeiT needs its native 224 px input; the ConvNeXt variants run at
+# 64 px (stage 4 at 2x2, so the depthwise convolutions see a real spatial extent).
+_LAYERNORM_ARCHITECTURES = (
+    "convnext_atto_imagenet",
+    "convnext_atto_deep_narrow_imagenet",
+    "convnext_atto_ols_imagenet",
+    "convnext_atto_convstem_imagenet",
+    "deit_tiny_imagenet",
+    "deit_tiny_convstem_imagenet",
+)
+_STUDENT_IMAGE_SIZE = {
+    **dict.fromkeys(_LAYERNORM_ARCHITECTURES, 64),
+    "deit_tiny_imagenet": 224,
+    "deit_tiny_convstem_imagenet": 224,
+}
+
+
 def _admit_candidate(kind: str) -> None:
     """Test-only allowlist extension for one candidate, confined to the test subprocess."""
-    if kind in _CANDIDATE_ARCHITECTURES:
+    if kind in _CANDIDATE_ARCHITECTURES or kind in _LAYERNORM_ARCHITECTURES:
         trainer_module.CUDA_GRAPH_ARCHITECTURES = CUDA_GRAPH_ARCHITECTURES | {kind}  # type: ignore[attr-defined]
 
 
@@ -157,7 +176,7 @@ def _student(kind: str, *, teacher_kind: str = _FIXTURE_TEACHER) -> tuple[nn.Mod
         pretrained=False,
         normalization=NormalizationConfig(profile="imagenet_standard"),
     )
-    return build_student(config, tier="dev"), 10, 32
+    return build_student(config, tier="dev"), 10, _STUDENT_IMAGE_SIZE.get(kind, 32)
 
 
 class _CropKeyed(torch.utils.data.Dataset):
@@ -200,7 +219,7 @@ def _loaders(
 
 
 # Plan 0103 Phase 2 batch A options a variant ("base" or "+"-joined names) switches on.
-_VARIANT_OPTIONS = frozenset({"ema", "label_smoothing", "exclude_norm_bias"})
+_VARIANT_OPTIONS = frozenset({"ema", "label_smoothing", "exclude_norm_bias", "adamw"})
 _ALL_OPTIONS = "ema+label_smoothing+exclude_norm_bias"
 _EMA_DECAY = 0.9  # large steps, so the EMA visibly moves within a 3-epoch fixture run
 _LABEL_SMOOTHING = 0.1
@@ -219,6 +238,42 @@ def _optimizer_parameters(student: nn.Module, options: set[str], weight_decay: f
     from ard.cli.train import _weight_decay_parameter_groups
 
     return _weight_decay_parameter_groups(student.parameters(), weight_decay=weight_decay)
+
+
+# Variant "adamw" (human-approved 2026-10-09): the plan 0103 ConvNeXt-Atto / DeiT-Tiny recipe as ard.cli.train
+# builds it -- betas 0.9/0.999, weight decay 0.05 with norm/bias excluded -- with capturable=True, which
+# ard.cli.train sets exactly when training.cuda_graph is on. The eager reference of a parity case uses the
+# same capturable optimizer (the graph run's own eager steps do); ARD_CUDA_GRAPH_TEST_ADAMW_CAPTURABLE=0
+# builds the capturable=False AdamW of an eager run without the flag (only for the numerics comparison).
+_ADAMW_WEIGHT_DECAY = 0.05
+_ADAMW_LEARNING_RATE = 2e-3
+
+
+def _optimizer(
+    student: nn.Module,
+    options: set[str],
+    *,
+    sgd_learning_rate: float,
+    sgd_weight_decay: float,
+    adamw_learning_rate: float = _ADAMW_LEARNING_RATE,
+) -> torch.optim.Optimizer:
+    if "adamw" in options:
+        from ard.cli.train import _weight_decay_parameter_groups
+
+        capturable = os.environ.get("ARD_CUDA_GRAPH_TEST_ADAMW_CAPTURABLE", "1") == "1"
+        return AdamW(
+            _weight_decay_parameter_groups(student.parameters(), weight_decay=_ADAMW_WEIGHT_DECAY),
+            lr=adamw_learning_rate,
+            betas=(0.9, 0.999),
+            **({"capturable": True} if capturable else {}),
+        )
+    return SGD(
+        _optimizer_parameters(student, options, sgd_weight_decay),
+        lr=sgd_learning_rate,
+        momentum=0.9,
+        weight_decay=sgd_weight_decay,
+        nesterov=True,
+    )
 
 
 # Training methods a parity case runs (human decision 2026-10-08 added all but pgd_at).
@@ -322,9 +377,7 @@ def build_trainer(
     options = _variant(variant)
     student, num_classes, image_size = _student(kind, teacher_kind=teacher_kind)
     student = student.to(device)
-    optimizer = SGD(
-        _optimizer_parameters(student, options, 5e-4), lr=0.05, momentum=0.9, weight_decay=5e-4, nesterov=True
-    )
+    optimizer = _optimizer(student, options, sgd_learning_rate=0.05, sgd_weight_decay=5e-4)
     parts = _method_parts(
         method,
         num_classes=num_classes,
@@ -466,6 +519,17 @@ def arm(
             return generator.manual_seed(generator.initial_seed() + 1)
 
         Trainer._attack_generator = shifted  # type: ignore[method-assign]
+    if mode == "graph_adamw_step_plus_one":
+        # Negative control (AdamW): the captured step also advances every AdamW step counter once more,
+        # so the bias corrections of every replay are those of a later step. Confined to the graph path.
+        original_body = Trainer._cuda_graph_body
+
+        def advanced(self: Trainer) -> None:
+            for state in self.optimizer.state.values():
+                state["step"].add_(1.0)
+            original_body(self)
+
+        Trainer._cuda_graph_body = advanced  # type: ignore[method-assign]
     cuda_graph = mode != "eager"
     common = {"diagnostics": diagnostics, "variant": variant, "method": method, "teacher_kind": teacher_kind}
     trainer, (num_classes, image_size) = build_trainer(root, kind=kind, cuda_graph=cuda_graph, device=device, **common)
@@ -499,6 +563,8 @@ def arm(
             not torch.equal(value, live[key]) for key, value in trainer.ema_model.state_dict().items()
         )
     fingerprint["optimizer_groups"] = [group["weight_decay"] for group in trainer.optimizer.param_groups]
+    fingerprint["optimizer"] = type(trainer.optimizer).__name__
+    fingerprint["optimizer_capturable"] = [group.get("capturable") for group in trainer.optimizer.param_groups]
     # Evidence the method's own step ran (method columns of the epoch rows).
     fingerprint["method_rows"] = [
         {
@@ -587,12 +653,12 @@ def _single_step_trainer(
         student.load_state_dict(torch.load(spec["checkpoint"], map_location="cpu", weights_only=False)["model"])
     student = student.to(device)
     options = _variant(spec.get("variant", "base"))
-    optimizer = SGD(
-        _optimizer_parameters(student, options, spec["weight_decay"]),
-        lr=spec["learning_rate"],
-        momentum=0.9,
-        weight_decay=spec["weight_decay"],
-        nesterov=True,
+    optimizer = _optimizer(
+        student,
+        options,
+        sgd_learning_rate=spec["learning_rate"],
+        sgd_weight_decay=spec["weight_decay"],
+        adamw_learning_rate=spec.get("adamw_learning_rate", _ADAMW_LEARNING_RATE),
     )
     size = 5 * spec["batch"]
     method = spec.get("method", "pgd_at")
@@ -646,18 +712,28 @@ def _single_step_trainer(
     return trainer, loader(size, 3, keyed=method in _BANK_METHODS), loader(spec["batch"], 99)
 
 
+def _optimizer_state_groups(optimizer: torch.optim.Optimizer) -> dict[str, str]:
+    """Tensor group name -> per-parameter optimizer state key compared by the one-step rule."""
+    if type(optimizer) is AdamW:
+        return {"exp_avg": "exp_avg", "exp_avg_sq": "exp_avg_sq"}
+    return {"momentum": "momentum_buffer"}
+
+
 def _single_step_state(trainer: Trainer) -> dict[str, Any]:
-    """Parameters, model buffers, SGD momentum buffers, the EMA state (when the variant has one) and the
-    CUDA RNG state, copied to the host."""
+    """Parameters, model buffers, the optimizer state (SGD momentum buffers; AdamW exp_avg, exp_avg_sq and step
+    counters), the EMA state (when the variant has one) and the CUDA RNG state, copied to the host."""
     names = {name for name, _ in trainer.model.named_parameters()}
     state = trainer.model.state_dict()
     parameters = [parameter for group in trainer.optimizer.param_groups for parameter in group["params"]]
     saved = {
         "parameters": {key: value.detach().cpu().clone() for key, value in state.items() if key in names},
         "buffers": {key: value.detach().cpu().clone() for key, value in state.items() if key not in names},
-        "momentum": [trainer.optimizer.state[p]["momentum_buffer"].detach().cpu().clone() for p in parameters],
         "cuda_rng": torch.cuda.get_rng_state(),
     }
+    for group, key in _optimizer_state_groups(trainer.optimizer).items():
+        saved[group] = [trainer.optimizer.state[p][key].detach().cpu().clone() for p in parameters]
+    if type(trainer.optimizer) is AdamW:
+        saved["step"] = [trainer.optimizer.state[p]["step"].detach().cpu().clone() for p in parameters]
     if trainer.ema_model is not None:
         saved["ema"] = {key: value.detach().cpu().clone() for key, value in trainer.ema_model.state_dict().items()}
     return saved
@@ -670,8 +746,11 @@ def _load_single_step_state(trainer: Trainer, saved: dict[str, Any]) -> None:
     with torch.no_grad():
         for key, value in state.items():
             value.copy_(saved["parameters"][key] if key in saved["parameters"] else saved["buffers"][key])
-        for parameter, buffer in zip(parameters, saved["momentum"], strict=True):
-            trainer.optimizer.state[parameter]["momentum_buffer"].copy_(buffer)
+        for group, key in _optimizer_state_groups(trainer.optimizer).items():
+            for parameter, buffer in zip(parameters, saved[group], strict=True):
+                trainer.optimizer.state[parameter][key].copy_(buffer)
+        for parameter, step in zip(parameters, saved.get("step", []), strict=False):
+            trainer.optimizer.state[parameter]["step"].copy_(step)
         if trainer.ema_model is not None:
             for key, value in trainer.ema_model.state_dict().items():
                 value.copy_(saved["ema"][key])
@@ -760,12 +839,14 @@ def single_step_arm(root: Path, spec_json: str, name: str) -> dict[str, Any]:
 
 def _flat(tensors: Any) -> torch.Tensor:
     values = tensors.values() if isinstance(tensors, dict) else tensors
-    return torch.cat([value.double().flatten() for value in values if value.is_floating_point()])
+    floating = [value.double().flatten() for value in values if value.is_floating_point()]
+    return torch.cat(floating) if floating else torch.zeros(0, dtype=torch.float64)
 
 
 _GROUPS = ("parameters", "momentum", "buffers")
-# With a weight EMA (variant "ema") its state is a fourth group, held to the same rule.
-_EMA_GROUPS = (*_GROUPS, "ema")
+# With a weight EMA (variant "ema") its state is a fourth group, held to the same rule. With AdamW the
+# optimizer state is two groups (exp_avg, exp_avg_sq) instead of the momentum buffers.
+_ALL_STATE_GROUPS = ("parameters", "momentum", "exp_avg", "exp_avg_sq", "buffers", "ema")
 
 
 def _groups(result: dict[str, Any]) -> tuple[str, ...]:
@@ -784,9 +865,27 @@ def single_step_distances(state_dir: Path, processes: list[str], sync: int) -> d
         if path.name.split(".", 1)[0] in processes:
             states[path.name[: -len(f"_after{sync}.pt")]] = torch.load(path, weights_only=False)
     reference = states["reference"]
-    groups = _EMA_GROUPS if "ema" in reference else _GROUPS
-    flat = {name: {group: _flat(state[group]) for group in groups} for name, state in states.items()}
+    present = [group for group in _ALL_STATE_GROUPS if group in reference]
+    flat = {name: {group: _flat(state[group]) for group in present} for name, state in states.items()}
     result: dict[str, Any] = {"update": {}, "floor": {}, "relative_update": {}}
+    # A group the reference step does not change at all (no floating-point element, or constant buffers such
+    # as a LayerNorm model's pixel-normalization constants) has no scale: it must be bitwise equal in every
+    # arm instead, and is left out of the distance rule.
+    constant = [
+        group
+        for group in present
+        if flat["reference"][group].numel() == 0 or torch.equal(flat["reference"][group], _flat(before[group]))
+    ]
+    result["constant_groups_equal"] = {
+        group: all(torch.equal(flat[name][group], flat["reference"][group]) for name in flat) for group in constant
+    }
+    groups = [group for group in present if group not in constant]
+    # AdamW step counters: exact in every arm (integers stored as float32).
+    result["steps_equal"] = all(
+        len(state.get("step", [])) == len(reference.get("step", []))
+        and all(torch.equal(a, b) for a, b in zip(state.get("step", []), reference.get("step", []), strict=True))
+        for state in states.values()
+    )
     for group in groups:
         new, old = flat["reference"][group], _flat(before[group])
         update = float((new - old).norm())
@@ -837,16 +936,36 @@ _METHOD_MUTATIONS = {
 }
 
 
+# Stale-graph mutations of the AdamW scope (2026-10-09): every AdamW hyperparameter the step bakes in (per
+# group) and every per-parameter state tensor it reads or writes by address.
+_ADAMW_MUTATIONS = (
+    "adamw_lr",
+    "adamw_beta1",
+    "adamw_beta2",
+    "adamw_eps",
+    "adamw_weight_decay_group1",
+    "adamw_exp_avg",
+    "adamw_exp_avg_sq",
+    "adamw_step_tensor",
+    "adamw_load_state_dict",
+)
+
+
 def stale_guard(root: Path, mutation: str) -> str:
     """Mutate the optimizer (or another baked-in input of the step) mid-epoch after capture; return the error."""
     device = torch.device("cuda")
     method = _METHOD_MUTATIONS.get(mutation, "pgd_at")
+    variant = "base"
+    if mutation == "ema_tensor":
+        variant = "ema"
+    elif mutation in _ADAMW_MUTATIONS:
+        variant = "adamw"
     trainer, (num_classes, image_size) = build_trainer(
         root,
         kind=_FIXTURE,
         cuda_graph=True,
         device=device,
-        variant="ema" if mutation == "ema_tensor" else "base",
+        variant=variant,
         method=method,
     )
     loader, validation_loader, _ = _loaders(
@@ -896,6 +1015,27 @@ def stale_guard(root: Path, mutation: str) -> str:
         elif mutation == "mixed_weight":
             assert trainer.mixed_batch is not None
             trainer.mixed_batch = trainer.mixed_batch.model_copy(update={"adversarial_weight": 0.5})
+        elif mutation in _ADAMW_MUTATIONS:
+            assert type(optimizer) is AdamW
+            first = optimizer.param_groups[0]["params"][0]
+            if mutation == "adamw_lr":
+                optimizer.param_groups[1]["lr"] *= 0.5
+            elif mutation == "adamw_beta1":
+                optimizer.param_groups[0]["betas"] = (0.8, optimizer.param_groups[0]["betas"][1])
+            elif mutation == "adamw_beta2":
+                optimizer.param_groups[0]["betas"] = (optimizer.param_groups[0]["betas"][0], 0.99)
+            elif mutation == "adamw_eps":
+                optimizer.param_groups[0]["eps"] = 1e-6
+            elif mutation == "adamw_weight_decay_group1":
+                # The norm/bias group (weight decay 0) gets decay: a per-group baked-in scalar.
+                optimizer.param_groups[1]["weight_decay"] = 0.05
+            elif mutation in ("adamw_exp_avg", "adamw_exp_avg_sq", "adamw_step_tensor"):
+                # A reallocated state tensor (same values): the graph would write the old one.
+                key = {"adamw_exp_avg": "exp_avg", "adamw_exp_avg_sq": "exp_avg_sq", "adamw_step_tensor": "step"}
+                optimizer.state[first][key[mutation]] = optimizer.state[first][key[mutation]].clone()
+            else:
+                # A deep copy, as a checkpoint load gives: new exp_avg / exp_avg_sq / step tensors.
+                optimizer.load_state_dict(copy.deepcopy(optimizer.state_dict()))
         else:
             raise AssertionError(mutation)
 
@@ -911,7 +1051,7 @@ def never_replays(root: Path) -> str:
     """cuda_graph on, but no capture is ever possible: the epoch must fail, not silently train eagerly."""
     device = torch.device("cuda")
     trainer, (num_classes, image_size) = build_trainer(root, kind=_FIXTURE, cuda_graph=True, device=device)
-    trainer_module.momentum_buffers_ready = lambda _optimizer: False  # type: ignore[assignment]
+    trainer_module.optimizer_state_ready = lambda _optimizer: False  # type: ignore[assignment]
     loader, validation_loader, _ = _loaders(num_classes, image_size, pin_memory=False)
     try:
         trainer.fit(loader, validation_loader=validation_loader, epochs=1)
@@ -1073,6 +1213,8 @@ def _comparable(fingerprint: dict[str, Any], *, diagnostics: bool = True) -> dic
         "has_ema",
         "ema_differs_from_model",
         "optimizer_groups",
+        "optimizer",
+        "optimizer_capturable",
         "method_rows",
         "peak_reserved_gib",
     }
@@ -1129,7 +1271,12 @@ def _assert_variant_ran(result: dict[str, Any], variant: str) -> None:
     if "ema" in options:
         assert result["ema_differs_from_model"]
         assert "last.pt:ema" in result and "best.pt:ema" in result
-    assert result["optimizer_groups"] == ([5e-4, 0.0] if "exclude_norm_bias" in options else [5e-4])
+    if "adamw" in options:
+        assert result["optimizer"] == "AdamW" and result["optimizer_capturable"] == [True, True]
+        assert result["optimizer_groups"] == [_ADAMW_WEIGHT_DECAY, 0.0]
+    else:
+        assert result["optimizer"] == "SGD"
+        assert result["optimizer_groups"] == ([5e-4, 0.0] if "exclude_norm_bias" in options else [5e-4])
 
 
 @pytest.mark.gpu
@@ -1470,6 +1617,14 @@ _MAX_RELATIVE_PARAMETER_UPDATE = 0.05
 _SINGLE_STEP_OVERRIDES: dict[str, dict[str, Any]] = {
     _FIXTURE: {"image_size": 8, "learning_rate": 0.05},
     "efficientnet_b0_imagenet": {"learning_rate": 0.015},
+    # ConvNeXt-Atto / DeiT-Tiny family with SGD: at lr 0.002 the update stayed so close to the FP32 floor that
+    # the lr x 1.001 control sat only 1.1-2.0x the bound (2026-10-09); lr 0.02 brings it to about 1% of the weights
+    # (the convstem variants, 8.8x at lr 0.02: lr 0.04).
+    **{architecture: {"learning_rate": 0.02} for architecture in _LAYERNORM_ARCHITECTURES},
+    "convnext_atto_convstem_imagenet": {"learning_rate": 0.04},
+    # DeiT-Tiny takes its native 224 px input only; batch 8 keeps every process small next to a production job.
+    "deit_tiny_imagenet": {"image_size": 224, "batch": 8, "learning_rate": 0.02},
+    "deit_tiny_convstem_imagenet": {"image_size": 224, "batch": 8, "learning_rate": 0.04},
 }
 _SINGLE_STEP_REGIME = {
     "image_size": 64,
@@ -1535,6 +1690,12 @@ def single_step_verdict(distances: dict[str, Any]) -> list[str]:
             failures.append(f"sync {sync}: parameter update {result['relative_update']['parameters']} too large")
         if not result["integer_buffers_equal"]:
             failures.append(f"sync {sync}: integer buffers differ between arms")
+        if not all(result.get("constant_groups_equal", {}).values()):
+            failures.append(
+                f"sync {sync}: a group the step leaves unchanged differs ({result['constant_groups_equal']})"
+            )
+        if not result.get("steps_equal", True):
+            failures.append(f"sync {sync}: AdamW step counters differ between arms")
         summary = single_step_summary(result)
         for group in _groups(result):
             if summary["spread"][group] > _MAX_SPREAD_OVER_FLOOR * result["floor"][group]:
@@ -1747,7 +1908,9 @@ _PRODUCTION_RANDOM_INIT_LR = {"efficientnet_b0_imagenet": 0.5, **dict.fromkeys(_
 @pytest.mark.parametrize(
     "kind",
     [
-        *sorted(CUDA_GRAPH_ARCHITECTURES),
+        # The ConvNeXt-Atto / DeiT-Tiny family has its own opt-in production-shape check (AdamW, bitwise:
+        # test_production_shape_adamw_graph_run_is_bit_identical).
+        *sorted(CUDA_GRAPH_ARCHITECTURES - set(_LAYERNORM_ARCHITECTURES)),
         *(pytest.param(architecture, marks=_candidate_opt_in) for architecture in _CANDIDATE_ARCHITECTURES),
     ],
 )
@@ -1923,4 +2086,264 @@ def test_production_shape_distillation_graph_run_is_bit_identical(method: str, t
     )
     assert graph["audit"] == [[1.0, float(_PRODUCTION_FULL_BATCHES - 1), 2.0]]
     ignored = {"audit", "real_teacher", "peak_reserved_gib"}
+    assert {k: v for k, v in graph.items() if k not in ignored} == {k: v for k, v in eager.items() if k not in ignored}
+
+
+# ============================== human approval 2026-10-09: AdamW, ConvNeXt-Atto / DeiT-Tiny and batch-B variants
+#
+# AdamW is captured through torch's capturable foreach implementation (device step counter and bias
+# corrections); ard.cli.train builds AdamW with capturable=True exactly when training.cuda_graph is on, so the
+# graph run's eager steps (first full batch, partial batch) and an eager reference built the same way are
+# the comparison. capturable=False (every eager AdamW run without the flag) computes the bias corrections on
+# the host in float64 and is numerically different -- shown below, and the reason a deterministic AdamW graph
+# run carries cuda_graph in its training_protocol_identity. Every case runs for the fixture and every
+# allowlisted student, which includes the ConvNeXt-Atto / DeiT-Tiny family (_LAYERNORM_ARCHITECTURES).
+_ADAMW_PHASE2 = "adamw+ema+label_smoothing"
+_ADAMW_KINDS = (_FIXTURE, *sorted(CUDA_GRAPH_ARCHITECTURES | set(_LAYERNORM_ARCHITECTURES)))
+_ADAMW_PARITY_CASES = [
+    (_FIXTURE, "adamw"),
+    *((kind, _ADAMW_PHASE2) for kind in _ADAMW_KINDS),
+]
+# The Phase 2 students with ConvNeXt-Atto / DeiT-Tiny method configs (RSLAD bank/online, mixed batch).
+_ADAMW_METHOD_KINDS = (_FIXTURE, "convnext_atto_imagenet", "deit_tiny_imagenet")
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize(("kind", "variant"), _ADAMW_PARITY_CASES)
+def test_adamw_graph_step_is_bit_identical_to_the_capturable_eager_step(kind: str, variant: str) -> None:
+    eager = _result(_run("arm", kind, "eager", "panel", variant))
+    graph = _result(_run("arm", kind, "graph", "panel", variant))
+    _assert_variant_ran(eager, variant)
+    _assert_variant_ran(graph, variant)
+    assert eager["has_probe"] and graph["has_probe"]
+    assert graph["audit"] == _EXPECTED_AUDIT
+    assert _comparable(graph) == _comparable(eager)
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", _NEW_METHODS)
+@pytest.mark.parametrize("kind", _ADAMW_METHOD_KINDS)
+def test_adamw_graph_step_of_new_methods_is_bit_identical(kind: str, method: str) -> None:
+    eager = _result(_run("arm", kind, "eager", "panel", "adamw+ema", method))
+    graph = _result(_run("arm", kind, "graph", "panel", "adamw+ema", method))
+    for result in (eager, graph):
+        _assert_method_ran(result, method)
+        _assert_variant_ran(result, "adamw+ema")
+    assert graph["audit"] == _EXPECTED_AUDIT
+    assert _comparable(graph) == _comparable(eager)
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("kind", _ADAMW_METHOD_KINDS)
+def test_adamw_graph_run_resumed_mid_run_equals_the_eager_run(kind: str) -> None:
+    eager = _result(_run("arm", kind, "eager", "panel", _ADAMW_PHASE2))
+    resumed = _result(_run("arm", kind, "resumed", "panel", _ADAMW_PHASE2))
+    _assert_variant_ran(resumed, _ADAMW_PHASE2)
+    assert _comparable(resumed, diagnostics=False) == _comparable(eager, diagnostics=False)
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("kind", [_FIXTURE, "convnext_atto_imagenet"])
+def test_negative_control_an_adamw_step_counter_advanced_in_the_graph_is_detected(kind: str) -> None:
+    eager = _result(_run("arm", kind, "eager", "panel", "adamw"))
+    shifted = _result(_run("arm", kind, "graph_adamw_step_plus_one", "panel", "adamw"))
+    assert shifted["audit"] == _EXPECTED_AUDIT
+    assert shifted["last.pt:model"] != eager["last.pt:model"]
+    assert shifted["last.pt:optimizer"] != eager["last.pt:optimizer"]
+    assert shifted["rows"] != eager["rows"]
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("mutation", _ADAMW_MUTATIONS)
+def test_mid_epoch_adamw_change_is_refused_not_replayed(mutation: str) -> None:
+    message = _result(_run("stale_guard", mutation))
+    assert "CUDA graph is stale" in message
+
+
+def _run_with_capturable(capturable: bool, *args: str, determinism: str = "deterministic") -> Any:
+    previous = os.environ.get("ARD_CUDA_GRAPH_TEST_ADAMW_CAPTURABLE")
+    os.environ["ARD_CUDA_GRAPH_TEST_ADAMW_CAPTURABLE"] = "1" if capturable else "0"
+    try:
+        return _result(_run(*args, determinism=determinism))
+    finally:
+        if previous is None:
+            os.environ.pop("ARD_CUDA_GRAPH_TEST_ADAMW_CAPTURABLE")
+        else:
+            os.environ["ARD_CUDA_GRAPH_TEST_ADAMW_CAPTURABLE"] = previous
+
+
+@pytest.mark.gpu
+@requires_cuda
+def test_capturable_adamw_is_not_bitwise_the_default_adamw() -> None:
+    """Why a deterministic AdamW graph run is recorded as such (ard.cli.evaluate._throughput_protocol_identity):
+    torch's capturable AdamW computes the bias corrections on the device in float32, the default one on the host
+    in float64, so two eager runs that differ only in ``capturable`` diverge. If a torch upgrade makes them
+    equal, the identity rule (and plan 0105) can be revisited."""
+    default = _run_with_capturable(False, "arm", _FIXTURE, "eager", "panel", "adamw")
+    capturable = _run_with_capturable(True, "arm", _FIXTURE, "eager", "panel", "adamw")
+    assert default["optimizer_capturable"] == [False, False]
+    assert capturable["optimizer_capturable"] == [True, True]
+    assert default["last.pt:model"] != capturable["last.pt:model"]
+
+
+_ADAMW_NONDETERMINISTIC_KINDS = (_FIXTURE, *_LAYERNORM_ARCHITECTURES)
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("kind", _ADAMW_NONDETERMINISTIC_KINDS)
+def test_nondeterministic_adamw_graph_run_keeps_every_rng_stream_exact(kind: str) -> None:
+    eager = _result(_run("nondeterministic_arm", kind, "eager", _ADAMW_PHASE2, determinism="nondeterministic"))
+    graph = _result(_run("nondeterministic_arm", kind, "graph", _ADAMW_PHASE2, determinism="nondeterministic"))
+    _assert_variant_ran(eager, _ADAMW_PHASE2)
+    _assert_variant_ran(graph, _ADAMW_PHASE2)
+    assert graph["audit"] == _EXPECTED_AUDIT
+    for key in _EXACT_UNDER_NONDETERMINISM:
+        assert graph[key] == eager[key], key
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", _NONDETERMINISTIC_NEW_METHODS)
+@pytest.mark.parametrize("kind", ["convnext_atto_imagenet", "deit_tiny_imagenet"])
+def test_nondeterministic_adamw_new_method_graph_run_keeps_every_rng_stream_exact(kind: str, method: str) -> None:
+    eager = _result(_run("nondeterministic_arm", kind, "eager", "adamw+ema", method, determinism="nondeterministic"))
+    graph = _result(_run("nondeterministic_arm", kind, "graph", "adamw+ema", method, determinism="nondeterministic"))
+    _assert_method_ran(eager, method)
+    _assert_method_ran(graph, method)
+    assert graph["audit"] == _EXPECTED_AUDIT
+    for key in _EXACT_UNDER_NONDETERMINISM:
+        assert graph[key] == eager[key], key
+
+
+# One-step regime for AdamW: lr sets the per-element update size (about lr / |w| of the weights). The update
+# must clear the FP32 floor by enough that the lr x 1.001 control is detectable: at lr 2e-4 ConvNeXt-Atto moved
+# 0.3-0.4% of its weights and that control sat only 7-8x the bound (the fixture: 0.07%, 1.5x). lr 6e-4 (the
+# fixture, with its larger weights, 3e-3) moves about 1% -- the size every SGD case uses.
+_ADAMW_SINGLE_STEP_LR = {_FIXTURE: 3e-3}
+
+
+def _adamw_single_step(kind: str) -> dict[str, Any]:
+    return {"adamw_learning_rate": _ADAMW_SINGLE_STEP_LR.get(kind, 6e-4)}
+
+
+def _single_step_spec(kind: str, **extra: Any) -> dict[str, Any]:
+    spec = {**_SINGLE_STEP_REGIME, "kind": kind, **extra}
+    spec.update(_SINGLE_STEP_OVERRIDES.get(kind, {}))
+    return spec
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("kind", _ADAMW_NONDETERMINISTIC_KINDS)
+def test_nondeterministic_adamw_graph_step_matches_eager_within_one_step_noise(tmp_path: Path, kind: str) -> None:
+    """The one-step rule with AdamW (+ the Phase 2 EMA and label smoothing): exp_avg and exp_avg_sq are
+    tensor groups held to the same bound, the step counters must be exact."""
+    spec = _single_step_spec(kind, variant=_ADAMW_PHASE2, **_adamw_single_step(kind))
+    distances = run_single_step_check(tmp_path, spec, "nondeterministic")
+    for result in distances.values():
+        assert {"exp_avg", "exp_avg_sq", "ema"} <= set(result["floor"]), result["floor"]
+        assert "momentum" not in result["floor"]
+    failures = single_step_verdict(distances)
+    assert not failures, (failures, {sync: single_step_summary(result) for sync, result in distances.items()})
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("method", _NONDETERMINISTIC_NEW_METHODS)
+def test_nondeterministic_adamw_new_method_graph_step_matches_eager_within_one_step_noise(
+    tmp_path: Path, method: str
+) -> None:
+    kind = "convnext_atto_imagenet"
+    spec = _single_step_spec(kind, variant="adamw+ema", method=method, **_adamw_single_step(kind))
+    distances = run_single_step_check(tmp_path, spec, "nondeterministic")
+    failures = single_step_verdict(distances)
+    assert not failures, (failures, {sync: single_step_summary(result) for sync, result in distances.items()})
+
+
+# Opt-in production shape, deterministic and BITWISE (as the distillation check above): the plan 0103
+# ConvNeXt-Atto / DeiT-Tiny Phase 2 PGD-AT step -- 224 px, batch 128, 1000 classes, PGD-3 (step 8/765,
+# epsilon 4/255), AdamW (lr 1e-3, betas 0.9/0.999, weight decay 0.05 without norm/bias) with the 0.9999
+# weight EMA -- one epoch of 4 full batches plus a partial batch of 64 and a validation pass, eager vs graph in
+# separate processes, random initialisation. FREE GPU only (about 6-8 GB per process):
+#
+#   ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1 CUDA_VISIBLE_DEVICES=<free gpu> PYTHONPATH=src python -m pytest -s \
+#     tests/integration/test_cuda_graph_training_step.py -k production_shape_adamw
+def production_adamw_arm(root: Path, kind: str, mode: str) -> dict[str, Any]:
+    from ard.cli.train import _weight_decay_parameter_groups
+
+    _seed_everything(1234)
+    device = torch.device("cuda")
+    _admit_candidate(kind)
+    student = build_student(
+        ModelConfig(
+            architecture=kind,  # type: ignore[arg-type]
+            num_classes=1000,
+            pretrained=False,
+            normalization=NormalizationConfig(profile="imagenet_standard"),
+        ),
+        tier="dev",
+    ).to(device)
+    optimizer = AdamW(
+        _weight_decay_parameter_groups(student.parameters(), weight_decay=0.05),
+        lr=1e-3,
+        betas=(0.9, 0.999),
+        capturable=True,
+    )
+    size = _PRODUCTION_FULL_BATCHES * _PRODUCTION_BATCH + _PRODUCTION_BATCH // 2
+    trainer = Trainer(
+        model=student,
+        optimizer=optimizer,
+        scheduler=None,
+        scaler=None,
+        attack=LinfPGD(AttackConfig(epsilon="4/255", step_size="8/765", steps=3, random_start=True)),
+        selection_attack=LinfPGD(AttackConfig(epsilon="4/255", step_size="8/765", steps=2)),
+        objective=PGDATObjective(),
+        weight_ema_decay=0.9999,
+        device=device,
+        output_dir=root,
+        config_hash="c" * 64,
+        seed=11,
+        tracker_run_id="production-shape-adamw",
+        diagnostics=TrainingDiagnostics.for_ids(list(range(size)), seed=0, size=24, mode="panel"),
+        step_diagnostics=False,
+        cuda_graph=mode == "graph",
+        student_architecture=kind,
+    )
+
+    def loader(dataset_size: int, seed: int) -> DataLoader:
+        dataset = IndexedDataset(SyntheticCIFAR(size=dataset_size, num_classes=1000, image_size=224, seed=seed))
+        return DataLoader(
+            dataset,
+            batch_size=_PRODUCTION_BATCH,
+            sampler=EpochShuffleSampler(dataset_size, seed=5, shuffle=True),
+            pin_memory=True,
+            collate_fn=collate_indexed,
+        )
+
+    history = trainer.fit(loader(size, 3), validation_loader=loader(_PRODUCTION_BATCH, 99), epochs=1)
+    fingerprint = _fingerprint(trainer, history, root)
+    fingerprint["audit"] = [[row.get(key) for key in _AUDIT_KEYS] for row in history]
+    fingerprint["peak_reserved_gib"] = torch.cuda.max_memory_reserved() / 2**30
+    return fingerprint
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.skipif(
+    os.environ.get("ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK") != "1",
+    reason="opt-in production-shape check (needs a free GPU): set ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1",
+)
+@pytest.mark.parametrize("kind", _LAYERNORM_ARCHITECTURES)
+def test_production_shape_adamw_graph_run_is_bit_identical(kind: str) -> None:
+    eager = _result(_run("production_adamw_arm", kind, "eager", timeout=3600))
+    graph = _result(_run("production_adamw_arm", kind, "graph", timeout=3600))
+    print(json.dumps({"kind": kind, "peak_reserved_gib": [eager["peak_reserved_gib"], graph["peak_reserved_gib"]]}))
+    assert graph["audit"] == [[1.0, float(_PRODUCTION_FULL_BATCHES - 1), 2.0]]
+    ignored = {"audit", "peak_reserved_gib"}
     assert {k: v for k, v in graph.items() if k not in ignored} == {k: v for k, v in eager.items() if k not in ignored}

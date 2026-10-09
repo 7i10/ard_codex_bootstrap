@@ -287,7 +287,7 @@ def _evaluation_preflight_config(config: ExperimentConfig, training_config: Expe
     return training_config.model_copy(update={"teacher": config.teacher})
 
 
-def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
+def _throughput_protocol_identity(training: TrainingConfig, *, optimizer_id: str = "sgd") -> dict[str, bool]:
     """Identity entries for the throughput options, present only when enabled.
 
     ``cudnn_benchmark`` and ``compile`` change kernel selection and fusion, so
@@ -323,7 +323,12 @@ def _throughput_protocol_identity(training: TrainingConfig) -> dict[str, bool]:
     #   exist before 2026-10-03, so no recorded identity changes.)
     # Widening the scope, or a torch/driver upgrade, requires rerunning those
     # tests first. It stays in the resolved config and config hash either way.
-    if training.cuda_graph and not training.deterministic:
+    # - optimizer adamw (2026-10-09): present in both determinism classes. A
+    #   cuda_graph run builds AdamW with capturable=True (device bias
+    #   corrections), which is bitwise equal to its own eager steps but not to
+    #   the capturable=False AdamW of an eager run, so they never pool silently.
+    #   (No AdamW graph run existed before 2026-10-09.)
+    if training.cuda_graph and (not training.deterministic or optimizer_id == "adamw"):
         identity["cuda_graph"] = True
     return identity
 
@@ -686,7 +691,9 @@ def main(argv: list[str] | None = None) -> int:
                         # recorded result.
                         "epsilon_warmup_epochs": training_config.training.epsilon_warmup_epochs,
                         "weight_ema_decay": training_config.training.weight_ema_decay,
-                        **_throughput_protocol_identity(training_config.training),
+                        **_throughput_protocol_identity(
+                            training_config.training, optimizer_id=training_config.optimizer.id
+                        ),
                         **_two_stage_protocol_identity(training_config.training),
                         **_data_loading_protocol_identity(training_config.training),
                         **_selection_protocol_identity(
