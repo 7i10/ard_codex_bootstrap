@@ -3824,3 +3824,20 @@ history behind this pivot.)
     1e-3.
   - Distillation waits for the Anteater banks (~10/13); the human says
     there is no hurry.
+- 2026-10-09 (human): Phase 2 runs deterministic + cuda_graph.
+  - MobileNetV4-M and EfficientNet-B0 Phase 2 configs were switched from
+    the Phase-1 baseline's non-deterministic + cudnn_benchmark (+ compile
+    for EfficientNet-B0). The commit is bf3b36c; queue lines were
+    repointed to worktree source-bf3b36cffe9a.
+  - A baseline+EMA det+cg run per model serves three purposes: Phase 2
+    reference, EMA effect, and setting check.
+    - Rule: raw-weight |diff| vs Phase-1 seeds <= the seed0-seed1 spread
+      or 0.5pt means "no setting effect".
+    - Queued (Hamster) just before the MobileNetV4-M items.
+  - EfficientNet-B0 split-BN mixed batch was added to the Ferret queue.
+  - On Hamster GPU0 after the MobileNetV4-M seed-1 run:
+    - cuda_graph candidate parity tests for the MobileNetV4-S variants;
+    - EfficientNet-B0 224 px / batch-128 cuda_graph memory measurement.
+    The pull queue resumes afterwards.
+  - The AdamW cuda_graph extension for ConvNeXt-Atto and DeiT-Tiny is in
+    progress; it is measured first and implemented only if it gains >= 5%.
