@@ -3809,3 +3809,18 @@ history behind this pivot.)
     - DeiT-Tiny after its grid closes.
   - Distillation soft-label banks (K=500, FP16, seed 0, all 5 teachers)
     are being built on Anteater GPUs 2/3; the estimate is about 3 days.
+- 2026-10-09 — Phase 2 pull queues armed (human: order group 1
+  MobileNetV4-S -> ConvNeXt-Atto -> MobileNetV4-M / EfficientNet-B0).
+  - Each host has `queues/work_queue.txt` and one `gpu_worker.sh` per GPU.
+    A worker pops the next line only when no other queue script owns its
+    GPU.
+    - Hamster has 14 items, worktree source-5dd329eaf31f.
+    - Ferret has 11 items, same SHA.
+    - The items are split between hosts in the human's order.
+  - ConvNeXt-Atto Phase 2 configs now carry the closed-grid LR 1e-3.
+  - cuda_graph is now on for MobileNetV4-S mixed-batch and AWP.
+  - DeiT-Tiny on Ferret GPU2 follows its own rule. After 2e-3 finishes:
+    if 2e-3 beats 1e-3 (35.00), run 4e-3; otherwise start DeiT seed 1 at
+    1e-3.
+  - Distillation waits for the Anteater banks (~10/13); the human says
+    there is no hurry.
