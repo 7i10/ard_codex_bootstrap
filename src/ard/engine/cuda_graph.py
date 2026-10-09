@@ -153,8 +153,10 @@ def optimizer_state_ready(optimizer: Optimizer) -> bool:
     parameter's device: capturable), ``exp_avg`` and ``exp_avg_sq`` -- AdamW creates them on a
     parameter's first update, and a capture before that would record the zero initialization.
     """
-    if type(optimizer) is not torch.optim.AdamW:
+    if type(optimizer) is torch.optim.SGD:
         return momentum_buffers_ready(optimizer)
+    if type(optimizer) is not torch.optim.AdamW:
+        raise TypeError(f"training.cuda_graph has no state-readiness rule for {type(optimizer).__name__}")
     for group in optimizer.param_groups:
         for parameter in group["params"]:
             state = optimizer.state.get(parameter, {})

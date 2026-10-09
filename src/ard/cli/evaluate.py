@@ -19,7 +19,11 @@ from torch.utils.data import DataLoader, Subset
 from ard.attacks import LinfPGD
 from ard.config import ExperimentConfig, save_resolved_config
 from ard.config.loader import load_evaluation_config, load_resolved_config_for_evaluation, resolved_config_dict
-from ard.config.schema import TrainingConfig, training_execution_identity
+from ard.config.schema import (
+    CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES,
+    TrainingConfig,
+    training_execution_identity,
+)
 from ard.data import EpochShuffleSampler, IndexedBatch, build_dataset, collate_indexed
 from ard.engine import config_digest
 from ard.evaluation import (
@@ -287,7 +291,9 @@ def _evaluation_preflight_config(config: ExperimentConfig, training_config: Expe
     return training_config.model_copy(update={"teacher": config.teacher})
 
 
-def _throughput_protocol_identity(training: TrainingConfig, *, optimizer_id: str = "sgd") -> dict[str, bool]:
+def _throughput_protocol_identity(
+    training: TrainingConfig, *, optimizer_id: str, student_architecture: str
+) -> dict[str, bool]:
     """Identity entries for the throughput options, present only when enabled.
 
     ``cudnn_benchmark`` and ``compile`` change kernel selection and fusion, so
@@ -327,8 +333,19 @@ def _throughput_protocol_identity(training: TrainingConfig, *, optimizer_id: str
     #   cuda_graph run builds AdamW with capturable=True (device bias
     #   corrections), which is bitwise equal to its own eager steps but not to
     #   the capturable=False AdamW of an eager run, so they never pool silently.
-    #   (No AdamW graph run existed before 2026-10-09.)
-    if training.cuda_graph and (not training.deterministic or optimizer_id == "adamw"):
+    #   (No AdamW graph run existed before 2026-10-09.) Such a run therefore
+    #   cannot be reproduced bitwise by an eager run with cuda_graph=false.
+    # - the ConvNeXt-Atto / DeiT-Tiny family (CUDA_GRAPH_IDENTITY_RECORDED_
+    #   ARCHITECTURES, 2026-10-09 review P2-2): present in both determinism
+    #   classes with SGD too, until the opt-in production-shape bitwise check
+    #   (test_production_shape_layernorm_graph_run_is_bit_identical, SGD) has
+    #   passed for them; then they can be removed from that set. No graph run
+    #   of these students existed before, so no recorded identity changes.
+    if training.cuda_graph and (
+        not training.deterministic
+        or optimizer_id == "adamw"
+        or student_architecture in CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES
+    ):
         identity["cuda_graph"] = True
     return identity
 
@@ -692,7 +709,9 @@ def main(argv: list[str] | None = None) -> int:
                         "epsilon_warmup_epochs": training_config.training.epsilon_warmup_epochs,
                         "weight_ema_decay": training_config.training.weight_ema_decay,
                         **_throughput_protocol_identity(
-                            training_config.training, optimizer_id=training_config.optimizer.id
+                            training_config.training,
+                            optimizer_id=training_config.optimizer.id,
+                            student_architecture=training_config.student.architecture,
                         ),
                         **_two_stage_protocol_identity(training_config.training),
                         **_data_loading_protocol_identity(training_config.training),

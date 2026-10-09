@@ -31,6 +31,7 @@ from ard.config import load_config
 from ard.config.loader import _expand_environment, resolved_config_dict
 from ard.config.schema import (
     CUDA_GRAPH_ARCHITECTURES,
+    CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES,
     CUDA_GRAPH_TEACHER_ARCHITECTURES,
     AttackConfig,
     AwpConfig,
@@ -67,6 +68,11 @@ STAGE1 = ROOT / "configs" / "scientific" / "imagenet_mobilenetv4_twostage_stage1
 # src/ard/attacks/pgd.py) on the seeded cases below, as SHA-256 digests.
 # Regenerate only from that file: ``python tests/unit/test_cuda_graph_config.py``.
 GOLDEN = Path(__file__).with_name("fixtures") / "pgd_generate_golden_4fd5ceb.json"
+_SGD_MNV4S = {"optimizer_id": "sgd", "student_architecture": "mobilenetv4_conv_small_imagenet"}
+
+
+def _identity_keys(config: ExperimentConfig) -> dict[str, str]:
+    return {"optimizer_id": config.optimizer.id, "student_architecture": config.student.architecture}
 
 
 def _git(*args: str) -> str:
@@ -241,7 +247,9 @@ def test_weight_ema_and_label_smoothing_are_admitted(
     )
     assert enabled.training.weight_ema_decay == 0.999 and enabled.method.label_smoothing == 0.1
     # Deterministic: still out of the pooling identity (bitwise parity); otherwise recorded.
-    assert _throughput_protocol_identity(enabled.training) == ({} if deterministic else {"cuda_graph": True})
+    assert _throughput_protocol_identity(enabled.training, **_identity_keys(enabled)) == (
+        {} if deterministic else {"cuda_graph": True}
+    )
 
 
 @pytest.mark.parametrize("deterministic", [True, False])
@@ -263,7 +271,9 @@ def test_mixed_batch_and_awp_are_admitted(
         return
     enabled = ExperimentConfig.model_validate(updated)
     assert enabled.training.cuda_graph
-    assert _throughput_protocol_identity(enabled.training) == ({} if deterministic else {"cuda_graph": True})
+    assert _throughput_protocol_identity(enabled.training, **_identity_keys(enabled)) == (
+        {} if deterministic else {"cuda_graph": True}
+    )
 
 
 def test_split_batchnorm_stays_outside_the_graph_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -294,7 +304,9 @@ def test_rslad_and_rslad_advt_distillation_are_admitted(
     raw = _phase2(monkeypatch, tmp_path, path)
     enabled = ExperimentConfig.model_validate(_with(raw, training={"cuda_graph": True, "deterministic": deterministic}))
     assert enabled.training.cuda_graph and enabled.method.id in {"rslad", "rslad_advt"}
-    assert _throughput_protocol_identity(enabled.training) == ({} if deterministic else {"cuda_graph": True})
+    assert _throughput_protocol_identity(enabled.training, **_identity_keys(enabled)) == (
+        {} if deterministic else {"cuda_graph": True}
+    )
     online = _with(raw, training={"cuda_graph": True}, distillation={"target_source": "online_teacher", "bank": None})
     online["distillation"].pop("bank")
     if enabled.method.id == "rslad":
@@ -453,13 +465,15 @@ def test_cuda_graph_pooling_identity_depends_on_the_determinism_class() -> None:
     Nondeterministic: recorded (equal only within FP32 rounding, not bitwise), so a graph run never pools
     silently with a nondeterministic eager run. (cudnn_benchmark, recorded when true, is refused with it.)"""
     base = {"per_rank_batch_size": 4, "global_batch_size": 4, "device": "cuda", "step_diagnostics": False}
-    assert _throughput_protocol_identity(TrainingConfig(**base, cuda_graph=True)) == {}
-    assert _throughput_protocol_identity(TrainingConfig(**base)) == {}
+    assert _throughput_protocol_identity(TrainingConfig(**base, cuda_graph=True), **_SGD_MNV4S) == {}
+    assert _throughput_protocol_identity(TrainingConfig(**base), **_SGD_MNV4S) == {}
     nondeterministic = {**base, "deterministic": False}
-    assert _throughput_protocol_identity(TrainingConfig(**nondeterministic, cuda_graph=True)) == {"cuda_graph": True}
-    assert _throughput_protocol_identity(TrainingConfig(**nondeterministic)) == {}
+    assert _throughput_protocol_identity(TrainingConfig(**nondeterministic, cuda_graph=True), **_SGD_MNV4S) == {
+        "cuda_graph": True
+    }
+    assert _throughput_protocol_identity(TrainingConfig(**nondeterministic), **_SGD_MNV4S) == {}
     benchmark = {**nondeterministic, "cudnn_benchmark": True}
-    assert _throughput_protocol_identity(TrainingConfig(**benchmark)) == {"cudnn_benchmark": True}
+    assert _throughput_protocol_identity(TrainingConfig(**benchmark), **_SGD_MNV4S) == {"cudnn_benchmark": True}
 
 
 def test_adamw_cuda_graph_is_recorded_in_both_determinism_classes() -> None:
@@ -470,12 +484,30 @@ def test_adamw_cuda_graph_is_recorded_in_both_determinism_classes() -> None:
     for deterministic in (True, False):
         training = {**base, "deterministic": deterministic}
         graph = TrainingConfig(**training, cuda_graph=True)
-        assert _throughput_protocol_identity(graph, optimizer_id="adamw") == {"cuda_graph": True}
-        assert _throughput_protocol_identity(TrainingConfig(**training), optimizer_id="adamw") == {}
-        assert _throughput_protocol_identity(graph, optimizer_id="sgd") == (
+        mnv4s = "mobilenetv4_conv_small_imagenet"
+        assert _throughput_protocol_identity(graph, optimizer_id="adamw", student_architecture=mnv4s) == {
+            "cuda_graph": True
+        }
+        assert (
+            _throughput_protocol_identity(TrainingConfig(**training), optimizer_id="adamw", student_architecture=mnv4s)
+            == {}
+        )
+        assert _throughput_protocol_identity(graph, optimizer_id="sgd", student_architecture=mnv4s) == (
             {} if deterministic else {"cuda_graph": True}
         )
-    assert _throughput_protocol_identity(TrainingConfig(**base, cuda_graph=True)) == {}
+        # Review of 1f17fa2 (P2-2): the ConvNeXt-Atto / DeiT-Tiny family is recorded with SGD too, until the
+        # production-shape bitwise SGD check has passed for it; without the flag nothing is recorded.
+        for architecture in CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES:
+            assert _throughput_protocol_identity(graph, optimizer_id="sgd", student_architecture=architecture) == {
+                "cuda_graph": True
+            }
+            assert (
+                _throughput_protocol_identity(
+                    TrainingConfig(**training), optimizer_id="sgd", student_architecture=architecture
+                )
+                == {}
+            )
+    assert _throughput_protocol_identity(TrainingConfig(**base, cuda_graph=True), **_SGD_MNV4S) == {}
 
 
 _ADAMW_PHASE2_CONFIGS = sorted(
@@ -970,6 +1002,10 @@ def test_adamw_state_ready_only_after_the_first_update() -> None:
     # SGD keeps its momentum-buffer rule.
     sgd = SGD(nn.Linear(3, 2).parameters(), lr=0.1, momentum=0.9)
     assert optimizer_state_ready(sgd) is momentum_buffers_ready(sgd) is False
+    # Review of 1f17fa2 (P3-3): any other optimizer has no readiness rule and is refused, not guessed.
+    for other in (Adam(nn.Linear(3, 2).parameters()), torch.optim.RMSprop(nn.Linear(3, 2).parameters())):
+        with pytest.raises(TypeError, match="no state-readiness rule"):
+            optimizer_state_ready(other)
 
 
 def test_require_is_the_host_check_outside_a_capture() -> None:

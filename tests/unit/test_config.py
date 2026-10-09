@@ -15,6 +15,9 @@ from ard.engine.checkpoint import config_digest
 from ard.tracking.adapter import canonical_run_group
 
 pytestmark = pytest.mark.t0
+# ard.cli.evaluate._throughput_protocol_identity's required keywords (plan 0105): an SGD run of a student outside
+# the cuda_graph allowlist.
+_SGD_IDENTITY_KEYS = {"optimizer_id": "sgd", "student_architecture": "resnet18"}
 
 
 def test_wandb_retention_does_not_change_training_identity() -> None:
@@ -1714,17 +1717,17 @@ def test_throughput_options_default_off_and_cudnn_benchmark_requires_nondetermin
     assert (default.deterministic, default.cudnn_benchmark, default.compile) == (True, False, False)
     # Defaults add nothing to the evaluation record's training_protocol_identity,
     # so re-evaluating a pre-existing run keeps its recorded identity byte-for-byte.
-    assert _throughput_protocol_identity(default) == {}
+    assert _throughput_protocol_identity(default, **_SGD_IDENTITY_KEYS) == {}
     with pytest.raises(ValidationError, match="cudnn_benchmark=true requires training.deterministic=false"):
         TrainingConfig(per_rank_batch_size=4, global_batch_size=4, cudnn_benchmark=True)
     fast = TrainingConfig(
         per_rank_batch_size=4, global_batch_size=4, deterministic=False, cudnn_benchmark=True, compile=True
     )
-    assert _throughput_protocol_identity(fast) == {"cudnn_benchmark": True, "compile": True}
+    assert _throughput_protocol_identity(fast, **_SGD_IDENTITY_KEYS) == {"cudnn_benchmark": True, "compile": True}
     with pytest.raises(ValidationError, match="compile=true requires training.deterministic=false"):
         TrainingConfig(per_rank_batch_size=4, global_batch_size=4, compile=True)
     compiled_only = TrainingConfig(per_rank_batch_size=4, global_batch_size=4, deterministic=False, compile=True)
-    assert _throughput_protocol_identity(compiled_only) == {"compile": True}
+    assert _throughput_protocol_identity(compiled_only, **_SGD_IDENTITY_KEYS) == {"compile": True}
 
 
 def test_step_diagnostics_defaults_on_and_is_serialized_only_when_off(
@@ -1739,7 +1742,7 @@ def test_step_diagnostics_defaults_on_and_is_serialized_only_when_off(
     assert default.step_diagnostics is True
     assert "step_diagnostics" not in default.model_dump()
     assert "step_diagnostics" not in json.loads(default.model_dump_json())
-    assert _throughput_protocol_identity(default) == {}
+    assert _throughput_protocol_identity(default, **_SGD_IDENTITY_KEYS) == {}
     # Independent of determinism: skipping forwards changes no kernel choice.
     for deterministic in (True, False):
         off = TrainingConfig(
@@ -1748,7 +1751,7 @@ def test_step_diagnostics_defaults_on_and_is_serialized_only_when_off(
         assert off.model_dump()["step_diagnostics"] is False
         assert TrainingConfig.model_validate_json(off.model_dump_json()).step_diagnostics is False
         # Training-neutral, so never part of the pooling identity.
-        assert _throughput_protocol_identity(off) == {}
+        assert _throughput_protocol_identity(off, **_SGD_IDENTITY_KEYS) == {}
 
     _set_repository_config_env(monkeypatch, tmp_path, per_rank=128)
     path = Path("configs/production/cifar10_r18_rslad_chen2021_ltd_wrn34_10.yaml")

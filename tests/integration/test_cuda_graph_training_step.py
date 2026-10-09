@@ -2267,14 +2267,20 @@ def test_nondeterministic_adamw_new_method_graph_step_matches_eager_within_one_s
 
 
 # Opt-in production shape, deterministic and BITWISE (as the distillation check above): the plan 0103
-# ConvNeXt-Atto / DeiT-Tiny Phase 2 PGD-AT step -- 224 px, batch 128, 1000 classes, PGD-3 (step 8/765,
-# epsilon 4/255), AdamW (lr 1e-3, betas 0.9/0.999, weight decay 0.05 without norm/bias) with the 0.9999
-# weight EMA -- one epoch of 4 full batches plus a partial batch of 64 and a validation pass, eager vs graph in
-# separate processes, random initialisation. FREE GPU only (about 6-8 GB per process):
+# ConvNeXt-Atto / DeiT-Tiny PGD-AT step -- 224 px, batch 128, 1000 classes, PGD-3 (step 8/765, epsilon 4/255),
+# with the 0.9999 weight EMA -- one epoch of 4 full batches plus a partial batch of 64 and a validation pass,
+# eager vs graph in separate processes, random initialisation, for both optimizers of the family: AdamW (Phase 2
+# recipe: lr 1e-3, betas 0.9/0.999, weight decay 0.05 without norm/bias; capturable, as ard.cli.train builds it
+# with the flag) and SGD (Phase 1 recipe: lr 0.025, momentum 0.9 Nesterov, weight decay 1e-4). Once the SGD
+# case passes for a student, it can leave CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES (review of 1f17fa2, P2-2).
+# FREE GPU only (about 6-8 GB per process):
 #
 #   ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1 CUDA_VISIBLE_DEVICES=<free gpu> PYTHONPATH=src python -m pytest -s \
-#     tests/integration/test_cuda_graph_training_step.py -k production_shape_adamw
-def production_adamw_arm(root: Path, kind: str, mode: str) -> dict[str, Any]:
+#     tests/integration/test_cuda_graph_training_step.py -k production_shape_layernorm_graph_run
+_LAYERNORM_OPTIMIZERS = ("adamw", "sgd")
+
+
+def production_layernorm_arm(root: Path, kind: str, optimizer_id: str, mode: str) -> dict[str, Any]:
     from ard.cli.train import _weight_decay_parameter_groups
 
     _seed_everything(1234)
@@ -2289,12 +2295,17 @@ def production_adamw_arm(root: Path, kind: str, mode: str) -> dict[str, Any]:
         ),
         tier="dev",
     ).to(device)
-    optimizer = AdamW(
-        _weight_decay_parameter_groups(student.parameters(), weight_decay=0.05),
-        lr=1e-3,
-        betas=(0.9, 0.999),
-        capturable=True,
-    )
+    optimizer: torch.optim.Optimizer
+    if optimizer_id == "adamw":
+        optimizer = AdamW(
+            _weight_decay_parameter_groups(student.parameters(), weight_decay=0.05),
+            lr=1e-3,
+            betas=(0.9, 0.999),
+            capturable=True,
+        )
+    else:
+        assert optimizer_id == "sgd", optimizer_id
+        optimizer = SGD(student.parameters(), lr=0.025, momentum=0.9, weight_decay=1e-4, nesterov=True)
     size = _PRODUCTION_FULL_BATCHES * _PRODUCTION_BATCH + _PRODUCTION_BATCH // 2
     trainer = Trainer(
         model=student,
@@ -2309,7 +2320,7 @@ def production_adamw_arm(root: Path, kind: str, mode: str) -> dict[str, Any]:
         output_dir=root,
         config_hash="c" * 64,
         seed=11,
-        tracker_run_id="production-shape-adamw",
+        tracker_run_id="production-shape-layernorm",
         diagnostics=TrainingDiagnostics.for_ids(list(range(size)), seed=0, size=24, mode="panel"),
         step_diagnostics=False,
         cuda_graph=mode == "graph",
@@ -2333,17 +2344,177 @@ def production_adamw_arm(root: Path, kind: str, mode: str) -> dict[str, Any]:
     return fingerprint
 
 
-@pytest.mark.gpu
-@requires_cuda
-@pytest.mark.skipif(
+_production_opt_in = pytest.mark.skipif(
     os.environ.get("ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK") != "1",
     reason="opt-in production-shape check (needs a free GPU): set ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1",
 )
+
+
+@pytest.mark.gpu
+@requires_cuda
+@_production_opt_in
+@pytest.mark.parametrize("optimizer_id", _LAYERNORM_OPTIMIZERS)
 @pytest.mark.parametrize("kind", _LAYERNORM_ARCHITECTURES)
-def test_production_shape_adamw_graph_run_is_bit_identical(kind: str) -> None:
-    eager = _result(_run("production_adamw_arm", kind, "eager", timeout=3600))
-    graph = _result(_run("production_adamw_arm", kind, "graph", timeout=3600))
-    print(json.dumps({"kind": kind, "peak_reserved_gib": [eager["peak_reserved_gib"], graph["peak_reserved_gib"]]}))
+def test_production_shape_layernorm_graph_run_is_bit_identical(kind: str, optimizer_id: str) -> None:
+    eager = _result(_run("production_layernorm_arm", kind, optimizer_id, "eager", timeout=3600))
+    graph = _result(_run("production_layernorm_arm", kind, optimizer_id, "graph", timeout=3600))
+    peaks = [eager["peak_reserved_gib"], graph["peak_reserved_gib"]]
+    print(json.dumps({"kind": kind, "optimizer": optimizer_id, "peak_reserved_gib": peaks}))
     assert graph["audit"] == [[1.0, float(_PRODUCTION_FULL_BATCHES - 1), 2.0]]
     ignored = {"audit", "peak_reserved_gib"}
     assert {k: v for k, v in graph.items() if k not in ignored} == {k: v for k, v in eager.items() if k not in ignored}
+
+
+# Opt-in production shape, NONDETERMINISTIC one-step rule (review of 1f17fa2, P2-1) for the ConvNeXt-Atto /
+# DeiT-Tiny family: the "full" shape above (224 px, batch 128, 1000 classes, PGD-3, step 8/765), random
+# initialisation, AdamW (+ the Phase 2 EMA) for every student and SGD for the two base students. Learning rates
+# chosen for an update of about 1% of the weights, as at test shapes (AdamW 6e-4; SGD 0.02 -- the regime asserts
+# <= 5% and the controls show whether the update clears the FP32 floor). FREE GPU only:
+#
+#   ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1 CUDA_VISIBLE_DEVICES=<free gpu> PYTHONPATH=src python -m pytest -s \
+#     tests/integration/test_cuda_graph_training_step.py -k production_shape_layernorm_graph_step
+_PRODUCTION_LAYERNORM_ONE_STEP_CASES = [
+    *((kind, "adamw") for kind in _LAYERNORM_ARCHITECTURES),
+    ("convnext_atto_imagenet", "sgd"),
+    ("deit_tiny_imagenet", "sgd"),
+]
+
+
+@pytest.mark.gpu
+@requires_cuda
+@_production_opt_in
+@pytest.mark.parametrize(("kind", "optimizer_id"), _PRODUCTION_LAYERNORM_ONE_STEP_CASES)
+def test_production_shape_layernorm_graph_step_matches_eager_within_one_step_noise(
+    tmp_path: Path, kind: str, optimizer_id: str
+) -> None:
+    spec = {**_PRODUCTION_COMMON, **_PRODUCTION_SHAPES["full"], "kind": kind, "learning_rate": 0.02}
+    if optimizer_id == "adamw":
+        spec.update(variant="adamw+ema", adamw_learning_rate=6e-4)
+    distances = run_single_step_check(tmp_path, spec, "nondeterministic")
+    summaries = {sync: single_step_summary(result) for sync, result in distances.items()}
+    print(
+        json.dumps({"kind": kind, "optimizer": optimizer_id, "distances": distances, "summary": summaries}, default=str)
+    )
+    failures = single_step_verdict(distances)
+    assert not failures, (failures, summaries)
+
+
+# Review of 1f17fa2 (P3-2 / P2-3): capturable and default AdamW are the same algorithm and differ only in
+# rounding. From one exact state (parameters, exp_avg, exp_avg_sq, step) and one exact gradient, one step of each
+# (deterministic, same process): exp_avg, exp_avg_sq and step are bitwise equal (the moment updates are the same
+# foreach kernels with the same Python-scalar betas); every parameter differs from the other only through the
+# bias-corrected update. The update is -lr / (1 - beta1^t) * m / (sqrt(v) / sqrt(1 - beta2^t) + eps); capturable
+# computes the bias corrections in float32 on the device (default: float64 on the host) and divides in another
+# order. A float32 1 - beta^t carries a relative error of about eps32 * kappa, kappa = beta^t / (1 - beta^t) (the
+# cancellation: kappa2 is about 500 at t = 2 for beta2 = 0.999), which reaches the update fully for beta1 and
+# halved through the square root for beta2. Bound, per element, with u = |the default step's update|:
+#   |p_capturable - p_default| <= 4 * (_CAPTURABLE_ULPS + kappa1 + kappa2 / 2) * eps32 * u + ulp(p_new)
+# (factor 4: margin; measured 2026-10-09, torch 2.11, fixture / ConvNeXt-Atto / DeiT-Tiny: at most 0.08 (t = 2)
+# and 0.44 (t = 21) of the update term, i.e. about 60 eps32 of the update at t = 21. ulp(p_new): the two new
+# values may round to neighbouring floats.) A step count off by one at t = 21 already moves the update by
+# about 2.5% (~1e5 eps32), so a different algorithm (a wrong bias correction, beta or step count) moves the
+# update by far more. Pins "same algorithm,
+# rounding only" across torch upgrades; the measured worst fraction of the bound is printed.
+_CAPTURABLE_ULPS = 8.0
+
+
+def _adamw_pair_state(kind: str, steps: int) -> tuple[nn.Module, list[torch.Tensor], list[dict[str, torch.Tensor]]]:
+    from ard.cli.train import _weight_decay_parameter_groups
+
+    torch.manual_seed(0)
+    device = torch.device("cuda")
+    model = (
+        _bn_dropout_student(3)
+        if kind == _FIXTURE
+        else build_student(
+            ModelConfig(
+                architecture=kind,  # type: ignore[arg-type]
+                num_classes=10,
+                pretrained=False,
+                normalization=NormalizationConfig(profile="imagenet_standard"),
+            ),
+            tier="dev",
+        )
+    ).to(device)
+    image_size = 8 if kind == _FIXTURE else _STUDENT_IMAGE_SIZE.get(kind, 32)
+    num_classes = 3 if kind == _FIXTURE else 10
+    warm = AdamW(_weight_decay_parameter_groups(model.parameters(), weight_decay=0.05), lr=1e-3)
+    generator = torch.Generator(device="cpu").manual_seed(1)
+    for _ in range(steps):
+        warm.zero_grad(set_to_none=True)
+        images = torch.rand(4, 3, image_size, image_size, generator=generator).to(device)
+        labels = torch.randint(0, num_classes, (4,), generator=generator).to(device)
+        nn.functional.cross_entropy(model(images), labels).backward()
+        warm.step()
+    warm.zero_grad(set_to_none=True)
+    images = torch.rand(4, 3, image_size, image_size, generator=generator).to(device)
+    labels = torch.randint(0, num_classes, (4,), generator=generator).to(device)
+    nn.functional.cross_entropy(model(images), labels).backward()
+    gradients = [parameter.grad.detach().clone() for parameter in model.parameters()]  # type: ignore[union-attr]
+    state = [{key: value.detach().clone() for key, value in warm.state[p].items()} for p in model.parameters()]
+    return model, gradients, state
+
+
+@pytest.mark.gpu
+@requires_cuda
+@pytest.mark.parametrize("steps", [1, 20])
+@pytest.mark.parametrize("kind", [_FIXTURE, "convnext_atto_imagenet", "deit_tiny_imagenet"])
+def test_capturable_adamw_step_equals_the_default_step_up_to_rounding(kind: str, steps: int) -> None:
+    from ard.cli.train import _weight_decay_parameter_groups
+
+    previous = torch.are_deterministic_algorithms_enabled()
+    torch.use_deterministic_algorithms(True)
+    try:
+        model, gradients, state = _adamw_pair_state(kind, steps)
+        start = [parameter.detach().clone() for parameter in model.parameters()]
+        results = {}
+        for capturable in (False, True):
+            with torch.no_grad():
+                for parameter, value in zip(model.parameters(), start, strict=True):
+                    parameter.copy_(value)
+            optimizer = AdamW(
+                _weight_decay_parameter_groups(model.parameters(), weight_decay=0.05),
+                lr=1e-3,
+                **({"capturable": True} if capturable else {}),
+            )
+            # The exact state, set directly (load_state_dict would also restore the saved groups' capturable flag).
+            for parameter, saved in zip(model.parameters(), state, strict=True):
+                optimizer.state[parameter] = {
+                    key: value.clone().to(parameter.device if (capturable or key != "step") else "cpu")
+                    for key, value in saved.items()
+                }
+            for parameter, gradient in zip(model.parameters(), gradients, strict=True):
+                parameter.grad = gradient.clone()
+            optimizer.step()
+            parameters = list(model.parameters())
+            results[capturable] = {
+                "parameters": [parameter.detach().clone() for parameter in parameters],
+                "exp_avg": [optimizer.state[p]["exp_avg"].clone() for p in parameters],
+                "exp_avg_sq": [optimizer.state[p]["exp_avg_sq"].clone() for p in parameters],
+                "step": [float(optimizer.state[p]["step"]) for p in parameters],
+                "step_device": {optimizer.state[p]["step"].device.type for p in parameters},
+            }
+    finally:
+        torch.use_deterministic_algorithms(previous)
+    default, capturable = results[False], results[True]
+    assert default["step_device"] == {"cpu"} and capturable["step_device"] == {"cuda"}
+    assert default["step"] == capturable["step"] == [float(steps + 1)] * len(start)
+    for key in ("exp_avg", "exp_avg_sq"):
+        assert all(torch.equal(a, b) for a, b in zip(default[key], capturable[key], strict=True)), key
+    eps = torch.finfo(torch.float32).eps
+    t = steps + 1
+    kappa1, kappa2 = (beta**t / (1 - beta**t) for beta in (0.9, 0.999))
+    relative = 4 * (_CAPTURABLE_ULPS + kappa1 + kappa2 / 2) * eps
+    worst = 0.0
+    any_difference = False
+    for old, a, b in zip(start, default["parameters"], capturable["parameters"], strict=True):
+        update = (a - old).abs()
+        ulp_new = torch.nextafter(a.abs(), torch.full_like(a, float("inf"))) - a.abs()
+        bound = relative * update + ulp_new
+        difference = (a - b).abs()
+        any_difference |= bool((difference > 0).any())
+        assert bool((difference <= bound).all()), (kind, float((difference - bound).max()))
+        # Beyond the one-rounding term, how much of the update term is used (what an algorithm change would blow).
+        excess = (difference - ulp_new).clamp_min(0.0)
+        worst = max(worst, float((excess / (relative * update).clamp_min(torch.finfo(torch.float32).tiny)).max()))
+    print(json.dumps({"kind": kind, "steps": steps, "worst_fraction_of_update_term": worst, "differs": any_difference}))

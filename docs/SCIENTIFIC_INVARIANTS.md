@@ -209,6 +209,13 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   to the captured step but NOT to the default (`capturable=False`, host float64 bias corrections) AdamW of an eager
   run (tested), so for AdamW `cuda_graph: true` is recorded in `training_protocol_identity` in both determinism
   classes and an AdamW graph run never pools with an eager AdamW run. Without the flag the AdamW call is unchanged.
+  Consequence: an AdamW graph run cannot be reproduced bitwise by rerunning it with `cuda_graph: false` (that builds
+  the default AdamW); the two are the same algorithm and differ only in rounding (one step from one exact state:
+  moments and step counter bitwise equal, parameters within a stated FP32 bound, tested). Its eager steps (first full
+  batch, partial batch) emit torch's one-time UserWarning "constructed with capturable=True ... step() is running
+  without cuda graph capture"; it is expected, not a fault. Until the opt-in production-shape bitwise SGD check has
+  passed for them, the ConvNeXt-Atto / DeiT-Tiny family (`CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES`) also records
+  `cuda_graph: true` with deterministic SGD; remove an architecture from that set once its check passes.
   The stale-graph guard also covers every AdamW hyperparameter per group (lr, betas, eps, weight decay, flags) and
   the addresses of `exp_avg`, `exp_avg_sq` and the step counter.
   - `training.deterministic: true`: **bitwise** equal to the eager step (checkpoints, RNG streams, epoch rows,

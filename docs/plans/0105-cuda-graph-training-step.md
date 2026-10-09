@@ -80,6 +80,18 @@ It must refuse every configuration where that is not proven.
   depthwise 7x7, SDPA attention), after their parity tests passed with SGD and AdamW. `cudnn_benchmark` stays
   refused with the graph, so the Phase 1/2 ConvNeXt / DeiT configs (nondeterministic + benchmark today) need
   `cudnn_benchmark: false` to use it; no config is edited here.
+  Consequences (review of 1f17fa2): an AdamW graph run cannot be reproduced bitwise by rerunning it eagerly with
+  `cuda_graph: false` (that builds the default AdamW); capturable and default AdamW are the same algorithm up to
+  rounding (`test_capturable_adamw_step_equals_the_default_step_up_to_rounding`: from one exact state and
+  gradient, exp_avg / exp_avg_sq / step bitwise equal, every parameter within 4 x (8 + kappa1 + kappa2 / 2) eps32
+  of the update plus one ulp of the new value, kappa = beta^t / (1 - beta^t); measured at most 0.08 (t = 2) and
+  0.44 (t = 21) of the update term). The run's eager steps emit torch's one-time UserWarning ("constructed with
+  capturable=True ... step() is running without cuda graph capture"); expected. Until the opt-in production-shape
+  bitwise SGD check (`test_production_shape_layernorm_graph_run_is_bit_identical[...-sgd]`) has passed for them,
+  the six new students are in `CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES`: their graph runs record
+  `cuda_graph: true` in `training_protocol_identity` with deterministic SGD too (their bitwise parity is shown at
+  test shapes only). Remove an architecture from that set once its check passes. `optimizer_state_ready` raises
+  for an optimizer other than SGD / AdamW.
 - **Memory (2026-10-08).** The graph's private pool used to stay allocated until the next epoch's re-capture,
   so the eager last partial batch, the validation pass and the train probe allocated their activations next
   to it (EfficientNet-B0, 224 px, batch 128: OOM at ~22.6 GB on a 24 GB 4090). The Trainer now releases the
@@ -337,9 +349,27 @@ It must refuse every configuration where that is not proven.
   Measured (AdamW one-step, 64 px ConvNeXt-Atto / 224 px DeiT-Tiny, batch 32 / 8): update 1.0-1.3% of the weights;
   graph arms at 0.05-0.09 of the bound (ConvNeXt) and bitwise equal to the nearest eager outcome (DeiT); controls
   lr x 1.001 16-26x, weight decay 0 35-37x, attack seed + 1 >= 78x, lr = 0 >= 15,000x the bound.
-  Opt-in production shape (not run: needs a FREE GPU, about 6-8 GB per process):
-  `test_production_shape_adamw_graph_run_is_bit_identical` (224 px, batch 128, 1000 classes, PGD-3, AdamW lr 1e-3
-  + EMA 0.9999, 4 full batches + a partial batch, deterministic, bitwise), command in the test file.
+  Opt-in production shape (not run: needs a FREE GPU, about 6-8 GB per process), commands in the test file:
+  `test_production_shape_layernorm_graph_run_is_bit_identical` (each of the six students x AdamW (lr 1e-3) / SGD
+  (lr 0.025, the Phase 1 recipe), 224 px, batch 128, 1000 classes, PGD-3, EMA 0.9999, 4 full batches + a partial
+  batch, deterministic, bitwise) and `test_production_shape_layernorm_graph_step_matches_eager_within_one_step_noise`
+  (nondeterministic one-step rule at 224 px / batch 128 / 1000 classes / PGD-3, random init: AdamW lr 6e-4 + EMA
+  for the six, SGD lr 0.02 for ConvNeXt-Atto and DeiT-Tiny). The free-GPU window runs all of it with the speed
+  benchmark in one command:
+
+      cd <checkout at this commit> && GPU=<free gpu> LOG=cuda_graph_free_gpu_$(date +%Y%m%dT%H%M).log && {
+        for arch in convnext_atto_imagenet deit_tiny_imagenet; do
+          for arm in "eager --nondeterministic --cudnn-benchmark" "eager --nondeterministic" \
+                     "graph --nondeterministic" "eager" "graph"; do
+            set -- $arm; mode=$1; shift
+            CUDA_VISIBLE_DEVICES=$GPU PYTHONPATH=src python scripts/cuda_graph_benchmark.py --architecture $arch \
+              --optimizer adamw --image-size 224 --batch-size 128 --batches 40 --epochs 2 --validation-batches 1 \
+              --mode $mode "$@"
+          done
+        done
+        ARD_CUDA_GRAPH_PRODUCTION_SHAPE_CHECK=1 CUDA_VISIBLE_DEVICES=$GPU PYTHONPATH=src python -m pytest -s -rA \
+          tests/integration/test_cuda_graph_training_step.py -k "production_shape_layernorm"
+      } 2>&1 | tee "$LOG"
 - Throughput potential, AdamW ConvNeXt-Atto / DeiT-Tiny (2026-10-09, `scripts/cuda_graph_benchmark.py --optimizer
   adamw`, real `Trainer.fit`, 224 px, PGD-3, panel diagnostics, 40 batches, second epoch). NO GPU WAS FREE (Hamster
   GPU0/1 and all three Ferret GPUs busy), so it ran on Hamster GPU1 SHARED with a production job at batch 2 / 4 / 6

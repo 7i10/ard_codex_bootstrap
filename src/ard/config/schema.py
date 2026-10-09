@@ -1399,6 +1399,19 @@ CUDA_GRAPH_ARCHITECTURES: frozenset[str] = frozenset(
         "deit_tiny_convstem_imagenet",
     }
 )
+# Allowlisted students whose cuda_graph runs are recorded in training_protocol_identity even when
+# deterministic with SGD (plan 0105 review of 1f17fa2, P2-2): their bitwise parity is shown at test shapes
+# only; remove an entry once test_production_shape_layernorm_graph_run_is_bit_identical (SGD) passes for it.
+CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES: frozenset[str] = frozenset(
+    {
+        "convnext_atto_imagenet",
+        "convnext_atto_deep_narrow_imagenet",
+        "convnext_atto_ols_imagenet",
+        "convnext_atto_convstem_imagenet",
+        "deit_tiny_imagenet",
+        "deit_tiny_convstem_imagenet",
+    }
+)
 # training.cuda_graph with a teacher that runs INSIDE the captured step (RSLAD with
 # distillation.target_source=online_teacher, and rslad_advt's teacher forward on x'):
 # frozen eval-mode ImageNet teacher architectures whose captured forward is
