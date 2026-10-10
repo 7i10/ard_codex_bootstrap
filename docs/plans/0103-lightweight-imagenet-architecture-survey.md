@@ -4218,3 +4218,161 @@ history behind this pivot.)
   computed in this postrun. `epoch-metrics.parquet` sha256 `d179d5e7...`,
   `sample-stats-train.parquet` sha256 `c76095cb...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-10 (postrun): **Phase 2 candidate 3 (Kurakin mixed batch, shared
+  BN), MobileNetV4-S seed 0 completed.** `plan0103-phase2-mnv4s-mixed-kurakin-s0-v1`
+  (hand-run with `run_queue.sh`, popped from the Hamster pull queue, Hamster
+  GPU0, one RTX 4090) ran 50/50 epochs. `run-bundle/completion.json` reads
+  `completed`, the manifest status is `completed`, and
+  `run-bundle/error-marker.txt` reads "no application error recorded". The
+  watcher re-derived it as terminal and successful. All 50 epoch rows are
+  present (`epoch_metrics_complete: true`). `train.log` has no traceback,
+  NaN or error line (only the wandb git-root warning); the wandb logs have
+  no error or retry line. `best.pt` (epoch 48), `best-ema.pt` (epoch 37),
+  `last.pt` and `epoch-049.pt` are on disk. Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract. The numbers
+  below are read from `outputs/train/epoch-metrics.jsonl` and the
+  run-bundle manifest.
+
+  Fixed identity: as the Phase 1 MobileNetV4-S reference
+  `plan0103-mnv4s-fullat-50ep-lr0025-cg-s0-v1` (53.85 / 30.71, source
+  `65369a3`) except (a) `method.mixed_batch` with `adversarial_fraction:
+  0.5`, `adversarial_weight: 0.3`, `split_batchnorm: false` (Kurakin et
+  al. 2017): in each batch of 128 the first 64 positions are attacked with
+  the training attack and the other 64 enter clean; the loss is
+  `(sum_clean L + 0.3 * sum_adv L) / (64 + 0.3 * 64)`, so the adversarial
+  half carries 0.15 / 0.65 = 23% of the objective; one BatchNorm set sees
+  both halves (`docs/SCIENTIFIC_INVARIANTS.md`, Phase 2 batch A); (b) the
+  Phase 2 template: `selection_subset_size: 5000` and `weight_ema_decay:
+  0.9999`; (c) the W&B group and source SHA. Schedule as the reference:
+  warmup_multistep (10-epoch warmup, x0.1 at epochs 25 and 38).
+  ImageNet-1k (original images, content `ae033613...`), MobileNetV4-Conv-S
+  random init, PGD-AT, no teacher, 224 px training. Training and
+  evaluation-attack seed 0 (split seed 20260911). Training attack CE
+  PGD-3, l_inf eps 4/255, step 8/765, random start (on the attacked half
+  only). Selection and validation attack PGD-10, same eps and step, random
+  start, eval mode. SGD (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.025,
+  50 epochs. World size 1, global batch 128, local BN. Deterministic, not
+  compiled, cuda_graph (admitted for mixed batch without split BN since
+  2026-10-08, plan 0105), fp32. Config
+  `imagenet_mobilenetv4_pgd_at_phase2_mixed_kurakin.yaml` (unchanged since
+  the source SHA), protocol `controlled_imagenet_stage02_init_lr_grid_v1`,
+  config hash `3924121b...`. Source SHA
+  `5dd329eaf31f12907d2cf103df263c19b1d9519d` (worktree
+  `source-5dd329eaf31f`, clean). "Full val", "subset", "complement" and
+  "probe" mean the same as in the cosine entry above (25,620 / 5,000 /
+  20,620 held-out original train images, 2,000 training images). None is
+  the ImageNet val split. No AutoAttack and no official evaluation has run.
+
+  End of training (full val and complement are evaluated once, at the
+  final epoch):
+
+  | checkpoint | full val clean / PGD-10 | complement clean / PGD-10 |
+  |---|---:|---:|
+  | last (ep 49), raw weights | 62.88 / 17.34 | 63.09 / 17.34 |
+  | last (ep 49), EMA weights | 63.04 / 17.59 | 63.20 / 17.49 |
+  | best raw (ep 48, by subset PGD-10) | 62.77 / 17.49 | 62.95 / 17.39 |
+  | best EMA (ep 37, by EMA subset PGD-10) | 62.24 / 17.85 | 62.40 / 17.76 |
+  | reference, multistep, full AT, last = best (ep 49), raw | 53.85 / 30.71 | — |
+  | Phase 2 cosine (full AT), last raw | 55.09 / 31.49 | 55.30 / 31.75 |
+  | Phase 2 label smoothing 0.1 (full AT), last raw | 53.35 / 31.16 | 53.65 / 31.39 |
+
+  Per-epoch trajectory (subset only, so not comparable with the
+  reference's per-epoch full-val numbers; the two loss columns are the
+  clean-half and attacked-half CE, and `train_loss` in the rows is their
+  unweighted mean, not the optimized objective):
+
+  | epoch | LR | subset raw clean / PGD-10 | subset EMA clean / PGD-10 | probe clean / PGD-10 | clean / adversarial loss |
+  |---|---:|---:|---:|---:|---:|
+  | 0 | 0.0025 | 2.74 / 1.06 | 0.12 / 0.08 | 2.20 / 0.90 | 6.488 / 6.839 |
+  | 9 | 0.025 (end of warmup) | 40.46 / 8.72 | 18.88 / 5.98 | 42.05 / 8.15 | 3.249 / 5.440 |
+  | 24 | 0.025 (last) | 49.18 / 11.50 | 56.22 / 17.84 | 52.60 / 10.75 | 2.726 / 5.095 |
+  | 25 | 0.0025 | 58.06 / 15.68 | 57.30 / 17.20 | 61.90 / 16.15 | 2.356 / 4.727 |
+  | 37 | 0.0025 (last; best EMA) | 61.00 / 16.26 | 61.58 / 18.30 | 66.20 / 17.45 | 2.112 / 4.517 |
+  | 38 | 0.00025 | 61.36 / 17.62 | 61.46 / 18.00 | 67.35 / 19.20 | 2.031 / 4.416 |
+  | 48 | 0.00025 (best raw) | 62.00 / 17.96 | 62.28 / 17.92 | 67.75 / 19.55 | 1.978 / 4.353 |
+  | 49 | 0.00025 (last) | 62.04 / 17.36 | 62.40 / 17.92 | 68.55 / 19.15 | 1.974 / 4.362 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Mixed batch vs the reference, last raw weights on full val (the
+     like-for-like number):** 62.88 / 17.34 vs 53.85 / 30.71, i.e.
+     **+9.03 clean / -13.37 PGD-10.** The two-run SE of a full-val
+     difference is about 0.43pt clean and 0.37pt PGD-10, so both gaps are
+     more than 20 SE; seed noise cannot explain them. Against the cosine
+     run: +7.79 / -14.15; against label smoothing: +9.53 / -13.82.
+  2. **Preregistered Phase 2 rule** (>= 1.5pt "effect", 0.5-1.5pt "hold",
+     < 0.5pt "no effect"): the tiers are written for a PGD-10 gain. Here
+     PGD-10 falls by 13.37pt, about 9 times the 1.5pt magnitude at which
+     the rule accepts one seed. Read in that spirit, this configuration
+     does not improve robustness on MobileNetV4-S; it moves along the
+     clean-robust trade-off towards clean accuracy. Acting on it (dropping
+     the arm, the split-BN variant, the queued MobileNetV4-M and
+     EfficientNet-B0 items with the same settings) is the human's
+     decision (packet).
+  3. **The trade-off is set from the start.** At the end of warmup
+     (epoch 9) the subset reads 40.46 / 8.72, against cosine's
+     30.96 / 15.98 at the same point (cosine reproduced the reference's
+     warmup exactly): +9.50 clean / -7.26 PGD-10 already. The gap does not
+     close later.
+  4. **Not tested here: why the robust loss is this large.** Two
+     candidates, neither checked: (a) the attacked half carries only 23%
+     of the objective (item in the identity above), and (b) shared BN: the
+     running statistics used in eval mode (attack, validation) average
+     clean and adversarial halves. The split-BN config
+     `imagenet_mobilenetv4_pgd_at_phase2_mixed_kurakin_splitbn.yaml`
+     (main BN = adversarial BN) separates (b); it is not in the Hamster
+     queue. Plain clean training of MobileNetV4-S reached 70.86% internal
+     val clean (`plan0103-mobilenetv4-standard-50ep-v1`, 2026-09-28), so
+     this run sits between clean training and full AT on clean accuracy.
+  5. **Best and last.** Best raw (epoch 48 by subset PGD-10) minus last on
+     full val: -0.12 clean / +0.16 PGD-10 (`robust_overfit_gap_full`
+     0.16pt); complement 0.05pt. Inside one SE.
+  6. **EMA.** Last EMA minus last raw on full val: +0.16 clean / +0.25
+     PGD-10. Best EMA (epoch 37) gives the highest full-val PGD-10 of any
+     checkpoint, 17.85 (+0.51 over last raw, -0.64 clean). Mid-run: far
+     below raw in warmup (epoch 9 subset 18.88 / 5.98 vs 40.46 / 8.72),
+     passes raw at epoch 11 (PGD-10) and 13 (clean), leads by up to
+     +8.22 clean (epoch 22) / +7.20 PGD-10 (epoch 21) at the peak LR, then
+     +0.90 to +2.04 PGD-10 through the middle stage and -0.04 to +0.74 in
+     the last stage. EMA subset PGD-10 at the end of the peak-LR stage
+     (17.84, epoch 24) already equals the final raw value.
+  7. **Trains normally.** Subset PGD-10 never falls more than 0.96pt
+     below its running maximum (epoch 21, 10.36 after 11.32 at epoch 17);
+     the catastrophic-overfitting guard (below half of the running
+     maximum) never fires. Each stage is flat: subset PGD-10
+     10.36-11.50 over epochs 17-24, 16.02-16.48 over epochs 26-37,
+     17.18-17.96 over epochs 38-49. Decays on the subset: epoch 24 to 25
+     +8.88 clean / +4.18 PGD-10, epoch 37 to 38 +0.36 / +1.36.
+  8. **Training-batch numbers.** Robust accuracy on the attacked half
+     (PGD-3, augmented) ends at 18.35%, above full-val PGD-10 (17.34%);
+     in the full-AT runs it ended below (28.16 vs 31.16 for label
+     smoothing). The two use different attacks (PGD-3 vs PGD-10), so this
+     is a change of sign in a loose signature, not a measured effect.
+     Clean-half train-mode accuracy ends at 57.84%.
+  9. **Seen-unseen gap.** Last probe minus full val: +5.67 clean / +1.81
+     PGD-10 (reference +5.95 / +3.69). Probe SE is about 1.0pt clean and
+     0.9pt PGD-10.
+  10. **Cost.** 10.55 h from start to finish (run-bundle `created_at`
+     2026-10-10 01:34:18 to `finished_at` 12:07:19 UTC, 37,981 s; full-AT
+     Phase 2 runs 15.4-15.8 h). Summed per-epoch training time is about
+     35,560 s (9.88 h); the rest (about 48 s per epoch) is subset
+     validation, the final full-val pass, probe, checkpointing and
+     start-up. Throughput 1,763-1,769 img/s in every epoch, about 1.50x
+     the full-AT Phase 2 runs (1,179-1,181), because only half of each
+     batch is attacked. cuda_graph: 1 capture, 2 eager steps and 9,807
+     replays per epoch. Peak allocated memory 3.05 GB, reserved 4.45 GB at
+     epoch 49 (full AT: 3.06 / 8.42 GB).
+
+  Caveats: one seed; the reference is a Phase 1 run at a different source
+  SHA (`65369a3`); the baseline+EMA setting check
+  (`plan0103-phase2-mnv4s-baseline-ema-s0-v1`, Hamster GPU1) is still
+  running. Any setting effect would be far smaller than the -13.37pt
+  here. Only one mixing setting (fraction 0.5, weight 0.3, shared BN) was
+  run. Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `d0588a91...`,
+  `sample-stats-train.parquet` sha256 `9c0af9b1...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id. Hamster GPU0 has
+  no queued work after this run: the worker log ends with `QUEUE DONE`,
+  and the 15 lines left in `queues/work_queue.txt` (including
+  `plan0103-phase2-mnv4m-mixed-kurakin-s0-v1` and
+  `plan0103-phase2-effb0-mixed-kurakin-s0-v1`, same mixing settings) are
+  not being pulled on GPU0.
