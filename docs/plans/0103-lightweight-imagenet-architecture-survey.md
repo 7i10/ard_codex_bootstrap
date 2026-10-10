@@ -4524,5 +4524,9 @@ history behind this pivot.)
   Checkpoint sha256 was not computed in this postrun.
   `epoch-metrics.parquet` sha256 `c6f77213...`,
   `sample-stats-train.parquet` sha256 `a1e5167b...` (from the run-bundle
-  manifest). W&B `lightweight-imagenet-at`, same run id. Hamster GPU1 was
-  idle when this postrun started.
+  manifest). W&B `lightweight-imagenet-at`, same run id. The Hamster GPU1
+  worker popped the next queue item, `plan0103-phase2-mnv4s-silu-s0-v1`
+  (source `5dd329e`), at 13:48:26 UTC. The setting check covers source
+  `d836c03` only; `5dd329e` changes `src/ard/engine/trainer.py`
+  (+398 / -55) and `cuda_graph.py` (+101 / -13), and its plain full-AT
+  path has not been checked against the reference (decision 0042).
