@@ -4114,3 +4114,107 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `588fd944...`,
   `sample-stats-train.parquet` sha256 `40fc5c59...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id.
+- 2026-10-10 (postrun): **Phase 1 seed 1, MobileNetV4-M random init /
+  SGD lr 0.025 completed.** `plan0103-phase1-mobilenetv4-conv-medium-random-s1-v1`
+  (hand-run, Hamster GPU0, one RTX 4090) ran 50/50 epochs.
+  `run-bundle/completion.json` reads `completed`, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful.
+  All 50 epoch rows are present (`epoch_metrics_complete: true`).
+  `train.log` has no traceback, NaN or error line (only the wandb git-root
+  warning). The wandb internal log has five transient `file_stream`
+  retries (2026-10-09 01:52-02:05 UTC); the local metrics are complete,
+  and the W&B history was not checked. `best.pt`, `last.pt` and
+  `epoch-049.pt` are on disk (best = epoch 48, last = epoch 49). Nothing is
+  imported into `docs/experiments/`: no aggregator exists for this
+  contract. The numbers below are read from
+  `outputs/train/epoch-metrics.jsonl` and the run-bundle manifest. This is
+  the first of the five seed-1 runs at the chosen LRs (discussion register
+  C, 2026-10-08).
+
+  Fixed identity: as the seed-0 cell
+  `plan0103-phase1-mobilenetv4-conv-medium-random-v1` except the training
+  seeds, the host and the source SHA. ImageNet-1k (original images,
+  content `ae033613...`), MobileNetV4-Conv-M
+  (`mobilenetv4_conv_medium_imagenet`, `imagenet_standard` profile),
+  random init, plain PGD-AT, no teacher, 224 px. Training seeds 1
+  (model init, data order, augmentation, training attack, panel);
+  evaluation-attack seed 0; split seed 20260911. Training attack CE PGD-3,
+  l_inf eps 4/255, step 8/765, random start, eval mode. Selection and
+  validation attack PGD-10, same eps and step, random start, eval mode.
+  SGD (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.025, warmup_multistep
+  (10-epoch warmup, x0.1 at epochs 25 and 38), 50 epochs. World size 1,
+  global batch 128, local BN. Non-deterministic with cudnn_benchmark, not
+  compiled, no cuda_graph, fp32, no EMA. Config
+  `imagenet_mobilenetv4_conv_medium_pgd_at_phase1_random.yaml` (the seed-0
+  cell's config, `ARD_SEED=1`; unchanged since the source SHA), protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`, config
+  hash `bbb4c272...`. Source SHA `609e6fa913d7b0f20ca8e9143f2a8604f68ea77f`
+  (worktree `source-609e6fa913d7`, clean). The seed-0 cell ran on Ferret
+  from `086072b`. "val" is internal validation (25,620 held-out original
+  train images, 224 px, the same slice for both seeds); "probe" is 2,000
+  training images. Neither is the ImageNet val split. No AutoAttack and no
+  official evaluation of this run.
+
+  | epoch | stage | val clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---|---:|---:|---:|
+  | 0 | warmup | 0.21 / 0.10 | 0.10 / 0.05 | 6.935 |
+  | 9 | end of warmup | 37.02 / 19.98 | 39.30 / 20.05 | 4.594 |
+  | 24 | end of lr 0.025 | 49.88 / 28.22 | 52.30 / 31.20 | 3.912 |
+  | 25 | first epoch at lr 0.0025 | 58.04 / 35.06 | 62.75 / 39.60 | 3.508 |
+  | 37 | end of lr 0.0025 | 61.24 / 37.25 | 67.50 / 43.75 | 3.225 |
+  | 38 | first epoch at lr 0.00025 | 62.90 / 38.79 | 68.50 / 46.50 | 3.111 |
+  | 48 | best (by val PGD-10) | 63.59 / 39.34 | 70.80 / 47.75 | 3.030 |
+  | 49 | last | 63.71 / 39.30 | 71.25 / 47.50 | 3.023 |
+
+  Reading (internal validation, PGD-10 only):
+  1. **Seed 1 vs seed 0, last epoch val PGD-10:** 39.30 vs 39.39, i.e.
+     **-0.09pt.** The val SE is about 0.30pt for both clean and PGD-10, so
+     the two-run SE of a difference is about 0.43pt; the gap is about 0.2
+     SE. The seed-0 clean number is not recorded in docs (the run is on
+     Ferret and was not re-read), so the clean spread is not available.
+  2. **First ImageNet seed spread at a chosen LR.** Discussion register C
+     (2026-10-08) says to revisit the Phase 2 thresholds (0.5 / 1.5pt)
+     once the five seed-1 runs measure the ImageNet spread. This is the
+     first of the five: 0.09pt PGD-10, well below 0.5pt. Earlier ImageNet
+     seed pair for context (MobileNetV4-S pretrained, Arm A, plan 0101):
+     30.58 / 30.59, 0.01pt. Two pairs are not a spread estimate; the
+     threshold review waits for the other four, as the register says.
+  3. **Setting check input.** The MobileNetV4-M baseline+EMA det+cg run
+     (discussion register C, 2026-10-09) now has both Phase-1 seeds to
+     compare against: 39.39 / 39.30. The seed spread (0.09pt) is smaller
+     than the rule's 0.5pt alternative.
+  4. **Trains normally.** Val PGD-10 never falls more than 0.15pt below
+     its running maximum (epoch 34, 36.92 after 37.07 at epoch 33); the
+     catastrophic-overfitting guard (below half of the running maximum)
+     never fires. The peak-LR stage is still rising slowly at its end
+     (+1.10pt PGD-10 over epochs 19-24).
+  5. **Decays.** Epoch 24 to 25: +8.16 clean / +6.84 PGD-10. The lr 0.0025
+     stage adds +2.19pt PGD-10 (epochs 25-37). Epoch 37 to 38: +1.66 /
+     +1.55. The last stage still creeps up (38.79 at epoch 38, 39.04-39.34
+     over epochs 43-49).
+  6. **Best and last.** Best epoch 48 (63.59 / 39.34), last epoch 49
+     (63.71 / 39.30); `robust_overfit_gap` 0.04pt, inside one val SE.
+  7. **Seen-unseen gap.** Last probe minus val: +7.5 clean / +8.2 PGD-10
+     (lr 0.0125 seed 0: +6.4 / +7.3). Probe SE is about 1.1pt.
+     Training-batch robust accuracy (PGD-3, augmented) ends at 37.46%,
+     below val PGD-10 39.30%: the val >= train signature of Phase 1
+     persists.
+  8. **Cost.** 35.39 h from start to finish (run-bundle `created_at`
+     2026-10-08 13:30:29 to `finished_at` 2026-10-10 00:53:59 UTC,
+     127,410 s). Summed per-epoch training time is about 120,900 s
+     (33.6 h); the rest (about 130 s per epoch) is validation, probe,
+     checkpointing and start-up. Throughput 515-521 img/s in every epoch,
+     no slow stretch (lr 0.0125 on Hamster: 514-523; the seed-0 cell
+     averaged about 420 img/s on Ferret). The other Hamster GPU ran the
+     Phase 2 MobileNetV4-S cosine, label-smoothing and baseline+EMA runs
+     throughout (GPU not shared, host shared). Peak allocated memory
+     9.61 GB at epoch 0, 7.44 GB after; reserved 11.24 GB at epoch 0,
+     9.79 GB at the end.
+
+  Caveats: the two seeds also differ in host (Hamster vs Ferret) and
+  source SHA (`609e6fa` vs `086072b`), so the 0.09pt mixes seed with those
+  (both runs are non-deterministic anyway). Checkpoint sha256 was not
+  computed in this postrun. `epoch-metrics.parquet` sha256 `d179d5e7...`,
+  `sample-stats-train.parquet` sha256 `c76095cb...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id.
