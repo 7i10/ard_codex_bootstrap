@@ -4530,3 +4530,156 @@ history behind this pivot.)
   `d836c03` only; `5dd329e` changes `src/ard/engine/trainer.py`
   (+398 / -55) and `cuda_graph.py` (+101 / -13), and its plain full-AT
   path has not been checked against the reference (decision 0042).
+- 2026-10-11 (postrun): **Phase 2 weight-decay exclusion (no weight decay
+  on norm/bias parameters), MobileNetV4-S seed 0 completed.**
+  `plan0103-phase2-mnv4s-wdexcl-s0-v1` (hand-run from the pull queue,
+  Hamster GPU0, one RTX 4090) ran 50/50 epochs.
+  `run-bundle/completion.json` is present, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful;
+  the GPU0 worker logged `exited ... rc=0`. All 50 epoch rows are present
+  (`epoch_metrics_complete: true`). `train.log` has no traceback, NaN or
+  error line (only the wandb git-root warning); the wandb logs have no
+  error or retry line. `best.pt` (epoch 47), `best-ema.pt` (epoch 48),
+  `last.pt` and `epoch-049.pt` are on disk. Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract. The numbers
+  below are read from `outputs/train/epoch-metrics.jsonl` of this run and
+  of the baseline+EMA run, and from the run-bundle manifest.
+
+  Fixed identity: as the Phase 2 baseline+EMA run
+  `plan0103-phase2-mnv4s-baseline-ema-s0-v1` (53.85 / 30.71, source
+  `d836c03`) except (a) `optimizer.exclude_norm_bias_from_weight_decay:
+  true`: parameters with ndim <= 1 (BatchNorm scale and shift, biases)
+  get no weight decay; conv and linear weights keep wd 1e-4; (b) the W&B
+  group and source SHA. Everything else is the reference recipe:
+  warmup_multistep (10-epoch warmup, x0.1 at epochs 25 and 38), no label
+  smoothing, full AT, Phase 2 template (selection subset 5,000, EMA
+  0.9999). ImageNet-1k (original images, content `ae033613...`),
+  MobileNetV4-Conv-S (ReLU) random init, plain PGD-AT, no teacher, 224 px
+  training. Training and evaluation-attack seed 0 (split seed 20260911).
+  Training attack CE PGD-3, l_inf eps 4/255, step 8/765, random start.
+  Selection and validation attack PGD-10, same eps and step, random start,
+  eval mode. SGD (Nesterov, momentum 0.9, wd 1e-4 on ndim >= 2 parameters
+  only), peak LR 0.025, 50 epochs. World size 1, global batch 128, local
+  BN. Deterministic, not compiled, cuda_graph, fp32. Config
+  `imagenet_mobilenetv4_pgd_at_phase2_wdexcl_cg.yaml` (unchanged since the
+  source SHA), protocol `controlled_imagenet_stage02_init_lr_grid_v1`,
+  config hash `5e09ec30...`. Source SHA
+  `5dd329eaf31f12907d2cf103df263c19b1d9519d` (worktree
+  `source-5dd329eaf31f`, clean). This is the ReLU / no-wd-on-norm cell of
+  the activation x weight-decay 2x2 (discussion register B, 2026-10-08);
+  the ReLU / wd cell is the baseline+EMA run. "Full val", "subset",
+  "complement" and "probe" mean the same as in the cosine entry above
+  (25,620 / 5,000 / 20,620 held-out original train images, 2,000 training
+  images). None is the ImageNet val split. No AutoAttack and no official
+  evaluation has run.
+
+  End of training (full val and complement are evaluated once, at the
+  final epoch):
+
+  | checkpoint | full val clean / PGD-10 | complement clean / PGD-10 |
+  |---|---:|---:|
+  | last (ep 49), raw weights | 53.47 / 29.57 | 53.66 / 29.78 |
+  | last (ep 49), EMA weights | 53.65 / 29.72 | 53.85 / 29.90 |
+  | best raw (ep 47, by subset PGD-10) | 53.61 / 29.69 | 53.81 / 29.79 |
+  | best EMA (ep 48, by EMA subset PGD-10) | 53.64 / 29.74 | 53.87 / 29.88 |
+  | baseline+EMA (wd on all parameters), last raw | 53.85 / 30.71 | 54.07 / 30.90 |
+  | baseline+EMA, last EMA | 53.95 / 30.80 | 54.20 / 31.00 |
+
+  Per-epoch trajectory against the baseline+EMA run (both subset; the
+  training differs from step 1, so no bit identity is expected):
+
+  | epoch | LR | subset raw clean / PGD-10 | baseline subset raw | subset EMA clean / PGD-10 | baseline subset EMA | probe clean / PGD-10 | baseline probe | train loss |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | 0 | 0.0025 | 0.66 / 0.60 | 0.68 / 0.54 | 0.12 / 0.10 | 0.10 / 0.04 | 0.75 / 0.60 | 0.85 / 0.75 | 6.821 |
+  | 9 | 0.025 (end of warmup) | 29.70 / 15.86 | 30.96 / 15.98 | 26.68 / 15.44 | 5.30 / 2.84 | 31.55 / 15.65 | 33.05 / 15.95 | 4.881 |
+  | 24 | 0.025 (last) | 40.88 / 21.66 | 40.40 / 21.76 | 46.04 / 26.76 | 45.90 / 27.20 | 44.55 / 23.10 | 43.75 / 23.20 | 4.324 |
+  | 25 | 0.0025 | 48.26 / 26.54 | 47.88 / 26.94 | 46.94 / 26.90 | 46.82 / 27.20 | 53.85 / 30.10 | 53.15 / 29.65 | 4.023 |
+  | 37 | 0.0025 (last) | 50.90 / 27.40 | 51.46 / 28.80 | 51.86 / 28.94 | 51.84 / 30.04 | 57.65 / 33.50 | 56.30 / 32.85 | 3.820 |
+  | 38 | 0.00025 | 52.06 / 28.30 | 52.26 / 29.30 | 52.18 / 28.70 | 52.28 / 29.52 | 59.25 / 34.50 | 58.95 / 33.85 | 3.743 |
+  | 47 | 0.00025 (best raw) | 52.76 / 29.34 | — | 52.62 / 29.14 | — | 59.90 / 35.25 | — | 3.700 |
+  | 48 | 0.00025 (best EMA) | 52.52 / 28.88 | — | 52.70 / 29.16 | — | 60.25 / 34.80 | — | 3.695 |
+  | 49 | 0.00025 (last) | 52.68 / 28.68 | 52.96 / 29.98 | 52.84 / 29.04 | 52.94 / 30.04 | 59.80 / 34.45 | 59.80 / 34.40 | 3.695 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Against baseline+EMA, last raw weights on full val (the
+     like-for-like number):** 53.47 / 29.57 vs 53.85 / 30.71, i.e.
+     **-0.38 clean / -1.14 PGD-10.** Complement -0.41 / -1.12; last EMA
+     -0.30 / -1.08. The two-run SE of a full-val difference is about
+     0.43pt clean and 0.37pt PGD-10, so the PGD-10 drop is about 3 SE and
+     about 3x the MobileNetV4-S seed-0 / seed-1 spread (0.36pt, discussion
+     register C, 2026-10-11); the clean drop is inside one SE.
+  2. **Preregistered Phase 2 rule** (>= 1.5pt "effect", 0.5-1.5pt "hold",
+     < 0.5pt "no effect"): the tiers are written for a PGD-10 gain. The
+     magnitude 1.14pt falls in the "hold" band, with the sign of a loss.
+     No reading of this run gives a gain. What to do with it (drop the
+     exclusion, run seed 1, or wait for the SiLU cells of the 2x2) is the
+     human's decision (packet).
+  3. **Source caveat.** The comparison crosses source SHAs: this run is
+     `5dd329e`, baseline+EMA is `d836c03`. Whether `5dd329e` trains plain
+     full AT exactly as `d836c03` does is still unchecked (decision 0042,
+     option B pending). Any such setting effect enters this -1.14pt
+     directly.
+  4. **The gap opens after the first LR decay, and only on held-out
+     images.** On the subset the two runs stay within about 0.5pt PGD-10
+     through warmup and the peak-LR stage (epoch 24: -0.10, epoch 25:
+     -0.40); the gap reaches -1.40 at epoch 37 and stays near -1.0 to
+     -1.3 in the last stage. On the training probe the run is level with
+     or above the baseline throughout (epoch 37 +1.35 / +0.65, epoch 49
+     0.00 / +0.05), and train loss (3.695 vs 3.697) and training-batch
+     robust accuracy (27.87% vs 27.90%) end the same. So the training fit
+     is unchanged and held-out PGD-10 is lower: probe minus full val is
+     +6.33 clean / +4.88 PGD-10, against +5.95 / +3.69 for the baseline.
+     That reads as a larger robust generalization gap. One seed, and probe
+     SE is about 1.0pt clean / 0.9pt PGD-10; the mechanism is not tested.
+  5. **EMA no longer lags in warmup.** At epoch 9 the EMA weights read
+     26.68 / 15.44 on the subset against raw 29.70 / 15.86; in the
+     baseline+EMA run they read 5.30 / 2.84 against 30.96 / 15.98 (and
+     the baseline EMA clean accuracy even falls from 6.02 at epoch 5 to
+     4.94 at epoch 8 while raw rises). Here EMA passes raw at epoch 10
+     (PGD-10) and 12 (clean), leads by up to +5.44 clean (epoch 22) /
+     +5.42 PGD-10 (epoch 21) at the peak LR, +0.14 to +1.54 PGD-10 in the
+     middle stage and -0.20 to +0.40 in the last stage. Two candidate
+     causes, neither checked: removing weight decay from the BN
+     parameters, or source `5dd329e`. The mixed-batch run (also
+     `5dd329e`, weight decay on all parameters) still lagged (epoch 9 EMA
+     18.88 / 5.98 vs raw 40.46 / 8.72), which points to the weight-decay
+     change, but that run has a different objective.
+  6. **EMA at the end.** Last EMA minus last raw on full val:
+     +0.18 clean / +0.15 PGD-10 (complement +0.19 / +0.12), the same
+     order as baseline+EMA (+0.10 / +0.10). Best EMA (epoch 48) gives
+     29.74, the highest full-val PGD-10 of the four checkpoints, +0.17
+     over last raw.
+  7. **Best and last.** Best raw (epoch 47 by subset PGD-10) minus last on
+     full val: +0.14 clean / +0.12 PGD-10 (`robust_overfit_gap_full`
+     0.12pt; complement 0.00pt). Inside one SE.
+  8. **Trains normally.** Subset raw PGD-10 never falls more than 0.90pt
+     below its running maximum (epoch 37, 27.40 after 28.30 at epoch 35);
+     the catastrophic-overfitting guard (below half of the running
+     maximum) never fires. Stages on the subset: PGD-10 20.38-21.88 over
+     epochs 17-24, 26.88-28.30 over epochs 26-37, 28.34-29.34 over epochs
+     38-49. Decays: epoch 24 to 25 +7.38 clean / +4.88 PGD-10, epoch 37 to
+     38 +1.16 / +0.90. Training-batch robust accuracy (PGD-3, augmented)
+     ends at 27.87%, below full-val PGD-10 29.57%: the val >= train
+     signature persists.
+  9. **Cost.** 15.22 h from start to finish (run-bundle `created_at`
+     2026-10-10 12:19:22 to `finished_at` 2026-10-11 03:32:35 UTC,
+     54,792 s; baseline+EMA 15.52 h). Summed per-epoch training time is
+     about 52,390 s (14.55 h); the rest (about 48 s per epoch) is subset
+     validation, the final full-val pass, probe, checkpointing and
+     start-up. Throughput 1,197-1,199 img/s (baseline+EMA 1,175-1,181,
+     on GPU1). cuda_graph: 1 capture, 2 eager steps and 9,807 replays per
+     epoch. Peak allocated memory 3.06 GB, reserved 4.79 GB at epoch 49
+     (baseline+EMA 3.06 / 8.42 GB; `5dd329e` frees graph memory).
+
+  Caveats: one seed; different source SHA from the comparison run
+  (item 3); different GPU (GPU0 vs GPU1), which does not change
+  deterministic results but does change throughput. Only one exclusion
+  rule (all ndim <= 1 parameters) was run. Checkpoint sha256 was not
+  computed in this postrun. `epoch-metrics.parquet` sha256 `d206eaf6...`,
+  `sample-stats-train.parquet` sha256 `b87f9549...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id. The Hamster GPU0
+  worker popped the next queue item,
+  `plan0103-phase2-mnv4s-idbh-weak-nocropshift-50ep-s0-v1` (source
+  `5dd329e`), at 03:34:33 UTC; GPU1 is still running
+  `plan0103-phase2-mnv4s-silu-s0-v1` (the SiLU / wd cell of the 2x2).
