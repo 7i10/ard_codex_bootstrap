@@ -2,7 +2,7 @@
 # (params +1.90%; MACs conv+linear +7.81%, incl. attention matmuls +6.70%).
 # Identical to imagenet_deit_tiny_pgd_at_phase1_adamw_random_lr5em4.yaml except student.architecture deit_tiny_imagenet -> deit_tiny_convstem_imagenet, tracking.group,
 # and training.selection_subset_size 5000 (Phase 2 template, human 2026-10-08).
-# DO NOT LAUNCH until the AdamW grid closes; set lr to the grid winner (5e-4 is a placeholder).
+# LR set to the closed AdamW grid winner 1e-3 (2026-10-10).
 # Plus training.weight_ema_decay 0.9999 (Phase 2 template, human 2026-10-08: EMA kept in every Phase 2 run, evaluated alongside the raw weights).
 schema_version: 2
 protocol: {id: controlled_imagenet_stage02_lightweight_architecture_survey_v1}
@@ -11,7 +11,7 @@ seeds: {split: 20260911, model_init: "${ARD_SEED}", data_order: "${ARD_SEED}", a
 dataset: {name: imagenet, root: "${ARD_IMAGENET_ROOT}", split: train, download: false, num_classes: 1000, image_size: 224, content_sha256: ae033613f1a67b5982f2e3aeb4bd1095761ac7cf526c066c8fc3671c64795358}
 student: {architecture: deit_tiny_convstem_imagenet, num_classes: 1000, preprocessing_owner: student_adapter, pretrained: false, normalization: {profile: imagenet_standard}}
 method: {id: pgd_at, version: 1, attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 3, random_start: true}, selection_attack: {loss: ce, epsilon: "4/255", step_size: "8/765", steps: 10, random_start: true, student_mode: eval, teacher_mode: eval}}
-optimizer: {id: adamw, learning_rate: 5e-4, beta1: 0.9, beta2: 0.999, weight_decay: 0.05}
+optimizer: {id: adamw, learning_rate: 1e-3, beta1: 0.9, beta2: 0.999, weight_decay: 0.05}
 scheduler: {id: warmup_multistep, milestones: [25, 38], gamma: 0.1, step_at: epoch_end, warmup_epochs: 10}
 training: {epochs: 50, per_rank_batch_size: 128, global_batch_size: 128, num_workers: "${ARD_NUM_WORKERS}", device: cuda, deterministic: false, cudnn_benchmark: true, step_diagnostics: false, validation_fraction: 0.02, selection_subset_size: 5000, weight_ema_decay: 0.9999, amp: false, batchnorm_mode: local_per_rank, train_probe_size: 2000}
 tracking: {mode: online, entity: "${WANDB_ENTITY}", project: "${WANDB_PROJECT}", group: imagenet-deit-tiny-convstem-pgd-at-phase2-random-adamw-lr5em4, run_id: "${ARD_RUN_ID}", name: null, diagnostics_mode: panel, panel_size: 24, panel_interval_epochs: 5, artifact_interval_epochs: 5}

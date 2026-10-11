@@ -338,9 +338,9 @@ PHASE2_CONFIGS = {
         "mobilenetv4_conv_small_silu_se_imagenet",
         MNV4_BASE,
     ),
-    "imagenet_deit_tiny_convstem_pgd_at_phase2_adamw_random_lr5em4.yaml": (
+    "imagenet_deit_tiny_convstem_pgd_at_phase2_adamw_random_lr1em3.yaml": (
         "deit_tiny_convstem_imagenet",
-        "imagenet_deit_tiny_pgd_at_phase1_adamw_random_lr5em4.yaml",
+        "imagenet_deit_tiny_pgd_at_phase1_adamw_random_lr1em3.yaml",
     ),
     "imagenet_convnext_atto_deep_narrow_pgd_at_phase2_adamw_random_lr1em3.yaml": (
         "convnext_atto_deep_narrow_imagenet",
@@ -369,9 +369,11 @@ def test_every_variant_has_exactly_one_phase2_config() -> None:
 def test_phase2_adamw_configs_are_marked_do_not_launch(config_file: str) -> None:
     header = (CONFIG_DIR / config_file).read_text().split("schema_version")[0]
     base = PHASE2_CONFIGS[config_file][1]
-    if base != MNV4_BASE and "convnext_atto" not in base:
+    if base != MNV4_BASE and "convnext_atto" not in base and "deit_tiny" not in base:
         assert "DO NOT LAUNCH until the AdamW grid closes" in header
     if "convnext_atto" in base:  # ConvNeXt-Atto AdamW grid closed 2026-10-09 at 1e-3
+        assert "LR set to the closed AdamW grid winner 1e-3" in header
+    if "deit_tiny" in base:  # DeiT-Tiny AdamW grid closed 2026-10-10 at 1e-3
         assert "LR set to the closed AdamW grid winner 1e-3" in header
 
 
