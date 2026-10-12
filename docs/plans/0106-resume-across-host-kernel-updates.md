@@ -92,3 +92,9 @@ Runs started before this change carry the old code. They still need the original
 - 2026-10-12: implemented; unit tests and the end-to-end check pass. Review: no P1. Its P2s were
   folded in: `machine`/`libc` hard fields, a parser test, the CUDA-graph driver rule, Hamster's
   recovery path, and the accurate ConvNeXt rollout statement.
+- 2026-10-12: Ferret's queue re-pinned to 9a16cd6 (9 items). The CUDA-graph driver rule was applied to
+  `plan0103-phase2-mnv4s-awp-s0-v1`. On Ferret GPU0 under driver 595.99, at the run's own source
+  5dd329e, the deterministic graph-vs-eager bitwise tests passed: plain step, Phase 2 options, AWP
+  (and RSLAD / mixed-batch), and graph run resumed mid-run vs uninterrupted eager. Result: 43 passed,
+  5 skipped (the opt-in candidate architectures, not used with graphs in production), 27 min. The run
+  needs no flag.
