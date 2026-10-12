@@ -136,12 +136,6 @@ def _run_git(args: list[str]) -> str | None:
     return completed.stdout.strip() if completed.returncode == 0 else None
 
 
-# Environment fields a resume may explicitly accept as changed (``--resume-accept-environment-drift``).
-# ``platform`` is the OS/kernel string only (e.g. a host reboot into an updated kernel); Python, PyTorch,
-# CUDA, cuDNN and the GPU list stay hard lineage checks.
-RESUME_ACCEPTABLE_ENVIRONMENT_DRIFT = frozenset({"platform"})
-
-
 def collect_environment() -> dict[str, Any]:
     """Collect only reproducibility-relevant, non-secret environment metadata."""
     return {
@@ -432,11 +426,7 @@ class LocalTracker:
         evaluation_seed: int | None = None,
         training_execution: Mapping[str, object] | None = None,
         teacher_lineage_config: ExperimentConfig | None = None,
-        accept_environment_drift: frozenset[str] = frozenset(),
     ) -> None:
-        unknown_drift = set(accept_environment_drift) - RESUME_ACCEPTABLE_ENVIRONMENT_DRIFT
-        if unknown_drift:
-            raise TrackingError(f"environment drift cannot be accepted for: {sorted(unknown_drift)}")
         self.config, self.output_dir, self.config_hash, self.root, self.run_id = (
             config,
             output_dir,
@@ -588,24 +578,11 @@ class LocalTracker:
             prior_environment = self.bundle_dir / "environment.json"
             if prior_environment.is_file():
                 previous_environment = json.loads(prior_environment.read_text(encoding="utf-8"))
-                current_environment = json.loads(json.dumps(collect_environment()))
-                drifted = sorted(
-                    key
-                    for key in set(previous_environment) | set(current_environment)
-                    if previous_environment.get(key) != current_environment.get(key)
-                )
-                if not set(drifted) <= set(accept_environment_drift):
+                current_environment = collect_environment()
+                if previous_environment != current_environment:
                     raise TrackingError("resume manifest lineage drift: environment")
-            else:
-                drifted, previous_environment, current_environment = [], {}, {}
             events = list(prior.get("resume_events", []))
-            event: dict[str, Any] = {"at": datetime.now(UTC).isoformat(), "git": git["sha"]}
-            if drifted:
-                event["accepted_environment_drift"] = {
-                    key: {"previous": previous_environment.get(key), "current": current_environment.get(key)}
-                    for key in drifted
-                }
-            events.append(event)
+            events.append({"at": datetime.now(UTC).isoformat(), "git": git["sha"]})
             self.manifest["resume_events"] = events
         self.bundle_dir.mkdir(parents=True, exist_ok=True)
         _write_json(self.bundle_dir / "environment.json", collect_environment())
@@ -1012,7 +989,6 @@ def create_tracker(
     training_seeds: Mapping[str, int] | None = None,
     evaluation_seed: int | None = None,
     training_execution: Mapping[str, object] | None = None,
-    accept_environment_drift: frozenset[str] = frozenset(),
 ) -> ExperimentTracker:
     """Return a no-op on non-zero ranks; only rank zero can initialize W&B."""
     if job_type == "evaluation" and training_execution is None:
@@ -1038,7 +1014,6 @@ def create_tracker(
         evaluation_seed=evaluation_seed,
         training_execution=training_execution,
         teacher_lineage_config=preflight_config,
-        accept_environment_drift=accept_environment_drift,
     )
 
 
@@ -1051,7 +1026,6 @@ def coordinated_create_tracker(
     resume_run_id: str | None = None,
     job_type: str = "train",
     run_id: str | None = None,
-    accept_environment_drift: frozenset[str] = frozenset(),
 ) -> ExperimentTracker:
     """One coordinated, RNG-neutral init phase; rank zero owns the real run."""
     resolved_id = run_id or stable_run_id(
@@ -1068,7 +1042,6 @@ def coordinated_create_tracker(
             root=root,
             run_id=resolved_id,
             job_type=job_type,
-            accept_environment_drift=accept_environment_drift,
         )
 
     _rng_preserving_rank_zero_phase(initialize, phase="tracker init")
