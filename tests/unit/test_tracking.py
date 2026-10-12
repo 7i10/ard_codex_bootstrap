@@ -31,6 +31,8 @@ from ard.tracking.adapter import (
     canonical_run_group,
     canonical_run_name,
     collect_git_state,
+    coordinated_create_tracker,
+    resume_environment_drift,
     should_upload_model_artifact,
     should_upload_run_bundle,
 )
@@ -164,6 +166,130 @@ def test_resume_rejects_environment_snapshot_drift(tmp_path: Path) -> None:
 
     with pytest.raises(TrackingError, match="lineage drift: environment"):
         create_tracker(config=config(output, mode="disabled"), output_dir=output, config_hash="abc", root=tmp_path)
+
+
+def _rewrite_environment(output: Path, **changes: object) -> dict[str, object]:
+    path = output / "run-bundle" / "environment.json"
+    environment = json.loads(path.read_text(encoding="utf-8"))
+    current = dict(environment)
+    environment.update(changes)
+    path.write_text(json.dumps(environment) + "\n", encoding="utf-8")
+    return current
+
+
+def test_resume_records_kernel_and_driver_drift_instead_of_refusing(tmp_path: Path) -> None:
+    # Plan 0106: a reboot into an updated kernel / NVIDIA driver must not orphan an interrupted run.
+    # This goes through coordinated_create_tracker, the constructor ard.cli.train uses.
+    output = tmp_path / "output"
+    output.mkdir()
+    cfg = config(output, mode="disabled")
+    coordinated_create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
+    current = _rewrite_environment(output, platform="Linux-7.0.0-28-generic", nvidia_driver="1.0-old-module")
+
+    coordinated_create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path).finish()
+
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["resume_events"][-1]["environment_drift"] == {
+        "nvidia_driver": {"previous": "1.0-old-module", "current": current["nvidia_driver"]},
+        "platform": {"previous": "Linux-7.0.0-28-generic", "current": current["platform"]},
+    }
+    environment = json.loads((output / "run-bundle" / "environment.json").read_text(encoding="utf-8"))
+    assert environment["platform"] == current["platform"]
+
+
+def test_resume_without_environment_change_records_no_drift(tmp_path: Path) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    cfg = config(output, mode="disabled")
+    create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
+    create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path).finish()
+    manifest = json.loads((output / "run-bundle" / "manifest.json").read_text(encoding="utf-8"))
+    assert set(manifest["resume_events"][-1]) == {"at", "git"}
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"torch": "0.0.0"},
+        {"cuda": "0.0"},
+        {"gpu": ["Some Other GPU"]},
+        {"platform": "Linux-other", "cudnn": 1},
+        {"legacy_field": None},
+        {"platform": "Linux-other", "libc": "glibc 2.40"},
+        {"machine": "aarch64"},
+    ],
+)
+def test_resume_still_refuses_numerical_stack_drift(tmp_path: Path, changes: dict[str, object]) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    cfg = config(output, mode="disabled")
+    create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
+    _rewrite_environment(output, **changes)
+
+    with pytest.raises(TrackingError, match="lineage drift: environment"):
+        create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
+
+
+def test_resume_environment_drift_rejects_a_missing_hard_field() -> None:
+    current = {
+        "python": "3",
+        "platform": "a",
+        "machine": "x86_64",
+        "libc": "glibc 2.39",
+        "nvidia_driver": "1",
+        "torch": "2",
+        "cuda": None,
+        "cudnn": None,
+        "gpu": [],
+    }
+    previous = {key: value for key, value in current.items() if key != "cuda"}
+    with pytest.raises(TrackingError, match="lineage drift: environment"):
+        resume_environment_drift(previous, current)
+    # An informational field absent from an older snapshot is recorded, not refused.
+    older = {key: value for key, value in current.items() if key != "nvidia_driver"}
+    assert resume_environment_drift(older, current) == {"nvidia_driver": {"previous": None, "current": "1"}}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  595.84  Release Build  "
+            "(dvs-builder@U22-I3-AM25-26-2)  Wed Jun 10 21:06:37 UTC 2026\n",
+            "595.84",
+        ),
+        ("NVRM version: NVIDIA UNIX x86_64 Kernel Module  550.54.14  Thu Feb 22 01:44:30 UTC 2024\n", "550.54.14"),
+        (None, None),
+    ],
+)
+def test_nvidia_driver_version_reads_the_loaded_kernel_module(
+    monkeypatch: pytest.MonkeyPatch, text: str | None, expected: str | None
+) -> None:
+    import ard.tracking.adapter as adapter
+
+    original = Path.read_text
+
+    def read_text(self: Path, *args: object, **kwargs: object) -> str:
+        if str(self) == "/proc/driver/nvidia/version":
+            if text is None:
+                raise FileNotFoundError(str(self))
+            return text
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read_text)
+    assert adapter._nvidia_driver_version() == expected
+
+
+def test_terminal_resume_accepts_kernel_drift_but_not_torch_drift(tmp_path: Path) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    cfg = config(output, mode="disabled")
+    create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path).finish()
+    _rewrite_environment(output, platform="Linux-old-kernel")
+    create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
+    _rewrite_environment(output, torch="0.0.0")
+    with pytest.raises(TrackingError, match="lineage drift: environment"):
+        create_tracker(config=cfg, output_dir=output, config_hash="abc", root=tmp_path)
 
 
 def test_manifest_preserves_complete_structured_training_seed_lineage(tmp_path: Path) -> None:

@@ -12,6 +12,7 @@ import json
 import math
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -136,15 +137,57 @@ def _run_git(args: list[str]) -> str | None:
     return completed.stdout.strip() if completed.returncode == 0 else None
 
 
+# Host fields a reboot can change without touching the numerical stack (plan 0106): the platform
+# string (it carries the kernel release) and the loaded NVIDIA kernel-module version. Both are
+# recorded; a resume that sees them change records the previous and current values in its resume
+# event instead of refusing. Python, the C library, the CPU architecture, PyTorch, CUDA, cuDNN and the
+# GPU list stay hard lineage checks.
+RESUME_INFORMATIONAL_ENVIRONMENT_FIELDS = frozenset({"platform", "nvidia_driver"})
+_NVIDIA_MODULE_VERSION = re.compile(r"Kernel Module(?: for \S+)?\s+([0-9][0-9.]*)")
+
+
+def _nvidia_driver_version() -> str | None:
+    """Return the loaded NVIDIA kernel-module version, or None when no NVIDIA driver is loaded."""
+    try:
+        text = Path("/proc/driver/nvidia/version").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = _NVIDIA_MODULE_VERSION.search(text)
+    return match.group(1) if match else None
+
+
 def collect_environment() -> dict[str, Any]:
     """Collect only reproducibility-relevant, non-secret environment metadata."""
     return {
         "python": sys.version,
         "platform": platform.platform(),
+        "machine": platform.machine(),
+        "libc": " ".join(platform.libc_ver()).strip(),
+        "nvidia_driver": _nvidia_driver_version(),
         "torch": torch.__version__,
         "cuda": torch.version.cuda,
         "cudnn": torch.backends.cudnn.version(),
         "gpu": [torch.cuda.get_device_name(index) for index in range(torch.cuda.device_count())],
+    }
+
+
+def resume_environment_drift(previous: Mapping[str, Any], current: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Compare a run-bundle's environment snapshot with the resuming process's.
+
+    Any difference outside ``RESUME_INFORMATIONAL_ENVIRONMENT_FIELDS`` -- a changed value, or a field
+    present on one side only -- raises. Returns the informational fields that changed, as
+    ``{field: {"previous": ..., "current": ...}}`` (an informational field missing from an older
+    snapshot reads as ``None``).
+    """
+    current = json.loads(json.dumps(dict(current)))
+    hard_previous = {key: value for key, value in previous.items() if key not in RESUME_INFORMATIONAL_ENVIRONMENT_FIELDS}
+    hard_current = {key: value for key, value in current.items() if key not in RESUME_INFORMATIONAL_ENVIRONMENT_FIELDS}
+    if hard_previous != hard_current:
+        raise TrackingError("resume manifest lineage drift: environment")
+    return {
+        key: {"previous": previous.get(key), "current": current.get(key)}
+        for key in sorted(RESUME_INFORMATIONAL_ENVIRONMENT_FIELDS)
+        if previous.get(key) != current.get(key)
     }
 
 
@@ -494,11 +537,10 @@ class LocalTracker:
             if prior.get("group") != effective_group:
                 raise TrackingError("resume manifest lineage drift: group")
             prior_environment = self.bundle_dir / "environment.json"
-            if (
-                prior_environment.is_file()
-                and json.loads(prior_environment.read_text(encoding="utf-8")) != collect_environment()
-            ):
-                raise TrackingError("resume manifest lineage drift: environment")
+            if prior_environment.is_file():
+                resume_environment_drift(
+                    json.loads(prior_environment.read_text(encoding="utf-8")), collect_environment()
+                )
             self.manifest = prior
             self._terminal_resume = True
             return
@@ -576,13 +618,16 @@ class LocalTracker:
                 if prior.get(key) != self.manifest.get(key):
                     raise TrackingError(f"resume manifest lineage drift: {key}")
             prior_environment = self.bundle_dir / "environment.json"
+            drift: dict[str, dict[str, Any]] = {}
             if prior_environment.is_file():
-                previous_environment = json.loads(prior_environment.read_text(encoding="utf-8"))
-                current_environment = collect_environment()
-                if previous_environment != current_environment:
-                    raise TrackingError("resume manifest lineage drift: environment")
+                drift = resume_environment_drift(
+                    json.loads(prior_environment.read_text(encoding="utf-8")), collect_environment()
+                )
             events = list(prior.get("resume_events", []))
-            events.append({"at": datetime.now(UTC).isoformat(), "git": git["sha"]})
+            event: dict[str, Any] = {"at": datetime.now(UTC).isoformat(), "git": git["sha"]}
+            if drift:
+                event["environment_drift"] = drift
+            events.append(event)
             self.manifest["resume_events"] = events
         self.bundle_dir.mkdir(parents=True, exist_ok=True)
         _write_json(self.bundle_dir / "environment.json", collect_environment())
