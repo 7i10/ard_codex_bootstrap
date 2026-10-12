@@ -5165,3 +5165,153 @@ history behind this pivot.)
   at postrun time: `plan0103-phase2-mnv4s-trades-b6-s0-v1` running (last
   progress 2026-10-12 15:46 UTC); Hamster GPU1 idle (17 MiB, 0% at session
   start).
+- 2026-10-13 (postrun): **Phase 2 TRADES beta 6, MobileNetV4-S seed 0
+  completed.** `plan0103-phase2-mnv4s-trades-b6-s0-v1` (hand-run from the
+  pull queue, Hamster GPU0, one RTX 4090; worker log: launched
+  2026-10-11 18:51:43, exited rc=0 2026-10-12 17:08:34 UTC) ran 50/50
+  epochs. `run-bundle/completion.json` reads `completed`, the manifest
+  status is `completed`, and `run-bundle/error-marker.txt` reads "no
+  application error recorded". The watcher re-derived it as terminal and
+  successful. All 50 epoch rows are present (`epoch_metrics_complete:
+  true`). `train.log` has no traceback, NaN or error line (only the wandb
+  git-root warning); the wandb internal log has no error or retry line.
+  `best.pt` (epoch 48), `best-ema.pt` (epoch 37), `last.pt` and
+  `epoch-049.pt` are on disk. Nothing is imported into `docs/experiments/`:
+  no aggregator exists for this contract. The numbers below are read from
+  the run-bundle manifest and `epoch-metrics.jsonl` of this run and of the
+  baseline+EMA run (via `scripts/ardx/read_bundle.py`).
+
+  Fixed identity: ImageNet-1k (original images, content `ae033613...`),
+  MobileNetV4-Conv-S (ReLU) random init, no teacher, 224 px training.
+  Method `trades` v1, beta 6.0: loss = CE(clean) + 6 x KL(student on
+  attacked image || student on clean image), temperature 1. Training
+  attack: KL against the student's clean output, l_inf eps 4/255, step
+  8/765, 3 steps, random start. Selection and validation attack: CE PGD-10,
+  same eps and step, random start, eval mode (the same evaluation attack as
+  every other Phase 2 run). SGD (Nesterov, momentum 0.9, wd 1e-4 on all
+  parameters), peak LR 0.025, warmup_multistep [25, 38] with 10-epoch
+  warmup, 50 epochs. No label smoothing, standard augmentation. Phase 2
+  template (selection subset 5,000, EMA 0.9999). Deterministic, eager
+  (`training.cuda_graph` is refused for methods other than `pgd_at`).
+  Training and evaluation-attack seed 0 (augmentation seed 0, split seed
+  20260911). World size 1, global batch 128, local BN. fp32. Config
+  `imagenet_mobilenetv4_pgd_at_phase2_trades_b6.yaml` (unchanged since
+  `9952320`), protocol `controlled_imagenet_stage02_init_lr_grid_v1`,
+  config hash `0f4b789c...`. Source SHA
+  `5dd329eaf31f12907d2cf103df263c19b1d9519d` (worktree
+  `source-5dd329eaf31f`, clean). Against the baseline+EMA run
+  `plan0103-phase2-mnv4s-baseline-ema-s0-v1` (53.85 / 30.71, source
+  `d836c03`) it differs in the training objective and attack, the
+  execution mode (eager vs cuda_graph) and the source SHA. "Full val",
+  "subset", "complement" and "probe" mean the same as in the cosine entry
+  above (25,620 / 5,000 / 20,620 held-out original train images, 2,000
+  training images seen without augmentation). None is the ImageNet val
+  split. No AutoAttack and no official evaluation has run. The human's
+  2026-10-08 Phase 2 list (discussion register B) names this arm as
+  "TRADES (beta 6, no EMA)"; the config keeps the Phase 2 EMA, which is
+  read-only on training, so the raw-weight numbers are the no-EMA arm.
+
+  End of training (full val and complement are evaluated once, at the
+  final epoch):
+
+  | checkpoint | full val clean / PGD-10 | complement clean / PGD-10 |
+  |---|---:|---:|
+  | last (ep 49), raw weights | 54.49 / 26.06 | 54.63 / 26.17 |
+  | last (ep 49), EMA weights | 55.00 / 26.46 | 55.20 / 26.65 |
+  | best raw (ep 48, by subset PGD-10) | 54.36 / 26.03 | 54.55 / 26.13 |
+  | best EMA (ep 37, by EMA subset PGD-10) | 54.05 / 26.51 | 54.28 / 26.70 |
+  | baseline+EMA, last raw | 53.85 / 30.71 | 54.07 / 30.90 |
+  | baseline+EMA, last EMA | 53.95 / 30.80 | 54.20 / 31.00 |
+
+  Per-epoch trajectory (subset and probe use CE PGD-10 in eval mode for
+  both runs):
+
+  | epoch | LR | subset raw clean / PGD-10 | baseline+EMA subset raw | subset EMA clean / PGD-10 | probe clean / PGD-10 | baseline+EMA probe |
+  |---|---:|---:|---:|---:|---:|---:|
+  | 0 | 0.0025 | 3.06 / 1.04 | 0.68 / 0.54 | 0.14 / 0.06 | 3.10 / 0.90 | 0.85 / 0.75 |
+  | 9 | 0.025 (end of warmup) | 35.94 / 13.60 | 30.96 / 15.98 | 14.64 / 6.52 | 37.85 / 13.30 | 33.05 / 15.95 |
+  | 24 | 0.025 (last) | 42.32 / 18.36 | 40.40 / 21.76 | 48.62 / 23.98 | 45.20 / 20.10 | 43.75 / 23.20 |
+  | 25 | 0.0025 | 50.24 / 23.36 | 47.88 / 26.94 | 49.58 / 23.92 | 54.85 / 26.10 | 53.15 / 29.65 |
+  | 37 | 0.0025 (last, best EMA) | 51.86 / 24.68 | 51.46 / 28.80 | 53.12 / 25.76 | 57.70 / 27.50 | 56.30 / 32.85 |
+  | 38 | 0.00025 | 53.32 / 25.26 | 52.26 / 29.30 | 53.06 / 25.36 | 60.35 / 28.45 | 58.95 / 33.85 |
+  | 48 | 0.00025 (best raw) | 53.56 / 25.54 | 52.84 / 29.78 | 54.20 / 25.60 | 59.65 / 28.55 | 59.20 / 34.65 |
+  | 49 | 0.00025 (last) | 53.94 / 25.46 | 52.96 / 29.98 | 54.20 / 25.60 | 60.00 / 28.80 | 59.80 / 34.40 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Against baseline+EMA, last raw weights on full val:** 54.49 / 26.06
+     vs 53.85 / 30.71, i.e. **+0.64 clean / -4.65 PGD-10.** Complement
+     +0.56 / -4.73; last EMA 55.00 / 26.46 vs 53.95 / 30.80, i.e. +1.05 /
+     -4.34. With the two-run SE of a full-val difference (about 0.43pt
+     clean, 0.37pt PGD-10) the PGD-10 loss is about 12 SE and the clean
+     gain about 1.5 SE. The PGD-10 loss is about 13x the MobileNetV4-S
+     seed spread (0.36pt).
+  2. **Preregistered Phase 2 rule** (>= 1.5pt "effect", 0.5-1.5pt "hold",
+     < 0.5pt "no effect"): |-4.65| is in the "effect" tier with the sign
+     of a loss.
+  3. **The robust deficit is there from the end of warmup and widens.**
+     Subset raw PGD-10 minus the baseline: -2.38 at epoch 9, -3.40 at
+     epoch 24, -4.12 at epoch 37, -4.52 at epoch 49. Clean leads instead:
+     +4.98 at epoch 9, +1.92 at 24, +0.40 at 37, +0.98 at 49. At epoch 0
+     TRADES is ahead on both (3.06 / 1.04 vs 0.68 / 0.54). LR decays on
+     the subset: epoch 24 to 25 +7.92 clean / +5.00 PGD-10 (baseline +7.48
+     / +5.18), epoch 37 to 38 +1.46 / +0.58 (baseline +0.80 / +0.50).
+  4. **Training images show the same deficit, so this is a fit gap, not a
+     generalization gap.** The probe (CE PGD-10 on 2,000 un-augmented
+     training images) ends at 60.00 / 28.80 vs 59.80 / 34.40 for the
+     baseline (+0.20 / -5.60). Probe minus full val is +5.51 clean / +2.74
+     PGD-10 (baseline +5.95 / +3.69): TRADES generalizes from training
+     to held-out images slightly better, but fits much less CE robustness
+     on the training images themselves.
+  5. **The training attack is weak against the CE criterion.** The
+     training-batch robust accuracy (accuracy on the training attack's own
+     images, here the 3-step KL attack on augmented images, train mode)
+     ends at 45.85%, while the CE PGD-10 probe on training images is
+     28.80%. In the baseline the training-batch figure (27.90%, CE PGD-3)
+     sits below its probe (34.40%). So the KL attack leaves about 17pt
+     more training images correctly classified than CE PGD-10 does. This
+     is consistent with reading item 4 (the model is trained against
+     perturbations that move the output distribution, not ones that flip
+     the label) but it is not a tested cause. Train loss (3.035 at the
+     end) is the TRADES objective and is not comparable with the
+     baseline's CE loss.
+  6. **EMA.** In warmup EMA lags raw (epoch 9 subset EMA 14.64 / 6.52,
+     baseline 5.30 / 2.84); EMA passes raw at epoch 12 (PGD-10) and 14
+     (clean). It leads raw on the subset by up to +6.42 clean (epoch 17) /
+     +5.98 PGD-10 (epoch 22) at the peak LR, by +0.24 to +1.34 PGD-10 in
+     the lr 0.0025 stage and by +0.06 to +0.40 in the last stage. At the
+     end on full val EMA minus raw is +0.51 clean / +0.39 PGD-10
+     (complement +0.57 / +0.48), against +0.10 / +0.10 for the baseline.
+  7. **Best and last.** Best raw (epoch 48 by subset PGD-10) minus last on
+     full val: -0.14 clean / -0.03 PGD-10 (`robust_overfit_gap_full`
+     -0.03pt). Best EMA (epoch 37) minus last EMA: -0.95 clean / +0.05
+     PGD-10. No robust overfitting within 50 epochs.
+  8. **Trains normally.** Subset raw PGD-10 never falls more than 0.92pt
+     below its running maximum (epoch 17, 16.26 after 17.18 at epoch 16);
+     the catastrophic-overfitting guard (below half of the running
+     maximum) never fires. Stages on the subset: PGD-10 16.26-18.36 over
+     epochs 17-24, 23.72-24.76 over epochs 26-37, 25.02-25.54 over epochs
+     38-49.
+  9. **Cost.** 22.28 h from start to finish (run-bundle `created_at`
+     2026-10-11 18:51:48 to `finished_at` 2026-10-12 17:08:26 UTC,
+     80,198 s; baseline+EMA 15.52 h, so 1.44x). Per-epoch training time
+     1,514-1,568 s, about 77,700 s (21.6 h) summed; the rest (about 50 s
+     per epoch) is subset validation, the final full-val pass, probe,
+     checkpointing and start-up. Throughput 800-829 img/s eager
+     (baseline+EMA 1,175-1,181 with cuda_graph; SiLU eager 928-943). The
+     extra cost is the clean forward and the KL attack, plus eager
+     execution.
+
+  Caveats: one seed; different source SHA from the comparison run
+  (`5dd329e` vs `d836c03`; `5dd329e` plain full AT is still not checked
+  against `d836c03`, decision 0042 option B pending) and different
+  execution mode (eager vs cuda_graph; deterministic cuda_graph matched
+  eager to two decimals in Phase 1). Neither is isolated. Only one beta (6) and one training
+  attack (3-step KL, the CE-PGD-3 budget) are read; the upstream TRADES
+  setting (10-step KL on CIFAR) is not reproduced at this scale, and the
+  evaluation is CE PGD-10 only. Checkpoint sha256 was not computed in this
+  postrun. `epoch-metrics.parquet` sha256 `2ae562dc...`,
+  `sample-stats-train.parquet` sha256 `19902b73...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id. Queue state at
+  postrun time: Hamster GPU0 worker popped
+  `plan0103-phase2-convnext-atto-cosine-s0-v1` at 2026-10-12 17:10:24 UTC;
+  GPU1 runs `plan0103-phase2-mnv4s-se-s0-v1` (launched 16:02:17 UTC).
