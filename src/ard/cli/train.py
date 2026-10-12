@@ -98,7 +98,7 @@ from ard.tracking import (
     should_upload_run_bundle,
     validate_tracking_guard,
 )
-from ard.tracking.adapter import collect_git_state
+from ard.tracking.adapter import RESUME_ACCEPTABLE_ENVIRONMENT_DRIFT, collect_git_state
 from ard.tracking.diagnostics import TrainingDiagnostics
 
 
@@ -113,6 +113,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("overrides", nargs="*", help="Dot-path YAML overrides such as training.epochs=2")
     parser.add_argument("--output", type=Path, help="Override output_dir")
     parser.add_argument("--resume", type=Path, help="Resume an epoch-boundary checkpoint")
+    parser.add_argument(
+        "--resume-accept-environment-drift",
+        action="append",
+        choices=sorted(RESUME_ACCEPTABLE_ENVIRONMENT_DRIFT),
+        default=[],
+        help=(
+            "With --resume only: accept that this environment field changed since the run-bundle was written "
+            "(e.g. 'platform' after a reboot into an updated kernel). The previous and current values are "
+            "recorded in the manifest's resume event; every other environment field must still match."
+        ),
+    )
     parser.add_argument(
         "--stagewise-late-mask",
         type=Path,
@@ -886,7 +897,10 @@ def _selection_subset_summary(
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.resume_accept_environment_drift and args.resume is None:
+        parser.error("--resume-accept-environment-drift requires --resume")
     config = load_config(args.config, args.overrides)
     if args.output is not None:
         config = config.model_copy(update={"output_dir": args.output})
@@ -983,6 +997,7 @@ def main(argv: list[str] | None = None) -> int:
             config_hash=config_hash,
             root=Path.cwd(),
             resume_run_id=resumed_run_id,
+            accept_environment_drift=frozenset(args.resume_accept_environment_drift),
         )
         active_tracker = tracker
 
