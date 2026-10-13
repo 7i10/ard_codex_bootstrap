@@ -5638,3 +5638,181 @@ history behind this pivot.)
   computed in this postrun. `epoch-metrics.parquet` sha256 `6141df12...`,
   `sample-stats-train.parquet` sha256 `a6d0896b...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id (two segments).
+- 2026-10-13 (postrun): **Phase 2 SiLU with no weight decay on norm/bias
+  parameters, MobileNetV4-S seed 0 completed.**
+  `plan0103-phase2-mnv4s-silu-wdexcl-s0-v1` (hand-run from the Ferret pull
+  queue, one RTX 4090; run-bundle `created_at` 2026-10-11 08:50:36,
+  `finished_at` 2026-10-13 03:58:25 UTC) ran 50/50 epochs. It was
+  interrupted by the 2026-10-12 Ferret reboot and resumed once from its own
+  `last.pt` at 08:13:06 UTC, same source SHA (discussion register F,
+  2026-10-12). The first W&B segment holds history rows for epochs 0-27 and
+  the second starts at epoch 28, so epochs 28-49 ran after the resume.
+  `train.log` holds the one refused resume attempt (`resume manifest
+  lineage drift: environment`, on the new kernel) and the successful resume
+  after it; no other traceback, NaN or error line (two NVML and the wandb
+  git-root warnings). `run-bundle/completion.json` reads `completed`, the
+  manifest status is `completed`, and `run-bundle/error-marker.txt` reads
+  "no application error recorded". The watcher re-derived it as terminal
+  and successful. All 50 epoch rows are present (`epoch_metrics_complete:
+  true`). `best.pt` (epoch 47), `best-ema.pt` (epoch 49), `last.pt` and
+  `epoch-049.pt` are on disk. Nothing is imported into `docs/experiments/`:
+  no aggregator exists for this contract. The numbers below are read from
+  the run-bundle manifest and `epoch-metrics.jsonl` of this run (via
+  `scripts/ardx/read_bundle.py`) and of the SiLU run
+  `plan0103-phase2-mnv4s-silu-s0-v1` (manifest, and its entry above).
+
+  Fixed identity: as the SiLU run `plan0103-phase2-mnv4s-silu-s0-v1`
+  (55.45 / 33.27, source `5dd329e`, eager, Hamster GPU1) except (a)
+  `optimizer.exclude_norm_bias_from_weight_decay: true`: parameters with
+  ndim <= 1 (BatchNorm scale and shift, biases) get no weight decay; conv
+  and linear weights keep wd 1e-4; (b) the W&B group; (c) the host (Ferret)
+  and one resume. ImageNet-1k (original images, content `ae033613...`),
+  MobileNetV4-Conv-S with every ReLU replaced by SiLU
+  (`mobilenetv4_conv_small_silu_imagenet`), random init, plain PGD-AT, no
+  teacher, 224 px training. Training attack CE PGD-3, l_inf eps 4/255,
+  step 8/765, random start. Selection and validation attack PGD-10, same
+  eps and step, random start, eval mode. SGD (Nesterov, momentum 0.9, wd
+  1e-4 on ndim >= 2 parameters only), peak LR 0.025, warmup_multistep
+  [25, 38] with 10-epoch warmup, 50 epochs. No label smoothing, standard
+  augmentation. Phase 2 template (selection subset 5,000, EMA 0.9999).
+  Deterministic, eager (SiLU is outside the CUDA Graphs scope), not
+  compiled, fp32. Training and evaluation-attack seed 0 (augmentation seed
+  0, split seed 20260911). World size 1, global batch 128, local BN.
+  Config `configs/scientific/imagenet_mobilenetv4_pgd_at_phase2_silu_wdexcl.yaml`
+  (unchanged since `9952320`), protocol
+  `controlled_imagenet_stage02_init_lr_grid_v1`, config hash
+  `8c4d6eb1...`. Source SHA `5dd329eaf31f12907d2cf103df263c19b1d9519d`
+  (worktree `source-5dd329eaf31f`, clean). The NVIDIA driver was 595.84
+  before the resume and 595.99 after (not part of the recorded
+  environment). This is the SiLU / no-wd-on-norm cell of the activation x
+  weight-decay 2x2 (discussion register B, 2026-10-08), run as decision
+  0043 option B (the packet's `chosen` field is still null). Its
+  comparison run, the SiLU / wd cell, has the same source SHA and the same
+  execution mode, so decision 0042 does not enter this comparison. "Full
+  val", "subset", "complement" and "probe" mean the same as in the cosine
+  entry above (25,620 / 5,000 / 20,620 held-out original train images,
+  2,000 training images seen without augmentation). None is the ImageNet
+  val split. No AutoAttack and no official evaluation has run.
+
+  End of training (full val and complement are evaluated once, at the
+  final epoch):
+
+  | checkpoint | full val clean / PGD-10 | complement clean / PGD-10 |
+  |---|---:|---:|
+  | last (ep 49), raw weights | 56.50 / 33.66 | 56.67 / 33.95 |
+  | last (ep 49), EMA weights | 56.61 / 33.90 | 56.86 / 34.18 |
+  | best raw (ep 47, by subset PGD-10) | 56.48 / 33.68 | 56.78 / 33.95 |
+  | best EMA (ep 49, by EMA subset PGD-10; same as last EMA) | 56.61 / 33.90 | 56.86 / 34.18 |
+  | SiLU (wd on all parameters), last raw | 55.45 / 33.27 | 55.56 / 33.39 |
+  | SiLU (wd on all parameters), last EMA | 55.60 / 33.53 | 55.73 / 33.66 |
+  | baseline+EMA (ReLU, wd on all), last raw | 53.85 / 30.71 | 54.07 / 30.90 |
+
+  Activation x weight-decay 2x2, last raw weights, full val clean / PGD-10
+  (seed 0 each):
+
+  | | wd on all parameters | no wd on norm/bias |
+  |---|---:|---:|
+  | ReLU | 53.85 / 30.71 (`d836c03`, cuda_graph) | 53.47 / 29.57 (`5dd329e`, cuda_graph) |
+  | SiLU | 55.45 / 33.27 (`5dd329e`, eager) | 56.50 / 33.66 (`5dd329e`, eager) |
+
+  Per-epoch trajectory against the SiLU run (both subset; probe uses CE
+  PGD-10 in eval mode):
+
+  | epoch | LR | subset raw clean / PGD-10 | SiLU subset raw | subset EMA clean / PGD-10 | SiLU subset EMA | probe clean / PGD-10 | SiLU probe | train loss (SiLU) |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | 0 | 0.0025 | 0.70 / 0.56 | 0.68 / 0.52 | 0.12 / 0.10 | 0.10 / 0.10 | 0.60 / 0.55 | 0.80 / 0.45 | 6.864 (6.861) |
+  | 9 | 0.025 (end of warmup) | 33.04 / 17.82 | 32.10 / 17.54 | 28.78 / 17.60 | 7.60 / 4.06 | 33.95 / 18.05 | 32.60 / 17.90 | 4.760 (4.833) |
+  | 24 | 0.025 (last) | 43.58 / 24.46 | 42.64 / 24.02 | 49.50 / 30.42 | 48.10 / 29.94 | 49.05 / 27.80 | 46.55 / 26.85 | 4.168 (4.290) |
+  | 25 | 0.0025 | 52.02 / 30.00 | 50.08 / 29.66 | 50.32 / 30.42 | 49.14 / 30.44 | 57.00 / 34.90 | 54.95 / 33.40 | 3.844 (3.948) |
+  | 37 | 0.0025 (last) | 54.28 / 31.16 | 53.08 / 31.10 | 54.70 / 32.44 | 53.62 / 32.74 | 61.45 / 37.40 | 58.10 / 36.30 | 3.635 (3.761) |
+  | 38 | 0.00025 | 55.16 / 32.02 | 54.34 / 32.24 | 54.96 / 32.40 | 53.76 / 32.72 | 63.20 / 38.55 | 60.85 / 37.75 | 3.551 (3.662) |
+  | 47 | 0.00025 (best raw) | 55.22 / 32.58 | 54.52 / 33.00 | 55.76 / 32.70 | 54.98 / 32.94 | 63.50 / 38.95 | 61.00 / 38.75 | 3.507 (3.612) |
+  | 49 | 0.00025 (last, best EMA) | 55.80 / 32.46 | 55.00 / 32.80 | 55.58 / 32.78 | 55.10 / 32.98 | 63.90 / 39.00 | 62.10 / 38.25 | 3.502 (3.608) |
+
+  Reading (n=1 per cell, internal validation, PGD-10 only):
+  1. **Against the SiLU run, last raw weights on full val (the
+     like-for-like number):** 56.50 / 33.66 vs 55.45 / 33.27, i.e.
+     **+1.05 clean / +0.39 PGD-10.** Complement +1.12 / +0.56; last EMA
+     +1.01 / +0.37. With the two-run SE of a full-val difference (about
+     0.43pt clean, 0.37pt PGD-10) the PGD-10 difference is about 1 SE and
+     the clean difference about 2.4 SE. Against baseline+EMA: +2.65 /
+     +2.95 (crosses source SHA and execution mode).
+  2. **Decision 0043 option B's preregistered rule** (Δ = SiLU+exclusion
+     minus SiLU+wd-on-all, last raw weights, full val PGD-10; Δ >= +0.5
+     opposite direction to ReLU, Δ <= -0.5 exclusion lowers under both,
+     |Δ| < 0.5 no effect under SiLU): **Δ = +0.39pt (100 of 25,620
+     images), so |Δ| < 0.5: "no effect under SiLU; the exclusion is not
+     adopted".** The Phase 2 tier rule gives the same "no effect" tier.
+     Reaching +0.5 would have needed 29 more correct images.
+  3. **The 2x2 on PGD-10.** The exclusion effect is -1.14 under ReLU
+     (crosses source SHA) and +0.39 under SiLU (same source and mode); the
+     difference between the two, +1.53pt, is the interaction estimate from
+     four single-seed runs. The SiLU effect is +2.56 with wd on all and
+     +4.09 with the exclusion. On clean the exclusion is -0.38 under ReLU
+     and +1.05 under SiLU.
+  4. **Subset and full val disagree in sign, both within noise.** On the
+     5,000-image subset the run is behind the SiLU run on PGD-10 at the
+     end (-0.42 at epoch 47, -0.34 at epoch 49; subset SE of a two-run
+     difference about 0.9pt), while full val (+0.39) and the 20,620-image
+     complement (+0.56) are ahead. At the listed epochs the subset PGD-10
+     difference stays inside about +-0.5pt (epoch 9 +0.28, 24 +0.44, 37
+     +0.06, 38 -0.22). Clean leads on the subset at every listed epoch
+     from epoch 9 on (+0.70 to +1.94).
+  5. **The exclusion improves the SiLU training fit.** Train loss ends at
+     3.502 vs 3.608 and training-batch robust accuracy (PGD-3, augmented,
+     train mode) at 30.75% vs 29.53% (+1.22). The training probe ends
+     +1.80 clean / +0.75 PGD-10 above the SiLU run. Probe minus full val
+     is +7.40 clean / +5.34 PGD-10 (SiLU +6.65 / +4.98; baseline +5.95 /
+     +3.69): the extra fit shows on clean held-out images but mostly not
+     on PGD-10. Under ReLU the exclusion left fit unchanged (train loss
+     3.695 vs 3.697) and lowered held-out PGD-10. The val >= train
+     signature persists (training-batch 30.75% < full-val PGD-10 33.66%).
+  6. **EMA no longer lags in warmup, in a same-source, same-mode pair.**
+     At epoch 9 the EMA weights read 28.78 / 17.60 on the subset against
+     raw 33.04 / 17.82; the SiLU run (same source `5dd329e`, same eager
+     mode, wd on all) read 7.60 / 4.06. EMA passes raw at epoch 10
+     (PGD-10) and 12 (clean), the same epochs as in the ReLU exclusion
+     run. Up to epoch 9 this pair differs only in the exclusion and the
+     host (the resume came after epoch 27), so it resolves the question
+     left open in the weight-decay exclusion entry above: the warmup EMA lag goes away when norm/bias parameters are
+     not decayed (one pair; mechanism not tested). EMA leads raw by up to
+     +6.58 clean / +6.30 PGD-10 (both epoch 22) at the peak LR, by +0.20
+     to +1.44 PGD-10 over epochs 26-37 and by +0.08 to +0.38 over epochs
+     38-49.
+  7. **EMA at the end.** Last EMA minus last raw on full val: +0.11 clean
+     / +0.24 PGD-10 (complement +0.19 / +0.23), against +0.16 / +0.26 for
+     the SiLU run. Below the 0.5pt "no effect" line.
+  8. **Best and last.** Best raw (epoch 47 by subset PGD-10) minus last
+     on full val: -0.02 clean / +0.02 PGD-10 (`robust_overfit_gap_full`
+     0.02pt; complement 0.00pt). Best EMA is the last epoch. No robust
+     overfitting within 50 epochs.
+  9. **Trains normally.** Subset raw PGD-10 never falls more than 0.48pt
+     below its running maximum (epoch 30, 30.72 after 31.20 at epoch 29;
+     epoch 33, 30.84 after 31.32 at epoch 32); the catastrophic-overfitting
+     guard (below half of the running maximum) never fires. Stages on the
+     subset: PGD-10 23.10-24.46 over epochs 17-24, 30.42-31.36 over epochs
+     26-37, 31.96-32.58 over epochs 38-49. Decays: epoch 24 to 25 +8.44
+     clean / +5.54 PGD-10 (SiLU +7.44 / +5.64), epoch 37 to 38 +0.88 /
+     +0.86 (SiLU +1.26 / +1.14). Epoch 27 to 28, across the resume:
+     30.68 to 30.60 subset PGD-10, no step.
+  10. **Cost (not comparable with the SiLU run).** 43.13 h from start to
+     finish (155,269 s), which includes the reboot outage. Per-epoch
+     training time sums to about 146,930 s (40.8 h). Throughput 478-491
+     img/s for epochs 0-10, 356-491 img/s over the whole run (SiLU run
+     928-943 on Hamster GPU1). Ferret ran other jobs during this run
+     (register F: a second run was co-located on GPU1 after the reboot;
+     which GPU this run used is not in the bundle). The cause of the
+     slowdown was not measured, and it is not a cost of the exclusion.
+
+  Caveats: one seed per cell; the comparison run differs in host (Hamster
+  vs Ferret; deterministic eager results should not depend on it, not
+  checked here) and this run has one resume across a driver change
+  (595.84 to 595.99) from `last.pt` at the end of epoch 27; the resumed
+  trajectory has no step, but bitwise continuity was not checked for this
+  run. Only one exclusion rule (all ndim <= 1 parameters) was run. The
+  ReLU side of the 2x2 crosses source SHAs (decision 0042 option B
+  pending), so the +1.53pt interaction carries that caveat. Evaluation is
+  CE PGD-10 only. Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `e739011f...`,
+  `sample-stats-train.parquet` sha256 `2d590bf2...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id (two segments).
