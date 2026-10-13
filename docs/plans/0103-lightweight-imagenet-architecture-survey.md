@@ -5416,8 +5416,8 @@ history behind this pivot.)
      loss in the "effect" tier.
   3. **Against shared BN (the descriptive number 0041 B asked for):**
      PGD-10 recovers **+5.12pt** (17.34 to 22.46; complement +5.23, last
-     EMA +5.16), about 14 SE, so shared BN accounts for about 5.1 of the
-     13.37pt the shared-BN run lost against the Phase 1 reference
+     EMA +5.16), about 14 SE, so the split-BN run recovers about 5.1 of
+     the 13.37pt the shared-BN run lost against the Phase 1 reference
      (`plan0103-mnv4s-fullat-50ep-lr0025-cg-s0-v1`, 53.85 / 30.71, which
      baseline+EMA reproduces). Clean falls **-14.93pt** (62.88 to 47.95),
      to 5.90pt below full AT. Per 0041 B this is recorded as a
@@ -5442,8 +5442,8 @@ history behind this pivot.)
      Subset raw PGD-10 minus baseline+EMA: -4.74 at epoch 9, -7.38 at 24,
      -6.98 at 37, -7.92 at 49. Clean: -4.46, -7.10, -6.18, -5.74. Against
      shared BN, PGD-10 is ahead from epoch 9 (+2.52) and the lead grows
-     (+2.88 at 24, +5.56 at 37, +4.70 at 49), while clean is 14-16pt
-     behind at every listed epoch. At epoch 0 split BN and shared BN are
+     (+2.88 at 24, +5.56 at 37, +4.70 at 49), while clean is 14.0-16.5pt
+     behind at every listed epoch from 9 on. At epoch 0 split BN and shared BN are
      alike (2.84 / 0.84 vs 2.74 / 1.06). LR decays on the subset: epoch
      24 to 25 +8.28 clean / +4.92 PGD-10 (baseline+EMA +7.48 / +5.18),
      epoch 37 to 38 +1.04 / +0.36 (baseline+EMA +0.80 / +0.50).
@@ -5457,7 +5457,7 @@ history behind this pivot.)
   7. **Best and last.** Best raw (epoch 44, first of three epochs tied at
      the subset maximum 22.24) minus last on full val: -0.28 clean / 0.00
      PGD-10 (`robust_overfit_gap_full` 0.00). Best EMA (epoch 46) minus
-     last EMA: -0.03 clean / -0.07 PGD-10. No robust overfitting.
+     last EMA: -0.04 clean / -0.07 PGD-10. No robust overfitting.
   8. **Trains normally.** Subset raw PGD-10 never falls more than 0.88pt
      below its running maximum (epoch 24, 14.38 after 15.26 at epoch 22);
      the catastrophic-overfitting guard never fires. Stages on the subset:
@@ -5467,10 +5467,10 @@ history behind this pivot.)
      2026-10-10 06:39:23 to `finished_at` 2026-10-12 02:59:37 UTC,
      159,614 s). Summed per-epoch training time 155,421 s (43.17 h); the
      rest (about 84 s per epoch) is subset validation, the final full-val
-     pass, probe, checkpointing and start-up. Throughput 385-431 img/s
+     pass, probe, checkpointing and start-up. Throughput 384-431 img/s
      over epochs 0-41 and 351-363 img/s over epochs 42-49, against
      1,763-1,769 for the shared-BN run (cuda_graph, Hamster) and 928-943
-     for SiLU full AT (eager, Hamster). The cause of the 4.2-5x slowdown
+     for SiLU full AT (eager, Hamster). The cause of the 4.1-5.0x slowdown
      (eager execution, the two BN passes, or other jobs on Ferret) was not
      measured. Decision 0041 B estimated 12-16 GPU hours; the real cost was
      about 3x that. Peak allocated memory 2.88 GB, reserved 4.21 GB at
