@@ -23,10 +23,13 @@ from ard.models.variants import VARIANT_BUILDERS, build_mobilenetv4_conv_small_v
 
 pytestmark = pytest.mark.t1
 
+MNV4M = "mobilenetv4_conv_medium_imagenet"
+MNV4M_SILU = "mobilenetv4_conv_medium_silu_imagenet"
 MNV4S, DEIT, CONVNEXT = "mobilenetv4_conv_small_imagenet", "deit_tiny_imagenet", "convnext_atto_imagenet"
 # id -> (params, conv+linear MACs, attention-matmul MACs) at 224, 1000 classes.
 BASE = {
     MNV4S: (3_774_024, 186_005_568, 0),
+    MNV4M: (9_715_512, 827_649_984, 0),
     DEIT: (5_717_416, 1_074_851_328, 178_831_872),
     CONVNEXT: (3_695_520, 547_332_480, 0),
     # MobileViT folds patches into the batch dimension; the counter must count every folded sequence.
@@ -39,6 +42,7 @@ VARIANTS = {
     "mobilenetv4_conv_small_se_imagenet": (3_772_296, 185_999_424, 0, MNV4S),
     "mobilenetv4_conv_small_silu_se_imagenet": (3_772_296, 185_999_424, 0, MNV4S),
     "mobilenetv4_conv_small_se_fullhead_imagenet": (4_023_432, 186_250_304, 0, MNV4S),
+    MNV4M_SILU: (9_715_512, 827_649_984, 0, MNV4M),
     "deit_tiny_convstem_imagenet": (5_826_280, 1_158_845_952, 178_831_872, DEIT),
     "convnext_atto_deep_narrow_imagenet": (2_758_636, 554_452_128, 0, CONVNEXT),
     "convnext_atto_ols_imagenet": (3_702_912, 576_534_912, 0, CONVNEXT),
@@ -51,6 +55,7 @@ PARAM_MATCHED = {
     "mobilenetv4_conv_small_gelu_imagenet",
     "mobilenetv4_conv_small_se_imagenet",
     "mobilenetv4_conv_small_silu_se_imagenet",
+    MNV4M_SILU,
     "deit_tiny_convstem_imagenet",
     "convnext_atto_ols_imagenet",
     "convnext_atto_convstem_imagenet",
@@ -97,7 +102,7 @@ def test_variant_complexity_is_pinned(architecture: str) -> None:
     base_params, base_conv_linear, _ = BASE[base]
     if architecture in PARAM_MATCHED:
         assert abs(params / base_params - 1) <= 0.03
-    if architecture.startswith("mobilenetv4_conv_small_"):
+    if architecture.startswith("mobilenetv4_conv_small_") or architecture == MNV4M_SILU:
         assert abs(conv_linear / base_conv_linear - 1) <= 0.002
 
 
@@ -330,7 +335,10 @@ def test_existing_timm_ids_build_exactly_what_they_built_before(architecture: st
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "scientific"
 MNV4_BASE = "imagenet_mobilenetv4_pgd_at_random_init_lr0025_cg.yaml"
+MNV4M_BASE = "imagenet_mobilenetv4_conv_medium_pgd_at_phase2_baseline_ema.yaml"
+MNV4M_SILU_CONFIG = "imagenet_mobilenetv4_conv_medium_silu_pgd_at_phase2_random_lr0025.yaml"
 PHASE2_CONFIGS = {
+    MNV4M_SILU_CONFIG: (MNV4M_SILU, MNV4M_BASE),
     "imagenet_mobilenetv4_silu_pgd_at_phase2_random_lr0025.yaml": ("mobilenetv4_conv_small_silu_imagenet", MNV4_BASE),
     "imagenet_mobilenetv4_gelu_pgd_at_phase2_random_lr0025.yaml": ("mobilenetv4_conv_small_gelu_imagenet", MNV4_BASE),
     "imagenet_mobilenetv4_se_pgd_at_phase2_random_lr0025.yaml": ("mobilenetv4_conv_small_se_imagenet", MNV4_BASE),
@@ -369,7 +377,7 @@ def test_every_variant_has_exactly_one_phase2_config() -> None:
 def test_phase2_adamw_configs_are_marked_do_not_launch(config_file: str) -> None:
     header = (CONFIG_DIR / config_file).read_text().split("schema_version")[0]
     base = PHASE2_CONFIGS[config_file][1]
-    if base != MNV4_BASE and "convnext_atto" not in base and "deit_tiny" not in base:
+    if base not in (MNV4_BASE, MNV4M_BASE) and "convnext_atto" not in base and "deit_tiny" not in base:
         assert "DO NOT LAUNCH until the AdamW grid closes" in header
     if "convnext_atto" in base:  # ConvNeXt-Atto AdamW grid closed 2026-10-09 at 1e-3
         assert "LR set to the closed AdamW grid winner 1e-3" in header
@@ -400,6 +408,16 @@ def test_phase2_configs_change_only_architecture_and_group(
     assert variant["student"]["architecture"] == architecture
     assert variant["student"]["pretrained"] is False
     assert variant["tracking"]["group"] != base["tracking"]["group"]
+    if base_file == MNV4M_BASE:
+        # The base is already a Phase 2 config: it carries the template fields itself, so compare directly.
+        assert base["student"]["architecture"] == MNV4M
+        assert variant["training"]["selection_subset_size"] == base["training"]["selection_subset_size"] == 5000
+        assert variant["training"]["weight_ema_decay"] == base["training"]["weight_ema_decay"] == 0.9999
+        for payload in (base, variant):
+            payload["student"]["architecture"] = None
+            payload["tracking"]["group"] = None
+        assert variant == base
+        return
     assert "cuda_graph" not in variant["training"]  # excluded from the dump only when false
     assert variant["training"]["selection_subset_size"] == 5000
     assert "selection_subset_size" not in base["training"]
@@ -412,3 +430,24 @@ def test_phase2_configs_change_only_architecture_and_group(
         payload["training"].pop("selection_subset_size", None)
         payload["training"].pop("weight_ema_decay", None)
     assert variant == base
+
+
+def test_mobilenetv4_medium_silu_uses_only_silu_where_the_base_uses_only_relu() -> None:
+    assert _activation_types(build_architecture(MNV4M_SILU, num_classes=1000)) == {nn.SiLU}
+    assert _activation_types(build_architecture(MNV4M, num_classes=1000)) == {nn.ReLU}
+
+
+def test_mobilenetv4_medium_silu_is_tensor_identical_to_the_base_except_activation_modules() -> None:
+    torch.manual_seed(0)
+    base = build_architecture(MNV4M, num_classes=1000)
+    torch.manual_seed(0)
+    variant = build_architecture(MNV4M_SILU, num_classes=1000)
+    base_state, variant_state = base.state_dict(), variant.state_dict()
+    assert list(base_state) == list(variant_state)
+    for key in base_state:
+        assert torch.equal(base_state[key], variant_state[key]), key
+    base_modules = dict(base.named_modules())
+    differing = {name for name, module in variant.named_modules() if type(module) is not type(base_modules[name])}
+    assert differing and all(type(base_modules[name]) is nn.ReLU for name in differing)
+    assert all(type(dict(variant.named_modules())[name]) is nn.SiLU for name in differing)
+    assert MNV4M_SILU not in CUDA_GRAPH_ARCHITECTURES

@@ -211,6 +211,14 @@ def build_convnext_atto_convstem(*, num_classes: int) -> nn.Module:
     return model
 
 
+def build_mobilenetv4_conv_medium_silu(*, num_classes: int) -> nn.Module:
+    """timm's ``mobilenetv4_conv_medium`` with every ReLU replaced by SiLU (``act_layer="silu"``). Activations
+    hold no tensors and draw no init RNG, so params, MACs and the seeded state_dict equal the base's."""
+    import timm
+
+    return timm.create_model("mobilenetv4_conv_medium", pretrained=False, num_classes=num_classes, act_layer="silu")
+
+
 # id -> builder(num_classes) for every Phase 2 variant; all random-init only.
 VARIANT_BUILDERS = {
     "mobilenetv4_conv_small_silu_imagenet": partial(build_mobilenetv4_conv_small_variant, act_layer="silu"),
@@ -224,6 +232,7 @@ VARIANT_BUILDERS = {
         se=True,
         num_features=MOBILENETV4_CONV_SMALL_SE_NUM_FEATURES,
     ),
+    "mobilenetv4_conv_medium_silu_imagenet": build_mobilenetv4_conv_medium_silu,
     "deit_tiny_convstem_imagenet": build_deit_tiny_convstem,
     "convnext_atto_deep_narrow_imagenet": build_convnext_atto_deep_narrow,
     "convnext_atto_ols_imagenet": build_convnext_atto_ols,
