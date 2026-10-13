@@ -5993,3 +5993,160 @@ history behind this pivot.)
   the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id
   (one segment). The Hamster GPU1 worker logged `QUEUE DONE` at 12:31:14
   UTC: GPU1 has no queued work after this run.
+- 2026-10-14 (postrun): **Phase 2 candidate 1 (cosine schedule),
+  ConvNeXt-Atto seed 0 completed.**
+  `plan0103-phase2-convnext-atto-cosine-s0-v1` (hand-run from the Hamster
+  pull queue, GPU0, one RTX 4090; popped at 2026-10-12 17:10:24 UTC) ran
+  50/50 epochs. `run-bundle/completion.json` reads `completed`, the
+  manifest status is `completed`, and `run-bundle/error-marker.txt` reads
+  "no application error recorded". The watcher re-derived it as terminal
+  and successful. All 50 epoch rows are present
+  (`epoch_metrics_complete: true`), one W&B segment, no resume.
+  `train.log` has no traceback, NaN or error line (only the wandb git-root
+  warning). `best.pt` (epoch 47), `best-ema.pt` (epoch 49), `last.pt` and
+  `epoch-049.pt` are on disk. Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract. The numbers
+  below are read from the run-bundle manifest and `epoch-metrics.jsonl`
+  of this run (via `scripts/ardx/read_bundle.py`). This is the first
+  finished ConvNeXt-Atto Phase 2 run and the second cosine run (after
+  MobileNetV4-S, decision 0038).
+
+  Fixed identity: as the Phase 1 ConvNeXt-Atto AdamW lr 1e-3 seed 0 run
+  (config `imagenet_convnext_atto_pgd_at_phase1_adamw_random_lr1em3.yaml`,
+  the closed-grid argmax, last-epoch full-val PGD-10 37.02; 2026-10-09
+  grid entry above) except (a) the scheduler, warmup_cosine (10-epoch
+  linear warmup to 1e-3, then cosine to 0 over epochs 10-49) instead of
+  warmup_multistep [25, 38]; (b) the Phase 2 template:
+  `selection_subset_size: 5000` and `weight_ema_decay: 0.9999`; (c) the
+  W&B group and source SHA. ImageNet-1k (original images, content
+  `ae033613...`), ConvNeXt-Atto V1 (`convnext_atto_imagenet`) random init,
+  plain PGD-AT, no teacher, 224 px training, standard augmentation.
+  Training and evaluation-attack seed 0 (split seed 20260911). Training
+  attack CE PGD-3, l_inf eps 4/255, step 8/765, random start. Selection
+  and validation attack PGD-10, same eps and step, random start, eval
+  mode. AdamW (betas 0.9 / 0.999, decoupled wd 0.05), peak LR 1e-3, 50
+  epochs. World size 1, global batch 128. fp32. Non-deterministic with
+  cudnn_benchmark, no cuda_graph, not compiled: the Phase 1 setting,
+  which is the fastest one measured for ConvNeXt-Atto (discussion
+  register C, 2026-10-10). Config
+  `configs/scientific/imagenet_convnext_atto_pgd_at_phase2_cosine.yaml`
+  (unchanged since the source SHA), protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`,
+  config hash `f294905f...`. Source SHA
+  `5dd329eaf31f12907d2cf103df263c19b1d9519d` (worktree
+  `source-5dd329eaf31f`, clean). "Full val", "subset", "complement" and
+  "probe" mean the same as in the MobileNetV4-S cosine entry above
+  (25,620 / 5,000 / 20,620 held-out original train images, 2,000 training
+  images seen without augmentation). None is the ImageNet val split. No
+  AutoAttack and no official evaluation has run.
+
+  End of training (full val and complement are evaluated once, at the
+  final epoch):
+
+  | checkpoint | full val clean / PGD-10 | complement clean / PGD-10 |
+  |---|---:|---:|
+  | last (ep 49), raw weights | 60.70 / 37.90 | 60.84 / 38.13 |
+  | last (ep 49), EMA weights | 60.66 / 37.89 | 60.81 / 38.12 |
+  | best raw (ep 47, by subset PGD-10) | 60.36 / 37.74 | 60.54 / 37.90 |
+  | best EMA (ep 49, by EMA subset PGD-10) = last EMA | 60.66 / 37.89 | 60.81 / 38.12 |
+  | Phase 1 AdamW 1e-3 multistep, seed 0, last raw | — / 37.02 | — |
+
+  (The Phase 1 run's clean accuracy and per-epoch values are not in this
+  repository's documents; its bundle is not on Hamster and was not read
+  in this postrun.)
+
+  Per-epoch trajectory (subset only, so not comparable with the Phase 1
+  run's per-epoch full-val numbers; probe uses CE PGD-10 in eval mode):
+
+  | epoch | LR | subset raw clean / PGD-10 | subset EMA clean / PGD-10 | probe clean / PGD-10 | train loss |
+  |---|---:|---:|---:|---:|---:|
+  | 0 | 1e-4 | 2.86 / 2.06 | 0.56 / 0.24 | 2.65 / 1.60 | 6.669 |
+  | 9 | 1e-3 (end of warmup) | 36.04 / 19.68 | 39.38 / 23.58 | 37.75 / 20.75 | 4.590 |
+  | 19 | 8.8e-4 | 41.54 / 24.12 | 48.72 / 30.92 | 46.50 / 27.65 | 4.216 |
+  | 30 | 5e-4 (half) | 48.46 / 28.42 | 53.56 / 33.62 | 52.75 / 31.95 | 3.909 |
+  | 40 | 1.5e-4 | 55.66 / 33.54 | 58.22 / 36.34 | 61.70 / 39.45 | 3.501 |
+  | 47 | 1.4e-5 (best raw) | 59.60 / 37.06 | 59.94 / 36.78 | 66.85 / 42.80 | 3.216 |
+  | 49 | 1.5e-6 (last) | 60.14 / 36.90 | 60.02 / 36.96 | 67.05 / 43.95 | 3.184 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Cosine vs multistep, last raw weights on full val (the
+     like-for-like number):** 37.90 vs 37.02, i.e. **+0.88 PGD-10**
+     (about 224 more PGD-10-correct images of 25,620). The two-run SE of
+     a full-val difference is about 0.43pt, so this is about 2.0 SE, and
+     about 2.4x the ConvNeXt-Atto seed-0 / seed-1 spread at lr 1e-3
+     (0.36pt, discussion register C, 2026-10-11). The clean difference
+     cannot be read: the Phase 1 clean number is not recorded here.
+  2. **Preregistered Phase 2 rule** (discussion register C, 2026-10-08:
+     >= 1.5pt "effect", 0.5-1.5pt "hold, confirm with a second seed",
+     < 0.5pt "no effect", read on last raw weights): **+0.88pt is
+     "hold"**. Against the Phase 1 seed 1 run the difference would be
+     +0.52 or +1.24 (37.02 -/+ 0.36; the sign of the seed spread is not
+     recorded here), still "hold" either way.
+  3. **Same direction and tier as MobileNetV4-S.** The MobileNetV4-S
+     cosine run gave +0.78 PGD-10 (SGD, "hold", decision 0038 with
+     `chosen` still null). Two models, one seed each, both in the hold
+     band with a positive sign. Decision 0038 option C (not chosen)
+     proposed "cosine - reference >= +0.5pt in at least 3 of 4 models";
+     under that unadopted rule the count is 2 of 2 read so far, with
+     MobileNetV4-M and EfficientNet-B0 not yet read.
+  4. **Setting caveat.** Phase 1 and this run both use the
+     non-deterministic + cudnn_benchmark setting, so a rerun of either
+     would not reproduce its numbers bit for bit; the size of that
+     non-determinism alone is unmeasured for ConvNeXt-Atto. The ConvNeXt
+     baseline+EMA run (the Phase 2 reference and setting check, plan 0106
+     rollout on Ferret) has not finished, and the source SHA and host of
+     the Phase 1 seed 0 run are not recorded in this repository's
+     documents. The +0.88 carries both caveats.
+  5. **Still climbing at the end.** Subset raw PGD-10 rises by about the
+     same amount in each half of the cosine decay: +8.74 from epoch 9 to
+     30 and +8.48 from epoch 30 to 49, with +3.36 over the last ten
+     epochs (33.54 at epoch 40 to 36.90 at 49) as the LR goes to 0. No
+     plateau is visible before the schedule ends.
+  6. **Best and last.** Best raw (epoch 47 by subset PGD-10) minus last on
+     full val: -0.34 clean / -0.15 PGD-10 (`robust_overfit_gap_full`
+     -0.15pt); complement -0.30 / -0.23. No robust overfitting within 50
+     epochs.
+  7. **EMA at the end adds nothing.** Last EMA minus last raw on full val:
+     -0.04 clean / -0.01 PGD-10 (complement -0.02 / -0.01), as expected
+     with the LR at 1.5e-6.
+  8. **EMA mid-run: no long warmup lag.** EMA weights are below raw only
+     in epochs 0-7 and pass raw at epoch 8 (subset 35.96 / 21.56 vs
+     34.36 / 19.24). They lead by up to +7.18 clean (epoch 19) / +6.80
+     PGD-10 (epochs 18 and 19) at the high LR, by +2.42 / +3.46 at epoch
+     37, and by about 0 from epoch 46 on (raw ahead on subset PGD-10 only
+     at epoch 47). In the MobileNetV4-S SGD runs with wd on all
+     parameters the EMA was far below raw at the end of warmup (cosine:
+     5.30 / 2.84 vs 30.96 / 15.98). ConvNeXt-Atto has LayerNorm (no BN
+     running statistics) and AdamW; which difference removes the lag was
+     not checked.
+  9. **Seen-unseen gap.** Last probe minus full val: +6.35 clean / +6.05
+     PGD-10 (MobileNetV4-S cosine +6.4 / +3.9; probe SE about 1.1pt).
+     Training-batch robust accuracy (PGD-3, augmented, train mode) ends at
+     34.74%, below full-val PGD-10 37.90%. Train loss ends at 3.184.
+  10. **Trains normally.** Subset raw PGD-10 never falls more than 0.48pt
+     below its running maximum (epoch 21, 24.60 after 25.08 at epoch 20;
+     epoch 48 is the next largest, 36.60 after 37.06); the
+     catastrophic-overfitting guard (below half of the running maximum)
+     never fires.
+  11. **Cost.** 25.23 h from start to finish (run-bundle `created_at`
+     2026-10-12 17:10:28 to `finished_at` 2026-10-13 18:24:00 UTC,
+     90,812 s). Per-epoch training time 1,754-1,782 s, about 87,900 s
+     (24.4 h) summed; the rest (about 58 s per epoch) is subset
+     validation, the final full-val pass, probe, checkpointing and
+     start-up. Throughput 705 img/s in epoch 0, then 713-716 img/s (the
+     2026-10-10 benchmark measured 741 for this setting; the other
+     Hamster GPU was busy during the run). Peak allocated memory 5.77 GB
+     at epoch 0, 5.16 GB after; reserved 6.39-6.53 GB.
+
+  Caveats: one seed; the comparison crosses Phase 1 and Phase 2 and a
+  source SHA, with non-deterministic execution on both sides and the
+  ConvNeXt baseline+EMA setting check not yet finished (item 4). Only the
+  Phase 1 PGD-10 number is available for the reference, so no clean
+  comparison is made. Evaluation is CE PGD-10 only. Checkpoint sha256 was
+  not computed in this postrun. `epoch-metrics.parquet` sha256
+  `a937442f...`, `sample-stats-train.parquet` sha256 `df11bf81...` (from
+  the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id
+  (one segment). At postrun time the Hamster run directories of
+  `plan0103-phase2-convnext-atto-convstem-s0-v1` (manifest `running`, no
+  epoch logged yet) and `plan0103-phase2-convnext-atto-deep-narrow-s0-v1`
+  (epoch 8 logged at 17:51 UTC) are live.
