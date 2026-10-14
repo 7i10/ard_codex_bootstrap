@@ -6857,3 +6857,114 @@ history behind this pivot.)
   postrun. `epoch-metrics.parquet` sha256 `dfdfa662...`,
   `sample-stats-train.parquet` sha256 `d72913d0...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id (one segment).
+- 2026-10-15 (postrun): **Phase 2 batch B, ConvStem ConvNeXt-Atto seed 0
+  ended "completed" but never learned: no ConvStem result.**
+  `plan0103-phase2-convnext-atto-convstem-s0-v1` (hand-run on Hamster, one
+  RTX 4090; the other Hamster GPU ran the deeper-narrower variant for most
+  of it) ran 50/50 epochs from 2026-10-13 18:26:02 to 2026-10-14 23:23:40
+  UTC (104,258 s, 28.96 h). `run-bundle/completion.json` reads
+  `completed`, the manifest status is `completed`, and
+  `run-bundle/error-marker.txt` reads "no application error recorded", so
+  the watcher re-derived it as terminal and successful. All 50 epoch rows
+  are present (`epoch_metrics_complete: true`), one W&B segment, no
+  resume. `train.log` has no traceback, NaN or error line (only the wandb
+  git-root warning). `best.pt`, `best-ema.pt`, `last.pt` and
+  `epoch-049.pt` are on disk. Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract, and there
+  is no valid result to import. The numbers below are read from the
+  run-bundle manifest and `epoch-metrics.jsonl` (via
+  `scripts/ardx/read_bundle.py`).
+
+  Fixed identity: as the ConvNeXt-Atto baseline+EMA run (59.69 / 36.92,
+  source `9a16cd6`, Ferret) except (a) `student.architecture:
+  convnext_atto_convstem_imagenet` (`build_convnext_atto_convstem` in
+  `src/ard/models/variants.py`: timm `convnext_atto` with `model.stem`
+  replaced by conv3x3/s2 3->20, LayerNorm2d, GELU, conv3x3/s2 20->40,
+  LayerNorm2d, GELU, the Singh/Croce/Hein ConvBlock1 structure scaled to
+  Atto); (b) the W&B group; (c) source SHA and host (`5dd329e` on
+  Hamster). Recipe: ConvNeXt-Atto Phase 1 closed grid (PGD-AT 50 epochs,
+  224 px, CE PGD-3 l_inf 4/255 step 8/765 random start, AdamW lr 1e-3 wd
+  0.05, warmup_multistep [25, 38] with 10-epoch warmup, standard
+  augmentation), Phase 2 template (selection subset 5,000, EMA 0.9999),
+  non-deterministic + cudnn_benchmark, no cuda_graph, fp32, world size 1,
+  global batch 128, training and evaluation-attack seed 0 (split seed
+  20260911). Config
+  `configs/scientific/imagenet_convnext_atto_convstem_pgd_at_phase2_adamw_random_lr1em3.yaml`
+  (unchanged since `5dd329e`), protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`, config
+  hash `b55c549f...`. Source SHA `5dd329eaf31f12907d2cf103df263c19b1d9519d`
+  (worktree `source-5dd329eaf31f`, clean), the same as the
+  deeper-narrower and cosine runs, which learned normally.
+
+  What the run shows:
+
+  | epoch | LR | train loss | training-batch robust | subset raw clean / PGD-10 | subset EMA clean / PGD-10 | probe clean / PGD-10 |
+  |---|---:|---:|---:|---:|---:|---:|
+  | 0 | 1e-4 | 6.9175 | 0.103% | 0.10 / 0.10 | 0.10 / 0.00 | 0.10 / 0.10 |
+  | 9 | 1e-3 (end of warmup) | 6.9077 | 0.100% | 0.10 / 0.10 | 0.10 / 0.10 | 0.10 / 0.10 |
+  | 24 | 1e-3 (last) | 6.9077 | 0.101% | 0.10 / 0.10 | 0.10 / 0.10 | 0.10 / 0.10 |
+  | 25 | 1e-4 | 6.9065 | 0.101% | 0.10 / 0.10 | 0.10 / 0.10 | 0.10 / 0.10 |
+  | 37 | 1e-4 (last) | 6.9063 | 0.096% | 0.10 / 0.10 | 0.10 / 0.10 | 0.10 / 0.10 |
+  | 38 | 1e-5 | 6.9062 | 0.101% | 0.10 / 0.10 | 0.10 / 0.10 | 0.10 / 0.10 |
+  | 49 | 1e-5 (last) | 6.9061 | 0.097% | 0.10 / 0.10 | 0.10 / 0.10 | 0.10 / 0.10 |
+
+  Full val (25,620 images) and complement (20,620), last and best, raw and
+  EMA: 0.10% clean / 0.10% PGD-10 everywhere (26 of 25,620; 21 of 20,620).
+  `best_epoch` is 0 because nothing ever rose above epoch 0.
+
+  Reading:
+  1. **The network's output does not depend on its input.** Every
+     accuracy is 1/1000, chance for ImageNet-1k, in every epoch, for raw
+     and EMA weights, clean and attacked. The subset value is exactly 5 of
+     5,000 and the full-val value 26 of 25,620, i.e. the predictions of a
+     model that outputs the same class for every image. A model that is
+     merely weak would scatter around 0.1%, not sit on it.
+  2. **Only the class prior is learned.** Train loss reaches ln(1000) =
+     6.9078 by epoch 3 and stays there through the peak LR (6.9077 at
+     epoch 24). After each LR decay it drops a little (6.9065 at epoch 25,
+     6.9061 at epoch 49, 0.0017 below ln(1000)). A drop this small fits a
+     constant output that has learned ImageNet's uneven class counts
+     (732-1,300 images per class); the exact entropy of this training
+     split's labels was not computed. The comparison runs on the same recipe
+     were at train loss 4.6-4.7 by epoch 8.
+  3. **Nothing in the run's own guards caught it.** The
+     catastrophic-overfitting guard compares against the running maximum,
+     which never left 0.1%, so it never fires. No NaN, no error, normal
+     throughput (618-626 img/s in the epochs read, 571 in epoch 49; peak
+     allocated memory 6.23 GB at epoch 0, 5.62 GB after; reserved 7.02 /
+     6.56 GB). About 29 GPU-hours were spent on a run that was visibly
+     dead at epoch 0.
+  4. **Not a statement about ConvStem.** Because the same source,
+     recipe and host trained the deeper-narrower variant to 57.97 / 35.53,
+     a dead network from epoch 0 points to this variant's build or its
+     interaction with the training code, not to ConvStem as an idea. The
+     ConvStem question of batch B is unanswered.
+  5. **Cause not determined.** A read-only code review at `5dd329e`
+     (bug-investigator, no code was executed) ruled out: a config
+     difference (the ConvStem and deeper-narrower configs differ only in
+     `student.architecture` and the W&B group); name-based optimizer
+     logic (`_weight_decay_parameter_groups`, `src/ard/cli/train.py`,
+     splits on `ndim` over `model.parameters()`; nothing keys on `stem`
+     or freezes by name); architecture-keyed training paths (the only one
+     is the cuda_graph scope check, and cuda_graph and compile were off);
+     a different input normalization (same `imagenet_standard` profile);
+     a build mismatch (`build_convnext_atto_convstem` matches the upstream
+     RobustBench `ConvBlock1`; timm `stages[0]` has stride 1 and no
+     downsample; the new stem is registered and keeps PyTorch's default
+     init, as upstream). It is already dead in epoch 0 at LR 1e-4 (train
+     loss 6.9175 vs 6.698 for the deeper-narrower run). Open hypotheses,
+     none tested: (a) the output barely depends on the input at init and
+     AdamW weight decay then makes the constant output permanent; (b) a
+     GPU-only numerical problem in the stem (3->20 conv then LayerNorm with
+     eps 1e-6 under cuDNN / TF32); (c) the default-init stem with lr 1e-3
+     at batch 128 (upstream used a much larger batch). The discriminating
+     check is CPU-only: build ConvStem, deeper-narrower and plain Atto at
+     seed 0 and compare the per-sample spread of logits; try to overfit 8
+     fixed images for 200 AdamW steps with the project's parameter groups;
+     inspect the stem weights and pooled-feature spread in `last.pt`. It
+     was not run in this postrun (no permission to execute code here).
+
+  Caveats: one seed. Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `d8bb43b6...`,
+  `sample-stats-train.parquet` sha256 `8efdb8af...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id (one segment).
