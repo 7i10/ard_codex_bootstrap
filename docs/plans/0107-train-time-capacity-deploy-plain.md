@@ -95,6 +95,10 @@ Supporting literature:
 - Decision rule (plan 0103 Phase 2 tiers on PGD-10 vs baseline+EMA): >= 1.5 effect, 0.5-1.5 pending,
   < 0.5 none.
 - The share of the SiLU gain (+2.56) that each run recovers is also reported.
+- Reading rule (review P2-5): in the `attack_and_optimizer` arm, the training attack uses the surrogate
+  gradient, so it is weaker against the true network. Its `train_robust_accuracy` and training loss are
+  therefore not comparable across arms. Optimization claims across arms use `train_probe_*` (eval-mode
+  probe under the true-gradient selection attack) and held-out metrics only.
 - If one reaches SiLU-level gain, it becomes the base model for the distillation verification (with
   its own speed setting). Otherwise SiLU vs ReLU is decided with decision 0044 and the DSP limitation
   wording.
