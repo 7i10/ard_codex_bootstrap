@@ -1,6 +1,6 @@
 ---
 id: 0049
-status: pending
+status: decided
 created: 2026-10-13
 campaign: plan0103-phase2-mnv4s-mixed-kurakin-splitbn-s0-v1（plan 0103 Phase 2 の候補③「Kurakin の mixed batch」の BN 分割版。各バッチ 128 枚の半分だけを攻撃し、攻撃画像は本体の BN、きれいな画像は補助の BN を通す。攻撃画像側の重み 0.3。MobileNetV4-S（ReLU）・ランダム初期化・SGD lr 0.025・50 epoch。Ferret の pull キューから hand-run、seed 0、50/50 epoch 完走、source SHA 5dd329e、決定的・eager）
 question: BN を分けた mixed batch は PGD-10 22.46（基準 30.71 より −8.25、BN 共有版より +5.12）、clean 47.95（基準より −5.90）でした。mixed batch の線を MobileNetV4-S でここで閉じるか、攻撃側の重みを 1.0 にした BN 分割版を1本だけ確かめるか、Ferret キューの EfficientNet-B0 BN 分割版を回すか。
@@ -9,7 +9,7 @@ options:
   B: 攻撃側の重みを 1.0 にした BN 分割版を MobileNetV4-S で1本回す（約 30〜45 GPU時間、4090 1枚）。重みを変えるので plan に新しい項目として書く。最後の普通の重みで full val PGD-10 が 32.21 以上なら続け、未満なら閉じる。
   C: Ferret キューの EfficientNet-B0 BN 分割版（重み 0.3）をそのまま回す（約 100〜140 GPU時間）。EfficientNet-B0 の基準（baseline+EMA が終わっていればそれ、なければ Phase 1 の lr 0.025 の 35.93）より PGD-10 が 1.5pt 以上高ければ続け、未満なら閉じる。
 recommendation: A
-chosen: null
+chosen: A
 ---
 
 # 0049: Phase 2 の mixed batch（BN 分割版）、MobileNetV4-S seed 0 が完了（PGD-10 −8.25、clean −5.90）
@@ -90,3 +90,7 @@ B は今回の読み方を確かめられますが、攻撃画像の割合が fu
 - clean と頑健性の交換の図を論文に載せたい場合は、すでにある2点（BN 共有 62.88 / 17.34、BN 分割 47.95 / 22.46）と基準で足りるかを先に見てください。足りなければ C か B が理由を持ちます。
 
 `chosen:` を人間が埋めるまで（ファイルを直接編集するか、チャットで答えてください）、新しい科学の job は始めず、キューも変更しません。
+
+## 決定（2026-10-13、本人、チャットで回答）
+
+**A を選択。** mixed batch の線は閉じる。BN を分けると混ぜて失った頑健性の一部は戻るが基準は超えない（先行研究 Xie & Yuille の MBN も同じ位置づけ）。攻撃側の重み 1.0 の版も、バッチの半分が clean である以上頑健性は下がると見込まれ、回さない。キューに残っていた mixed batch 6本（EfficientNet-B0 の BN 分割版を含む）は 2026-10-12 に外した。詳細は discussion register B（2026-10-12）。

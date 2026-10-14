@@ -1,6 +1,6 @@
 ---
 id: 0048
-status: pending
+status: decided
 created: 2026-10-13
 campaign: plan0103-phase2-mnv4s-awp-s0-v1（plan 0103 Phase 2 の「AWP」。MobileNetV4-S（ReLU）・ランダム初期化・SGD lr 0.025・50 epoch、AWP の γ=0.01・warmup 0（公式コードの既定値）。Ferret GPU0、hand-run、seed 0、50/50 epoch 完走（Ferret 再起動で1回中断し、同じ source から再開）、source SHA 5dd329e、決定的・CUDA Graphs）
 question: AWP（γ=0.01）は clean 28.47 / PGD-10 17.45 で、基準（53.85 / 30.71）より clean −25.38、PGD-10 −13.26。学習画像にも当てはまっていない「学習不足」。AWP の線をここで閉じるか、γ を 1/10 にした1本だけ確かめてから閉じるか。
@@ -8,7 +8,7 @@ options:
   A: ここで閉じる（追加 0 GPU時間）。「MobileNetV4-S では AWP γ=0.01 は学習不足を起こし、PGD-10 を 13.26pt 下げる」と記録し、AWP の他の run（他のモデル、seed 1）はキューに入れない。
   B: γ=0.001 の AWP を1本だけ回す（約 20〜23 GPU時間、4090 1枚）。最後の普通の重みで full val PGD-10 が 32.21 以上（基準 30.71 + 1.5）なら AWP の線を続け、未満なら閉じる。
 recommendation: A
-chosen: null
+chosen: A
 ---
 
 # 0048: Phase 2 の AWP、MobileNetV4-S seed 0 が完了（clean −25.38、PGD-10 −13.26）
@@ -84,3 +84,7 @@ Phase 2 の目的（同じ計算量で基準を超える工夫を探す）から
 また、0042 B（source の確認）で `5dd329e` 自体に問題が見つかった場合は、この判断を見直します。
 
 `chosen:` を人間が埋めるまで（ファイルを直接編集するか、チャットで答えてください）、新しい科学の job は始めません。
+
+## 決定（2026-10-13、本人、チャットで回答）
+
+**A を選択。** AWP は有効ではないと結論づける。設定（γ=0.01、ウォームアップなし）は公式コード AT-AWP の既定値で、AWP をそのまま試したものとして妥当。基準には AWP が直す頑健性の過学習がなく（検証の PGD-10 は最後まで上がり、学習画像の抜き出しとの差は 4.4pt）、AWP は学習への当てはまりを下げて差を縮めただけ（学習損失 3.70 → 5.64）。γ を弱めても基準に近づくだけなので B は回さない。今後は学習不足を補う手法で組み立てる。詳細は discussion register B（2026-10-13）。
