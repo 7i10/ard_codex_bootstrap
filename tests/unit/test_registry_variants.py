@@ -156,6 +156,7 @@ _CUDA_GRAPH_VARIANTS = frozenset(
         "convnext_atto_ols_imagenet",
         "convnext_atto_convstem_imagenet",
         "deit_tiny_convstem_imagenet",
+        "mobilenetv4_conv_small_silu_imagenet",  # human-approved 2026-10-15
     }
 )
 

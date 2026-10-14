@@ -1398,6 +1398,9 @@ CUDA_GRAPH_ARCHITECTURES: frozenset[str] = frozenset(
         "convnext_atto_convstem_imagenet",
         "deit_tiny_imagenet",
         "deit_tiny_convstem_imagenet",
+        # 2026-10-15 (human-approved): the plan 0103 MobileNetV4-S SiLU variant (deterministic graph-vs-eager
+        # bitwise parity at test shapes, incl. the Phase 2 options and the RSLAD/bank methods).
+        "mobilenetv4_conv_small_silu_imagenet",
     }
 )
 # Allowlisted students whose cuda_graph runs are recorded in training_protocol_identity even when
@@ -1411,6 +1414,8 @@ CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES: frozenset[str] = frozenset(
         "convnext_atto_convstem_imagenet",
         "deit_tiny_imagenet",
         "deit_tiny_convstem_imagenet",
+        # Parity shown at test shapes only (no production-shape bitwise run yet), so recorded like the above.
+        "mobilenetv4_conv_small_silu_imagenet",
     }
 )
 # training.cuda_graph with a teacher that runs INSIDE the captured step (RSLAD with
