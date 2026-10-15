@@ -7133,3 +7133,174 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `76e34e0f...`,
   `sample-stats-train.parquet` sha256 `3eaedb00...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id (one segment).
+- 2026-10-15 (postrun): **Phase 2 SiLU (ReLU replaced by SiLU everywhere),
+  MobileNetV4-M seed 0 completed.** `plan0103-phase2-mnv4m-silu-s0-v1`
+  (hand-run on Ferret, one RTX 4090; `environment.json` records kernel
+  7.0.0-28 and driver 595.99.02; the GPU index is not recorded) ran 50/50
+  epochs from 2026-10-13 05:22:21 to 2026-10-15 08:44:53 UTC.
+  `run-bundle/completion.json` reads `completed`, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application
+  error recorded". The watcher re-derived it as terminal and successful.
+  All 50 epoch rows are present (`epoch_metrics_complete: true`), one W&B
+  segment, no resume. `train.log` and the wandb logs have no traceback,
+  NaN, error, retry or warning line apart from the wandb git-root warning.
+  `best.pt` (epoch 49), `best-ema.pt` (epoch 49), `last.pt` and
+  `epoch-049.pt` are on disk. Nothing is imported into
+  `docs/experiments/`: no aggregator exists for this contract. The numbers
+  below are read from the run-bundle manifest and `epoch-metrics.jsonl`
+  of this run and of the Phase 1 seed-1 run (via
+  `scripts/ardx/read_bundle.py`); the Phase 1 seed-0 number is from its
+  entry above.
+
+  Fixed identity: the config
+  `imagenet_mobilenetv4_conv_medium_silu_pgd_at_phase2_random_lr0025.yaml`
+  equals the MobileNetV4-M Phase 2 baseline+EMA config except (a)
+  `student.architecture: mobilenetv4_conv_medium_silu_imagenet` (timm
+  `mobilenetv4_conv_medium` with every ReLU replaced by SiLU; parameters
+  and MACs unchanged) and (b) the W&B group. Against the Phase 1 config
+  (`imagenet_mobilenetv4_conv_medium_pgd_at_phase1_random.yaml`) it differs
+  in (a), the W&B group, and the Phase 2 template (selection subset 5,000,
+  EMA 0.9999); the template only adds evaluation of a subset and of an EMA
+  copy, so the raw-weight training recipe is the Phase 1 one (not checked
+  bitwise). Both configs are unchanged since the source SHA (`git diff
+  cabd60a HEAD`; `variants.py` only gained the hard-swish MobileNetV4-S
+  entry). ImageNet-1k (original images, content `ae033613...`),
+  MobileNetV4-Conv-M SiLU random init, plain PGD-AT, no teacher, 224 px
+  training. Training and evaluation-attack seed 0 (split seed 20260911).
+  Training attack CE PGD-3, l_inf eps 4/255, step 8/765, random start.
+  Selection and validation attack PGD-10, same eps and step, random start,
+  eval mode. SGD (Nesterov, momentum 0.9, wd 1e-4 on all parameters), peak
+  LR 0.025, warmup_multistep (10-epoch warmup, x0.1 at epochs 25 and 38),
+  no label smoothing, full AT, 50 epochs. World size 1, global batch 128,
+  local BN. fp32. Non-deterministic with cudnn_benchmark, no cuda_graph,
+  not compiled (the Phase 1 setting, as the 2026-10-11 human decision set
+  for MobileNetV4-M). Protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`, config
+  hash `2ee21502...`. Source SHA `cabd60a1590ac04274115dc4ba4270679cf3770c`
+  (worktree `source-cabd60a1590a`, clean). This extends the MobileNetV4-S
+  SiLU result (+1.60 clean / +2.56 PGD-10, decision 0044) to the only other
+  ReLU model (human-approved 2026-10-13). "Full val", "subset",
+  "complement" and "probe" mean the same as in the cosine entry above
+  (25,620 / 5,000 / 20,620 held-out original train images, 2,000 training
+  images). None is the ImageNet val split. No AutoAttack and no official
+  evaluation has run.
+
+  The MobileNetV4-M Phase 2 reference, baseline+EMA
+  (`plan0103-phase2-mnv4m-baseline-ema-s0-v1`, source `d97bf6e`), is still
+  running (manifest `running`, 23 of 50 epoch rows at this postrun). Until
+  it finishes, the comparison below is against the two Phase 1 ReLU runs
+  at the same recipe: seed 0 (Ferret, `086072b`, 39.39 PGD-10; its clean
+  number is on Ferret and was not re-read) and seed 1 (Hamster,
+  `609e6fa`, 63.71 / 39.30).
+
+  End of training (full val and complement are evaluated once, at the
+  final epoch):
+
+  | checkpoint | full val clean / PGD-10 | complement clean / PGD-10 |
+  |---|---:|---:|
+  | last (ep 49), raw weights | 61.26 / 38.33 | 61.40 / 38.49 |
+  | last (ep 49), EMA weights | 61.37 / 38.69 | 61.59 / 38.84 |
+  | best raw (ep 49, by subset PGD-10) = last raw | 61.26 / 38.33 | 61.40 / 38.49 |
+  | best EMA (ep 49, by EMA subset PGD-10) = last EMA | 61.37 / 38.69 | 61.59 / 38.84 |
+  | Phase 1 ReLU seed 1, last (no EMA) | 63.71 / 39.30 | n/a |
+  | Phase 1 ReLU seed 0, last (no EMA) | not re-read / 39.39 | n/a |
+
+  Per-epoch trajectory against Phase 1 seed 1. Train loss and
+  training-batch robust accuracy (PGD-3, augmented, train mode) are over
+  the full training set in both runs, so they are the like-for-like
+  columns. The SiLU val column is the 5,000-image subset, the Phase 1
+  column is full val (the subset sits 0.59pt PGD-10 below full val at
+  epoch 49 in this run). The two runs also differ in training seed (0 vs
+  1); whether the 2,000 probe images depend on the training seed was not
+  checked.
+
+  | epoch | LR | SiLU subset raw clean / PGD-10 | P1 s1 full val | SiLU subset EMA | SiLU probe | P1 s1 probe | train loss SiLU (P1 s1) | train robust acc SiLU (P1 s1) |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | 0 | 0.0025 | 0.18 / 0.20 | 0.21 / 0.10 | 0.10 / 0.10 | 0.20 / 0.20 | 0.10 / 0.05 | 6.911 (6.935) | 0.17 (0.11) |
+  | 4 | 0.0125 | 19.24 / 10.64 | 17.68 / 9.68 | 1.48 / 1.10 | 20.80 / 10.55 | 17.40 / 9.85 | 5.529 (5.633) | 7.18 (6.24) |
+  | 8 | 0.0225 | 32.58 / 18.36 | 33.68 / 18.54 | 0.72 / 0.40 | 36.10 / 19.40 | 34.20 / 18.50 | 4.746 (4.723) | 14.73 (14.70) |
+  | 9 | 0.025 (end of warmup) | 35.40 / 20.08 | 37.02 / 19.98 | 0.80 / 0.50 | 36.90 / 20.00 | 39.30 / 20.05 | 4.654 (4.594) | 15.74 (16.08) |
+  | 24 | 0.025 (last) | 47.40 / 27.18 | 49.88 / 28.22 | 52.20 / 33.52 | 50.65 / 29.55 | 52.30 / 31.20 | 4.039 (3.912) | 22.98 (24.28) |
+  | 25 | 0.0025 | 56.02 / 34.26 | 58.04 / 35.06 | 54.10 / 34.24 | 60.35 / 38.30 | 62.75 / 39.60 | 3.650 (3.508) | 28.53 (30.07) |
+  | 37 | 0.0025 (last) | 57.96 / 35.58 | 61.24 / 37.25 | 58.88 / 37.04 | 64.20 / 41.95 | 67.50 / 43.75 | 3.426 (3.225) | 31.74 (34.17) |
+  | 38 | 0.00025 | 59.56 / 36.82 | 62.90 / 38.79 | 59.36 / 37.38 | 65.95 / 43.45 | 68.50 / 46.50 | 3.310 (3.111) | 33.52 (36.07) |
+  | 49 | 0.00025 (last, best raw, best EMA) | 60.70 / 37.74 | 63.71 / 39.30 | 60.46 / 38.06 | 66.70 / 44.00 | 71.25 / 47.50 | 3.240 (3.023) | 34.54 (37.46) |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Against Phase 1 ReLU, last raw weights on full val:** 61.26 /
+     38.33 vs seed 1's 63.71 / 39.30, i.e. **-2.44 clean / -0.96 PGD-10**
+     (626 and 247 images of 25,620); against seed 0's 39.39, -1.06 PGD-10.
+     With the two-run SE of a full-val difference (about 0.43pt clean,
+     0.37pt PGD-10) that is about 5.7 / 2.6 SE, and the PGD-10 drop is
+     about 10x the MobileNetV4-M seed-0 / seed-1 spread (0.09pt). Last EMA
+     against seed 1's raw: -2.34 / -0.60. **SiLU lowers both clean and
+     PGD-10 on MobileNetV4-M.**
+  2. **Phase 2 tier rule** (discussion register C, 2026-10-08: >= 1.5pt
+     "effect", 0.5-1.5pt "hold", < 0.5pt "no effect"), applied to the
+     PGD-10 difference against Phase 1: |-0.96| and |-1.06| are both in
+     the "hold" band, in the losing direction. The formal reference for
+     the rule is baseline+EMA, which has not finished, so this verdict is
+     provisional. Clean -2.44 is beyond the 1.5pt line.
+  3. **Opposite sign to MobileNetV4-S.** There SiLU gave +1.60 clean /
+     +2.56 PGD-10 against its baseline+EMA ("effect"; decision 0044). Here
+     -2.44 / -0.96 against Phase 1. The MobileNetV4-S pair crossed source
+     SHA and execution mode (deterministic eager vs CUDA Graphs); this
+     pair crosses source SHA, host and training seed but not execution
+     mode. The seed spreads seen so far (0.09-0.36pt) are far smaller than
+     the 3.5pt between the two PGD-10 differences; the source, host and
+     mode effects have not been measured. Why the sign differs between
+     the two sizes was not tested.
+  4. **SiLU learns faster in early warmup, then fits the training data
+     worse at every later stage.** Train loss is lower than Phase 1 seed 1
+     for epochs 0-7 (by up to 0.103 at epoch 4) and training-batch robust
+     accuracy higher (up to +0.94 at epoch 4); they cross at epoch 8 (LR
+     0.0225). From there the train-loss gap widens without a break:
+     +0.060 at epoch 9, +0.127 at epoch 24, +0.201 at epoch 37, +0.217 at
+     epoch 49; training-batch robust accuracy -0.34, -1.30, -2.43, -2.92
+     at the same epochs. The LR decays do not close the gap. On
+     MobileNetV4-S, SiLU ended with a lower train loss (3.608 vs 3.697)
+     and higher training-batch robust accuracy (+1.63).
+  5. **Seen-unseen gap shrinks because the fit is worse.** Probe ends
+     -4.55 clean / -3.50 PGD-10 below seed 1, more than full val (-2.44 /
+     -0.96), so probe minus full val is +5.44 / +5.67 against +7.54 /
+     +8.20 for seed 1. Probe SE is about 1.1pt per run. Training-batch
+     robust accuracy 34.54% < full-val PGD-10 38.33%: the val >= train
+     signature persists.
+  6. **EMA lags in warmup, as on MobileNetV4-S.** At epoch 9 the EMA
+     weights read 0.80 / 0.50 on the subset against raw 35.40 / 20.08.
+     EMA passes raw at epoch 14 (PGD-10) and 16 (clean); it leads by up
+     to +5.80 clean / +6.76 PGD-10 (both epoch 23) at the peak LR, by
+     -0.02 to +2.04 PGD-10 over epochs 25-37 and by -0.22 to +0.68 over
+     epochs 38-49.
+  7. **EMA at the end.** Last EMA minus last raw on full val: +0.11 clean
+     / +0.36 PGD-10 (complement +0.19 / +0.35). Below the 0.5pt "no
+     effect" line.
+  8. **Best and last; trains normally.** Best raw and best EMA are the
+     last epoch (`robust_overfit_gap_full` 0.00pt). Subset raw PGD-10
+     never falls more than 0.76pt below its running maximum (epoch 34,
+     34.86 after 35.62 at epoch 32); the catastrophic-overfitting guard
+     never fires. Decays on the subset: epoch 24 to 25 +8.62 clean / +7.08
+     PGD-10 (seed 1 full val +8.16 / +6.84), epoch 37 to 38 +1.60 / +1.24
+     (seed 1 +1.66 / +1.55); the last stage creeps up (36.82 to 37.74).
+  9. **Cost.** 51.38 h from start to finish (184,952 s; Phase 1 seed 1 on
+     Hamster 35.39 h). Summed per-epoch training time is about 180,000 s
+     (50.0 h); the rest (about 99 s per epoch) is subset validation, the
+     final full-val pass, probe, checkpointing and start-up. Throughput
+     369-375 img/s in epochs 0-20, 255-356 in epochs 21-36 and 370-383 in
+     epochs 37-49 (Phase 1 seed 1 on Hamster 515-521; seed 0 on Ferret
+     about 420). The steady 370-380 img/s matches the measured Ferret GPU2
+     rate (about 376 img/s, remote NUMA), so host and GPU dominate the
+     comparison; the SiLU kernel cost is not separable here. Peak
+     allocated memory 11.99 GB at epoch 0, 9.80 GB after; reserved 13.04
+     / 12.40 GB (seed 1: 9.61 / 7.44 allocated, 11.24 / 9.79 reserved),
+     i.e. about +2.4 GB allocated after epoch 0; not investigated.
+
+  Caveats: one seed; the comparison crosses source SHA (`cabd60a` vs
+  `609e6fa` / `086072b`), host and training seed; both sides are
+  non-deterministic. The Phase 2 reference (baseline+EMA) is not finished,
+  so the tier verdict is provisional. The SiLU subset column and the
+  Phase 1 full-val column in the trajectory table are different image
+  sets. Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `83aea794...`,
+  `sample-stats-train.parquet` sha256 `f363bf95...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id (one segment).
