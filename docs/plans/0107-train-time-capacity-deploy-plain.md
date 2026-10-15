@@ -132,3 +132,7 @@ MobileNetV4-M at matched GPU-hours.
 ## Progress
 
 - 2026-10-15: direction approved. Hard-swish and smooth-backward (two scopes) implementation started.
+- 2026-10-15: implementation committed (8f51192; scientific review no P1, P2s fixed; verify green). The
+  three runs (`plan0107-mnv4s-{hardswish,smoothgrad-opt,smoothgrad-both}-s0-v1`) are at the front of
+  Ferret's pull queue, worktree `source-8f511929ed7e`. Hamster's GPUs had just started multi-day
+  MobileNetV4-M / EfficientNet-B0 runs, so they start as Ferret GPUs free (from the night of 10/15).
