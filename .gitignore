@@ -15,3 +15,9 @@ wandb/
 outputs/
 configs/analysis/ffnr-causal-pilot-v1/
 teacher_cache
+# biweekly decks: generated files and decks handed over by the human are never committed
+tools/slides/node_modules/
+reports/biweekly/**/*.pptx
+reports/biweekly/**/*.pdf
+reports/biweekly/**/render/
+/*.pptx

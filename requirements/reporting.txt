@@ -1,4 +1,4 @@
-# Reporting-only dependencies.
+# Reporting-only dependencies (biweekly deck QA: text dump, validation, rendering).
 #
 # These are NOT part of the training runtime and MUST NOT be installed into
 # the ard-v2 environment: adding packages there changes the environment
@@ -10,4 +10,9 @@
 #   conda create -y -n ard-report python=3.11
 #   conda run -n ard-report pip install -r requirements/reporting.txt
 #
+# The deck itself is generated with Node (tools/slides, `npm install` there).
 python-pptx==1.0.2
+markitdown[pptx]
+Pillow
+defusedxml
+lxml

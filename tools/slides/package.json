@@ -1,0 +1,10 @@
+{
+  "name": "ard-biweekly-slides",
+  "private": true,
+  "description": "Biweekly progress deck builder (reporting only; not part of the training runtime).",
+  "dependencies": {
+    "js-yaml": "4.1.0",
+    "jszip": "3.10.1",
+    "pptxgenjs": "3.12.0"
+  }
+}
