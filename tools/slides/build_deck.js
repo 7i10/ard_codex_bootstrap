@@ -124,6 +124,21 @@ function addFrame(slide, s, citeNums) {
   if (citeNums.length) slide.addText(citeNums.map((n) => `[${n}]`).join(", "), { placeholder: "cite" });
   if (s.notes) slide.addNotes(String(s.notes));
 }
+function estLines(items, w, size) {
+  const perLine = Math.max(8, Math.floor((w * 72) / size));
+  let n = 0;
+  const walk = (it, lvl) => {
+    if (Array.isArray(it)) return it.forEach((x) => walk(x, lvl + 1));
+    const t = String(it).replace(/\*\*|==/g, "");
+    const wide = [...t].reduce((a, c) => a + (c.charCodeAt(0) > 0x2e7f ? 1 : 0.55), 0);
+    n += Math.max(1, Math.ceil((wide + 2) / perLine));
+  };
+  items.forEach((it) => walk(it, 0));
+  return n;
+}
+function cardHeight(cards, w, size) {
+  return Math.max(...cards.map((c) => 0.75 + estLines(c.body || [], w - 0.3, size) * size * 1.45 / 72 + (c.body || []).length * 0.08));
+}
 function card(slide, x, y, w, h, head, body, size = 18) {
   slide.addShape("rect", { x, y, w, h, fill: { color: T.tint }, line: { color: T.tint }, objectName: `card ${head}` });
   slide.addShape("rect", { x, y, w, h: 0.48, fill: { color: T.primary }, line: { color: T.primary } });
@@ -131,24 +146,30 @@ function card(slide, x, y, w, h, head, body, size = 18) {
   slide.addText(bulletRuns(body, size), tb({ x: x + 0.15, y: y + 0.6, w: w - 0.3, h: h - 0.7 }));
 }
 function sideText(slide, s, x, w) {
-  if (s.side) slide.addText(bulletRuns(s.side, s.side_size || 18), tb({ x, y: BODY_Y, w, h: BODY_H }));
+  const Y = s._top, HH = FOOT_Y - 0.12 - Y;
+  if (s.side) slide.addText(bulletRuns(s.side, s.side_size || 18), tb({ x, y: Y, w, h: HH }));
 }
 const BODY = {
   bullets(slide, s) {
-    slide.addText(bulletRuns(s.body || [], s.size || 20, { space: 10 }), tb({ x: M, y: BODY_Y, w: W - 2 * M, h: BODY_H }));
+    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
+    slide.addText(bulletRuns(s.body || [], s.size || 20, { space: 10 }), tb({ x: M, y: Y, w: W - 2 * M, h: HH }));
   },
   cards(slide, s) {
+    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
     const n = s.cards.length, cols = s.cols || n, rows = Math.ceil(n / cols), gap = 0.3;
-    const top = s.lead ? BODY_Y + 0.55 : BODY_Y;
-    if (s.lead) slide.addText(runs(s.lead, { fontSize: 18, color: T.sub }), tb({ x: M, y: BODY_Y, w: W - 2 * M, h: 0.45 }));
-    const cw = (W - 2 * M - gap * (cols - 1)) / cols, ch = (FOOT_Y - 0.15 - top - gap * (rows - 1)) / rows;
-    s.cards.forEach((c, i) => card(slide, M + (i % cols) * (cw + gap), top + Math.floor(i / cols) * (ch + gap), cw, ch, c.head, c.body || [], s.size || 17));
+    const top = s.lead ? Y + 0.55 : Y;
+    if (s.lead) slide.addText(runs(s.lead, { fontSize: 18, color: T.sub }), tb({ x: M, y: Y, w: W - 2 * M, h: 0.45 }));
+    const size = s.size || 19;
+    const cw = (W - 2 * M - gap * (cols - 1)) / cols, maxH = (FOOT_Y - 0.15 - top - gap * (rows - 1)) / rows;
+    const ch = s.fill ? maxH : Math.min(maxH, cardHeight(s.cards, cw, size));
+    s.cards.forEach((c, i) => card(slide, M + (i % cols) * (cw + gap), top + Math.floor(i / cols) * (ch + gap), cw, ch, c.head, c.body || [], size));
   },
   overview(slide, s) {
+    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
     // three blocks on top (goal / questions / approach), a timeline strip at the bottom
-    const gap = 0.3, cw = (W - 2 * M - gap * 2) / 3, ch = 3.0;
-    s.blocks.forEach((b, i) => card(slide, M + i * (cw + gap), BODY_Y, cw, ch, b.head, b.body || [], 16));
-    const ty = BODY_Y + ch + 0.35, n = s.timeline.length, tw = (W - 2 * M - 0.15 * (n - 1)) / n;
+    const gap = 0.3, cw = (W - 2 * M - gap * 2) / 3, ch = Math.min(3.3, cardHeight(s.blocks, cw, 17));
+    s.blocks.forEach((b, i) => card(slide, M + i * (cw + gap), Y, cw, ch, b.head, b.body || [], 17));
+    const ty = Y + ch + 0.35, n = s.timeline.length, tw = (W - 2 * M - 0.15 * (n - 1)) / n;
     s.timeline.forEach((t, i) => {
       const x = M + i * (tw + 0.15), cur = !!t.current;
       slide.addShape("homePlate", { x, y: ty, w: tw, h: 1.0, fill: { color: cur ? T.primary : T.message }, line: { color: cur ? T.primary : T.line, width: 1 } });
@@ -159,6 +180,7 @@ const BODY = {
     });
   },
   table(slide, s) {
+    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
     const t = s.table, sideW = s.side ? (s.side_w || 4.2) : 0;
     const tw = W - 2 * M - (sideW ? sideW + 0.3 : 0);
     const hl = new Set((t.highlight || []).map(([r, c]) => `${r},${c}`));
@@ -169,16 +191,21 @@ const BODY = {
       options: { align: ci === 0 ? "left" : "center", fill: { color: hl.has(`${ri},${ci}`) ? T.tint : (ri % 2 ? "F7F9FC" : T.white) } },
     })));
     const colW = t.col_w ? t.col_w.map((f) => f * tw) : undefined;
-    slide.addTable([header, ...rows], { x: M, y: BODY_Y, w: tw, colW, fontFace: T.latin, border: { type: "solid", pt: 1, color: T.line }, valign: "middle", rowH: t.row_h || 0.5, margin: 0.06 });
-    if (t.caption) slide.addText(runs(t.caption, { fontSize: 12, color: T.sub }), tb({ x: M, y: FOOT_Y - 0.5, w: tw, h: 0.35 }));
+    const capTop = t.caption && t.caption_pos === "top";
+    if (capTop) slide.addText(runs(t.caption, { fontSize: 12, color: T.sub }), tb({ x: M, y: Y - 0.08, w: W - 2 * M, h: 0.34 }));
+    const ty = capTop ? Y + 0.3 : Y;
+    slide.addTable([header, ...rows], { x: M, y: ty, w: tw, colW, fontFace: T.latin, border: { type: "solid", pt: 1, color: T.line }, valign: "middle", rowH: t.row_h || 0.5, margin: 0.06 });
+    if (t.caption && !capTop) slide.addText(runs(t.caption, { fontSize: 12, color: T.sub }), tb({ x: M, y: FOOT_Y - 0.5, w: tw, h: 0.35 }));
     sideText(slide, s, W - M - sideW, sideW);
   },
   chart(slide, s) {
+    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
     const c = s.chart, sideW = s.side ? (s.side_w || 4.2) : 0, cw = W - 2 * M - (sideW ? sideW + 0.3 : 0);
     const data = c.series.map((se) => ({ name: se.name, labels: c.categories, values: se.values }));
     slide.addChart(c.kind || "bar", data, {
-      x: M, y: BODY_Y, w: cw, h: BODY_H, barDir: c.horizontal ? "bar" : "col",
-      chartColors: c.colors || (c.series.length > 1 ? [T.primary, "9DC3E6", T.sub] : [T.primary]), invertIfNegative: false, showValue: true, dataLabelFontSize: 12, dataLabelColor: T.text,
+      x: M, y: Y, w: cw, h: HH, barDir: c.horizontal ? "bar" : "col",
+      chartColors: c.colors || (c.series.length > 1 ? [T.primary, "9DC3E6", T.sub] : [T.primary]), invertIfNegative: false, showValue: c.show_values ?? (c.kind || "bar") === "bar",
+      lineSize: 2.5, lineDataSymbol: "none", catAxisLabelFrequency: c.label_every || 1, dataLabelFontSize: 12, dataLabelColor: T.text,
       dataLabelFormatCode: c.format || "0.0", catAxisLabelFontSize: 13, valAxisLabelFontSize: 12,
       catAxisLabelColor: T.text, valAxisLabelColor: T.sub, valGridLine: { color: "E6E6E6", size: 1 },
       showLegend: c.series.length > 1, legendPos: "b", legendFontSize: 12,
@@ -189,22 +216,24 @@ const BODY = {
     sideText(slide, s, W - M - sideW, sideW);
   },
   figure(slide, s) {
+    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
     const sideW = s.side ? (s.side_w || 4.6) : 0, fw = W - 2 * M - (sideW ? sideW + 0.3 : 0);
     const img = path.resolve(s._dir, s.image);
-    const fh = BODY_H - (s.caption ? 0.4 : 0);
-    slide.addImage({ path: img, x: M, y: BODY_Y, w: fw, h: fh, sizing: { type: "contain", w: fw, h: fh } });
-    if (s.caption) slide.addText(runs(s.caption, { fontSize: 12, color: T.sub }), tb({ x: M, y: BODY_Y + fh + 0.02, w: fw, h: 0.35 }));
+    const fh = HH - (s.caption ? 0.4 : 0);
+    slide.addImage({ path: img, x: M, y: Y, w: fw, h: fh, sizing: { type: "contain", w: fw, h: fh } });
+    if (s.caption) slide.addText(runs(s.caption, { fontSize: 12, color: T.sub }), tb({ x: M, y: Y + fh + 0.02, w: fw, h: 0.35 }));
     sideText(slide, s, W - M - sideW, sideW);
   },
   plan(slide, s) {
+    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
     const lw = 5.4, gap = 0.35, rw = W - 2 * M - lw - gap;
-    card(slide, M, BODY_Y, lw, BODY_H, s.micro_head || "次回まで", s.micro || [], 17);
+    card(slide, M, Y, lw, Math.min(HH, cardHeight([{ body: s.micro || [] }], lw, 18) + 0.2), s.micro_head || "次回まで", s.micro || [], 18);
     const x = M + lw + gap, rows = s.macro || [];
-    slide.addShape("rect", { x, y: BODY_Y, w: rw, h: 0.48, fill: { color: T.primary }, line: { color: T.primary } });
-    slide.addText(runs(s.macro_head || "修論まで", { color: T.white, bold: true, fontSize: 18 }), tb({ x: x + 0.12, y: BODY_Y, w: rw - 0.24, h: 0.48, valign: "middle" }));
-    const rh = Math.min(0.75, (BODY_H - 0.6) / Math.max(rows.length, 1));
+    slide.addShape("rect", { x, y: Y, w: rw, h: 0.48, fill: { color: T.primary }, line: { color: T.primary } });
+    slide.addText(runs(s.macro_head || "修論まで", { color: T.white, bold: true, fontSize: 18 }), tb({ x: x + 0.12, y: Y, w: rw - 0.24, h: 0.48, valign: "middle" }));
+    const rh = Math.min(0.75, (HH - 0.6) / Math.max(rows.length, 1));
     rows.forEach((r, i) => {
-      const y = BODY_Y + 0.6 + i * rh, cur = !!r.current;
+      const y = Y + 0.6 + i * rh, cur = !!r.current;
       slide.addShape("rect", { x, y, w: 1.5, h: rh - 0.08, fill: { color: cur ? T.primary : T.tint }, line: { color: cur ? T.primary : T.tint } });
       slide.addText(r.period, tb({ x, y, w: 1.5, h: rh - 0.08, align: "center", valign: "middle", fontSize: 15, bold: true, color: cur ? T.white : T.primaryDark }));
       slide.addText(runs(r.item, { fontSize: 16, color: T.text }), tb({ x: x + 1.65, y, w: rw - 1.65, h: rh - 0.08, valign: "middle" }));
@@ -268,17 +297,19 @@ async function main() {
     const type = s.type || "bullets";
     if (type === "agenda") { const a = addToc(s.section); if (s.notes) a.addNotes(String(s.notes)); continue; }
     if (!BODY[type]) throw new Error(`unknown slide type: ${type}`);
-    const slide = pres.addSlide({ masterName: "CONTENT" });
-    addFrame(slide, s, (s.cite || []).map(num));
+    // full: a whole-slide body without the key-point box (e.g. one large summary table)
+    s._top = s.full ? 1.2 : BODY_Y;
+    const slide = pres.addSlide({ masterName: s.full ? "REFS" : "CONTENT" });
+    addFrame(slide, s.full ? { ...s, point: undefined } : s, (s.cite || []).map(num));
     BODY[type](slide, s);
   }
 
-  // references (IEEE strings, numbered by first use), split over slides of 6
+  // references (IEEE strings, numbered by first use), split over slides of 7
   const refSec = doc.references_section || "参考文献";
-  for (let p = 0; p * 6 < order.length; p++) {
-    const chunk = order.slice(p * 6, p * 6 + 6);
+  for (let p = 0; p * 7 < order.length; p++) {
+    const chunk = order.slice(p * 7, p * 7 + 7);
     const slide = pres.addSlide({ masterName: "REFS" });
-    const pages = Math.ceil(order.length / 6);
+    const pages = Math.ceil(order.length / 7);
     addFrame(slide, { section: refSec, title: pages > 1 ? `参考文献 ${p + 1}/${pages}` : "参考文献" }, []);
     const items = [];
     chunk.forEach((k, i) => items.push({ text: `[${num(k)}] ${refs[k]}`, options: { fontSize: 13, color: T.text, paraSpaceAfter: 8, breakLine: i < chunk.length - 1 } }));

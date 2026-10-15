@@ -112,13 +112,15 @@ slides:
 | 型 | 項目 |
 |---|---|
 | bullets | `body: [文, [入れ子の文]]`、`size` |
-| cards | `cards: [{head, body: [...]}]`、`cols`、`lead`（上の一文） |
+| cards | `cards: [{head, body: [...]}]`、`cols`、`lead`（上の一文）、`size`、`fill: true`（下まで伸ばす。既定は中身に合わせた高さ） |
 | overview | `blocks: [{head, body}]×3`、`timeline: [{label, note, current}]` |
-| table | `table: {header, rows, highlight: [[行,列]], col_w: [比率], caption, size}`、`side: [...]`、`side_w` |
-| chart | `chart: {kind: bar, categories, series: [{name, values}], y_title, min, max, horizontal}`、`side` |
+| table | `table: {header, rows, highlight: [[行,列]], col_w: [比率], caption, caption_pos: top, size, row_h}`、`side: [...]`、`side_w`。数字は末尾の0を残すため文字列（"3.70"）で書く。見出しの改行は `\n` |
+| chart | `chart: {kind: bar|line, categories, series: [{name, values}], colors, y_title, format, min, max, horizontal, label_every}`、`side` |
 | figure | `image`（deck.yaml からの相対パス）、`caption`、`side` |
 | plan | `micro: [...]`、`macro: [{period, item, current}]` |
 | agenda | 項目なし（その section を強調した目次） |
+
+どの型にも `full: true` を付けると、要点の欄を省いてページ全体を本文に使う（大きな一覧表など）。
 
 文中の `**語**` は太字、`==語==` は強調色（赤）。強調色は1枚に1〜2か所まで。
 
