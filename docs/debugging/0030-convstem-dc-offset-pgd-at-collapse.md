@@ -75,3 +75,39 @@ Scripts and logs: `/tmp/claude-1001/.../scratchpad/convstem/` (`train_probe.py`,
    - Epsilon warmup, with a matched control.
    This connects to plan 0107's optimization-not-capacity hypothesis: a trivial constant-output
    attractor of PGD-AT from scratch.
+
+## Follow-up (2026-10-15): why Singh et al.'s from-scratch ConvStem trains and ours did not
+
+Singh et al. (2303.01870, Table 1, "random init., basic augment.") trained ConvStem models from random
+init successfully: ConvNeXt-T+CvSt 64.2 / 37.6 vs ConvNeXt-T 64.0 / 37.1; ViT-S+CvSt 62.8 / 34.4 vs
+ViT-S 61.5 / 31.8. So training from scratch alone does not explain the collapse.
+
+Each of their recipe differences was tested one at a time in the CPU probe:
+
+| Factor | Result |
+|---|---|
+| Label smoothing 0.1 | No effect on the onset |
+| 2-step attack (approximating APGD-2) | No effect on the onset |
+| Per-step lr warmup | Deeper collapse |
+| Raw [0,1] input, as Singh's released models use | Worse |
+| Singh's own width (ConvNeXt-T+ConvStem, DC share 0.42) | Collapses under our recipe; plain ConvNeXt-T does not |
+| **AdamW beta2 = 0.95** (Singh) vs 0.999 (ours) | **The only factor that changes the outcome** |
+
+- **The onset happens in every condition.**
+- **beta2 = 0.95 lets the model escape.** On a 1,000-image probe, beta2 = 0.999 keeps collapsing
+  (logit std 0.163 -> 0.0006 by step 700), while beta2 = 0.95 bottoms out at step 150 and recovers to
+  0.365. DeiT-Ti ConvStem shows the same ordering.
+- **The real run's optimizer state shows the trap closing.** Median sqrt(v) of `stages.0.blocks.0.conv_dw`
+  was 4.9e-9 (below Adam eps 1e-8) at the end of epoch 0. By epoch 48 the stem's update ratio was
+  about 3e-5, so only weight decay was acting.
+- **Interpretation (not verified):** with beta2 = 0.999, v remembers the large early gradients, so step
+  sizes shrink as the collapse deepens. With beta2 = 0.95, v tracks the shrinking gradients and steps
+  stay near lr.
+- **Untested:** batch size (Singh used about 1,392).
+
+Probe limits: 256- or 1,000-image pools, one seed, at most 700 steps. An escape there does not
+guarantee an escape on 1.28M images.
+
+Cheapest change: `optimizer.beta2: 0.95`. It must also go on the matched baseline, because beta2 changes
+plain-Atto dynamics too. Caution: earlier MobileNetV4 "revisiting AT recipe" configs with beta2 0.95
+collapsed (decisions 0016/0017), but those changed several factors at once.
