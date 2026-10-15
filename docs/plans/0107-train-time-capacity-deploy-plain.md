@@ -136,3 +136,9 @@ MobileNetV4-M at matched GPU-hours.
   three runs (`plan0107-mnv4s-{hardswish,smoothgrad-opt,smoothgrad-both}-s0-v1`) are at the front of
   Ferret's pull queue, worktree `source-8f511929ed7e`. Hamster's GPUs had just started multi-day
   MobileNetV4-M / EfficientNet-B0 runs, so they start as Ferret GPUs free (from the night of 10/15).
+- 2026-10-15 (human): order of decisions. The MobileNetV4-S hard-swish and smooth-backward results come
+  first, because DSP-friendly options take priority. If they reach SiLU-level gain, MobileNetV4-M follows
+  that direction. If not, MobileNetV4-M gets a SiLU learning-rate search, starting at lr 0.0125. That
+  search is needed because the MobileNetV4-M SiLU run, at the ReLU-tuned lr 0.025, gave 61.26 / 38.33
+  vs ReLU 63.71 / 39.30, with a higher final training loss.
+
