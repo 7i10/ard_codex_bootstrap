@@ -142,6 +142,14 @@ def _exact(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     return [{key: float(value).hex() for key, value in sorted(row.items())} for row in rows]
 
 
+# Epoch-row keys added after the pre-change commit (the never-learned guard's
+# observability, debugging 0030). The historical trainer cannot emit them, so
+# they are left out of both row digests; everything else -- every other row
+# value and every checkpoint state digest -- must still match bit for bit.
+# Their presence and values are tested in tests/unit/test_never_learned.py.
+_NEWER_OBSERVABILITY_KEYS = frozenset({"val_distinct_predictions", "val_logit_std_over_images"})
+
+
 @pytest.fixture
 def deterministic_algorithms() -> Any:
     previous = torch.are_deterministic_algorithms_enabled()
@@ -161,10 +169,22 @@ def test_default_is_bit_identical_to_the_pre_change_trainer(
         monkeypatch.setattr(parity, "build_student", _batchnorm_dropout_student)
     with monkeypatch.context() as patch:
         patch.setattr(parity, "Trainer", _pre_change_trainer_module().Trainer)
-        old = parity._fingerprint(tmp_path / "old", method, device=torch.device("cpu"), loaders=parity._loaders())
+        old = parity._fingerprint(
+            tmp_path / "old",
+            method,
+            device=torch.device("cpu"),
+            loaders=parity._loaders(),
+            drop_row_keys=_NEWER_OBSERVABILITY_KEYS,
+        )
     new_trainer = parity._trainer(tmp_path / "probe", method)
     assert new_trainer.step_diagnostics is True
-    new = parity._fingerprint(tmp_path / "new", method, device=torch.device("cpu"), loaders=parity._loaders())
+    new = parity._fingerprint(
+        tmp_path / "new",
+        method,
+        device=torch.device("cpu"),
+        loaders=parity._loaders(),
+        drop_row_keys=_NEWER_OBSERVABILITY_KEYS,
+    )
     assert "last.pt:rng" in new and "best.pt:model" in new
     assert new == old
 

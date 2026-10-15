@@ -135,7 +135,14 @@ def test_standard_trainer_makes_no_training_attack_call_and_trains_on_clean_batc
     # Validation still runs the selection attack.
     validation = trainer.validate_epoch(validation_loader)
     assert generate_calls and all(attack is trainer.selection_attack for attack in generate_calls)
-    assert set(validation) == {"clean_accuracy", "pgd_accuracy"}
+    assert set(validation) == {
+        "clean_accuracy",
+        "pgd_accuracy",
+        # Never-learned guard observability (debugging 0030) and its sample size.
+        "distinct_predictions",
+        "logit_std_over_images",
+        "num_examples",
+    }
 
 
 def test_standard_equals_pgd_at_whose_training_attack_returns_the_clean_batch(tmp_path: Path) -> None:

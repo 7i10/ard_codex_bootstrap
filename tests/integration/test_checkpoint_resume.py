@@ -537,6 +537,9 @@ def test_checkpoint_is_complete_and_best_last_are_distinct(tmp_path: Path) -> No
         "train_attack_step_size",
         "val_clean_accuracy",
         "val_pgd_accuracy",
+        # Debugging 0030 never-learned guard observability (clean pass, raw weights).
+        "val_distinct_predictions",
+        "val_logit_std_over_images",
         "learning_rate",
         "next_learning_rate",
         *BOUNDARY_TELEMETRY_KEYS,

@@ -16,7 +16,12 @@ from torch.optim import SGD, AdamW
 from torch.utils.data import DataLoader
 
 from ard.analysis import write_sample_parquet
-from ard.analysis.epoch_metrics import EpochMetricStore, epoch_trajectory_summary, write_epoch_metrics_parquet
+from ard.analysis.epoch_metrics import (
+    EpochMetricStore,
+    epoch_trajectory_summary,
+    load_epoch_metrics,
+    write_epoch_metrics_parquet,
+)
 from ard.analysis.frozen_oracle import FrozenRiskLookup, load_frozen_risk_lookup
 from ard.analysis.ordering_telemetry import OrderingTelemetry
 from ard.attacks import LinfPGD
@@ -231,6 +236,12 @@ def _guard_output(output_dir: Path, *, resume: Path | None, config_hash: str) ->
         if output_dir.exists() and any(output_dir.iterdir()):
             raise FileExistsError(f"refusing to overwrite existing output directory without --resume: {output_dir}")
         return
+    marker = output_dir / "never-learned.json"
+    if marker.exists():
+        raise ValueError(
+            f"refusing --resume: the never-learned guard stopped this run ({marker}); its student never left a "
+            "constant output at epochs 0 and 1. Delete that file deliberately to override."
+        )
     resume = resume.resolve()
     if resume.parent != output_dir:
         raise ValueError("resume checkpoint must live in the selected output directory")
@@ -1416,6 +1427,18 @@ def main(argv: list[str] | None = None) -> int:
         start_epoch = 0
         if args.resume is not None:
             start_epoch = trainer.resume(args.resume, sampler=sampler).next_epoch
+            if start_epoch == 1:
+                # Never-learned guard: a resume at epoch 1 needs epoch 0's
+                # values, which live in the persisted epoch rows. Rank zero
+                # reads them and broadcasts, so every rank holds the same seed;
+                # an unreadable file fails the resume on every rank (rank zero's
+                # epoch store would refuse it below anyway). Pre-metric rows
+                # leave the guard unable to fire for this run.
+                prior_rows = run_rank_zero_value(
+                    lambda: load_epoch_metrics(output_dir / "epoch-metrics.jsonl"),
+                    phase="never-learned resume seed read",
+                )
+                trainer.seed_never_learned_observations(prior_rows)
         if start_epoch >= config.training.epochs:
 
             def validate_noop_resume(active_tracker: ExperimentTracker) -> None:

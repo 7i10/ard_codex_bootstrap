@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import math
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -75,6 +76,14 @@ from .distributed import (
     suspend_ddp_buffer_broadcasts,
     unwrap_model,
 )
+from .never_learned import (
+    NEVER_LEARNED_EPOCHS,
+    NeverLearnedError,
+    NonFiniteValidationLogitsError,
+    never_learned_reason,
+    observation_from_metrics,
+    observations_from_epoch_rows,
+)
 from .mixed_batch import AuxiliaryBatchNorm, adversarial_count, check_split_batchnorm_batch, example_weights
 from .surrogate_gradient import ReluSurrogateGradient, install_relu_surrogate
 
@@ -106,6 +115,25 @@ def _evaluation_mode(model: nn.Module) -> Iterator[None]:
         yield
     finally:
         model.train(mode)
+
+
+def _clean_output_spread(class_totals: torch.Tensor) -> dict[str, float]:
+    """Never-learned observability from reduced ``[4, classes]`` clean sums (rows 0-2 used).
+
+    ``distinct_predictions``: classes that are the clean argmax of at least one
+    valid image. ``logit_std_over_images``: the mean over classes of the
+    population (ddof 0) std of that class's logit across valid images, from
+    float64 sums (E[x^2] - E[x]^2, clamped at 0). See ``ard.engine.never_learned``.
+    """
+    images = float(class_totals[0].sum().item())
+    if images <= 0:
+        return {"distinct_predictions": 0.0, "logit_std_over_images": 0.0}
+    mean = class_totals[1] / images
+    variance = (class_totals[2] / images - mean.square()).clamp_min(0.0)
+    return {
+        "distinct_predictions": float((class_totals[0] > 0).sum().item()),
+        "logit_std_over_images": float(variance.sqrt().mean().item()),
+    }
 
 
 def _float64_totals(values: Sequence[torch.Tensor | float], *, device: torch.device) -> torch.Tensor:
@@ -663,6 +691,10 @@ class Trainer:
         self.selection_subset: dict[str, Any] | None = None
         self._selection_member_ids: torch.Tensor | None = None
         self._validation_prefix = "val"
+        # Never-learned guard state: epoch -> (distinct predictions, logit std
+        # over images) for the guarded epochs this process observed (or seeded
+        # on a resume at epoch 1). Not checkpointed; see ard.engine.never_learned.
+        self.never_learned_observations: dict[int, tuple[float, float]] = {}
         if (selection_subset is None) != (selection_subset_ids is None):
             raise ValueError("selection_subset and selection_subset_ids must be given together")
         if selection_subset is not None and selection_subset_ids is not None:
@@ -2944,12 +2976,29 @@ class Trainer:
         return metrics
 
     def _validation_totals(
-        self, loader: DataLoader[IndexedBatch], model: nn.Module, outside_of: torch.Tensor | None = None
+        self,
+        loader: DataLoader[IndexedBatch],
+        model: nn.Module,
+        outside_of: torch.Tensor | None = None,
+        *,
+        clean_class_statistics: list[torch.Tensor] | None = None,
     ) -> torch.Tensor:
         """Reduced float64 sums [clean correct, PGD correct, count] over
         ``loader``; with ``outside_of`` (source IDs), three more sums over the
-        examples whose ID is NOT in it -- same pass, same random starts."""
+        examples whose ID is NOT in it -- same pass, same random starts.
+
+        With ``clean_class_statistics`` (an empty list), one reduced float64
+        ``[4, classes]`` tensor is appended: per class, the number of valid
+        images whose clean argmax is that class, the sum and sum of squares of
+        that class's clean logit over valid images, and the number of valid
+        images whose clean logit for that class is non-finite (the caller
+        raises on any; counted, not raised per batch, so every DDP rank sees
+        the same reduced verdict and none is stranded at a collective). Observability
+        only (the never-learned guard, ``ard.engine.never_learned``): it reads
+        the clean logits this pass already computes, draws no RNG and leaves
+        ``totals`` and the attack untouched."""
         totals = torch.zeros(3 if outside_of is None else 6, dtype=torch.float64, device=self.device)
+        class_totals: torch.Tensor | None = None
         generator = self._selection_generator()
         with _evaluation_mode(model):
             for batch in loader:
@@ -2977,6 +3026,21 @@ class Trainer:
                     outside = (~torch.isin(batch.sample_ids.to(torch.int64), outside_of)).to(mask.dtype)
                     values += [(term * outside).sum() for term in (clean_correct, robust_correct, mask)]
                 totals += _float64_totals(values, device=self.device)
+                if clean_class_statistics is not None:
+                    valid = mask > 0
+                    logits64 = clean_logits.detach()[valid].to(torch.float64)
+                    if class_totals is None:
+                        class_totals = torch.zeros(
+                            4, clean_logits.shape[1], dtype=torch.float64, device=self.device
+                        )
+                    class_totals[0] += torch.bincount(
+                        clean_logits.argmax(1)[valid], minlength=clean_logits.shape[1]
+                    ).to(torch.float64)
+                    class_totals[1] += logits64.sum(0)
+                    class_totals[2] += logits64.square().sum(0)
+                    class_totals[3] += (~torch.isfinite(logits64)).sum(0).to(torch.float64)
+        if clean_class_statistics is not None and class_totals is not None:
+            clean_class_statistics.append(reduce_sums(class_totals))
         return reduce_sums(totals)
 
     def validate_epoch(self, loader: DataLoader[IndexedBatch], *, model: nn.Module | None = None) -> dict[str, float]:
@@ -2988,9 +3052,28 @@ class Trainer:
         reusing the student's selected epoch (see
         docs/SCIENTIFIC_INVARIANTS.md's ADR section).
         """
-        totals = self._validation_totals(loader, self.model if model is None else model)
+        class_statistics: list[torch.Tensor] = []
+        totals = self._validation_totals(
+            loader, self.model if model is None else model, clean_class_statistics=class_statistics
+        )
         count = max(float(totals[2].item()), 1.0)
-        return {"clean_accuracy": float(totals[0].item()) / count, "pgd_accuracy": float(totals[1].item()) / count}
+        metrics = {
+            "clean_accuracy": float(totals[0].item()) / count,
+            "pgd_accuracy": float(totals[1].item()) / count,
+        }
+        if class_statistics:
+            non_finite = int(class_statistics[0][3].sum().item())
+            if non_finite:
+                # Explicit, at validation time, on every rank alike (reduced
+                # count): never a NaN epoch row (debugging 0030 review P2-2).
+                raise NonFiniteValidationLogitsError(
+                    f"clean validation logits are non-finite: {non_finite} non-finite logit value(s) over "
+                    f"{int(totals[2].item())} valid images at epoch {self.current_epoch} "
+                    f"({'live student' if model is None else 'secondary model, e.g. the weight-EMA shadow'})"
+                )
+            metrics.update(_clean_output_spread(class_statistics[0]))
+            metrics["num_examples"] = float(totals[2].item())
+        return metrics
 
     def _held_out_metrics(self, loader: DataLoader[IndexedBatch], model: nn.Module) -> dict[str, float]:
         """Full held-out split and its complement (held-out minus the
@@ -3357,6 +3440,12 @@ class Trainer:
                     "next_learning_rate": float(self.optimizer.param_groups[0]["lr"]),
                 }
             )
+            for key in ("distinct_predictions", "logit_std_over_images"):
+                # Never-learned observability (debugging 0030): raw weights,
+                # clean pass, same images as the accuracies above. Absent only
+                # when a caller substitutes its own validate_epoch.
+                if key in validation_metrics:
+                    epoch_metrics[f"{self._validation_prefix}_{key}"] = validation_metrics[key]
             if "cuda_graph_replays" in train_metrics:
                 # training.cuda_graph audit (plan 0105): how many steps of
                 # this epoch were captured / replayed / run eagerly.
@@ -3432,7 +3521,55 @@ class Trainer:
             # is observational only and cannot alter model/state selection.
             if on_epoch_end is not None:
                 on_epoch_end(epoch_metrics, improved)
+            # Never-learned guard (debugging 0030). After the epoch's
+            # checkpoints and metric row, so the evidence is persisted; it
+            # gates nothing else. Fires only when BOTH epoch 0 and epoch 1
+            # are observed and degenerate (ard.engine.never_learned). A
+            # non-finite clean validation logit never reaches it: validate_epoch
+            # already raised NonFiniteValidationLogitsError for that epoch.
+            if epoch in NEVER_LEARNED_EPOCHS:
+                observation = observation_from_metrics(epoch_metrics, prefix=self._validation_prefix)
+                if observation is not None:
+                    self.never_learned_observations[epoch] = observation
+                reason = never_learned_reason(
+                    self.never_learned_observations, validation_images=validation_metrics.get("num_examples")
+                )
+                # Every rank raises together: the inputs are cross-rank
+                # reductions and the resume seed is rank-zero broadcast, but a
+                # MAX-reduced flag makes agreement structural rather than assumed.
+                fire = reduce_max(torch.tensor(0.0 if reason is None else 1.0, device=self.device))
+                if reason is None and float(fire.item()) > 0:
+                    reason = "never-learned guard fired on another rank; see never-learned.json"
+                if reason is not None:
+                    if get_rank() == 0:
+                        (self.output_dir / "never-learned.json").write_text(
+                            json.dumps(
+                                {
+                                    "reason": reason,
+                                    "validation_images": validation_metrics.get("num_examples"),
+                                    "observations": {
+                                        str(key): {
+                                            "distinct_predictions": value[0],
+                                            "logit_std_over_images": value[1],
+                                        }
+                                        for key, value in sorted(self.never_learned_observations.items())
+                                    },
+                                },
+                                sort_keys=True,
+                                indent=2,
+                            )
+                            + "\n",
+                            encoding="utf-8",
+                        )
+                    raise NeverLearnedError(reason)
         return history
+
+    def seed_never_learned_observations(self, rows: Sequence[Mapping[str, Any]]) -> None:
+        """Resume at epoch 1: restore epoch 0's guard values from persisted
+        epoch-metric rows. Rows lacking the metrics are ignored, which leaves
+        the guard unable to fire for this run (see ard.engine.never_learned)."""
+        for epoch, observation in observations_from_epoch_rows(rows, prefix=self._validation_prefix).items():
+            self.never_learned_observations.setdefault(epoch, observation)
 
     def resume(self, path: Path, *, sampler: Any) -> TrainingState:
         state = load_checkpoint(

@@ -201,12 +201,25 @@ def _canonical(value: object, digest: Any) -> None:
         digest.update(f"{type(value).__name__}:{value!r}|".encode())
 
 
-def _fingerprint(output: Path, method: str, *, device: torch.device, loaders: tuple[DataLoader, DataLoader]) -> dict:
+def _fingerprint(
+    output: Path,
+    method: str,
+    *,
+    device: torch.device,
+    loaders: tuple[DataLoader, DataLoader],
+    drop_row_keys: frozenset[str] = frozenset(),
+) -> dict:
+    """``drop_row_keys``: epoch-row keys left out of the row digest -- only for
+    comparisons against a historical trainer that predates those keys."""
     trainer = _trainer(output, method, device)
     loader, validation_loader = loaders
     history = trainer.fit(loader, validation_loader=validation_loader, epochs=2)
     rows = [
-        {key: float(value).hex() for key, value in sorted(row.items()) if not key.endswith(_TIMING_SUFFIXES)}
+        {
+            key: float(value).hex()
+            for key, value in sorted(row.items())
+            if not key.endswith(_TIMING_SUFFIXES) and key not in drop_row_keys
+        }
         for row in history
     ]
     fingerprint: dict[str, Any] = {"rows": hashlib.sha256(repr(rows).encode()).hexdigest()}
