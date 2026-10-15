@@ -30,16 +30,27 @@ const T = {
 };
 const W = 13.333, H = 7.5;           // LAYOUT_WIDE
 const M = 0.5;                       // side margin
-const BODY_Y = 1.95, FOOT_Y = 7.08;  // body starts under the key-point box; footer band top
+const BODY_Y = 1.45, FOOT_Y = 7.08;  // header: tab at (0,0), line 0.66, key point 0.76-1.3  // body starts under the key-point box; footer band top
 const BODY_H = FOOT_Y - 0.12 - BODY_Y;
 
 // ---------------------------------------------------------------- text helpers
 // "**bold**" -> bold run, "==x==" -> accent run. Returns pptxgenjs run array.
+// inline citations: "[@key]" in any text becomes "[n]" (numbered by first use across the deck)
+let CITE = (k) => `[${k}]`;
 function runs(s, base = {}) {
+  s = String(s).replace(/\[@([\w-]+(?:\s*,\s*@?[\w-]+)*)\]/g, (_, ks) => `[${ks.split(/\s*,\s*@?/).map((k) => CITE(k)).join(", ")}]`);
+  if (s.includes("\n")) {  // soft line break inside one paragraph (keeps a bullet's hanging indent)
+    const out = [];
+    s.split("\n").forEach((part, i) => {
+      const r = runs(part, base);
+      if (i > 0 && r.length) r[0].options = { ...r[0].options, softBreakBefore: true };
+      out.push(...r);
+    });
+    return out;
+  }
   const out = [];
   const re = /(\*\*[^*]+\*\*|==[^=]+==)/g;
   let last = 0, m;
-  s = String(s);
   while ((m = re.exec(s))) {
     if (m.index > last) out.push({ text: s.slice(last, m.index), options: { ...base } });
     const t = m[0];
@@ -81,7 +92,7 @@ function defineLayouts(pres) {
   });
   const frame = (extra = []) => [
     { rect: { x: 0, y: FOOT_Y, w: W, h: H - FOOT_Y, fill: { color: T.primary } } },
-    { line: { x: M, y: 1.02, w: W - 2 * M, h: 0, line: { color: T.line, width: 1 } } },
+    { line: { x: 2.55, y: 0.62, w: W - 2.55 - M, h: 0, line: { color: T.line, width: 1 } } },
     { placeholder: { options: { name: "cite", type: "body", x: M, y: FOOT_Y + 0.03, w: W - 2 * M - 1.0, h: H - FOOT_Y - 0.06, fontSize: 11, color: T.white, valign: "middle", fontFace: T.latin }, text: "" } },
     ...extra,
   ];
@@ -89,20 +100,20 @@ function defineLayouts(pres) {
     title: "CONTENT", background: { color: T.white },
     slideNumber: { x: W - M - 0.8, y: FOOT_Y + 0.07, w: 0.8, h: 0.28, fontSize: 12, color: T.white, align: "right", fontFace: T.latin },
     objects: frame([
-      { rect: { x: 0, y: 0.32, w: 2.55, h: 0.58, fill: { color: T.primary } } },
-      { placeholder: { options: { name: "section", type: "body", x: 0.18, y: 0.32, w: 2.35, h: 0.58, fontSize: 20, bold: true, color: T.white, valign: "middle", fontFace: T.latin }, text: "" } },
-      { placeholder: { options: { name: "title", type: "title", x: 2.8, y: 0.32, w: W - 2.8 - M, h: 0.58, fontSize: 24, bold: true, color: T.text, valign: "middle", align: "left", fontFace: T.latin }, text: "" } },
-      { rect: { x: M, y: 1.18, w: W - 2 * M, h: 0.6, fill: { color: T.message } } },
-      { placeholder: { options: { name: "point", type: "body", x: M + 0.15, y: 1.18, w: W - 2 * M - 0.3, h: 0.6, fontSize: 20, bold: true, color: T.primaryDark, valign: "middle", fontFace: T.latin }, text: "" } },
+      { rect: { x: 0, y: 0, w: 2.55, h: 0.62, fill: { color: T.primary } } },
+      { placeholder: { options: { name: "section", type: "body", x: 0.15, y: 0, w: 2.38, h: 0.62, fontSize: 20, bold: true, color: T.white, valign: "middle", fontFace: T.latin }, text: "" } },
+      { placeholder: { options: { name: "title", type: "title", x: 2.75, y: 0, w: W - 2.75 - M, h: 0.62, fontSize: 24, bold: true, color: T.text, valign: "middle", align: "left", fontFace: T.latin }, text: "" } },
+      { rect: { x: M, y: 0.76, w: W - 2 * M, h: 0.54, fill: { color: T.message } } },
+      { placeholder: { options: { name: "point", type: "body", x: M + 0.15, y: 0.76, w: W - 2 * M - 0.3, h: 0.54, fontSize: 20, bold: true, color: T.primaryDark, valign: "middle", fontFace: T.latin }, text: "" } },
     ]),
   });
   pres.defineSlideMaster({
     title: "REFS", background: { color: T.white },
     slideNumber: { x: W - M - 0.8, y: FOOT_Y + 0.07, w: 0.8, h: 0.28, fontSize: 12, color: T.white, align: "right", fontFace: T.latin },
     objects: frame([
-      { rect: { x: 0, y: 0.32, w: 2.55, h: 0.58, fill: { color: T.primary } } },
-      { placeholder: { options: { name: "section", type: "body", x: 0.18, y: 0.32, w: 2.35, h: 0.58, fontSize: 20, bold: true, color: T.white, valign: "middle", fontFace: T.latin }, text: "" } },
-      { placeholder: { options: { name: "title", type: "title", x: 2.8, y: 0.32, w: W - 2.8 - M, h: 0.58, fontSize: 24, bold: true, color: T.text, valign: "middle", align: "left", fontFace: T.latin }, text: "" } },
+      { rect: { x: 0, y: 0, w: 2.55, h: 0.62, fill: { color: T.primary } } },
+      { placeholder: { options: { name: "section", type: "body", x: 0.15, y: 0, w: 2.38, h: 0.62, fontSize: 20, bold: true, color: T.white, valign: "middle", fontFace: T.latin }, text: "" } },
+      { placeholder: { options: { name: "title", type: "title", x: 2.75, y: 0, w: W - 2.75 - M, h: 0.62, fontSize: 24, bold: true, color: T.text, valign: "middle", align: "left", fontFace: T.latin }, text: "" } },
     ]),
   });
   pres.defineSlideMaster({
@@ -117,11 +128,11 @@ function defineLayouts(pres) {
 }
 
 // ---------------------------------------------------------------- slide bodies
-function addFrame(slide, s, citeNums) {
+function addFrame(slide, s, citeLabels) {
   slide.addText(s.section || "", { placeholder: "section" });
-  slide.addText(s.title || "", { placeholder: "title" });
+  slide.addText(runs(s.title || "", {}), { placeholder: "title" });
   if (s.point !== undefined) slide.addText(runs(s.point || "", {}), { placeholder: "point" });
-  if (citeNums.length) slide.addText(citeNums.map((n) => `[${n}]`).join(", "), { placeholder: "cite" });
+  if (citeLabels.length) slide.addText(citeLabels.join("　"), { placeholder: "cite" });
   if (s.notes) slide.addNotes(String(s.notes));
 }
 function estLines(items, w, size) {
@@ -147,7 +158,7 @@ function card(slide, x, y, w, h, head, body, size = 18) {
 }
 function sideText(slide, s, x, w) {
   const Y = s._top, HH = FOOT_Y - 0.12 - Y;
-  if (s.side) slide.addText(bulletRuns(s.side, s.side_size || 18), tb({ x, y: Y, w, h: HH }));
+  if (s.side) slide.addText(bulletRuns(s.side, s.side_size || 17), tb({ x, y: Y, w, h: HH }));
 }
 const BODY = {
   bullets(slide, s) {
@@ -159,7 +170,7 @@ const BODY = {
     const n = s.cards.length, cols = s.cols || n, rows = Math.ceil(n / cols), gap = 0.3;
     const top = s.lead ? Y + 0.55 : Y;
     if (s.lead) slide.addText(runs(s.lead, { fontSize: 18, color: T.sub }), tb({ x: M, y: Y, w: W - 2 * M, h: 0.45 }));
-    const size = s.size || 19;
+    const size = s.size || 18;
     const cw = (W - 2 * M - gap * (cols - 1)) / cols, maxH = (FOOT_Y - 0.15 - top - gap * (rows - 1)) / rows;
     const ch = s.fill ? maxH : Math.min(maxH, cardHeight(s.cards, cw, size));
     s.cards.forEach((c, i) => card(slide, M + (i % cols) * (cw + gap), top + Math.floor(i / cols) * (ch + gap), cw, ch, c.head, c.body || [], size));
@@ -254,11 +265,25 @@ async function main() {
 
   // citation numbers in order of first use across the deck
   const order = [];
-  for (const s of doc.slides) for (const k of s.cite || []) {
+  const use = (k) => {
     if (!(k in refs)) throw new Error(`unknown reference key: ${k}`);
     if (!order.includes(k)) order.push(k);
+  };
+  for (const s of doc.slides) {
+    // keys cited inline anywhere in the slide's text, in reading order, then the slide-level cite list
+    s._inline = [];
+    for (const m of JSON.stringify(s).matchAll(/\[@([\w-]+(?:\s*,\s*@?[\w-]+)*)\]/g))
+      for (const k of m[1].split(/\s*,\s*@?/)) { use(k); if (!s._inline.includes(k)) s._inline.push(k); }
+    for (const k of s.cite || []) use(k);
   }
   const num = (k) => order.indexOf(k) + 1;
+  CITE = (k) => String(num(k));
+  // "[n] Qin+ 2024": first author's surname and the year, read from the IEEE string
+  const short = (k) => {
+    const r = refs[k], first = r.replace(/\s+et al\./, ",").split(/,| and /)[0].trim().split(/\s+/).pop(), year = (r.match(/(19|20)\d\d(?!.*(19|20)\d\d)/) || [""])[0];
+    const many = /et al\.|,.*(,| and )/.test(r.split('"')[0]);
+    return `[${num(k)}] ${first}${many ? "+" : ""} ${year}`;
+  };
 
   const pres = new pptxgen();
   pres.layout = "LAYOUT_WIDE";
@@ -298,9 +323,10 @@ async function main() {
     if (type === "agenda") { const a = addToc(s.section); if (s.notes) a.addNotes(String(s.notes)); continue; }
     if (!BODY[type]) throw new Error(`unknown slide type: ${type}`);
     // full: a whole-slide body without the key-point box (e.g. one large summary table)
-    s._top = s.full ? 1.2 : BODY_Y;
+    s._top = s.full ? 0.8 : BODY_Y;
     const slide = pres.addSlide({ masterName: s.full ? "REFS" : "CONTENT" });
-    addFrame(slide, s.full ? { ...s, point: undefined } : s, (s.cite || []).map(num));
+    const keys = [...s._inline, ...(s.cite || []).filter((k) => !s._inline.includes(k))].sort((a, b) => num(a) - num(b));
+    addFrame(slide, s.full ? { ...s, point: undefined } : s, keys.map(short));
     BODY[type](slide, s);
   }
 
@@ -313,7 +339,7 @@ async function main() {
     addFrame(slide, { section: refSec, title: pages > 1 ? `参考文献 ${p + 1}/${pages}` : "参考文献" }, []);
     const items = [];
     chunk.forEach((k, i) => items.push({ text: `[${num(k)}] ${refs[k]}`, options: { fontSize: 13, color: T.text, paraSpaceAfter: 8, breakLine: i < chunk.length - 1 } }));
-    slide.addText(items, tb({ x: M, y: 1.25, w: W - 2 * M, h: FOOT_Y - 1.4 }));
+    slide.addText(items, tb({ x: M, y: 0.85, w: W - 2 * M, h: FOOT_Y - 1.0 }));
   }
 
   await pres.writeFile({ fileName: out });
@@ -333,7 +359,7 @@ async function setEastAsianFont(file) {
   for (const name of parts) {
     let xml = await zip.file(name).async("string");
     xml = xml.replace(/<a:ea typeface="[^"]*"[^>]*\/>/g, `<a:ea typeface="${T.ea}"/>`);
-    xml = xml.replace(/(<\/a:r>)<a:pPr[^>]*>(?:(?!<\/a:pPr>).)*?<\/a:pPr>/g, "$1");
+    xml = xml.replace(/(<\/a:r>|<a:br\/>)<a:pPr[^>]*>(?:(?!<\/a:pPr>).)*?<\/a:pPr>/g, "$1");
     zip.file(name, xml);
   }
   fs.writeFileSync(file, await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
