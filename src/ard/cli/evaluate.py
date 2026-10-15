@@ -397,6 +397,16 @@ def _selection_protocol_identity(training: TrainingConfig, selection_metadata: o
     return {"selection_subset_size": size, "selection_subset_sha256": subset["ids_sha256"]}
 
 
+def _surrogate_gradient_protocol_identity(training: TrainingConfig) -> dict[str, object]:
+    """``training.relu_surrogate_gradient`` (SAT smooth ReLU backward, human-approved 2026-10-15), present
+    only when set (same byte-identity argument as ``_throughput_protocol_identity``). The forward is plain
+    ReLU and the evaluated checkpoint is the plain architecture, so nothing else in the record shows that
+    the training updates (and, for one scope, the training attack) used the softplus derivative; without
+    this entry the mixed-identity guard would pool such a run with the ReLU-gradient baseline."""
+    surrogate = training.relu_surrogate_gradient
+    return {} if surrogate is None else {"relu_surrogate_gradient": surrogate.model_dump(mode="json")}
+
+
 def _augmentation_protocol_identity(dataset: Any) -> dict[str, object]:
     """Plan 0103 Phase 2 batch C, present only when set (same byte-identity
     argument as ``_throughput_protocol_identity``): an IDBH-trained run shares
@@ -731,6 +741,7 @@ def main(argv: list[str] | None = None) -> int:
                             }
                         ),
                         **_augmentation_protocol_identity(training_config.dataset),
+                        **_surrogate_gradient_protocol_identity(training_config.training),
                     },
                     "evaluation_protocol_identity": evaluation_protocol_identity,
                     "teacher": None if training_config.teacher is None else training_config.teacher.architecture,

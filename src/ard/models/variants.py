@@ -223,6 +223,10 @@ def build_mobilenetv4_conv_medium_silu(*, num_classes: int) -> nn.Module:
 VARIANT_BUILDERS = {
     "mobilenetv4_conv_small_silu_imagenet": partial(build_mobilenetv4_conv_small_variant, act_layer="silu"),
     "mobilenetv4_conv_small_gelu_imagenet": partial(build_mobilenetv4_conv_small_variant, act_layer="gelu"),
+    # Plan 0103 Phase 2 (human-approved 2026-10-15): DSP-friendly SiLU alternative. timm resolves
+    # "hard_swish" to torch.nn.Hardswish (x * relu6(x + 3) / 6, Howard et al. 2019); every ReLU,
+    # stem and head included, is replaced exactly as in the SiLU variant.
+    "mobilenetv4_conv_small_hardswish_imagenet": partial(build_mobilenetv4_conv_small_variant, act_layer="hard_swish"),
     "mobilenetv4_conv_small_se_imagenet": partial(
         build_mobilenetv4_conv_small_variant, se=True, num_features=MOBILENETV4_CONV_SMALL_SE_NUM_FEATURES
     ),

@@ -727,6 +727,8 @@ class ModelConfig(StrictModel):
         "convnext_atto_convstem_imagenet",
         "mobilenetv4_conv_small_se_fullhead_imagenet",
         "mobilenetv4_conv_medium_silu_imagenet",
+        # Plan 0103 Phase 2 (human-approved 2026-10-15), random init only.
+        "mobilenetv4_conv_small_hardswish_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)
@@ -1170,6 +1172,25 @@ class InitCheckpointConfig(StrictModel):
         return self
 
 
+class ReluSurrogateGradientConfig(StrictModel):
+    """ReLU forward, smooth backward (Xie et al. 2020, "Smooth Adversarial Training", arXiv:2006.14536,
+    Sec. 3 "improving gradient quality"; human-approved 2026-10-15, plan 0103 Phase 2).
+
+    The student's forward is exactly ReLU (bitwise). While the surrogate is active, the backward of every
+    student ``nn.ReLU`` multiplies the upstream gradient by the derivative of SAT's parametric softplus
+    ``f(alpha, x) = (1/alpha) * log(1 + exp(alpha * x))`` (their Eqn. 2), i.e. ``sigmoid(alpha * x)`` (Eqn. 3),
+    evaluated at the ReLU input, instead of by ``1[x > 0]``. ``beta`` is SAT's ``alpha`` (they set 10).
+
+    ``scope``: ``optimizer`` -- active only in the backward of the training loss that updates the weights
+    (SAT Table 1 row 3); ``attack_and_optimizer`` -- also in the gradient steps of the *training* attack
+    (row 4). Never active for the selection / validation / probe / held-out attacks, ard.cli.evaluate or
+    AutoAttack (see ard.engine.surrogate_gradient and Trainer).
+    """
+
+    beta: float = Field(default=10.0, gt=0, allow_inf_nan=False)
+    scope: Literal["optimizer", "attack_and_optimizer"]
+
+
 class TrainingConfig(StrictModel):
     epochs: int = Field(default=1, ge=1)
     checkpoint_epochs: tuple[int, ...] = (49, 99, 149, 199)
@@ -1327,6 +1348,14 @@ class TrainingConfig(StrictModel):
     # capture. Serialized only when true, so every existing config keeps a
     # byte-identical resolved config and config hash.
     cuda_graph: bool = Field(default=False, exclude_if=lambda value: value is False)
+    # Plan 0103 Phase 2 (human-approved 2026-10-15): ReLU forward with SAT's smooth (softplus) backward;
+    # see ReluSurrogateGradientConfig. Changes the training updates, so it is part of the config hash and
+    # of the evaluation training_protocol_identity. Only ard.cli.train applies it. None (default) is
+    # today's exact behavior; serialized only when set, so every existing config keeps a byte-identical
+    # resolved config and config hash.
+    relu_surrogate_gradient: ReluSurrogateGradientConfig | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @model_validator(mode="after")
     def validate_batch_identity(self) -> TrainingConfig:
@@ -1347,6 +1376,19 @@ class TrainingConfig(StrictModel):
                 "training.compile=true requires training.deterministic=false: bitwise reproducibility of "
                 "torch.compile/inductor kernels is not established"
             )
+        if self.relu_surrogate_gradient is not None:
+            # (condition that must hold, why): combinations whose parity is untested fail closed.
+            requirements = (
+                (not self.cuda_graph, "training.cuda_graph=false (the captured step is not parity-tested with it)"),
+                (not self.compile, "training.compile=false (not parity-tested with the custom autograd Function)"),
+                (
+                    self.global_batch_size == self.per_rank_batch_size,
+                    "global_batch_size == per_rank_batch_size (world size 1; DDP is not tested with it)",
+                ),
+            )
+            missing = [reason for holds, reason in requirements if not holds]
+            if missing:
+                raise ValueError("training.relu_surrogate_gradient requires " + "; ".join(missing))
         if self.cuda_graph:
             # (condition that must hold, why) -- every entry fails closed.
             requirements = (
@@ -1403,6 +1445,10 @@ CUDA_GRAPH_ARCHITECTURES: frozenset[str] = frozenset(
         "mobilenetv4_conv_small_silu_imagenet",
     }
 )
+# Allowlisted students admitted to training.cuda_graph in deterministic mode only: their bitwise parity
+# passes, but the nondeterministic one-step check does not (its must-fail lr x 1.001 control goes
+# undetected for the MobileNetV4-S SiLU variant, 2026-10-15), so the nondeterministic graph stays refused.
+CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES: frozenset[str] = frozenset({"mobilenetv4_conv_small_silu_imagenet"})
 # Allowlisted students whose cuda_graph runs are recorded in training_protocol_identity even when
 # deterministic with SGD (plan 0105 review of 1f17fa2, P2-2): their bitwise parity is shown at test shapes
 # only; remove an entry once test_production_shape_layernorm_graph_run_is_bit_identical (SGD) passes for it.
@@ -1461,6 +1507,8 @@ def reject_throughput_options(training: TrainingConfig, *, runtime: str) -> None
         unsupported.append(("cuda_graph", "true", "false"))
     if training.selection_subset_size is not None:
         unsupported.append(("selection_subset_size", str(training.selection_subset_size), "null"))
+    if training.relu_surrogate_gradient is not None:
+        unsupported.append(("relu_surrogate_gradient", "<set>", "null"))
     if unsupported:
         requested = ", ".join(f"training.{name}={value}" for name, value, _ in unsupported)
         remediation = ", ".join(f"training.{name}={value}" for name, _, value in unsupported)
@@ -2106,6 +2154,28 @@ class ExperimentConfig(StrictModel):
                 "training.weight_ema_decay cannot be combined with method.adr: adr already tracks its own "
                 "EMA as a distillation target; a second, independent weight EMA would need a second shadow model"
             )
+        surrogate = self.training.relu_surrogate_gradient
+        if surrogate is not None:
+            # Allowed = tested: a plain PGD-AT (or, scope optimizer only, standard) step, FP32, nothing else.
+            method = self.method
+            requirements = (
+                (
+                    method.id == "pgd_at" or (method.id == "standard" and surrogate.scope == "optimizer"),
+                    "method pgd_at (or method standard with scope=optimizer; standard has no training attack)",
+                ),
+                (method.mixed_batch is None, "no method.mixed_batch"),
+                (method.awp is None, "no method.awp"),
+                (method.adr is None, "no method.adr"),
+                (method.target_policy is None and not method.oracle_mask, "no target policy or oracle mask"),
+                (method.frozen_oracle_manifest is None, "no frozen oracle"),
+                (self.teacher is None and self.distillation is None, "no teacher or distillation"),
+                (self.intervention is None and self.prescriptive_v3 is None, "no intervention / prescriptive route"),
+                (self.observation.profile == "off", "observation.profile=off"),
+                (not self.training.amp, "training.amp=false"),
+            )
+            missing = [reason for holds, reason in requirements if not holds]
+            if missing:
+                raise ValueError("training.relu_surrogate_gradient requires " + "; ".join(missing))
         if self.training.train_image_size is not None:
             if self.dataset.name != "imagenet":
                 raise ValueError("training.train_image_size is only defined for the imagenet dataset")
@@ -2341,6 +2411,13 @@ class ExperimentConfig(StrictModel):
             (
                 mixed_batch is None or not mixed_batch.split_batchnorm,
                 "no method.mixed_batch.split_batchnorm (not parity-tested)",
+            ),
+            (
+                self.student.architecture not in CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES
+                or self.training.deterministic,
+                "training.deterministic=true for student.architecture "
+                + self.student.architecture
+                + " (deterministic-only graph parity; the nondeterministic one-step check does not pass)",
             ),
             (
                 self.method.awp is None or self.training.deterministic,

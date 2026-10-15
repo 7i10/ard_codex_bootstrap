@@ -63,6 +63,7 @@ from ard.attacks import AttackRequest, LinfPGD
 from ard.cli.train import _seed_everything
 from ard.config.schema import (
     CUDA_GRAPH_ARCHITECTURES,
+    CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES,
     CUDA_GRAPH_TEACHER_ARCHITECTURES,
     AttackConfig,
     AwpConfig,
@@ -109,6 +110,13 @@ _CANDIDATE_ARCHITECTURES = (
     "mobilenetv4_conv_small_se_imagenet",
     "mobilenetv4_conv_small_silu_se_imagenet",
     "mobilenetv4_conv_small_se_fullhead_imagenet",
+)
+# Candidates for the nondeterministic cases: not yet allowlisted (an allowlisted candidate is already covered
+# by its allowlist case, and a deterministic-only one must never be asked for a nondeterministic graph).
+_NONDETERMINISTIC_CANDIDATE_ARCHITECTURES = tuple(
+    architecture
+    for architecture in _CANDIDATE_ARCHITECTURES
+    if architecture not in CUDA_GRAPH_ARCHITECTURES and architecture not in CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES
 )
 _candidate_opt_in = pytest.mark.skipif(
     os.environ.get("ARD_CUDA_GRAPH_CANDIDATES") != "1",
@@ -1549,10 +1557,13 @@ _EXACT_UNDER_NONDETERMINISM = (
 # Trainer's benchmark refusal lifted locally).
 _NONDETERMINISTIC_CASES = [
     (_FIXTURE, "nondeterministic"),
-    *((architecture, "nondeterministic") for architecture in sorted(CUDA_GRAPH_ARCHITECTURES)),
+    *(
+        (architecture, "nondeterministic")
+        for architecture in sorted(CUDA_GRAPH_ARCHITECTURES - CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES)
+    ),
     *(
         pytest.param(architecture, "nondeterministic", marks=_candidate_opt_in)
-        for architecture in _CANDIDATE_ARCHITECTURES
+        for architecture in _NONDETERMINISTIC_CANDIDATE_ARCHITECTURES
     ),
 ]
 
@@ -1910,8 +1921,12 @@ _PRODUCTION_RANDOM_INIT_LR = {"efficientnet_b0_imagenet": 0.5, **dict.fromkeys(_
     [
         # The ConvNeXt-Atto / DeiT-Tiny family has its own opt-in production-shape check (AdamW, bitwise:
         # test_production_shape_adamw_graph_run_is_bit_identical).
-        *sorted(CUDA_GRAPH_ARCHITECTURES - set(_LAYERNORM_ARCHITECTURES)),
-        *(pytest.param(architecture, marks=_candidate_opt_in) for architecture in _CANDIDATE_ARCHITECTURES),
+        # Always nondeterministic, so deterministic-only students are excluded.
+        *sorted(CUDA_GRAPH_ARCHITECTURES - set(_LAYERNORM_ARCHITECTURES) - CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES),
+        *(
+            pytest.param(architecture, marks=_candidate_opt_in)
+            for architecture in _NONDETERMINISTIC_CANDIDATE_ARCHITECTURES
+        ),
     ],
 )
 def test_production_shape_graph_step_matches_eager_within_one_step_noise(tmp_path: Path, kind: str, shape: str) -> None:

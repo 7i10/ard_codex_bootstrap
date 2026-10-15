@@ -1411,6 +1411,7 @@ def main(argv: list[str] | None = None) -> int:
             mixed_batch=config.method.mixed_batch,
             auxiliary_batchnorm=auxiliary_batchnorm,
             awp=config.method.awp,
+            relu_surrogate_gradient=config.training.relu_surrogate_gradient,
         )
         start_epoch = 0
         if args.resume is not None:

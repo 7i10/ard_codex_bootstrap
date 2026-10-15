@@ -25,6 +25,7 @@ pytestmark = pytest.mark.t1
 
 MNV4M = "mobilenetv4_conv_medium_imagenet"
 MNV4M_SILU = "mobilenetv4_conv_medium_silu_imagenet"
+MNV4S_HARDSWISH = "mobilenetv4_conv_small_hardswish_imagenet"  # human-approved 2026-10-15
 MNV4S, DEIT, CONVNEXT = "mobilenetv4_conv_small_imagenet", "deit_tiny_imagenet", "convnext_atto_imagenet"
 # id -> (params, conv+linear MACs, attention-matmul MACs) at 224, 1000 classes.
 BASE = {
@@ -39,6 +40,7 @@ BASE = {
 VARIANTS = {
     "mobilenetv4_conv_small_silu_imagenet": (3_774_024, 186_005_568, 0, MNV4S),
     "mobilenetv4_conv_small_gelu_imagenet": (3_774_024, 186_005_568, 0, MNV4S),
+    MNV4S_HARDSWISH: (3_774_024, 186_005_568, 0, MNV4S),
     "mobilenetv4_conv_small_se_imagenet": (3_772_296, 185_999_424, 0, MNV4S),
     "mobilenetv4_conv_small_silu_se_imagenet": (3_772_296, 185_999_424, 0, MNV4S),
     "mobilenetv4_conv_small_se_fullhead_imagenet": (4_023_432, 186_250_304, 0, MNV4S),
@@ -53,6 +55,7 @@ VARIANTS = {
 PARAM_MATCHED = {
     "mobilenetv4_conv_small_silu_imagenet",
     "mobilenetv4_conv_small_gelu_imagenet",
+    MNV4S_HARDSWISH,
     "mobilenetv4_conv_small_se_imagenet",
     "mobilenetv4_conv_small_silu_se_imagenet",
     MNV4M_SILU,
@@ -178,6 +181,7 @@ def _activation_types(model: nn.Module) -> set[type]:
     [
         ("mobilenetv4_conv_small_silu_imagenet", nn.SiLU),
         ("mobilenetv4_conv_small_gelu_imagenet", "gelu"),
+        (MNV4S_HARDSWISH, nn.Hardswish),  # timm get_act_layer("hard_swish") is torch's nn.Hardswish
         ("mobilenetv4_conv_small_se_imagenet", nn.ReLU),
         ("mobilenetv4_conv_small_silu_se_imagenet", nn.SiLU),
     ],
@@ -192,7 +196,9 @@ def test_mobilenetv4_variant_uses_one_activation_everywhere(architecture: str, a
     assert _activation_types(build_architecture("mobilenetv4_conv_small_imagenet", num_classes=1000)) == {nn.ReLU}
 
 
-@pytest.mark.parametrize("architecture", ["mobilenetv4_conv_small_se_imagenet", "mobilenetv4_conv_small_silu_se_imagenet"])
+@pytest.mark.parametrize(
+    "architecture", ["mobilenetv4_conv_small_se_imagenet", "mobilenetv4_conv_small_silu_se_imagenet"]
+)
 def test_mobilenetv4_se_is_efficientnet_b0_style(architecture: str) -> None:
     """SE in every UIB block, squeeze = 0.25 x block input channels, sigmoid gate, squeeze act = block act."""
     from timm.models._efficientnet_blocks import SqueezeExcite, UniversalInvertedResidual
@@ -239,7 +245,9 @@ def _state_shapes(model: nn.Module) -> dict[str, torch.Size]:
     return {key: value.shape for key, value in model.state_dict().items()}
 
 
-@pytest.mark.parametrize("architecture", ["mobilenetv4_conv_small_silu_imagenet", "mobilenetv4_conv_small_gelu_imagenet"])
+@pytest.mark.parametrize(
+    "architecture", ["mobilenetv4_conv_small_silu_imagenet", "mobilenetv4_conv_small_gelu_imagenet", MNV4S_HARDSWISH]
+)
 def test_activation_variants_are_tensor_identical_to_the_base_except_activation_modules(architecture: str) -> None:
     """Activations hold no tensors and draw no init RNG: same seed -> the same state_dict, value for value."""
     torch.manual_seed(0)
@@ -251,10 +259,19 @@ def test_activation_variants_are_tensor_identical_to_the_base_except_activation_
     for key in base_state:
         assert torch.equal(base_state[key], variant_state[key]), key
     base_modules = dict(base.named_modules())
-    differing = {
-        name for name, module in variant.named_modules() if type(module) is not type(base_modules[name])
-    }
+    differing = {name for name, module in variant.named_modules() if type(module) is not type(base_modules[name])}
     assert differing and all(type(base_modules[name]) is nn.ReLU for name in differing)
+    # Every ReLU is replaced (stem bn1.act and head norm_head.act included), nothing else.
+    assert differing == {name for name, module in base_modules.items() if type(module) is nn.ReLU}
+    assert {"bn1.act", "norm_head.act"} <= differing
+
+
+def test_hardswish_name_resolves_to_torch_hardswish() -> None:
+    from timm.layers import get_act_layer
+
+    assert get_act_layer("hard_swish") is nn.Hardswish
+    images = torch.linspace(-5, 5, 101)
+    torch.testing.assert_close(nn.Hardswish()(images), images * torch.clamp(images + 3, 0, 6) / 6)
 
 
 @pytest.mark.parametrize(
@@ -268,8 +285,9 @@ def test_activation_variants_are_tensor_identical_to_the_base_except_activation_
 def test_se_variants_match_the_base_except_se_and_head(architecture: str, head_changes: bool) -> None:
     """Same tensors (names and shapes) as the base except the added ``.se.*`` and, for the matched arms,
     the narrowed head. Values differ under one seed only because SE's init draws shift the RNG order."""
-    base, variant = _state_shapes(build_architecture(MNV4S, num_classes=1000)), _state_shapes(
-        build_architecture(architecture, num_classes=1000)
+    base, variant = (
+        _state_shapes(build_architecture(MNV4S, num_classes=1000)),
+        _state_shapes(build_architecture(architecture, num_classes=1000)),
     )
     head = ("conv_head.", "norm_head.", "classifier.")
     se_keys = {key for key in variant if ".se." in key}
@@ -319,7 +337,9 @@ def test_deit_convstem_keeps_the_token_grid_and_transformer() -> None:
         (192, (1, 1), (1, 1)),
     ]
     stem_free = {key: value.shape for key, value in model.state_dict().items() if not key.startswith("patch_embed.")}
-    base_stem_free = {key: value.shape for key, value in base.state_dict().items() if not key.startswith("patch_embed.")}
+    base_stem_free = {
+        key: value.shape for key, value in base.state_dict().items() if not key.startswith("patch_embed.")
+    }
     assert stem_free == base_stem_free
 
 
@@ -338,6 +358,9 @@ CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "scientific"
 MNV4_BASE = "imagenet_mobilenetv4_pgd_at_random_init_lr0025_cg.yaml"
 MNV4M_BASE = "imagenet_mobilenetv4_conv_medium_pgd_at_phase2_baseline_ema.yaml"
 MNV4M_SILU_CONFIG = "imagenet_mobilenetv4_conv_medium_silu_pgd_at_phase2_random_lr0025.yaml"
+# The 2026-10-15 arms are cloned from the Phase 2 baseline+EMA config (itself Phase 1 + the Phase 2 template).
+MNV4_PHASE2_EMA_BASE = "imagenet_mobilenetv4_pgd_at_phase2_baseline_ema_cg.yaml"
+MNV4S_HARDSWISH_CONFIG = "imagenet_mobilenetv4_hardswish_pgd_at_phase2_random_lr0025.yaml"
 PHASE2_CONFIGS = {
     MNV4M_SILU_CONFIG: (MNV4M_SILU, MNV4M_BASE),
     "imagenet_mobilenetv4_silu_pgd_at_phase2_random_lr0025.yaml": ("mobilenetv4_conv_small_silu_imagenet", MNV4_BASE),
@@ -367,6 +390,7 @@ PHASE2_CONFIGS = {
         "mobilenetv4_conv_small_se_fullhead_imagenet",
         MNV4_BASE,
     ),
+    MNV4S_HARDSWISH_CONFIG: (MNV4S_HARDSWISH, MNV4_PHASE2_EMA_BASE),
 }
 
 
@@ -378,7 +402,11 @@ def test_every_variant_has_exactly_one_phase2_config() -> None:
 def test_phase2_adamw_configs_are_marked_do_not_launch(config_file: str) -> None:
     header = (CONFIG_DIR / config_file).read_text().split("schema_version")[0]
     base = PHASE2_CONFIGS[config_file][1]
-    if base not in (MNV4_BASE, MNV4M_BASE) and "convnext_atto" not in base and "deit_tiny" not in base:
+    if (
+        base not in (MNV4_BASE, MNV4M_BASE, MNV4_PHASE2_EMA_BASE)
+        and "convnext_atto" not in base
+        and "deit_tiny" not in base
+    ):
         assert "DO NOT LAUNCH until the AdamW grid closes" in header
     if "convnext_atto" in base:  # ConvNeXt-Atto AdamW grid closed 2026-10-09 at 1e-3
         assert "LR set to the closed AdamW grid winner 1e-3" in header
@@ -409,6 +437,16 @@ def test_phase2_configs_change_only_architecture_and_group(
     assert variant["student"]["architecture"] == architecture
     assert variant["student"]["pretrained"] is False
     assert variant["tracking"]["group"] != base["tracking"]["group"]
+    if base_file == MNV4_PHASE2_EMA_BASE:
+        # 2026-10-15: also the nondeterministic fastest setting (deterministic false, cudnn_benchmark true,
+        # no cuda_graph -- the variant is not graph-allowlisted); see the dedicated test below.
+        assert base["student"]["architecture"] == MNV4S
+        _strip_nondeterministic_fastest_setting(base, variant)
+        for payload in (base, variant):
+            payload["student"]["architecture"] = None
+            payload["tracking"]["group"] = None
+        assert variant == base
+        return
     if base_file == MNV4M_BASE:
         # The base is already a Phase 2 config: it carries the template fields itself, so compare directly.
         assert base["student"]["architecture"] == MNV4M
@@ -452,3 +490,64 @@ def test_mobilenetv4_medium_silu_is_tensor_identical_to_the_base_except_activati
     assert differing and all(type(base_modules[name]) is nn.ReLU for name in differing)
     assert all(type(dict(variant.named_modules())[name]) is nn.SiLU for name in differing)
     assert MNV4M_SILU not in CUDA_GRAPH_ARCHITECTURES
+
+
+def _set_config_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    for key, value in {
+        "ARD_SEED": "7",
+        "ARD_IMAGENET_ROOT": str(tmp_path / "imagenet"),
+        "ARD_NUM_WORKERS": "0",
+        "ARD_JOB_OUTPUT_DIR": str(tmp_path / "job-output"),
+        "ARD_RUN_ID": "config-test-run",
+        "WANDB_ENTITY": "entity",
+        "WANDB_PROJECT": "project",
+    }.items():
+        monkeypatch.setenv(key, value)
+
+
+def _strip_nondeterministic_fastest_setting(base: dict, variant: dict) -> None:
+    """Assert and remove the 2026-10-15 arms' nondeterministic fastest setting relative to the base."""
+    assert base["training"]["deterministic"] is True and base["training"]["cudnn_benchmark"] is False
+    assert base["training"]["cuda_graph"] is True
+    assert variant["training"]["deterministic"] is False and variant["training"]["cudnn_benchmark"] is True
+    assert "cuda_graph" not in variant["training"]  # excluded from the dump only when false
+    for payload in (base, variant):
+        for key in ("deterministic", "cudnn_benchmark", "cuda_graph"):
+            payload["training"].pop(key, None)
+
+
+# 2026-10-15 arms cloned from the Phase 2 baseline+EMA config: file -> (architecture, relu_surrogate_gradient).
+PHASE2_OCT15_CONFIGS = {
+    MNV4S_HARDSWISH_CONFIG: (MNV4S_HARDSWISH, None),
+    "imagenet_mobilenetv4_pgd_at_phase2_smoothgrad_opt.yaml": (MNV4S, {"beta": 10.0, "scope": "optimizer"}),
+    "imagenet_mobilenetv4_pgd_at_phase2_smoothgrad_both.yaml": (MNV4S, {"beta": 10.0, "scope": "attack_and_optimizer"}),
+}
+
+
+@pytest.mark.parametrize("config_file", sorted(PHASE2_OCT15_CONFIGS))
+def test_oct15_configs_differ_from_baseline_ema_only_in_the_listed_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_file: str
+) -> None:
+    """Base + {deterministic false, cudnn_benchmark true, no cuda_graph, tracking.group, the factor}."""
+    _set_config_env(monkeypatch, tmp_path)
+    architecture, surrogate = PHASE2_OCT15_CONFIGS[config_file]
+    base = load_config(CONFIG_DIR / MNV4_PHASE2_EMA_BASE).model_dump(mode="json")
+    variant = load_config(CONFIG_DIR / config_file).model_dump(mode="json")
+    assert variant["student"]["architecture"] == architecture
+    assert variant["tracking"]["group"] != base["tracking"]["group"]
+    assert variant["training"].get("relu_surrogate_gradient") == surrogate
+    assert "relu_surrogate_gradient" not in base["training"]
+    header = (CONFIG_DIR / config_file).read_text().split("schema_version")[0]
+    assert "2026-10-15" in header and MNV4_PHASE2_EMA_BASE in header and "deterministic" in header
+    _strip_nondeterministic_fastest_setting(base, variant)
+    variant["training"].pop("relu_surrogate_gradient", None)
+    for payload in (base, variant):
+        payload["student"]["architecture"] = None
+        payload["tracking"]["group"] = None
+    assert variant == base
+
+
+def test_oct15_tracking_groups_are_distinct(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_config_env(monkeypatch, tmp_path)
+    groups = [load_config(CONFIG_DIR / name).tracking.group for name in (*PHASE2_OCT15_CONFIGS, MNV4_PHASE2_EMA_BASE)]
+    assert len(set(groups)) == len(groups)

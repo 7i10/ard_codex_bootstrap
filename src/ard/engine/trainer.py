@@ -6,7 +6,7 @@ import copy
 import math
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -18,7 +18,14 @@ from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
 from ard.attacks import AttackGenerator, AttackRequest, LinfPGD
-from ard.config.schema import CUDA_GRAPH_TEACHER_ARCHITECTURES, AdrConfig, AwpConfig, MixedBatchConfig
+from ard.config.schema import (
+    CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES,
+    CUDA_GRAPH_TEACHER_ARCHITECTURES,
+    AdrConfig,
+    AwpConfig,
+    MixedBatchConfig,
+    ReluSurrogateGradientConfig,
+)
 from ard.data import IndexedBatch
 from ard.distillation.soft_label_bank import SoftLabelBankTeacher, pseudo_logits, reconstruct_probabilities
 from ard.distillation.trainer_hooks import DistillationTargetHooks, bank_clean_logits
@@ -69,6 +76,7 @@ from .distributed import (
     unwrap_model,
 )
 from .mixed_batch import AuxiliaryBatchNorm, adversarial_count, check_split_batchnorm_batch, example_weights
+from .surrogate_gradient import ReluSurrogateGradient, install_relu_surrogate
 
 # Trainer(selection_subset=...): what the selection record must state.
 SELECTION_SUBSET_KEYS = frozenset({"size", "ids_sha256", "full_split_size", "seed", "sampling", "source"})
@@ -305,6 +313,7 @@ class Trainer:
         mixed_batch: MixedBatchConfig | None = None,
         auxiliary_batchnorm: AuxiliaryBatchNorm | None = None,
         awp: AwpConfig | None = None,
+        relu_surrogate_gradient: ReluSurrogateGradientConfig | None = None,
     ) -> None:
         self.model = model.to(device)
         self.teacher = None if teacher is None else teacher.to(device)
@@ -701,6 +710,69 @@ class Trainer:
         if cuda_graph:
             self._validate_cuda_graph_scope(student_architecture)
             self._cuda_graph = CudaGraphStepState(device=self.device)
+        # training.relu_surrogate_gradient (SAT, arXiv:2006.14536; ard.engine.surrogate_gradient). Installed
+        # last, so the EMA shadow and the AWP proxy (deep copies made above) keep plain nn.ReLU. The switch
+        # is turned on only by _surrogate_gradient_scope around the training attack and the training
+        # loss's backward in train_epoch; every other gradient is the true ReLU gradient.
+        self.relu_surrogate_gradient = relu_surrogate_gradient
+        self._relu_surrogate: ReluSurrogateGradient | None = None
+        if relu_surrogate_gradient is not None:
+            requirements = (
+                (not cuda_graph, "no cuda_graph (not parity-tested)"),
+                (get_world_size() == 1, "world size 1 (DDP not tested)"),
+                (unwrap_model(self.model) is self.model, "an unwrapped (not DDP or compiled) student"),
+                (
+                    relu_surrogate_gradient.scope != "attack_and_optimizer" or self.attack is not None,
+                    "a training attack for scope=attack_and_optimizer",
+                ),
+                # Mirrors the schema (allowed = tested): a plain PGD-AT / standard FP32 step only.
+                (type(self.objective) is PGDATObjective, "the PGD-AT objective"),
+                (self.scaler is None, "no AMP GradScaler"),
+                (self.mixed_batch is None and self.awp_config is None, "no mixed_batch or awp"),
+                (not self.clean_wrong_attack_skip, "no clean-wrong attack skipping"),
+                (
+                    self.teacher is None and self.distillation_hooks is None and self.adr_config is None,
+                    "no teacher, distillation or ADR",
+                ),
+                (self.policy is None and self.sample_store is None, "no policy or sample state"),
+                (
+                    self.target_policy is None
+                    and self.intervention_mask is None
+                    and self.prescriptive_v3_route is None
+                    and self.dynamic_s3_router is None
+                    and self.online_state_s2_router is None
+                    and self.frozen_risk_lookup is None
+                    and not self.oracle_mask,
+                    "no target policy, intervention, router or oracle",
+                ),
+                (self.observation_profile == "off", "observation_profile=off"),
+            )
+            missing = [reason for holds, reason in requirements if not holds]
+            if missing:
+                raise ValueError("relu_surrogate_gradient requires " + "; ".join(missing))
+            self._relu_surrogate = ReluSurrogateGradient(relu_surrogate_gradient.beta)
+            install_relu_surrogate(self.model, self._relu_surrogate)
+
+    def _surrogate_gradient_scope(self, phase: str) -> AbstractContextManager[None]:
+        """The smooth-ReLU-backward switch for one training-step phase (a no-op without the option).
+
+        ``training_backward``: the training loss's ``backward()`` (both scopes). ``training_attack``: the
+        training attack's ``generate`` call (scope ``attack_and_optimizer`` only). Nothing else ever enters it.
+        """
+        if phase not in {"training_attack", "training_backward"}:
+            raise ValueError(f"unknown surrogate-gradient phase {phase!r}")
+        config = self.relu_surrogate_gradient
+        if self._relu_surrogate is None or config is None:
+            return nullcontext()
+        if phase == "training_attack" and config.scope != "attack_and_optimizer":
+            return nullcontext()
+        return self._relu_surrogate.active()
+
+    def _generate_training_attack(self, request: AttackRequest) -> Any:
+        """The training attack (train_epoch's eager step only), under the surrogate switch for its scope."""
+        assert self.attack is not None
+        with self._surrogate_gradient_scope("training_attack"):
+            return self.attack.generate(request)
 
     def _validate_phase2_batch_a_scope(self) -> None:
         """Mixed batch / split BN / AWP are defined for a plain PGD-AT step only (mirrors the schema)."""
@@ -808,6 +880,11 @@ class Trainer:
             (
                 student_architecture in CUDA_GRAPH_ARCHITECTURES,
                 f"a parity-tested student architecture ({', '.join(sorted(CUDA_GRAPH_ARCHITECTURES))})",
+            ),
+            (
+                student_architecture not in CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES
+                or torch.are_deterministic_algorithms_enabled(),
+                f"deterministic algorithms on for {student_architecture} (deterministic-only graph parity)",
             ),
             (not torch.backends.cudnn.benchmark, "cuDNN benchmark off"),
             (self.scaler is None, "no AMP GradScaler"),
@@ -2156,7 +2233,7 @@ class Trainer:
                 attack_result = None
                 adversarial = batch.images
                 if mixed_count > 0:
-                    attack_result = self.attack.generate(
+                    attack_result = self._generate_training_attack(
                         AttackRequest(
                             inputs=batch.images[:mixed_count],
                             labels=batch.labels[:mixed_count],
@@ -2181,7 +2258,7 @@ class Trainer:
                     subset_target = (
                         None if teacher_clean_logits is None else teacher_clean_logits.index_select(0, attack_indices)
                     )
-                    attack_result = self.attack.generate(
+                    attack_result = self._generate_training_attack(
                         AttackRequest(
                             inputs=batch.images.index_select(0, attack_indices),
                             labels=batch.labels.index_select(0, attack_indices),
@@ -2206,7 +2283,7 @@ class Trainer:
                 else:
                     attack_result = None
             else:
-                attack_result = self.attack.generate(
+                attack_result = self._generate_training_attack(
                     AttackRequest(
                         inputs=batch.images,
                         labels=batch.labels,
@@ -2687,10 +2764,13 @@ class Trainer:
                     get_world_size() / global_weight.to(dtype=terms.total.dtype)
                 )
             _assert_finite_training_loss(loss)
-            if self.scaler is None:
-                loss.backward()
-            else:
-                self.scaler.scale(loss).backward()
+            # training.relu_surrogate_gradient: the training loss's backward (the gradient that updates the
+            # weights) is the one backward the optimizer scope covers.
+            with self._surrogate_gradient_scope("training_backward"):
+                if self.scaler is None:
+                    loss.backward()
+                else:
+                    self.scaler.scale(loss).backward()
             if self.teacher is not None and any(parameter.grad is not None for parameter in self.teacher.parameters()):
                 raise RuntimeError("frozen Teacher unexpectedly received a parameter gradient")
             if self.scaler is None:

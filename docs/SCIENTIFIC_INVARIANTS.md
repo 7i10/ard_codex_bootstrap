@@ -66,6 +66,9 @@ including BatchNorm tracking counters. These counts are identity checks, not int
 - single-teacher RSLAD-familyではteacher parameterを`requires_grad=False`にし、`.grad`を残さない。
 - teacher-forward-only pathはteacher input gradientを要求しない。将来teacher input gradientが必要なmethodを
   追加するときは、parameter freezeとinput gradientを別々にtestする。
+- `training.relu_surrogate_gradient` (SAT smooth ReLU backward, 2026-10-15) may replace ReLU's derivative only in the
+  training loss's backward and, with `scope: attack_and_optimizer`, in the training attack. Selection, validation,
+  probe, evaluation and AutoAttack gradients are always the true model gradients; forwards stay exactly ReLU.
 
 ## 3. Objective and policy identity
 
@@ -216,6 +219,8 @@ AMPを有効にする将来configではattack gradient precisionとGradScaler st
   without cuda graph capture"; it is expected, not a fault. Until the opt-in production-shape bitwise SGD check has
   passed for them, the ConvNeXt-Atto / DeiT-Tiny family (`CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES`) also records
   `cuda_graph: true` with deterministic SGD; remove an architecture from that set once its check passes.
+  Since 2026-10-15 (human-approved) the MobileNetV4-S SiLU variant is allowlisted in deterministic mode only
+  (`CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES`): its nondeterministic one-step check does not pass.
   The stale-graph guard also covers every AdamW hyperparameter per group (lr, betas, eps, weight decay, flags) and
   the addresses of `exp_avg`, `exp_avg_sq` and the step counter.
   - `training.deterministic: true`: **bitwise** equal to the eager step (checkpoints, RNG streams, epoch rows,

@@ -31,6 +31,7 @@ from ard.config import load_config
 from ard.config.loader import _expand_environment, resolved_config_dict
 from ard.config.schema import (
     CUDA_GRAPH_ARCHITECTURES,
+    CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES,
     CUDA_GRAPH_IDENTITY_RECORDED_ARCHITECTURES,
     CUDA_GRAPH_TEACHER_ARCHITECTURES,
     AttackConfig,
@@ -199,7 +200,11 @@ def test_allowlist_is_the_parity_tested_students() -> None:
         "convnext_atto_convstem_imagenet",
         "deit_tiny_imagenet",
         "deit_tiny_convstem_imagenet",
+        # 2026-10-15: the MobileNetV4-S SiLU variant, deterministic mode only.
+        "mobilenetv4_conv_small_silu_imagenet",
     }
+    assert CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES == {"mobilenetv4_conv_small_silu_imagenet"}
+    assert CUDA_GRAPH_DETERMINISTIC_ONLY_ARCHITECTURES <= CUDA_GRAPH_ARCHITECTURES
 
 
 @pytest.mark.parametrize(
@@ -1109,3 +1114,62 @@ if __name__ == "__main__":  # pragma: no cover - fixture regeneration from the p
     }
     GOLDEN.write_text(json.dumps(payload, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     print(f"wrote {GOLDEN}")
+
+
+@pytest.mark.parametrize("deterministic", [True, False])
+def test_silu_variant_is_admitted_to_the_graph_only_when_deterministic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, deterministic: bool
+) -> None:
+    """2026-10-15: the MobileNetV4-S SiLU variant passes deterministic bitwise parity but not the
+    nondeterministic one-step check, so only the deterministic graph is admitted."""
+    raw = _stage1(monkeypatch, tmp_path)
+    updated = _with(
+        raw,
+        student={"architecture": "mobilenetv4_conv_small_silu_imagenet", "pretrained": False},
+        training={"cuda_graph": True, "deterministic": deterministic},
+    )
+    if not deterministic:
+        with pytest.raises(ValueError, match="deterministic-only graph parity"):
+            ExperimentConfig.model_validate(updated)
+        return
+    assert ExperimentConfig.model_validate(updated).training.cuda_graph
+
+
+@pytest.mark.parametrize("deterministic", [True, False])
+def test_trainer_refuses_the_silu_variant_graph_without_deterministic_algorithms(
+    tmp_path: Path, deterministic: bool
+) -> None:
+    """Trainer-side mirror of the schema rule (2026-10-15): _validate_cuda_graph_scope lists every missing
+    condition, so on CPU the error always names the CUDA device and, only with deterministic algorithms
+    off, the deterministic-only graph parity of the SiLU variant."""
+    from torch.optim import SGD
+
+    from ard.attacks import LinfPGD
+    from ard.engine.trainer import Trainer
+    from ard.objectives import PGDATObjective
+
+    attack = AttackConfig(epsilon="8/255", step_size="2/255", steps=2, random_start=True)
+    model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(48, 3))
+    previous = (torch.are_deterministic_algorithms_enabled(), torch.is_deterministic_algorithms_warn_only_enabled())
+    try:
+        torch.use_deterministic_algorithms(deterministic)
+        with pytest.raises(ValueError, match="a CUDA device") as raised:
+            Trainer(
+                model=model,
+                optimizer=SGD(model.parameters(), lr=0.1),
+                scheduler=None,
+                scaler=None,
+                attack=LinfPGD(attack),
+                selection_attack=LinfPGD(attack),
+                objective=PGDATObjective(),
+                device=torch.device("cpu"),
+                output_dir=tmp_path,
+                config_hash="e" * 64,
+                seed=0,
+                step_diagnostics=False,
+                cuda_graph=True,
+                student_architecture="mobilenetv4_conv_small_silu_imagenet",
+            )
+    finally:
+        torch.use_deterministic_algorithms(previous[0], warn_only=previous[1])
+    assert ("deterministic-only graph parity" in str(raised.value)) is (not deterministic)
