@@ -16,3 +16,4 @@ markitdown[pptx]
 Pillow
 defusedxml
 lxml
+matplotlib

@@ -198,7 +198,7 @@ const BODY = {
     const size = t.size || 17;
     const header = t.header.map((h) => ({ text: h, options: { bold: true, color: T.white, fill: { color: T.primary }, align: "center", fontSize: size } }));
     const rows = t.rows.map((r, ri) => r.map((v, ci) => ({
-      text: runs(String(v), { fontSize: size, color: T.text }),
+      text: runs(String(v) === "" ? "\u00a0" : String(v), { fontSize: size, color: T.text }),
       options: { align: ci === 0 ? "left" : "center", fill: { color: hl.has(`${ri},${ci}`) ? T.tint : (ri % 2 ? "F7F9FC" : T.white) } },
     })));
     const colW = t.col_w ? t.col_w.map((f) => f * tw) : undefined;
