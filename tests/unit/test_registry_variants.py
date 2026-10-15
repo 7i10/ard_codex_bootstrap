@@ -551,3 +551,50 @@ def test_oct15_tracking_groups_are_distinct(tmp_path: Path, monkeypatch: pytest.
     _set_config_env(monkeypatch, tmp_path)
     groups = [load_config(CONFIG_DIR / name).tracking.group for name in (*PHASE2_OCT15_CONFIGS, MNV4_PHASE2_EMA_BASE)]
     assert len(set(groups)) == len(groups)
+
+
+# 2026-10-15 decision 0057 option B: AdamW beta2 0.95 clones (kept out of PHASE2_CONFIGS so its one-per-variant test stays exact).
+BETA2_095_CONFIGS = {
+    "imagenet_convnext_atto_pgd_at_phase2_baseline_ema_beta2_095.yaml": "imagenet_convnext_atto_pgd_at_phase2_baseline_ema.yaml",
+    "imagenet_convnext_atto_convstem_pgd_at_phase2_adamw_random_lr1em3_beta2_095.yaml": "imagenet_convnext_atto_convstem_pgd_at_phase2_adamw_random_lr1em3.yaml",
+    "imagenet_deit_tiny_pgd_at_phase2_baseline_ema_beta2_095.yaml": "imagenet_deit_tiny_pgd_at_phase2_baseline_ema.yaml",
+    "imagenet_deit_tiny_convstem_pgd_at_phase2_adamw_random_lr1em3_beta2_095.yaml": "imagenet_deit_tiny_convstem_pgd_at_phase2_adamw_random_lr1em3.yaml",
+}
+BETA2_095_PAIRS = {
+    "imagenet_convnext_atto_pgd_at_phase2_baseline_ema_beta2_095.yaml": "imagenet_convnext_atto_convstem_pgd_at_phase2_adamw_random_lr1em3_beta2_095.yaml",
+    "imagenet_deit_tiny_pgd_at_phase2_baseline_ema_beta2_095.yaml": "imagenet_deit_tiny_convstem_pgd_at_phase2_adamw_random_lr1em3_beta2_095.yaml",
+}
+
+
+@pytest.mark.parametrize("config_file", sorted(BETA2_095_CONFIGS))
+def test_beta2_095_configs_differ_from_base_only_in_beta2_and_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_file: str
+) -> None:
+    _set_config_env(monkeypatch, tmp_path)
+    base_file = BETA2_095_CONFIGS[config_file]
+    base = load_config(CONFIG_DIR / base_file).model_dump(mode="json")
+    variant = load_config(CONFIG_DIR / config_file).model_dump(mode="json")
+    assert base["optimizer"]["beta2"] == 0.999 and variant["optimizer"]["beta2"] == 0.95
+    assert variant["tracking"]["group"] == base["tracking"]["group"] + "-beta2-095"
+    header = (CONFIG_DIR / config_file).read_text().split("schema_version")[0]
+    assert "2026-10-15" in header and "0057" in header and base_file in header and "2303.01870" in header
+    for payload in (base, variant):
+        payload["optimizer"]["beta2"] = None
+        payload["tracking"]["group"] = None
+    assert variant == base
+
+
+@pytest.mark.parametrize("baseline_file", sorted(BETA2_095_PAIRS))
+def test_beta2_095_convstem_pairs_differ_only_in_architecture_and_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, baseline_file: str
+) -> None:
+    _set_config_env(monkeypatch, tmp_path)
+    baseline = load_config(CONFIG_DIR / baseline_file).model_dump(mode="json")
+    convstem = load_config(CONFIG_DIR / BETA2_095_PAIRS[baseline_file]).model_dump(mode="json")
+    assert convstem["student"]["architecture"] != baseline["student"]["architecture"]
+    assert "convstem" in convstem["student"]["architecture"]
+    assert convstem["tracking"]["group"] != baseline["tracking"]["group"]
+    for payload in (baseline, convstem):
+        payload["student"]["architecture"] = None
+        payload["tracking"]["group"] = None
+    assert convstem == baseline
