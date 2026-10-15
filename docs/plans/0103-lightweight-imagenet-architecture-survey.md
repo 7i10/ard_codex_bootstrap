@@ -6968,3 +6968,168 @@ history behind this pivot.)
   `epoch-metrics.parquet` sha256 `d8bb43b6...`,
   `sample-stats-train.parquet` sha256 `8efdb8af...` (from the run-bundle
   manifest). W&B `lightweight-imagenet-at`, same run id (one segment).
+- 2026-10-15 (postrun): **Phase 2 candidate 2 (label smoothing 0.1),
+  ConvNeXt-Atto seed 0 completed.** `plan0103-phase2-convnext-atto-ls01-s0-v1`
+  (hand-run from the Ferret pull queue, host `islab-3gpu` in the wandb
+  metadata, one RTX 4090; the GPU index is not recorded;
+  `environment.json` records kernel 7.0.0-28 and driver 595.99.02, the
+  same as the baseline+EMA run) ran 50/50 epochs from 2026-10-13 04:46:58
+  to 2026-10-15 03:42:11 UTC. `run-bundle/completion.json` reads
+  `completed`, the manifest status is `completed`, and
+  `run-bundle/error-marker.txt` reads "no application error recorded".
+  The watcher re-derived it as terminal and successful. All 50 epoch rows
+  are present (`epoch_metrics_complete: true`), one W&B segment, no
+  resume. `train.log` and the wandb logs have no traceback, NaN, error or
+  warning line apart from the wandb git-root warning. `best.pt` (epoch
+  49), `best-ema.pt` (epoch 49), `last.pt` and `epoch-049.pt` are on
+  disk. Nothing is imported into `docs/experiments/`: no aggregator exists
+  for this contract. The numbers below are read from the run-bundle
+  manifest and `epoch-metrics.jsonl` of this run (via
+  `scripts/ardx/read_bundle.py`); the baseline+EMA and cosine numbers are
+  from their entries above.
+
+  Fixed identity: as the ConvNeXt-Atto baseline+EMA run
+  `plan0103-phase2-convnext-atto-baseline-ema-s0-v1` (59.69 / 36.92)
+  except (a) `method.label_smoothing: 0.1` on the training loss only (the
+  PGD-3 training attack and the PGD-10 selection and validation attacks
+  keep plain CE, `loss: ce`), the Singh/Croce/Hein 2023 value; (b) the W&B
+  group. Same source SHA (`9a16cd6`), same host (Ferret), same kernel and
+  driver: the two configs differ in nothing else (checked with `git diff`
+  of `imagenet_convnext_atto_pgd_at_phase2_baseline_ema.yaml` and
+  `imagenet_convnext_atto_pgd_at_phase2_ls01.yaml`, both unchanged since
+  `9a16cd6`). This is the cleanest pair in the ConvNeXt-Atto Phase 2 so
+  far; both sides are still non-deterministic. Recipe: ConvNeXt-Atto
+  Phase 1 closed grid: warmup_multistep (10-epoch linear warmup to 1e-3,
+  x0.1 at epochs 25 and 38), full AT, standard augmentation. ImageNet-1k
+  (original images, content `ae033613...`), ConvNeXt-Atto V1
+  (`convnext_atto_imagenet`) random init, plain PGD-AT, no teacher, 224 px
+  training. Training and evaluation-attack seed 0 (split seed 20260911).
+  Training attack CE PGD-3, l_inf eps 4/255, step 8/765, random start.
+  Selection and validation attack PGD-10, same eps and step, random
+  start, eval mode. AdamW (betas 0.9 / 0.999, decoupled wd 0.05), peak LR
+  1e-3, 50 epochs. World size 1, global batch 128. fp32.
+  Non-deterministic with cudnn_benchmark, no cuda_graph, not compiled.
+  Phase 2 template (selection subset 5,000, EMA 0.9999). Protocol
+  `controlled_imagenet_stage02_lightweight_architecture_survey_v1`,
+  config hash `fc3dc048...`. Source SHA
+  `9a16cd622312f03669e5dea2eb0e9a9723e38ce2` (worktree
+  `source-9a16cd622312`, clean; plan 0106 re-pinned this item from
+  `5dd329e`). The arm is Phase 2 candidate ④ (label smoothing,
+  discussion register B, 2026-10-08) on ConvNeXt-Atto; no decision packet
+  preregistered a rule for it, so the only rule is the Phase 2 tier rule
+  (register C, 2026-10-08) against the Phase 2 reference (baseline+EMA).
+  "Full val", "subset", "complement" and "probe" mean the same as in the
+  cosine entry above (25,620 / 5,000 / 20,620 held-out original train
+  images, 2,000 training images seen without augmentation). None is the
+  ImageNet val split. No AutoAttack and no official evaluation has run.
+
+  End of training (full val and complement are evaluated once, at the
+  final epoch):
+
+  | checkpoint | full val clean / PGD-10 | complement clean / PGD-10 |
+  |---|---:|---:|
+  | last (ep 49), raw weights | 59.63 / 37.61 | 59.74 / 37.76 |
+  | last (ep 49), EMA weights | 59.64 / 37.75 | 59.84 / 37.96 |
+  | best raw (ep 49, by subset PGD-10) = last raw | 59.63 / 37.61 | 59.74 / 37.76 |
+  | best EMA (ep 49, by EMA subset PGD-10) = last EMA | 59.64 / 37.75 | 59.84 / 37.96 |
+  | baseline+EMA (no LS), last raw | 59.69 / 36.92 | 59.89 / 37.09 |
+  | baseline+EMA (no LS), last EMA | 59.72 / 36.99 | 59.95 / 37.20 |
+  | cosine (no LS), last raw | 60.70 / 37.90 | 60.84 / 38.13 |
+
+  Per-epoch trajectory against baseline+EMA (both subset; probe uses CE
+  PGD-10 in eval mode; same schedule; train loss is not listed because it
+  includes the smoothing term and is not comparable with a no-LS run):
+
+  | epoch | LR | subset raw clean / PGD-10 | baseline subset raw | subset EMA clean / PGD-10 | baseline subset EMA | probe clean / PGD-10 | baseline probe |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | 0 | 1e-4 | 2.82 / 1.94 | 2.84 / 2.00 | 0.46 / 0.24 | 0.54 / 0.22 | 2.20 / 1.50 | 2.60 / 1.70 |
+  | 8 | 9e-4 (EMA passes raw) | 34.02 / 19.64 | 34.06 / 18.88 | 35.72 / 21.80 | 36.32 / 22.24 | 36.70 / 19.55 | 36.60 / 20.90 |
+  | 9 | 1e-3 (end of warmup) | 36.10 / 20.52 | 36.18 / 19.82 | 39.36 / 24.20 | 39.72 / 24.38 | 38.40 / 21.60 | 37.60 / 20.65 |
+  | 19 | 1e-3 | 41.52 / 24.22 | 40.82 / 23.88 | 47.94 / 30.70 | 48.22 / 30.30 | 45.70 / 27.05 | 45.60 / 25.45 |
+  | 24 | 1e-3 (last) | 43.76 / 25.00 | 43.20 / 25.34 | 49.06 / 31.68 | 49.58 / 31.72 | 46.65 / 26.70 | 46.65 / 26.10 |
+  | 25 | 1e-4 | 52.06 / 32.52 | 52.82 / 32.02 | 50.78 / 32.30 | 51.24 / 32.06 | 56.20 / 37.00 | 56.50 / 35.20 |
+  | 30 | 1e-4 | 55.70 / 34.72 | 56.00 / 33.88 | 55.90 / 35.22 | 56.50 / 34.70 | 60.50 / 39.05 | 60.05 / 39.00 |
+  | 37 | 1e-4 (last) | 56.70 / 35.64 | 56.82 / 34.86 | 57.90 / 36.04 | 57.84 / 35.64 | 61.85 / 41.10 | 62.75 / 39.45 |
+  | 38 | 1e-5 | 57.86 / 36.16 | 57.88 / 35.22 | 58.04 / 36.20 | 58.18 / 35.76 | 63.75 / 42.15 | 63.75 / 41.35 |
+  | 40 | 1e-5 | 58.40 / 36.34 | 58.32 / 35.34 | 58.18 / 36.44 | 58.40 / 35.58 | 63.70 / 42.45 | 64.45 / 41.95 |
+  | 45 | 1e-5 | 58.50 / 36.72 | 58.52 / 35.98 | 58.64 / 36.60 | 58.76 / 36.12 | 64.70 / 42.65 | 65.15 / 42.50 |
+  | 47 | 1e-5 | 58.64 / 36.76 | 58.58 / 35.62 | 58.78 / 36.72 | 58.76 / 36.06 | 64.35 / 42.70 | 65.00 / 43.00 |
+  | 49 | 1e-5 (last, best raw, best EMA) | 59.18 / 36.98 | 58.86 / 36.20 | 58.80 / 36.86 | 58.78 / 36.08 | 64.95 / 42.80 | 65.20 / 43.20 |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **Against the Phase 2 reference (baseline+EMA).** Last raw weights
+     on full val: **-0.06 clean / +0.69 PGD-10** (59.63 / 37.61 vs 59.69 /
+     36.92; about 176 PGD-10-correct images of 25,620). With the two-run
+     SE of a full-val difference (about 0.43pt clean, 0.37pt PGD-10) that
+     is about 0.1 / 1.9 SE; the PGD-10 difference is about 1.9x the
+     ConvNeXt-Atto seed-0 / seed-1 spread (0.36pt). Complement -0.15 /
+     +0.67; last EMA -0.08 / +0.76. Under the Phase 2 tier rule (>= 1.5pt
+     "effect", 0.5-1.5pt "hold", < 0.5pt "no effect") PGD-10 is
+     **"hold"**, 0.19pt (about 49 images) above the "no effect" line;
+     clean is "no effect". Against Phase 1 seed 0 (37.02): +0.59.
+  2. **Against MobileNetV4-S label smoothing.** There label smoothing
+     gave -0.50 clean / +0.45 PGD-10 against its reference ("no effect",
+     0.05pt under the line; decision 0039). Here: -0.06 / +0.69. Same
+     sign on PGD-10 in both architectures, smaller clean cost on
+     ConvNeXt-Atto; each is one seed, and the two use different
+     optimizers (SGD vs AdamW) and determinism settings.
+  3. **Against cosine (different source and host).** -1.07 clean / -0.29
+     PGD-10. Label smoothing does not reach the cosine run on this seed.
+     The two changes have not been combined.
+  4. **Where the PGD-10 lead appears.** On the subset, raw PGD-10 is equal
+     at epoch 0 (-0.06), ahead by +0.70-0.76 at the end of warmup (epochs
+     8-9), mixed at the peak LR (+0.34 at epoch 19, -0.34 at epoch 24),
+     and ahead at every listed epoch from the first decay on (+0.50 at
+     epoch 25, +0.78-0.84 in the middle stage, +0.74 to +1.14 in the last
+     stage, +0.78 at epoch 49). Subset raw clean stays within -0.76 to
+     +0.70 throughout. EMA columns show the same picture after the first
+     decay (+0.40 to +0.86 PGD-10 at the listed epochs from epoch 30 on)
+     and no lead at the peak LR (-0.18 to +0.40 at epochs 9-24). The subset SE of a
+     two-run difference is about 0.9pt, so no single subset row is
+     beyond noise; the consistent sign over the last 25 epochs and the
+     full-val reading (item 1) agree.
+  5. **Smaller seen-unseen gap on PGD-10.** The training probe ends
+     -0.25 clean / -0.40 PGD-10 below the baseline while full val is
+     -0.06 / +0.69, so probe minus full val narrows to +5.32 clean /
+     +5.19 PGD-10 (baseline +5.51 / +6.28). Probe SE is about 1.1pt, so
+     this is inside noise; the direction is the one expected if label
+     smoothing reduces fitting of the training images under attack.
+     Training-batch robust accuracy (PGD-3, augmented, train mode; argmax,
+     so comparable) ends at 33.59% vs 33.35%, below full-val PGD-10
+     37.61%: the val >= train signature persists.
+  6. **EMA at the end adds nothing.** Last EMA minus last raw on full val:
+     +0.01 clean / +0.14 PGD-10 (complement +0.11 / +0.20), "no effect"
+     (< 0.5pt), as for the baseline+EMA run (+0.03 / +0.06).
+  7. **EMA mid-run: no long warmup lag, as in the other ConvNeXt-Atto
+     runs.** EMA passes raw at epoch 8 for both clean and PGD-10 (the
+     same epoch as baseline+EMA). It leads by up to +6.64 clean / +7.30
+     PGD-10 (both epoch 20) at the peak LR, by -0.22 to +1.14 PGD-10 over
+     epochs 25-37 and by -0.22 to +0.30 over epochs 38-49.
+  8. **Best and last; trains normally.** Best raw and best EMA are the
+     last epoch (`robust_overfit_gap_full` 0.00pt): no robust overfitting
+     within 50 epochs. Subset raw PGD-10 never falls more than 0.64pt
+     below its running maximum (epoch 20, 23.76 after 24.40 at epoch 16;
+     next 0.58pt at epoch 35); the catastrophic-overfitting guard never
+     fires. Decays: first +8.30 clean / +7.52 PGD-10 (subset, epoch 24 to
+     25; baseline +9.62 / +6.68), second +1.16 / +0.52 (epoch 37 to 38;
+     baseline +1.06 / +0.36); the last stage creeps up (36.16 to 36.98).
+  9. **Cost.** 46.92 h from start to finish (168,913 s; baseline+EMA
+     32.18 h). Throughput 355-362 img/s in epochs 0-20, 241-323 in epochs
+     21-29, 463-465 in epochs 30-31 and 514-536 in epochs 32-49
+     (baseline+EMA on Ferret 487-591). The slow stretches follow the
+     shared host's load; which GPU ran it and what shared it are not
+     recorded. Label smoothing changes only the loss target, so the
+     slowdown is not attributed to it. Peak allocated memory 5.77
+     GB at epoch 0, 5.16 GB after; reserved 6.39-6.53 GB in the epochs
+     read (0-2), the same as baseline+EMA.
+
+  Caveats: one seed. Both sides are non-deterministic, and the size of
+  the non-determinism alone is still not measured for ConvNeXt-Atto, so
+  +0.69 includes it. The PGD-10 reading sits 0.19pt above a tier
+  boundary. Evaluation is CE PGD-10 only; label smoothing is known to
+  inflate PGD numbers through gradient masking in some settings, which a
+  stronger attack (AutoAttack from a saved checkpoint) would check; none
+  has run. Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `76e34e0f...`,
+  `sample-stats-train.parquet` sha256 `3eaedb00...` (from the run-bundle
+  manifest). W&B `lightweight-imagenet-at`, same run id (one segment).
