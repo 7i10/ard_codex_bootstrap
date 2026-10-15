@@ -1,6 +1,6 @@
 ---
 id: 0057
-status: pending
+status: decided
 created: 2026-10-15
 campaign: plan0103-phase2-convnext-atto-convstem-s0-v1（plan 0103 Phase 2 batch B の「ConvStem 版 ConvNeXt-Atto」。timm の 4x4 パッチ化の入口（stem）を、Singh/Croce/Hein の ConvStem（conv3x3/s2 3→20、LayerNorm、GELU、conv3x3/s2 20→40、LayerNorm、GELU）に置き換えたもの。ランダム初期化・AdamW lr 1e-3・full AT 50 epoch。Hamster で hand-run、seed 0、50/50 epoch 完走、source SHA 5dd329e、非決定的＋cudnn_benchmark）
 question: ConvStem 版は「完了」で終わりましたが、50 epoch ずっと当てずっぽう（0.10%）のままで、何も学習していませんでした。まず原因を CPU だけで調べるか、ConvStem の問いをここで閉じるか、同じ設定でもう一度回して最初の epoch で確かめるか。
@@ -9,7 +9,7 @@ options:
   B: ConvStem の問いを閉じる（0 GPU時間）。原因は調べず、「ConvStem は Phase 2 で試せなかった」と記録する。
   C: 同じ設定・同じ source でもう一度回し、epoch 0 で確かめる（epoch 0 だけなら約 0.6 GPU時間、最後まで行けば約 29 GPU時間）。epoch 0 のサブセット clean が 1% を越えなければその場で止める。
 recommendation: A
-chosen: null
+chosen: B'
 ---
 
 # 0057: ConvStem 版 ConvNeXt-Atto、seed 0 は学習しなかった（結果なし）
@@ -94,3 +94,7 @@ B で閉じると、同じ形の失敗がほかの版でも起きうるという
 **この packet とは別の、仕組みの問題**: 今回、走っている途中で「当てずっぽうのまま」を止める見張りがありませんでした。「epoch 0（または 1）が終わっても精度が当てずっぽうのままなら止める」見張りを足すかどうかは、学習コードの変更なので、別の計画として決めてください（CLAUDE.md のルール 3 にそって、インフラの不具合は別の計画にします）。
 
 `chosen` は人間が記入します（ファイルを編集するか、チャットで答えてください）。記入されるまで、この packet に関わる新しい学習は始めません。
+
+## 決定（2026-10-15、本人、チャットで回答）
+
+**packet の選択肢とは別の B'（人間の判断）。** 原因は CPU の調査で特定した（docs/debugging/0030）：ConvStem の GELU/LayerNorm が作る入力によらない一定成分が、ランダム初期化からの PGD-AT で「どの画像にも同じ答え」の行き止まりに引き込む。AdamW の β2 を Singh らと同じ 0.95 にすると抜け出す（β2 0.999 では抜け出さない）。崩れの理由がわかっただけで、ConvNeXt で ConvStem の効果があるかは確かめられていないため、ConvNeXt-Atto と DeiT-Tiny の両方で、β2 = 0.95 の「ConvStem あり」と「なし（基準＋EMA）」を2本ずつ、計4本回す。β2 0.999 の既存の基準＋EMA との比較から、β2 の効果も副産物として得られる。学習しない場合は never-learned guard（650fbed）が2エポック以内に止める。
