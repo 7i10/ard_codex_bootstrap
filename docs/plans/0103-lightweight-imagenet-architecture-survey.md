@@ -7601,13 +7601,13 @@ history behind this pivot.)
   6. **Reference for the queued EfficientNet-B0 arms.** This run is the
      formal reference that the EfficientNet-B0 Phase 2 arms are read
      against: cosine (Hamster queue; the four-model cosine rule of
-     decisions 0052 / 0053 option C, still unchosen), label smoothing 0.1
-     (Ferret queue), and the split-BN mixed batch, whose preregistered
-     rule (decision 0049 option C) names "baseline+EMA if finished,
-     otherwise Phase 1 35.93" (queue state from the 2026-10-16 snapshot
-     in `reports/biweekly/2026-10-19/facts.md`; not re-read in this
-     postrun). Since 35.87 is 0.06pt from 35.93, that choice changes no
-     verdict by more than 0.06pt.
+     decisions 0052 / 0053 option C, still unchosen) and label smoothing
+     0.1 (Ferret queue); queue state from the 2026-10-16 snapshot in
+     `reports/biweekly/2026-10-19/facts.md`, not re-read in this postrun.
+     The EfficientNet-B0 split-BN mixed batch is not one of them: decision
+     0049 chose A, which removed it. Against the Phase 1 seed-0 value
+     (35.93) this reference differs by 0.06pt, so swapping one for the
+     other moves any arm's difference by 0.06pt.
   7. **Cost.** 47.98 h from start to finish (172,742 s; Phase 1 lr 0.05
      on Hamster 48.62 h). Summed per-epoch training time is about
      167,300 s (46.5 h); the rest (about 109 s per epoch) is subset
