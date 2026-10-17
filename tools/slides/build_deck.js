@@ -139,131 +139,182 @@ function addFrame(slide, s, citeLabels) {
   if (s.notes) parts.push("【メモ】\n" + String(s.notes).trim());
   if (parts.length) slide.addNotes(parts.join("\n\n"));
 }
-function estLines(items, w, size) {
-  // calibrated on Mac PowerPoint / Yu Gothic: a 3-column card holds about 15 full-width characters at 18pt
-  const perLine = Math.max(8, ((w * 72) / size) * 1.05);
+// ---------------------------------------------------------------- sizing and line-break check
+// Type sizes are fixed by role. Space left under a block is filled with content (a `below` note, table,
+// chart or figure), never by growing the text.
+const SZ = { card: 17, side: 16, overview: 16, plan: 17, note: 16, caption: 12 };
+// Yu Gothic full-width = 1 em; Latin letters/digits 0.58 em and spaces 0.3 em (Calibri ≈ 0.5 / 0.23, rounded up),
+// plus 0.2 em at each Japanese/Latin boundary (PowerPoint's autospace). Deliberately conservative.
+const isWide = (c) => c.charCodeAt(0) > 0x2e7f;
+const lineW = (t) => {
+  const cs = [...t];
+  return cs.reduce((a, c, i) => a + (isWide(c) ? 1 : c === " " ? 0.3 : 0.58)
+    + (i && c !== " " && cs[i - 1] !== " " && isWide(c) !== isWide(cs[i - 1]) ? 0.2 : 0), 0);
+};
+const plain = (t) => String(t).replace(/\*\*|==/g, "").replace(/\[@([\w-]+(?:\s*,\s*@?[\w-]+)*)\]/g, (_, ks) => `[${ks.split(/\s*,\s*@?/).map(() => "00").join(", ")}]`);
+// characters that fit on one line of a text box `boxW` inches wide (bullet indent included)
+const capacity = (boxW, size, bullet = 0) => ((boxW - 0.1) * 72 - (bullet === 0 ? 0 : bullet === 1 ? 18 : 50)) / size;
+// every hand-broken line that would wrap again is reported, so line breaks stay where the author put them
+const LINT = [];
+let SLIDE_NO = 0;
+function lintText(where, items, boxW, size, bullets = true) {
+  const walk = (it, lvl) => {
+    if (Array.isArray(it)) return it.forEach((x) => walk(x, lvl + 1));
+    const z = lvl ? size - 2 : size, cap = capacity(boxW, z, bullets ? lvl + 1 : 0);
+    for (const t of plain(it).split("\n")) if (lineW(t) > cap - (bullets ? 0.3 : 0.1)) LINT.push(`p${SLIDE_NO} ${where}: ${lineW(t).toFixed(1)} > ${cap.toFixed(1)}  「${t}」`);
+  };
+  (Array.isArray(items) ? items : [items]).forEach((it) => walk(it, 0));
+}
+function estLines(items, boxW, size) {
   let n = 0;
   const walk = (it, lvl) => {
     if (Array.isArray(it)) return it.forEach((x) => walk(x, lvl + 1));
-    // each soft line break starts a new line
-    for (const t of String(it).replace(/\*\*|==/g, "").split("\n")) {
-      const wide = [...t].reduce((a, c) => a + (c.charCodeAt(0) > 0x2e7f ? 1 : 0.55), 0);
-      n += Math.max(1, Math.ceil(wide / perLine));
-    }
+    for (const t of plain(it).split("\n")) n += Math.max(1, Math.ceil(lineW(t) / capacity(boxW, size, lvl + 1)));
   };
   items.forEach((it) => walk(it, 0));
   return n;
 }
-function textHeight(items, w, size) {
-  return estLines(items, w, size) * size * 1.45 / 72 + items.length * 0.08;
+function textHeight(items, boxW, size, space = 6) {
+  return estLines(items, boxW, size) * size * 1.22 / 72 + items.length * space / 72 + 0.15;
 }
 function cardHeight(cards, w, size) {
-  return Math.max(...cards.map((c) => 0.75 + textHeight(c.body || [], w - 0.3, size)));
+  return Math.max(...cards.map((c) => 0.62 + textHeight(c.body || [], w - 0.24, size)));
 }
-// widest hand-broken line (full-width = 1, half-width = 0.55)
-function widestLine(items) {
-  let m = 0;
-  const walk = (it) => Array.isArray(it) ? it.forEach(walk) : String(it).replace(/\*\*|==|\[@[^\]]*\]/g, "").split("\n")
-    .forEach((t) => { m = Math.max(m, [...t].reduce((a, c) => a + (c.charCodeAt(0) > 0x2e7f ? 1 : 0.55), 0)); });
-  items.forEach(walk);
-  return m;
-}
-// the largest font size (max..min) whose estimated height fits h and whose hand-broken lines do not wrap again;
-// fills the slide instead of leaving the bottom empty
-function fitSize(heightAt, h, max, min, items, w) {
-  const widest = items ? widestLine(items) : 0;
-  for (let z = max; z > min; z--) if (heightAt(z) <= h && (!items || widest <= ((w * 72) / z) * 1.05)) return z;
-  return min;
-}
-// extra space between paragraphs so the leftover height is spread out rather than left at the bottom
-function spreadSpace(slack, n) {
-  return Math.round(6 + Math.max(0, Math.min(24, (slack * 72 * 0.8) / Math.max(n, 1))));
-}
-function card(slide, x, y, w, h, head, body, size = 18, space = 6) {
+function card(slide, x, y, w, h, head, body, size = SZ.card) {
   slide.addShape("rect", { x, y, w, h, fill: { color: T.tint }, line: { color: T.tint }, objectName: `card ${head}` });
   slide.addShape("rect", { x, y, w, h: 0.48, fill: { color: T.primary }, line: { color: T.primary } });
   slide.addText(runs(head, { color: T.white, bold: true, fontSize: 18 }), tb({ x: x + 0.12, y, w: w - 0.24, h: 0.48, valign: "middle" }));
-  slide.addText(bulletRuns(body, size, { space }), tb({ x: x + 0.15, y: y + 0.6, w: w - 0.3, h: h - 0.7 }));
+  lintText(`card「${head}」`, body, w - 0.24, size);
+  slide.addText(bulletRuns(body, size), tb({ x: x + 0.12, y: y + 0.56, w: w - 0.24, h: h - 0.6 }));
 }
 function sideText(slide, s, x, w) {
   const Y = s._top, HH = FOOT_Y - 0.12 - Y;
   if (!s.side) return;
-  const size = s.side_size || fitSize((z) => textHeight(s.side, w - 0.3, z), HH - 0.2, 20, 15, s.side, w - 0.3);
-  const space = spreadSpace(HH - 0.3 - textHeight(s.side, w - 0.3, size), s.side.length);
-  slide.addText(bulletRuns(s.side, size, { space }), tb({ x, y: Y, w, h: HH }));
+  const size = s.side_size || SZ.side;
+  lintText("side", s.side, w, size);
+  slide.addText(bulletRuns(s.side, size, { space: 8 }), tb({ x, y: Y, w, h: HH }));
+}
+function drawTable(slide, t, x, y, w) {
+  const hl = new Set((t.highlight || []).map(([r, c]) => `${r},${c}`));
+  // a row is never shorter than its text needs (CJK line ≈ 1.45 em plus the cell margins)
+  const size = t.size || 17, margin = t.margin ?? 0.06, rowH = Math.max(t.row_h || 0.5, size * 1.45 / 72 + 2 * margin);
+  const colW = (t.col_w || t.header.map(() => 1 / t.header.length)).map((f) => f * w);
+  const header = t.header.map((h) => ({ text: h, options: { bold: true, color: T.white, fill: { color: T.primary }, align: "center", fontSize: size } }));
+  const rows = t.rows.map((r, ri) => r.map((v, ci) => ({
+    text: runs(String(v) === "" ? " " : String(v), { fontSize: size, color: T.text }),
+    options: { align: ci === 0 ? "left" : "center", fill: { color: hl.has(`${ri},${ci}`) ? T.tint : (ri % 2 ? "F7F9FC" : T.white) } },
+  })));
+  // header cells are bold (≈ 8% wider)
+  t.header.forEach((v, ci) => lintText("table header", String(v), (colW[ci] - 0.02) / 1.08, size, false));
+  t.rows.forEach((r) => r.forEach((v, ci) => lintText("table", String(v), colW[ci] - 0.02, size, false)));
+  slide.addTable([header, ...rows], { x, y, w, colW, fontFace: T.latin, border: { type: "solid", pt: 1, color: T.line }, valign: "middle", rowH, margin });
+  let bottom = y + rowH * (rows.length + 1);
+  if (bottom > FOOT_Y - 0.1) LINT.push(`p${SLIDE_NO} table runs into the footer by ${(bottom - FOOT_Y + 0.1).toFixed(2)} in`);
+  if (t.caption && t.caption_pos !== "top") {
+    lintText("caption", t.caption, w, SZ.caption, false);
+    slide.addText(runs(t.caption, { fontSize: SZ.caption, color: T.sub }), tb({ x, y: bottom + 0.05, w, h: 0.32 }));
+    bottom += 0.4;
+  }
+  return bottom;
+}
+function drawChart(slide, c, x, y, w, h) {
+  const data = c.series.map((se) => ({ name: se.name, labels: c.categories, values: se.values }));
+  slide.addChart(c.kind || "bar", data, {
+    x, y, w, h, barDir: c.horizontal ? "bar" : "col",
+    chartColors: c.colors || (c.series.length > 1 ? [T.primary, "9DC3E6", T.sub] : [T.primary]), invertIfNegative: false, showValue: c.show_values ?? (c.kind || "bar") === "bar",
+    lineSize: 2.5, lineDataSymbol: "none", catAxisLabelFrequency: c.label_every || 1, catAxisLabelRotate: c.label_rotate ?? 0, dataLabelFontSize: 12, dataLabelColor: T.text,
+    dataLabelFormatCode: c.format || "0.0", catAxisLabelFontSize: 13, valAxisLabelFontSize: 12,
+    catAxisLabelColor: T.text, valAxisLabelColor: T.sub, valGridLine: { color: "E6E6E6", size: 1 },
+    showLegend: c.series.length > 1, legendPos: "b", legendFontSize: 12,
+    showValAxisTitle: !!c.y_title, valAxisTitle: c.y_title || "", valAxisTitleFontSize: 12,
+    showCatAxisTitle: !!c.x_title, catAxisTitle: c.x_title || "", catAxisTitleFontSize: 12,
+    catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", dataLabelFontFace: "+mn-lt", legendFontFace: "+mn-lt",
+    ...(c.min !== undefined ? { valAxisMinVal: c.min } : {}), ...(c.max !== undefined ? { valAxisMaxVal: c.max } : {}),
+  });
+}
+// content placed under the main block: a supplement note, a small table, a chart or a figure.
+// It starts right under the block and never stretches the block itself.
+function below(slide, s, x, y, w) {
+  const b = s.below;
+  if (!b) return;
+  const bottom = FOOT_Y - 0.15, avail = bottom - y;
+  if (avail < 0.5) { LINT.push(`p${SLIDE_NO} below: no room (${avail.toFixed(2)} in)`); return; }
+  if (b.title) {
+    lintText("below title", b.title, w, 15, false);
+    slide.addText(runs(b.title, { fontSize: 15, bold: true, color: T.primaryDark }), tb({ x, y, w, h: 0.34 }));
+    y += 0.38;
+  }
+  if (b.note) {
+    const items = Array.isArray(b.note) ? b.note : [b.note], size = b.size || SZ.note, lead = b.head ? 1.9 : 0;
+    const tw = w - 0.35 - lead, h = Math.min(bottom - y, textHeight(items, tw, size) + 0.12);
+    slide.addShape("rect", { x, y, w, h, fill: { color: T.message }, line: { color: T.message } });
+    slide.addShape("rect", { x, y, w: 0.08, h, fill: { color: T.primary }, line: { color: T.primary } });
+    if (b.head) slide.addText(runs(b.head, { fontSize: size, bold: true, color: T.primaryDark }), tb({ x: x + 0.2, y, w: lead, h, valign: "middle" }));
+    lintText("note", items, tw, size, items.length > 1);
+    slide.addText(items.length > 1 ? bulletRuns(items, size, { space: 4 }) : runs(items[0], { fontSize: size, color: T.text }), tb({ x: x + 0.2 + lead, y, w: tw, h, valign: "middle" }));
+  } else if (b.table) {
+    const need = (b.table.row_h || 0.5) * (b.table.rows.length + 1) + (b.table.caption ? 0.4 : 0);
+    if (y + need > bottom + 0.02) LINT.push(`p${SLIDE_NO} below table overflows by ${(y + need - bottom).toFixed(2)} in`);
+    drawTable(slide, b.table, x, y, w);
+  } else if (b.chart) {
+    drawChart(slide, b.chart, x, y, w, bottom - y);
+  } else if (b.image) {
+    const h = bottom - y - (b.caption ? 0.36 : 0);
+    slide.addImage({ path: path.resolve(s._dir, b.image), x, y, w, h, sizing: { type: "contain", w, h } });
+    if (b.caption) slide.addText(runs(b.caption, { fontSize: SZ.caption, color: T.sub }), tb({ x, y: y + h + 0.02, w, h: 0.32 }));
+  }
 }
 const BODY = {
   bullets(slide, s) {
     const Y = s._top, HH = FOOT_Y - 0.12 - Y;
+    lintText("body", s.body || [], W - 2 * M, s.size || 20);
     slide.addText(bulletRuns(s.body || [], s.size || 20, { space: 10 }), tb({ x: M, y: Y, w: W - 2 * M, h: HH }));
   },
   cards(slide, s) {
-    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
+    const Y = s._top;
     const n = s.cards.length, cols = s.cols || n, rows = Math.ceil(n / cols), gap = 0.3;
     const top = s.lead ? Y + 0.55 : Y;
     if (s.lead) slide.addText(runs(s.lead, { fontSize: 18, color: T.sub }), tb({ x: M, y: Y, w: W - 2 * M, h: 0.45 }));
+    const size = s.size || SZ.card;
     const cw = (W - 2 * M - gap * (cols - 1)) / cols, maxH = (FOOT_Y - 0.15 - top - gap * (rows - 1)) / rows;
-    // cards run to the bottom of the body area; the font grows (up to 20pt) while the text still fits
-    const all = s.cards.flatMap((c) => c.body || []);
-    const size = s.size || fitSize((z) => cardHeight(s.cards, cw, z), maxH - 0.2, 20, 16, all, cw - 0.3);
-    const ch = s.fill === false ? Math.min(maxH, cardHeight(s.cards, cw, size)) : maxH;
-    const space = spreadSpace(ch - 0.25 - cardHeight(s.cards, cw, size), Math.max(...s.cards.map((c) => (c.body || []).length)));
-    s.cards.forEach((c, i) => card(slide, M + (i % cols) * (cw + gap), top + Math.floor(i / cols) * (ch + gap), cw, ch, c.head, c.body || [], size, space));
+    // a card is as tall as its text (all cards in a row share the height); `fill: true` runs it to the bottom
+    const ch = s.fill ? maxH : Math.min(maxH, cardHeight(s.cards, cw, size));
+    s.cards.forEach((c, i) => card(slide, M + (i % cols) * (cw + gap), top + Math.floor(i / cols) * (ch + gap), cw, ch, c.head, c.body || [], size));
+    below(slide, s, M, top + rows * ch + (rows - 1) * gap + 0.25, W - 2 * M);
   },
   overview(slide, s) {
-    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
-    // three blocks on top (goal / questions / approach), a timeline strip at the bottom
-    const gap = 0.3, cw = (W - 2 * M - gap * 2) / 3, ch = HH - 1.4;
-    const size = fitSize((z) => cardHeight(s.blocks, cw, z), ch - 0.2, 19, 15, s.blocks.flatMap((b) => b.body || []), cw - 0.3);
-    const space = spreadSpace(ch - 0.25 - cardHeight(s.blocks, cw, size), Math.max(...s.blocks.map((b) => (b.body || []).length)));
-    s.blocks.forEach((b, i) => card(slide, M + i * (cw + gap), Y, cw, ch, b.head, b.body || [], size, space));
-    const ty = Y + ch + 0.35, n = s.timeline.length, tw = (W - 2 * M - 0.15 * (n - 1)) / n;
+    const Y = s._top;
+    // three blocks on top (goal / questions / approach), a timeline strip under them
+    const gap = 0.3, cw = (W - 2 * M - gap * 2) / 3, size = SZ.overview, ch = Math.min(3.3, cardHeight(s.blocks, cw, size));
+    s.blocks.forEach((b, i) => card(slide, M + i * (cw + gap), Y, cw, ch, b.head, b.body || [], size));
+    const ty = Y + ch + 0.25, n = s.timeline.length, tw = (W - 2 * M - 0.15 * (n - 1)) / n;
     s.timeline.forEach((t, i) => {
       const x = M + i * (tw + 0.15), cur = !!t.current;
-      slide.addShape("homePlate", { x, y: ty, w: tw, h: 1.0, fill: { color: cur ? T.primary : T.message }, line: { color: cur ? T.primary : T.line, width: 1 } });
+      slide.addShape("homePlate", { x, y: ty, w: tw, h: 0.75, fill: { color: cur ? T.primary : T.message }, line: { color: cur ? T.primary : T.line, width: 1 } });
       slide.addText([
         { text: t.label, options: { bold: true, fontSize: 15, color: cur ? T.white : T.text, breakLine: true } },
         { text: t.note || "", options: { fontSize: 12, color: cur ? T.white : T.sub } },
-      ], tb({ x: x + 0.1, y: ty + 0.05, w: tw - 0.45, h: 0.9, valign: "middle" }));
+      ], tb({ x: x + 0.1, y: ty + 0.03, w: tw - 0.45, h: 0.69, valign: "middle" }));
     });
+    below(slide, s, M, ty + 0.75 + 0.2, W - 2 * M);
   },
   table(slide, s) {
-    const Y = s._top, HH = FOOT_Y - 0.12 - Y;
+    const Y = s._top;
     const t = s.table, sideW = s.side ? (s.side_w || 4.2) : 0;
     const tw = W - 2 * M - (sideW ? sideW + 0.3 : 0);
-    const hl = new Set((t.highlight || []).map(([r, c]) => `${r},${c}`));
-    const size = t.size || 17;
-    const header = t.header.map((h) => ({ text: h, options: { bold: true, color: T.white, fill: { color: T.primary }, align: "center", fontSize: size } }));
-    const rows = t.rows.map((r, ri) => r.map((v, ci) => ({
-      text: runs(String(v) === "" ? "\u00a0" : String(v), { fontSize: size, color: T.text }),
-      options: { align: ci === 0 ? "left" : "center", fill: { color: hl.has(`${ri},${ci}`) ? T.tint : (ri % 2 ? "F7F9FC" : T.white) } },
-    })));
-    const colW = t.col_w ? t.col_w.map((f) => f * tw) : undefined;
     const capTop = t.caption && t.caption_pos === "top";
-    if (capTop) slide.addText(runs(t.caption, { fontSize: 12, color: T.sub }), tb({ x: M, y: Y - 0.08, w: W - 2 * M, h: 0.34 }));
-    const ty = capTop ? Y + 0.3 : Y;
-    // rows share the body height (capped) unless row_h is given, so short tables do not leave the bottom empty
-    const availH = FOOT_Y - 0.15 - ty - (t.caption && !capTop ? 0.5 : 0);
-    const rowH = t.row_h || Math.min(t.row_max || 0.72, availH / (rows.length + 1));
-    slide.addTable([header, ...rows], { x: M, y: ty, w: tw, colW, fontFace: T.latin, border: { type: "solid", pt: 1, color: T.line }, valign: "middle", rowH, margin: 0.06 });
-    if (t.caption && !capTop) slide.addText(runs(t.caption, { fontSize: 12, color: T.sub }), tb({ x: M, y: FOOT_Y - 0.5, w: tw, h: 0.35 }));
+    if (capTop) {
+      lintText("caption", t.caption, W - 2 * M, SZ.caption, false);
+      slide.addText(runs(t.caption, { fontSize: SZ.caption, color: T.sub }), tb({ x: M, y: Y - 0.08, w: W - 2 * M, h: 0.34 }));
+    }
+    const end = drawTable(slide, t, M, capTop ? Y + 0.3 : Y, tw);
+    below(slide, s, M, end + 0.2, tw);
     sideText(slide, s, W - M - sideW, sideW);
   },
   chart(slide, s) {
     const Y = s._top, HH = FOOT_Y - 0.12 - Y;
-    const c = s.chart, sideW = s.side ? (s.side_w || 4.2) : 0, cw = W - 2 * M - (sideW ? sideW + 0.3 : 0);
-    const data = c.series.map((se) => ({ name: se.name, labels: c.categories, values: se.values }));
-    slide.addChart(c.kind || "bar", data, {
-      x: M, y: Y, w: cw, h: HH, barDir: c.horizontal ? "bar" : "col",
-      chartColors: c.colors || (c.series.length > 1 ? [T.primary, "9DC3E6", T.sub] : [T.primary]), invertIfNegative: false, showValue: c.show_values ?? (c.kind || "bar") === "bar",
-      lineSize: 2.5, lineDataSymbol: "none", catAxisLabelFrequency: c.label_every || 1, catAxisLabelRotate: c.label_rotate ?? 0, dataLabelFontSize: 12, dataLabelColor: T.text,
-      dataLabelFormatCode: c.format || "0.0", catAxisLabelFontSize: 13, valAxisLabelFontSize: 12,
-      catAxisLabelColor: T.text, valAxisLabelColor: T.sub, valGridLine: { color: "E6E6E6", size: 1 },
-      showLegend: c.series.length > 1, legendPos: "b", legendFontSize: 12,
-      showValAxisTitle: !!c.y_title, valAxisTitle: c.y_title || "", valAxisTitleFontSize: 12,
-      catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", dataLabelFontFace: "+mn-lt", legendFontFace: "+mn-lt",
-      ...(c.min !== undefined ? { valAxisMinVal: c.min } : {}), ...(c.max !== undefined ? { valAxisMaxVal: c.max } : {}),
-    });
+    const sideW = s.side ? (s.side_w || 4.2) : 0, cw = W - 2 * M - (sideW ? sideW + 0.3 : 0);
+    drawChart(slide, s.chart, M, Y, cw, HH);
     sideText(slide, s, W - M - sideW, sideW);
   },
   figure(slide, s) {
@@ -272,22 +323,26 @@ const BODY = {
     const img = path.resolve(s._dir, s.image);
     const fh = HH - (s.caption ? 0.4 : 0);
     slide.addImage({ path: img, x: M, y: Y, w: fw, h: fh, sizing: { type: "contain", w: fw, h: fh } });
-    if (s.caption) slide.addText(runs(s.caption, { fontSize: 12, color: T.sub }), tb({ x: M, y: Y + fh + 0.02, w: fw, h: 0.35 }));
+    if (s.caption) {
+      lintText("caption", s.caption, fw, SZ.caption, false);
+      slide.addText(runs(s.caption, { fontSize: SZ.caption, color: T.sub }), tb({ x: M, y: Y + fh + 0.02, w: fw, h: 0.35 }));
+    }
     sideText(slide, s, W - M - sideW, sideW);
   },
   plan(slide, s) {
     const Y = s._top, HH = FOOT_Y - 0.12 - Y;
     const lw = 5.4, gap = 0.35, rw = W - 2 * M - lw - gap;
-    const mb = s.micro || [], msize = fitSize((z) => cardHeight([{ body: mb }], lw, z), HH - 0.2, 19, 15, mb, lw - 0.3);
-    card(slide, M, Y, lw, HH, s.micro_head || "次回まで", mb, msize, spreadSpace(HH - 0.25 - cardHeight([{ body: mb }], lw, msize), mb.length));
+    const mb = s.micro || [];
+    card(slide, M, Y, lw, Math.min(HH, cardHeight([{ body: mb }], lw, SZ.plan) + 0.1), s.micro_head || "次回まで", mb, SZ.plan);
     const x = M + lw + gap, rows = s.macro || [];
     slide.addShape("rect", { x, y: Y, w: rw, h: 0.48, fill: { color: T.primary }, line: { color: T.primary } });
     slide.addText(runs(s.macro_head || "修論まで", { color: T.white, bold: true, fontSize: 18 }), tb({ x: x + 0.12, y: Y, w: rw - 0.24, h: 0.48, valign: "middle" }));
-    const rh = Math.min(1.2, (HH - 0.6) / Math.max(rows.length, 1));
+    const rh = Math.min(0.8, (HH - 0.6) / Math.max(rows.length, 1));
     rows.forEach((r, i) => {
       const y = Y + 0.6 + i * rh, cur = !!r.current;
       slide.addShape("rect", { x, y, w: 1.5, h: rh - 0.08, fill: { color: cur ? T.primary : T.tint }, line: { color: cur ? T.primary : T.tint } });
       slide.addText(r.period, tb({ x, y, w: 1.5, h: rh - 0.08, align: "center", valign: "middle", fontSize: 15, bold: true, color: cur ? T.white : T.primaryDark }));
+      lintText("macro", r.item, rw - 1.65, 16, false);
       slide.addText(runs(r.item, { fontSize: 16, color: T.text }), tb({ x: x + 1.65, y, w: rw - 1.65, h: rh - 0.08, valign: "middle" }));
     });
   },
@@ -372,6 +427,9 @@ async function main() {
     s._top = s.full ? 0.8 : BODY_Y;
     const slide = pres.addSlide({ masterName: s.full ? "REFS" : "CONTENT" });
     const keys = [...s._inline, ...(s.cite || []).filter((k) => !s._inline.includes(k))].sort((a, b) => num(a) - num(b));
+    SLIDE_NO = pres.slides.length;
+    lintText("title", s.title || "", W - 2.75 - M, 24, false);
+    if (!s.full && s.point) lintText("point", s.point, W - 2 * M - 0.3, 20, false);
     addFrame(slide, s.full ? { ...s, point: undefined } : s, keys.map(short));
     BODY[type](slide, s);
   }
@@ -379,13 +437,19 @@ async function main() {
   // references (IEEE strings, numbered by first use): always one page; the font shrinks to fit
   if (order.length) {
     const refSec = doc.references_section || "参考文献";
-    const n = order.length, fsz = n <= 10 ? 13 : n <= 13 ? 12 : n <= 16 ? 11 : n <= 20 ? 10 : 9;
+    // the largest size (13..9pt) at which every entry fits above the footer
+    const n = order.length, avail = FOOT_Y - 0.9;
+    const hAt = (z) => order.reduce((a, k) => a + Math.ceil((`[${num(k)}] ${refs[k]}`.length * 0.47) / capacity(W - 2 * M, z))  /* English prose in Calibri ≈ 0.47 em */, 0) * z * 1.2 / 72 + n * (z <= 10 ? 2 : 4) / 72;
+    let fsz = 13;
+    while (fsz > 9 && hAt(fsz) > avail) fsz--;
     const slide = pres.addSlide({ masterName: "REFS" });
     addFrame(slide, { section: refSec, title: "参考文献" }, []);
     const items = order.map((k, i) => ({ text: `[${num(k)}] ${refs[k]}`, options: { fontSize: fsz, color: T.text, paraSpaceAfter: fsz <= 10 ? 2 : 4, breakLine: i < n - 1 } }));
     slide.addText(items, tb({ x: M, y: 0.75, w: W - 2 * M, h: FOOT_Y - 0.82, fit: "shrink" }));
   }
 
+  // line-break check: every hand-broken line that would wrap again (fix the text, not the size)
+  if (LINT.length) console.error(`line-break check: ${LINT.length} line(s) would wrap\n  ` + LINT.join("\n  "));
   await pres.writeFile({ fileName: out });
   await setEastAsianFont(out);
   console.log(out);
