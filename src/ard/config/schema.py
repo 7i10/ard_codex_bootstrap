@@ -727,6 +727,7 @@ class ModelConfig(StrictModel):
         "convnext_atto_convstem_imagenet",
         "mobilenetv4_conv_small_se_fullhead_imagenet",
         "mobilenetv4_conv_medium_silu_imagenet",
+        "mobilenetv4_conv_medium_hardswish_imagenet",  # human-approved 2026-10-18
         # Plan 0103 Phase 2 (human-approved 2026-10-15), random init only.
         "mobilenetv4_conv_small_hardswish_imagenet",
     ] = "fixture_cnn"

@@ -25,6 +25,7 @@ pytestmark = pytest.mark.t1
 
 MNV4M = "mobilenetv4_conv_medium_imagenet"
 MNV4M_SILU = "mobilenetv4_conv_medium_silu_imagenet"
+MNV4M_HARDSWISH = "mobilenetv4_conv_medium_hardswish_imagenet"  # human-approved 2026-10-18
 MNV4S_HARDSWISH = "mobilenetv4_conv_small_hardswish_imagenet"  # human-approved 2026-10-15
 MNV4S, DEIT, CONVNEXT = "mobilenetv4_conv_small_imagenet", "deit_tiny_imagenet", "convnext_atto_imagenet"
 # id -> (params, conv+linear MACs, attention-matmul MACs) at 224, 1000 classes.
@@ -45,6 +46,7 @@ VARIANTS = {
     "mobilenetv4_conv_small_silu_se_imagenet": (3_772_296, 185_999_424, 0, MNV4S),
     "mobilenetv4_conv_small_se_fullhead_imagenet": (4_023_432, 186_250_304, 0, MNV4S),
     MNV4M_SILU: (9_715_512, 827_649_984, 0, MNV4M),
+    MNV4M_HARDSWISH: (9_715_512, 827_649_984, 0, MNV4M),
     "deit_tiny_convstem_imagenet": (5_826_280, 1_158_845_952, 178_831_872, DEIT),
     "convnext_atto_deep_narrow_imagenet": (2_758_636, 554_452_128, 0, CONVNEXT),
     "convnext_atto_ols_imagenet": (3_702_912, 576_534_912, 0, CONVNEXT),
@@ -59,6 +61,7 @@ PARAM_MATCHED = {
     "mobilenetv4_conv_small_se_imagenet",
     "mobilenetv4_conv_small_silu_se_imagenet",
     MNV4M_SILU,
+    MNV4M_HARDSWISH,
     "deit_tiny_convstem_imagenet",
     "convnext_atto_ols_imagenet",
     "convnext_atto_convstem_imagenet",
@@ -105,7 +108,7 @@ def test_variant_complexity_is_pinned(architecture: str) -> None:
     base_params, base_conv_linear, _ = BASE[base]
     if architecture in PARAM_MATCHED:
         assert abs(params / base_params - 1) <= 0.03
-    if architecture.startswith("mobilenetv4_conv_small_") or architecture == MNV4M_SILU:
+    if architecture.startswith("mobilenetv4_conv_small_") or architecture in (MNV4M_SILU, MNV4M_HARDSWISH):
         assert abs(conv_linear / base_conv_linear - 1) <= 0.002
 
 
@@ -358,11 +361,13 @@ CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "scientific"
 MNV4_BASE = "imagenet_mobilenetv4_pgd_at_random_init_lr0025_cg.yaml"
 MNV4M_BASE = "imagenet_mobilenetv4_conv_medium_pgd_at_phase2_baseline_ema.yaml"
 MNV4M_SILU_CONFIG = "imagenet_mobilenetv4_conv_medium_silu_pgd_at_phase2_random_lr0025.yaml"
+MNV4M_HARDSWISH_CONFIG = "imagenet_mobilenetv4_conv_medium_hardswish_pgd_at_phase2_random_lr0025.yaml"
 # The 2026-10-15 arms are cloned from the Phase 2 baseline+EMA config (itself Phase 1 + the Phase 2 template).
 MNV4_PHASE2_EMA_BASE = "imagenet_mobilenetv4_pgd_at_phase2_baseline_ema_cg.yaml"
 MNV4S_HARDSWISH_CONFIG = "imagenet_mobilenetv4_hardswish_pgd_at_phase2_random_lr0025.yaml"
 PHASE2_CONFIGS = {
     MNV4M_SILU_CONFIG: (MNV4M_SILU, MNV4M_BASE),
+    MNV4M_HARDSWISH_CONFIG: (MNV4M_HARDSWISH, MNV4M_BASE),
     "imagenet_mobilenetv4_silu_pgd_at_phase2_random_lr0025.yaml": ("mobilenetv4_conv_small_silu_imagenet", MNV4_BASE),
     "imagenet_mobilenetv4_gelu_pgd_at_phase2_random_lr0025.yaml": ("mobilenetv4_conv_small_gelu_imagenet", MNV4_BASE),
     "imagenet_mobilenetv4_se_pgd_at_phase2_random_lr0025.yaml": ("mobilenetv4_conv_small_se_imagenet", MNV4_BASE),
@@ -492,6 +497,27 @@ def test_mobilenetv4_medium_silu_is_tensor_identical_to_the_base_except_activati
     assert MNV4M_SILU not in CUDA_GRAPH_ARCHITECTURES
 
 
+def test_mobilenetv4_medium_hardswish_uses_only_hardswish_where_the_base_uses_only_relu() -> None:
+    assert _activation_types(build_architecture(MNV4M_HARDSWISH, num_classes=1000)) == {nn.Hardswish}
+    assert _activation_types(build_architecture(MNV4M, num_classes=1000)) == {nn.ReLU}
+
+
+def test_mobilenetv4_medium_hardswish_is_tensor_identical_to_the_base_except_activation_modules() -> None:
+    torch.manual_seed(0)
+    base = build_architecture(MNV4M, num_classes=1000)
+    torch.manual_seed(0)
+    variant = build_architecture(MNV4M_HARDSWISH, num_classes=1000)
+    base_state, variant_state = base.state_dict(), variant.state_dict()
+    assert list(base_state) == list(variant_state)
+    for key in base_state:
+        assert torch.equal(base_state[key], variant_state[key]), key
+    base_modules = dict(base.named_modules())
+    differing = {name for name, module in variant.named_modules() if type(module) is not type(base_modules[name])}
+    assert differing and all(type(base_modules[name]) is nn.ReLU for name in differing)
+    assert all(type(dict(variant.named_modules())[name]) is nn.Hardswish for name in differing)
+    assert MNV4M_HARDSWISH not in CUDA_GRAPH_ARCHITECTURES
+
+
 def _set_config_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for key, value in {
         "ARD_SEED": "7",
@@ -542,6 +568,33 @@ def test_oct15_configs_differ_from_baseline_ema_only_in_the_listed_fields(
     _strip_nondeterministic_fastest_setting(base, variant)
     variant["training"].pop("relu_surrogate_gradient", None)
     for payload in (base, variant):
+        payload["student"]["architecture"] = None
+        payload["tracking"]["group"] = None
+    assert variant == base
+
+
+LR00125_CONFIGS = {
+    "imagenet_mobilenetv4_silu_pgd_at_phase2_random_lr00125.yaml": "mobilenetv4_conv_small_silu_imagenet",
+    "imagenet_mobilenetv4_hardswish_pgd_at_phase2_random_lr00125.yaml": MNV4S_HARDSWISH,
+}
+
+
+@pytest.mark.parametrize("config_file", sorted(LR00125_CONFIGS))
+def test_lr00125_configs_change_only_lr_architecture_and_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_file: str
+) -> None:
+    """2026-10-18: lr 0.0125 check for MobileNetV4-S SiLU / hard-swish, cloned from the hard-swish lr 0.025 config."""
+    _set_config_env(monkeypatch, tmp_path)
+    base = load_config(CONFIG_DIR / MNV4S_HARDSWISH_CONFIG).model_dump(mode="json")
+    variant = load_config(CONFIG_DIR / config_file).model_dump(mode="json")
+    assert base["optimizer"]["learning_rate"] == 0.025 and variant["optimizer"]["learning_rate"] == 0.0125
+    assert variant["student"]["architecture"] == LR00125_CONFIGS[config_file]
+    assert variant["student"]["pretrained"] is False
+    assert variant["tracking"]["group"].endswith("-lr00125") and variant["tracking"]["group"] != base["tracking"]["group"]
+    assert variant["training"]["deterministic"] is False and variant["training"]["cudnn_benchmark"] is True
+    assert "cuda_graph" not in variant["training"]
+    for payload in (base, variant):
+        payload["optimizer"]["learning_rate"] = None
         payload["student"]["architecture"] = None
         payload["tracking"]["group"] = None
     assert variant == base
