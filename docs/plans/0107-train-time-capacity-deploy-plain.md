@@ -303,10 +303,11 @@ MobileNetV4-M at matched GPU-hours.
   not computed in this postrun. `epoch-metrics.parquet` sha256
   `3b6afc51...`, `sample-stats-train.parquet` sha256 `fbec04b5...` (from
   the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id
-  (one segment). Plan status: this is the first of the three first
-  experiments; the two smooth-backward runs are recorded by their own
-  postruns, and the plan's "base model for the distillation verification"
-  choice waits for them.
+  (one segment). Plan status: one of the three first experiments; the
+  two smooth-backward runs have their own entries below (optimizer only
+  -1.21, attack and optimizer -7.19 PGD-10), so hard-swish is the only
+  one of the three that gains. The plan's "base model for the
+  distillation verification" choice is the human's (packet).
 - 2026-10-18 (postrun): **smooth backward, optimizer only, MobileNetV4-S seed 0 completed.**
   `plan0107-mnv4s-smoothgrad-opt-s0-v1` (hand-run on Ferret, one RTX 4090; `environment.json` records
   kernel 7.0.0-28; the GPU index is not recorded) ran 50/50 epochs from 2026-10-15 03:48:28 to
