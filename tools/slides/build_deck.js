@@ -136,7 +136,7 @@ function addFrame(slide, s, citeLabels) {
   // speaker notes: the talk script first; memos follow under an explicit label so they are never read out
   const parts = [];
   if (s.script) parts.push(String(s.script).trim());
-  if (s.notes) parts.push("【メモ（原稿ではありません）】\n" + String(s.notes).trim());
+  if (s.notes) parts.push("【メモ】\n" + String(s.notes).trim());
   if (parts.length) slide.addNotes(parts.join("\n\n"));
 }
 function estLines(items, w, size) {
@@ -336,16 +336,16 @@ async function main() {
     BODY[type](slide, s);
   }
 
-  // references (IEEE strings, numbered by first use), split over slides of 7
+  // references (IEEE strings, numbered by first use): one page when they fit, else split evenly
   const refSec = doc.references_section || "参考文献";
-  for (let p = 0; p * 7 < order.length; p++) {
-    const chunk = order.slice(p * 7, p * 7 + 7);
+  const PER_PAGE = doc.references_per_page || 11;
+  const pages = Math.ceil(order.length / PER_PAGE), per = Math.ceil(order.length / Math.max(pages, 1));
+  for (let p = 0; p < pages; p++) {
+    const chunk = order.slice(p * per, p * per + per);
     const slide = pres.addSlide({ masterName: "REFS" });
-    const pages = Math.ceil(order.length / 7);
     addFrame(slide, { section: refSec, title: pages > 1 ? `参考文献 ${p + 1}/${pages}` : "参考文献" }, []);
-    const items = [];
-    chunk.forEach((k, i) => items.push({ text: `[${num(k)}] ${refs[k]}`, options: { fontSize: 13, color: T.text, paraSpaceAfter: 8, breakLine: i < chunk.length - 1 } }));
-    slide.addText(items, tb({ x: M, y: 0.85, w: W - 2 * M, h: FOOT_Y - 1.0 }));
+    const items = chunk.map((k, i) => ({ text: `[${num(k)}] ${refs[k]}`, options: { fontSize: 12, color: T.text, paraSpaceAfter: 5, breakLine: i < chunk.length - 1 } }));
+    slide.addText(items, tb({ x: M, y: 0.8, w: W - 2 * M, h: FOOT_Y - 0.9 }));
   }
 
   await pres.writeFile({ fileName: out });

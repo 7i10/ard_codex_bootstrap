@@ -372,3 +372,13 @@ Ferret のキューの4〜7行目（ラベル平滑化3本の後）、worktree s
 | MobileNetV4-M SiLU（再掲） | 61.26 / 38.33 | — | Phase 2 の基準＋EMA（39.10）比 −0.77、clean −2.33 |
 
 注意：plan 0107 の3本は非決定的モード、比べる基準と SiLU は決定的モード。seed 1本。学習損失・学習画像（probe）：hard-swish 3.678 / 60.10・36.45、①3.728 / 59.50・33.80、②3.535 / 61.40・27.40（② の学習中の攻撃は代理勾配で作るので、学習損失は他と比べない）。
+
+## 追記（2026-10-18 午後）：実験用セッションでの決定と新しい数字
+
+- MobileNetV4-M cosine 減衰：65.32 / 40.28（EMA 65.22 / 40.50）、基準＋EMA 63.59 / 39.10 比 +1.73 / +1.18、保留（D0065:L、記録 d61e8e4）。cosine は 3 / 3 モデルで +0.5pt 以上（D0065）。
+- 勾配だけ滑らかにする案は閉じた（D0062 chosen A）。仕組み（CPU 調査、正式な結果ではない）：MobileNetV4 の ReLU 入力の 80% が |x|<0.3（ResNet-18 は 49%）で、β=10 は ReLU のよい近似にならない。攻撃＋更新では、滑らかな勾配の PGD-3 が本当の勾配より 8.2pt 弱い（1000枚で正答率 38.1 対 29.9）。損失の局所的な線形性は SiLU・hard-swish 0.995、ReLU 0.977（D0062 決定欄）。
+- 学習なしの確認：SiLU / hard-swish の重みのまま活性化関数を ReLU に差し替えると clean・PGD-10 とも 0.1% まで崩れる。効果は重みでなく関数の形にある（REG 2026-10-18 B、2本目）。
+- 活性化関数の採用ルール（REG 2026-10-18 B）：それぞれの最良の学習率で比べ、SiLU が hard-swish を 1.0pt 以上上回れば SiLU、それ未満なら hard-swish。DSP を考えるのは MobileNet だけ。キュー：MobileNetV4-M hard-swish（lr 0.025）、MobileNetV4-S の SiLU と hard-swish を lr 0.0125。
+- 実機の遅延（REG 2026-10-18 C、Qualcomm AI Hub、Galaxy S24、全層 NPU、224px、バッチ1、最小値）：MobileNetV4-S ReLU 0.254 ms、hard-swish 0.255 ms（+0.4%）、SiLU 0.296 ms（+17%）。MobileNetV4-M ReLU 0.559、hard-swish 0.565（+1%）、SiLU 0.655 ms（+17%）。
+- 構造の再パラメータ化：実装済み（c9314b0）。hard-swish の S が土台。学習の1ステップは普通の S の 2.45 倍で、M（2.6 倍）とほぼ同じ → 同じ GPU 時間で M と比べる（P0107、90135a8）。
+- 蒸留は活性化関数の結果を見てから始める（REG 2026-10-18 B）。
