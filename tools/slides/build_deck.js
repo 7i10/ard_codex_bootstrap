@@ -133,7 +133,11 @@ function addFrame(slide, s, citeLabels) {
   slide.addText(runs(s.title || "", {}), { placeholder: "title" });
   if (s.point !== undefined) slide.addText(runs(s.point || "", {}), { placeholder: "point" });
   if (citeLabels.length) slide.addText(citeLabels.join("　"), { placeholder: "cite" });
-  if (s.notes) slide.addNotes(String(s.notes));
+  // speaker notes: the talk script first; memos follow under an explicit label so they are never read out
+  const parts = [];
+  if (s.script) parts.push(String(s.script).trim());
+  if (s.notes) parts.push("【メモ（原稿ではありません）】\n" + String(s.notes).trim());
+  if (parts.length) slide.addNotes(parts.join("\n\n"));
 }
 function estLines(items, w, size) {
   const perLine = Math.max(8, Math.floor((w * 72) / size));
@@ -257,9 +261,11 @@ async function main() {
   const args = process.argv.slice(2);
   if (!args.length) { console.error("usage: build_deck.js deck.yaml [-o out.pptx]"); process.exit(2); }
   const src = path.resolve(args[0]);
-  const out = args.includes("-o") ? path.resolve(args[args.indexOf("-o") + 1]) : src.replace(/\.ya?ml$/, ".pptx");
   const dir = path.dirname(src);
   const doc = yaml.load(fs.readFileSync(src, "utf8"));
+  // output: -o, else meta.output (e.g. 261019_naito.pptx, yymmdd of the talk), else deck.pptx
+  const out = args.includes("-o") ? path.resolve(args[args.indexOf("-o") + 1])
+    : doc.meta?.output ? path.resolve(dir, doc.meta.output) : src.replace(/\.ya?ml$/, ".pptx");
   let refs = doc.references || {};
   if (doc.references_file) refs = { ...yaml.load(fs.readFileSync(path.resolve(dir, doc.references_file), "utf8")), ...refs };
 
