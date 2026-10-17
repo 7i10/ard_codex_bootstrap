@@ -24,3 +24,4 @@ autoattack: 'F. Croce and M. Hein, "Reliable evaluation of adversarial robustnes
 salman: 'H. Salman, A. Ilyas, L. Engstrom, A. Kapoor, and A. Madry, "Do adversarially robust ImageNet models transfer better?," in Proc. NeurIPS, 2020.'
 fkd: 'Z. Shen and E. Xing, "A fast knowledge distillation framework for visual recognition," arXiv:2112.01528, 2021.'
 ard: 'M. Goldblum, L. Fowl, S. Feizi, and T. Goldstein, "Adversarially robust distillation," in Proc. AAAI, 2020.'
+llr: 'C. Qin, J. Martens, S. Gowal, D. Krishnan, K. Dvijotham, A. Fawzi, S. De, R. Stanforth, and P. Kohli, "Adversarial robustness through local linearization," in Proc. NeurIPS, 2019.'
