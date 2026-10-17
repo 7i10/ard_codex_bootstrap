@@ -1,6 +1,6 @@
 ---
 id: 0060
-status: pending
+status: decided
 created: 2026-10-16
 campaign: plan0103-phase2-mnv4m-baseline-ema-s0-v1（plan 0103 Phase 2。MobileNetV4-M の基準＋EMA。Phase 1 と同じ学習手順に Phase 2 の共通設定（サブセット 5,000、EMA 0.9999）を足したもの。ランダム初期化、SGD lr 0.025、full AT 50 epoch。Hamster で hand-run、seed 0、50/50 epoch 完走、非決定的＋cudnn_benchmark、source d97bf6e）
 question: MobileNetV4-M の Phase 2 の基準が 63.59 / 39.10 に決まり、SiLU はこれより clean −2.33 / PGD-10 −0.77 でした。decision 0059 の A のルールどおり「MobileNetV4-M では SiLU を採用しない」と記録して閉じるか、SiLU の seed 1 を回すか、plan 0107 に「MobileNetV4-M でも下がらないこと」という条件を足すか。
@@ -9,7 +9,7 @@ options:
   B: SiLU MobileNetV4-M の seed 1 を Hamster で回す（約 36〜40 GPU時間）。Phase 1 ReLU seed 1（63.71 / 39.30、Hamster）と比べ、d1 ≤ −0.5pt なら「2本とも下がる」として閉じる。
   C: いまは GPU を使わず、plan 0107 の採用条件に「MobileNetV4-S で効果ありになった活性化の案は、蒸留のベースにする前に MobileNetV4-M でも1本回し、この基準より 0.5pt 以上下がらないこと」を足す（後で 1 案あたり約 36〜51 GPU時間）。
 recommendation: A
-chosen: null
+chosen: closed
 ---
 
 # 0060: MobileNetV4-M 基準＋EMA が完了（63.59 / 39.10）。SiLU は正式な基準に対しても −2.33 / −0.77
@@ -92,3 +92,7 @@ decision 0044（MobileNetV4-S の SiLU を標準にするか）も未決です�
 - 設定チェックの差（−0.29）が気になる場合: これは 0.5pt の条件は満たしていますが、seed の差（0.09pt）より大きい値です。ただし、SiLU との差（−0.77）は Phase 1 と比べても基準＋EMA と比べても同じ帯に入るので、この判定には効きません。
 
 `chosen` は人間が記入します（ファイルを編集するか、チャットで答えてください）。記入されるまで、この packet に関わる新しい学習は始めません。
+
+## 決定（2026-10-18、本人、チャットで回答）
+
+**閉じる（人間、2026-10-18）。** MobileNetV4-M の Phase 2 基準を 63.59 / 39.10 で確定。SiLU（lr 0.025）は −0.77 で、学習率との相性が疑われるので、MobileNet の活性化関数の探索（SiLU と hard-swish、それぞれの最良の学習率）で扱う。

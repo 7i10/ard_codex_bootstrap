@@ -1,6 +1,6 @@
 ---
 id: 0061
-status: pending
+status: decided
 created: 2026-10-17
 campaign: plan0103-phase2-effb0-baseline-ema-s0-v1（plan 0103 Phase 2。EfficientNet-B0 の基準＋EMA。Phase 1 と同じ学習手順に Phase 2 の共通設定（サブセット 5,000、EMA 0.9999）を足したもの。ランダム初期化、SGD lr 0.025、full AT 50 epoch。Hamster で hand-run、seed 0、50/50 epoch 完走、非決定的＋cudnn_benchmark＋torch.compile、source d97bf6e）
 question: EfficientNet-B0 の Phase 2 の基準が 58.11 / 35.87 に決まり、設定チェックも通りました（Phase 1 seed 0 との差 −0.11 / −0.06）。このまま基準を確定してキューを進めるだけにするか、あわせて Ferret にある Phase 1 seed 1（EfficientNet-B0 と DeiT-Tiny）を docs に取り込み、register C で保留していた「判定の基準の見直し」を始めるか。
@@ -8,7 +8,7 @@ options:
   A: 追加の作業はしない（0 GPU時間）。基準を 58.11 / 35.87（EMA 58.30 / 36.07）で確定し、キューの EfficientNet-B0 の案（cosine、ラベル平滑化）はこの基準と Phase 2 の判定ルールで読む。
   B: A に加えて、Ferret の Phase 1 seed 1 の2本（EfficientNet-B0、DeiT-Tiny）を postrun で docs に取り込む（0 GPU時間、セッション2回分）。そろったら下の事前ルールで、モデルごとの「効果なし」の線を決める。
 recommendation: B
-chosen: null
+chosen: B
 ---
 
 # 0061: EfficientNet-B0 基準＋EMA が完了（58.11 / 35.87）。設定チェックは seed の差の範囲内で合格
@@ -81,3 +81,7 @@ EfficientNet-B0 自体については、設定チェックが seed の差の範�
 - DeiT-Tiny の Phase 2 の案を回さないことにした場合 → 見直しを急ぐ理由が弱くなり、A で十分です。
 
 `chosen` は人間が記入します（ファイルを編集するか、チャットで答えてください）。記入されるまで、この packet に関わる新しい学習は始めません。
+
+## 決定（2026-10-18、本人、チャットで回答）
+
+**B を選択（人間、2026-10-18）。** EfficientNet-B0 の Phase 2 基準を 58.11 / 35.87 で確定。あわせて Phase 1 の seed 1（EfficientNet-B0 と DeiT-Tiny）を記録に取り込み、5モデルの seed による揺れから判定の基準（1.5 / 0.5pt）を見直す（CPU だけの作業）。

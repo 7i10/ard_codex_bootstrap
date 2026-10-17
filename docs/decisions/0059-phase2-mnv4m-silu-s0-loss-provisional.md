@@ -1,6 +1,6 @@
 ---
 id: 0059
-status: pending
+status: decided
 created: 2026-10-15
 campaign: plan0103-phase2-mnv4m-silu-s0-v1（plan 0103 Phase 2。MobileNetV4-M の ReLU をすべて SiLU に替えたもの。ランダム初期化、SGD lr 0.025、full AT 50 epoch、Phase 2 の共通設定（サブセット 5,000、EMA 0.9999）。Ferret で hand-run、seed 0、50/50 epoch 完走、非決定的＋cudnn_benchmark、source cabd60a）
 question: MobileNetV4-S では SiLU で PGD-10 が +2.56pt 上がりましたが、MobileNetV4-M では Phase 1 の ReLU より clean −2.44 / PGD-10 −0.96 と下がりました。正式な比較相手（MobileNetV4-M 基準＋EMA）の完了を待って読み直すだけにするか、seed 1 を回すか、plan 0107 の採用条件に「MobileNetV4-M でも下がらないこと」を足すか。
@@ -9,7 +9,7 @@ options:
   B: SiLU MobileNetV4-M の seed 1 を回す（約 36〜51 GPU時間）。Phase 1 ReLU seed 1（63.71 / 39.30）と比べ、d1 ≤ −0.5pt なら「2本とも下がる」として MobileNetV4-M の SiLU を閉じる。
   C: いまは GPU を使わず、plan 0107 の採用条件を変える。MobileNetV4-S で「効果あり」になった活性化の案は、蒸留のベースにする前に MobileNetV4-M でも1本回し（1案あたり約 36〜51 GPU時間、後で）、基準＋EMA より 0.5pt 以上下がらないことを条件にする。
 recommendation: A
-chosen: null
+chosen: closed
 ---
 
 # 0059: SiLU、MobileNetV4-M seed 0 が完了（Phase 1 の ReLU より clean −2.44 / PGD-10 −0.96、暫定）
@@ -101,3 +101,7 @@ MobileNetV4-S と MobileNetV4-M で向きが逆という結果は、seed 1本で
 - A の判定で Δ ≥ +0.5pt（Phase 1 との比較と向きが逆）になった場合 → Phase 2 の共通設定か source の影響を疑い、改めて packet を出します。
 
 `chosen` は人間が記入します（ファイルを編集するか、チャットで答えてください）。記入されるまで、この packet に関わる新しい学習は始めません。
+
+## 決定（2026-10-18、本人、チャットで回答）
+
+**閉じる（人間、2026-10-18）。** MobileNetV4-M の SiLU の扱いは、MobileNet の活性化関数の方針（SiLU と hard-swish をそれぞれの最良の学習率で効率よく探索し、長所と短所を出す。SiLU が hard-swish を 1.0pt 以上上回るときだけ SiLU。discussion register 2026-10-18）に引き継ぐ。正式な比較は decision 0060 の基準（63.59 / 39.10）。

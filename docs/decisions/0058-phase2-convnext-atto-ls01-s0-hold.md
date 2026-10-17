@@ -1,6 +1,6 @@
 ---
 id: 0058
-status: pending
+status: decided
 created: 2026-10-15
 campaign: plan0103-phase2-convnext-atto-ls01-s0-v1（plan 0103 Phase 2 の候補④「ラベル平滑化 0.1」を ConvNeXt-Atto で。ランダム初期化・AdamW lr 1e-3・full AT 50 epoch。基準＋EMA との違いはラベル平滑化だけで、source（9a16cd6）・ホスト（Ferret）・カーネル・ドライバも同じ。Ferret の pull キューから hand-run、seed 0、50/50 epoch 完走、非決定的＋cudnn_benchmark）
 question: ConvNeXt-Atto のラベル平滑化は基準＋EMA より PGD-10 が +0.69pt（clean −0.06pt）で、Phase 2 のルールでは「保留」でした。seed 1 で確かめるか、「保留」のまま GPU を使わずに置いておくか、AutoAttack で PGD の上げ幅が見かけ（勾配の隠れ）でないかを先に確かめるか。
@@ -9,7 +9,7 @@ options:
   B: いまは何も足さない（追加 0 GPU時間）。「保留」として記録し、採用も却下もしない。cosine（0052/0053）の判断が出て、Phase 2 の候補を組み合わせる計画を立てるときに、もう一度この packet を見る。
   C: 基準＋EMA とラベル平滑化の保存済みチェックポイントに、同じ 5,000 枚で AutoAttack をかける（約 2〜6 GPU時間、見積もり）。PGD-10 の +0.69 が AutoAttack でも +0.5pt 以上残るかを見る。評価の手順を足すので、plan への追記とレビューが先に要る。
 recommendation: B
-chosen: null
+chosen: hold
 ---
 
 # 0058: ラベル平滑化、ConvNeXt-Atto seed 0 が完了（PGD-10 +0.69pt で「保留」、clean は変わらず）
@@ -94,3 +94,7 @@ GPU は 2026-10-14 の決定どおり蒸留の検証を優先しています。
 - 「1000 クラスで 0.1 は適切か」という疑問を確かめたい場合 → この packet の範囲外です。別の値（例: 0.05、0.2）を試すのは新しい計画として立てます。
 
 `chosen` は人間が記入します（ファイルを編集するか、チャットで答えてください）。記入されるまで、この packet に関わる新しい学習は始めません。
+
+## 決定（2026-10-18、本人、チャットで回答）
+
+**保留のまま（人間、2026-10-18）。** ConvNeXt-Atto のラベル平滑化（+0.69）は、今のキューが全部終わった後の「段階2：保留の効果を深掘りするか決める」で、ほかの保留の効果（cosine など）とまとめて判断する。今は GPU を使わない。
