@@ -220,7 +220,7 @@ const BODY = {
     slide.addChart(c.kind || "bar", data, {
       x: M, y: Y, w: cw, h: HH, barDir: c.horizontal ? "bar" : "col",
       chartColors: c.colors || (c.series.length > 1 ? [T.primary, "9DC3E6", T.sub] : [T.primary]), invertIfNegative: false, showValue: c.show_values ?? (c.kind || "bar") === "bar",
-      lineSize: 2.5, lineDataSymbol: "none", catAxisLabelFrequency: c.label_every || 1, dataLabelFontSize: 12, dataLabelColor: T.text,
+      lineSize: 2.5, lineDataSymbol: "none", catAxisLabelFrequency: c.label_every || 1, catAxisLabelRotate: c.label_rotate ?? 0, dataLabelFontSize: 12, dataLabelColor: T.text,
       dataLabelFormatCode: c.format || "0.0", catAxisLabelFontSize: 13, valAxisLabelFontSize: 12,
       catAxisLabelColor: T.text, valAxisLabelColor: T.sub, valGridLine: { color: "E6E6E6", size: 1 },
       showLegend: c.series.length > 1, legendPos: "b", legendFontSize: 12,
@@ -313,11 +313,14 @@ async function main() {
   const addToc = (current) => {
     const toc = pres.addSlide({ masterName: "TOC" });
     toc.addText("目次", { placeholder: "title" });
-    const rowH = Math.min(0.72, 5.6 / Math.max(sections.length, 1));
+    // fit every section between the top margin and the footer band
+    const n = Math.max(sections.length, 1), top = 0.5, avail = FOOT_Y - 0.35 - top;
+    const gap = n > 7 ? 0.08 : 0.12, rowH = Math.min(0.72, (avail - gap * (n - 1)) / n);
+    const fs = rowH < 0.55 ? 18 : 22;
     sections.forEach((sec, i) => {
-      const y = 0.8 + i * (rowH + 0.12), on = current === undefined || sec === current;
+      const y = top + i * (rowH + gap), on = current === undefined || sec === current;
       toc.addShape("rect", { x: 4.4, y, w: 7.6, h: rowH, fill: { color: sec === current ? T.primary : T.tint }, line: { color: sec === current ? T.primary : T.tint } });
-      toc.addText(sec, tb({ x: 4.6, y, w: 7.2, h: rowH, valign: "middle", fontSize: 22, bold: true, color: sec === current ? T.white : (on ? T.primaryDark : "8EA9C8") }));
+      toc.addText(sec, tb({ x: 4.6, y, w: 7.2, h: rowH, valign: "middle", fontSize: fs, bold: true, color: sec === current ? T.white : (on ? T.primaryDark : "8EA9C8") }));
     });
     return toc;
   };
