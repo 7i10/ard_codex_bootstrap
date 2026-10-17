@@ -485,4 +485,21 @@ MobileNetV4-M at matched GPU-hours.
   arm does not reach SiLU-level gain and does not become the distillation base model. What follows
   (close this scope, try another beta or annealing, or read it together with the optimizer-only and
   hard-swish runs, recorded separately) is the human's decision (packet).
+- 2026-10-18: smooth-backward closed (decision 0062 A, human). Results (MobileNetV4-S, full held-out last,
+  clean / PGD-10): hard-swish 55.00 / 32.62 (+1.91, about 75% of SiLU's +2.56); smooth backward
+  `optimizer` 54.37 / 29.49 (-1.22); `attack_and_optimizer` 55.91 / 23.52 (-7.19). Mechanism (CPU
+  analysis of saved checkpoints, not a registered protocol):
+  - MobileNetV4's ReLU inputs are small: 80% have |x| < 0.3, vs 49% for an adversarially trained
+    ResNet-18. So beta = 10 is a poor ReLU surrogate here.
+  - In the attack, the surrogate PGD-3 is 8.2 pt weaker against the true network (beta = 50 removes the
+    gap), so the `attack_and_optimizer` arm trained against a weak attack.
+  - In the optimizer, the direction is right (expected cosine 0.94-0.97), but early-layer updates shrink
+    to 0.55-0.67x. The training loss never fell below the baseline.
+  - SiLU and hard-swish instead change the deployed forward function: loss-surface local linearity is
+    0.995 vs 0.977 for ReLU, and the linearization error is about 25% smaller.
+  Implication for "train smooth, deploy ReLU": the gain appears to live in the smooth forward function,
+  so annealing to ReLU is expected to lose most of it. The zero-shot swap probe tests this.
+- 2026-10-18 (human): MobileNet activation rule. Compare SiLU and hard-swish each at its best lr. Choose
+  SiLU only if it beats hard-swish by >= 1.0 pt; otherwise choose hard-swish. Queued: MobileNetV4-M
+  hard-swish (lr 0.025); MobileNetV4-S SiLU and hard-swish at lr 0.0125 (369577859b07).
 
