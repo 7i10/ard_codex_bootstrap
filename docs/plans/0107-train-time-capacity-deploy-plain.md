@@ -519,3 +519,100 @@ MobileNetV4-M at matched GPU-hours.
     to keep the gain.
   - Structural reparameterization stays the clean test of the optimization hypothesis, because it leaves
     the deployed function class unchanged.
+
+## Design: structural reparameterization (human-approved 2026-10-18)
+
+Goal: train MobileNetV4-Conv-S with extra linear branches, fold them away after training, and deploy
+exactly the timm 1.0.9 `mobilenetv4_conv_small` (ReLU) network. A gain then cannot come from a larger
+deployed function class, so it tests this plan's optimization hypothesis directly.
+References: RepVGG (arXiv:2101.03697), MobileOne (arXiv:2206.04040).
+
+**Where branches go.** A "position" is a conv + BatchNorm whose BatchNorm is followed by a ReLU. In
+timm the ReLU sits inside `BatchNormAct2d.act`. MobileNetV4-Conv-S has 30 such positions:
+- the stem `conv_stem` + `bn1` (3x3, stride 2, 3 -> 32);
+- the four plain `cn` layers of stages 0, 1 and the one of stage 4 (`ConvBnAct`: `conv` + `bn1`;
+  3x3 stride 2, or 1x1);
+- in each of the 12 `UniversalInvertedResidual` blocks, `pw_exp` (1x1 expansion) and, in the 11 blocks
+  that have one, `dw_mid` (depthwise 3x3 or 5x5, stride 1 or 2);
+- the head `conv_head` + `norm_head` (1x1, 960 -> 1280, applied after global pooling).
+
+Positions whose BatchNorm has no activation are left unchanged: `dw_start` (depthwise, followed by the
+linear `pw_exp`) and `pw_proj` (1x1 projection, followed by the residual add). This follows the approved
+rule ("followed by a ReLU"). Branches there would also fold exactly; they are a possible later variant.
+
+**Branches at one position** (all summed before the ReLU; MobileOne's block, with the original conv kept
+as the first k x k branch):
+- the original conv + BN (same module names inside the training block, same init as the plain model);
+- `extra_branches` additional k x k conv + BN branches with the same groups and stride (default 1, so two
+  k x k branches in total, i.e. MobileOne's over-parameterization factor k = 1 + extra);
+- for k > 1, one 1x1 conv + BN "scale" branch with the same groups and stride;
+- an identity BN branch when in = out channels and stride = 1 (e.g. stride-1 `dw_mid`, the 32 -> 32 1x1
+  `cn` layer).
+For a 1x1 position the extra branches are 1x1, and there is no separate scale branch.
+New branch convs use timm's own MobileNet init (`_init_weight_goog`); every branch BN starts at weight 1,
+bias 0, as in RepVGG and MobileOne. The extra branches are initialized after the plain network, so at the
+same seed the original branch equals the plain model's initial weights tensor for tensor.
+
+**Exactness.** Every timm conv here has symmetric padding k // 2, dilation 1, zero padding and no bias.
+So a 1x1 kernel zero-padded to k x k, centered, gives the same output grid as the k x k conv at stride 1
+and stride 2. The identity is a k x k kernel with a single 1 at the center (input channel `o % (in /
+groups)`). The builder checks these conditions and refuses a position that breaks them; it never skips
+one silently.
+
+**Folding** (eval-mode BN, i.e. running statistics). Each branch conv + BN becomes kernel `W * g /
+sqrt(v + eps)` and bias `b - m * g / sqrt(v + eps)`; the identity BN uses the identity kernel as `W`. The
+1x1 kernels are padded, and all kernels and biases are summed, in float64, then cast to float32. The sum
+goes into the plain model's conv weight. The plain model's `BatchNormAct2d` gets weight 1, the folded bias,
+running mean 0 and running variance `1 - eps` (so `sqrt(var + eps)` is 1). The result loads with
+`strict=True` into `build_architecture("mobilenetv4_conv_small_imagenet")`.
+
+**Training, selection and validation** use the unfolded model. In eval mode every BN is a fixed affine
+map, so the unfolded network and the folded one compute the same function, up to float32 rounding
+(tested, including input gradients). Selection and validation PGD therefore attack the deployed function.
+In train mode each branch BN normalizes with its own batch statistics; that is the method, and it has no
+plain-network equivalent. Weight decay (1e-4 on all parameters, as in the baseline) applies to every
+branch parameter.
+
+**Checkpoints and evaluation.**
+- New student id `mobilenetv4_conv_small_reparam_imagenet` (one extra k x k branch). Training checkpoints
+  hold the unfolded model and EMA, so resume works as for any other student. The builder takes
+  `extra_branches`; another factor gets its own id and config when a run needs it.
+- `python -m ard.cli.fold_reparam --run-dir <run>` folds `last.pt`, `best.pt` and `best-ema.pt` (both
+  the `model` and the `ema` weight sets) into `<run>/folded/`. It copies `resolved_config.yaml` byte for
+  byte, keeps every lineage key of each checkpoint (config hash, run id, world size, selection record),
+  adds a `reparameterization` record (training and deployed architecture, source checkpoint SHA-256,
+  output-equivalence check, `source_git_sha`, `source_git_dirty`, torch and timm versions), and refuses to
+  fold if the folded and unfolded outputs differ beyond the stated tolerance. It refuses a dirty source
+  tree unless `--allow-dirty-source` is passed.
+- `ard.cli.evaluate --checkpoint-dir <run>/folded` then builds the plain architecture and loads the
+  folded weights strictly. For a reparam training config it refuses an unfolded checkpoint, so an
+  official number is always from the deployed network. The evaluation record keeps `student` = the
+  training id and adds `deployed_architecture` and the `reparameterization` record; records of other
+  students are unchanged.
+
+With one extra branch the 30 positions carry 84 conv/BN branches (30 original, 30 extra, 14 scale,
+10 identity).
+
+**Cost** (`ard.models.complexity`, one 224 px image, 1000 classes; MACs = conv + linear).
+- Training-time model: 5,765,896 params, 331,985,856 MACs, i.e. 1.53x / 1.78x the plain model.
+- Folded model: 3,774,024 params, 186,005,568 MACs, equal to the plain MobileNetV4-S exactly (tested).
+- The MAC count leaves out BatchNorm and the branch sums. Those are memory-bound on a GPU, and this
+  network is mostly depthwise and 1x1 convs, so the training-time slowdown can be larger than 1.78x.
+  A short GPU throughput check is needed before the matched-GPU-hours comparison with MobileNetV4-M is
+  scheduled (MobileNetV4-M: 827,649,984 MACs, 4.45x the plain MobileNetV4-S).
+
+**Numerical check** (tests in `tests/unit/test_reparam.py`; every number in this paragraph was measured on
+CPU). In float64 the unfolded and folded networks
+agree to about 1e-14 of the largest logit, outputs and input gradients (asserted at 1e-10). In float32
+they agree to 5e-6 to 1e-5 of the largest logit. That is the float32 rounding of the plain network
+itself (same weights, float32 against float64: about 5e-6). Input gradients in float32 have cosine at
+least 0.99999 and sign agreement at least 0.9994 (PGD uses the sign). Single gradient elements can
+differ by up to a few percent of the largest one where a ReLU gate flips at a near-zero pre-activation.
+The same happens between float32 and float64 of one plain network, so it is float32 noise, not a folding error.
+These CPU figures do not carry over to a GPU. There, cuDNN TF32 convolutions make the unfolded and folded
+outputs differ by about 1e-3 relative per conv. That is the same noise class as the convolution algorithm that
+`cudnn_benchmark` picks. Any agreement between the unfolded and the folded network that is reported for a GPU
+run must be measured on the GPU. The fold CLI's own check runs on CPU in float64 and tests only the folding
+arithmetic.
+Config: `configs/scientific/imagenet_mobilenetv4_reparam_pgd_at_phase2_random_lr0025.yaml` (the hard-swish
+lr 0.025 config with only `student.architecture` and `tracking.group` changed).

@@ -730,6 +730,9 @@ class ModelConfig(StrictModel):
         "mobilenetv4_conv_medium_hardswish_imagenet",  # human-approved 2026-10-18
         # Plan 0103 Phase 2 (human-approved 2026-10-15), random init only.
         "mobilenetv4_conv_small_hardswish_imagenet",
+        # Plan 0107 structural reparameterization (human-approved 2026-10-18), random init only: the
+        # training-time multi-branch student; its folded weights are mobilenetv4_conv_small_imagenet's.
+        "mobilenetv4_conv_small_reparam_imagenet",
     ] = "fixture_cnn"
     num_classes: int = Field(default=10, ge=2)
     normalization: NormalizationConfig = Field(default_factory=NormalizationConfig)

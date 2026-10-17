@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
@@ -33,6 +33,7 @@ from ard.evaluation import (
     validate_checkpoint_lineage,
 )
 from ard.models import build_student
+from ard.models.reparam import FOLD_CONTRACT, REPARAM_ARCHITECTURES, deployed_student_config
 from ard.tracking import (
     LocalTracker,
     create_tracker,
@@ -407,6 +408,47 @@ def _surrogate_gradient_protocol_identity(training: TrainingConfig) -> dict[str,
     return {} if surrogate is None else {"relu_surrogate_gradient": surrogate.model_dump(mode="json")}
 
 
+def _reparameterization_records(
+    training_config: ExperimentConfig,
+    checkpoints: Sequence[Path],
+    payloads: Sequence[Mapping[str, object]],
+    *,
+    weights: str,
+) -> list[dict[str, object]] | None:
+    """Plan 0107 structural reparameterization (human-approved 2026-10-18).
+
+    A reparameterized student is evaluated only as its deployed plain network: every checkpoint must be a
+    folded one written by ``ard.cli.fold_reparam`` for this training architecture and weight set. A
+    reparameterization record on any other student is refused. ``None`` for every other student, so their
+    evaluation records stay byte-identical."""
+    architecture = training_config.student.architecture
+    spec = REPARAM_ARCHITECTURES.get(architecture)
+    records: list[dict[str, object]] = []
+    for checkpoint, payload in zip(checkpoints, payloads, strict=True):
+        record = payload.get("reparameterization")
+        if spec is None:
+            if record is not None:
+                raise ValueError(
+                    f"{checkpoint.name} carries a reparameterization record but the training student "
+                    f"{architecture!r} is not a reparameterized architecture"
+                )
+            continue
+        if (
+            not isinstance(record, Mapping)
+            or record.get("contract") != FOLD_CONTRACT
+            or record.get("training_architecture") != architecture
+            or record.get("deployed_architecture") != spec.deployed_architecture
+            or weights not in cast(list[str], record.get("folded_weight_sets", []))
+        ):
+            raise ValueError(
+                f"{checkpoint.name} is not a folded {architecture} checkpoint with weight set {weights!r}; "
+                "a reparameterized student is evaluated only as its deployed plain network -- run "
+                "`python -m ard.cli.fold_reparam --run-dir <training output>` and evaluate <training output>/folded"
+            )
+        records.append(dict(record))
+    return None if spec is None else records
+
+
 def _augmentation_protocol_identity(dataset: Any) -> dict[str, object]:
     """Plan 0103 Phase 2 batch C, present only when set (same byte-identity
     argument as ``_throughput_protocol_identity``): an IDBH-trained run shares
@@ -501,6 +543,12 @@ def main(argv: list[str] | None = None) -> int:
                     f"--weights=ema requires a checkpoint selected on the EMA's own accuracy, but "
                     f"{checkpoint.name} was not (selection_source={source!r}) -- point at best-ema.pt instead"
                 )
+    reparameterization = _reparameterization_records(
+        training_config, checkpoints, checkpoint_payloads, weights=args.weights
+    )
+    evaluated_student = (
+        training_config.student if reparameterization is None else deployed_student_config(training_config.student)
+    )
     # Fail before any evaluation work when a checkpoint's selection record
     # contradicts training.selection_subset_size.
     for payload in checkpoint_payloads:
@@ -615,10 +663,12 @@ def main(argv: list[str] | None = None) -> int:
         raise
     results: list[dict[str, Any]] = []
     try:
-        for checkpoint, checkpoint_payload in zip(checkpoints, checkpoint_payloads, strict=True):
+        for checkpoint_index, (checkpoint, checkpoint_payload) in enumerate(
+            zip(checkpoints, checkpoint_payloads, strict=True)
+        ):
             payload_world_size = checkpoint_payload["world_size"]
             assert isinstance(payload_world_size, int) and not isinstance(payload_world_size, bool)
-            student = build_student(training_config.student, tier=training_config.tier)
+            student = build_student(evaluated_student, tier=training_config.tier)
             result = evaluate_saved_checkpoint(
                 checkpoint=checkpoint,
                 model=student,
@@ -767,6 +817,15 @@ def main(argv: list[str] | None = None) -> int:
                     "count": result.count,
                     "sample_stats": None if result.sample_stats is None else str(result.sample_stats),
                     "panel": str(result.panel),
+                    # Plan 0107: present only for a reparameterized student (its folded checkpoint).
+                    **(
+                        {}
+                        if reparameterization is None
+                        else {
+                            "deployed_architecture": evaluated_student.architecture,
+                            "reparameterization": reparameterization[checkpoint_index],
+                        }
+                    ),
                 }
             )
             evaluation_tracker.log_metrics(

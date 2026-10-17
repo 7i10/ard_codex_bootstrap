@@ -7,6 +7,7 @@ from torch import nn
 from torchvision import models
 
 from ard.config.schema import ModelConfig, NormalizationConfig
+from ard.models.reparam import REPARAM_ARCHITECTURES, build_reparam_architecture
 from ard.models.variants import VARIANT_BUILDERS
 
 
@@ -258,6 +259,11 @@ def build_architecture(architecture: str, num_classes: int, *, pretrained: bool 
         import timm
 
         return timm.create_model("mobilevit_s.cvnets_in1k", pretrained=pretrained, num_classes=num_classes)
+    if architecture in REPARAM_ARCHITECTURES:
+        # Plan 0107 method candidate 3 (human-approved 2026-10-18): training-time multi-branch student whose
+        # folded weights load strictly into its plain deployed architecture -- see ard.models.reparam.
+        # Random init only (absent from the pretrained allowlist above).
+        return build_reparam_architecture(architecture, num_classes)
     if architecture in VARIANT_BUILDERS:
         # Plan 0103 Phase 2 architecture variants (human-approved 2026-10-08): random init only --
         # pretrained=True is refused above because these ids are absent from that allowlist. See
