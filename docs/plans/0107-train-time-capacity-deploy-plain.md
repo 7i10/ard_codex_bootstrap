@@ -503,3 +503,19 @@ MobileNetV4-M at matched GPU-hours.
   SiLU only if it beats hard-swish by >= 1.0 pt; otherwise choose hard-swish. Queued: MobileNetV4-M
   hard-swish (lr 0.025); MobileNetV4-S SiLU and hard-swish at lr 0.0125 (369577859b07).
 
+- 2026-10-18: zero-shot activation-swap probe (analysis only, not an official result).
+  - Setup: run's own 5000-image selection subset, project PGD-10, raw last weights.
+  - SiLU weights evaluated with ReLU collapse: 0.10 / 0.10 clean / PGD-10; 14.92 / 0.00 with BN re-estimated.
+  - Hard-swish weights to ReLU behave the same.
+  - SiLU weights evaluated as x*sigmoid(beta x), BN re-estimated:
+    - beta 1.25 keeps clean (56.00) but PGD-10 falls 32.46 -> 28.12, below the ReLU baseline.
+    - beta 2 gives 6.24.
+  - SiLU to hard-swish gives 28.14.
+  - So the robustness gain is not stored in the weights. It depends sharply on the forward shape near
+    zero, and more sharply for robustness than for clean accuracy.
+  - Together with the smooth-backward analysis, this places the activation effect in the deployed
+    function class (forward smoothness and local linearity), not in optimization alone.
+  - "Train smooth, anneal to ReLU" would in effect retrain a ReLU network at the end. It is not expected
+    to keep the gain.
+  - Structural reparameterization stays the clean test of the optimization hypothesis, because it leaves
+    the deployed function class unchanged.
