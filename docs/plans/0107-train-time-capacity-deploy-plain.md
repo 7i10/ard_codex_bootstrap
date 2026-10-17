@@ -626,3 +626,17 @@ lr 0.025 config with only `student.architecture` and `tracking.group` changed).
     2.6x S. A 50-epoch reparam S run therefore costs about the same 4090 time as a 50-epoch M run. The
     matched-4090-time comparison against M holds under the project's efficiency metric. Reference
     points: plain S 50 ep (1x), plain S 100 ep (2x), reparam S 50 ep (about 2.4x), M 50 ep (about 2.6x).
+- 2026-10-18 (human): preregistered rule for the first reparam run, `plan0107-mnv4s-reparam-s0-v1`
+  (config `imagenet_mobilenetv4_reparam_pgd_at_phase2_random_lr0025.yaml`, source c9314b0, ReLU,
+  nondeterministic). Metric: full held-out, last checkpoint, PGD-10 of the folded raw weights.
+  1. Primary: Phase 2 tiers against plain S baseline+EMA 50 ep, 30.71 (>= 1.5 effect, 0.5-1.5 pending,
+     < 0.5 none). The baseline was deterministic; measured setting effects are <= 0.3 pt.
+  2. Matched training time: compare with plain S at 100 ep, 31.88 (2x time; reparam costs about 2.4x).
+     Exceeding it means "spending the extra training time on branches beats spending it on epochs".
+  3. MobileNetV4-M (39.10; 2.2x slower on device) is only a point on the efficiency (robustness vs
+     on-device latency) plot. It is not a matched comparison, because the inference cost differs.
+  4. Learning rate: branches raise the effective step on the folded weights. If the result is below the
+     effect tier, run lr 0.0125. If 0.0125 is better, decide whether to go lower. Raising lr (0.05) has
+     low priority and is not planned.
+  5. If it works, re-implement in the OREPA form (online folding, one BN per position) to cut the
+     training cost (measured 2.45x a plain step), and check that the effect is kept.
