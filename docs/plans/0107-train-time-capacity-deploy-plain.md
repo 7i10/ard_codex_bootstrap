@@ -141,4 +141,181 @@ MobileNetV4-M at matched GPU-hours.
   that direction. If not, MobileNetV4-M gets a SiLU learning-rate search, starting at lr 0.0125. That
   search is needed because the MobileNetV4-M SiLU run, at the ReLU-tuned lr 0.025, gave 61.26 / 38.33
   vs ReLU 63.71 / 39.30, with a higher final training loss.
+- 2026-10-17 (postrun): **smooth backward, optimizer only, MobileNetV4-S seed 0 completed.**
+  `plan0107-mnv4s-smoothgrad-opt-s0-v1` (hand-run on Ferret, one RTX 4090; `environment.json` records
+  kernel 7.0.0-28; the GPU index is not recorded) ran 50/50 epochs from 2026-10-15 03:48:28 to
+  2026-10-16 17:31:54 UTC. `run-bundle/completion.json` reads `completed`, the manifest status is
+  `completed`, and `run-bundle/error-marker.txt` reads "no application error recorded". The watcher
+  re-derived it as terminal and successful. All 50 epoch rows are present (`epoch_metrics_complete:
+  true`), one W&B segment, no resume. `train.log` has no traceback, NaN or error line (only the wandb
+  git-root warning); the wandb internal log has one transient `file_stream` HTTP 500 retry
+  (2026-10-15 23:07 UTC). `best.pt` (epoch 47), `best-ema.pt` (epoch 37), `last.pt` and
+  `epoch-049.pt` are on disk. Nothing is imported into `docs/experiments/`: no aggregator exists for
+  this contract. The numbers below are read from the run-bundle manifests and `epoch-metrics.jsonl`
+  of this run and of the two comparison runs (via `scripts/ardx/read_bundle.py`); the SiLU complement
+  and EMA numbers are from its plan 0103 ledger row.
+
+  Fixed identity: config `imagenet_mobilenetv4_pgd_at_phase2_smoothgrad_opt.yaml` (unchanged since the
+  source SHA) = the MobileNetV4-S baseline+EMA recipe plus `training.relu_surrogate_gradient: {beta:
+  10.0, scope: optimizer}`, i.e. the derivative of softplus (beta 10) replaces the ReLU derivative in
+  the backward pass of the training loss only; the forward pass is exactly ReLU, and the training
+  attack, selection, probe and validation attacks use true ReLU gradients. ImageNet-1k (original
+  images, content `ae033613...`), MobileNetV4-Conv-S (`mobilenetv4_conv_small_imagenet`,
+  `imagenet_standard` profile) random init, plain PGD-AT, no teacher, 224 px training. Training and
+  evaluation-attack seed 0 (split seed 20260911). Training attack CE PGD-3, l_inf eps 4/255, step
+  8/765, random start, eval mode. Selection and validation attack PGD-10, same eps and step, random
+  start, eval mode. SGD (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.025, warmup_multistep (10-epoch
+  warmup, x0.1 at epochs 25 and 38), no label smoothing, full AT, 50 epochs. Phase 2 template:
+  5,000-image selection subset, EMA 0.9999. World size 1, global batch 128, local BN. fp32.
+  Non-deterministic with cudnn_benchmark, eager (no `torch.compile`, no cuda_graph). Protocol
+  `controlled_imagenet_stage02_init_lr_grid_v1`, config hash `8baf9c56...`. Source SHA
+  `8f511929ed7e67684415fe64f3403ae4aa415b55` (worktree `source-8f511929ed7e`, clean). "Full val"
+  (25,620), "subset" (5,000), "complement" (20,620) are held-out original train images and "probe"
+  is 2,000 training images, as in plan 0103. None is the ImageNet val split. No AutoAttack and no
+  official evaluation has run.
+
+  End of training (full val and complement are evaluated at the end, for the last and the best
+  checkpoints). Baseline+EMA = `plan0103-phase2-mnv4s-baseline-ema-s0-v1` (Hamster, `d836c03`,
+  deterministic, CUDA Graphs); SiLU = `plan0103-phase2-mnv4s-silu-s0-v1` (Hamster, `5dd329e`,
+  deterministic, eager):
+
+  | checkpoint | full val clean / PGD-10 | complement clean / PGD-10 | baseline+EMA full val | smooth minus baseline (full val) |
+  |---|---:|---:|---:|---:|
+  | last (ep 49), raw weights | 54.37 / 29.49 | 54.60 / 29.62 | 53.85 / 30.71 | **+0.52 / -1.21** |
+  | last (ep 49), EMA weights | 54.49 / 29.75 | 54.78 / 29.89 | 53.95 / 30.80 | +0.53 / -1.05 |
+  | best raw (by subset PGD-10) | 54.31 / 29.72 (ep 47) | 54.65 / 29.82 | 53.74 / 30.57 (ep 43) | +0.57 / -0.85 |
+  | best EMA (by EMA subset PGD-10) | 53.61 / 29.85 (ep 37) | 53.90 / 29.98 | 52.75 / 30.60 (ep 36) | +0.87 / -0.75 |
+  | SiLU, last raw | 55.45 / 33.27 | 55.56 / 33.39 | | smooth minus SiLU -1.08 / -3.78 |
+
+  Per-epoch trajectory, this run against baseline+EMA (subset and probe are evaluated every epoch;
+  subset values for both runs, train loss and training-batch robust accuracy for both runs):
+
+  | epoch | LR | subset raw clean / PGD-10 | baseline subset raw | subset EMA clean / PGD-10 | probe clean / PGD-10 | train loss (baseline) | train robust acc (baseline) |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | 0 | 0.0025 | 0.50 / 0.42 | 0.68 / 0.54 | 0.10 / 0.10 | 0.55 / 0.45 | 6.859 (6.831) | 0.28 (0.31) |
+  | 4 | 0.0125 | 16.30 / 8.72 | 16.12 / 8.60 | 5.28 / 2.98 | 16.40 / 8.60 | 5.663 (5.673) | 6.17 (6.12) |
+  | 9 | 0.025 (end of warmup) | 31.42 / 16.40 | 30.96 / 15.98 | 5.22 / 2.82 | 33.10 / 16.55 | 4.830 (4.833) | 13.87 (13.82) |
+  | 14 | 0.025 | 37.76 / 19.84 | 37.18 / 18.96 | 37.20 / 21.86 | 40.45 / 20.50 | 4.505 (4.504) | 17.34 (17.36) |
+  | 24 | 0.025 (last) | 41.98 / 21.80 | 40.40 / 21.76 | 46.70 / 27.36 | 46.35 / 23.25 | 4.329 (4.330) | 19.33 (19.34) |
+  | 25 | 0.0025 | 48.48 / 27.20 | 47.88 / 26.94 | 47.90 / 27.56 | 54.45 / 29.30 | 4.024 (4.016) | 23.40 (23.51) |
+  | 37 | 0.0025 (last; best EMA) | 51.74 / 28.28 | 51.46 / 28.80 | 52.42 / 29.34 | 57.20 / 32.70 | 3.847 (3.827) | 25.69 (26.00) |
+  | 38 | 0.00025 | 52.78 / 28.40 | 52.26 / 29.30 | 52.62 / 28.98 | 58.35 / 33.35 | 3.770 (3.744) | 26.88 (27.25) |
+  | 47 | 0.00025 (best raw) | 52.94 / 29.26 | 52.86 / 29.60 | 53.18 / 29.20 | 59.25 / 34.05 | 3.732 (3.702) | 27.31 (27.79) |
+  | 49 | 0.00025 (last) | 53.42 / 29.02 | 52.96 / 29.98 | 53.28 / 29.10 | 59.50 / 33.80 | 3.728 (3.697) | 27.41 (27.90) |
+
+  Reading (n=1, internal validation, PGD-10 only):
+  1. **No gain; PGD-10 is lower.** Last raw weights on full val: **+0.52 clean / -1.21 PGD-10**
+     against baseline+EMA (about 132 / 311 images of 25,620; about 1.2 / 3.0 two-run SE of about
+     0.44 / 0.40pt; PGD-10 about 3.4x the MobileNetV4-S seed spread of 0.36pt). Complement +0.53 /
+     -1.29, last EMA +0.53 / -1.05, best raw +0.57 / -0.85, best EMA +0.87 / -0.75: every checkpoint
+     has the same signs. Under the plan's rule (PGD-10 vs baseline+EMA: >= 1.5 effect, 0.5-1.5
+     pending, < 0.5 none) the magnitude is in the "pending" band, in the losing direction.
+  2. **Share of the SiLU gain recovered: -47%** (-1.21 of +2.56). Against SiLU directly: -1.08 /
+     -3.78. SAT's ResNet-50 result (smooth backward in the weight update alone: 33.0 -> 35.8, training
+     cross-entropy lower) does not carry over to MobileNetV4-S under PGD-3 here.
+  3. **Where it diverges: after the first LR decay, in the training fit.** Through warmup and the
+     peak-LR stage the training loss matches the baseline to within 0.003 at every epoch listed
+     (epochs 4-24), and training-batch robust accuracy to within 0.05pt. Held-out subset PGD-10 is
+     level or slightly ahead (+0.42 at epoch 9, +0.88 at 14, +0.04 at 24); subset clean leads by up to
+     +1.58 (epoch 24). From the first decay on, the training loss falls less than the baseline's (+0.009
+     at epoch 25, +0.021 at 37, +0.031 at 49) and training-batch robust accuracy ends 0.49pt lower;
+     subset PGD-10 falls behind (-0.52 at epoch 37, -0.90 at 38, -0.96 at 49) and the probe ends
+     -0.30 / -0.60. In this arm the training attack uses true gradients, so its training loss and
+     training-batch robust accuracy are comparable with the baseline (the review P2-5 caveat applies
+     only to `attack_and_optimizer`). So at seed 0 the surrogate fits the training data worse, the
+     opposite of the SAT report and of SiLU on MobileNetV4-S (train loss 3.608 vs 3.697). Why the
+     surrogate stops helping at low LR (for example, a mismatch between the surrogate direction and the
+     true loss landscape that matters once steps are small) is not tested.
+  4. **EMA: as in the baseline.** EMA minus raw at the end +0.12 / +0.26 ("no effect", < 0.5pt;
+     baseline +0.10 / +0.10). EMA warmup lag as in the baseline: epoch 9 EMA subset 5.22 / 2.82
+     (baseline 5.30 / 2.84); EMA passes raw at epoch 14 (PGD-10) and 15 (clean).
+  5. **Best and last; trains normally.** Best raw is epoch 47 (subset 29.26 vs last 29.02); on full val
+     it is -0.06 / +0.23 against last (`robust_overfit_gap_full` 0.23pt, inside one val SE). Best EMA
+     is epoch 37 (the end of the middle stage), 0.10pt above last EMA on full-val PGD-10. Subset raw
+     PGD-10 never falls more than 0.94pt below its running maximum (epoch 18, 20.08 after 21.02 at
+     epoch 16); the catastrophic-overfitting guard never fires. Probe minus full val at the end: +5.13
+     clean / +4.31 PGD-10 (baseline +5.95 / +3.69). Training-batch robust accuracy 27.41% < full-val
+     PGD-10 29.49%: the val >= train signature persists.
+  6. **Cost: not comparable with the baseline.** 37.72 h from start to finish on Ferret, 438-492 img/s
+     (per-epoch training time about 2,600-2,730 s). Baseline+EMA ran 15.52 h at 1,175-1,181 img/s on
+     Hamster with CUDA Graphs (deterministic); host, GPU, execution mode and the surrogate all differ,
+     so the surrogate's own cost is not separated here.
+
+  Caveats: one seed. The comparison crosses host (Ferret vs Hamster), source SHA (`8f51192` vs
+  `d836c03`) and execution mode (non-deterministic eager vs deterministic CUDA Graphs). The setting
+  checks measured so far are 0.00 (MobileNetV4-S, same host), -0.06 to -0.29 (other models,
+  non-deterministic, some across hosts), all below the 1.21pt here, but none covers this host and mode
+  for MobileNetV4-S. No telemetry in the run confirms per step that the surrogate was active; the
+  evidence is the resolved config (`relu_surrogate_gradient: {beta: 10.0, scope: optimizer}`), the
+  tested code path at the source SHA, and the training loss diverging from the baseline only after the
+  first decay. Evaluation is CE PGD-10 only. Checkpoint sha256 was not computed in this postrun.
+  `epoch-metrics.parquet` sha256 `ab8856c9...`, `sample-stats-train.parquet` sha256 `72cc2586...`
+  (from the run-bundle manifest). W&B `lightweight-imagenet-at`, same run id (one segment).
+- 2026-10-18 (postrun): **smooth backward, attack and optimizer, MobileNetV4-S seed 0 completed.**
+  `plan0107-mnv4s-smoothgrad-both-s0-v1` (hand-run; `environment.json` records kernel 7.0.0-28, i.e.
+  Ferret, where this plan queued the three runs; the GPU index is not recorded) ran 50/50 epochs from
+  2026-10-15 08:47 to 2026-10-17 01:11 UTC (40.4 h). `run-bundle/completion.json` and the manifest read
+  `completed`, `error-marker.txt` reads "no application error recorded", and the watcher re-derived it
+  as terminal and successful. All 50 epoch rows are present, one W&B segment, no resume, no `ERROR` line
+  in the wandb internal log. `best.pt` (epoch 26), `best-ema.pt` (epoch 29), `last.pt` and
+  `epoch-049.pt` are on disk. Nothing is imported into `docs/experiments/`: no aggregator exists for this
+  contract. Numbers are read from the run-bundle manifest and `epoch-metrics.jsonl` via
+  `scripts/ardx/read_bundle.py`; the baseline+EMA trajectory is read the same way from
+  `plan0103-phase2-mnv4s-baseline-ema-s0-v1`.
+
+  Fixed identity: config `imagenet_mobilenetv4_pgd_at_phase2_smoothgrad_both.yaml` (config hash
+  `d0a662f5...`). ImageNet-1k (original images, content `ae033613...`), MobileNetV4-Conv-S
+  (`mobilenetv4_conv_small_imagenet`, ReLU forward) random init, plain PGD-AT, no teacher, 224 px.
+  `training.relu_surrogate_gradient`: beta 10, scope `attack_and_optimizer` (softplus-derivative
+  backward in the training attack and the weight update). Training and evaluation-attack seed 0 (split
+  seed 20260911). Training attack CE PGD-3, l_inf eps 4/255, step 8/765, random start. Selection and
+  validation attack PGD-10, same eps and step, random start, eval mode, true ReLU gradients. SGD
+  (Nesterov, momentum 0.9, wd 1e-4), peak LR 0.025, warmup_multistep (10-epoch warmup, x0.1 at epochs
+  25 and 38), 50 epochs. Phase 2 template: 5,000-image selection subset, EMA 0.9999. World size 1,
+  global batch 128, local BN, fp32, non-deterministic with cudnn_benchmark, eager. Protocol
+  `controlled_imagenet_stage02_init_lr_grid_v1`. Source SHA `650fbed386adc8fbc201c94fc1e079369cf77f5f`
+  (worktree `source-650fbed386ad`, clean; it contains the 8f51192 implementation plus the never-learned
+  guard). "Full val" is the 25,620 held-out original train images, "subset" the 5,000-image selection
+  subset of it, "complement" the other 20,620, "probe" 2,000 training images attacked in eval mode with
+  the true-gradient PGD-10.
+
+  Results (internal validation, PGD-10 l_inf 4/255; never an official test result):
+  1. **Last (ep 49) raw weights: 55.91% clean / 23.52% PGD-10.** Against baseline+EMA (53.85 / 30.71):
+     +2.06 clean / -7.19 PGD-10 (about 1,842 images; about 4.7 / 18 two-run SE; about 20x the
+     MobileNetV4-S seed spread of 0.36pt). Against SiLU (55.45 / 33.27): +0.46 / -9.75. Share of the
+     SiLU PGD-10 gain recovered: none (the run moves PGD-10 the other way, -2.8x the SiLU gain).
+  2. Complement 56.18 / 23.73. Last EMA 55.94 / 23.91 (against baseline EMA 53.95 / 30.80: +1.99 /
+     -6.89; EMA minus raw +0.04 / +0.38, "no effect").
+  3. Best raw (ep 26, chosen on the subset) 51.71 / 24.94; best EMA (ep 29) 53.25 / 26.31. Best minus
+     last on full val PGD-10 is 1.42pt (raw).
+  4. **When the gap opens.** Subset PGD-10, this run minus baseline+EMA (raw): -0.62 at epoch 9, -1.86 at
+     24, -2.98 at 26, -4.26 at 30, -5.60 at 37, -6.46 at 44, -7.30 at 49. Subset clean is ahead from the
+     warmup on (+0.68 at 9, +2.14 at 24, +1.80 at 49). Subset PGD-10 peaks at 24.64% (epochs 26-27) and
+     then falls 1.96pt to 22.68% while clean keeps rising; the baseline rises to the end (29.98%).
+  5. **The loss is on training images too, so it is not a generalization gap.** Probe PGD-10 (true
+     gradient) ends at 27.40% against the baseline's 34.40% (-7.00); probe clean 61.40 vs 59.80
+     (+1.60). Probe minus full val PGD-10 is +3.88 (baseline +3.69). Among the epochs read (0, 1, 4, 9, 14, 19, 24-27, 30,
+     34, 37-39, 44, 48, 49), probe PGD-10 is highest at 28.0% at epoch 27 and ends at 27.4.
+  6. Training loss (3.535 vs 3.697) and training-batch robust accuracy (29.94% vs 27.90%) are measured
+     under the surrogate-gradient training attack, so by the reading rule above they are not comparable
+     across arms. Within this run, the training-batch robust accuracy under the PGD-3 surrogate attack
+     (29.94%, train mode) is above the probe's true-gradient PGD-10 (27.40%, eval mode); in the baseline
+     it is below (27.90 vs 34.40). That is consistent with the surrogate training attack being weaker
+     against the true network, but the two measurements differ in steps, mode and images, so it is not a
+     direct strength measurement.
+  7. The run was not stopped by any guard; no collapse (983 distinct subset predictions at the end).
+     Throughput 433-499 img/s on shared Ferret (baseline+EMA 1,175-1,181 img/s on Hamster with CUDA
+     Graphs, deterministic), so the time cost of the surrogate itself is not separable from host and
+     execution mode. Peak allocated 3.74 GB.
+
+  Caveats: one seed. The comparison crosses source SHA (`650fbed` vs `d836c03`), host (Ferret vs
+  Hamster) and execution mode (non-deterministic eager vs deterministic CUDA Graphs); measured setting
+  effects so far are 0.3pt or less, about 1/20 of this difference. No AutoAttack, no official
+  evaluation. The SAT result this arm tests (ResNet-50, PGD-1: 33.0 -> 36.9) did not carry over to
+  MobileNetV4-S with PGD-3 at beta 10 on this seed.
+
+  Decision under the rule above: PGD-10 -7.19 is beyond the 1.5pt tier in the losing direction, so this
+  arm does not reach SiLU-level gain and does not become the distillation base model. What follows
+  (close this scope, try another beta or annealing, or read it together with the optimizer-only and
+  hard-swish runs, recorded separately) is the human's decision (packet).
 
