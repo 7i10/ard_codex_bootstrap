@@ -339,16 +339,14 @@ async function main() {
     BODY[type](slide, s);
   }
 
-  // references (IEEE strings, numbered by first use): one page when they fit, else split evenly
-  const refSec = doc.references_section || "参考文献";
-  const PER_PAGE = doc.references_per_page || 11;
-  const pages = Math.ceil(order.length / PER_PAGE), per = Math.ceil(order.length / Math.max(pages, 1));
-  for (let p = 0; p < pages; p++) {
-    const chunk = order.slice(p * per, p * per + per);
+  // references (IEEE strings, numbered by first use): always one page; the font shrinks to fit
+  if (order.length) {
+    const refSec = doc.references_section || "参考文献";
+    const n = order.length, fsz = n <= 10 ? 13 : n <= 13 ? 12 : n <= 16 ? 11 : n <= 20 ? 10 : 9;
     const slide = pres.addSlide({ masterName: "REFS" });
-    addFrame(slide, { section: refSec, title: pages > 1 ? `参考文献 ${p + 1}/${pages}` : "参考文献" }, []);
-    const items = chunk.map((k, i) => ({ text: `[${num(k)}] ${refs[k]}`, options: { fontSize: 12, color: T.text, paraSpaceAfter: 5, breakLine: i < chunk.length - 1 } }));
-    slide.addText(items, tb({ x: M, y: 0.8, w: W - 2 * M, h: FOOT_Y - 0.9 }));
+    addFrame(slide, { section: refSec, title: "参考文献" }, []);
+    const items = order.map((k, i) => ({ text: `[${num(k)}] ${refs[k]}`, options: { fontSize: fsz, color: T.text, paraSpaceAfter: fsz <= 10 ? 2 : 4, breakLine: i < n - 1 } }));
+    slide.addText(items, tb({ x: M, y: 0.75, w: W - 2 * M, h: FOOT_Y - 0.82, fit: "shrink" }));
   }
 
   await pres.writeFile({ fileName: out });
