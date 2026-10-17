@@ -616,3 +616,13 @@ run must be measured on the GPU. The fold CLI's own check runs on CPU in float64
 arithmetic.
 Config: `configs/scientific/imagenet_mobilenetv4_reparam_pgd_at_phase2_random_lr0025.yaml` (the hard-swish
 lr 0.025 config with only `student.architecture` and `tracking.group` changed).
+- 2026-10-18: GPU training-step cost of the reparam student.
+  - Setup: Hamster GPU 1, co-located with a production run, so only the ratio is meaningful. PGD-3 plus
+    an SGD step, batch 128, 224 px, nondeterministic with cudnn_benchmark.
+  - Throughput: plain MobileNetV4-S 805-812 img/s; reparam 330 img/s. The reparam step costs 2.45x the
+    plain step, more than the 1.78x MAC ratio, because the extra BNs and branch sums are memory-bound.
+  - Peak memory: 4.5 GiB, fine for any host.
+  - Measured setting throughput (2026-10-11): plain S 1364 img/s, MobileNetV4-M 522 img/s, so M costs
+    2.6x S. A 50-epoch reparam S run therefore costs about the same 4090 time as a 50-epoch M run. The
+    matched-4090-time comparison against M holds under the project's efficiency metric. Reference
+    points: plain S 50 ep (1x), plain S 100 ep (2x), reparam S 50 ep (about 2.4x), M 50 ep (about 2.6x).
